@@ -7,6 +7,7 @@ use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Enums\Vouchers\VoucherType;
 use App\Exceptions\Vouchers\VoucherNotDeletableException;
+use App\Exceptions\Vouchers\VoucherNotFoundException;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
@@ -181,6 +182,16 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('Voucher not found');
 
         $this->service->delete($voucherId);
+    }
+
+    public function testDeleteThrowsVoucherNotFoundExceptionWhenMissing(): void
+    {
+        $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('find')->with(99)->andReturn(null);
+
+        $this->expectException(VoucherNotFoundException::class);
+
+        $this->service->delete(99);
     }
 
     public function testCheckDeletable()
@@ -387,6 +398,26 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertEquals($expectedCount, $result);
     }
 
+    public function testGetVoucherByIdReturnsVoucher(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+
+        $this->repository->expects('find')->with(3)->andReturn($voucher);
+
+        $result = $this->service->getVoucherById(3);
+
+        $this->assertSame($voucher, $result);
+    }
+
+    public function testGetVoucherByIdReturnsNullWhenNotFound(): void
+    {
+        $this->repository->expects('find')->with(0)->andReturn(null);
+
+        $result = $this->service->getVoucherById(0);
+
+        $this->assertNull($result);
+    }
+
     public function testCreateVoucherWithProducts()
     {
         $data = [
@@ -565,6 +596,89 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Voucher::class, $result);
     }
+
+    public function testCreateDoesNotSyncRelationsWhenNotProvided(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+
+        $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('create')->andReturn($voucher);
+        $this->repository->expects('syncProducts')->never();
+        $this->repository->expects('syncCategories')->never();
+        $this->repository->expects('syncBrands')->never();
+
+        $result = $this->service->create(['code' => 'CLEAN']);
+
+        $this->assertSame($voucher, $result);
+    }
+
+    public function testCreateStripsRelationKeysFromMainPayload(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+
+        $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->repository
+            ->expects('create')
+            ->withArgs(function (array $data) {
+                return !array_key_exists('product_ids', $data)
+                    && !array_key_exists('category_ids', $data)
+                    && !array_key_exists('brand_ids', $data);
+            })
+            ->andReturn($voucher);
+
+        $this->repository->allows('syncProducts');
+        $this->repository->allows('syncCategories');
+        $this->repository->allows('syncBrands');
+
+        $result = $this->service->create([
+            'code' => 'X',
+            'product_ids' => [1],
+            'category_ids' => [2],
+            'brand_ids' => [3],
+        ]);
+
+        $this->assertSame($voucher, $result);
+    }
+
+    public function testUpdateSyncsRelationsWhenProvided(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $voucher->id = 1;
+
+        $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('update')->andReturn($voucher);
+        $this->repository->expects('syncProducts')->with(1, [7])->once();
+        $this->repository->expects('syncCategories')->with(1, [8])->once();
+        $this->repository->expects('syncBrands')->with(1, [9])->once();
+
+        $result = $this->service->update(1, [
+            'code' => 'X',
+            'product_ids' => [7],
+            'category_ids' => [8],
+            'brand_ids' => [9],
+        ]);
+
+        $this->assertSame($voucher, $result);
+    }
+
+    public function testUpdateDoesNotSyncRelationsWhenNotProvided(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+
+        $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('update')->andReturn($voucher);
+        $this->repository->expects('syncProducts')->never();
+        $this->repository->expects('syncCategories')->never();
+        $this->repository->expects('syncBrands')->never();
+
+        $result = $this->service->update(1, ['code' => 'Y']);
+
+        $this->assertSame($voucher, $result);
+    }
+
 
     public function testUpdateVoucherCategories()
     {
@@ -952,6 +1066,113 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertEquals(0, $result->discount);
     }
 
+    public function testValidateVoucherForSubscriptionUsesBasePlanPriceWhenNoTier(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 29.99;
+        $plan->pricingTiers = collect([]);
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+        $this->subscriptionPlanRepository->expects('find')->andReturn($plan);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                return $ctx->orderValue == 29.99;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForSubscription('CODE', 1);
+
+        $this->assertSame($validResult, $result);
+    }
+
+    public function testValidateVoucherForSubscriptionReturnsInvalidWhenTierNotFound(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 29.99;
+        $plan->pricingTiers = collect([]);
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+        $this->subscriptionPlanRepository->expects('find')->andReturn($plan);
+
+        $result = $this->service->validateVoucherForSubscription('CODE', 1, null, 999);
+
+        $this->assertFalse($result->valid);
+        $this->assertSame('Invalid pricing tier', $result->message);
+    }
+
+    public function testValidateVoucherForSubscriptionUsesDigitalPriceForDigitalType(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $tier = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->id = 1;
+        $tier->digital_price = 15.00;
+        $tier->digital_sale_price = 12.00;
+        $tier->price = 20.00;
+        $tier->sale_price = null;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 25.00;
+        $plan->pricingTiers = collect([$tier]);
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+        $this->subscriptionPlanRepository->expects('find')->andReturn($plan);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                // min(15.00, 12.00) = 12.00
+                return $ctx->orderValue == 15;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForSubscription(
+            'CODE', 1, null, 1, SubscriptionType::DIGITAL->value
+        );
+
+        $this->assertSame($validResult, $result);
+    }
+
+    public function testValidateVoucherForSubscriptionUsesPhysicalPriceWhenNotDigital(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $tier = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->id = 1;
+        $tier->digital_price = 15.00;
+        $tier->digital_sale_price = null;
+        $tier->price = 20.00;
+        $tier->sale_price = 18.00;
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->price = 25.00;
+        $plan->pricingTiers = collect([$tier]);
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+        $this->subscriptionPlanRepository->expects('find')->andReturn($plan);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                // min(20.00, 18.00) = 18.00
+                return $ctx->orderValue == 20;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForSubscription('CODE', 1, null, 1, 'physical');
+
+        $this->assertSame($validResult, $result);
+    }
+
     public function testValidateVoucherForSubscriptionNotApplicableToSubscriptions()
     {
         $voucher = Mockery::mock(Voucher::class)->makePartial();
@@ -1131,6 +1352,79 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->assertEquals(80.00, $result->eligibleSubtotal); // 50 + 30
         $this->assertCount(2, $result->eligibleItems);
         $this->assertEquals(8.00, $result->discount);
+    }
+
+    public function testValidateVoucherForCheckoutReturnsInvalidWhenNotFound(): void
+    {
+        $this->repository->expects('findByCode')->with('NONE')->andReturn(null);
+
+        $result = $this->service->validateVoucherForCheckout('NONE', []);
+
+        $this->assertFalse($result->valid);
+        $this->assertSame('Voucher not found', $result->message);
+    }
+
+    public function testValidateVoucherForCheckoutDetectsOfferDiscountFromItemType(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $cartItems = [['item_type' => 'offer', 'price' => 10, 'base_price' => 10]];
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                return $ctx->hasOfferDiscount === true;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForCheckout('CODE', $cartItems);
+
+        $this->assertSame($validResult, $result);
+    }
+
+    public function testValidateVoucherForCheckoutDetectsOfferDiscountFromPriceDiff(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $cartItems = [['price' => 8.0, 'base_price' => 10.0]];
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                return $ctx->hasOfferDiscount === true;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForCheckout('CODE', $cartItems);
+
+        $this->assertSame($validResult, $result);
+    }
+
+    public function testValidateVoucherForCheckoutPassesFalseWhenNoOfferDiscount(): void
+    {
+        $voucher = Mockery::mock(Voucher::class)->makePartial();
+        $validResult = Mockery::mock(VoucherValidationResult::class)->makePartial();
+
+        $cartItems = [['price' => 10.0, 'base_price' => 10.0]];
+
+        $this->repository->expects('findByCode')->andReturn($voucher);
+
+        $this->validationService
+            ->expects('validate')
+            ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
+                return $ctx->hasOfferDiscount === false;
+            })
+            ->andReturn($validResult);
+
+        $result = $this->service->validateVoucherForCheckout('CODE', $cartItems);
+
+        $this->assertSame($validResult, $result);
     }
 
     public function testInvalidPlanReturnsInvalidResult()

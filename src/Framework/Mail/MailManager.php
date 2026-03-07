@@ -75,4 +75,9 @@ class MailManager
     {
         return $this->mailer;
     }
+
+    public static function reset(): void
+    {
+        self::$instance = null;
+    }
 }

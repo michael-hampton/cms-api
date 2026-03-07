@@ -2,18 +2,18 @@
 
 namespace App\DTO\Subscriptions;
 
-final class SubscriptionPricing
+class SubscriptionPricing
 {
     public function __construct(
-        public readonly int    $subtotalCents,
-        public readonly int    $discountCents,
-        public readonly int    $shippingCents,
-        public readonly int    $taxCents,
-        public readonly int    $totalCents,
-        public readonly string $deliveryType,
-        public readonly ?int   $voucherId = null,
-        public readonly ?array $shippingAddressSnapshot = [],
-        public readonly ?float $originalAmount = 0
+        public int    $subtotalCents,
+        public int    $discountCents,
+        public int    $shippingCents,
+        public int    $taxCents,
+        public int    $totalCents,
+        public string $deliveryType,
+        public ?int   $voucherId = null,
+        public ?array $shippingAddressSnapshot = [],
+        public ?float $originalAmount = 0
     )
     {
     }

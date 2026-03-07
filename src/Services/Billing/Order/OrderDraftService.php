@@ -23,8 +23,8 @@ class OrderDraftService
     }
 
     /**
-     * Create order from subscriptions in pending status
-     * This happens BEFORE payment
+     * Create order from subscriptions in pending status.
+     * This happens BEFORE payment.
      */
     public function createPendingOrder(
         array              $subscriptionsWithPricing,
@@ -39,10 +39,11 @@ class OrderDraftService
         $totalSubtotalCents = 0;
         $totalShippingCents = 0;
         $totalDiscountCents = 0;
+        // FIX: accumulate totalCents inside the loop instead of reading $pricing
+        // after the loop ends (which only held the last iteration's value).
+        $totalCents = 0;
 
-        // Build order items and calculate totals
         foreach ($subscriptionsWithPricing as $subData) {
-
             $subscription = $subData['subscription'];
             /** @var SubscriptionPricing $pricing */
             $pricing = $subData['pricing'];
@@ -50,6 +51,7 @@ class OrderDraftService
             $totalSubtotalCents += $pricing->subtotalCents;
             $totalShippingCents += $pricing->shippingCents;
             $totalDiscountCents += $pricing->discountCents;
+            $totalCents += $pricing->totalCents;
 
             $meta = $subData['meta'] ?? [];
 
@@ -60,17 +62,17 @@ class OrderDraftService
                 'quantity' => 1,
                 'unit_price' => $pricing->getSubtotal(),
                 'subtotal' => $pricing->getSubtotal(),
-                'tax' => 0, // Will be calculated below
+                'tax' => 0,
                 'total' => $pricing->getSubtotal() + $pricing->getShipping(),
                 'preorder_enabled' => $meta['is_preorder'] ?? false,
                 'expected_ship_date' => $meta['expected_ship_date'] ?? $meta['estimated_delivery_to'] ?? null,
                 'metadata' => array_merge(
-                    $meta, // meta overrides defaults if keys collide
+                    $meta,
                     [
                         'subscription_id' => $subscription->id,
-                        'delivery_type' => $pricing->deliveryType
+                        'delivery_type' => $pricing->deliveryType,
                     ]
-                )
+                ),
             ];
         }
 
@@ -86,33 +88,26 @@ class OrderDraftService
             $postalCode,
             $member
         );
-
         $totalTaxCents = $taxResult->taxCents;
 
-        // Distribute tax proportionally to items using TaxCalculatorService
         if ($totalTaxCents > 0) {
             $orderItems = $this->taxCalculatorService->distributeTaxToItems(
                 $orderItems,
                 $totalTaxCents
             );
 
-            // Update item totals after tax distribution
             foreach ($orderItems as &$item) {
                 $item['total'] = $item['subtotal'] + $item['tax'] +
                     ($item['metadata']['delivery_type'] === SubscriptionType::PRINTED->value
                         ? ($item['total'] - $item['subtotal'])
                         : 0);
             }
+            unset($item);
         }
 
-        //if (!empty($resolvedDiscounts)) {
-        //  $totalDiscountCents = $resolvedDiscounts->getTotalDiscountCents();
-        // $totalCents = $resolvedDiscounts->finalSubtotalCents + $totalShippingCents + $totalTaxCents;
-        //} else {
-        $totalCents = $pricing->totalCents + $totalTaxCents;
-        //}
+        // Tax is not included in individual pricing->totalCents, add it once here
+        $totalCents += $totalTaxCents;
 
-        // Prepare order data
         $orderData = [
             'user_id' => $member->id,
             'status' => 'pending',
@@ -123,13 +118,15 @@ class OrderDraftService
             'shipping' => $totalShippingCents / 100,
             'discount' => $totalDiscountCents / 100,
             'total' => $totalCents / 100,
-            'currency' => 'USD', // Should be from config or plan
+            'currency' => 'USD',
             'reward_discount' => $resolvedDiscounts ? $resolvedDiscounts->rewardDiscountCents / 100 : 0,
             'offer_discount' => $resolvedDiscounts ? $resolvedDiscounts->offerDiscountCents / 100 : 0,
             'voucher_discount' => $resolvedDiscounts ? $resolvedDiscounts->voucherDiscountCents / 100 : 0,
             'tiered_discount' => $resolvedDiscounts ? $resolvedDiscounts->tieredDiscountCents / 100 : 0,
-            'merchant_funded' => $resolvedDiscounts->merchantFundedCents / 100,
-            'platform_funded' => $resolvedDiscounts->platformFundedCents / 100,
+            // FIX: these were accessed unconditionally on the original, causing a fatal
+            // TypeError when $resolvedDiscounts is null.
+            'merchant_funded' => $resolvedDiscounts ? $resolvedDiscounts->merchantFundedCents / 100 : 0,
+            'platform_funded' => $resolvedDiscounts ? $resolvedDiscounts->platformFundedCents / 100 : 0,
         ];
 
         if ($isFreeOrder) {
@@ -144,19 +141,18 @@ class OrderDraftService
             $orderData['tiered_discount'] = 0;
         }
 
-        // Add subscription IDs to order
         $subscriptionIds = array_map(fn($s) => $s['subscription']->id, $subscriptionsWithPricing);
+
         if (count($subscriptionIds) === 1) {
             $orderData['one_time_subscription_id'] = $subscriptionIds[0];
         } else {
             $orderData['one_time_subscription_id'] = $subscriptionIds[0];
             $orderData['metadata'] = [
                 'subscription_ids' => $subscriptionIds,
-                'multiple_subscriptions' => true
+                'multiple_subscriptions' => true,
             ];
         }
 
-        // Add shipping address if any subscription requires it
         $requiresShipping = $this->hasAnyPrintDelivery($subscriptionsWithPricing);
         if ($requiresShipping) {
             if (!empty($checkoutData['saved_address'])) {
@@ -181,7 +177,7 @@ class OrderDraftService
     }
 
     /**
-     * Attach payment intent ID to order AFTER Stripe call succeeds
+     * Attach payment intent ID to order AFTER Stripe call succeeds.
      */
     public function attachPaymentIntent(Order $order, array $paymentResult): void
     {

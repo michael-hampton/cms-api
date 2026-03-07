@@ -18,6 +18,27 @@ class NewsletterControllerTest extends FunctionalTestCase
 
     private $manager;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $config = include __DIR__ . '/../../../../../config/mail.php';
+        $config['driver'] = 'array';
+
+        Config::set('mail', $config);
+
+        MailManager::reset(); // Destroy the cached singleton
+        $this->manager = MailManager::getInstance(); // Rebuild with array driver
+
+        ArrayMailer::clear();
+    }
+
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+    }
+
     public function test_index_returns_all_active_newsletters(): void
     {
         // Arrange
@@ -744,26 +765,6 @@ class NewsletterControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
-    }
-
-
-    protected function setUp(): void
-    {
-        $config = include __DIR__ . '/../../../../../config/mail.php';
-        $config['driver'] = 'array';
-
-        Config::set('mail', $config);
-
-        $this->manager = MailManager::getInstance();
-        ArrayMailer::clear();
-
-        parent::setUp();
-    }
-
-    protected function tearDown(): void
-    {
-        parent::tearDown();
-
     }
 
     private function createNewsletterIssue(Newsletter $newsletter, array $attributes = []): NewsletterIssue

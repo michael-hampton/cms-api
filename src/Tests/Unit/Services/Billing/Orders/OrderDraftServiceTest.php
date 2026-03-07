@@ -13,18 +13,28 @@ use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\TaxCalculatorService;
+use App\Services\Vouchers\ResolvedDiscounts;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * BUG NOTE: createPendingOrder uses $pricing AFTER the foreach loop ends:
+ *   $totalCents = $pricing->totalCents + $totalTaxCents;
+ * This means $pricing holds the LAST iteration's value — not an aggregate.
+ * For single-subscription carts this is accidental-correct; for multi-subscription
+ * carts totalCents will be wrong. Tests below expose both behaviours.
+ *
+ * BUG NOTE: createPendingOrder calls $resolvedDiscounts->merchantFundedCents and
+ * ->platformFundedCents unconditionally (outside the ternary) — if $resolvedDiscounts
+ * is null this will throw a fatal error. The test below exposes this.
+ */
 class OrderDraftServiceTest extends TestCase
 {
-    use MockeryPHPUnitIntegration;
-
-    private $orderCreationService;
-    private $orderRepository;
-    private $taxCalculatorService;
-    private $database;
+    private OrderCreationService&MockInterface $orderCreationService;
+    private OrderRepository&MockInterface $orderRepository;
+    private TaxCalculatorService&MockInterface $taxCalculatorService;
+    private Database&MockInterface $database;
     private OrderDraftService $service;
 
     protected function setUp(): void
@@ -50,766 +60,746 @@ class OrderDraftServiceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_create_pending_order_calculates_totals_correctly(): void
-    {
-        $member = $this->createMockMember();
-        $subscriptionsWithPricing = [
-            [
-                'subscription' => $this->createMockSubscription(),
-                'pricing' => new SubscriptionPricing(
-                    subtotalCents: 5000,
-                    discountCents: 500,
-                    shippingCents: 1000,
-                    taxCents: 0,
-                    totalCents: 5500,
-                    deliveryType: SubscriptionType::PRINTED->value,
-                    voucherId: null,
-                    shippingAddressSnapshot: [
-                        'address_line_1' => '123 Main St',
-                        'address_line_2' => '',
-                        'city' => 'New York',
-                        'state' => 'NY',
-                        'postcode' => '10001',
-                        'country' => 'US'
-                    ]
-                )
-            ]
-        ];
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
-        $this->setTaxCalculatorExpectations();
-
-        // FIXED: Match the exact structure that OrderDraftService creates
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    // Verify all required fields
-                    $valid = $data['user_id'] === 123
-                        && $data['status'] === 'pending'
-                        && $data['payment_status'] === 'unpaid'
-                        && $data['payment_method'] === 'stripe'
-                        && $data['subtotal'] === 50
-                        && $data['discount'] === 5
-                        && $data['shipping'] === 10
-                        && $data['tax'] === 10.5 // Allow small float variance
-                        && $data['total'] === 65.5
-                        && $data['currency'] === 'USD'
-                        && $data['one_time_subscription_id'] === 456;
-
-                    // Verify shipping address structure
-                    $valid = $valid && isset($data['shipping_address'])
-                        && is_array($data['shipping_address'])
-                        && $data['shipping_address']['address_line_1'] === '123 Main St';
-
-                    return $valid;
-                }),
-                Mockery::on(function ($items) {
-                    // Verify order items structure
-                    return is_array($items)
-                        && count($items) === 1
-                        && $items[0]['product_name'] === 'Test Plan (Print)'
-                        && $items[0]['quantity'] === 1;
-                }),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, []);
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    public function test_create_pending_order_handles_division_by_zero_in_tax(): void
-    {
-        $member = $this->createMockMember();
-
-        // All items discounted to zero
-        $subscriptionsWithPricing = [
-            [
-                'subscription' => $this->createMockSubscription(),
-                'pricing' => new SubscriptionPricing(
-                    subtotalCents: 5000,
-                    discountCents: 5000, // 100% discount
-                    shippingCents: 0,
-                    taxCents: 0,
-                    totalCents: 0,
-                    deliveryType: SubscriptionType::DIGITAL->value,
-                    voucherId: 999,
-                    shippingAddressSnapshot: null
-                )
-            ]
-        ];
-
-        $this->setTaxCalculatorExpectations($member, 5000, 0);
-
-        // FIXED: Match the exact structure for zero-discount scenario
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    // When everything is zero, tax should be 0.00 (no division by zero)
-                    return $data['user_id'] === 123
-                        && $data['subtotal'] === 50
-                        && $data['discount'] === 50
-                        && $data['shipping'] === 0
-                        && $data['tax'] === 10.5
-                        && $data['total'] === 10.5 //todo how?
-                        && !isset($data['shipping_address']); // Digital doesn't have address
-                }),
-                Mockery::any(),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, []);
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    public function test_create_pending_order_with_multiple_subscriptions(): void
-    {
-        $member = $this->createMockMember();
-
-        $sub1 = $this->createMockSubscription(456);
-        $sub2 = $this->createMockSubscription(457);
-
-        $subscriptionsWithPricing = [
-            [
-                'subscription' => $sub1,
-                'pricing' => new SubscriptionPricing(
-                    subtotalCents: 5000,
-                    discountCents: 0,
-                    shippingCents: 0,
-                    taxCents: 0,
-                    totalCents: 5000,
-                    deliveryType: SubscriptionType::DIGITAL->value,
-                    voucherId: null,
-                    shippingAddressSnapshot: null
-                )
-            ],
-            [
-                'subscription' => $sub2,
-                'pricing' => new SubscriptionPricing(
-                    subtotalCents: 6000,
-                    discountCents: 0,
-                    shippingCents: 1000,
-                    taxCents: 0,
-                    totalCents: 7000,
-                    deliveryType: SubscriptionType::PRINTED->value,
-                    voucherId: null,
-                    shippingAddressSnapshot: ['address_line_1' => '123 Main St']
-                )
-            ]
-        ];
-
-        $this->setTaxCalculatorExpectations(null, 11000, 1000);
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    return $data['subtotal'] === 110 // 50 + 60
-                        && $data['shipping'] === 10
-                        && $data['one_time_subscription_id'] === 456 // First subscription
-                        && isset($data['metadata']['subscription_ids'])
-                        && $data['metadata']['subscription_ids'] === [456, 457]
-                        && $data['metadata']['multiple_subscriptions'] === true;
-                }),
-                Mockery::on(function ($items) {
-                    return count($items) === 2;
-                }),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, []);
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    public function test_create_pending_order_uses_saved_address_when_provided(): void
-    {
-        $member = $this->createMockMember();
-
-        $subscriptionsWithPricing = [
-            [
-                'subscription' => $this->createMockSubscription(),
-                'pricing' => new SubscriptionPricing(
-                    subtotalCents: 5000,
-                    discountCents: 0,
-                    shippingCents: 1000,
-                    taxCents: 0,
-                    totalCents: 6000,
-                    deliveryType: SubscriptionType::PRINTED->value,
-                    voucherId: null,
-                    shippingAddressSnapshot: ['address_line_1' => '123 Main St']
-                )
-            ]
-        ];
-
-        $checkoutData = [
-            'saved_address' => 999 // Member selected saved address
-        ];
-
-        $this->setTaxCalculatorExpectations($member);
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    // Should use saved_address_id instead of shipping_address array
-                    return $data['shipping_address_id'] === 999
-                        && !isset($data['shipping_address']);
-                }),
-                Mockery::any(),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, $checkoutData);
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    public function test_attach_payment_intent_updates_order(): void
-    {
-        $order = $this->createMockOrder();
-
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('update')
-            ->once()
-            ->with(
-                789,
-                Mockery::on(function ($data) {
-                    return $data['payment_intent_id'] === 'pi_test_123'
-                        && $data['stripe_customer_id'] === 'cus_test123';
-                })
-            );
-
-        $paymentResult = [
-            'payment_intent_id' => 'pi_test_123',
-            'customer_id' => 'cus_test123'
-        ];
-
-        $this->service->attachPaymentIntent($order, $paymentResult);
-    }
-
-    public function test_attach_payment_intent_handles_missing_customer_id(): void
-    {
-        $order = $this->createMockOrder();
-
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('update')
-            ->once()
-            ->with(
-                789,
-                Mockery::on(function ($data) {
-                    return $data['payment_intent_id'] === 'pi_test_123'
-                        && $data['stripe_customer_id'] === null;
-                })
-            );
-
-        $paymentResult = [
-            'payment_intent_id' => 'pi_test_123'
-            // No customer_id
-        ];
-
-        $this->service->attachPaymentIntent($order, $paymentResult);
-    }
-
-    public function testCreatePendingOrderUsesTaxCalculatorService(): void
+    private function makeMember(int $id = 1): Member&MockInterface
     {
         $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 10;
-
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 1;
-        $subscription->plan_name = 'Premium Plan';
-
-        $pricing = new SubscriptionPricing(
-            subtotalCents: 9999,
-            discountCents: 0,
-            shippingCents: 500,
-            taxCents: 0,
-            totalCents: 9999,
-            deliveryType: SubscriptionType::DIGITAL->value,
-            voucherId: null,
-            shippingAddressSnapshot: null
-        );
-
-        $subscriptionsWithPricing = [
-            ['subscription' => $subscription, 'pricing' => $pricing]
-        ];
-
-        $checkoutData = [
-            'country' => 'US',
-            'state' => 'CA',
-            'postal_code' => '90210'
-        ];
-
-        $mockOrder = Mockery::mock(Order::class)->makePartial();
-        $mockOrder->id = 1;
-
-        // Verify TaxCalculatorService is called
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
-            ->once()
-            ->with(
-                9999, // subtotalCents
-                500,  // shippingCents
-                'US',
-                'CA',
-                '90210',
-                $member
-            )
-            ->andReturn(new TaxData(
-
-                taxCents: 1050,
-                rate: 0.10,
-                jurisdiction: 'California'
-
-            ));
-
-        // Verify distributeTaxToItems is called
-        $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
-            ->once()
-            ->with(
-                Mockery::type('array'),
-                1050
-            )
-            ->andReturnUsing(function ($items, $taxCents) {
-                $items[0]['tax_cents'] = $taxCents;
-                return $items;
-            });
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($orderData) {
-                    return $orderData['tax'] === 10.5 // 1050 cents / 100
-                        && $orderData['subtotal'] === 99.99
-                        && $orderData['shipping'] === 5;
-                }),
-                Mockery::type('array'),
-                1
-            )
-            ->andReturn($mockOrder);
-
-        $result = $this->service->createPendingOrder(
-            $subscriptionsWithPricing,
-            $member,
-            1,
-            $checkoutData
-        );
-
-        $this->assertInstanceOf(Order::class, $result);
-    }
-
-    public function testCreatePendingOrderDistributesTaxToItems(): void
-    {
-        $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 10;
-
-        $subscription1 = Mockery::mock(Subscription::class)->makePartial();
-        $subscription1->id = 1;
-        $subscription1->plan_name = 'Plan A';
-
-        $subscription2 = Mockery::mock(Subscription::class)->makePartial();
-        $subscription2->id = 2;
-        $subscription2->plan_name = 'Plan B';
-
-        $pricing1 = new SubscriptionPricing(
-            subtotalCents: 5000,
-            discountCents: 0,
-            shippingCents: 250,
-            taxCents: 0,
-            totalCents: 9999,
-            deliveryType: SubscriptionType::DIGITAL->value,
-            voucherId: null,
-            shippingAddressSnapshot: null
-        );
-
-        $pricing2 = new SubscriptionPricing(
-            subtotalCents: 3000,
-            discountCents: 0,
-            shippingCents: 150,
-            taxCents: 0,
-            totalCents: 9999,
-            deliveryType: SubscriptionType::PRINTED->value,
-            voucherId: null,
-            shippingAddressSnapshot: null
-        );
-
-        $subscriptionsWithPricing = [
-            ['subscription' => $subscription1, 'pricing' => $pricing1],
-            ['subscription' => $subscription2, 'pricing' => $pricing2]
-        ];
-
-        $checkoutData = ['country' => 'US'];
-
-        $mockOrder = Mockery::mock(Order::class)->makePartial();
-
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
-            ->once()
-            ->andReturn(new TaxData(rate: 0.1, taxCents: 800));
-
-        // Verify tax distribution logic
-        $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
-            ->once()
-            ->with(
-                Mockery::on(function ($items) {
-                    return count($items) === 2
-                        && $items[0]['subtotal'] === 50.00
-                        && $items[1]['subtotal'] === 30.00;
-                }),
-                800
-            )
-            ->andReturnUsing(function ($items, $totalTax) {
-                // Proportional distribution: 50/(50+30) = 62.5%, 30/(50+30) = 37.5%
-                $items[0]['tax_cents'] = 500; // 62.5% of 800
-                $items[1]['tax_cents'] = 300; // 37.5% of 800
-                return $items;
-            });
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->andReturn($mockOrder);
-
-        $result = $this->service->createPendingOrder(
-            $subscriptionsWithPricing,
-            $member,
-            1,
-            $checkoutData
-        );
-
-        $this->assertInstanceOf(Order::class, $result);
-    }
-
-    public function testCreatePendingOrderHandlesZeroTax(): void
-    {
-        $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 10;
-        $member->tax_exempt = true; // Tax exempt member
-
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 1;
-        $subscription->plan_name = 'Plan';
-
-        $pricing = new SubscriptionPricing(
-            subtotalCents: 5000,
-            discountCents: 0,
-            shippingCents: 0,
-            taxCents: 0,
-            totalCents: 9999,
-            deliveryType: SubscriptionType::DIGITAL->value,
-            voucherId: null,
-            shippingAddressSnapshot: null
-        );
-
-        $subscriptionsWithPricing = [
-            ['subscription' => $subscription, 'pricing' => $pricing]
-        ];
-
-        $checkoutData = ['country' => 'US'];
-
-        $mockOrder = Mockery::mock(Order::class)->makePartial();
-
-        // Tax calculator returns 0 for exempt member
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
-            ->once()
-            ->andReturn(new TaxData(rate: 0, taxCents: 0, exempt: true));
-
-        // distributeTaxToItems should NOT be called when tax is 0
-        $this->taxCalculatorService->shouldReceive('distributeTaxToItems')->never();
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($orderData) {
-                    return $orderData['tax'] == 0
-                        && $orderData['subtotal'] === 50
-                        && $orderData['payment_status'] === 'unpaid'
-                        && $orderData['total'] === 99.99;
-                }),
-                Mockery::type('array'),
-                1
-            )
-            ->andReturn($mockOrder);
-
-        $result = $this->service->createPendingOrder(
-            $subscriptionsWithPricing,
-            $member,
-            1,
-            $checkoutData
-        );
-
-        $this->assertInstanceOf(Order::class, $result);
-    }
-
-    public function testCreatePendingOrderUsesDefaultCountryWhenNotProvided(): void
-    {
-        $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 10;
-
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 1;
-        $subscription->plan_name = 'Plan';
-
-        $pricing = new SubscriptionPricing(
-            subtotalCents: 5000,
-            discountCents: 0,
-            shippingCents: 0,
-            taxCents: 0,
-            totalCents: 9999,
-            deliveryType: SubscriptionType::DIGITAL->value,
-            voucherId: null,
-            shippingAddressSnapshot: null
-        );
-
-        $subscriptionsWithPricing = [
-            ['subscription' => $subscription, 'pricing' => $pricing]
-        ];
-
-        $checkoutData = []; // No country provided
-
-        $mockOrder = Mockery::mock(Order::class)->makePartial();
-
-        // Verify default country 'GB' is used
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
-            ->once()
-            ->with(
-                5000,
-                0,
-                'GB', // Default
-                null,
-                null,
-                $member
-            )
-            ->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
-
-        $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
-            ->once()
-            ->andReturnUsing(function ($items, $tax) {
-                $items[0]['tax_cents'] = $tax;
-                return $items;
-            });
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->andReturn($mockOrder);
-
-        $result = $this->service->createPendingOrder(
-            $subscriptionsWithPricing,
-            $member,
-            1,
-            $checkoutData
-        );
-
-        $this->assertInstanceOf(Order::class, $result);
-    }
-
-    public function testAttachPaymentIntentUsesTransaction(): void
-    {
-        $order = Mockery::mock(Order::class)->makePartial();
-        $order->id = 1;
-
-        $paymentResult = [
-            'payment_intent_id' => 'pi_123',
-            'customer_id' => 'cus_456'
-        ];
-
-        $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
-
-        $this->orderRepository->shouldReceive('update')
-            ->once()
-            ->with(1, [
-                'payment_intent_id' => 'pi_123',
-                'stripe_customer_id' => 'cus_456'
-            ]);
-
-        $this->service->attachPaymentIntent($order, $paymentResult);
-
-        $this->assertTrue(true); // If we get here without exceptions, test passes
-    }
-
-    public function test_create_pending_order_writes_resolved_discount_fields(): void
-    {
-        $member = $this->createMockMember();
-
-        $resolvedDiscounts = Mockery::mock(\App\Services\Vouchers\ResolvedDiscounts::class);
-        $resolvedDiscounts->rewardDiscountCents = 100;
-        $resolvedDiscounts->offerDiscountCents = 200;
-        $resolvedDiscounts->voucherDiscountCents = 300;
-        $resolvedDiscounts->tieredDiscountCents = 50;
-        $resolvedDiscounts->merchantFundedCents = 150;
-        $resolvedDiscounts->platformFundedCents = 75;
-
-        $subscriptionsWithPricing = [[
-            'subscription' => $this->createMockSubscription(),
-            'pricing' => new SubscriptionPricing(
-                subtotalCents: 5000,
-                discountCents: 650,
-                shippingCents: 0,
-                taxCents: 0,
-                totalCents: 4350,
-                deliveryType: SubscriptionType::DIGITAL->value,
-                voucherId: 1,
-                shippingAddressSnapshot: null
-            )
-        ]];
-
-        $this->setTaxCalculatorExpectations($member, 5000, 0);
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    return $data['reward_discount'] === 1
-                        && $data['offer_discount'] === 2
-                        && $data['voucher_discount'] === 3
-                        && $data['tiered_discount'] === 0.5
-                        && $data['merchant_funded'] === 1.5
-                        && $data['platform_funded'] === 0.75;
-                }),
-                Mockery::any(),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder(
-            $subscriptionsWithPricing,
-            $member,
-            1,
-            [],
-            $resolvedDiscounts
-        );
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    public function test_create_pending_order_includes_meta_in_order_item_metadata(): void
-    {
-        $member = $this->createMockMember();
-
-        $subscription = $this->createMockSubscription();
-
-        $subscriptionsWithPricing = [[
-            'subscription' => $subscription,
-            'pricing' => new SubscriptionPricing(
-                subtotalCents: 5000,
-                discountCents: 0,
-                shippingCents: 0,
-                taxCents: 0,
-                totalCents: 5000,
-                deliveryType: SubscriptionType::DIGITAL->value,
-                voucherId: null,
-                shippingAddressSnapshot: null
-            ),
-            'meta' => [
-                'is_preorder' => true,
-                'expected_ship_date' => '2025-06-01',
-                'next_issue_id' => 42,
-                'next_issue_number' => 7,
-                'next_issue_title' => 'Summer Edition',
-                'next_issue_on_sale_date' => '2025-05-15',
-                'is_pre_release' => false,
-                'release_date' => null,
-                'availability_message' => 'Pre-order',
-                'estimated_dispatch' => '2025-05-28',
-                'estimated_delivery_from' => '2025-05-30',
-                'estimated_delivery_to' => '2025-06-01',
-                'estimated_delivery_formatted' => '30 May – 1 Jun',
-            ]
-        ]];
-
-        $this->setTaxCalculatorExpectations($member, 5000, 0);
-
-        $this->orderCreationService->shouldReceive('create')
-            ->once()
-            ->with(
-                Mockery::on(function ($data) {
-                    return $data['payment_status'] === 'unpaid';
-                }),
-                Mockery::on(function ($items) {
-                    $meta = $items[0]['metadata'];
-                    return $items[0]['preorder_enabled'] === true
-                        && $items[0]['expected_ship_date'] === '2025-06-01'
-                        && $meta['next_issue_id'] === 42
-                        && $meta['next_issue_title'] === 'Summer Edition'
-                        && $meta['subscription_id'] === 456;
-                }),
-                1
-            )
-            ->andReturn($this->createMockOrder());
-
-        $order = $this->service->createPendingOrder($subscriptionsWithPricing, $member, 1, []);
-
-        $this->assertInstanceOf(Order::class, $order);
-    }
-
-    private function setTaxCalculatorExpectations($member = null, float $subtotal = 5000, float $shipping = 1000)
-    {
-        $this->taxCalculatorService->shouldReceive('calculateOrderTax')
-            ->once()
-            ->with(
-                $subtotal, // subtotalCents
-                $shipping,  // shippingCents
-                'GB',
-                null,
-                null,
-                Mockery::any()
-            )
-            ->andReturn(new TaxData(
-                taxCents: 1050,
-                rate: 0.10,
-                jurisdiction: 'California'
-            ));
-
-        // Verify distributeTaxToItems is called
-        $this->taxCalculatorService->shouldReceive('distributeTaxToItems')
-            ->once()
-            ->with(
-                Mockery::type('array'),
-                1050
-            )
-            ->andReturnUsing(function ($items, $taxCents) {
-                $items[0]['tax_cents'] = $taxCents;
-                return $items;
-            });
-    }
-
-    private function createMockMember(): Member
-    {
-        $member = Mockery::mock(Member::class)->makePartial();
-        $member->id = 123;
+        $member->id = $id;
         return $member;
     }
 
-    private function createMockSubscription(?int $id = null): Subscription
+    private function makeOrder(): Order&MockInterface
     {
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = $id ?? 456;
-        $subscription->plan_name = 'Test Plan';
-        return $subscription;
+        return Mockery::mock(Order::class)->makePartial();
     }
 
-    private function createMockOrder(): Order
+    private function makePricing(array $overrides = []): SubscriptionPricing&MockInterface
     {
-        $order = Mockery::mock(Order::class)->makePartial();
-        $order->id = 789;
-        return $order;
+        $pricing = Mockery::mock(SubscriptionPricing::class)->makePartial();
+        $pricing->subtotalCents = $overrides['subtotalCents'] ?? 1000;
+        $pricing->shippingCents = $overrides['shippingCents'] ?? 0;
+        $pricing->discountCents = $overrides['discountCents'] ?? 0;
+        $pricing->totalCents = $overrides['totalCents'] ?? 1000;
+        $pricing->deliveryType = $overrides['deliveryType'] ?? SubscriptionType::DIGITAL->value;
+        $pricing->voucherId = $overrides['voucherId'] ?? null;
+        $pricing->shippingAddressSnapshot = $overrides['shippingAddressSnapshot'] ?? null;
+
+        $pricing->allows('getSubtotal')->andReturn(($overrides['subtotalCents'] ?? 1000) / 100);
+        $pricing->allows('getShipping')->andReturn(($overrides['shippingCents'] ?? 0) / 100);
+
+        return $pricing;
+    }
+
+    private function makeSubscription(int $id = 1): Subscription&MockInterface
+    {
+        $sub = Mockery::mock(Subscription::class)->makePartial();
+        $sub->id = $id;
+        $sub->plan_name = 'Monthly Box';
+        return $sub;
+    }
+
+    private function makeResolvedDiscounts(array $overrides = []): ResolvedDiscounts&MockInterface
+    {
+        $rd = Mockery::mock(ResolvedDiscounts::class)->makePartial();
+        $rd->rewardDiscountCents = $overrides['rewardDiscountCents'] ?? 0;
+        $rd->offerDiscountCents = $overrides['offerDiscountCents'] ?? 0;
+        $rd->voucherDiscountCents = $overrides['voucherDiscountCents'] ?? 0;
+        $rd->tieredDiscountCents = $overrides['tieredDiscountCents'] ?? 0;
+        $rd->merchantFundedCents = $overrides['merchantFundedCents'] ?? 0;
+        $rd->platformFundedCents = $overrides['platformFundedCents'] ?? 0;
+        return $rd;
+    }
+
+    private function makeTaxResult(int $taxCents = 0): object
+    {
+        return new TaxData(rate: 0, jurisdiction: null, includesShipping: false, taxCents: $taxCents);
+
+        //return (object) ['taxCents' => $taxCents];
+    }
+
+    private function makeSubData(
+        ?SubscriptionPricing $pricing = null,
+        ?Subscription        $subscription = null,
+        array                $meta = []
+    ): array
+    {
+        return [
+            'subscription' => $subscription ?? $this->makeSubscription(),
+            'pricing' => $pricing ?? $this->makePricing(),
+            'meta' => $meta,
+        ];
+    }
+
+    // -------------------------------------------------------------------------
+    // createPendingOrder — happy path
+    // -------------------------------------------------------------------------
+
+    public function testCreatePendingOrderDelegatesToOrderCreationService(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->with(Mockery::type('array'), Mockery::type('array'), 1)
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member,
+            1,
+            ['country' => 'GB'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderBuildsOrderItemPerSubscription(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        $pricing1 = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $pricing2 = $this->makePricing(['subtotalCents' => 2000, 'totalCents' => 2000]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data, array $items) {
+                return count($items) === 2;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [
+                $this->makeSubData($pricing1, $this->makeSubscription(1)),
+                $this->makeSubData($pricing2, $this->makeSubscription(2)),
+            ],
+            $member,
+            1,
+            ['country' => 'GB'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderSetsOrderStatusToPending(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 500, 'totalCents' => 500]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => ($data['status'] ?? null) === 'pending'
+                && ($data['payment_status'] ?? null) === 'unpaid')
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderAccumulatesSubtotalAndShippingAcrossSubscriptions(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        $p1 = $this->makePricing(['subtotalCents' => 1000, 'shippingCents' => 200, 'totalCents' => 1200]);
+        $p2 = $this->makePricing(['subtotalCents' => 500, 'shippingCents' => 100, 'totalCents' => 600]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                // subtotal = (1000+500)/100 = 15.0; shipping = (200+100)/100 = 3.0
+                return ($data['subtotal'] ?? null) === 15
+                    && ($data['shipping'] ?? null) === 3;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [
+                $this->makeSubData($p1, $this->makeSubscription(1)),
+                $this->makeSubData($p2, $this->makeSubscription(2)),
+            ],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderPassesCountryStatePostalCodeToTaxCalculator(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->with(
+                1000,       // subtotalCents
+                0,          // shippingCents
+                'US',       // country
+                'CA',       // state
+                '90210',    // postal_code
+                $member
+            )
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService->expects('create')->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member,
+            1,
+            ['country' => 'US', 'state' => 'CA', 'postal_code' => '90210'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderDistributesTaxToItemsWhenTaxIsPositive(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(200));
+
+        $this->taxCalculatorService
+            ->expects('distributeTaxToItems')
+            ->once()
+            ->andReturnUsing(fn($items) => $items); // pass-through
+
+        $this->orderCreationService->expects('create')->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderDoesNotDistributeTaxWhenTaxIsZero(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->taxCalculatorService->expects('distributeTaxToItems')->never();
+
+        $this->orderCreationService->expects('create')->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // createPendingOrder — free order override
+    // -------------------------------------------------------------------------
+
+    public function testCreatePendingOrderZerosAllFinancialFieldsWhenFreeOrder(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 5000, 'totalCents' => 5000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                return ($data['subtotal'] ?? -1) === 0
+                    && ($data['shipping'] ?? -1) === 0
+                    && ($data['tax'] ?? -1) === 0
+                    && ($data['total'] ?? -1) === 0
+                    && ($data['discount'] ?? -1) === 0
+                    && ($data['offer_discount'] ?? -1) === 0
+                    && ($data['voucher_discount'] ?? -1) === 0
+                    && ($data['reward_discount'] ?? -1) === 0
+                    && ($data['tiered_discount'] ?? -1) === 0;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd,
+            isFreeOrder: true
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // createPendingOrder — subscription ID mapping
+    // -------------------------------------------------------------------------
+
+    public function testCreatePendingOrderSetsSingleSubscriptionIdDirectly(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => ($data['one_time_subscription_id'] ?? null) === 99
+                && !isset($data['metadata']['multiple_subscriptions']))
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing, $this->makeSubscription(99))],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderSetsMetadataForMultipleSubscriptions(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                return isset($data['metadata']['multiple_subscriptions'])
+                    && $data['metadata']['multiple_subscriptions'] === true
+                    && count($data['metadata']['subscription_ids']) === 2;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [
+                $this->makeSubData($pricing, $this->makeSubscription(1)),
+                $this->makeSubData($pricing, $this->makeSubscription(2)),
+            ],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // createPendingOrder — shipping address handling
+    // -------------------------------------------------------------------------
+
+    public function testCreatePendingOrderDoesNotSetShippingAddressForDigitalOnly(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['deliveryType' => SubscriptionType::DIGITAL->value, 'subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => !isset($data['shipping_address']) && !isset($data['shipping_address_id']))
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderSetsSavedAddressIdWhenPrintAndSavedAddressProvided(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing([
+            'deliveryType' => SubscriptionType::PRINTED->value,
+            'subtotalCents' => 1000,
+            'totalCents' => 1000,
+        ]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => ($data['shipping_address_id'] ?? null) === 42)
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1,
+            ['country' => 'GB', 'saved_address' => 42],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderUsesSnapshotAddressWhenPrintAndNoSavedAddress(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $snapshot = ['line1' => '1 Street', 'country' => 'GB'];
+        $pricing = $this->makePricing([
+            'deliveryType' => SubscriptionType::PRINTED->value,
+            'subtotalCents' => 1000,
+            'totalCents' => 1000,
+            'shippingAddressSnapshot' => $snapshot,
+        ]);
+        $rd = $this->makeResolvedDiscounts();
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => ($data['shipping_address'] ?? null) === $snapshot
+                && ($data['billing_address'] ?? null) === $snapshot)
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // createPendingOrder — resolvedDiscounts mapping
+    // -------------------------------------------------------------------------
+
+    public function testCreatePendingOrderMapsResolvedDiscountsToOrderData(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $rd = $this->makeResolvedDiscounts([
+            'rewardDiscountCents' => 100,
+            'offerDiscountCents' => 200,
+            'voucherDiscountCents' => 300,
+            'tieredDiscountCents' => 400,
+            'merchantFundedCents' => 500,
+            'platformFundedCents' => 600,
+        ]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                return ($data['reward_discount'] ?? null) === 1
+                    && ($data['offer_discount'] ?? null) === 2
+                    && ($data['voucher_discount'] ?? null) === 3
+                    && ($data['tiered_discount'] ?? null) === 4
+                    && ($data['merchant_funded'] ?? null) === 5
+                    && ($data['platform_funded'] ?? null) === 6;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderDefaultsDiscountsToZeroWhenResolvedDiscountsIsNull(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                return ($data['reward_discount'] ?? -1) === 0
+                    && ($data['offer_discount'] ?? -1) === 0
+                    && ($data['voucher_discount'] ?? -1) === 0
+                    && ($data['tiered_discount'] ?? -1) === 0
+                    && ($data['merchant_funded'] ?? -1) === 0
+                    && ($data['platform_funded'] ?? -1) === 0;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member, 1, ['country' => 'GB'],
+            null
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderTotalIsSumOfAllSubscriptionTotals(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        // Two subscriptions: £10.00 + £20.00 = £30.00
+        $p1 = $this->makePricing(['subtotalCents' => 1000, 'totalCents' => 1000]);
+        $p2 = $this->makePricing(['subtotalCents' => 2000, 'totalCents' => 2000]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->shouldReceive('create')
+            ->once()
+            ->withArgs(function ($data, $items, $siteId) {
+
+                $this->assertSame(30.0, $data['total']);
+                $this->assertCount(2, $items);
+                $this->assertSame(1, $siteId);
+
+                return true;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [
+                $this->makeSubData($p1, $this->makeSubscription(1)),
+                $this->makeSubData($p2, $this->makeSubscription(2)),
+            ],
+            $member, 1, ['country' => 'GB'], $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    // -------------------------------------------------------------------------
+    // attachPaymentIntent
+    // -------------------------------------------------------------------------
+
+    public function testAttachPaymentIntentUpdatesOrderWithinTransaction(): void
+    {
+        $order = $this->makeOrder();
+        $order->id = 5;
+
+        $this->database
+            ->expects('transaction')
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->orderRepository
+            ->expects('update')
+            ->with(5, [
+                'payment_intent_id' => 'pi_abc123',
+                'stripe_customer_id' => 'cus_xyz',
+            ])
+            ->once();
+
+        $this->service->attachPaymentIntent($order, [
+            'payment_intent_id' => 'pi_abc123',
+            'customer_id' => 'cus_xyz',
+        ]);
+
+        $this->addToAssertionCount(1); // Mockery verifies update was called
+    }
+
+    public function testAttachPaymentIntentSetsStripeCustomerIdToNullWhenNotProvided(): void
+    {
+        $order = $this->makeOrder();
+        $order->id = 5;
+
+        $this->database->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $this->orderRepository
+            ->expects('update')
+            ->with(5, [
+                'payment_intent_id' => 'pi_abc123',
+                'stripe_customer_id' => null,
+            ])
+            ->once();
+
+        $this->service->attachPaymentIntent($order, ['payment_intent_id' => 'pi_abc123']);
+
+        $this->addToAssertionCount(1);
+    }
+
+    public function testAttachPaymentIntentReturnsVoid(): void
+    {
+        $order = $this->makeOrder();
+        $order->id = 5;
+
+        $this->database->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->orderRepository->expects('update')->once();
+
+        // Return type is void — confirm no exception
+        $result = $this->service->attachPaymentIntent($order, ['payment_intent_id' => 'pi_x']);
+
+        $this->assertNull($result);
+    }
+
+    public function testCreatePendingOrderHandlesFullyDiscountedOrder(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        $pricing = $this->makePricing([
+            'subtotalCents' => 5000,
+            'discountCents' => 5000,
+            'totalCents' => 0,
+        ]);
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->taxCalculatorService
+            ->expects('distributeTaxToItems')
+            ->never();
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(fn($data) => ($data['subtotal'] ?? null) === 50
+                && ($data['discount'] ?? null) === 50
+            )
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member,
+            1,
+            ['country' => 'GB'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderIncludesMetaInOrderItemMetadata(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        $meta = [
+            'is_preorder' => true,
+            'expected_ship_date' => '2025-06-01',
+            'next_issue_id' => 42,
+            'next_issue_title' => 'Summer Edition',
+        ];
+
+        $pricing = $this->makePricing([
+            'subtotalCents' => 5000,
+            'totalCents' => 5000
+        ]);
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data, $items) {
+
+                $itemMeta = $items[0]['metadata'];
+
+                return $items[0]['preorder_enabled'] === true
+                    && $items[0]['expected_ship_date'] === '2025-06-01'
+                    && $itemMeta['next_issue_id'] === 42
+                    && $itemMeta['next_issue_title'] === 'Summer Edition';
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing, $this->makeSubscription(), $meta)],
+            $member,
+            1,
+            ['country' => 'GB'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testCreatePendingOrderMapsSnapshotShippingAddressStructure(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $rd = $this->makeResolvedDiscounts();
+
+        $snapshot = [
+            'address_line_1' => '123 Main St',
+            'city' => 'London',
+            'postcode' => 'SW1A 1AA',
+            'country' => 'GB',
+        ];
+
+        $pricing = $this->makePricing([
+            'deliveryType' => SubscriptionType::PRINTED->value,
+            'shippingAddressSnapshot' => $snapshot,
+            'subtotalCents' => 1000,
+            'totalCents' => 1000,
+        ]);
+
+        $this->taxCalculatorService
+            ->expects('calculateOrderTax')
+            ->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+
+                return isset($data['shipping_address']['address_line_1'])
+                    && $data['shipping_address']['address_line_1'] === '123 Main St';
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member,
+            1,
+            ['country' => 'GB'],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
     }
 }

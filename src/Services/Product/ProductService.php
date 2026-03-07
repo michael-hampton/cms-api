@@ -109,7 +109,7 @@ class ProductService
             // Store old prices for comparison
             $oldPrice = $product->price;
             $oldSalePrice = $product->sale_price;
-            $oldImagePath = $product->image ?? null;
+            $oldImagePath = $product->image;
 
             // Handle image upload
             $data = $this->processImageUpload($data, $imageFile, $oldImagePath);

@@ -797,4 +797,20 @@ abstract class FunctionalTestCase extends TestCase
         );
     }
 
+    protected function assertOrderData(array $data, array $expectations): bool
+    {
+        foreach ($expectations as $key => $value) {
+
+            if (!array_key_exists($key, $data)) {
+                return false;
+            }
+
+            if ($data[$key] !== $value) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
 }

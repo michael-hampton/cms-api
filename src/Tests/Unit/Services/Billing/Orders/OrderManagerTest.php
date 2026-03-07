@@ -10,7 +10,6 @@ use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
-use PHPUnit\Framework\TestCase;
 
 class OrderManagerTest extends FunctionalTestCase
 {
@@ -43,6 +42,20 @@ class OrderManagerTest extends FunctionalTestCase
     // ===================================================================
     // findById() Tests
     // ===================================================================
+
+    public function testFindByIdReturnsOrderWhenFound(): void
+    {
+        $order = m::mock(Order::class)->makePartial();
+
+        $this->orderRepository
+            ->expects('getOrderById')
+            ->with(1)
+            ->andReturn($order);
+
+        $result = $this->service->findById(1);
+
+        $this->assertSame($order, $result);
+    }
 
     public function testFindByIdReturnsOrder(): void
     {
@@ -162,6 +175,20 @@ class OrderManagerTest extends FunctionalTestCase
     // ===================================================================
     // getAll() Tests
     // ===================================================================
+
+    public function testGetAllReturnsPagedArray(): void
+    {
+        $expected = ['data' => [], 'total' => 0];
+
+        $this->orderRepository
+            ->expects('getAll')
+            ->with(1, 50)
+            ->andReturn($expected);
+
+        $result = $this->service->getAll(1, 50);
+
+        $this->assertSame($expected, $result);
+    }
 
     public function testGetAllReturnsAllOrders(): void
     {
@@ -447,5 +474,75 @@ class OrderManagerTest extends FunctionalTestCase
         $result = $this->service->delete($orderId);
 
         $this->assertTrue($result);
+    }
+
+    public function testUpdateOrderStatusDelegatesToRepository(): void
+    {
+        $order = m::mock(Order::class)->makePartial();
+
+        $this->orderRepository
+            ->expects('update')
+            ->with(1, ['status' => 'completed', 'payment_status' => 'paid'])
+            ->andReturn($order);
+
+        $result = $this->service->updateOrderStatus(1, 'completed', 'paid');
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testFindDelegatesToRepository(): void
+    {
+        $order = m::mock(Order::class)->makePartial();
+
+        $this->orderRepository
+            ->expects('find')
+            ->with(7)
+            ->andReturn($order);
+
+        $result = $this->service->find(7);
+
+        $this->assertSame($order, $result);
+    }
+
+    public function testFindReturnsNullWhenNotFound(): void
+    {
+        $this->orderRepository
+            ->expects('find')
+            ->with(999)
+            ->andReturn(null);
+
+        $result = $this->service->find(999);
+
+        $this->assertNull($result);
+    }
+
+    // -------------------------------------------------------------------------
+    // getByUserPaginated
+    // -------------------------------------------------------------------------
+
+    public function testGetByUserPaginatedReturnsPaginatedArray(): void
+    {
+        $expected = ['data' => [], 'total' => 0, 'page' => 2];
+
+        $this->orderRepository
+            ->expects('getByUserPaginated')
+            ->with(3, 2, 10)
+            ->andReturn($expected);
+
+        $result = $this->service->getByUserPaginated(3, 2, 10);
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function testGetByUserPaginatedUsesDefaultValues(): void
+    {
+        $this->orderRepository
+            ->expects('getByUserPaginated')
+            ->with(3, 1, 10)
+            ->andReturn([]);
+
+        $result = $this->service->getByUserPaginated(3);
+
+        $this->assertIsArray($result);
     }
 }

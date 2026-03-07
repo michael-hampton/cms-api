@@ -17,6 +17,7 @@ use App\Repositories\Product\MerchantRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\ReviewRepository;
 use App\Repositories\Vouchers\VoucherRepository;
+use App\Services\Adverts\MerchantAnalyticsService;
 use App\Services\Product\MerchantStatsService;
 
 class MerchantDashboardController extends Controller
@@ -33,6 +34,7 @@ class MerchantDashboardController extends Controller
         private readonly ReviewRepository            $reviewRepository,
         private readonly CommissionRepository        $commissionRepository,
         private readonly MerchantStatsService        $statsService,
+        private readonly MerchantAnalyticsService $analyticsService,
     )
     {
         parent::__construct();
@@ -44,6 +46,7 @@ class MerchantDashboardController extends Controller
         $merchant = Merchant::find(1);
 
         $stats = $this->statsService->forMerchant($merchant);
+        $analytics = $this->analyticsService->forMerchant($merchant, days: 30);
 
         $boostResult = $this->boostRepository->getAllWithFilters([
             'merchant_id' => $merchant->id,
@@ -52,36 +55,29 @@ class MerchantDashboardController extends Controller
         ]);
 
         $activeBoosts = $boostResult['data'];
-
         $boostStats = $this->merchantBoostStatRepository->findByMerchant($merchant->id);
-
         $recentOrders = $this->orderRepository->getRecentForMerchant($merchant->id);
-
         $topProducts = $this->productRepository->topByRevenueForMerchant($merchant->id, limit: 4);
-
         $products = $this->productRepository->getProductsByMerchant($merchant->id);
         $offers = $this->offerRepository->search(['merchant_id' => $merchant->id]);
-
         $shipments = $this->shipmentRepository->getByMerchantId($merchant->id);
-
         $vouchers = $this->voucherRepository->getByMerchant($merchant->id);
 
         $transactions = $this->merchantRepository->getTransactions($merchant->id, [
             'status' => 'completed',
         ]);
 
-        // Commission — resolved via CommissionRepository
         $commissionSummary = $this->commissionRepository->summaryForMerchant($merchant->id);
         $commissionByProduct = $this->commissionRepository->byProductForMerchant($merchant->id);
         $commissionRates = $this->commissionRepository->ratesByMerchant($merchant->id);
 
-        // Reviews — resolved via ReviewRepository
         $recentReviews = $this->reviewRepository->recentForMerchant($merchant->id, limit: 10);
         $reviewStats = $this->reviewRepository->statsForMerchant($merchant->id);
 
         return $this->view('merchant-portal/dashboard', compact(
             'merchant',
             'stats',
+            'analytics',
             'activeBoosts',
             'boostStats',
             'recentOrders',
