@@ -6,20 +6,6 @@ use App\Enums\Newsletters\LayoutVersionState;
 use App\Models\NewsletterLayout;
 use App\Models\NewsletterLayoutVersion;
 
-/**
- * Seeds the "Curates" newsletter layout — a fashion-editorial template
- * modelled on the WhoWhatWear curated digest format.
- *
- * Layout schema v2 — uses regions (top / center / bottom).
- *
- * Region map:
- *   top    → brand header bar (logo, view-in-browser, nav label)
- *   center → editorial content (driven by newsletter content_blocks)
- *   bottom → footer (social links, legal, unsubscribe)
- *
- * The center region's slots accept any block type.  The top and bottom
- * regions carry fixed structural blocks that do not change per issue.
- */
 class CuratesNewsletterLayoutSeeder
 {
     public function run(): void

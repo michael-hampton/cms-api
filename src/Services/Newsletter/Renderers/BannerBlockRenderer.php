@@ -53,7 +53,6 @@ class BannerBlockRenderer implements EmailBlockRenderer
         $bg = htmlspecialchars($blockData->backgroundColor);
         $color = htmlspecialchars($blockData->textColor);
 
-        // View-in-browser link — placeholder replaced per-recipient at dispatch time
         $viewInBrowserHref = '{{VIEW_IN_BROWSER_URL}}';
         $viewInBrowserLabel = $blockData->subtitle
             ? htmlspecialchars($blockData->subtitle)
@@ -74,10 +73,37 @@ class BannerBlockRenderer implements EmailBlockRenderer
             Str::sanitize($blockData->title)
         );
 
-        $taglineHtml = '';
-        if (!empty($blockData->ctaText)) {
-            $taglineHtml = sprintf(
-                '<div style="font-size:11px;letter-spacing:1.5px;color:%s;text-transform:uppercase;margin-top:6px;">%s</div>',
+        // Nav links bar — supports navLinks array or falls back to single ctaText
+        $navHtml = '';
+        if (!empty($blockData->navLinks) && is_array($blockData->navLinks)) {
+            $navItems = '';
+            foreach ($blockData->navLinks as $index => $link) {
+                $linkText = Str::sanitize($link['text'] ?? '');
+                $linkUrl = Str::sanitize($link['url'] ?? '#');
+                $isFirst = $index === 0;
+
+                // First item gets a white box highlight to match the Ceros design
+                $linkStyle = $isFirst
+                    ? "font-size:11px;font-weight:700;letter-spacing:1.5px;color:{$bg};background-color:{$color};padding:3px 8px;text-decoration:none;text-transform:uppercase;display:inline-block;"
+                    : "font-size:11px;font-weight:700;letter-spacing:1.5px;color:{$color};text-decoration:none;text-transform:uppercase;display:inline-block;padding:3px 8px;";
+
+                $navItems .= sprintf(
+                    '<a href="%s" style="%s">%s</a>',
+                    $linkUrl,
+                    $linkStyle,
+                    $linkText
+                );
+            }
+
+            $navHtml = sprintf(
+                '<div style="text-align:center;padding:10px 20px;background-color:%s;">%s</div>',
+                $bg,
+                $navItems
+            );
+        } elseif (!empty($blockData->ctaText)) {
+            // Legacy fallback — plain tagline text
+            $navHtml = sprintf(
+                '<div style="font-size:11px;letter-spacing:1.5px;color:%s;text-transform:uppercase;margin-top:6px;text-align:center;">%s</div>',
                 $color,
                 Str::sanitize($blockData->ctaText)
             );
@@ -94,10 +120,14 @@ class BannerBlockRenderer implements EmailBlockRenderer
     </td>
   </tr>
   <tr>
-    <td style="padding:28px 20px;text-align:center;">
+    <td style="padding:28px 20px 16px;text-align:center;">
       {$logoHtml}
       {$titleHtml}
-      {$taglineHtml}
+    </td>
+  </tr>
+  <tr>
+    <td style="border-top:1px solid rgba(255,255,255,0.15);">
+      {$navHtml}
     </td>
   </tr>
 </table>

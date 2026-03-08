@@ -5,19 +5,6 @@ namespace App\Database\Seeders;
 use App\Models\Newsletter;
 use App\Models\NewsletterLayout;
 
-/**
- * Seeds a demo "Curates Template A" newsletter.
- *
- * Architecture:
- *   - No renderer class. Standard pipeline: NewsletterContentResolver
- *     → LayoutRenderPipeline → buildTemplate().
- *   - Chrome, editorial intro, and social footer are driven by the generic
- *     `design_config` column — not by template-name branching in any PHP class.
- *   - All content block types are already registered in BlockDataFactory /
- *     EmailBlockRendererRegistry.
- *
- * Run after CuratesNewsletterLayoutSeeder.
- */
 class CuratesNewsletterDemoSeeder
 {
     public function run(int $siteId = 1): void

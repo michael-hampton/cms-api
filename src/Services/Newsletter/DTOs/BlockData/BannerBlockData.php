@@ -17,7 +17,8 @@ class BannerBlockData extends BaseBlockData
         public readonly float  $rating,
         public readonly int    $reviewCount,
         public readonly bool   $showDismiss,
-        public readonly bool   $dismissible
+        public readonly bool $dismissible,
+        public ?array        $navLinks = []
     )
     {
     }
@@ -37,7 +38,8 @@ class BannerBlockData extends BaseBlockData
             rating: (float)($data['rating'] ?? 0),
             reviewCount: (int)($data['reviewCount'] ?? 0),
             showDismiss: (bool)($data['showDismiss'] ?? false),
-            dismissible: (bool)($data['dismissible'] ?? false)
+            dismissible: (bool)($data['dismissible'] ?? false),
+            navLinks: $data['navLinks'] ?? [],
         );
     }
 }

@@ -6,11 +6,11 @@ use App\Enums\Newsletters\LayoutVersionState;
 use App\Models\NewsletterLayout;
 use App\Models\NewsletterLayoutVersion;
 
-class CuratesMastheadNewsletterLayoutSeeder
+class CuratesTemplateAV2NewsletterLayoutSeeder
 {
     public function run(): void
     {
-        $existing = NewsletterLayout::where('slug', 'curates-masthead')
+        $existing = NewsletterLayout::where('slug', 'curates-template-a-v2')
             ->whereNull('site_id')
             ->first();
 
@@ -20,8 +20,8 @@ class CuratesMastheadNewsletterLayoutSeeder
         }
 
         $layout = NewsletterLayout::create([
-            'name' => 'Curates Masthead',
-            'slug' => 'curates-masthead',
+            'name' => 'Curates Template A v2',
+            'slug' => 'curates-template-a-v2',
             'is_system_layout' => true,
             'site_id' => null,
             'created_by' => null,
@@ -60,12 +60,15 @@ class CuratesMastheadNewsletterLayoutSeeder
             'schema_version' => 2,
             'template' => 'curates',
             'meta' => [
-                'name' => 'Curates Masthead',
-                'description' => 'Fashion-editorial curated digest with resolved branding variables, '
-                    . 'structural masthead header and legal footer.',
+                'name' => 'Curates Template A v2',
+                'description' => 'Fashion-editorial curated digest. '
+                    . 'Approved design: masthead → editorial intro → sponsor → '
+                    . '3-col shop grid → 2-col feature → 4-col picks → sign-off → legal footer.',
                 'preview_url' => 'https://view.ceros.com/dennis/3-curates-template-a-approved/p/1',
             ],
             'regions' => [
+
+                // ── Top — brand masthead ──────────────────────────────────────
                 [
                     'id' => 'top',
                     'type' => 'top',
@@ -101,19 +104,22 @@ class CuratesMastheadNewsletterLayoutSeeder
                     ],
                 ],
 
+                // ── Center — all editorial content ────────────────────────────
                 [
                     'id' => 'center',
                     'type' => 'center',
                     'order' => 2,
                     'label' => 'Editorial Content',
                     'slots' => [
+
                         [
                             'name' => 'editorial_intro',
-                            'label' => 'Editorial Intro (editor note + quotes)',
+                            'label' => 'Editorial Intro',
                             'required' => false,
-                            'allowed_block_types' => ['text', 'quote', 'image', 'divider'],
+                            'allowed_block_types' => ['quote', 'image', 'text', 'divider'],
                             'blocks' => [],
                         ],
+
                         [
                             'name' => 'sponsor_banner',
                             'label' => 'Sponsor / Ad Banner',
@@ -121,30 +127,42 @@ class CuratesMastheadNewsletterLayoutSeeder
                             'allowed_block_types' => ['banner', 'image'],
                             'blocks' => [],
                         ],
+
                         [
                             'name' => 'product_collection',
-                            'label' => 'Shop the Collection',
+                            'label' => 'Shop the Collection (3-col grid)',
                             'required' => false,
-                            'allowed_block_types' => ['card-group', 'card', 'heading', 'cta'],
+                            'allowed_block_types' => ['heading', 'card-group', 'card', 'cta'],
                             'blocks' => [],
                         ],
+
                         [
                             'name' => 'feature_editorial',
-                            'label' => 'Feature / Two-Column Editorial',
+                            'label' => 'Feature Editorial (2-col)',
                             'required' => false,
-                            'allowed_block_types' => ['image', 'text', 'quote', 'divider', 'card-group'],
+                            'allowed_block_types' => ['card-group', 'image', 'text', 'quote', 'divider'],
                             'blocks' => [],
                         ],
+
+                        [
+                            'name' => 'more_picks',
+                            'label' => 'More Picks (4-col grid)',
+                            'required' => false,
+                            'allowed_block_types' => ['heading', 'card-group', 'card', 'cta'],
+                            'blocks' => [],
+                        ],
+
                         [
                             'name' => 'sign_off',
                             'label' => 'Editor Sign-Off',
                             'required' => false,
-                            'allowed_block_types' => ['text', 'image', 'divider', 'person', 'note'],
+                            'allowed_block_types' => ['person', 'note', 'text', 'image', 'divider'],
                             'blocks' => [],
                         ],
                     ],
                 ],
 
+                // ── Bottom — legal footer ─────────────────────────────────────
                 [
                     'id' => 'bottom',
                     'type' => 'bottom',
@@ -163,12 +181,16 @@ class CuratesMastheadNewsletterLayoutSeeder
                                         'bannerType' => 'footer-legal',
                                         'title' => '{{site.name}}',
                                         'subtitle' => null,
-                                        'ctaText' => null,
+                                        'ctaText' => '750 N. San Vicente Blvd, 8th Floor East, West Hollywood, CA 90069',
                                         'ctaUrl' => null,
                                         'backgroundColor' => '#f5f5f5',
                                         'textColor' => '#666666',
                                         'image' => null,
-                                        'providers' => [],
+                                        'providers' => [
+                                            ['platform' => 'instagram', 'url' => 'https://instagram.com/'],
+                                            ['platform' => 'pinterest', 'url' => 'https://pinterest.com/'],
+                                            ['platform' => 'facebook', 'url' => 'https://facebook.com/'],
+                                        ],
                                         'rating' => 0,
                                         'reviewCount' => 0,
                                         'showDismiss' => false,
