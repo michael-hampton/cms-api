@@ -280,6 +280,91 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
+    private function validStorePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'subject' => 'Weekly digest #1',
+            'content_blocks' => [
+                ['type' => 'text', 'data' => ['content' => 'Hello world']],
+            ],
+            'snapshot_json' => [],
+            'scheduled_at' => date('Y-m-d H:i:s', strtotime('+1 week')),
+        ], $overrides);
+    }
+
+    public function testStoreRejectsSubjectExceeding255Characters(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['subject' => str_repeat('x', 256)])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreRejectsContentBlocksThatIsNotAnArray(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['content_blocks' => 'not-an-array'])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreRejectsSnapshotJsonThatIsNotAnArray(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['snapshot_json' => 'not-an-array'])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreRejectsInvalidScheduledAtDateFormat(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['scheduled_at' => 'not-a-date'])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreAcceptsNullSubject(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['subject' => null])
+        );
+
+        // subject is optional in CreateNewsletterIssueRequest — omitting is valid
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public function testStoreAcceptsEmptyContentBlocks(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues",
+            $this->validStorePayload(['content_blocks' => []])
+        );
+
+        $this->assertResponseStatus(201, $response);
+    }
+
     public function test_show_returns_404_when_issue_belongs_to_different_newsletter(): void
     {
         $newsletterA = $this->createNewsletter(['site_id' => $this->siteId]);
@@ -393,6 +478,21 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $this->assertEquals($newsletter->id, $data['data']['newsletter_id']);
         $this->assertArrayHasKey('send_id', $data['data']);
         $this->assertArrayHasKey('sent_to', $data['data']);
+    }
+
+    public function testSendReturns409WhenIssueAlreadySent(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $issue = $this->createNewsletterIssue($newsletter, [
+            'newsletter_id' => $newsletter->id,
+            'status' => 'sent',
+        ]);
+
+        $response = $this->postForSite(
+            "/api/newsletters/{$newsletter->id}/issues/{$issue->id}/send"
+        );
+
+        $this->assertResponseStatus(409, $response);
     }
 
     private function createConfirmedSubscriber(string $email): void
@@ -538,6 +638,40 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
         $this->assertEquals(2, $data['data']['recipients']);
+    }
+
+    public function testManualSendRejectsInvalidSendType(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $issue = $this->createNewsletterIssue($newsletter, ['newsletter_id' => $newsletter->id]);
+
+        $response = $this->postForSite("/api/newsletter-issues/{$issue->id}/send", [
+            'send_type' => 'selected', // not a valid send_type
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testManualSendRequiresCustomEmailsWhenSendTypeIsCustom(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $issue = $this->createNewsletterIssue($newsletter, ['newsletter_id' => $newsletter->id]);
+
+        $response = $this->postForSite("/api/newsletter-issues/{$issue->id}/send", [
+            'send_type' => 'custom',
+            // custom_emails omitted
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testManualSendReturns404ForNonExistentIssue(): void
+    {
+        $response = $this->postForSite("/api/newsletter-issues/99999/send", [
+            'send_type' => 'all',
+        ]);
+
+        $this->assertResponseStatus(404, $response);
     }
 
     public function test_manual_send_does_not_transition_issue_to_sent(): void

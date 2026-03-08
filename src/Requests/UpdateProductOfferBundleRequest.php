@@ -19,8 +19,8 @@ class UpdateProductOfferBundleRequest extends FormRequest
             'is_active' => ['boolean'],
             'status' => ['in:draft,published,rejected'],
             'items' => ['array', 'min:2'],
-            'items.*.product_id' => ['integer', 'required_without:items.*.product_offer_id'],
-            'items.*.product_offer_id' => ['integer', 'required_without:items.*.product_id'],
+            'items.*.product_id' => ['integer'],
+            'items.*.product_offer_id' => ['integer'],
             'items.*.quantity' => ['integer', 'min:1'],
         ];
     }

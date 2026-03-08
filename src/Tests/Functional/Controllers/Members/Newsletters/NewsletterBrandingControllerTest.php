@@ -336,4 +336,100 @@ class NewsletterBrandingControllerTest extends FunctionalTestCase
 
         $this->assertEquals(404, $response->getStatusCode());
     }
+
+    public function test_save_validates_logo_url_must_be_valid_url(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'logo_url' => 'not-a-url',
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('logo_url', $data['errors']);
+    }
+
+    public function test_save_accepts_valid_url_for_logo(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'logo_url' => 'https://cdn.example.com/logo.svg',
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+    }
+
+    public function test_save_validates_theme_json_primary_color_max_length(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'theme_json' => [
+                'primary_color' => '#ff000000', // 9 chars — exceeds max:7
+            ],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('theme_json.primary_color', $data['errors']);
+    }
+
+    public function test_save_validates_theme_json_secondary_color_max_length(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'theme_json' => [
+                'secondary_color' => '#aabbccdd', // too long
+            ],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('theme_json.secondary_color', $data['errors']);
+    }
+
+    public function test_save_validates_theme_json_text_color_max_length(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'theme_json' => [
+                'text_color' => '#ffffffff',
+            ],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('theme_json.text_color', $data['errors']);
+    }
+
+    public function test_save_accepts_valid_theme_json(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", [
+            'theme_json' => [
+                'primary_color' => '#ff0000',
+                'secondary_color' => '#00ff00',
+                'text_color' => '#333333',
+            ],
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+    }
+
+    public function test_save_allows_all_optional_fields_to_be_absent(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        // SaveNewsletterBrandingRequest has no required fields
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/branding", []);
+
+        $this->assertResponseStatus(200, $response);
+    }
+
 }

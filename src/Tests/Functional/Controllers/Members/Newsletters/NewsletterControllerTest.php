@@ -104,6 +104,166 @@ class NewsletterControllerTest extends FunctionalTestCase
         $this->assertNotNull($newsletter);
     }
 
+    public function test_create_validates_required_title(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'interval' => 'weekly',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('title', $data['errors']);
+    }
+
+    public function test_create_validates_required_interval(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'No Interval',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('interval', $data['errors']);
+    }
+
+    public function test_create_validates_interval_enum(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'Bad Interval',
+            'interval' => 'fortnightly', // not in allowed values
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('interval', $data['errors']);
+    }
+
+    public function test_create_accepts_all_valid_intervals(): void
+    {
+        foreach (['daily', 'weekly', 'biweekly', 'monthly'] as $interval) {
+            $response = $this->postForSite('/api/newsletters', [
+                'title' => "Test {$interval}",
+                'interval' => $interval,
+            ]);
+            $this->assertResponseStatus(201, $response, "Failed for interval: {$interval}");
+        }
+    }
+
+    public function test_create_validates_sort_order_enum(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'Test',
+            'interval' => 'weekly',
+            'sort_order' => 'sideways', // not asc or desc
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('sort_order', $data['errors']);
+    }
+
+    public function test_create_validates_content_type_enum(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'Test',
+            'interval' => 'weekly',
+            'content_type' => 'rss', // not in allowed values
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('content_type', $data['errors']);
+    }
+
+    public function test_create_validates_title_max_255(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => str_repeat('a', 256),
+            'interval' => 'weekly',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('title', $data['errors']);
+    }
+
+    public function test_create_sets_is_default_when_first_newsletter(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'First Newsletter',
+            'interval' => 'weekly',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(201, $response);
+        $this->assertTrue((bool)$data['data']['newsletter']['is_default']);
+    }
+
+    public function test_update_validates_interval_enum_when_provided(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'interval' => 'hourly',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('interval', $data['errors']);
+    }
+
+    public function test_update_validates_sort_order_enum_when_provided(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'sort_order' => 'random',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('sort_order', $data['errors']);
+    }
+
+    public function test_update_validates_content_type_enum_when_provided(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'content_type' => 'generated',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('content_type', $data['errors']);
+    }
+
+    public function test_update_validates_title_max_255_when_provided(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'title' => str_repeat('x', 256),
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(422, $response);
+        $this->assertArrayHasKey('title', $data['errors']);
+    }
+
+    public function test_update_sets_as_default_when_is_default_true(): void
+    {
+        $newsletter1 = $this->createNewsletter(['is_default' => true]);
+        $newsletter2 = $this->createNewsletter(['is_default' => false]);
+
+        $this->putForSite("/api/newsletters/{$newsletter2->id}", [
+            'is_default' => true,
+        ]);
+
+        $newsletter2 = $newsletter2->fresh();
+        $this->assertTrue((bool)$newsletter2->is_default);
+    }
+
     public function test_create_newsletter_with_automated_content(): void
     {
         // Arrange

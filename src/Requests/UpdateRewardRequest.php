@@ -16,7 +16,7 @@ class UpdateRewardRequest extends FormRequest
             'reward_type' => 'in:voucher,discount,points',
             'criteria' => 'array',
             'reward_config' => 'array',
-            'max_claims_per_member' => 'integer|min:1',
+            'max_claims_per_member' => 'integer|min_number:1',
             'is_active' => 'boolean',
             'sort_order' => 'integer'
         ];

@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Models\SubscriptionPlanPricing;
@@ -45,12 +46,11 @@ class SubscriptionPlanPricingController extends Controller
 
     public function store(CreatePricingTierRequest $request, int $planId)
     {
-
-        $data = $request->all();
-
-        $data['plan_id'] = $planId;
-
         try {
+            $data = $request->validated();
+
+            $data['plan_id'] = $planId;
+
             $pricing = $this->pricingService->createPricingTier($planId, $data);
 
             $pricing = SubscriptionPlanPricing::find($pricing->id);
@@ -60,7 +60,8 @@ class SubscriptionPlanPricingController extends Controller
                 'message' => 'Pricing tier created successfully',
                 'data' => $pricing->toArray()
             ]);
-
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->resourceResponse([
                 'success' => false,
@@ -81,9 +82,9 @@ class SubscriptionPlanPricingController extends Controller
 
     public function update(UpdatePricingTierRequest $request, int $planId, int $pricingId)
     {
-        $data = $request->all();
-
         try {
+            $data = $request->validated();
+
             $pricing = $this->pricingService->updatePricingTier($pricingId, $data);
 
             return $this->resourceResponse([
@@ -91,7 +92,8 @@ class SubscriptionPlanPricingController extends Controller
                 'message' => 'Pricing tier updated successfully',
                 'data' => $pricing->toArray()
             ]);
-
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\Exception $e) {
             Logger::error('Failed to update pricing tier', [
                 'pricing_id' => $pricingId,

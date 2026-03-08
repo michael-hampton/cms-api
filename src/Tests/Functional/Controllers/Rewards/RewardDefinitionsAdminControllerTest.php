@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers\Rewards;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 {
@@ -171,6 +172,82 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $this->assertEquals('New Reward', $data['definition']['name']);
     }
 
+    public function testCreateRequiresName(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['name' => null])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRequiresSlug(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['slug' => null])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRequiresRewardType(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['reward_type' => null])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsRewardTypeNotInAllowedValues(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['reward_type' => 'cashback']) // not in enum
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    #[DataProvider('validRewardTypes')]
+    public function testCreateAcceptsAllValidRewardTypes(string $type): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload([
+                'reward_type' => $type,
+                'slug' => "reward-{$type}",
+                'reward_config' => $type === 'voucher'
+                    ? ['code_prefix' => 'VCH']
+                    : ($type === 'discount' ? ['percentage' => 10] : ['points' => 100]),
+            ])
+        );
+
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public static function validRewardTypes(): array
+    {
+        return [
+            ['voucher'],
+            ['discount'],
+            ['points'],
+        ];
+    }
+
     public function testCreateRequiresValidation(): void
     {
         $this->actingAs($this->user);
@@ -179,6 +256,186 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(422, $response);
     }
+
+    public function testCreateRequiresCriteria(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['criteria' => null])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsCriteriaThatIsNotAnArray(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['criteria' => 'not-an-array'])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRequiresRewardConfig(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['reward_config' => null])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsRewardConfigThatIsNotAnArray(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['reward_config' => 'not-an-array'])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsMaxClaimsPerMemberBelow1(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['max_claims_per_member' => 0])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsNameExceeding255Characters(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['name' => str_repeat('x', 256)])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateRejectsSlugExceeding255Characters(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite(
+            '/api/reward-definitions',
+            $this->validCreatePayload(['slug' => str_repeat('x', 256)])
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testCreateValidatesEmptyPayload(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->postForSite('/api/reward-definitions', []);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsRewardTypeNotInAllowedValues(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition();
+
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['reward_type' => 'cashback']
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsCriteriaThatIsNotAnArray(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition();
+
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['criteria' => 'not-an-array']
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsRewardConfigThatIsNotAnArray(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition();
+
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['reward_config' => 'not-an-array']
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsMaxClaimsPerMemberBelow1(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition();
+
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['max_claims_per_member' => 0]
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition();
+
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['name' => str_repeat('x', 256)]
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateAcceptsPartialPayload(): void
+    {
+        $this->actingAs($this->user);
+
+        $definition = $this->createRewardDefinition(['name' => 'Original']);
+
+        // UpdateRewardRequest has no required fields — partial update is valid
+        $response = $this->putForSite(
+            "/api/reward-definitions/{$definition->id}",
+            ['is_active' => false]
+        );
+
+        $this->assertResponseOk($response);
+        $this->assertFalse($definition->fresh()->is_active);
+    }
+
 
     public function testUpdateRewardDefinition(): void
     {
@@ -203,6 +460,15 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
         $this->assertTrue($data['success']);
         $this->assertEquals('Updated Name', $data['definition']['name']);
         $this->assertFalse($data['definition']['is_active']);
+    }
+
+    public function testUpdateReturns404ForNonExistentDefinition(): void
+    {
+        $this->actingAs($this->user);
+
+        $response = $this->putForSite('/api/reward-definitions/99999', ['name' => 'Ghost']);
+
+        $this->assertResponseStatus(404, $response);
     }
 
     public function testDeleteRewardDefinition(): void
@@ -283,5 +549,24 @@ class RewardDefinitionsAdminControllerTest extends FunctionalTestCase
     {
         parent::setUp();
         $this->user = $this->createUser();
+    }
+
+    private function validCreatePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'New Reward',
+            'slug' => 'new-reward',
+            'description' => 'Test reward',
+            'reward_type' => 'points',
+            'criteria' => [
+                ['type' => 'signup', 'operator' => '>=', 'value' => 1],
+            ],
+            'reward_config' => [
+                'points' => 100,
+            ],
+            'max_claims_per_member' => 1,
+            'is_active' => true,
+            'sort_order' => 1,
+        ], $overrides);
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -79,6 +80,8 @@ class NewsletterBrandingController extends Controller
 
 
             return $this->successResponse('Branding saved', ['branding' => $branding]);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {

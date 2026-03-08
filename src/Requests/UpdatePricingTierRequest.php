@@ -9,12 +9,12 @@ class UpdatePricingTierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'duration_months' => ['integer', 'min:1'],
-            'issue_count' => ['integer', 'min:1'],
-            'price' => ['numeric', 'min:0'],
-            'original_price' => ['nullable', 'numeric', 'min:0'],
-            'digital_price' => ['nullable', 'numeric', 'min:0'],
-            'discount_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'duration_months' => ['integer', 'min_number:1'],
+            'issue_count' => ['integer', 'min_number:1'],
+            'price' => ['numeric', 'min_number:0'],
+            'original_price' => ['nullable', 'numeric', 'min_number:0'],
+            'digital_price' => ['nullable', 'numeric', 'min_number:0'],
+            'discount_percentage' => ['nullable', 'integer', 'min_number:0', 'max:100'],
             'label' => ['nullable', 'string', 'max:100'],
             'period_description' => ['nullable', 'string', 'max:255'],
             'is_default' => ['nullable', 'boolean'],

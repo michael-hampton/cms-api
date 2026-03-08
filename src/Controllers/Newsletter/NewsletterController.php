@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\DTO\Newsletters\NewsletterContentDTO;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Mail\MailManager;
@@ -98,24 +99,25 @@ class NewsletterController extends Controller
         try {
             $siteId = SiteContext::getId();
             $isDefault = $request->input('is_default', false);
+            $data = $request->validated();
 
             $data = [
                 'site_id' => $siteId,
-                'title' => $request->input('title'),
-                'content' => $request->input('content'),
-                'interval' => $request->input('interval'),
-                'active' => $request->input('active', true),
+                'title' => $data['title'],
+                'content' => $data['content'],
+                'interval' => $data['interval'],
+                'active' => $data['active'] ?? true,
                 'is_default' => false, // Will be set below if needed
-                'content_type' => $request->input('content_type', 'manual'),
-                'max_pages' => $request->input('max_pages', 10),
-                'sort_by' => $request->input('sort_by', 'published_at'),
-                'sort_order' => $request->input('sort_order', 'desc'),
-                'template' => $request->input('template', 'default'),
-                'layout_id' => $request->input('layout_id'),
-                'design_config' => $request->input('design_config')
-                    ? (is_string($request->input('design_config'))
-                        ? $request->input('design_config')
-                        : json_encode($request->input('design_config')))
+                'content_type' => $data['content_type'] ?? 'manual',
+                'max_pages' => $data['max_pages'] ?? 10,
+                'sort_by' => $data['sort_by'] ?? 'published_at',
+                'sort_order' => $data['sort_order'] ?? 'desc',
+                'template' => $data['template'] ?? 'default',
+                'layout_id' => $data['layout_id'],
+                'design_config' => $data['design_config']
+                    ? is_string($data['design_config'])
+                        ? $data['design_config']
+                        : json_encode($data['design_config'])
                     : null,
             ];
 
@@ -143,6 +145,8 @@ class NewsletterController extends Controller
                 'newsletter' => $newsletter->fresh()->toArray()
             ], 201);
 
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\Exception $e) {
             Logger::error('Failed to create newsletter', [
                 'error' => $e->getMessage(),
@@ -196,22 +200,23 @@ class NewsletterController extends Controller
                 $newsletter->regionSets(true)->sync(array_map('intval', $ids));
             }
             $newsletter->load(['regionSets']);
+            $data = $request->validated();
 
             $data = array_filter([
-                'title' => $request->input('title'),
-                'content' => $request->input('content'),
-                'interval' => $request->input('interval'),
-                'active' => $request->input('active'),
-                'content_type' => $request->input('content_type'),
-                'max_pages' => $request->input('max_pages'),
-                'sort_by' => $request->input('sort_by'),
-                'sort_order' => $request->input('sort_order'),
-                'template' => $request->input('template'),
-                'layout_id' => $request->input('layout_id'),
-                'design_config' => $request->input('design_config')
-                    ? (is_string($request->input('design_config'))
-                        ? $request->input('design_config')
-                        : json_encode($request->input('design_config')))
+                'title' => $data['title'],
+                'content' => $data['content'],
+                'interval' => $data['interval'],
+                'active' => $data['active'],
+                'content_type' => $data['content_type'],
+                'max_pages' => $data['max_pages'],
+                'sort_by' => $data['sort_by'],
+                'sort_order' => $data['sort_order'],
+                'template' => $data['template'],
+                'layout_id' => $data['layout_id'],
+                'design_config' => $data['design_config']
+                    ? is_string($data['design_config'])
+                        ? $data['design_config']
+                        : json_encode($data['design_config'])
                     : null,
             ], fn($value) => $value !== null);
 
@@ -230,6 +235,8 @@ class NewsletterController extends Controller
                 'newsletter' => $updated->toArray()
             ]);
 
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\Exception $e) {
             Logger::error('Failed to update newsletter', [
                 'id' => $id,

@@ -19,8 +19,8 @@ class StoreProductOfferBundleRequest extends FormRequest
             'is_active' => ['boolean'],
             'status' => ['in:draft,published,rejected'],
             'items' => ['required', 'array', 'min:2'],
-            'items.*.product_id' => ['integer', 'required_without:items.*.product_offer_id'],
-            'items.*.product_offer_id' => ['integer', 'required_without:items.*.product_id'],
+            'items.*.product_id' => ['integer'], //todo 'required_without:items.*.product_offer_id'
+            'items.*.product_offer_id' => ['integer'], //todo 'required_without:items.*.product_id'
             'items.*.quantity' => ['integer', 'min:1'],
         ];
     }

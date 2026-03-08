@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\DTO\Newsletters\IssueManualSendDTO;
 use App\DTO\Newsletters\NewsletterIssueDTO;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -88,10 +89,12 @@ class NewsletterIssueController extends Controller
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            $dto = NewsletterIssueDTO::fromArray($request->all());
+            $dto = NewsletterIssueDTO::fromArray($request->validated());
             $issue = $this->issueService->createIssue($newsletterId, $siteId, $dto);
 
             return $this->resourceResponse(['issue' => $issue->toArray()], 201);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\RuntimeException $e) {

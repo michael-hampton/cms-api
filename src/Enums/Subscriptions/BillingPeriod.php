@@ -6,6 +6,7 @@ enum BillingPeriod: string
 {
     case MONTHLY = 'monthly';
     case QUARTERLY = 'quarterly';
+    case WEEKLY = 'weekly';
     case YEARLY = 'yearly';
     case LIFETIME = 'lifetime';
     case ONE_TIME = '2year'; // Keep existing '2year' for backward compatibility

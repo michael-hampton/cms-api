@@ -4,6 +4,7 @@ namespace App\Controllers\Subscription;
 
 use App\Actions\SubscriptionPlan\BulkTogglePlanActive;
 use App\Controllers\Controller;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
@@ -109,7 +110,7 @@ class SubscriptionController extends Controller
         $siteId = SiteContext::getId();
 
         try {
-            $data = $request->all();
+            $data = $request->validated();
 
             // Handle image uploads
             if ($request->hasFile('print_image')) {
@@ -140,6 +141,8 @@ class SubscriptionController extends Controller
                 'plan' => $plan
             ]);
 
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,
@@ -152,7 +155,7 @@ class SubscriptionController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-            $data = $request->all();
+            $data = $request->validated();
 
             if ($request->hasFile('print_image')) {
                 $upload = new \App\Framework\FileUpload\ImageUpload(
@@ -185,6 +188,8 @@ class SubscriptionController extends Controller
                 'message' => 'Plan updated successfully',
                 'plan' => $plan
             ]);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
 
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);

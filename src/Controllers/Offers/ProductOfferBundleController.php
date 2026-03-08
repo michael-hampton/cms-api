@@ -50,7 +50,7 @@ class ProductOfferBundleController extends Controller
     public function store(StoreProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
+            $data = $request->validated();
             $bundle = $this->bundleService->createBundle($data);
 
             return $this->resourceResponse([
@@ -65,7 +65,7 @@ class ProductOfferBundleController extends Controller
                 $e->getErrors()
             );
         } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
@@ -92,7 +92,7 @@ class ProductOfferBundleController extends Controller
     public function update(int $bundleId, UpdateProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
-            $bundle = $this->bundleService->updateBundle($bundleId, $request->all());
+            $bundle = $this->bundleService->updateBundle($bundleId, $request->validated());
 
             if (!$bundle) {
                 return $this->jsonResponse([

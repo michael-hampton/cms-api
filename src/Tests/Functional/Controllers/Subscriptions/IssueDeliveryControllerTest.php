@@ -7,21 +7,15 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 class IssueDeliveryControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
-    public function testIndexDisplaysSchedules(): void
-    {
-        $schedule = $this->createIssueSchedule();
-
-        $response = $this->getForSite('/api/issue-deliveries');
-
-        $this->assertEquals(200, $response->getStatusCode());
-        $content = $response->getContent();
-        $this->assertStringContainsString($schedule->issue_title, $content);
-    }
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     private function createIssueSchedule(array $overrides = []): IssueDelivery
     {
@@ -38,7 +32,7 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
             'price' => $plan->price ?? 10.00,
             'currency' => $plan->currency ?? 'GBP',
             'delivery_type' => SubscriptionType::PRINTED->value,
-            'type' => 'paid'
+            'type' => 'paid',
         ]);
 
         return IssueDelivery::create(array_merge([
@@ -46,24 +40,45 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
             'issue_title' => 'Test Issue',
             'issue_number' => '001',
             'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
-            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month + 5 days')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +5 days')),
             'status' => IssueScheduleStatus::DRAFT->value,
             'subscription_id' => $subscription->id,
         ], $overrides));
     }
 
-    public function testStoreCreatesSchedule(): void
+    private function validStorePayload(array $overrides = []): array
     {
-        $data = [
+        return array_merge([
             'issue_title' => 'Test Issue',
             'issue_number' => '001',
             'on_sale_date' => '2025-03-01',
             'cut_off_date' => '2025-02-25',
-            'status' => 'draft'
-        ];
+            'status' => 'draft',
+        ], $overrides);
+    }
 
-        $response = $this->postForSite(
-            '/api/issue-deliveries', $data);
+    // =========================================================================
+    // GET /api/issue-deliveries
+    // =========================================================================
+
+    public function testIndexDisplaysSchedules(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->getForSite('/api/issue-deliveries');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $content = $response->getContent();
+        $this->assertStringContainsString($schedule->issue_title, $content);
+    }
+
+    // =========================================================================
+    // POST /api/issue-deliveries — happy path
+    // =========================================================================
+
+    public function testStoreCreatesSchedule(): void
+    {
+        $response = $this->postForSite('/api/issue-deliveries', $this->validStorePayload());
 
         $this->assertEquals(200, $response->getStatusCode());
         $responseData = json_decode($response->getContent(), true);
@@ -78,25 +93,159 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertEquals(IssueScheduleStatus::DRAFT->value, $schedule->status);
     }
 
-    public function testStoreValidatesRequiredFields(): void
+    // =========================================================================
+    // POST — StoreIssueDeliveryRequest validation
+    // =========================================================================
+
+    public function testStoreRequiresIssueTitle(): void
     {
         $response = $this->postForSite(
-            '/api/issue-deliveries', []);
+            '/api/issue-deliveries',
+            $this->validStorePayload(['issue_title' => null])
+        );
 
         $this->assertEquals(422, $response->getStatusCode());
     }
+
+    public function testStoreRequiresIssueNumber(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['issue_number' => null])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRequiresOnSaleDate(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['on_sale_date' => null])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsIssueTitleExceeding255Characters(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['issue_title' => str_repeat('x', 256)])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsIssueNumberExceeding100Characters(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['issue_number' => str_repeat('x', 101)])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsIssueConcodeExceeding100Characters(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['issue_code' => str_repeat('x', 101)])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsInvalidOnSaleDateFormat(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['on_sale_date' => 'not-a-date'])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsInvalidCutOffDateFormat(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['cut_off_date' => 'not-a-date'])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsInvalidFulfilmentDateFormat(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['fulfilment_date' => 'not-a-date'])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreRejectsStatusNotInAllowedValues(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['status' => 'pending']) // not in: draft,active,cancelled
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    #[DataProvider('validStatuses')]
+    public function testStoreAcceptsAllValidStatuses(string $status): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['status' => $status])
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public static function validStatuses(): array
+    {
+        return [
+            ['draft'],
+            ['active'],
+            ['cancelled'],
+        ];
+    }
+
+    public function testStoreRejectsNonIntegerSubscriptionPlanId(): void
+    {
+        $response = $this->postForSite(
+            '/api/issue-deliveries',
+            $this->validStorePayload(['subscription_plan_id' => 'not-an-int'])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStoreValidatesEmptyPayload(): void
+    {
+        $response = $this->postForSite('/api/issue-deliveries', []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    // =========================================================================
+    // PUT /api/issue-deliveries/{id} — happy path
+    // =========================================================================
 
     public function testUpdateSchedule(): void
     {
         $schedule = $this->createIssueSchedule();
 
-        $data = [
-            'issue_title' => 'Updated Title',
-            'status' => 'active'
-        ];
-
         $response = $this->putForSite(
-            "/api/issue-deliveries/{$schedule->id}", $data);
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_title' => 'Updated Title', 'status' => 'active']
+        );
 
         $this->assertEquals(200, $response->getStatusCode());
         $responseData = json_decode($response->getContent(), true);
@@ -108,6 +257,100 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertEquals('Updated Title', $schedule->issue_title);
         $this->assertEquals(IssueScheduleStatus::ACTIVE->value, $schedule->status);
     }
+
+    // =========================================================================
+    // PUT — UpdateIssueDeliveryRequest validation
+    // =========================================================================
+
+    public function testUpdateRejectsIssueTitleExceeding255Characters(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_title' => str_repeat('x', 256)]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsIssueNumberExceeding100Characters(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_number' => str_repeat('x', 101)]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsStatusNotInAllowedValues(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['status' => 'pending']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidOnSaleDateFormat(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['on_sale_date' => 'not-a-date']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidCutOffDateFormat(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['cut_off_date' => 'not-a-date']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNonIntegerSubscriptionPlanId(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['subscription_plan_id' => 'not-an-int']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateAcceptsPartialPayload(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        // UpdateIssueDeliveryRequest has no required fields — partial update is valid
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_title' => 'Partial Update']
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals('Partial Update', $schedule->fresh()->issue_title);
+    }
+
+    // =========================================================================
+    // DELETE /api/issue-deliveries/{id}
+    // =========================================================================
 
     public function testDestroyDeletesSchedule(): void
     {
@@ -133,7 +376,7 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
             'issue_number' => '1',
             'issue_title' => 'Test',
             'estimated_delivery_date' => date('Y-m-d'),
-            'status' => IssueScheduleStatus::ACTIVE->value
+            'status' => IssueScheduleStatus::ACTIVE->value,
         ]);
 
         $response = $this->deleteForSite("/api/issue-deliveries/{$schedule->id}");
@@ -144,6 +387,10 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertFalse($responseData['success']);
         $this->assertStringContainsString('existing deliveries', $responseData['message']);
     }
+
+    // =========================================================================
+    // PUT /api/issue-deliveries/{id}/status
+    // =========================================================================
 
     public function testUpdateStatus(): void
     {
@@ -158,10 +405,24 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertTrue($responseData['success']);
-
-        $schedule = $schedule->fresh();
-        $this->assertEquals(IssueScheduleStatus::ACTIVE->value, $schedule->status);
+        $this->assertEquals(IssueScheduleStatus::ACTIVE->value, $schedule->fresh()->status);
     }
+
+    public function testUpdateStatusRejectsInvalidStatus(): void
+    {
+        $schedule = $this->createIssueSchedule(['status' => IssueScheduleStatus::DRAFT->value]);
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}/status",
+            ['status' => 'invalid']
+        );
+
+        $this->assertEquals(500, $response->getStatusCode());
+    }
+
+    // =========================================================================
+    // GET /api/issue-deliveries/search
+    // =========================================================================
 
     public function testSearchSchedules(): void
     {
@@ -176,10 +437,5 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertTrue($responseData['success']);
         $this->assertCount(1, $responseData['items']);
         $this->assertEquals('January Issue', $responseData['items'][0]['issue_title']);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
     }
 }

@@ -21,6 +21,7 @@ use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MinLengthRule;
+use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
@@ -348,6 +349,7 @@ abstract class FormRequest extends Request
             'confirmed' => ConfirmedRule::class,
             'sometimes' => SometimesRule::class,
             'after' => AfterRule::class,
+            'min_number' => MinRule::class,
             // Add other mappings as needed
         ];
 

@@ -117,36 +117,45 @@ class RewardDefinitionsAdminController extends Controller
 
     public function update(UpdateRewardRequest $request, int $definitionId)
     {
-        if (!Auth::check()) {
-            return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
+        try {
+            if (!Auth::check()) {
+                return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+            }
 
-        $definition = $this->rewardDefinitionRepository->findRewardDefinitionById($definitionId);
+            $definition = $this->rewardDefinitionRepository->findRewardDefinitionById($definitionId);
 
-        if (!$definition) {
-            return $this->resourceResponse(['success' => false, 'message' => 'Reward definition not found'], 404);
-        }
+            if (!$definition) {
+                return $this->resourceResponse(['success' => false, 'message' => 'Reward definition not found'], 404);
+            }
 
-        $data = $request->validated();
-        $userId = Auth::id();
+            $data = $request->validated();
+            $userId = Auth::id();
 
 
-        $updated = $this->rewardDefinitionRepository->update($definitionId, $data, $userId);
+            $updated = $this->rewardDefinitionRepository->update($definitionId, $data, $userId);
 
-        if (!$updated) {
+            if (!$updated) {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Failed to update reward definition'
+                ], 400);
+            }
+
+            $definition = $this->rewardDefinitionRepository->findRewardDefinitionById($definitionId);
+
             return $this->resourceResponse([
-                'success' => false,
-                'message' => 'Failed to update reward definition'
-            ], 400);
+                'success' => true,
+                'message' => 'Reward definition updated successfully',
+                'definition' => $definition->toArray()
+            ]);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+
+        } catch (\Exception $exception) {
+            return $this->errorResponse($exception->getMessage(), 500);
         }
 
-        $definition = $this->rewardDefinitionRepository->findRewardDefinitionById($definitionId);
 
-        return $this->resourceResponse([
-            'success' => true,
-            'message' => 'Reward definition updated successfully',
-            'definition' => $definition->toArray()
-        ]);
     }
 
     public function delete(Request $request, int $definitionId)

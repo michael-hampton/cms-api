@@ -6,6 +6,7 @@ use App\Actions\Subscriptions\ExportIssueSchedulesAction;
 use App\Actions\Subscriptions\ImportIssueSchedulesAction;
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
@@ -60,22 +61,24 @@ class IssueDeliveryController extends Controller
 
     public function store(StoreIssueDeliveryRequest $request)
     {
-        $siteId = SiteContext::getId();
-
-        $data = $request->all();
-        $data['site_id'] = $siteId;
-
-        if (isset($data['title'])) {
-            $data['issue_title'] = $data['title'];
-        }
-
         try {
-            if (empty($data['issue_title']) || empty($data['issue_number']) || empty($data['on_sale_date'])) {
-                return $this->resourceResponse([
-                    'success' => false,
-                    'message' => 'Missing required fields'
-                ], 422);
+            $siteId = SiteContext::getId();
+
+            $data = $request->validated();
+
+            $data['site_id'] = $siteId;
+
+            if (isset($data['title'])) {
+                $data['issue_title'] = $data['title'];
             }
+
+//            if (empty($data['issue_title']) || empty($data['issue_number']) || empty($data['on_sale_date'])) {
+//                die('here');
+//                return $this->resourceResponse([
+//                    'success' => false,
+//                    'message' => 'Missing required fields'
+//                ], 422);
+//            }
 
             $schedule = $this->issueDeliveryRepository->create($data);
 
@@ -84,6 +87,9 @@ class IssueDeliveryController extends Controller
                 'message' => 'Schedule created successfully',
                 'data' => $schedule->toArray()
             ]);
+
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
 
         } catch (\Exception $e) {
             return $this->resourceResponse([
@@ -95,13 +101,13 @@ class IssueDeliveryController extends Controller
 
     public function update(UpdateIssueDeliveryRequest $request, int $id)
     {
-        $data = $request->all();
-
-        if (isset($data['title'])) {
-            $data['issue_title'] = $data['title'];
-        }
-
         try {
+            $data = $request->validated();
+
+            if (isset($data['title'])) {
+                $data['issue_title'] = $data['title'];
+            }
+
             $schedule = $this->issueDeliveryRepository->update($id, $data);
 
             if (isset($data['plan_ids'])) {
@@ -115,6 +121,9 @@ class IssueDeliveryController extends Controller
                 'message' => 'Schedule updated successfully',
                 'data' => $schedule->toArray()
             ]);
+
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
 
         } catch (\Exception $e) {
 
@@ -150,7 +159,12 @@ class IssueDeliveryController extends Controller
         $data = $request->all();
 
         try {
-            $status = IssueScheduleStatus::from($data['status']);
+            $status = IssueScheduleStatus::tryFrom($data['status']);
+
+            if (!$status) {
+                return $this->errorResponse('Invalid status', 500);
+            }
+
             $schedule = $this->issueDeliveryService->updateScheduleStatus($id, $status);
 
             return $this->resourceResponse([
