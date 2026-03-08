@@ -319,11 +319,12 @@ class NewsletterPageBuilderService
         }
 
         $site = Site::findOrFail($siteId);
+        $design = $newsletter->design_config ?? [];
 
+        // ── Logo ──────────────────────────────────────────────────────────────
         $logoUrl = $branding?->logo_url ?? $site->getLogoUrl();
-        $footerText = $branding?->footer_text
-            ?? ('&copy; ' . date('Y') . ' ' . htmlspecialchars($site->name) . '. All rights reserved.');
 
+        // ── Custom CSS ────────────────────────────────────────────────────────
         $customCssTag = '';
         if ($branding?->custom_css) {
             $sanitized = $this->cssSanitizer->sanitizeAndScope(
@@ -338,6 +339,64 @@ class NewsletterPageBuilderService
         $scopeId = 'newsletter-' . $newsletter->id;
         $viewInBrowserBanner = $this->buildViewInBrowserBanner();
 
+        // ── Chrome config (all optional) ──────────────────────────────────────
+        $chrome = $design['chrome'] ?? [];
+        $headerBg = $chrome['header_background'] ?? '#ffffff';
+        $headerTextColor = $chrome['header_text_color'] ?? '#000000';
+        $showNav = !empty($chrome['show_nav']);
+        $navLinks = $chrome['nav_links'] ?? [];
+
+        // ── Editorial intro (optional) ────────────────────────────────────────
+        $editorial = $design['editorial'] ?? [];
+        $editorialNote = $editorial['note'] ?? null;
+        $editorName = $editorial['editor_name'] ?? null;
+        $editorTitle = $editorial['editor_title'] ?? null;
+        $editorImageUrl = $editorial['editor_image_url'] ?? null;
+
+        // ── Footer config ─────────────────────────────────────────────────────
+        $footerConfig = $design['footer'] ?? [];
+        $footerBg = $footerConfig['background'] ?? '#f8f8f8';
+        $footerTextColor = $footerConfig['text_color'] ?? '#666666';
+        $footerAddress = $footerConfig['address'] ?? null;
+        $socialLinks = $footerConfig['social_links'] ?? [];
+        $legalLinks = $footerConfig['legal_links'] ?? [];
+
+        // Resolve token URLs for legal link placeholders
+        $unsubscribeUrl = $unsubscribeToken
+            ? url("/member/subscriptions/unsubscribe/{$unsubscribeToken}")
+            : null;
+        $manageUrl = $unsubscribeToken
+            ? url("/member/subscriptions/manage/{$unsubscribeToken}")
+            : null;
+
+        $legalLinks = array_map(function (array $link) use ($unsubscribeUrl, $manageUrl): array {
+            $url = $link['url'] ?? '#';
+            $url = str_replace('{{UNSUBSCRIBE_URL}}', $unsubscribeUrl ?? '#', $url);
+            $url = str_replace('{{MANAGE_URL}}', $manageUrl ?? '#', $url);
+            return array_merge($link, ['url' => $url]);
+        }, $legalLinks);
+
+        // Fall back to generic unsubscribe/manage footer if no legal_links defined
+        // but a token is available (preserves existing behaviour for non-design_config
+        // newsletters).
+        if (empty($legalLinks) && $unsubscribeToken) {
+            $legalLinks = [
+                ['label' => 'Unsubscribe', 'url' => $unsubscribeUrl],
+                ['label' => 'Manage Preferences', 'url' => $manageUrl],
+            ];
+        }
+
+        $this->buildDesignFooter(
+            $footerTextColor,
+            $socialLinks,
+            $legalLinks,
+            $footerAddress,
+            $site->name,
+            $branding?->footer_text,
+            $unsubscribeToken
+        );
+
+        // ── Assemble ──────────────────────────────────────────────────────────
         $html = '<!DOCTYPE html>
 <html>
 <head>
@@ -346,33 +405,54 @@ class NewsletterPageBuilderService
     <title>' . Str::sanitize($newsletter->title) . '</title>
     ' . $customCssTag . '
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background-color:#f4f4f4;">
 <div id="' . $scopeId . '">
     ' . $viewInBrowserBanner . '
     <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-            <td align="center" style="padding: 20px 0;">
-                <table width="600" cellpadding="0" cellspacing="0" border="0" style="background-color: #ffffff;">
-                    <!-- Logo Header -->
+            <td align="center" style="padding:20px 0;">
+                <table width="600" cellpadding="0" cellspacing="0" border="0"
+                       style="background-color:#ffffff;">
+
+                    <!-- ── Header / Logo ─────────────────────────────────── -->
                     <tr>
-                        <td align="center" style="padding: 30px 20px; background-color: #ffffff; border-bottom: 2px solid #e0e0e0;">
-                            ' . $this->buildLogoHtml($logoUrl, $site->name) . '
+                        <td align="center"
+                            style="padding:24px 20px;background-color:' . htmlspecialchars($headerBg) . ';
+                                   border-bottom:2px solid #e0e0e0;">
+                            ' . $this->buildLogoHtml($logoUrl, $site->name, $headerTextColor) . '
                         </td>
                     </tr>
 
-                    <!-- Newsletter Content -->
+                    ' . ($showNav && !empty($navLinks)
+                ? $this->buildNavBar($navLinks, $headerBg, $headerTextColor)
+                : '') . '
+
+                    ' . ($editorialNote
+                ? $this->buildEditorialIntro($editorialNote, $editorName, $editorTitle, $editorImageUrl)
+                : '') . '
+
+                    <!-- ── Body blocks ───────────────────────────────────── -->
                     <tr>
-                        <td style="padding: 20px;">
+                        <td style="padding:20px;">
                             ' . $blockHtml . '
                         </td>
                     </tr>
 
-                    <!-- Footer -->
+                    <!-- ── Footer ───────────────────────────────────────── -->
                     <tr>
-                        <td style="padding: 20px; background-color: #f8f8f8; text-align: center; font-size: 12px; color: #666;">
-                            ' . $this->renderFooter($unsubscribeToken, $branding) . '
+                        <td style="background-color:' . htmlspecialchars($footerBg) . ';
+                                   padding:24px 20px;text-align:center;">
+                            ' . $this->buildDesignFooter(
+                $footerTextColor,
+                $socialLinks,
+                $legalLinks,
+                $footerAddress,
+                $site->name,
+                $branding?->footer_text
+            ) . '
                         </td>
                     </tr>
+
                 </table>
             </td>
         </tr>
@@ -404,20 +484,192 @@ class NewsletterPageBuilderService
 HTML;
     }
 
-    private function buildLogoHtml(?string $logoUrl, string $siteName): string
+    private function buildLogoHtml(?string $logoUrl, string $siteName, string $textColor = '#1a202c'): string
     {
         if ($logoUrl) {
             return sprintf(
-                '<img src="%s" alt="%s" style="max-width: 200px; height: auto;">',
+                '<img src="%s" alt="%s" style="max-width:200px;height:auto;">',
                 Str::sanitize($logoUrl),
                 htmlspecialchars($siteName)
             );
         }
 
         return sprintf(
-            '<div style="font-size: 24px; font-weight: bold; color: #1a202c;">%s</div>',
+            '<div style="font-size:24px;font-weight:bold;color:%s;">%s</div>',
+            htmlspecialchars($textColor),
             htmlspecialchars($siteName)
         );
+    }
+
+    /**
+     * Optional nav bar rendered below the logo when design_config.chrome.show_nav
+     * is true and nav_links is non-empty.
+     */
+    private function buildNavBar(array $navLinks, string $bg, string $textColor): string
+    {
+        $links = '';
+        foreach ($navLinks as $link) {
+            $label = htmlspecialchars($link['label'] ?? '');
+            $url = htmlspecialchars($link['url'] ?? '#');
+            $links .= sprintf(
+                '<a href="%s" style="color:%s;text-decoration:none;font-size:11px;
+                                     letter-spacing:1.5px;font-weight:600;
+                                     padding:0 12px;">%s</a>',
+                $url,
+                htmlspecialchars($textColor),
+                $label
+            );
+        }
+
+        return sprintf(
+            '<tr>
+                <td align="center"
+                    style="background-color:%s;padding:10px 20px;
+                           border-bottom:1px solid rgba(255,255,255,0.15);">
+                    %s
+                </td>
+            </tr>',
+            htmlspecialchars($bg),
+            $links
+        );
+    }
+
+    /**
+     * Optional editorial intro block rendered between the header and body blocks.
+     * Only emitted when design_config.editorial.note is set.
+     */
+    private function buildEditorialIntro(
+        string  $note,
+        ?string $editorName,
+        ?string $editorTitle,
+        ?string $editorImageUrl
+    ): string
+    {
+        $byline = '';
+
+        if ($editorName) {
+            $avatar = $editorImageUrl
+                ? sprintf(
+                    '<img src="%s" alt="%s"
+              style="width:36px;height:36px;border-radius:50%%;
+                     object-fit:cover;vertical-align:middle;
+                     margin-right:8px;">',
+                    htmlspecialchars($editorImageUrl, ENT_QUOTES, 'UTF-8', false),
+                    htmlspecialchars($editorName, ENT_QUOTES, 'UTF-8', false)
+                )
+                : '';
+
+            $titlePart = $editorTitle
+                ? ', <span style="font-style:italic;">' . htmlspecialchars($editorTitle) . '</span>'
+                : '';
+
+            $byline = sprintf(
+                '<p style="margin:12px 0 0 0;font-size:13px;color:#888;">
+                    %s%s%s
+                </p>',
+                $avatar,
+                htmlspecialchars($editorName),
+                $titlePart
+            );
+        }
+
+        return sprintf(
+            '<tr>
+                <td style="padding:24px 28px;border-bottom:1px solid #eeeeee;">
+                    <p style="margin:0;font-size:15px;line-height:1.7;color:#333;">%s</p>
+                    %s
+                </td>
+            </tr>',
+            nl2br(htmlspecialchars($note)),
+            $byline
+        );
+    }
+
+    /**
+     * Footer driven entirely by design_config values.
+     * Falls back gracefully at every level so non-Curates newsletters are unaffected.
+     */
+    private function buildDesignFooter(
+        string  $textColor,
+        array   $socialLinks,
+        array   $legalLinks,
+        ?string $address,
+        string  $siteName,
+        ?string $brandingFooterText = null,
+        ?string $unsubscribeToken = null
+    ): string
+    {
+        $html = '';
+
+        // Social icons
+        if (!empty($socialLinks)) {
+            $icons = '';
+            foreach ($socialLinks as $social) {
+                $platform = strtolower($social['platform'] ?? '');
+                $url = htmlspecialchars($social['url'] ?? '#');
+                $label = ucfirst($platform);
+                // Unicode glyphs keep this email-safe without external image deps.
+                $glyph = match ($platform) {
+                    'instagram' => '📷',
+                    'pinterest' => '📌',
+                    'facebook' => 'f',
+                    'twitter', 'x' => '𝕏',
+                    'tiktok' => '♪',
+                    default => '🔗',
+                };
+                $icons .= sprintf(
+                    '<a href="%s" title="%s"
+                          style="display:inline-block;margin:0 8px;
+                                 color:%s;text-decoration:none;font-size:18px;">%s</a>',
+                    $url,
+                    $label,
+                    htmlspecialchars($textColor),
+                    $glyph
+                );
+            }
+            $html .= '<div style="margin-bottom:14px;">' . $icons . '</div>';
+        }
+
+        // Legal links
+        if (!empty($legalLinks)) {
+            $links = [];
+            foreach ($legalLinks as $link) {
+                $links[] = sprintf(
+                    '<a href="%s" style="color:%s;text-decoration:none;font-size:11px;
+                                         letter-spacing:0.5px;">%s</a>',
+                    htmlspecialchars($link['url'] ?? '#'),
+                    htmlspecialchars($textColor),
+                    htmlspecialchars($link['label'] ?? '')
+                );
+            }
+            $html .= '<p style="margin:0 0 10px 0;">' . implode(' &nbsp;|&nbsp; ', $links) . '</p>';
+        }
+
+        // Custom footer text (from branding) or address
+        if ($brandingFooterText) {
+            $html .= '<p style="margin:0 0 8px 0;font-size:12px;color:' . htmlspecialchars($textColor) . ';">'
+                . nl2br(htmlspecialchars($brandingFooterText)) . '</p>';
+        } else {
+            $html .= '<p>You received this email because you are subscribed to our newsletter.</p>';
+        }
+
+        if ($address) {
+            $html .= '<p style="margin:0 0 8px 0;font-size:11px;color:' . htmlspecialchars($textColor) . ';">'
+                . htmlspecialchars($address) . '</p>';
+        }
+
+        if ($unsubscribeToken) {
+            $unsubscribeUrl = url("/member/subscriptions/unsubscribe/{$unsubscribeToken}");
+            $manageUrl = url("/member/subscriptions/manage/{$unsubscribeToken}");
+            $html .= '<p><a href="' . $unsubscribeUrl . '" style="color: #999;">Unsubscribe</a> | ';
+            $html .= '<a href="' . $manageUrl . '" style="color: #999;">Manage Preferences</a></p>';
+        }
+
+        // Copyright — always present
+        $html .= '<p style="margin:0;font-size:11px;color:' . htmlspecialchars($textColor) . ';">'
+            . '&copy; ' . date('Y') . ' ' . htmlspecialchars($siteName) . '. All rights reserved.</p>';
+
+        return $html;
     }
 
     // -------------------------------------------------------------------------

@@ -1865,6 +1865,419 @@
             font-size: 12px;
             font-family: var(--font-mono)
         }
+
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: var(--ink);
+            border-top: 1px solid rgba(255, 255, 255, .08);
+            z-index: 200;
+            padding: 0 4px;
+            align-items: center;
+            justify-content: space-around;
+            gap: 2px;
+        }
+
+        .mobile-nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            padding: 6px 4px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            color: rgba(255, 255, 255, .4);
+            font-size: 9px;
+            font-family: var(--font-mono);
+            letter-spacing: .03em;
+            text-transform: uppercase;
+            transition: color var(--transition), background var(--transition);
+            position: relative;
+            user-select: none;
+            text-align: center;
+            min-width: 0;
+            border: none;
+            background: transparent;
+        }
+
+        .mobile-nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .mobile-nav-item.active {
+            color: var(--accent);
+        }
+
+        .mobile-nav-item .mob-badge {
+            position: absolute;
+            top: 4px;
+            right: 50%;
+            transform: translateX(6px);
+            background: var(--accent);
+            color: white;
+            font-size: 8px;
+            font-family: var(--font-mono);
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            line-height: 1;
+        }
+
+        /* Hamburger button — shown only on mobile */
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--ink-2);
+            padding: 6px;
+            border-radius: var(--radius);
+            transition: background var(--transition);
+            flex-shrink: 0;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--paper-2);
+        }
+
+        /* Overlay for sidebar drawer on mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 14, 13, .55);
+            backdrop-filter: blur(2px);
+            z-index: 99;
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        /* ── BREAKPOINTS ─────────────────────────── */
+
+        /* ── 1280px: tighten stats grid ─────────── */
+        @media (max-width: 1280px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .three-col {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        /* ── 1024px: collapse sidebar width ─────── */
+        @media (max-width: 1024px) {
+            :root {
+                --sidebar-w: 200px;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stats-grid-3 {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .three-col {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .commission-summary {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+            }
+
+            .commission-divider {
+                display: none;
+            }
+
+            .commission-block {
+                border-bottom: 1px solid var(--border);
+            }
+
+            .commission-block:last-child {
+                border-bottom: none;
+            }
+        }
+
+        /* ── 768px: drawer sidebar, bottom nav ───── */
+        @media (max-width: 768px) {
+            /* Show toggle and mobile nav */
+            .sidebar-toggle {
+                display: flex;
+                align-items: center;
+            }
+
+            .mobile-nav {
+                display: flex;
+            }
+
+            /* Push content above bottom nav */
+            body {
+                padding-bottom: 60px;
+            }
+
+            /* Sidebar becomes a fixed drawer */
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                z-index: 100;
+                transform: translateX(-100%);
+                transition: transform 260ms cubic-bezier(.4, 0, .2, 1);
+                width: 260px;
+                overflow-y: auto;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            /* Topbar */
+            .topbar {
+                padding: 0 16px;
+                gap: 10px;
+            }
+
+            .topbar-title {
+                font-size: 16px;
+            }
+
+            .topbar-breadcrumb {
+                display: none;
+            }
+
+            /* Hide topbar search & secondary btn on mobile */
+            .topbar .search-bar {
+                display: none;
+            }
+
+            .topbar .btn-secondary:not(.keep-mobile) {
+                display: none;
+            }
+
+            /* Content */
+            .content-area {
+                padding: 16px;
+            }
+
+            /* Grids → single column */
+            .stats-grid,
+            .stats-grid-3,
+            .two-col,
+            .three-col {
+                grid-template-columns: 1fr;
+            }
+
+            /* Offer/commission horizontal → vertical */
+            .commission-summary {
+                grid-template-columns: 1fr;
+            }
+
+            /* Form rows → stack */
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            /* Revenue chart — shorter */
+            .chart-area {
+                height: 110px;
+            }
+
+            .analytics-chart-wrap {
+                height: 130px;
+            }
+
+            /* Product grid — 2 cols on tablet */
+            .product-grid {
+                grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+                gap: 12px;
+            }
+
+            /* Tables: let them scroll */
+            .table-wrap {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            table {
+                min-width: 480px;
+                font-size: 12px;
+            }
+
+            thead th,
+            tbody td {
+                padding: 9px 12px;
+            }
+
+            /* Voucher cards: allow wrapping */
+            .voucher-right {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .voucher-actions {
+                flex-wrap: wrap;
+            }
+
+            /* Modals: full-screen */
+            .modal {
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+                max-height: 92vh;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+            }
+
+            .modal-overlay {
+                align-items: flex-end;
+            }
+
+            /* Tab bars: allow horizontal scroll */
+            .tab-bar {
+                overflow-x: auto;
+                overflow-y: hidden;
+                scrollbar-width: none;
+                flex-shrink: 0;
+            }
+
+            .tab-bar::-webkit-scrollbar {
+                display: none;
+            }
+
+            .tab-btn {
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            /* Offers row: stack */
+            .offer-list-item {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .offer-price {
+                margin-left: auto;
+            }
+
+            /* Balance card: smaller text */
+            .balance-amount {
+                font-size: 16px;
+            }
+
+            /* Notif: full width */
+            .notif {
+                left: 16px;
+                right: 16px;
+                bottom: 72px;
+            }
+        }
+
+        /* ── 480px: single column tight ─────────── */
+        @media (max-width: 480px) {
+            .topbar {
+                padding: 0 12px;
+                gap: 8px;
+            }
+
+            .topbar-title {
+                font-size: 15px;
+            }
+
+            .content-area {
+                padding: 12px;
+            }
+
+            .stat-value {
+                font-size: 22px;
+            }
+
+            .stat-card {
+                padding: 14px;
+            }
+
+            .product-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .product-img {
+                height: 110px;
+                font-size: 28px;
+            }
+
+            .card-header {
+                padding: 12px 14px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .card-body {
+                padding: 14px;
+            }
+
+            .btn {
+                padding: 6px 11px;
+                font-size: 12px;
+            }
+
+            .btn-sm {
+                padding: 4px 8px;
+                font-size: 11px;
+            }
+
+            /* Hide label text in mobile nav to save space */
+            .mobile-nav-item span {
+                display: none;
+            }
+
+            .mobile-nav-item {
+                gap: 0;
+            }
+
+            table {
+                min-width: 420px;
+            }
+        }
+
+        /* ── Landscape phone ─────────────────────── */
+        @media (max-width: 768px) and (orientation: landscape) {
+            .modal {
+                border-radius: 0;
+                position: fixed;
+                inset: 0;
+                max-height: 100vh;
+            }
+
+            .modal-overlay {
+                align-items: center;
+            }
+
+            body {
+                padding-bottom: 0;
+            }
+
+            .mobile-nav {
+                position: relative;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1878,6 +2291,45 @@ $activeBoostCount = $activeBoosts->count();
 $pendingOffersCount = $offers->where('status', 'pending')->count();
 $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
 ?>
+
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<nav class="mobile-nav" id="mobile-nav">
+    <button class="mobile-nav-item active" data-panel="overview" onclick="mobileNavigate('overview')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="1" y="1" width="6" height="6" rx="1"/>
+            <rect x="9" y="1" width="6" height="6" rx="1"/>
+            <rect x="1" y="9" width="6" height="6" rx="1"/>
+            <rect x="9" y="9" width="6" height="6" rx="1"/>
+        </svg>
+        <span>Overview</span>
+    </button>
+    <button class="mobile-nav-item" data-panel="products" onclick="mobileNavigate('products')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 4l6-2 6 2v8l-6 2-6-2V4z"/>
+        </svg>
+        <span>Products</span>
+    </button>
+    <button class="mobile-nav-item" data-panel="offers" onclick="mobileNavigate('offers')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="8" cy="8" r="6"/>
+            <path d="M5 8l2 2 4-4"/>
+        </svg>
+        <span>Offers</span>
+    </button>
+    <button class="mobile-nav-item" data-panel="analytics" onclick="mobileNavigate('analytics')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 12l3-4 3 2 3-5 3 3"/>
+        </svg>
+        <span>Analytics</span>
+    </button>
+    <button class="mobile-nav-item" onclick="toggleSidebar()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 4h12M2 8h12M2 12h12"/>
+        </svg>
+        <span>More</span>
+    </button>
+</nav>
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
@@ -2008,6 +2460,11 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
 <!-- MAIN -->
 <div class="main">
     <header class="topbar">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menu">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M2 4h12M2 8h12M2 12h12"/>
+            </svg>
+        </button>
         <div>
             <div class="topbar-title" id="page-title">Overview</div>
             <div class="topbar-breadcrumb text-xs"><?= htmlspecialchars($merchant->name) ?> → <span
@@ -3462,7 +3919,14 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                 reviews: {title: 'Reviews', breadcrumb: 'Community → Reviews', action: null, modal: null},
             };
 
-            function navigate(key) {
+            navigate = function (key) {
+                _originalNavigate(key);
+                document.querySelectorAll('.mobile-nav-item[data-panel]').forEach(el => {
+                    el.classList.toggle('active', el.dataset.panel === key);
+                });
+            };
+
+            function _originalNavigate(key) {
                 document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.panel === key));
                 document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
                 document.getElementById('panel-' + key)?.classList.add('active');
@@ -4028,10 +4492,38 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                 chartTooltip.style.top = (y - 8 - th < 0 ? y + 8 : y - th - 8) + 'px';
             });
 
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 768) closeSidebar();
+            });
+
             document.addEventListener('mouseout', function (e) {
                 if (!e.target.closest('.analytics-bar')) return;
                 chartTooltip.style.opacity = '0';
             });
+
+            // ─── MOBILE SIDEBAR ──────────────────────────────────────────────────────────
+            function toggleSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                const isOpen = sidebar.classList.toggle('open');
+                overlay?.classList.toggle('open', isOpen);
+                document.body.style.overflow = isOpen ? 'hidden' : '';
+            }
+
+            function closeSidebar() {
+                document.querySelector('.sidebar')?.classList.remove('open');
+                document.getElementById('sidebar-overlay')?.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+
+            function mobileNavigate(key) {
+                navigate(key);
+                // Update mobile nav active state
+                document.querySelectorAll('.mobile-nav-item[data-panel]').forEach(el => {
+                    el.classList.toggle('active', el.dataset.panel === key);
+                });
+                closeSidebar();
+            }
 
             // ─── INIT ─────────────────────────────────────────────────────────────────
             buildRevenueChart();
