@@ -10,13 +10,19 @@ use App\Services\Newsletter\Services\BlockDataFactory;
 /**
  * Renders a single slot's blocks to HTML.
  * Delegates each block to EmailBlockRendererRegistry.
- * No newsletter-specific logic.
+ *
+ * Variable resolution:
+ *   Before a block's data reaches BlockDataFactory, LayoutBlockVariableResolver
+ *   replaces any {{variable}} placeholders using values derived from the
+ *   NewsletterRenderContext.  This keeps the renderers and DTOs clean — they
+ *   always receive concrete values, never template syntax.
  */
 class SlotRenderer
 {
     public function __construct(
-        private readonly EmailBlockRendererRegistry $blockRegistry,
-        private readonly BlockDataFactory $blockDataFactory
+        private readonly EmailBlockRendererRegistry  $blockRegistry,
+        private readonly BlockDataFactory            $blockDataFactory,
+        private readonly LayoutBlockVariableResolver $variableResolver,
     )
     {
     }
@@ -27,10 +33,16 @@ class SlotRenderer
             return '';
         }
 
+        // Build variable map once per slot render so we don't re-derive it
+        // for every block. Map is empty when there is no context.
+        $variableMap = $context !== null
+            ? $this->variableResolver->buildVariableMap($context)
+            : [];
+
         $htmlBlocks = [];
 
         foreach ($slot->blocks as $block) {
-            $result = $this->renderBlock($block, $context);
+            $result = $this->renderBlock($block, $context, $variableMap);
 
             if (!empty($result['success']) && !empty($result['html'])) {
                 $htmlBlocks[] = $result['html'];
@@ -53,7 +65,7 @@ class SlotRenderer
         );
     }
 
-    public function renderBlock(array $block, ?NewsletterRenderContext $context): array
+    public function renderBlock(array $block, ?NewsletterRenderContext $context, array $variableMap = []): array
     {
         try {
             $type = $block['type'] ?? null;
@@ -62,9 +74,15 @@ class SlotRenderer
                 throw new \Exception('Missing block type');
             }
 
+            // Resolve variables in the raw data array before hydration
+            $rawData = $block['data'] ?? [];
+            if (!empty($variableMap) && is_array($rawData)) {
+                $rawData = $this->variableResolver->resolveBlock($rawData, $variableMap);
+            }
+
             $blockData = $this->blockDataFactory->create(
                 $type,
-                $block['data'] ?? []
+                $rawData
             );
 
             $renderedBlock = $this->blockRegistry->render(

@@ -7,6 +7,7 @@ use App\Services\Newsletter\DTOs\BlockData\HeadingBlockData;
 use App\Services\Newsletter\DTOs\BlockData\TextBlockData;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
+use App\Services\Newsletter\Layout\LayoutBlockVariableResolver;
 use App\Services\Newsletter\Layout\SlotRenderer;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
 use App\Services\Newsletter\Services\BlockDataFactory;
@@ -18,6 +19,27 @@ class SlotRendererTest extends TestCase
     private EmailBlockRendererRegistry $registry;
     private BlockDataFactory $factory;
     private SlotRenderer $renderer;
+    private LayoutBlockVariableResolver $layoutBlockVariableResolver;
+
+    protected function setUp(): void
+    {
+        $this->registry = Mockery::mock(EmailBlockRendererRegistry::class);
+        $this->factory = Mockery::mock(BlockDataFactory::class);
+        $this->layoutBlockVariableResolver = Mockery::mock(LayoutBlockVariableResolver::class);
+
+        $this->layoutBlockVariableResolver->shouldReceive('buildVariableMap')->andReturn([])->byDefault();
+
+        $this->renderer = new SlotRenderer(
+            $this->registry,
+            $this->factory,
+            $this->layoutBlockVariableResolver
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+    }
 
     public function test_returns_empty_string_when_slot_is_empty(): void
     {
@@ -452,21 +474,5 @@ class SlotRendererTest extends TestCase
         $result = $this->renderer->render($slot);
 
         $this->assertStringContainsString('<p>Valid</p>', $result);
-    }
-
-    protected function setUp(): void
-    {
-        $this->registry = Mockery::mock(EmailBlockRendererRegistry::class);
-        $this->factory = Mockery::mock(BlockDataFactory::class);
-
-        $this->renderer = new SlotRenderer(
-            $this->registry,
-            $this->factory
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
     }
 }
