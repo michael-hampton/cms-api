@@ -111,7 +111,12 @@ class NewsletterController extends Controller
                 'sort_by' => $request->input('sort_by', 'published_at'),
                 'sort_order' => $request->input('sort_order', 'desc'),
                 'template' => $request->input('template', 'default'),
-                'layout_id' => $request->input('layout_id')
+                'layout_id' => $request->input('layout_id'),
+                'design_config' => $request->input('design_config')
+                    ? (is_string($request->input('design_config'))
+                        ? $request->input('design_config')
+                        : json_encode($request->input('design_config')))
+                    : null,
             ];
 
             $newsletter = $this->newsletterRepository->create($data);
@@ -202,7 +207,12 @@ class NewsletterController extends Controller
                 'sort_by' => $request->input('sort_by'),
                 'sort_order' => $request->input('sort_order'),
                 'template' => $request->input('template'),
-                'layout_id' => $request->input('layout_id')
+                'layout_id' => $request->input('layout_id'),
+                'design_config' => $request->input('design_config')
+                    ? (is_string($request->input('design_config'))
+                        ? $request->input('design_config')
+                        : json_encode($request->input('design_config')))
+                    : null,
             ], fn($value) => $value !== null);
 
             $updated = $this->newsletterRepository->update($id, $data);

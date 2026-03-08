@@ -21,7 +21,7 @@ class NewsletterLayoutRepository extends Repository
         return NewsletterLayout::where('slug', $slug)->first();
     }
 
-    public function findBySlugForSite(string $slug, ?int $siteId): ?NewsletterLayout
+    public function findBySlugForSite(string $slug, ?int $siteId = null): ?NewsletterLayout
     {
         return NewsletterLayout::where('slug', $slug)
             ->when(

@@ -782,7 +782,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         });
 
         $router->put(
-            'newsletter-layout-versions/{id}/state',
+            'newsletter-layout-versions/{versionId}/state',
             [NewsletterLayoutController::class, 'transitionState']
         );
 

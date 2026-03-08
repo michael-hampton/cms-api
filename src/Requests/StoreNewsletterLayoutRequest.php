@@ -11,7 +11,7 @@ class StoreNewsletterLayoutRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'slug' => ['string', 'max:255'],
+            'slug' => ['string', 'max:255', 'required'],
             'site_id' => ['integer'],
             'created_by' => ['integer'],
             'layout_definition' => ['array'],
