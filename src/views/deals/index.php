@@ -344,6 +344,8 @@
     categories = <?= json_encode($categories ?? []) ?>;
     brands = <?= json_encode($brands ?? []) ?>;
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
+    CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
+
 </script>
 
 @js('deals-carousel.js')

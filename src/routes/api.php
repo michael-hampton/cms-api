@@ -42,6 +42,7 @@ use App\Controllers\Newsletter\NewsletterIssueController;
 use App\Controllers\Newsletter\NewsletterLayoutController;
 use App\Controllers\Newsletter\NewsletterScheduleController;
 use App\Controllers\Offers\DealsController;
+use App\Controllers\Offers\OfferStatisticsDetailController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\Product\MerchantContactController;
@@ -207,6 +208,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/reward-definitions/statistics', [RewardDefinitionsAdminController::class, 'getStatistics']);
         $router->get('/rewards/statistics', [RewardsAdminController::class, 'getStatistics']);
         $router->get('/offers/statistics', [ProductOfferController::class, 'getStatistics']);
+        $router->get('/offers/statistics/{type}', [OfferStatisticsDetailController::class, 'show']);
+        $router->post('/offers/bulk/publish', [ProductOfferController::class, 'bulkPublish']);
+        $router->post('/offers/bulk/delete', [ProductOfferController::class, 'bulkDelete']);
 
         $router->get('/reward-definitions', [RewardDefinitionsAdminController::class, 'index']);
         $router->get('/reward-definitions/search', [RewardDefinitionsAdminController::class, 'search']);
@@ -279,6 +283,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->post('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
+
+        $router->post('/subscriptions/plans/bulk-toggle-active', [SubscriptionController::class, 'bulkToggleActive']);
 
         // Subscription premium access management
         $router->post(
@@ -477,6 +483,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/bundles/{bundleId}', ProductOfferBundleController::class, 'destroy');
         $router->post('/bundles/{bundleId}/publish', [ProductOfferBundleController::class, 'publish']);
         $router->post('/bundles/{bundleId}/reject', [ProductOfferBundleController::class, 'reject']);
+        $router->post('/bundles/bulk/publish', [ProductOfferBundleController::class, 'bulkPublish']);
+        $router->post('/bundles/bulk/delete', [ProductOfferBundleController::class, 'bulkDelete']);
 
         //merchants
         $router->get('/merchants', MerchantController::class, 'index');
@@ -755,6 +763,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         // Subscription Plan Pricing
         $router->get('/subscription-plans/{planId}/pricing', [SubscriptionPlanPricingController::class, 'index']);
+        $router->get('/subscription-plans/pricing', [SubscriptionPlanPricingController::class, 'index']);
         $router->post('/subscription-plans/{planId}/pricing', [SubscriptionPlanPricingController::class, 'store']);
         $router->put('/subscription-plans/{planId}/pricing/sort-order', [SubscriptionPlanPricingController::class, 'updateSortOrder']);
         $router->put('/subscription-plans/{planId}/pricing/{pricingId}', [SubscriptionPlanPricingController::class, 'update']);

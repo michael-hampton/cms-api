@@ -291,6 +291,9 @@
 
 <script>
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
+    CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
+
+    alert(CURRENCY_SYMBOL)
 </script>
 
 @js('productModal.js')

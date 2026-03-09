@@ -12,16 +12,16 @@ class StoreProductOfferBundleRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['string', 'max:255'],
             'description' => ['string'],
-            'bundle_price' => ['required', 'numeric', 'min:0'],
-            'total_price' => ['numeric', 'min:0'],
+            'bundle_price' => ['required', 'numeric', 'min_number:0'],
+            'total_price' => ['numeric', 'min_number:0'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after:start_date'],
             'is_active' => ['boolean'],
             'status' => ['in:draft,published,rejected'],
-            'items' => ['required', 'array', 'min:2'],
-            'items.*.product_id' => ['integer'], //todo 'required_without:items.*.product_offer_id'
-            'items.*.product_offer_id' => ['integer'], //todo 'required_without:items.*.product_id'
-            'items.*.quantity' => ['integer', 'min:1'],
+            'items' => ['required', 'array', 'min_number:2'],
+            'items.*.product_id' => ['integer', 'required_without:items.*.product_offer_id'],
+            'items.*.product_offer_id' => ['integer', 'required_without:items.*.product_id'],
+            'items.*.quantity' => ['integer', 'min_number:1'],
         ];
     }
 }

@@ -15,6 +15,7 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Services\Cms\MenuRenderer;
+use App\Services\Currency\CurrencyResolver;
 use App\Services\Offers\DealAlertService;
 use App\Services\Offers\DealsService;
 use App\Services\Offers\PriceAlertService;
@@ -32,7 +33,8 @@ class DealsController extends Controller
         private readonly ProductRepository     $productRepository,
         private readonly ProductViewRepository     $productViewRepository,
         private readonly ProductOfferService       $offerService,
-        private readonly ProductOfferBundleService $bundleService
+        private readonly ProductOfferBundleService $bundleService,
+        private readonly CurrencyResolver          $currencyResolver,
     ) {
         parent::__construct();
     }
@@ -119,6 +121,9 @@ class DealsController extends Controller
         $specRepository = app(ProductSpecificationGroupRepository::class);
         $specificationGroups = $specRepository->getAllWithCounts($siteId);
 
+        $currencyCode = $this->currencyResolver->resolveUpperCase();
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         return $this->view('deals.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
@@ -128,7 +133,9 @@ class DealsController extends Controller
             'deals' => $deals,
             'todaysDeals' => $this->dealsService->getTodaysDeals(10),
             'offers' => $offers,
-            'bundles' => $bundles
+            'bundles' => $bundles,
+            'currencyCode' => $currencyCode,
+            'currencySymbol' => $currencySymbol,
         ]);
     }
 

@@ -345,15 +345,15 @@
                     <div class="modal-price-stats">
                         <div class="modal-price-stat">
                             <span class="modal-price-stat-label">Current</span>
-                            <span class="modal-price-stat-val current">$${currentPrice.toFixed(2)}</span>
+                            <span class="modal-price-stat-val current">${CURRENCY_SYMBOL}${currentPrice.toFixed(2)}</span>
                         </div>
                         <div class="modal-price-stat">
                             <span class="modal-price-stat-label">Lowest</span>
-                            <span class="modal-price-stat-val low">$${lowestPrice.toFixed(2)}</span>
+                            <span class="modal-price-stat-val low">${CURRENCY_SYMBOL}${lowestPrice.toFixed(2)}</span>
                         </div>
                         <div class="modal-price-stat">
                             <span class="modal-price-stat-label">Highest</span>
-                            <span class="modal-price-stat-val high">$${highestPrice.toFixed(2)}</span>
+                            <span class="modal-price-stat-val high">${CURRENCY_SYMBOL}${highestPrice.toFixed(2)}</span>
                         </div>
                     </div>
                     ${isAtLowest ? `<div class="modal-price-tag modal-price-tag--good">✓ Currently at lowest price</div>` : ''}
@@ -406,7 +406,7 @@
                         ${comparison.category_avg_price ? `
                             <div class="modal-comparison-row">
                                 <span>Category Average</span>
-                                <span>$${parseFloat(comparison.category_avg_price).toFixed(2)}</span>
+                                <span>${CURRENCY_SYMBOL}${parseFloat(comparison.category_avg_price).toFixed(2)}</span>
                             </div>
                         ` : ''}
                         ${comparison.discount_vs_regular ? `
@@ -693,9 +693,9 @@
                     ${product.brand ? `<div class="product-brand">${this.escapeHtml(product.brand.name)}</div>` : ''}
                     <h2 class="product-title">${this.escapeHtml(product.name)}</h2>
                     <div class="product-price">
-                        <span class="current-price">$${parseFloat(currentPrice).toFixed(2)}</span>
+                        <span class="current-price">${CURRENCY_SYMBOL}${parseFloat(currentPrice).toFixed(2)}</span>
                         ${hasDiscount ? `
-                            <span class="original-price">$${parseFloat(originalPrice).toFixed(2)}</span>
+                            <span class="original-price">${CURRENCY_SYMBOL}${parseFloat(originalPrice).toFixed(2)}</span>
                             <span class="discount-badge">-${discountPercent}%</span>
                         ` : ''}
                     </div>
@@ -766,7 +766,7 @@
                                     ${i === 0 ? '<span class="best-price-badge">Best Price</span>' : ''}
                                 </div>
                                 <div class="merchant-price">
-                                    <span class="price">$${parseFloat(m.sale_price || m.price).toFixed(2)}</span>
+                                    <span class="price">${CURRENCY_SYMBOL}${parseFloat(m.sale_price || m.price).toFixed(2)}</span>
                                     ${m.has_discount ? `<span class="discount">-${m.discount_percentage}%</span>` : ''}
                                 </div>
                             </div>
@@ -777,15 +777,15 @@
                         <div class="modal-merchant-stats">
                             <div class="modal-merchant-stat">
                                 <span class="modal-merchant-stat-label">Lowest</span>
-                                <span class="modal-merchant-stat-val stat-low">$${stats.lowest.toFixed(2)}</span>
+                                <span class="modal-merchant-stat-val stat-low">${CURRENCY_SYMBOL}${stats.lowest.toFixed(2)}</span>
                             </div>
                             <div class="modal-merchant-stat">
                                 <span class="modal-merchant-stat-label">Average</span>
-                                <span class="modal-merchant-stat-val">$${stats.average.toFixed(2)}</span>
+                                <span class="modal-merchant-stat-val">${CURRENCY_SYMBOL}${stats.average.toFixed(2)}</span>
                             </div>
                             <div class="modal-merchant-stat">
                                 <span class="modal-merchant-stat-label">Highest</span>
-                                <span class="modal-merchant-stat-val stat-high">$${stats.highest.toFixed(2)}</span>
+                                <span class="modal-merchant-stat-val stat-high">${CURRENCY_SYMBOL}${stats.highest.toFixed(2)}</span>
                             </div>
                         </div>
                     ` : ''}
@@ -859,8 +859,8 @@
                         ${product.brand ? `<p class="mini-brand">${this.escapeHtml(product.brand)}</p>` : ''}
                         <div class="mini-price">
                             ${product.sale_price ? `
-                                <span class="sale">$${parseFloat(product.sale_price).toFixed(2)}</span>
-                                <span class="original">$${parseFloat(product.price).toFixed(2)}</span>
+                                <span class="sale">${CURRENCY_SYMBOL}${parseFloat(product.sale_price).toFixed(2)}</span>
+                                <span class="original">${CURRENCY_SYMBOL}${parseFloat(product.price).toFixed(2)}</span>
                             ` : `<span>$${parseFloat(product.price).toFixed(2)}</span>`}
                         </div>
                     </div>

@@ -22,6 +22,7 @@ use App\Search\SearchCriteria;
 use App\Services\Adverts\Boost\BoostEventService;
 use App\Services\Adverts\Boost\BoostRankingService;
 use App\Services\Cms\MenuRenderer;
+use App\Services\Currency\CurrencyResolver;
 use App\Services\Product\BuildProductCardService;
 use App\Services\Product\ProductService;
 
@@ -34,7 +35,8 @@ class ProductListController extends Controller
         private readonly ProductViewRepository $productViewRepository,
         private readonly BoostRankingService $boostRankingService,
         private readonly BoostEventService $boostEventService,
-        private readonly BoostRepository   $boostRepository
+        private readonly BoostRepository  $boostRepository,
+        private readonly CurrencyResolver $currencyResolver,
     )
     {
         parent::__construct();
@@ -117,12 +119,17 @@ class ProductListController extends Controller
         $specRepository = app(ProductSpecificationGroupRepository::class);
         $specificationGroups = $specRepository->getAllWithCounts($siteId);
 
+        $currencyCode = $this->currencyResolver->resolveUpperCase();
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         return $this->view('products.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
             'menu' => $menu,
             'menuRenderer' => new MenuRenderer(),
             'specificationGroups' => $specificationGroups->toArray(),
+            'currencyCode' => $currencyCode,
+            'currencySymbol' => $currencySymbol,
         ]);
     }
 

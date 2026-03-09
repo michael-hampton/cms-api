@@ -170,7 +170,7 @@
             style="display:flex;justify-content:space-between;padding:6px 8px;text-decoration:none;color:#1e293b;font-size:0.8125rem;border-radius:4px;"
             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
             <span>${escapeHtml(name)}</span>
-            <span style="font-weight:600;margin-left:12px;">$${formatPrice(price)}</span>
+            <span style="font-weight:600;margin-left:12px;">${CURRENCY_SYMBOL}${formatPrice(price)}</span>
         </a>`;
         }).join('');
 
@@ -587,10 +587,10 @@
                     ${renderMerchants(product.availableMerchants || [])}
                         <div class="product-price">
                             ${product.sale_price && product.sale_price < product.price ? `
-                                <span class="price-sale">$${formatPrice(product.sale_price)}</span>
-                                <span class="price-original">$${formatPrice(product.price)}</span>
+                                <span class="price-sale">${CURRENCY_SYMBOL}${formatPrice(product.sale_price)}</span>
+                                <span class="price-original">${CURRENCY_SYMBOL}${formatPrice(product.price)}</span>
                             ` : `
-                                <span class="price-current">$${formatPrice(product.price)}</span>
+                                 <span class="price-current">${CURRENCY_SYMBOL}${formatPrice(product.price)}</span>
                             `}
                         </div>
                         <div class="product-actions">
@@ -1118,7 +1118,7 @@
                             ${variant.discount_percentage > 0 ? `
                                 <div style="font-size: 0.75rem; color: #059669;">-${variant.discount_percentage}%</div>
                             ` : ''}
-                            <div style="font-size: 0.75rem; color: #64748b;">$${formatPrice(variant.final_price)}</div>
+                            <div style="font-size: 0.75rem; color: #64748b;">${CURRENCY_SYMBOL}${formatPrice(variant.final_price)}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -1145,15 +1145,15 @@
                     <div class="price-stats">
                         <div class="price-stat">
                             <div class="price-stat-label">Current</div>
-                            <div class="price-stat-value current">$${formatPrice(currentPrice)}</div>
+                            <div class="price-stat-value current">${CURRENCY_SYMBOL}${formatPrice(currentPrice)}</div>
                         </div>
                         <div class="price-stat">
                             <div class="price-stat-label">Lowest</div>
-                            <div class="price-stat-value low">$${formatPrice(lowestPrice)}</div>
+                            <div class="price-stat-value low">${CURRENCY_SYMBOL}${formatPrice(lowestPrice)}</div>
                         </div>
                         <div class="price-stat">
                             <div class="price-stat-label">Highest</div>
-                            <div class="price-stat-value high">$${formatPrice(highestPrice)}</div>
+                            <div class="price-stat-value high">${CURRENCY_SYMBOL}${formatPrice(highestPrice)}</div>
                         </div>
                     </div>
                     ${savingsPercent > 0 ? `
@@ -1203,7 +1203,7 @@
                     ${comparison.category_avg_price ? `
                         <div class="comparison-item">
                             <span class="comparison-label">Category Average</span>
-                            <span class="comparison-value">$${comparison.category_avg_price}</span>
+                            <span class="comparison-value">${CURRENCY_SYMBOL}${comparison.category_avg_price}</span>
                         </div>
                     ` : ''}
                     ${comparison.discount_vs_regular ? `
@@ -1239,7 +1239,7 @@
                                 </a>
                             </span>
                             <span class="comparison-value">
-                                $${formatPrice(merchant.sale_price > 0 ? merchant.sale_price : merchant.price)}
+                                ${CURRENCY_SYMBOL}${formatPrice(merchant.sale_price > 0 ? merchant.sale_price : merchant.price)}
                                 ${merchant.has_discount ? `
                                     <span style="color: #059669; font-size: 0.75rem; margin-left: 0.25rem;">
                                         -${merchant.discount_percentage}%

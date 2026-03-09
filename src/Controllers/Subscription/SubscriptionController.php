@@ -13,6 +13,7 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Requests\BulkToggleActiveRequest;
 use App\Requests\CreateSubscriptionPlanRequest;
 use App\Requests\UpdateSubscriptionPlanRequest;
 use App\Resources\SubscriptionResource;
@@ -222,7 +223,7 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function bulkToggleActive(Request $request)
+    public function bulkToggleActive(BulkToggleActiveRequest $request)
     {
         try {
             $planIds = $request->get('plan_ids', []);

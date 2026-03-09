@@ -6,7 +6,7 @@ class BooleanRule extends BaseValidationRule
 {
     public function validate($value, array $data = []): bool
     {
-        return is_bool($value) || $value === '0' || $value === '1' || $value === 0 || $value === 1;
+        return is_bool($value) || $value === '0' || $value === '1' || $value === 0 || $value === 1 || $value === 'true';
     }
 
     protected function getDefaultMessage(): string

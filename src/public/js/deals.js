@@ -411,12 +411,12 @@
             const maxPrice = Math.max(...prices);
 
             if (maxPrice > 100) {
-                suggestions.push({type: 'price', label: 'Under £25', maxPrice: 25});
-                suggestions.push({type: 'price', label: 'Under £50', maxPrice: 50});
-                suggestions.push({type: 'price', label: 'Under £100', maxPrice: 100});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100});
             } else if (maxPrice > 50) {
-                suggestions.push({type: 'price', label: 'Under £25', maxPrice: 25});
-                suggestions.push({type: 'price', label: 'Under £50', maxPrice: 50});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
             }
         }
 
@@ -636,10 +636,10 @@
                     ${renderMerchants(product.availableMerchants || [])}
                         <div class="product-price">
                             ${product.sale_price && product.sale_price < product.original_price ? `
-                                <span class="price-sale">$${formatPrice(product.sale_price)}</span>
-                                <span class="price-original">$${formatPrice(product.original_price)}</span>
+                                <span class="price-sale">${CURRENCY_SYMBOL}${formatPrice(product.sale_price)}</span>
+                                <span class="price-original">${CURRENCY_SYMBOL}${formatPrice(product.original_price)}</span>
                             ` : `
-                                <span class="price-current">$${formatPrice(product.original_price)}</span>
+                                 <span class="price-current">${CURRENCY_SYMBOL}${formatPrice(product.original_price)}</span>
                             `}
                         </div>
                         <div class="product-actions">
@@ -792,7 +792,7 @@
             style="display:flex;justify-content:space-between;padding:6px 8px;text-decoration:none;color:#1e293b;font-size:0.8125rem;border-radius:4px;"
             onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
             <span>${escapeHtml(name)}</span>
-            <span style="font-weight:600;margin-left:12px;">$${formatPrice(price)}</span>
+            <span style="font-weight:600;margin-left:12px;">\`${CURRENCY_SYMBOL}${formatPrice(price)}\`</span>
         </a>`;
         }).join('');
 
@@ -1309,15 +1309,15 @@
                     <div class="price-stats">
                         <div class="price-stat">
                             <div class="price-stat-label">Current</div>
-                            <div class="price-stat-value current">$${formatPrice(currentPrice)}</div>
+                            <div class="price-stat-value current">${CURRENCY_SYMBOL}${formatPrice(currentPrice)}</div>
                         </div>
                         <div class="price-stat">
                             <div class="price-stat-label">Lowest</div>
-                            <div class="price-stat-value low">$${formatPrice(lowestPrice)}</div>
+                            <div class="price-stat-value low">${CURRENCY_SYMBOL}${formatPrice(lowestPrice)}</div>
                         </div>
                         <div class="price-stat">
                             <div class="price-stat-label">Highest</div>
-                            <div class="price-stat-value high">$${formatPrice(highestPrice)}</div>
+                            <div class="price-stat-value high">${CURRENCY_SYMBOL}${formatPrice(highestPrice)}</div>
                         </div>
                     </div>
                     ${savingsPercent > 0 ? `

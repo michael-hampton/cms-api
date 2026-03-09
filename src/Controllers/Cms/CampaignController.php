@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CampaignRepository;
@@ -40,7 +41,12 @@ class CampaignController extends Controller
                 ]);
             });
 
-            return $this->resourceResponse(['campaigns' => $campaignsData->toArray()]);
+            $stats = $this->buildStats($campaigns);
+
+            return $this->resourceResponse([
+                'campaigns' => $campaignsData->toArray(),
+                'stats' => $stats,
+            ]);
         } catch (\Exception $e) {
             Logger::error('Failed to fetch campaigns', ['error' => $e->getMessage()]);
             return $this->errorResponse($e->getMessage(), 500);
@@ -73,11 +79,9 @@ class CampaignController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-
             $data = $request->validated();
             $slug = $data['slug'];
 
-            // Check for duplicate slug
             $existing = $this->campaignRepository->findBySlug($slug, $siteId);
             if ($existing) {
                 return $this->errorResponse('Campaign with this slug already exists', 400);
@@ -104,7 +108,6 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign not found', 404);
             }
 
-            // Check slug uniqueness if changing
             $newSlug = $request->input('slug');
             if ($newSlug && $newSlug !== $campaign->slug) {
                 $existing = $this->campaignRepository->findBySlug($newSlug, $siteId);
@@ -113,12 +116,10 @@ class CampaignController extends Controller
                 }
             }
 
-            $data = $request->validated();
-
-            $updated = $this->campaignRepository->update($id, $data);
+            $updated = $this->campaignRepository->update($id, $request->validated());
 
             return $this->successResponse('Campaign updated successfully', [
-                'campaign' => $updated->toArray()
+                'campaign' => $updated->toArray(),
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to update campaign', ['id' => $id, 'error' => $e->getMessage()]);
@@ -136,7 +137,6 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign not found', 404);
             }
 
-            // Check if campaign has subscribers
             $subscriberCount = $this->campaignRepository->getSubscriberCount($id);
             if ($subscriberCount > 0) {
                 return $this->errorResponse(
@@ -159,7 +159,6 @@ class CampaignController extends Controller
         try {
             $siteId = $request->getSiteId();
             $targetSiteId = $request->input('target_site_id', $siteId);
-
             $campaign = $this->campaignRepository->find($id);
 
             if (!$campaign || $campaign->site_id !== $siteId) {
@@ -174,7 +173,7 @@ class CampaignController extends Controller
 
             return $this->jsonResponse([
                 'campaign' => $cloned->toArray(),
-                'message' => 'Campaign cloned successfully'
+                'message' => 'Campaign cloned successfully',
             ], 201);
         } catch (\Exception $e) {
             Logger::error('Failed to clone campaign', ['id' => $id, 'error' => $e->getMessage()]);
@@ -205,7 +204,7 @@ class CampaignController extends Controller
             }
 
             return $this->successResponse($result['message'], [
-                'campaign' => $result['campaign']->toArray()
+                'campaign' => $result['campaign']->toArray(),
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to pause campaign', ['id' => $id, 'error' => $e->getMessage()]);
@@ -224,11 +223,34 @@ class CampaignController extends Controller
             }
 
             return $this->successResponse($result['message'], [
-                'campaign' => $result['campaign']->toArray()
+                'campaign' => $result['campaign']->toArray(),
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to resume campaign: ' . $e->getMessage(), 500);
         }
+    }
+
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
+
+    /**
+     * Derive lightweight stats from the already-loaded campaign collection.
+     * No extra queries — uses the isActive() domain method already available.
+     *
+     * @param Collection $campaigns
+     */
+    private function buildStats(Collection $campaigns): array
+    {
+        $total = $campaigns->count();
+        $active = $campaigns->filter(fn($c) => $c->isActive())->count();
+        $approved = $campaigns->filter(fn($c) => $c->status === 'active')->count();
+
+        return [
+            'total' => $total,
+            'active' => $active,
+            'approved' => $approved,
+        ];
     }
 }

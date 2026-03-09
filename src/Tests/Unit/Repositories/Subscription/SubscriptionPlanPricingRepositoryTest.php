@@ -202,7 +202,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
 
         $result = $this->repository->searchPricingTiersPaginated([
             'plan_id' => $plan1->id
-        ]);
+        ], $this->siteId);
 
         $this->assertEquals(1, $result['pagination']['total']);
         $this->assertEquals($plan1->id, $result['data']->first()->plan_id);
@@ -237,7 +237,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
         $result = $this->repository->searchPricingTiersPaginated([
             'plan_id' => $plan->id,
             'status' => 'active'
-        ]);
+        ], $this->siteId);
 
         $this->assertEquals(1, $result['pagination']['total']);
         $this->assertTrue($result['data']->first()->is_active);
@@ -272,7 +272,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
         $result = $this->repository->searchPricingTiersPaginated([
             'plan_id' => $plan->id,
             'search' => 'Premium'
-        ]);
+        ], $this->siteId);
 
         $this->assertEquals(1, $result['pagination']['total']);
         $this->assertStringContainsString('Premium', $result['data']->first()->label);
@@ -299,7 +299,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'plan_id' => $plan->id,
             'per_page' => 10,
             'page' => 1
-        ]);
+        ], $this->siteId);
 
         $this->assertEquals(20, $result['pagination']['total']);
         $this->assertEquals(10, $result['data']->count());
@@ -310,7 +310,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'plan_id' => $plan->id,
             'per_page' => 10,
             'page' => 2
-        ]);
+        ], $this->siteId);
 
         $this->assertEquals(10, $result2['data']->count());
         $this->assertFalse($result2['pagination']['has_more']);
@@ -355,7 +355,7 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
 
         $result = $this->repository->searchPricingTiersPaginated([
             'plan_id' => $plan->id
-        ]);
+        ], $this->siteId);
 
         $data = $result['data']->toArray();
         $this->assertEquals('First', $data[0]['label']);

@@ -919,10 +919,10 @@
 
                     <div class="product-price">
                         <?php if ($product->sale_price && $product->sale_price < $product->price): ?>
-                            <span class="price-sale">$<?= number_format($product->sale_price, 2) ?></span>
-                            <span class="price-original">$<?= number_format($product->price, 2) ?></span>
+                            <span class="price-sale"><?= $currencySymbol ?><?= number_format($product->sale_price, 2) ?></span>
+                            <span class="price-original"><?= $currencySymbol ?><?= number_format($product->price, 2) ?></span>
                         <?php else: ?>
-                            <span class="price-current">$<?= number_format($product->price, 2) ?></span>
+                            <span class="price-current"><?= $currencySymbol ?><?= number_format($product->price, 2) ?></span>
                         <?php endif; ?>
                     </div>
 
@@ -966,10 +966,10 @@
                                             <?php endif; ?>
                                             <div class="variant-price-info">
                                                 <?php if (!empty($variant->sale_price) && $variant->sale_price < $variant->price): ?>
-                                                    <span class="variant-sale-price">$<?= number_format($variant->sale_price, 2) ?></span>
-                                                    <span class="variant-original-price">$<?= number_format($variant->price, 2) ?></span>
+                                                    <span class="variant-sale-price"><?= $currencySymbol ?><?= number_format($variant->sale_price, 2) ?></span>
+                                                    <span class="variant-original-price"><?= $currencySymbol ?><?= number_format($variant->price, 2) ?></span>
                                                 <?php else: ?>
-                                                    <span class="variant-price">$<?= number_format($variant->price, 2) ?></span>
+                                                    <span class="variant-price"><?= $currencySymbol ?><?= number_format($variant->price, 2) ?></span>
                                                 <?php endif; ?>
                                             </div>
                                         </div>
@@ -1128,10 +1128,10 @@
                                                 <div class="merchant-pricing">
                                                     <div class="merchant-price-container">
                                                         <?php if (!empty($merchant->sale_price) && $merchant->sale_price < $merchant->price): ?>
-                                                            <span class="merchant-price sale-price">$<?= number_format($merchant->sale_price, 2) ?></span>
-                                                            <span class="merchant-original-price">$<?= number_format($merchant->price, 2) ?></span>
+                                                            <span class="merchant-price sale-price"><?= $currencySymbol ?><?= number_format($merchant->sale_price, 2) ?></span>
+                                                            <span class="merchant-original-price"><?= $currencySymbol ?><?= number_format($merchant->price, 2) ?></span>
                                                         <?php else: ?>
-                                                            <span class="merchant-price">$<?= number_format($merchant->price, 2) ?></span>
+                                                            <span class="merchant-price"><?= $currencySymbol ?><?= number_format($merchant->price, 2) ?></span>
                                                         <?php endif; ?>
                                                     </div>
                                                     <?php if ($discount > 0): ?>
@@ -1253,7 +1253,7 @@
                                     <div class="price-stat-value" style="color: #10b981;">$<?= number_format($lowestPrice, 2) ?></div>
                                     <div class="price-stat-change">
                                         <?php if ($currentPrice > $lowestPrice): ?>
-                                            +$<?= number_format($currentPrice - $lowestPrice, 2) ?> from lowest
+                                            +<?= $currencySymbol ?><?= number_format($currentPrice - $lowestPrice, 2) ?> from lowest
                                         <?php else: ?>
                                             Lowest price now!
                                         <?php endif; ?>
@@ -1268,10 +1268,11 @@
                                         </svg>
                                     </div>
                                     <div class="price-stat-label">Highest Price</div>
-                                    <div class="price-stat-value" style="color: #ef4444;">$<?= number_format($highestPrice, 2) ?></div>
+                                    <div class="price-stat-value"
+                                         style="color: #ef4444;"><?= $currencySymbol ?><?= number_format($highestPrice, 2) ?></div>
                                     <div class="price-stat-change">
                                         <?php if ($currentPrice < $highestPrice): ?>
-                                            -$<?= number_format($highestPrice - $currentPrice, 2) ?> from highest
+                                            -<?= $currencySymbol ?><?= number_format($highestPrice - $currentPrice, 2) ?> from highest
                                         <?php else: ?>
                                             Highest price now
                                         <?php endif; ?>
@@ -1285,12 +1286,12 @@
                                         </svg>
                                     </div>
                                     <div class="price-stat-label">Average Price</div>
-                                    <div class="price-stat-value">$<?= number_format($avgPrice, 2) ?></div>
+                                    <div class="price-stat-value"><?= $currencySymbol ?><?= number_format($avgPrice, 2) ?></div>
                                     <div class="price-stat-change">
                                         <?php if ($currentPrice < $avgPrice): ?>
-                                            $<?= number_format($avgPrice - $currentPrice, 2) ?> below average
+                                            <?= $currencySymbol ?><?= number_format($avgPrice - $currentPrice, 2) ?> below average
                                         <?php else: ?>
-                                            $<?= number_format($currentPrice - $avgPrice, 2) ?> above average
+                                            <?= $currencySymbol ?><?= number_format($currentPrice - $avgPrice, 2) ?> above average
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -1322,7 +1323,7 @@
                                                     <?= $history['recorded_at']->format('M d, Y') ?> ?>
                                                 </div>
                                                 <div class="timeline-price">
-                                                    $<?= number_format($historyPrice, 2) ?>
+                                                    <?= $currencySymbol ?><?= number_format($historyPrice, 2) ?>
                                                     <?php if ($index > 0): ?>
                                                         <?php
                                                         $prevPrice = $priceHistory[$index - 1]['sale_price'] ?? $priceHistory[$index - 1]['price'];
@@ -1633,6 +1634,7 @@ $merchants = json_encode(array_map(function($m) {
 <script>
     const SITE = 'test-mike';
     const PRODUCT_ID = '<?= $product->id ?>';
+    const CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
     // Store merchant data for variants
     const merchantData = <?php echo $merchants ?>;
@@ -1729,11 +1731,11 @@ $merchants = json_encode(array_map(function($m) {
             // Build pricing section
             const pricingHtml = merchant.effective_sale_price && merchant.effective_sale_price < merchant.effective_price
                 ? `<div class="merchant-price-container">
-                    <span class="merchant-price sale-price">$${merchant.effective_sale_price.toFixed(2)}</span>
-                    <span class="merchant-original-price">$${merchant.effective_price.toFixed(2)}</span>
+                    <span class="merchant-price sale-price">${CURRENCY_SYMBOL}${merchant.effective_sale_price.toFixed(2)}</span>
+                    <span class="merchant-original-price">${CURRENCY_SYMBOL}${merchant.effective_price.toFixed(2)}</span>
                </div>`
                 : `<div class="merchant-price-container">
-                    <span class="merchant-price">$${merchant.effective_price.toFixed(2)}</span>
+                    <span class="merchant-price">${CURRENCY_SYMBOL}${merchant.effective_price.toFixed(2)}</span>
                </div>`;
 
             const savingsHtml = discount > 0
@@ -1788,13 +1790,13 @@ $merchants = json_encode(array_map(function($m) {
             if (variantSalePrice && variantSalePrice < variantPrice) {
                 // Has sale price
                 productPriceContainer.innerHTML = `
-                <span class="price-sale">$${variantSalePrice.toFixed(2)}</span>
-                <span class="price-original">$${variantPrice.toFixed(2)}</span>
+                <span class="price-sale">${CURRENCY_SYMBOL}${variantSalePrice.toFixed(2)}</span>
+                <span class="price-original">${CURRENCY_SYMBOL}${variantPrice.toFixed(2)}</span>
             `;
             } else {
                 // Regular price only
                 productPriceContainer.innerHTML = `
-                <span class="price-current">$${variantPrice.toFixed(2)}</span>
+                <span class="price-current">${CURRENCY_SYMBOL}${variantPrice.toFixed(2)}</span>
             `;
             }
 

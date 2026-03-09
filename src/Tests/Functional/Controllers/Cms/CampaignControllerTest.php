@@ -41,6 +41,96 @@ class CampaignControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['campaigns']);
     }
 
+    public function test_index_includes_stats(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        // Active (is_active true and within date range)
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Active Campaign',
+            'slug' => 'active-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+30 days')),
+        ]);
+
+        // Inactive
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Inactive Campaign',
+            'slug' => 'inactive-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => false,
+            'status' => 'paused',
+        ]);
+
+        $response = $this->getForSite('/api/campaigns');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('stats', $data);
+        $this->assertArrayHasKey('total', $data['stats']);
+        $this->assertArrayHasKey('active', $data['stats']);
+        $this->assertArrayHasKey('approved', $data['stats']);
+
+        $this->assertEquals(2, $data['stats']['total']);
+    }
+
+    public function test_index_stats_count_approved_campaigns(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Approved 1',
+            'slug' => 'approved-1',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Approved 2',
+            'slug' => 'approved-2',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'status' => 'active',
+        ]);
+
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Pending',
+            'slug' => 'pending-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => false,
+            'status' => 'paused',
+        ]);
+
+        $response = $this->getForSite('/api/campaigns');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(200, $response);
+        $this->assertEquals(3, $data['stats']['total']);
+        $this->assertEquals(2, $data['stats']['approved']);
+    }
+
+    public function test_index_returns_empty_stats_when_no_campaigns(): void
+    {
+        $response = $this->getForSite('/api/campaigns');
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertResponseStatus(200, $response);
+        $this->assertEquals(0, $data['stats']['total']);
+        $this->assertEquals(0, $data['stats']['active']);
+        $this->assertEquals(0, $data['stats']['approved']);
+    }
+
     public function test_show_returns_campaign_with_stats(): void
     {
         $newsletter = $this->createNewsletter();
@@ -74,7 +164,6 @@ class CampaignControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(404, $response);
     }
-
 
     public function test_create_campaign_with_valid_data(): void
     {

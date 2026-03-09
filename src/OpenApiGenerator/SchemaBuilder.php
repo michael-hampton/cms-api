@@ -31,10 +31,10 @@ class SchemaBuilder
         $schema = ['type' => 'object', 'properties' => $properties];
 
         if (!empty($required)) {
-            // Strip wildcard indicators from required list
+            // Strip wildcard indicators from required list so they match flat property keys
             $cleanRequired = array_map(fn($f) => str_replace('[]', '', $f), $required);
-            $cleanRequired = array_unique(array_filter($cleanRequired));
-            $schema['required'] = array_values($cleanRequired);
+            $cleanRequired = array_values(array_unique(array_filter($cleanRequired)));
+            $schema['required'] = $cleanRequired;
         }
 
         return $schema;
@@ -43,7 +43,7 @@ class SchemaBuilder
     /**
      * Convert a flat dot-notation field map into a nested OpenAPI properties structure.
      *
-     * Example:
+     * Examples:
      *   'address.street' => {...}  →  address: { type: object, properties: { street: {...} } }
      *   'tags[]'         => {...}  →  tags: { type: array, items: {...} }
      *
@@ -82,8 +82,6 @@ class SchemaBuilder
             }
 
             if ($sub !== '') {
-                // Must extract as a named reference — passing $tree[$key]['__children']
-                // directly to an &array param silently passes a copy in PHP.
                 $ref = &$tree[$key]['__children'];
                 $this->setNested($ref, $sub, $schema);
                 unset($ref);
@@ -154,41 +152,52 @@ class SchemaBuilder
     /**
      * Build a component schema stub for a resource (response shape).
      * Returns a named $ref-able schema with common ID + timestamps fields.
+     * The caller (OpenApiBuilder::registerResponseComponents) enriches this
+     * via mergeIntoResource() when request fields are available.
      */
     public function buildResourceSchema(string $resourceName): array
     {
         return [
             'type' => 'object',
             'properties' => [
-                'id' => [
-                    'type' => 'integer',
-                    'example' => 1,
-                ],
-                // Additional properties inferred per endpoint are merged in OpenApiBuilder
+                'id' => ['type' => 'integer', 'example' => 1],
+                'created_at' => ['type' => 'string', 'format' => 'date-time', 'example' => '2024-01-15T10:00:00Z'],
+                'updated_at' => ['type' => 'string', 'format' => 'date-time', 'example' => '2024-01-15T10:00:00Z'],
             ],
         ];
     }
 
     /**
-     * Build query parameter schemas from pagination and filter fields.
+     * Build query parameter schemas from FormRequest fields.
+     * Strips the [] wildcard suffix from array field names before emitting them
+     * as query parameter names (e.g. 'tags[]' becomes 'tags[]' in the query string,
+     * which is valid, but path-param exclusion must compare clean names).
      *
      * @return array<int, array> OpenAPI Parameter Objects
      */
     public function buildQueryParams(array $fields, array $required, array $pathParams = []): array
     {
         $params = [];
+        // Build a set of path param names for quick exclusion
         $pathParamNames = array_column($pathParams, 'name');
 
         foreach ($fields as $name => $schema) {
-            // Skip path params — already declared separately
-            if (in_array($name, $pathParamNames, true)) {
+            // Strip [] for the purpose of path param exclusion comparison
+            $cleanName = str_replace('[]', '', $name);
+
+            if (in_array($cleanName, $pathParamNames, true)) {
                 continue;
             }
 
+            // For array-type query params, use name[] convention
+            $paramName = ($schema['type'] ?? 'string') === 'array'
+                ? $cleanName . '[]'
+                : $cleanName;
+
             $params[] = [
-                'name' => $name,
+                'name' => $paramName,
                 'in' => 'query',
-                'required' => in_array($name, $required, true),
+                'required' => in_array($name, $required, true) || in_array($cleanName, $required, true),
                 'schema' => $schema,
             ];
         }
@@ -198,14 +207,14 @@ class SchemaBuilder
 
     /**
      * Merge response field hints from FormRequest into a resource schema.
-     * Useful when request fields mirror response fields (e.g., on store/update).
+     * Existing explicit definitions (e.g. 'id', 'created_at') are never overwritten.
      */
     public function mergeIntoResource(array $resourceSchema, array $requestFields): array
     {
         $existing = $resourceSchema['properties'] ?? [];
         $additional = $this->buildProperties($requestFields);
 
-        // Don't overwrite existing explicit definitions
+        // Existing keys win — we merge additional UNDER existing so they don't overwrite
         $merged = array_merge($additional, $existing);
 
         return array_merge($resourceSchema, ['properties' => $merged]);

@@ -10,6 +10,7 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Currency\CurrencyResolver;
 use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
@@ -20,17 +21,22 @@ class OneTimeSubscriptionsController extends Controller
     public function __construct(
         private readonly OneTimeSubscriptionService         $subscriptionService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly StripePaymentProcessor       $stripeProcessor,
-        private readonly SubscriptionCatalogService   $catalogService,
-        private readonly SubscriptionBundleRepository $bundleRepository,
-        private readonly ReviewService                $reviewService
+        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly SubscriptionCatalogService         $catalogService,
+        private readonly SubscriptionBundleRepository       $bundleRepository,
+        private readonly ReviewService                      $reviewService,
+        private readonly CurrencyResolver                   $currencyResolver,
     )
     {
         parent::__construct();
     }
 
     /**
-     * Shop page - shows all subscriptions across all sites with filters
+     * Shop page - shows all subscriptions across all sites with filters.
+     *
+     * Currency is resolved at the site level here because the index lists plans
+     * from potentially multiple sites. The per-plan currency override is only
+     * applied on the individual plan's show() page.
      */
     public function index(Request $request)
     {
@@ -50,12 +56,19 @@ class OneTimeSubscriptionsController extends Controller
 
         $siteId = (int)$filters['site_id'] ?? null;
 
+        // Site-level currency (used for the listing index where all prices are
+        // in the same site currency; a per-plan currency is only meaningful on
+        // the detail page where a single plan's currency field is available).
+        $currencyCode = $this->currencyResolver->resolveUpperCase($siteId ?: null);
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         $catalogData = $this->catalogService->getCatalog($filters);
 
-        // Handle AJAX filter requests
         if ($request->header('X-Requested-With') === 'XMLHttpRequest' || $request->input('ajax')) {
             return $this->jsonResponse([
                 'success' => true,
+                'currency_code' => $currencyCode,
+                'currency_symbol' => $currencySymbol,
                 'plans' => $catalogData['data']->map(function ($plan) {
                     $plan->delivery_type = !empty($plan->digital_download_url)
                         ? SubscriptionType::DIGITAL->value
@@ -73,12 +86,10 @@ class OneTimeSubscriptionsController extends Controller
         }
 
         $availableSites = $this->catalogService->getAvailableSites();
-        $priceRange = $this->catalogService->getPriceRange($siteId ?? null);
-        $availableCategories = $this->catalogService->getAvailableCategories($siteId ?? null);
-        $availableTags = $this->catalogService->getAvailableTags($siteId ?? null);
+        $priceRange = $this->catalogService->getPriceRange($siteId ?: null);
+        $availableCategories = $this->catalogService->getAvailableCategories($siteId ?: null);
+        $availableTags = $this->catalogService->getAvailableTags($siteId ?: null);
 
-        // Active bundles for the current site — shown in a dedicated section
-        // above the individual plans listing.
         $bundles = $this->bundleRepository
             ->getActiveBundles()
             ->map(fn($bundle) => [
@@ -119,7 +130,6 @@ class OneTimeSubscriptionsController extends Controller
         ];
 
         $lookup = array_column($categoryMappings, null, 'name');
-
         $merged = array_map(
             fn($name) => $lookup[$name] ?? ['name' => $name, 'icon' => '❓', 'color' => '#000000'],
             $availableCategories
@@ -146,7 +156,9 @@ class OneTimeSubscriptionsController extends Controller
             'price_range' => $priceRange,
             'sort_options' => SubscriptionSortOption::cases(),
             'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
-            'bundles' => $bundles
+            'bundles' => $bundles,
+            'currency_code' => $currencyCode,
+            'currency_symbol' => $currencySymbol,
         ]);
     }
 
@@ -166,11 +178,16 @@ class OneTimeSubscriptionsController extends Controller
             'special_filter' => $request->input('special_filter'),
         ];
 
+        $siteId = (int)($filters['site_id'] ?? 0) ?: null;
+        $currencyCode = $this->currencyResolver->resolveUpperCase($siteId);
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         $catalogData = $this->catalogService->getCatalog($filters);
 
-        // Handle AJAX filter requests
         return $this->jsonResponse([
             'success' => true,
+            'currency_code' => $currencyCode,
+            'currency_symbol' => $currencySymbol,
             'plans' => $catalogData['data'],
             'pagination' => [
                 'current_page' => $catalogData['pagination']['current_page'],
@@ -197,7 +214,6 @@ class OneTimeSubscriptionsController extends Controller
         $orderId = $request->input('order_id');
         $siteId = SiteContext::getId();
 
-        // Handle both single and multiple subscriptions
         $subscriptionIds = $request->input('subscription_ids');
         $subscriptionId = $request->input('subscription_id');
 
@@ -215,7 +231,6 @@ class OneTimeSubscriptionsController extends Controller
             ], 400);
         }
 
-        // Convert to array for uniform handling
         if (!empty($subscriptionId)) {
             $subscriptionIds = [$subscriptionId];
         }
@@ -228,12 +243,10 @@ class OneTimeSubscriptionsController extends Controller
         );
 
         if ($result['success']) {
-            // Activate all subscriptions
             foreach ($subscriptionIds as $subId) {
                 $this->subscriptionService->activateSubscription($subId, $orderId);
             }
 
-            // Update order status
             \App\Models\Order::where('id', $orderId)->update([
                 'status' => 'completed',
                 'payment_status' => 'paid'
@@ -269,7 +282,11 @@ class OneTimeSubscriptionsController extends Controller
     }
 
     /**
-     * Single plan detail/purchase page (old index.php functionality)
+     * Single plan detail/purchase page.
+     *
+     * Currency is resolved from the plan's own `currency` field first, then
+     * falls back to the site-level config. This allows a GBP plan to show £
+     * even on a site whose default currency is USD.
      */
     public function show(int $id, Request $request)
     {
@@ -279,7 +296,10 @@ class OneTimeSubscriptionsController extends Controller
             return $this->redirect('/subscriptions');
         }
 
-        // If this is a post-purchase view with subscription ID
+        // Resolve currency: plan's own field wins, then site default.
+        $currencyCode = $this->currencyResolver->resolveForPlanUpperCase($plan->currency ?? null);
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         $subscriptionId = $request->input('subscription_id');
 
         if ($subscriptionId) {
@@ -287,22 +307,25 @@ class OneTimeSubscriptionsController extends Controller
 
             return $this->view('subscriptions/onetime/details', array_merge([
                 'plan' => $plan,
-                'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+                'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
+                'currency_code' => $currencyCode,
+                'currency_symbol' => $currencySymbol,
             ], $subscriptionDetails));
         }
 
-        $reviewData = $this->reviewService->getPlanReviews($id, 1, 5); // First 5 reviews
+        $reviewData = $this->reviewService->getPlanReviews($id, 1, 5);
         $reviewStats = $this->reviewService->getPlanReviewSummary($id);
         $canReview = $this->reviewService->canUserReviewPlan($id);
 
-        // Regular plan view for purchase
         return $this->view('subscriptions/onetime/show', [
             'plan' => $plan,
             'reviewData' => $reviewData,
             'reviewStats' => $reviewStats,
             'canReview' => $canReview,
             'isAuthenticated' => MemberAuth::check(),
-            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key')
+            'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
+            'currency_code' => $currencyCode,
+            'currency_symbol' => $currencySymbol,
         ]);
     }
 }

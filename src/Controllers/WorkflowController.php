@@ -10,6 +10,7 @@ use App\Framework\Http\Response;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Support\Logger;
+use App\Requests\WorkflowRequest;
 
 /**
  * Triggers any registered job or console handler on demand via HTTP or CLI.
@@ -78,7 +79,7 @@ class WorkflowController extends Controller
     // HTTP entry point
     // -------------------------------------------------------------------------
 
-    public function run(Request $request): Response
+    public function run(WorkflowRequest $request): Response
     {
         $body = $this->parseBody($request);
 

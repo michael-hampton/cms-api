@@ -4,6 +4,7 @@ namespace App\Framework\Support;
 
 use ArrayIterator;
 use Countable;
+use DateTimeInterface;
 use IteratorAggregate;
 use JsonSerializable;
 
@@ -541,9 +542,9 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         $sorted = $this->items;
 
         usort($sorted, function ($a, $b) use ($key, $direction) {
-            // Determine value to compare
+
             $getValue = fn($item) => match (true) {
-                $key === null => $item, // sort by the value itself
+                $key === null => $item,
                 is_callable($key) => $key($item),
                 is_array($item) => $item[$key] ?? null,
                 default => $item->$key ?? null,
@@ -552,15 +553,19 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
             $aValue = $getValue($a);
             $bValue = $getValue($b);
 
-            // Handle nulls: always last
+            // Nulls last
             if ($aValue === null && $bValue === null) return 0;
             if ($aValue === null) return 1;
             if ($bValue === null) return -1;
 
-            // Compare numerically if possible
-            if (is_numeric($aValue) && is_numeric($bValue)) {
+            // DateTime comparison
+            if ($aValue instanceof DateTimeInterface && $bValue instanceof DateTimeInterface) {
                 $cmp = $aValue <=> $bValue;
-            } else {
+            } // Numeric comparison
+            elseif (is_numeric($aValue) && is_numeric($bValue)) {
+                $cmp = $aValue <=> $bValue;
+            } // Default string comparison
+            else {
                 $cmp = strcmp((string)$aValue, (string)$bValue);
             }
 

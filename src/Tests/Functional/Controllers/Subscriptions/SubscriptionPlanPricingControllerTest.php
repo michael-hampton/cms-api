@@ -35,6 +35,7 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
             'is_default' => false,
             'is_active' => true,
             'sort_order' => 0,
+            'site_id' => $this->siteId
         ], $overrides));
     }
 

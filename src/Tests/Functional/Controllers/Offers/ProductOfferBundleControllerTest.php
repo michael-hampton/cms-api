@@ -264,48 +264,67 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
-//    public function testStoreValidatesItemQuantityMinimumOne(): void
-//    {
-//        $offer1 = $this->createProductOffer($this->createProduct()->id);
-//        $offer2 = $this->createProductOffer($this->createProduct()->id);
-//
-//        $response = $this->postForSite('/api/bundles', [
-//            'name' => 'Test Bundle',
-//            'bundle_price' => 150.00,
-//            'start_date' => date('Y-m-d H:i:s'),
-//            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-//            'items' => [
-//                ['product_offer_id' => $offer1->id, 'quantity' => 0],
-//                ['product_offer_id' => $offer2->id, 'quantity' => 1],
-//            ],
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//        $this->assertArrayHasKey('items.0.quantity', $data['errors']);
-//    }
+    public function testStoreAcceptsItemWithOnlyProductOfferId(): void
+    {
+        $offer1 = $this->createProductOffer($this->createProduct()->id);
+        $offer2 = $this->createProductOffer($this->createProduct()->id);
 
-//    public function testStoreValidatesBundlePriceNotNegative(): void
-//    {
-//        $offer1 = $this->createProductOffer($this->createProduct()->id);
-//        $offer2 = $this->createProductOffer($this->createProduct()->id);
-//
-//        $response = $this->postForSite('/api/bundles', [
-//            'name' => 'Test Bundle',
-//            'bundle_price' => -10.00,
-//            'start_date' => date('Y-m-d H:i:s'),
-//            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-//            'items' => [
-//                ['product_offer_id' => $offer1->id, 'quantity' => 1],
-//                ['product_offer_id' => $offer2->id, 'quantity' => 1],
-//            ],
-//        ]);
-//
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//        $this->assertArrayHasKey('bundle_price', $data['errors']);
-//    }
+        $response = $this->postForSite('/api/bundles', [
+            'name' => 'Offer-only Bundle',
+            'bundle_price' => 150.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'slug' => uniqid(),
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function testStoreValidatesItemQuantityMinimumOne(): void
+    {
+        $offer1 = $this->createProductOffer($this->createProduct()->id);
+        $offer2 = $this->createProductOffer($this->createProduct()->id);
+
+        $response = $this->postForSite('/api/bundles', [
+            'name' => 'Test Bundle',
+            'bundle_price' => 150.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 0],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertArrayHasKey('items.0.quantity', $data['errors']);
+    }
+
+    public function testStoreValidatesBundlePriceNotNegative(): void
+    {
+        $offer1 = $this->createProductOffer($this->createProduct()->id);
+        $offer2 = $this->createProductOffer($this->createProduct()->id);
+
+        $response = $this->postForSite('/api/bundles', [
+            'name' => 'Test Bundle',
+            'bundle_price' => -10.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertArrayHasKey('bundle_price', $data['errors']);
+    }
 
     public function testStoreValidatesStatusEnum(): void
     {
@@ -646,5 +665,181 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
         $response = $this->postForSite("/api/bundles/{$bundle->id}/reject", []);
 
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    // =========================================================================
+    // POST /api/bundles/bulk/publish
+    // =========================================================================
+
+    public function testBulkPublishPublishesPendingBundles(): void
+    {
+        $bundle1 = ProductOfferBundle::create([
+            'name' => 'Pending Bundle 1',
+            'slug' => 'pending-bundle-1',
+            'bundle_price' => 100.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'pending',
+            'total_price' => 100
+        ]);
+
+        $bundle2 = ProductOfferBundle::create([
+            'name' => 'Pending Bundle 2',
+            'slug' => 'pending-bundle-2',
+            'bundle_price' => 200.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'pending',
+            'total_price' => 100
+        ]);
+
+        $response = $this->postForSite('/api/bundles/bulk/publish', [
+            'ids' => [$bundle1->id, $bundle2->id],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['published']);
+        $this->assertEmpty($data['failed']);
+
+        $this->assertEquals('published', ProductOfferBundle::find($bundle1->id)->status);
+        $this->assertEquals('published', ProductOfferBundle::find($bundle2->id)->status);
+    }
+
+    public function testBulkPublishReportsNonPendingBundlesAsFailed(): void
+    {
+        $pending = ProductOfferBundle::create([
+            'name' => 'Pending',
+            'slug' => 'pending-bulk',
+            'bundle_price' => 100.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'pending',
+            'total_price' => 100
+        ]);
+
+        $published = ProductOfferBundle::create([
+            'name' => 'Already Published',
+            'slug' => 'already-published-bulk',
+            'bundle_price' => 100.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'status' => 'published',
+            'total_price' => 100
+        ]);
+
+        $response = $this->postForSite('/api/bundles/bulk/publish', [
+            'ids' => [$pending->id, $published->id],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['published']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals($published->id, $data['failed'][0]['id']);
+    }
+
+    public function testBulkPublishBundlesReturns422WhenIdsAreMissing(): void
+    {
+        $response = $this->postForSite('/api/bundles/bulk/publish', []);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkPublishBundlesReturns422WhenIdsIsEmpty(): void
+    {
+        $response = $this->postForSite('/api/bundles/bulk/publish', ['ids' => []]);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkPublishBundlesHandlesNonExistentIds(): void
+    {
+        $response = $this->postForSite('/api/bundles/bulk/publish', ['ids' => [99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEmpty($data['published']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertStringContainsString('not found', $data['failed'][0]['reason']);
+    }
+
+    // =========================================================================
+    // DELETE /api/bundles/bulk
+    // =========================================================================
+
+    public function testBulkDeleteDeletesBundles(): void
+    {
+        $bundle1 = ProductOfferBundle::create([
+            'name' => 'Bundle To Delete 1',
+            'slug' => 'bundle-delete-1',
+            'bundle_price' => 100.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'total_price' => 100
+        ]);
+
+        $bundle2 = ProductOfferBundle::create([
+            'name' => 'Bundle To Delete 2',
+            'slug' => 'bundle-delete-2',
+            'bundle_price' => 200.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'total_price' => 100
+        ]);
+
+        $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => [$bundle1->id, $bundle2->id]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['deleted']);
+        $this->assertEmpty($data['failed']);
+
+        $this->assertDatabaseMissing('product_offer_bundles', ['id' => $bundle1->id]);
+        $this->assertDatabaseMissing('product_offer_bundles', ['id' => $bundle2->id]);
+    }
+
+    public function testBulkDeleteHandlesNonExistentIds(): void
+    {
+        $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => [99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEmpty($data['deleted']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals(99999, $data['failed'][0]['id']);
+    }
+
+    public function testBulkDeleteBundlesReturns422WhenIdsIsEmpty(): void
+    {
+        $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => []]);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkDeletePartialSuccessIsReturned(): void
+    {
+        $bundle = ProductOfferBundle::create([
+            'name' => 'Partial Bundle',
+            'slug' => 'partial-bundle',
+            'bundle_price' => 100.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'is_active' => true,
+            'total_price' => 100
+        ]);
+
+        $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => [$bundle->id, 99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['deleted']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals(2, $data['total']);
     }
 }

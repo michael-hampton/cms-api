@@ -37,7 +37,7 @@ class OpenApiBuilder
      *
      * @param array[] $routes From RouteParser::parse()
      * @param array $config title, version, description, servers
-     * @return array              Complete OpenAPI 3.0 document
+     * @return array Complete OpenAPI 3.0 document
      */
     public function build(array $routes, array $config): array
     {
@@ -59,19 +59,16 @@ class OpenApiBuilder
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Route processing
-    // -------------------------------------------------------------------------
+    // ── Route processing ───────────────────────────────────────────────────────
 
     private function processRoute(array $route): void
     {
-        // Support both 'path' (normalised) and 'uri' (raw) — prefer 'path'
         $rawUri = $route['path'] ?? $route['uri'] ?? null;
         if ($rawUri === null) {
-            return; // skip unparseable routes rather than crashing
+            return;
         }
 
-        // Normalise key names: RouteParser uses camelCase keys, OpenApiBuilder uses snake_case
+        // Normalise key names from RouteParser (camelCase) to what we use internally
         $route['action'] = $route['action'] ?? $route['controllerMethod'] ?? '';
         $route['controller'] = $route['controller'] ?? $route['controllerClass'] ?? '';
         $route['path_params'] = $route['path_params'] ?? $route['pathParams'] ?? [];
@@ -85,31 +82,23 @@ class OpenApiBuilder
             $this->paths[$uri] = [];
         }
 
-        $operation = $this->buildOperation($route);
-        $this->paths[$uri][$httpMethod] = $operation;
+        $this->paths[$uri][$httpMethod] = $this->buildOperation($route);
     }
 
     private function buildOperation(array $route): array
     {
         $tag = $route['tag'] ?? 'General';
-        $actionName = $route['action'] ?? '';
+        $httpMethod = strtoupper($route['method']); // resolved here, passed to helpers
 
-        // Register tag
         $this->registerTag($tag);
 
-        // Resolve controller method info
         $methodInfo = $this->resolveMethodInfo($route);
+        $parameters = $this->buildParameters($route, $methodInfo, $httpMethod);
 
-        // Build parameters (path + query)
-        $parameters = $this->buildParameters($route, $methodInfo);
-
-        // Build request body (for write operations)
-        $requestBody = $this->buildRequestBody($route, $httpMethod ?? $route['method']);
-
-        // Infer response
+        // FIX: $httpMethod was previously an undefined variable in this scope.
+        $requestBody = $this->buildRequestBody($route, $httpMethod);
         $response = $this->responseInferer->infer($route, $methodInfo);
 
-        // Ensure response schema is registered as a component
         $this->registerResponseComponents($route, $response);
 
         $operation = [
@@ -119,12 +108,11 @@ class OpenApiBuilder
             'parameters' => $parameters,
         ];
 
-        // Apply bearer auth security requirement for authenticated routes
         if ($route['authenticated'] ?? false) {
             $operation['security'] = [['bearerAuth' => []]];
         }
 
-        if ($route['description'] ?? null) {
+        if (!empty($route['description'])) {
             $operation['description'] = $route['description'];
         }
 
@@ -132,25 +120,20 @@ class OpenApiBuilder
             $operation['requestBody'] = $requestBody;
         }
 
-        $operation['responses'] = $this->buildResponses($response, $route);
+        $operation['responses'] = $this->buildResponses($response, $route, $httpMethod);
 
         return $operation;
     }
 
-    // -------------------------------------------------------------------------
-    // Parameters
-    // -------------------------------------------------------------------------
+    // ── Parameters ─────────────────────────────────────────────────────────────
 
     /**
-     * Build path + query parameters for an operation.
-     *
      * @return array<int, array> OpenAPI Parameter Objects
      */
-    private function buildParameters(array $route, array $methodInfo): array
+    private function buildParameters(array $route, array $methodInfo, string $httpMethod): array
     {
         $params = [];
 
-        // Path parameters
         foreach ($route['path_params'] ?? [] as $param) {
             $params[] = [
                 'name' => $param['name'],
@@ -160,8 +143,7 @@ class OpenApiBuilder
             ];
         }
 
-        // Query parameters from FormRequest (GET/DELETE only — POST/PUT/PATCH use body)
-        $httpMethod = strtoupper($route['method']);
+        // Query params from FormRequest for read-only methods
         if (in_array($httpMethod, ['GET', 'DELETE'], true) && !empty($route['form_request'])) {
             $analyzed = $this->requestAnalyzer->analyze($route['form_request']);
             $queryParams = $this->schemaBuilder->buildQueryParams(
@@ -172,7 +154,6 @@ class OpenApiBuilder
             $params = array_merge($params, $queryParams);
         }
 
-        // Auto-inject pagination params for index/list actions
         if ($this->isPaginatedAction($route)) {
             $params = array_merge($params, $this->paginationParameters());
         }
@@ -203,35 +184,28 @@ class OpenApiBuilder
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Request body
-    // -------------------------------------------------------------------------
+    // ── Request body ───────────────────────────────────────────────────────────
 
     private function buildRequestBody(array $route, string $httpMethod): ?array
     {
-        if (!in_array(strtoupper($httpMethod), ['POST', 'PUT', 'PATCH'], true)) {
+        if (!in_array($httpMethod, ['POST', 'PUT', 'PATCH'], true)) {
             return null;
         }
 
         if (empty($route['form_request'])) {
-            // No FormRequest — emit a generic empty object body
             return [
                 'required' => false,
                 'content' => [
-                    'application/json' => [
-                        'schema' => ['type' => 'object'],
-                    ],
+                    'application/json' => ['schema' => ['type' => 'object']],
                 ],
             ];
         }
 
         $analyzed = $this->requestAnalyzer->analyze($route['form_request']);
         $schema = $this->schemaBuilder->buildRequestSchema($analyzed);
-
         $shortName = class_basename($route['form_request']);
         $componentKey = $shortName . 'Body';
 
-        // Register as a reusable component
         $this->components['schemas'][$componentKey] = $schema;
 
         return [
@@ -244,11 +218,9 @@ class OpenApiBuilder
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Responses
-    // -------------------------------------------------------------------------
+    // ── Responses ──────────────────────────────────────────────────────────────
 
-    private function buildResponses(array $response, array $route): array
+    private function buildResponses(array $response, array $route, string $httpMethod): array
     {
         $responses = [];
 
@@ -257,17 +229,17 @@ class OpenApiBuilder
 
         if ($response['schema'] !== null) {
             $successEntry['content'] = [
-                'application/json' => [
-                    'schema' => $response['schema'],
-                ],
+                'application/json' => ['schema' => $response['schema']],
             ];
         }
 
         $responses[$successStatus] = $successEntry;
 
-        // Always include 422 for write operations with FormRequest
-        $httpMethod = strtoupper($route['method']);
-        if (in_array($httpMethod, ['POST', 'PUT', 'PATCH'], true)) {
+        // 422 for all write operations that carry a FormRequest
+        if (
+            in_array($httpMethod, ['POST', 'PUT', 'PATCH'], true)
+            || ($httpMethod === 'DELETE' && !empty($route['form_request']))
+        ) {
             $responses['422'] = [
                 'description' => 'Validation error',
                 'content' => [
@@ -278,7 +250,7 @@ class OpenApiBuilder
             ];
         }
 
-        // 404 for routes with ID path params
+        // 404 for routes with ID-style path params
         $hasIdParam = !empty(array_filter(
             $route['path_params'] ?? [],
             fn($p) => in_array($p['name'], ['id', 'uuid'], true) || str_ends_with($p['name'], '_id')
@@ -288,35 +260,54 @@ class OpenApiBuilder
             $responses['404'] = ['description' => 'Resource not found'];
         }
 
-        // 401 as standard — most APIs require authentication
+        // 401 for all routes (standard)
         $responses['401'] = ['description' => 'Unauthenticated'];
+
+        // 403 for authenticated routes — authorization is distinct from authentication
+        if ($route['authenticated'] ?? false) {
+            $responses['403'] = ['description' => 'Forbidden — insufficient permissions'];
+        }
 
         return $responses;
     }
 
-    // -------------------------------------------------------------------------
-    // Components
-    // -------------------------------------------------------------------------
+    // ── Components ─────────────────────────────────────────────────────────────
 
+    /**
+     * Register a resource schema component, enriched with request fields where available.
+     * For store/update operations we merge the request body fields into the response schema
+     * so that the component reflects the actual shape of the resource.
+     */
     private function registerResponseComponents(array $route, array $response): void
     {
         $resource = $this->guessResourceName($route);
 
         if (!isset($this->components['schemas'][$resource])) {
-            $this->components['schemas'][$resource] = $this->schemaBuilder->buildResourceSchema($resource);
+            $baseSchema = $this->schemaBuilder->buildResourceSchema($resource);
+
+            // For write operations, enrich the resource schema with request fields
+            $httpMethod = strtoupper($route['method']);
+            if (
+                in_array($httpMethod, ['POST', 'PUT', 'PATCH'], true)
+                && !empty($route['form_request'])
+            ) {
+                $analyzed = $this->requestAnalyzer->analyze($route['form_request']);
+                if (!empty($analyzed['fields'])) {
+                    $baseSchema = $this->schemaBuilder->mergeIntoResource($baseSchema, $analyzed['fields']);
+                }
+            }
+
+            $this->components['schemas'][$resource] = $baseSchema;
         }
     }
 
     private function buildComponents(): array
     {
-        // Always include standard error schemas
         $this->components['schemas']['ValidationError'] = $this->validationErrorSchema();
         $this->components['schemas']['ErrorResponse'] = $this->errorResponseSchema();
 
-        // Sort schemas alphabetically for stable output
         ksort($this->components['schemas']);
 
-        // Bearer token auth — matches AuthenticateWithToken middleware
         $this->components['securitySchemes']['bearerAuth'] = [
             'type' => 'http',
             'scheme' => 'bearer',
@@ -355,9 +346,7 @@ class OpenApiBuilder
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private function resolveMethodInfo(array $route): array
     {
@@ -386,7 +375,6 @@ class OpenApiBuilder
 
     private function normalizeUri(string $uri): string
     {
-        // Ensure leading slash, strip trailing slash
         $uri = '/' . ltrim(rtrim($uri, '/'), '/');
         return $uri === '/' ? '/' : $uri;
     }
@@ -395,7 +383,6 @@ class OpenApiBuilder
     {
         $action = $route['action'] ?? '';
         $resource = $this->guessResourceName($route);
-        $httpMethod = strtoupper($route['method']);
 
         return match ($action) {
             'index' => "List {$resource} resources",
@@ -437,10 +424,8 @@ class OpenApiBuilder
 
     private function buildServers(array $config): array
     {
-        $baseUrl = $config['base_url'] ?? 'http://localhost';
-
         return [
-            ['url' => $baseUrl, 'description' => 'Default server'],
+            ['url' => $config['base_url'] ?? 'http://localhost', 'description' => 'Default server'],
         ];
     }
 }

@@ -93,9 +93,9 @@ class SubscriptionPlanPricingRepository extends Repository
         return true;
     }
 
-    public function searchPricingTiersPaginated(array $filters): array
+    public function searchPricingTiersPaginated(array $filters, int $siteId): array
     {
-        $query = SubscriptionPlanPricing::query();
+        $query = SubscriptionPlanPricing::forSite($siteId);
 
         // Filter by plan_id
         if (!empty($filters['plan_id'])) {

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional\Controllers\Members\Newsletters;
+namespace App\Tests\Functional\Controllers\Newsletters;
 
 use App\Framework\Mail\ArrayMailer;
 use App\Models\Newsletter;

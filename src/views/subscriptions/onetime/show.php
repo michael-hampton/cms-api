@@ -1178,12 +1178,13 @@ $pagination = $reviewData['pagination'] ?? [];
 
                             <div class="duration-option__right">
                                 <?php if ($pricing->hasDiscount()): ?>
-                                    <div class="duration-option__was">£<?= number_format($originalPrice, 2) ?></div>
+                                    <div class="duration-option__was"><?= $currencySymbol ?><?= number_format($originalPrice, 2) ?></div>
                                 <?php endif; ?>
-                                <div class="duration-option__price">£<?= number_format($actualPrice, 2) ?></div>
+                                <div class="duration-option__price"><?= $currencySymbol ?><?= number_format($actualPrice, 2) ?></div>
                                 <?php if ($pricing->issue_count > 0): ?>
                                     <div class="duration-option__per-issue">
-                                        £<?= number_format($pricing->getPricePerIssue(), 2) ?>/issue
+                                        <?= $currencySymbol ?><?= number_format($pricing->getPricePerIssue(), 2) ?>
+                                        /issue
                                     </div>
                                 <?php endif; ?>
                                 <?php if ($pricing->getSavingsText()): ?>
@@ -1434,6 +1435,7 @@ $pagination = $reviewData['pagination'] ?? [];
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?? 'default' ?>';
     const PLAN_ID = <?= (int)$plan->id ?>;
     let cartData = {items: [], total: 0, count: 0};
+    const CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
     document.addEventListener('DOMContentLoaded', () => {
         loadCart();
@@ -1482,11 +1484,11 @@ $pagination = $reviewData['pagination'] ?? [];
             const pSale = parseFloat(radio.dataset.originalPrice);
 
             if (isDigital && dPrice > 0) {
-                priceEl.textContent = '£' + dSale.toFixed(2);
-                if (wasEl && dSale < dPrice) wasEl.textContent = '£' + dPrice.toFixed(2);
+                priceEl.textContent = CURRENCY_SYMBOL + dSale.toFixed(2);
+                if (wasEl && dSale < dPrice) wasEl.textContent = CURRENCY_SYMBOL + dPrice.toFixed(2);
             } else {
-                priceEl.textContent = '£' + pSale.toFixed(2);
-                if (wasEl && pSale < pPrice) wasEl.textContent = '£' + pPrice.toFixed(2);
+                priceEl.textContent = CURRENCY_SYMBOL + pSale.toFixed(2);
+                if (wasEl && pSale < pPrice) wasEl.textContent = CURRENCY_SYMBOL + pPrice.toFixed(2);
             }
         });
     }
@@ -1504,8 +1506,8 @@ $pagination = $reviewData['pagination'] ?? [];
     function updateCartDisplay() {
         const count = cartData.count || 0;
         document.getElementById('cart-count').textContent = count;
-        document.getElementById('cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
-        document.getElementById('mini-cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
+        document.getElementById('cart-total').textContent = CURRENCY_SYMBOL + (cartData.total || 0).toFixed(2);
+        document.getElementById('mini-cart-total').textContent = CURRENCY_SYMBOL + (cartData.total || 0).toFixed(2);
         const badge = document.getElementById('header-cart-count');
         badge.textContent = count;
         badge.style.display = count > 0 ? 'flex' : 'none';
@@ -1519,7 +1521,7 @@ $pagination = $reviewData['pagination'] ?? [];
             <div class="cart-item">
                 <div class="cart-item-name">${item.product_name || item.options?.plan_name || 'Subscription'}</div>
                 <div class="cart-item-details">${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months</div>
-                <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
+                <div class="cart-item-price">${CURRENCY_SYMBOL}${(item.price || 0).toFixed(2)}</div>
             </div>`).join('');
     }
 

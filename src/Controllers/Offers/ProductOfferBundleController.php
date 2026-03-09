@@ -2,12 +2,15 @@
 
 namespace App\Controllers\Offers;
 
+use App\Actions\Offers\BulkDeleteBundles;
+use App\Actions\Offers\BulkPublishBundles;
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\ProductOfferBundle;
+use App\Requests\BulkActionRequest;
 use App\Requests\StoreProductOfferBundleRequest;
 use App\Requests\UpdateProductOfferBundleRequest;
 use App\Resources\ProductOfferBundleResource;
@@ -20,7 +23,9 @@ use Exception;
 class ProductOfferBundleController extends Controller
 {
     public function __construct(
-        private readonly ProductOfferBundleService $bundleService
+        private readonly ProductOfferBundleService $bundleService,
+        private readonly BulkPublishBundles        $bulkPublishBundles,
+        private readonly BulkDeleteBundles         $bulkDeleteBundles,
     )
     {
         parent::__construct();
@@ -56,14 +61,10 @@ class ProductOfferBundleController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Bundle created successfully',
-                'bundle' => $bundle->toArray()
+                'bundle' => $bundle->toArray(),
             ], 201);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -75,14 +76,12 @@ class ProductOfferBundleController extends Controller
             $bundle = $this->bundleService->getBundle($bundleId);
 
             if (!$bundle) {
-                return $this->jsonResponse([
-                    'message' => 'Bundle not found'
-                ], 404);
+                return $this->jsonResponse(['message' => 'Bundle not found'], 404);
             }
 
             return $this->resourceResponse([
                 'success' => true,
-                'bundle' => $bundle->toArray()
+                'bundle' => $bundle->toArray(),
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -95,22 +94,16 @@ class ProductOfferBundleController extends Controller
             $bundle = $this->bundleService->updateBundle($bundleId, $request->validated());
 
             if (!$bundle) {
-                return $this->jsonResponse([
-                    'message' => 'Bundle not found'
-                ], 404);
+                return $this->jsonResponse(['message' => 'Bundle not found'], 404);
             }
 
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Bundle updated successfully',
-                'bundle' => $bundle->toArray()
+                'bundle' => $bundle->toArray(),
             ]);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -122,14 +115,12 @@ class ProductOfferBundleController extends Controller
             $deleted = $this->bundleService->deleteBundle($bundleId);
 
             if (!$deleted) {
-                return $this->jsonResponse([
-                    'message' => 'Bundle not found'
-                ], 404);
+                return $this->jsonResponse(['message' => 'Bundle not found'], 404);
             }
 
             return $this->jsonResponse([
                 'success' => true,
-                'message' => 'Bundle deleted successfully'
+                'message' => 'Bundle deleted successfully',
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -143,15 +134,13 @@ class ProductOfferBundleController extends Controller
             $bundle = $this->bundleService->publish($bundleId, $userId);
 
             if (!$bundle) {
-                return $this->resourceResponse([
-                    'message' => 'Bundle cannot be published'
-                ], 400);
+                return $this->resourceResponse(['message' => 'Bundle cannot be published'], 400);
             }
 
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Bundle published successfully',
-                'bundle' => $bundle->toArray()
+                'bundle' => $bundle->toArray(),
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -171,15 +160,74 @@ class ProductOfferBundleController extends Controller
             $bundle = $this->bundleService->reject($bundleId, $userId, $reason);
 
             if (!$bundle) {
-                return $this->resourceResponse([
-                    'message' => 'Bundle cannot be rejected'
-                ], 400);
+                return $this->resourceResponse(['message' => 'Bundle cannot be rejected'], 400);
             }
 
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Bundle rejected successfully',
-                'bundle' => $bundle->toArray()
+                'bundle' => $bundle->toArray(),
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    // =========================================================================
+    // Bulk actions
+    // =========================================================================
+
+    /**
+     * POST /api/bundles/bulk/publish
+     *
+     * Body: { "ids": [1, 2, 3] }
+     */
+    public function bulkPublish(Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $ids = $request->input('ids');
+
+            if (!is_array($ids) || empty($ids)) {
+                return $this->errorResponse('ids must be a non-empty array', 422);
+            }
+
+            $userId = auth()->id() ?? 1;
+            $result = $this->bulkPublishBundles->handle(array_map('intval', $ids), $userId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => sprintf('%d bundle(s) published successfully', count($result['published'])),
+                'published' => $result['published'],
+                'failed' => $result['failed'],
+                'total' => $result['total'],
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * DELETE /api/bundles/bulk
+     *
+     * Body: { "ids": [1, 2, 3] }
+     */
+    public function bulkDelete(BulkActionRequest $request, string $siteName): JsonResponse
+    {
+        try {
+            $ids = $request->input('ids');
+
+            if (!is_array($ids) || empty($ids)) {
+                return $this->errorResponse('ids must be a non-empty array', 422);
+            }
+
+            $result = $this->bulkDeleteBundles->handle(array_map('intval', $ids));
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => sprintf('%d bundle(s) deleted successfully', count($result['deleted'])),
+                'deleted' => $result['deleted'],
+                'failed' => $result['failed'],
+                'total' => $result['total'],
             ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);

@@ -126,7 +126,7 @@ class ProductOffer extends Model implements BoostableInterface
 
     public function publisher()
     {
-        return $this->belongsTo(User::class, 'published_by');
+        return $this->belongsTo(User::class, 'published_by', 'id');
     }
 
     public function rejector()

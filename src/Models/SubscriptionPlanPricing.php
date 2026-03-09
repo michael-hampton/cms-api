@@ -20,9 +20,10 @@ class SubscriptionPlanPricing extends Model
         'is_active',
         'digital_price',
         'digital_sale_price',
-        'currency',               // ← NEW
-        'stripe_price_id',        // ← NEW: set by AddPlanPriceAction / ReplacePlanPriceAction
-        'replaced_by_price_id',   // ← NEW: FK to the successor row (set by ReplacePlanPriceAction)
+        'currency',
+        'stripe_price_id',
+        'replaced_by_price_id',
+        'site_id'
     ];
 
     protected $casts = [
@@ -81,5 +82,10 @@ class SubscriptionPlanPricing extends Model
         }
 
         return round($this->price / $this->issue_count, 2);
+    }
+
+    public function scopeForSite($query, int $siteId)
+    {
+        return $query->where('subscription_plan_pricing.site_id', $siteId);
     }
 }

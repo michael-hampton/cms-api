@@ -10,6 +10,7 @@ use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\HasModel;
 use App\Framework\Validation\Rules\AcceptedRule;
+use App\Framework\Validation\Rules\AfterOrEqualRule;
 use App\Framework\Validation\Rules\AfterRule;
 use App\Framework\Validation\Rules\ArrayRule;
 use App\Framework\Validation\Rules\BooleanRule;
@@ -26,6 +27,7 @@ use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\NumericRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
+use App\Framework\Validation\Rules\RequiredWithoutRule;
 use App\Framework\Validation\Rules\RequiredWithRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\StringRule;
@@ -330,17 +332,18 @@ abstract class FormRequest extends Request
         $ruleMap = [
             'required' => RequiredRule::class,
             'required_if' => RequiredIfRule::class,
+            'required_with' => RequiredWithRule::class,
+            'required_without' => RequiredWithoutRule::class,
             'date' => DateRule::class,
-            'required_with' => RequiredWithRule::class, // ADD THIS LINE
-            'string' => StringRule::class, // You'll need this
+            'string' => StringRule::class,
             'integer' => IntegerRule::class,
-            'boolean' => BooleanRule::class, // You'll need this
+            'boolean' => BooleanRule::class,
             'max' => MaxLengthRule::class,
             'accepted' => AcceptedRule::class,
             'nullable' => NullableRule::class,
             'min' => MinLengthRule::class,
             'email' => EmailRule::class,
-            'exists' => ExistsRule::class, // You'll need this
+            'exists' => ExistsRule::class,
             'unique' => UniqueRule::class,
             'in' => InRule::class,
             'url' => UrlRule::class,
@@ -349,8 +352,8 @@ abstract class FormRequest extends Request
             'confirmed' => ConfirmedRule::class,
             'sometimes' => SometimesRule::class,
             'after' => AfterRule::class,
+            'after_or_equal' => AfterOrEqualRule::class,
             'min_number' => MinRule::class,
-            // Add other mappings as needed
         ];
 
         if (!isset($ruleMap[$ruleName])) {

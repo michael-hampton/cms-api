@@ -300,22 +300,22 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('sale_price', $data['errors']);
     }
 
-//    public function testStoreValidatesSalePriceNotNegative(): void
-//    {
-//        $product = $this->createProduct();
-//
-//        $response = $this->postForSite("/api/products/{$product->id}/offers", [
-//            'sale_price' => -5.00,
-//            'start_date' => date('Y-m-d H:i:s'),
-//            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-//            'link' => 'https://www.test.com',
-//            'original_price' => 99.99,
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//        $this->assertArrayHasKey('sale_price', $data['errors']);
-//    }
+    public function testStoreValidatesSalePriceNotNegative(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->postForSite("/api/products/{$product->id}/offers", [
+            'sale_price' => -5.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'link' => 'https://www.test.com',
+            'original_price' => 99.99,
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertArrayHasKey('sale_price', $data['errors']);
+    }
 
     public function testStoreValidatesStatusEnum(): void
     {
@@ -469,19 +469,19 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('end_date', $data['errors']);
     }
 
-//    public function testUpdateValidatesSalePriceNotNegative(): void
-//    {
-//        $product = $this->createProduct();
-//        $offer = $this->createProductOffer($product->id);
-//
-//        $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
-//            'sale_price' => -10.00,
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//        $this->assertArrayHasKey('sale_price', $data['errors']);
-//    }
+    public function testUpdateValidatesSalePriceNotNegative(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
+            'sale_price' => -10.00,
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertArrayHasKey('sale_price', $data['errors']);
+    }
 
     public function testUpdateValidatesSalePriceIsNumeric(): void
     {
@@ -805,5 +805,143 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'offer_id' => $offer->id,
             'action' => 'copy_code',
         ]);
+    }
+
+    // =========================================================================
+    // POST /api/offers/bulk/publish
+    // =========================================================================
+
+    public function testBulkPublishPublishesPendingOffers(): void
+    {
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id, [
+            'status' => 'pending',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+        $offer2 = $this->createProductOffer($product->id, [
+            'status' => 'pending',
+            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+        ]);
+
+        $response = $this->postForSite('/api/offers/bulk/publish', [
+            'ids' => [$offer1->id, $offer2->id],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['published']);
+        $this->assertEmpty($data['failed']);
+
+        $this->assertEquals('published', ProductOffer::find($offer1->id)->status);
+        $this->assertEquals('published', ProductOffer::find($offer2->id)->status);
+    }
+
+    public function testBulkPublishReportsNonPendingOffersAsFailed(): void
+    {
+        $product = $this->createProduct();
+        $pending = $this->createProductOffer($product->id, ['status' => 'pending']);
+        $already = $this->createProductOffer($product->id, [
+            'status' => 'published',
+            'published_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $response = $this->postForSite('/api/offers/bulk/publish', [
+            'ids' => [$pending->id, $already->id],
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['published']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals($already->id, $data['failed'][0]['id']);
+    }
+
+    public function testBulkPublishReturns422WhenIdsAreMissing(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/publish', []);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkPublishReturns422WhenIdsIsEmpty(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/publish', ['ids' => []]);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkPublishHandlesNonExistentIds(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/publish', ['ids' => [99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEmpty($data['published']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertStringContainsString('not found', $data['failed'][0]['reason']);
+    }
+
+    // =========================================================================
+    // DELETE /api/offers/bulk
+    // =========================================================================
+
+    public function testBulkDeleteDeletesOffers(): void
+    {
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
+
+        $response = $this->postForSite('/api/offers/bulk/delete', ['ids' => [$offer1->id, $offer2->id]]);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $this->assertCount(2, $data['deleted']);
+        $this->assertEmpty($data['failed']);
+
+        $this->assertDatabaseMissing('product_offers', ['id' => $offer1->id]);
+        $this->assertDatabaseMissing('product_offers', ['id' => $offer2->id]);
+    }
+
+    public function testBulkDeleteHandlesNonExistentIds(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/delete', ['ids' => [99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEmpty($data['deleted']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals(99999, $data['failed'][0]['id']);
+    }
+
+
+    public function testBulkDeleteReturns422WhenIdsAreMissing(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/delete', []);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkDeleteReturns422WhenIdsIsEmpty(): void
+    {
+        $response = $this->postForSite('/api/offers/bulk/delete', ['ids' => []]);
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkDeletePartialSuccessIsReturned(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $response = $this->postForSite('/api/offers/bulk/delete', ['ids' => [$offer->id, 99999]]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $data['deleted']);
+        $this->assertCount(1, $data['failed']);
+        $this->assertEquals(2, $data['total']);
     }
 }

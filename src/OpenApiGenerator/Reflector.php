@@ -118,6 +118,7 @@ class Reflector
      *        'return'  => string|null,
      *        'doc'     => string,
      *        'visibility' => 'public'|'protected'|'private',
+     *        'line'    => int,   // 1-based line number of function keyword
      *      ]
      *   ]
      * ]
@@ -162,7 +163,7 @@ class Reflector
             $result['uses'][$alias] = $fqcn;
         }
 
-        // Methods — extract via token_get_all for accuracy
+        // Methods — extract via token_get_all for accuracy, including line numbers
         $result['methods'] = $this->extractMethods($src, $result['uses']);
 
         $this->cache[$filePath] = $result;
@@ -171,38 +172,175 @@ class Reflector
 
     // ── Private ───────────────────────────────────────────────────────────────
 
+    /**
+     * Extract method metadata using token_get_all for accurate line tracking.
+     *
+     * This replaces the old regex-only approach which could not reliably track
+     * line numbers — causing RequestAnalyzer to read the wrong method body.
+     */
     private function extractMethods(string $src, array $uses): array
     {
         $methods = [];
+        $tokens = token_get_all($src);
+        $count = count($tokens);
 
-        // Match method signatures with optional doc comment above
-        $pattern = '/
-            (?:\/\*\*(.*?)\*\/\s*)?          # optional docblock
-            (public|protected|private)\s+     # visibility
-            (?:static\s+)?                    # optional static
-            function\s+(\w+)\s*              # function name
-            \(([^)]*(?:\([^)]*\)[^)]*)*)\)   # parameter list (handles defaults with parens)
-            (?:\s*:\s*([\w\\\\|?]+))?         # optional return type
-        /xs';
+        for ($i = 0; $i < $count; $i++) {
+            if (!is_array($tokens[$i]) || $tokens[$i][0] !== T_FUNCTION) {
+                continue;
+            }
 
-        preg_match_all($pattern, $src, $matches, PREG_SET_ORDER);
+            $funcLine = $tokens[$i][2];
 
-        foreach ($matches as $m) {
-            $doc = trim($m[1] ?? '');
-            $visibility = $m[2];
-            $name = $m[3];
-            $paramStr = trim($m[4]);
-            $returnType = trim($m[5] ?? '');
+            // Collect visibility (scan backwards from T_FUNCTION, skipping whitespace)
+            $visibility = 'public';
+            for ($j = $i - 1; $j >= 0; $j--) {
+                if (!is_array($tokens[$j])) {
+                    break;
+                }
+                if ($tokens[$j][0] === T_WHITESPACE) {
+                    continue;
+                }
+                if (in_array($tokens[$j][0], [T_PUBLIC, T_PROTECTED, T_PRIVATE], true)) {
+                    $visibility = $tokens[$j][1];
+                }
+                break;
+            }
+
+            // Skip anonymous functions: next non-whitespace after T_FUNCTION must be T_STRING
+            $nameIdx = $i + 1;
+            while ($nameIdx < $count && is_array($tokens[$nameIdx]) && $tokens[$nameIdx][0] === T_WHITESPACE) {
+                $nameIdx++;
+            }
+
+            if (!is_array($tokens[$nameIdx]) || $tokens[$nameIdx][0] !== T_STRING) {
+                continue; // anonymous function, skip
+            }
+
+            $name = $tokens[$nameIdx][1];
+
+            // Collect doc comment (scan backwards past whitespace/attributes)
+            $doc = '';
+            for ($j = $i - 1; $j >= 0; $j--) {
+                if (!is_array($tokens[$j])) {
+                    break;
+                }
+                if ($tokens[$j][0] === T_WHITESPACE) {
+                    continue;
+                }
+                // PHP 8 attributes: #[Something] — skip the attribute tokens
+                if ($tokens[$j][0] === T_ATTRIBUTE || $tokens[$j][1] === ']') {
+                    // Skip until we find the matching #[
+                    while ($j >= 0 && !(is_array($tokens[$j]) && $tokens[$j][0] === T_ATTRIBUTE)) {
+                        $j--;
+                    }
+                    continue;
+                }
+                if ($tokens[$j][0] === T_DOC_COMMENT) {
+                    $doc = $this->cleanDoc($tokens[$j][1]);
+                }
+                break;
+            }
+
+            // Parse parameter list — find opening ( and closing )
+            $paramStr = $this->extractParamString($tokens, $nameIdx + 1, $count);
+
+            // Parse return type — find : after the closing )
+            $returnType = $this->extractReturnType($tokens, $nameIdx + 1, $count);
 
             $methods[$name] = [
                 'visibility' => $visibility,
                 'params' => $this->parseParams($paramStr, $uses),
                 'return' => $returnType ?: null,
-                'doc' => $this->cleanDoc($doc),
+                'doc' => $doc,
+                'line' => $funcLine,
             ];
         }
 
         return $methods;
+    }
+
+    /**
+     * Extract the raw parameter string from between the ( ) of a function signature.
+     */
+    private function extractParamString(array $tokens, int $start, int $count): string
+    {
+        // Advance to opening paren
+        $i = $start;
+        while ($i < $count && $tokens[$i] !== '(' && !(is_array($tokens[$i]) && $tokens[$i][1] === '(')) {
+            $i++;
+        }
+
+        $depth = 0;
+        $parts = [];
+        for (; $i < $count; $i++) {
+            $tok = $tokens[$i];
+            $val = is_array($tok) ? $tok[1] : $tok;
+
+            if ($val === '(') {
+                $depth++;
+                if ($depth === 1) {
+                    continue; // skip the opening paren itself
+                }
+            } elseif ($val === ')') {
+                $depth--;
+                if ($depth === 0) {
+                    break;
+                }
+            }
+
+            if ($depth >= 1) {
+                $parts[] = $val;
+            }
+        }
+
+        return implode('', $parts);
+    }
+
+    /**
+     * Extract the return type hint from after the closing ) of a function signature.
+     */
+    private function extractReturnType(array $tokens, int $start, int $count): string
+    {
+        // First skip past the parameter list
+        $i = $start;
+        $depth = 0;
+        $foundOpen = false;
+        for (; $i < $count; $i++) {
+            $tok = $tokens[$i];
+            $val = is_array($tok) ? $tok[1] : $tok;
+            if ($val === '(') {
+                $depth++;
+                $foundOpen = true;
+            } elseif ($val === ')') {
+                $depth--;
+                if ($foundOpen && $depth === 0) {
+                    $i++;
+                    break;
+                }
+            }
+        }
+
+        // Now look for : followed by type name, stopping at { or ;
+        $returnParts = [];
+        for (; $i < $count; $i++) {
+            $tok = $tokens[$i];
+            $val = is_array($tok) ? $tok[1] : $tok;
+
+            if ($val === '{' || $val === ';') {
+                break;
+            }
+            if ($val === ':' && empty($returnParts)) {
+                continue; // skip the colon itself
+            }
+            if (is_array($tok) && $tok[0] === T_WHITESPACE) {
+                continue;
+            }
+            if ($val !== ':') {
+                $returnParts[] = $val;
+            }
+        }
+
+        return trim(implode('', $returnParts));
     }
 
     private function parseParams(string $paramStr, array $uses): array
@@ -212,8 +350,6 @@ class Reflector
         }
 
         $params = [];
-
-        // Split by comma, but only at top-level (not inside <> or [])
         $parts = $this->splitParams($paramStr);
 
         foreach ($parts as $part) {

@@ -185,20 +185,169 @@ class GiftPromotionControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('name', $data['errors']);
     }
 
-//    public function test_store_validates_end_date_after_start_date(): void
-//    {
-//        $response = $this->postForSite('/api/gift-promotions', [
-//            'name'       => 'Date Validation Promo',
-//            'type'       => 'gift',
-//            'start_date' => '2024-12-31',
-//            'end_date'   => '2024-01-01',
-//        ]);
-//
-//        $this->assertResponseStatus(422, $response);
-//
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertArrayHasKey('end_date', $data['errors']);
-//    }
+    public function test_store_validates_required_gift_type(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Test Promo',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('gift_type', $data['errors']);
+    }
+
+    public function test_store_validates_ends_at_after_or_equal_starts_at(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Date Validation Promo',
+            'gift_type' => 'subscription',
+            'starts_at' => '2024-12-31',
+            'ends_at' => '2024-01-01',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('ends_at', $data['errors']);
+    }
+
+    public function test_store_accepts_ends_at_equal_to_starts_at(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Same Day Promo',
+            'gift_type' => 'subscription',
+            'starts_at' => '2024-06-01',
+            'ends_at' => '2024-06-01',
+        ]);
+
+        // ends_at === starts_at is explicitly allowed by after_or_equal
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public function test_store_accepts_ends_at_after_starts_at(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Valid Date Range Promo',
+            'gift_type' => 'subscription',
+            'starts_at' => '2024-06-01',
+            'ends_at' => '2024-12-31',
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public function test_store_accepts_omitted_date_fields(): void
+    {
+        // Both starts_at and ends_at are nullable — omitting them is valid
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'No Dates Promo',
+            'gift_type' => 'subscription',
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public function test_store_accepts_ends_at_when_starts_at_is_omitted(): void
+    {
+        // starts_at absent — ends_at has nothing to compare against, so it passes
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'End Only Promo',
+            'gift_type' => 'subscription',
+            'ends_at' => '2024-12-31',
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+    }
+
+    public function test_store_validates_max_per_order_minimum_one(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Max Order Promo',
+            'gift_type' => 'subscription',
+            'max_per_order' => 0,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('max_per_order', $data['errors']);
+    }
+
+    public function test_store_validates_priority_minimum_zero(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Priority Promo',
+            'gift_type' => 'subscription',
+            'priority' => -1,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('priority', $data['errors']);
+    }
+
+    public function test_store_validates_gift_type_max_length(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Test Promo',
+            'gift_type' => str_repeat('x', 101),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('gift_type', $data['errors']);
+    }
+
+    public function test_store_validates_trigger_requires_type(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Trigger Promo',
+            'gift_type' => 'subscription',
+            'triggers' => [
+                ['operator' => '=', 'value' => '5'], // missing type
+            ],
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('triggers.0.type', $data['errors']);
+    }
+
+    public function test_store_validates_trigger_requires_operator(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Trigger Promo',
+            'gift_type' => 'subscription',
+            'triggers' => [
+                ['type' => 'cart_total', 'value' => '5'], // missing operator
+            ],
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('triggers.0.operator', $data['errors']);
+    }
+
+    public function test_store_validates_excluded_issue_ids_must_be_integers(): void
+    {
+        $response = $this->postForSite('/api/gift-promotions', [
+            'name' => 'Test Promo',
+            'gift_type' => 'subscription',
+            'excluded_issue_ids' => ['not-an-integer'],
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('excluded_issue_ids.0', $data['errors']);
+    }
+
 
     // ─── update ──────────────────────────────────────────────────────────────
 
@@ -220,6 +369,26 @@ class GiftPromotionControllerTest extends FunctionalTestCase
 
         $updated = GiftPromotion::find($promotion->id);
         $this->assertEquals('Updated Name', $updated->name);
+    }
+
+    public function test_update_validates_ends_at_after_or_equal_starts_at(): void
+    {
+        $promotion = $this->createGiftPromotion([
+            'starts_at' => '2024-01-01',
+            'ends_at' => '2024-12-31',
+        ]);
+
+        $response = $this->putForSite("/api/gift-promotions/{$promotion->id}", [
+            'name' => $promotion->name,
+            'gift_type' => 'subscription',
+            'starts_at' => '2024-12-31',
+            'ends_at' => '2024-01-01',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('ends_at', $data['errors']);
     }
 
     public function test_update_replaces_triggers(): void

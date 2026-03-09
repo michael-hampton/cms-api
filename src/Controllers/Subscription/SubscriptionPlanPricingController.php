@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
+use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Requests\CreatePricingTierRequest;
@@ -22,15 +23,16 @@ class SubscriptionPlanPricingController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, int $planId)
+    public function index(Request $request, ?int $planId = null)
     {
+        $siteId = SiteContext::getId();
         $filters = [
-            'plan_id' => $planId,
+            //'plan_id' => $planId,
             'status' => $request->input('status'),
             'search' => $request->input('search')
         ];
 
-        $result = $this->pricingRepository->searchPricingTiersPaginated($filters);
+        $result = $this->pricingRepository->searchPricingTiersPaginated($filters, $siteId);
 
         return $this->resourceResponse([
             'success' => true,
@@ -50,6 +52,7 @@ class SubscriptionPlanPricingController extends Controller
             $data = $request->validated();
 
             $data['plan_id'] = $planId;
+            $data['site_id'] = SiteContext::getId();
 
             $pricing = $this->pricingService->createPricingTier($planId, $data);
 
@@ -84,6 +87,7 @@ class SubscriptionPlanPricingController extends Controller
     {
         try {
             $data = $request->validated();
+            $data['site_id'] = SiteContext::getId();
 
             $pricing = $this->pricingService->updatePricingTier($pricingId, $data);
 

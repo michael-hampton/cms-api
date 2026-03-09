@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Functional\Controllers\Members\Newsletters;
+namespace App\Tests\Functional\Controllers\Newsletters;
 
 use App\Models\Model;
 use App\Models\NewsletterLayout;

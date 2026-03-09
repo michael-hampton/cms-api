@@ -233,6 +233,20 @@ class SubscriptionControllerTest extends FunctionalTestCase
         ];
     }
 
+    public function testCreatePlanRequiresPrice(): void
+    {
+        $response = $this->postForSite('/api/subscriptions/plans', [
+            'name' => 'Test Plan',
+            'billing_period' => 'monthly',
+            'currency' => 'GBP',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('price', $data['errors']);
+    }
+
     public function testCreatePlanRejectsPriceBelow0(): void
     {
         $response = $this->postForSite('/api/subscriptions/plans', [
@@ -244,16 +258,18 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals(500, $response->getStatusCode());
     }
 
-    public function testCreatePlanAcceptsZeroPrice(): void
+    public function testCreatePlanRequiresCurrency(): void
     {
-        // price has min:0 — zero is explicitly allowed for free plans
         $response = $this->postForSite('/api/subscriptions/plans', [
-            'name' => 'Free Plan',
+            'name' => 'Test Plan',
             'billing_period' => 'monthly',
-            'price' => 0,
+            'price' => 9.99,
         ]);
 
-        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(422, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('currency', $data['errors']);
     }
 
     public function testCreatePlanRejectsDurationMonthsBelow1(): void
@@ -289,6 +305,20 @@ class SubscriptionControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testCreatePlanAcceptsValidCurrencyCodes(): void
+    {
+        foreach (['GBP', 'USD', 'EUR'] as $currency) {
+            $response = $this->postForSite('/api/subscriptions/plans', [
+                'name' => "Plan {$currency}",
+                'billing_period' => 'monthly',
+                'price' => 9.99,
+                'currency' => $currency,
+            ]);
+
+            $this->assertEquals(200, $response->getStatusCode(), "Expected 200 for currency: {$currency}");
+        }
     }
 
     public function testCreatePlanGeneratesSlugFromNameWhenOmitted(): void
@@ -470,64 +500,56 @@ class SubscriptionControllerTest extends FunctionalTestCase
     // POST /api/subscriptions/plans/bulk-toggle-active
     // =========================================================================
 
-//    public function testBulkToggleActiveActivatesPlans(): void
-//    {
-//        $plan1 = $this->createSubscriptionPlan(['is_active' => false]);
-//        $plan2 = $this->createSubscriptionPlan(['is_active' => false]);
-//
-//        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
-//            'plan_ids' => [$plan1->id, $plan2->id],
-//            'active' => true,
-//        ]);
-//
-//        dd($response);
-//
-//        $this->assertEquals(500, $response->getStatusCode());
-//
-//        $data = json_decode($response->getContent(), true);
-//        $this->assertTrue($data['success']);
-//
-//        $this->assertTrue($plan1->fresh()->is_active);
-//        $this->assertTrue($plan2->fresh()->is_active);
-//    }
-//
-//    public function testBulkToggleActiveDeactivatesPlans(): void
-//    {
-//        $plan1 = $this->createSubscriptionPlan(['is_active' => true]);
-//        $plan2 = $this->createSubscriptionPlan(['is_active' => true]);
-//
-//        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
-//            'plan_ids' => [$plan1->id, $plan2->id],
-//            'active' => false,
-//        ]);
-//
-//        dd($response);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $this->assertFalse($plan1->fresh()->is_active);
-//        $this->assertFalse($plan2->fresh()->is_active);
-//    }
-//
-//    public function testBulkToggleActiveRequiresPlanIds(): void
-//    {
-//        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
-//            'active' => true,
-//        ]);
-//
-//        dd($response);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//    }
-//
-//    public function testBulkToggleActiveRequiresPlanIdsToBeNonEmptyArray(): void
-//    {
-//        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
-//            'plan_ids' => [],
-//            'active' => true,
-//        ]);
-//
-//        dd($response);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//    }
+    public function testBulkToggleActiveActivatesPlans(): void
+    {
+        $plan1 = $this->createSubscriptionPlan(['is_active' => false]);
+        $plan2 = $this->createSubscriptionPlan(['is_active' => false]);
+
+        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
+            'plan_ids' => [$plan1->id, $plan2->id],
+            'active' => true,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+
+        $this->assertTrue($plan1->fresh()->is_active);
+        $this->assertTrue($plan2->fresh()->is_active);
+    }
+
+    public function testBulkToggleActiveDeactivatesPlans(): void
+    {
+        $plan1 = $this->createSubscriptionPlan(['is_active' => true]);
+        $plan2 = $this->createSubscriptionPlan(['is_active' => true]);
+
+        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
+            'plan_ids' => [$plan1->id, $plan2->id],
+            'active' => false,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertFalse($plan1->fresh()->is_active);
+        $this->assertFalse($plan2->fresh()->is_active);
+    }
+
+    public function testBulkToggleActiveRequiresPlanIds(): void
+    {
+        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
+            'active' => true,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkToggleActiveRequiresPlanIdsToBeNonEmptyArray(): void
+    {
+        $response = $this->postForSite('/api/subscriptions/plans/bulk-toggle-active', [
+            'plan_ids' => [],
+            'active' => true,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 }

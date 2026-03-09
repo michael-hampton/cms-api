@@ -30,6 +30,7 @@ class AuthenticateWithToken implements MiddlewareInterface
         $userId = $this->authService->validateToken($token, $siteId);
 
         if (!$userId) {
+            die('here');
             return Response::json([
                 'success' => false,
                 'message' => 'Invalid or expired token',

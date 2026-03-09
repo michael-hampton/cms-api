@@ -555,11 +555,13 @@ $selectedTags = !empty($filters['tags'])
                     <div class="price-range-row">
                         <input type="number" name="price_min" id="price_min"
                                value="<?= htmlspecialchars($filters['price_min'] ?? '') ?>"
-                               placeholder="£<?= $price_range['min'] ?? 0 ?>" step="0.01" min="0">
+                               placeholder="<?= $currencySymbol ?><?= $price_range['min'] ?? 0 ?>"
+                               step="0.01" min="0">
                         <span>–</span>
                         <input type="number" name="price_max" id="price_max"
                                value="<?= htmlspecialchars($filters['price_max'] ?? '') ?>"
-                               placeholder="£<?= $price_range['max'] ?? 999 ?>" step="0.01" min="0">
+                               placeholder="<?= $currencySymbol ?><?= $price_range['max'] ?? 999 ?>"
+                               step="0.01" min="0">
                     </div>
                 </div>
 
@@ -668,10 +670,9 @@ $selectedTags = !empty($filters['tags'])
                                     </div>
                                     <div class="bundle-card__pricing">
                                         <div>
-                                            <div class="bundle-card__was">Was
-                                                £<?= number_format($bundle['total_price'], 2) ?></div>
-                                            <div class="bundle-card__price">
-                                                £<?= number_format($bundle['bundle_price'], 2) ?></div>
+                                            <div class="bundle-card__was">
+                                                Was <?= $currencySymbol ?><?= number_format($bundle['total_price'], 2) ?></div>
+                                            <div class="bundle-card__price"><?= $currencySymbol ?><?= number_format($bundle['bundle_price'], 2) ?></div>
                                         </div>
                                         <button class="bundle-card__cta"
                                                 data-delivery_type="<?= $bundle['delivery_type'] ?? 'print' ?>"
@@ -817,11 +818,10 @@ $selectedTags = !empty($filters['tags'])
                                     <div>
                                         <div class="plan-card__from">from</div>
                                         <?php if ($hasSale && $originalPrice): ?>
-                                            <div class="plan-card__price-was">
-                                                £<?= number_format($originalPrice, 2) ?></div>
+                                            <div class="plan-card__price-was"><?= $currencySymbol ?><?= number_format($originalPrice, 2) ?></div>
                                         <?php endif; ?>
                                         <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
-                                            £<?= number_format($displayPrice, 2) ?>
+                                            <?= $currencySymbol ?><?= number_format($displayPrice, 2) ?>
                                         </div>
                                     </div>
                                     <div>
@@ -934,8 +934,8 @@ $selectedTags = !empty($filters['tags'])
         console.log('data', cartData)
         const count = cartData.count || 0;
         document.getElementById('cart-count').textContent = count;
-        document.getElementById('cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
-        document.getElementById('mini-cart-total').textContent = '£' + (cartData.total || 0).toFixed(2);
+        document.getElementById('cart-total').textContent = CURRENCY_SYMBOL + +(cartData.total || 0).toFixed(2);
+        document.getElementById('mini-cart-total').textContent = CURRENCY_SYMBOL + +(cartData.total || 0).toFixed(2);
         const badge = document.getElementById('header-cart-count');
         badge.textContent = count;
         badge.style.display = count > 0 ? 'flex' : 'none';
@@ -949,7 +949,7 @@ $selectedTags = !empty($filters['tags'])
         <div class="cart-item">
             <div class="cart-item-name">${item.product_name || item.options?.plan_name || 'Subscription'}</div>
             <div class="cart-item-details">${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months</div>
-            <div class="cart-item-price">£${(item.price || 0).toFixed(2)}</div>
+            <div class="cart-item-price">${CURRENCY_SYMBOL}${(item.price || 0).toFixed(2)}</div>
         </div>`).join('');
     }
 
@@ -992,7 +992,7 @@ $selectedTags = !empty($filters['tags'])
     function renderPlanCard(plan) {
         const price = parseFloat(plan.has_sale ? plan.sale_price : plan.price) || 0;
         const wasLine = (plan.has_sale && plan.original_price)
-            ? `<div class="plan-card__price-was">£${parseFloat(plan.original_price).toFixed(2)}</div>` : '';
+            ? `<div class="plan-card__price-was">${CURRENCY_SYMBOL}${parseFloat(plan.original_price).toFixed(2)}</div>` : '';
         const saleNote = plan.has_sale ? `<div class="plan-card__price-note">🔥 Sale price</div>` : '';
         const btnClass = plan.has_sale ? 'plan-card__btn plan-card__btn--sale' : 'plan-card__btn';
         const btnLabel = plan.has_sale ? '🔥 View deal' : 'View details';
@@ -1042,7 +1042,7 @@ $selectedTags = !empty($filters['tags'])
                 <div>
                     <div class="plan-card__from">from</div>
                     ${wasLine}
-                    <div class="${priceClass}">£${price.toFixed(2)}</div>
+                    <div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div>
                 </div>
                 <div>
                     <div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>
