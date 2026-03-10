@@ -7,6 +7,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\Str;
 use App\Models\Block;
+use App\Models\Member;
 use App\Models\Merchant;
 use App\Models\Model;
 use App\Models\OrderItem;
@@ -41,7 +42,14 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $this->searchEngine = new SearchEngine($config);
     }
 
-    public function search(SearchCriteria $criteria): PaginatedResult
+    /**
+     * Search products with optional member-scoped region visibility.
+     *
+     * When a Member is supplied, the scopeVisibleToMember constraint is applied
+     * so that products restricted to region sets the member's territory does not
+     * belong to are excluded from results.
+     */
+    public function search(SearchCriteria $criteria, ?Member $member = null): PaginatedResult
     {
         $boostedIds = [];
         try {
@@ -60,8 +68,13 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             'availableMerchants.merchant',
             'brand',
             'category',
-            'approvedReviews'
+            'approvedReviews',
+            'regionSets',
         ]);
+
+        // Apply member-scoped region visibility. When no member is given (e.g.
+        // admin contexts), the scope is a no-op and all products are returned.
+        $query->visibleToMember($member);
 
         if (!empty($boostedIds)) {
             $ids = implode(',', array_map('intval', $boostedIds));
@@ -189,7 +202,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
 
         return $rows->map(function ($row) use ($products) {
-
             $product = $products->get($row['product_id']) ?? null;
 
             if ($product) {
@@ -199,7 +211,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             return $product;
         })->filter();
     }
-
 
     protected function getModelClass(): string
     {
@@ -244,7 +255,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
                 'alt' => $imageData['alt'] ?? null,
                 'is_primary' => $imageData['is_primary'] ?? false,
                 'sort_order' => $imageData['sort_order'] ?? 0,
-                //'variant_id' => $imageData['variant_id'] ?? null,
                 'variant_id' => null
             ]);
         }
@@ -271,7 +281,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return collect($formattedMerchants);
     }
 
-    // Merchant operations
     public function syncMerchants(int $productId, array $merchants): array
     {
         $existingMerchants = $this->getFormattedMerchants($productId);
@@ -279,15 +288,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $merchantIds = [];
 
         foreach ($merchants as $merchantData) {
-            // Find or create merchant in lookup table
             $merchantLookup = $this->findOrCreateMerchant($merchantData['name']);
 
-            // Check if this product-merchant combination already exists
             $existingPM = null;
             if (!empty($merchantData['id']) && $existingMerchants->has($merchantData['id'])) {
                 $existingPM = $existingMerchants->get($merchantData['id']);
             } else {
-                // Check by merchant_id and variant_id combination
                 $query = ProductMerchant::where('product_id', $productId)
                     ->where('merchant_id', $merchantLookup->id);
 
@@ -312,12 +318,9 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ];
 
             if ($existingPM) {
-
-                // Update existing
                 ProductMerchant::where('id', $existingPM['id'])->update($updateData);
                 $merchantIds[] = $existingPM['id'];
             } else {
-                // Create new
                 $productMerchant = ProductMerchant::create(array_merge([
                     'product_id' => $productId,
                     'merchant_id' => $merchantLookup->id,
@@ -341,7 +344,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $merchant;
     }
 
-// Keep original getMerchants for backward compatibility
     public function getMerchants(int $productId): Collection
     {
         return $this->getProductMerchantsWithDetails($productId);
@@ -379,7 +381,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         ProductMerchant::where('product_id', $productId)->delete();
     }
 
-    // Variant operations
     public function syncVariants(int $productId, array $variants): array
     {
         ProductVariant::where('product_id', $productId)->delete();
@@ -402,7 +403,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
             $variantIds[] = $variant->id;
 
-            // Sync variant images if provided
             if (!empty($images)) {
                 $this->syncVariantImages($variant->id, $productId, $images);
             }
@@ -459,7 +459,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         ProductSpecification::where('product_id', $productId)->delete();
 
         foreach ($specifications as $specData) {
-            // Get or create specification group
             $groupId = null;
             if (!empty($specData['category'])) {
                 $group = $this->specificationGroupRepository
@@ -517,14 +516,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->first();
     }
 
-//    public function getAllMerchants(): Collection
-//    {
-//        return ProductMerchant::select('id', 'name')
-//            ->distinct()
-//            ->orderBy('name')
-//            ->get();
-//    }
-
     public function updateVariant(int $variantId, array $data): bool
     {
         $variant = ProductVariant::find($variantId);
@@ -545,7 +536,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             return false;
         }
 
-        // Delete variant images first
         $this->deleteVariantImages($variantId);
 
         return $variant->delete();
@@ -609,30 +599,25 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
     public function getProductPages(int $productId): Collection
     {
-        // Fetch only blocks we care about by type (much cheaper than scanning everything)
         $blocks = Block::whereIn('type', [
             'product',
             'deal',
             'product-comparison',
         ])->get();
 
-        // Filter manually in PHP
         $filtered = $blocks->filter(function (Block $block) use ($productId) {
             $data = $block->data ?? [];
 
             return match ($block->type) {
                 'product' => ($data['product_id'] ?? null) == $productId,
                 'deal' => ($data['product_id'] ?? null) == $productId,
-
                 'product-comparison' =>
                     ($data['product_a_id'] ?? null) == $productId ||
                     ($data['product_b_id'] ?? null) == $productId,
-
                 default => false,
             };
         });
 
-        // Extract unique page IDs
         $pageIds = $filtered->pluck('page_id')->unique()->toArray();
 
         return Page::whereIn('id', $pageIds)
@@ -648,14 +633,12 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             return [];
         }
 
-        // Get top review
         $topReview = \App\Models\Review::where('product_id', $productId)
             ->where('is_approved', true)
             ->orderBy('rating', 'desc')
             ->orderBy('helpful_count', 'desc')
             ->first();
 
-        // Get merchant summary
         $merchants = \App\Models\ProductMerchant::where('product_id', $productId)
             ->where('is_available', true)
             ->with(['merchant'])
@@ -742,7 +725,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->active()
             ->get()
             ->map(function ($product) use ($merchantId) {
-                // Attach merchant-specific data to each product
                 $merchantData = $product->merchants->firstWhere('merchant_id', $merchantId);
                 $product->merchant_data = $merchantData;
                 return $product;
@@ -752,5 +734,41 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function findWithRelations(int $productId, array $relations = [])
     {
         return Product::with($relations)->find($productId);
+    }
+
+    /**
+     * Sync a product's region set associations.
+     * Passing an empty array removes all restrictions (globally visible).
+     *
+     * @param int $productId
+     * @param int[] $regionSetIds
+     */
+    public function syncRegionSets(int $productId, array $regionSetIds): void
+    {
+        $product = $this->find($productId);
+
+        if (!$product) {
+            return;
+        }
+
+        $product->regionSets(true)->sync($regionSetIds);
+    }
+
+    /**
+     * Sync a variant's region set associations.
+     * Passing an empty array removes all restrictions (globally visible).
+     *
+     * @param int $variantId
+     * @param int[] $regionSetIds
+     */
+    public function syncVariantRegionSets(int $variantId, array $regionSetIds): void
+    {
+        $variant = ProductVariant::find($variantId);
+
+        if (!$variant) {
+            return;
+        }
+
+        $variant->regionSets(true)->sync($regionSetIds);
     }
 }

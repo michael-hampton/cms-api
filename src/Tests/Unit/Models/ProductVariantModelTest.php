@@ -2,9 +2,11 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductVariant;
+use App\Models\RegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -145,6 +147,124 @@ class ProductVariantModelTest extends FunctionalTestCase
         $this->assertIsArray($variant->attributes);
         $this->assertEquals('red', $variant->attributes['color']);
         $this->assertEquals('large', $variant->attributes['size']);
+    }
+
+    public function test_variant_without_region_sets_is_visible_to_any_member(): void
+    {
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $variant->load('regionSets');
+
+        $member = $this->createMemberWithTerritory(territoryId: 1);
+
+        $this->assertTrue($variant->isVisibleToMember($member));
+    }
+
+    public function test_variant_with_region_set_is_visible_to_member_in_covered_territory(): void
+    {
+        [$regionSet] = $this->createRegionSetWithTerritory(territoryId: 4);
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $variant->regionSets(true)->attach($regionSet->id);
+        $variant->load('regionSets.territories');
+
+        $member = $this->createMemberWithTerritory(territoryId: 4);
+
+        $this->assertTrue($variant->isVisibleToMember($member));
+    }
+
+    public function test_variant_with_region_set_is_not_visible_to_member_outside_territory(): void
+    {
+        [$regionSet] = $this->createRegionSetWithTerritory(territoryId: 4);
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $variant->regionSets(true)->attach($regionSet->id);
+        $variant->load('regionSets.territories');
+
+        $member = $this->createMemberWithTerritory(territoryId: 77);
+
+        $this->assertFalse($variant->isVisibleToMember($member));
+    }
+
+    public function test_variant_visibility_is_independent_of_product_visibility(): void
+    {
+        // Product has no region restriction.
+        // Variant IS restricted to territory 6.
+        // A member in territory 9 should see the product but NOT the variant.
+        [$regionSet] = $this->createRegionSetWithTerritory(territoryId: 6);
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $variant->regionSets(true)->attach($regionSet->id);
+
+        $product->load('regionSets');
+        $variant->load('regionSets.territories');
+
+        $member = $this->createMemberWithTerritory(territoryId: 9);
+
+        $this->assertTrue($product->isVisibleToMember($member));
+        $this->assertFalse($variant->isVisibleToMember($member));
+    }
+
+    public function test_variant_region_sets_sync_replaces_existing(): void
+    {
+        [$regionSetA] = $this->createRegionSetWithTerritory(territoryId: 1);
+        [$regionSetB] = $this->createRegionSetWithTerritory(territoryId: 2);
+
+        $product = $this->createProduct();
+        $variant = $this->createProductVariant($product->id);
+        $variant->regionSets(true)->attach($regionSetA->id);
+
+        $variant->regionSets(true)->sync([$regionSetB->id]);
+        $variant->load('regionSets');
+
+        $this->assertCount(1, $variant->regionSets);
+        $this->assertEquals($regionSetB->id, $variant->regionSets->first()->id);
+    }
+
+    public function test_detaching_all_region_sets_makes_product_globally_visible(): void
+    {
+        [$regionSet] = $this->createRegionSetWithTerritory(territoryId: 3);
+        $product = $this->createProduct();
+        $product->regionSets(true)->attach($regionSet->id);
+
+        // Remove all restrictions.
+        $product->regionSets(true)->sync([]);
+        $product->load('regionSets');
+
+        $member = $this->createMemberWithTerritory(territoryId: 99);
+        $this->assertTrue($product->isVisibleToMember($member));
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /**
+     * Creates a RegionSet with one Territory attached.
+     * Returns [$regionSet, $territory].
+     */
+    private function createRegionSetWithTerritory(int $territoryId): array
+    {
+        $regionSet = RegionSet::create(['name' => "Region Set {$territoryId}", 'slug' => 'test-' . uniqid(), 'site_id' => $this->siteId]);
+
+        $territory = $this->createTerritory(['id' => $territoryId, 'region_set_id' => $regionSet->id]);
+
+        return [$regionSet, $territory];
+    }
+
+    private function createMemberWithTerritory(int $territoryId): Member
+    {
+        $member = \Mockery::mock(Member::class)->makePartial();
+        $member->shouldReceive('hasTerritoryId')->andReturn(true);
+        $member->shouldReceive('getTerritoryId')->andReturn($territoryId);
+        return $member;
+    }
+
+    private function createMemberWithoutTerritory(): Member
+    {
+        $member = \Mockery::mock(Member::class)->makePartial();
+        $member->shouldReceive('hasTerritoryId')->andReturn(false);
+        return $member;
     }
 
 }

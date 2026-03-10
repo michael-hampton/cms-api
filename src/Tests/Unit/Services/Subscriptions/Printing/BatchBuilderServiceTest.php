@@ -19,6 +19,20 @@ class BatchBuilderServiceTest extends FunctionalTestCase
     private PrintFulfillmentRepository|MockInterface $fulfilmentRepository;
     private BatchBuilderService $service;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
+        $this->fulfilmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
+        $this->service = new BatchBuilderService($this->batchRepository, $this->fulfilmentRepository);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_creates_one_batch_per_territory(): void
     {
         $issueDelivery = $this->makeIssueDelivery(1);
@@ -54,29 +68,6 @@ class BatchBuilderServiceTest extends FunctionalTestCase
 
         $this->assertCount(2, $batches);
     }
-
-    private function makeIssueDelivery(int $id): IssueDelivery
-    {
-        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
-        $delivery->id = $id;
-        return $delivery;
-    }
-
-    private function makeFulfilment(): object
-    {
-        return new \stdClass();
-    }
-
-    private function makeBatch(int $id): PrintBatch
-    {
-        $batch = Mockery::mock(PrintBatch::class)->makePartial();
-        $batch->id = $id;
-        return $batch;
-    }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
 
     public function test_returns_empty_collection_when_no_fulfilments_exist(): void
     {
@@ -144,17 +135,104 @@ class BatchBuilderServiceTest extends FunctionalTestCase
         $this->assertTrue(true);
     }
 
-    protected function setUp(): void
+    // =========================================================================
+    // Territory override path
+    // =========================================================================
+
+    public function test_skips_territory_grouping_and_produces_single_batch_when_override_set(): void
     {
-        parent::setUp();
-        $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
-        $this->fulfilmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
-        $this->service = new BatchBuilderService($this->batchRepository, $this->fulfilmentRepository);
+        $issueDelivery = $this->makeIssueDelivery(id: 10, territoryId: 7);
+
+        // Fulfilment repository must NOT be consulted — override bypasses grouping entirely.
+        $this->fulfilmentRepository->shouldNotReceive('findByIssueDeliveryGroupedByTerritory');
+
+        $batch = $this->makeBatch(50);
+
+        $this->batchRepository
+            ->shouldReceive('findOrCreateForIssueDeliveryAndTerritory')
+            ->once()
+            ->with(10, 7, PrintExportFormat::CSV)
+            ->andReturn($batch);
+
+        $batches = $this->service->buildBatches($issueDelivery);
+
+        $this->assertCount(1, $batches);
+        $this->assertSame(50, $batches->first()->id);
     }
 
-    protected function tearDown(): void
+
+    public function test_override_batch_uses_issue_delivery_territory_id(): void
     {
-        Mockery::close();
-        parent::tearDown();
+        $issueDelivery = $this->makeIssueDelivery(id: 20, territoryId: 99);
+
+        $this->fulfilmentRepository->shouldNotReceive('findByIssueDeliveryGroupedByTerritory');
+
+        $this->batchRepository
+            ->shouldReceive('findOrCreateForIssueDeliveryAndTerritory')
+            ->once()
+            ->with(20, 99, PrintExportFormat::CSV)
+            ->andReturn($this->makeBatch(60));
+
+        $this->service->buildBatches($issueDelivery);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_override_path_respects_explicit_format_argument(): void
+    {
+        $issueDelivery = $this->makeIssueDelivery(id: 30, territoryId: 5);
+
+        $this->fulfilmentRepository->shouldNotReceive('findByIssueDeliveryGroupedByTerritory');
+
+        $this->batchRepository
+            ->shouldReceive('findOrCreateForIssueDeliveryAndTerritory')
+            ->once()
+            ->with(30, 5, PrintExportFormat::CSV)
+            ->andReturn($this->makeBatch(70));
+
+        // Even if more formats are added later, the API contract is explicit.
+        $this->service->buildBatches($issueDelivery, PrintExportFormat::CSV);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_non_override_delivery_still_uses_grouped_path(): void
+    {
+        // Explicit null territory_id must use the normal grouped path.
+        $issueDelivery = $this->makeIssueDelivery(id: 40, territoryId: null);
+
+        $this->fulfilmentRepository
+            ->shouldReceive('findByIssueDeliveryGroupedByTerritory')
+            ->once()
+            ->andReturn(new Collection([]));
+
+        $this->batchRepository->shouldNotReceive('findOrCreateForIssueDeliveryAndTerritory');
+
+        $batches = $this->service->buildBatches($issueDelivery);
+
+        $this->assertCount(0, $batches);
+    }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+    private function makeIssueDelivery(int $id, ?int $territoryId = null): IssueDelivery
+    {
+        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
+        $delivery->id = $id;
+        $delivery->territory_id = $territoryId;
+        return $delivery;
+    }
+
+    private function makeFulfilment(): object
+    {
+        return new \stdClass();
+    }
+
+    private function makeBatch(int $id): PrintBatch
+    {
+        $batch = Mockery::mock(PrintBatch::class)->makePartial();
+        $batch->id = $id;
+        return $batch;
     }
 }

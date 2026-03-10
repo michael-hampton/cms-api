@@ -2,8 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasRegionSetVisibility;
+
+/**
+ * @property int $id
+ * @property int $product_id
+ * @property string $sku
+ * @property string|null $name
+ * @property array $attributes
+ * @property float $price
+ * @property float|null $sale_price
+ * @property float $price_modifier
+ * @property bool $is_active
+ */
 class ProductVariant extends Model
 {
+    use HasRegionSetVisibility;
+
     protected $table = 'product_variants';
 
     protected $fillable = [
@@ -35,6 +50,10 @@ class ProductVariant extends Model
 
     protected $appends = ['name', 'final_price', 'discount_percentage'];
 
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
+
     public function product()
     {
         return $this->belongsTo(Product::class);
@@ -50,18 +69,31 @@ class ProductVariant extends Model
         return $this->hasMany(ProductMerchant::class, 'variant_id');
     }
 
-    // Add computed attribute for final price (can keep for backward compatibility)
-    public function getFinalPriceAttribute(): float
+    /**
+     * The RegionSets this variant is restricted to.
+     * Empty = globally visible. One or more = restricted to members in those regions.
+     * Variant region sets are evaluated independently of the parent product's region sets.
+     */
+    public function regionSets(bool $relation = false)
     {
-        return $this->price ?? ($this->product->price + ($this->price_modifier ?? 0));
+        return $this->belongsToMany(RegionSet::class, 'product_variant_region_sets', 'product_variant_id', 'region_set_id', $relation);
     }
 
-// Add discount percentage
+    // -------------------------------------------------------------------------
+    // Computed attributes
+    // -------------------------------------------------------------------------
+
+    public function getFinalPriceAttribute(): float
+    {
+        return $this->sale_price ?? $this->price;
+    }
+
     public function getDiscountPercentageAttribute(): int
     {
-        if (!$this->sale_price || $this->price == 0 || $this->sale_price > $this->price) {
+        if ($this->sale_price === null || $this->price == 0 || $this->sale_price >= $this->price) {
             return 0;
         }
+
         return (int) round((($this->price - $this->sale_price) / $this->price) * 100);
     }
 }

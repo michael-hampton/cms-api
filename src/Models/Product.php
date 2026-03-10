@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Contracts\Boost\BoostableInterface;
 use App\Framework\Database\QueryBuilder;
 use App\Models\Concerns\HasCloneHistory;
+use App\Models\Concerns\HasRegionSetVisibility;
 use App\Models\Concerns\IsBoostable;
 use App\Models\Concerns\Stockable;
 use App\Models\Concerns\TracksCreator;
@@ -13,7 +14,7 @@ use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
 
 class Product extends Model implements BoostableInterface, Stockable
 {
-    use HasCloneHistory, TracksCreator, IsBoostable;
+    use HasCloneHistory, TracksCreator, IsBoostable, HasRegionSetVisibility;
 
     const BOOSTABLE_TYPE = 'product';
 
@@ -114,7 +115,6 @@ class Product extends Model implements BoostableInterface, Stockable
 
     public function getAverageRatingAttribute(): float
     {
-        // This will be cached or calculated
         $avg = $this->approvedReviews()->avg('rating');
         return $avg ? round((float)$avg, 1) : 0.0;
     }
@@ -182,7 +182,6 @@ class Product extends Model implements BoostableInterface, Stockable
         return $this->hasMany(ProductPriceHistory::class)->orderBy('recorded_at', 'desc');
     }
 
-// Accessor for main image URL
     public function getMainImageUrlAttribute(): ?string
     {
         return $this->primaryImage?->url ?? $this->images->first()?->url ?? $this->image;
@@ -239,6 +238,15 @@ class Product extends Model implements BoostableInterface, Stockable
             'product_id',
             'specification_group_id'
         )->distinct();
+    }
+
+    /**
+     * The RegionSets this product is restricted to.
+     * Empty = globally visible. One or more = restricted to members in those regions.
+     */
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(RegionSet::class, 'product_region_sets', 'product_id', 'region_set_id', $relation);
     }
 
     public function availabilityPolicy(): AvailabilityPolicyInterface
