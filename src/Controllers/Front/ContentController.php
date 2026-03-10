@@ -78,7 +78,7 @@ class ContentController extends Controller
         // Load page relationships
         $page->load([
             'blocks', 'categories', 'tags', 'metadata',
-            'seo', 'settings', 'social', 'customFields', 'authors', 'products'
+            'seo', 'settings', 'social', 'customFields', 'authors', 'products', 'comments'
         ]);
 
         $modalData = $this->modalService->getModalData($member, $siteId);

@@ -264,6 +264,23 @@ const utilityBar = (() => {
         }
     }
 
+    /**
+     * Call this from your comment modal after a new comment is successfully posted
+     * to bump the count on all utility bars for that page.
+     *
+     * @param {number|string} pageId
+     * @param {number} [delta=1]  – pass -1 if a comment was deleted
+     */
+    function updateCommentCount(pageId, delta = 1) {
+        document.querySelectorAll(`.utility-bar__btn--comment[data-page-id="${pageId}"]`).forEach(btn => {
+            const current = parseInt(btn.dataset.commentCount ?? '0', 10);
+            const next = Math.max(0, current + delta);
+            btn.dataset.commentCount = String(next);
+            const label = btn.querySelector('.utility-bar__label--comment-count');
+            if (label) label.textContent = next > 0 ? String(next) : 'Comment';
+        });
+    }
+
     // ── Hub ───────────────────────────────────────────────────────────────────
     /**
      * Opens the member hub.
@@ -426,6 +443,7 @@ const utilityBar = (() => {
         showGuestSavePrompt,
         hideGuestSavePrompt,
         submitGuestSave,
+        updateCommentCount,
     };
 
 })();

@@ -57,6 +57,7 @@ class ProductService
             $merchants = $data['merchants'] ?? [];
             $variants = $data['variants'] ?? [];
             $specifications = $data['specifications'] ?? [];
+            $regionSetIds = $data['region_set_ids'] ?? [];
 
             // Remove from main data array
             unset($data['images'], $data['merchants'], $data['variants'], $data['specifications']);
@@ -85,6 +86,10 @@ class ProductService
                 $this->repository->syncSpecifications($product->id, $specifications);
             }
 
+            if (!empty($regionSetIds)) {
+                $this->repository->syncRegionSets($product->id, $regionSetIds);
+            }
+
             // Emit event
             event(new ProductCreatedEvent($product, [
                 'has_images' => !empty($images),
@@ -95,6 +100,90 @@ class ProductService
 
             return $product;
         });
+    }
+
+    private function processImageUpload(array $data, ?UploadedFile $imageFile, ?string $oldPath = null): array
+    {
+        if ($imageFile && $imageFile->isValid()) {
+            try {
+                $data['image'] = $this->imageUploadService->upload($imageFile, $oldPath);
+            } catch (Exception $e) {
+                throw new Exception('Failed to upload product image: ' . $e->getMessage());
+            }
+        } elseif (isset($data['image']) && $this->imageUploadService->isBase64Image($data['image'])) {
+            // Delete old image if replacing with base64
+            if ($oldPath) {
+                $this->deleteImageSafely($oldPath);
+            }
+            $data['image'] = $this->imageUploadService->saveBase64Image($data['image']);
+        }
+
+        return $data;
+    }
+
+    private function deleteImageSafely(string $path): void
+    {
+        try {
+            $this->imageUploadService->delete($path);
+        } catch (Exception $e) {
+            Logger::error('Failed to delete image: ' . $e->getMessage(), [
+                'path' => $path,
+                'exception' => $e
+            ]);
+            // Don't throw - continue with deletion
+        }
+    }
+
+    private function createVariants(int $productId, array $variants): array
+    {
+        $variantIds = $this->repository->syncVariants($productId, $variants);
+        $variantIdMapping = [];
+
+        // Create mapping: form index -> actual DB ID
+        foreach ($variants as $index => $variant) {
+            if (isset($variantIds[$index])) {
+                // Form sends variant_id as 1, 2, 3... (1-indexed)
+                // We need to map these to the actual database IDs
+                $variantIdMapping[$index + 1] = $variantIds[$index];
+            }
+        }
+
+        return $variantIdMapping;
+    }
+
+    private function createMerchants(Product $product, array $merchants, array $variantIdMapping): void
+    {
+        // Map merchant variant_ids from form indices to actual DB IDs
+        $mappedMerchants = $this->mapMerchantVariantIds($merchants, $variantIdMapping);
+
+        $productMerchantIds = $this->repository->syncMerchants($product->id, $mappedMerchants);
+
+        // Record price history for each merchant
+        foreach ($productMerchantIds as $index => $productMerchantId) {
+            $merchantData = $mappedMerchants[$index];
+            $variants = $this->repository->getVariants($product->id);
+            $prices = $this->merchantPricingResolver->resolve($merchantData, $variants);
+
+            if ($prices['price'] !== null) {
+                $this->repository->recordMerchantPriceHistory(
+                    $product->id,
+                    $productMerchantId,
+                    $prices['price'],
+                    $merchantData['id'],
+                    $prices['sale_price']
+                );
+            }
+        }
+    }
+
+    private function mapMerchantVariantIds(array $merchants, array $variantIdMapping): array
+    {
+        return array_map(function ($merchantData) use ($variantIdMapping) {
+            if (!empty($merchantData['variant_id']) && isset($variantIdMapping[$merchantData['variant_id']])) {
+                $merchantData['variant_id'] = $variantIdMapping[$merchantData['variant_id']];
+            }
+            return $merchantData;
+        }, $merchants);
     }
 
     public function updateProduct(int $id, array $data, ?UploadedFile $imageFile = null): ?Model
@@ -117,6 +206,7 @@ class ProductService
             // Extract related data
             $images = $data['images'] ?? null;
             $merchants = $data['merchants'] ?? null;
+            $regionSetIds = $data['region_set_ids'] ?? null;
             $variants = $data['variants'] ?? null;
             $specifications = $data['specifications'] ?? null;
 
@@ -156,6 +246,10 @@ class ProductService
                 $this->updateMerchants($product, $merchants);
             }
 
+            if ($regionSetIds !== null) {
+                $this->repository->syncRegionSets($product->id, $regionSetIds);
+            }
+
             if ($variants !== null) {
                 $this->repository->syncVariants($product->id, $variants);
             }
@@ -175,6 +269,51 @@ class ProductService
 
             return $product;
         });
+    }
+
+    private function updateMerchants(Product $product, array $merchants): void
+    {
+        $oldMerchants = $this->repository->getProductMerchantsWithDetails($product->id)->keyBy('id');
+        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
+
+        // Record price history for merchants with price changes
+        foreach ($merchants as $index => $merchantData) {
+            $merchantId = $merchantIds[$index];
+
+            // Find old merchant
+            $oldMerchant = null;
+            if (!empty($merchantData['id']) && $oldMerchants->has($merchantData['id'])) {
+                $oldMerchant = $oldMerchants->get($merchantData['id']);
+            }
+
+            $variants = $this->repository->getVariants($product->id);
+            $newPrices = $this->merchantPricingResolver->resolve($merchantData, $variants);
+            $oldPrice = $oldMerchant && isset($oldMerchant['price']) ? $oldMerchant['price'] : null;
+            $oldSalePrice = $oldMerchant && isset($oldMerchant['sale_price']) ? $oldMerchant['sale_price'] : null;
+
+            // Record if new merchant or price changed
+            if (!$oldMerchant || $oldPrice != $newPrices['price'] || $oldSalePrice != $newPrices['sale_price']) {
+                if ($newPrices['price'] !== null) {
+                    $this->repository->recordMerchantPriceHistory(
+                        $product->id,
+                        $merchantId,
+                        $newPrices['price'],
+                        $merchantData['id'],
+                        $newPrices['sale_price']
+                    );
+
+                    event(new ProductPriceChangedEvent(
+                        $product,
+                        PriceChangeType::MERCHANT_PRICE,
+                        $oldPrice,
+                        $newPrices['price'],
+                        $oldSalePrice,
+                        $newPrices['sale_price'],
+                        $merchantData['id']
+                    ));
+                }
+            }
+        }
     }
 
     public function deleteProduct(int $id): bool
@@ -263,134 +402,5 @@ class ProductService
             $this->requestContext->getSessionId(),
             $this->requestContext->getIpAddress()
         ));
-    }
-
-    private function processImageUpload(array $data, ?UploadedFile $imageFile, ?string $oldPath = null): array
-    {
-        if ($imageFile && $imageFile->isValid()) {
-            try {
-                $data['image'] = $this->imageUploadService->upload($imageFile, $oldPath);
-            } catch (Exception $e) {
-                throw new Exception('Failed to upload product image: ' . $e->getMessage());
-            }
-        } elseif (isset($data['image']) && $this->imageUploadService->isBase64Image($data['image'])) {
-            // Delete old image if replacing with base64
-            if ($oldPath) {
-                $this->deleteImageSafely($oldPath);
-            }
-            $data['image'] = $this->imageUploadService->saveBase64Image($data['image']);
-        }
-
-        return $data;
-    }
-
-    private function createVariants(int $productId, array $variants): array
-    {
-        $variantIds = $this->repository->syncVariants($productId, $variants);
-        $variantIdMapping = [];
-
-        // Create mapping: form index -> actual DB ID
-        foreach ($variants as $index => $variant) {
-            if (isset($variantIds[$index])) {
-                // Form sends variant_id as 1, 2, 3... (1-indexed)
-                // We need to map these to the actual database IDs
-                $variantIdMapping[$index + 1] = $variantIds[$index];
-            }
-        }
-
-        return $variantIdMapping;
-    }
-
-    private function createMerchants(Product $product, array $merchants, array $variantIdMapping): void
-    {
-        // Map merchant variant_ids from form indices to actual DB IDs
-        $mappedMerchants = $this->mapMerchantVariantIds($merchants, $variantIdMapping);
-
-        $productMerchantIds = $this->repository->syncMerchants($product->id, $mappedMerchants);
-
-        // Record price history for each merchant
-        foreach ($productMerchantIds as $index => $productMerchantId) {
-            $merchantData = $mappedMerchants[$index];
-            $variants = $this->repository->getVariants($product->id);
-            $prices = $this->merchantPricingResolver->resolve($merchantData, $variants);
-
-            if ($prices['price'] !== null) {
-                $this->repository->recordMerchantPriceHistory(
-                    $product->id,
-                    $productMerchantId,
-                    $prices['price'],
-                    $merchantData['id'],
-                    $prices['sale_price']
-                );
-            }
-        }
-    }
-
-    private function updateMerchants(Product $product, array $merchants): void
-    {
-        $oldMerchants = $this->repository->getProductMerchantsWithDetails($product->id)->keyBy('id');
-        $merchantIds = $this->repository->syncMerchants($product->id, $merchants);
-
-        // Record price history for merchants with price changes
-        foreach ($merchants as $index => $merchantData) {
-            $merchantId = $merchantIds[$index];
-
-            // Find old merchant
-            $oldMerchant = null;
-            if (!empty($merchantData['id']) && $oldMerchants->has($merchantData['id'])) {
-                $oldMerchant = $oldMerchants->get($merchantData['id']);
-            }
-
-            $variants = $this->repository->getVariants($product->id);
-            $newPrices = $this->merchantPricingResolver->resolve($merchantData, $variants);
-            $oldPrice = $oldMerchant && isset($oldMerchant['price']) ? $oldMerchant['price'] : null;
-            $oldSalePrice = $oldMerchant && isset($oldMerchant['sale_price']) ? $oldMerchant['sale_price'] : null;
-
-            // Record if new merchant or price changed
-            if (!$oldMerchant || $oldPrice != $newPrices['price'] || $oldSalePrice != $newPrices['sale_price']) {
-                if ($newPrices['price'] !== null) {
-                    $this->repository->recordMerchantPriceHistory(
-                        $product->id,
-                        $merchantId,
-                        $newPrices['price'],
-                        $merchantData['id'],
-                        $newPrices['sale_price']
-                    );
-
-                    event(new ProductPriceChangedEvent(
-                        $product,
-                        PriceChangeType::MERCHANT_PRICE,
-                        $oldPrice,
-                        $newPrices['price'],
-                        $oldSalePrice,
-                        $newPrices['sale_price'],
-                        $merchantData['id']
-                    ));
-                }
-            }
-        }
-    }
-
-    private function mapMerchantVariantIds(array $merchants, array $variantIdMapping): array
-    {
-        return array_map(function ($merchantData) use ($variantIdMapping) {
-            if (!empty($merchantData['variant_id']) && isset($variantIdMapping[$merchantData['variant_id']])) {
-                $merchantData['variant_id'] = $variantIdMapping[$merchantData['variant_id']];
-            }
-            return $merchantData;
-        }, $merchants);
-    }
-
-    private function deleteImageSafely(string $path): void
-    {
-        try {
-            $this->imageUploadService->delete($path);
-        } catch (Exception $e) {
-            Logger::error('Failed to delete image: ' . $e->getMessage(), [
-                'path' => $path,
-                'exception' => $e
-            ]);
-            // Don't throw - continue with deletion
-        }
     }
 }

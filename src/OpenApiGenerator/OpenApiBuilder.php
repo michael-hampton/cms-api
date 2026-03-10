@@ -158,12 +158,38 @@ class OpenApiBuilder
             $params = array_merge($params, $this->paginationParameters());
         }
 
-        return $params;
+        // All index/search methods support the SearchEngine filter/sort/search params
+        if ($this->isSearchEngineAction($route)) {
+            $params = array_merge($params, $this->searchEngineParameters());
+        }
+
+        // Deduplicate by name — later entries (more specific) win
+        $seen = [];
+        $deduped = [];
+        foreach (array_reverse($params) as $p) {
+            if (!isset($seen[$p['name']])) {
+                $seen[$p['name']] = true;
+                $deduped[] = $p;
+            }
+        }
+
+        return array_reverse($deduped);
     }
 
     private function isPaginatedAction(array $route): bool
     {
-        return in_array($route['action'] ?? '', ['index', 'list', 'search', 'paginate'], true);
+        return in_array($route['controllerMethod'] ?? $route['action'] ?? '', ['index', 'list', 'search', 'paginate'], true);
+    }
+
+    /**
+     * Any GET index-style method is assumed to be backed by SearchEngine.
+     * This covers: index, list, all, search, and any other listing action on a GET route.
+     */
+    private function isSearchEngineAction(array $route): bool
+    {
+        $method = $route['controllerMethod'] ?? $route['action'] ?? '';
+        return in_array($method, ['index', 'list', 'all', 'search', 'paginate', 'active', 'featured', 'recent', 'popular'], true)
+            && ($route['method'] ?? '') === 'GET';
     }
 
     private function paginationParameters(): array
@@ -179,7 +205,53 @@ class OpenApiBuilder
                 'name' => 'per_page',
                 'in' => 'query',
                 'required' => false,
-                'schema' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'example' => 15],
+                'schema' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 1000, 'example' => 20],
+                'description' => 'Number of results per page (max 1000)',
+            ],
+        ];
+    }
+
+    /**
+     * Standard SearchEngine query parameters emitted for all index-style endpoints.
+     * These mirror SearchCriteria / SearchCriteriaParser conventions.
+     */
+    private function searchEngineParameters(): array
+    {
+        return [
+            [
+                'name' => 'q',
+                'in' => 'query',
+                'required' => false,
+                'description' => 'Full-text search query applied across searchable columns',
+                'schema' => ['type' => 'string', 'example' => 'keyword'],
+            ],
+            [
+                'name' => 'sort_by',
+                'in' => 'query',
+                'required' => false,
+                'description' => 'Field to sort results by. Available values depend on the resource.',
+                'schema' => ['type' => 'string', 'example' => 'created_at'],
+            ],
+            [
+                'name' => 'sort_order',
+                'in' => 'query',
+                'required' => false,
+                'description' => 'Sort direction',
+                'schema' => ['type' => 'string', 'enum' => ['asc', 'desc'], 'default' => 'asc'],
+            ],
+            [
+                'name' => 'status',
+                'in' => 'query',
+                'required' => false,
+                'description' => 'Filter by status',
+                'schema' => ['type' => 'string'],
+            ],
+            [
+                'name' => 'site_id',
+                'in' => 'query',
+                'required' => false,
+                'description' => 'Scope results to a specific site',
+                'schema' => ['type' => 'integer'],
             ],
         ];
     }

@@ -47,6 +47,10 @@ $pageLikes = $page->likes;
 $isLiked = $isLoggedIn ? $pageLikes->where('member_id', MemberAuth::id())->count() : false;
 $likeCount = (int)($pageLikes->count() ?? 0);
 
+// [TODO-COMMENTS] Replace with real comment count:
+// $commentCount = $pageId ? (int)\App\Repositories\CommentRepository::countForPage($pageId) : 0;
+$commentCount = (int)($page->comments_count ?? $page->comments?->count() ?? 0);
+
 // Unique suffix so multiple bars on a listing page don't share IDs
 $uid = 'ub-' . ($pageId ?? uniqid());
 ?>
@@ -186,6 +190,7 @@ $uid = 'ub-' . ($pageId ?? uniqid());
                 data-action="comment"
                 data-url="<?= htmlspecialchars($fullUrl) ?>"
                 data-page-id="<?= (int)$pageId ?>"
+                data-comment-count="<?= $commentCount ?>"
         >
         <span class="utility-bar__icon">
             <svg viewBox="0 0 24 24" width="20" height="20"
@@ -193,7 +198,9 @@ $uid = 'ub-' . ($pageId ?? uniqid());
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
         </span>
-            <span class="utility-bar__label">Comment</span>
+            <span class="utility-bar__label utility-bar__label--comment-count">
+            <?= $commentCount > 0 ? $commentCount : 'Comment' ?>
+        </span>
         </button>
 
         <button

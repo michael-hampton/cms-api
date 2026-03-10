@@ -516,6 +516,30 @@ class ProductServiceTest extends FunctionalTestCase
         $this->assertEquals('Test Product', $result->name);
     }
 
+    public function testCreateProductWithRegionSets()
+    {
+        $data = [
+            'name' => 'Test Product',
+            'price' => 99.99,
+            'region_set_ids' => [1, 2, 3]
+        ];
+
+        $product = new Product(['id' => 1, 'name' => 'Test Product']);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('create')->once()->andReturn($product);
+        $this->repository->shouldReceive('recordPriceHistory')->once();
+
+        $this->repository->shouldReceive('syncRegionSets')
+            ->once()
+            ->with(1, [1, 2, 3])
+            ->andReturn([1]);
+
+        $result = $this->service->createProduct($data);
+
+        $this->assertEquals('Test Product', $result->name);
+    }
+
     public function testCreateProductWithMerchantsUsesPricingResolver()
     {
         $data = [
@@ -764,6 +788,34 @@ class ProductServiceTest extends FunctionalTestCase
             'merchants' => [
                 ['id' => 1, 'name' => 'eBay', 'url' => 'https://ebay.com', 'price' => 89.99, 'is_available' => true],
             ]
+        ];
+
+        $result = $this->service->updateProduct(1, $data);
+
+        $this->assertNotNull($result);
+    }
+
+    public function testUpdateProductWithRegionSets()
+    {
+        $product = new Product(['id' => 1, 'name' => 'Product', 'price' => 99.99]);
+
+        $this->repository->shouldReceive('find')->with(1)->andReturn($product);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->shouldReceive('update')->once()->andReturn($product);
+
+        $this->repository->shouldReceive('getProductMerchantsWithDetails')
+            ->with(1)
+            ->andReturn(collect([]));
+
+        $this->repository->shouldReceive('syncRegionSets')
+            ->once()
+            ->with(1, [1, 2, 3])
+            ->andReturn([1]);
+
+        $data = [
+            'name' => 'Updated Product',
+            'region_set_ids' => [1, 2, 3]
         ];
 
         $result = $this->service->updateProduct(1, $data);

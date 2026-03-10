@@ -1083,7 +1083,6 @@
 
     // Show toast notification
     function showToast(message, type = 'info') {
-        alert('here ' + message);
         elements.toast.textContent = message;
         elements.toast.className = `toast ${type} show`;
 

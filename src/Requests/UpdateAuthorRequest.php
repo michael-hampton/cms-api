@@ -34,7 +34,15 @@ class UpdateAuthorRequest extends FormRequest
             'twitter' => ['string', 'max:255'],
             'linkedin' => ['string', 'max:255'],
             'facebook' => ['string', 'max:255'],
-            'status' => ['in:active,inactive']
+            'status' => ['in:active,inactive'],
+            'expertise' => ['nullable', 'string', 'max:800'],
+            'location' => ['nullable', 'array'],
+            'location.*' => ['string', 'max:255'],
+            'education' => ['nullable', 'array'],
+            'education.*' => ['string', 'max:255'],
+            'awards' => ['nullable', 'array'],
+            'awards.*' => ['string', 'max:255'],
+            'seniority_date' => ['nullable', 'date'],
         ];
     }
 
@@ -55,7 +63,12 @@ class UpdateAuthorRequest extends FormRequest
         return [
             'name.required' => 'Author name is required',
             'slug.unique' => 'This slug is already in use',
-            'email.unique' => 'This email is already registered'
+            'email.unique' => 'This email is already registered',
+            'expertise.max' => 'Expertise may not exceed 800 characters',
+            'location.array' => 'Location must be an array of strings',
+            'education.array' => 'Education must be an array of strings',
+            'awards.array' => 'Awards must be an array of strings',
+            'seniority_date.date' => 'Seniority date must be a valid date',
         ];
     }
 

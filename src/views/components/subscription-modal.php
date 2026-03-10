@@ -1446,8 +1446,6 @@ $isLoggedIn = !empty($member);
 
         showLoading();
 
-        alert('here')
-
         try {
             const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug()?>/member/login', {
                 method: 'POST',

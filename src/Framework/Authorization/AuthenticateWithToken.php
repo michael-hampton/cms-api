@@ -12,7 +12,9 @@ class AuthenticateWithToken implements MiddlewareInterface
     public function __construct(
         private AuthenticationService $authService,
         private UserRepositoryInterface $userRepository
-    ) {}
+    )
+    {
+    }
 
     public function handle(Request $request, callable $next)
     {
@@ -30,7 +32,6 @@ class AuthenticateWithToken implements MiddlewareInterface
         $userId = $this->authService->validateToken($token, $siteId);
 
         if (!$userId) {
-            die('here');
             return Response::json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
@@ -64,6 +65,10 @@ class AuthenticateWithToken implements MiddlewareInterface
     {
         $header = $request->header('Authorization', '');
 
+        if (empty($header)) {
+            return null;
+        }
+
         if (preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
             return $matches[1];
         }
@@ -73,7 +78,7 @@ class AuthenticateWithToken implements MiddlewareInterface
 
     private function getCurrentSiteId(Request $request): int
     {
-        return (int) $request->header('X-Site-Id', 1);
+        return (int)$request->header('X-Site-Id', 1);
     }
 
     public function register(): void

@@ -22,7 +22,7 @@ class CloneAuthor
 
     public function handle(int $authorId, ?string $newName = null): array
     {
-        return $this->database->transaction(function() use ($authorId, $newName) {
+        return $this->database->transaction(function () use ($authorId, $newName) {
             $originalAuthor = $this->authorRepository->find($authorId);
 
             if (!$originalAuthor) {
@@ -33,15 +33,27 @@ class CloneAuthor
 
             $data = [
                 'name' => $newName ?? ($originalAuthor->name . ' (Copy)'),
-                'email' => null, // Email must be unique, so clear it
+                // Email must be unique — clear it so the clone can be given a fresh one
+                'email' => null,
                 'bio' => $originalAuthor->bio,
                 'site_id' => SiteContext::getId(),
                 'website' => $originalAuthor->website,
-                'social_links' => $originalAuthor->social_links,
-                'status' => 'inactive', // Set to inactive for review
+                'twitter' => $originalAuthor->twitter,
+                'linkedin' => $originalAuthor->linkedin,
+                'facebook' => $originalAuthor->facebook,
+                // Expertise / experience fields are cloned as-is
+                'expertise' => $originalAuthor->expertise,
+                'location' => $originalAuthor->location,
+                'education' => $originalAuthor->education,
+                'awards' => $originalAuthor->awards,
+                'seniority_date' => $originalAuthor->seniority_date
+                    ? $originalAuthor->seniority_date->format('Y-m-d')
+                    : null,
+                // Clones start inactive so they can be reviewed before publishing
+                'is_active' => false,
+                'status' => 'inactive',
             ];
 
-            // Generate unique slug
             $data['slug'] = $this->generateSlug($data['name']);
 
             // Handle avatar duplication
@@ -58,7 +70,6 @@ class CloneAuthor
             $newAuthor = $this->authorRepository->create($data);
             $results['success'][] = 'author_created';
 
-            // Add clone history
             $originalAuthor->addCloneRecord('cloned_to', $newAuthor->id, null);
             $newAuthor->addCloneRecord('cloned_from', $originalAuthor->id, null);
             $results['success'][] = 'clone_history';
@@ -66,7 +77,7 @@ class CloneAuthor
             return [
                 'author' => $newAuthor,
                 'results' => $results,
-                'original_author_id' => $authorId
+                'original_author_id' => $authorId,
             ];
         });
     }

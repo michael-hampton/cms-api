@@ -41,7 +41,6 @@ class CloneAuthorActionTest extends FunctionalTestCase
         parent::tearDown();
     }
 
-
     public function testDuplicateAuthorWithCustomName(): void
     {
         $originalAuthor = new Author([
@@ -49,36 +48,19 @@ class CloneAuthorActionTest extends FunctionalTestCase
             'name' => 'John Doe',
             'bio' => 'Author bio',
             'status' => 'active',
-            'slug' => 'john-doe'
+            'slug' => 'john-doe',
         ]);
 
-        $this->databaseMock
-            ->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn ($callback) => $callback());
 
-        $this->authorRepository
-            ->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('find')->with(1)->once()->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('findBySlug')->with('jane-smith')->once()->andReturn(null);
 
-        $this->authorRepository
-            ->shouldReceive('findBySlug')
-            ->with('jane-smith')
-            ->once()
-            ->andReturn(null);
+        $newAuthor = new Author(['id' => 2, 'name' => 'Jane Smith', 'slug' => 'jane-smith']);
 
-        $newAuthor = new Author([
-            'id' => 2,
-            'name' => 'Jane Smith',
-            'slug' => 'jane-smith'
-        ]);
-
-        $this->authorRepository
-            ->shouldReceive('create')
-            ->once()
-            ->andReturn($newAuthor);
+        $this->authorRepository->shouldReceive('create')->once()->andReturn($newAuthor);
 
         $result = $this->service->handle(1, 'Jane Smith');
 
@@ -87,16 +69,11 @@ class CloneAuthorActionTest extends FunctionalTestCase
 
     public function testDuplicateAuthorThrowsExceptionWhenNotFound(): void
     {
-        $this->databaseMock
-            ->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn ($callback) => $callback());
 
-        $this->authorRepository
-            ->shouldReceive('find')
-            ->with(999)
-            ->once()
-            ->andReturn(null);
+        $this->authorRepository->shouldReceive('find')->with(999)->once()->andReturn(null);
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Author not found');
@@ -111,36 +88,20 @@ class CloneAuthorActionTest extends FunctionalTestCase
         $originalAuthor->name = 'John Doe';
         $originalAuthor->avatar = 'avatars/john.jpg';
 
-        $this->databaseMock
-            ->shouldReceive('transaction')
+        $this->databaseMock->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(fn ($callback) => $callback());
 
-        $this->authorRepository
-            ->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($originalAuthor);
-
-        $this->imageUploadService
-            ->shouldReceive('duplicate')
-            ->once()
-            ->andThrow(new \Exception('File not found'));
-
-        $this->authorRepository
-            ->shouldReceive('findBySlug')
-            ->once()
-            ->andReturn(null);
+        $this->authorRepository->shouldReceive('find')->with(1)->once()->andReturn($originalAuthor);
+        $this->imageUploadService->shouldReceive('duplicate')->once()->andThrow(new \Exception('File not found'));
+        $this->authorRepository->shouldReceive('findBySlug')->once()->andReturn(null);
 
         $newAuthor = Mockery::mock(Author::class)->makePartial();
         $newAuthor->id = 2;
 
-        $this->authorRepository
-            ->shouldReceive('create')
+        $this->authorRepository->shouldReceive('create')
             ->once()
-            ->with(Mockery::on(function($data) {
-                return $data['avatar'] === null;
-            }))
+            ->with(Mockery::on(fn($data) => $data['avatar'] === null))
             ->andReturn($newAuthor);
 
         $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
@@ -150,7 +111,7 @@ class CloneAuthorActionTest extends FunctionalTestCase
         $this->assertInstanceOf(Author::class, $result['author']);
     }
 
-    public function testCloneAuthorReturnsDetailedResults()
+    public function testCloneAuthorReturnsDetailedResults(): void
     {
         $originalAuthor = Mockery::mock(Author::class)->makePartial();
         $originalAuthor->id = 1;
@@ -179,7 +140,7 @@ class CloneAuthorActionTest extends FunctionalTestCase
         $this->assertContains('clone_history', $result['results']['success']);
     }
 
-    public function testCloneAuthorTracksAvatarFailure()
+    public function testCloneAuthorTracksAvatarFailure(): void
     {
         $originalAuthor = Mockery::mock(Author::class)->makePartial();
         $originalAuthor->id = 1;
@@ -201,5 +162,75 @@ class CloneAuthorActionTest extends FunctionalTestCase
         $this->assertCount(1, $result['results']['failed']);
         $this->assertEquals('avatar', $result['results']['failed'][0]['field']);
         $this->assertContains('author_created', $result['results']['success']);
+    }
+
+    public function testCloneAuthorCopiesExpertiseFields(): void
+    {
+        $seniorityDate = new \DateTime('2019-01-01');
+
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'Expert Author';
+        $originalAuthor->avatar = null;
+        $originalAuthor->expertise = 'Finance & Economics';
+        $originalAuthor->location = ['New York', 'London'];
+        $originalAuthor->education = ['MBA Harvard'];
+        $originalAuthor->awards = ['Best Writer 2022'];
+        $originalAuthor->seniority_date = $seniorityDate;
+        $originalAuthor->is_active = true;
+
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->authorRepository->shouldReceive('find')->with(1)->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('findBySlug')->andReturn(null);
+
+        $this->authorRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['expertise'] === 'Finance & Economics'
+                    && $data['location'] === ['New York', 'London']
+                    && $data['education'] === ['MBA Harvard']
+                    && $data['awards'] === ['Best Writer 2022']
+                    && $data['seniority_date'] === '2019-01-01'
+                    // Clone is set to inactive regardless of original
+                    && $data['is_active'] === false
+                    // Email must be cleared
+                    && $data['email'] === null;
+            }))
+            ->andReturn($newAuthor);
+
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
+
+        $result = $this->service->handle(1);
+
+        $this->assertInstanceOf(Author::class, $result['author']);
+    }
+
+    public function testCloneAuthorSetsIsActiveToFalseRegardlessOfOriginal(): void
+    {
+        $originalAuthor = Mockery::mock(Author::class)->makePartial();
+        $originalAuthor->id = 1;
+        $originalAuthor->name = 'Active Author';
+        $originalAuthor->avatar = null;
+        $originalAuthor->is_active = true;
+
+        $newAuthor = Mockery::mock(Author::class)->makePartial();
+        $newAuthor->id = 2;
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->authorRepository->shouldReceive('find')->with(1)->andReturn($originalAuthor);
+        $this->authorRepository->shouldReceive('findBySlug')->andReturn(null);
+
+        $this->authorRepository->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['is_active'] === false))
+            ->andReturn($newAuthor);
+
+        $this->setCloneHistoryExpectations($originalAuthor, $newAuthor, 1, 2);
+
+        $this->service->handle(1);
+        $this->assertTrue(true);
     }
 }

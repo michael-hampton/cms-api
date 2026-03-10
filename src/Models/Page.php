@@ -98,6 +98,11 @@ class Page extends Model
         return $this->hasMany(Block::class, 'page_id', 'id', $relation)->orderBy('order');
     }
 
+    public function comments(bool $relation = false)
+    {
+        return $this->hasMany(Comment::class, 'page_id', 'id', $relation);
+    }
+
     public function categories(bool $relation = false)
     {
         return $this->belongsToMany(

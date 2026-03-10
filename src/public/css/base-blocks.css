@@ -11472,11 +11472,20 @@ body.card-flipped {
 @media (max-width: 640px) {
     .advert-overflow-row {
         flex-direction: column;
+        margin: 24px 10px !important;
     }
 
     .advert-overflow-row [data-advert] {
         flex: none;
         width: 100%;
+    }
+
+    .product-card-container .product-image {
+        width: 85%;
+    }
+
+    .advert-block {
+        margin: 10px !important;
     }
 }
 

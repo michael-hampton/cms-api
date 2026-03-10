@@ -42,6 +42,11 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $this->searchEngine = new SearchEngine($config);
     }
 
+    public function create(array $data): Model
+    {
+        return $this->model->create($data);
+    }
+
     /**
      * Search products with optional member-scoped region visibility.
      *
@@ -92,22 +97,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function paginate(int $perPage = 15, int $page = 1): array
     {
         return $this->model->latest()->paginate($perPage);
-    }
-
-    public function create(array $data): Model
-    {
-        return $this->model->create($data);
-    }
-
-    public function delete(int $id): bool
-    {
-        $product = $this->find($id);
-
-        if (!$product) {
-            return false;
-        }
-
-        return $product->delete();
     }
 
     public function findByCategory(string $category): Collection
@@ -212,11 +201,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         })->filter();
     }
 
-    protected function getModelClass(): string
-    {
-        return Product::class;
-    }
-
     public function findRelated(Product $product, int $limit = 8): Collection
     {
         return $this->model
@@ -260,25 +244,22 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         }
     }
 
+    public function delete(int $id): bool
+    {
+        $product = $this->find($id);
+
+        if (!$product) {
+            return false;
+        }
+
+        return $product->delete();
+    }
+
     public function getImages(int $productId): Collection
     {
         return ProductImage::where('product_id', $productId)
             ->orderBy('sort_order')
             ->get();
-    }
-
-    private function getFormattedMerchants(int $productId)
-    {
-        $existingMerchants = ProductMerchant::with(['merchant'])->where('product_id', $productId)
-            ->get()->toArray();
-
-        $formattedMerchants = [];
-
-        foreach ($existingMerchants as $existingMerchant) {
-            $formattedMerchants[$existingMerchant['merchant']['id']] = $existingMerchant;
-        }
-
-        return collect($formattedMerchants);
     }
 
     public function syncMerchants(int $productId, array $merchants): array
@@ -333,6 +314,20 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $merchantIds;
     }
 
+    private function getFormattedMerchants(int $productId)
+    {
+        $existingMerchants = ProductMerchant::with(['merchant'])->where('product_id', $productId)
+            ->get()->toArray();
+
+        $formattedMerchants = [];
+
+        foreach ($existingMerchants as $existingMerchant) {
+            $formattedMerchants[$existingMerchant['merchant']['id']] = $existingMerchant;
+        }
+
+        return collect($formattedMerchants);
+    }
+
     protected function findOrCreateMerchant(string $name): Merchant
     {
         $merchant = Merchant::where('name', $name)->first();
@@ -347,6 +342,43 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
     public function getMerchants(int $productId): Collection
     {
         return $this->getProductMerchantsWithDetails($productId);
+    }
+
+    public function getProductMerchantsWithDetails(int $productId): Collection
+    {
+        return ProductMerchant::with(['merchant', 'variant'])
+            ->where('product_id', $productId)
+            ->get()
+            ->map(function ($pm) {
+                return [
+                    'id' => $pm->id,
+                    'merchant_id' => $pm->merchant_id,
+                    'name' => $pm->merchant->name,
+                    'url' => $pm->url,
+                    'price' => $pm->price,
+                    'sale_price' => $pm->sale_price,
+                    'override_price' => $pm->override_price,
+                    'override_sale_price' => $pm->override_sale_price,
+                    'variant_sku' => $pm->variant_sku,
+                    'is_available' => $pm->is_available,
+                    'variant_id' => $pm->variant_id,
+                    'variant' => $pm->variant ? [
+                        'id' => $pm->variant->id,
+                        'sku' => $pm->variant->sku,
+                        'name' => $pm->variant->name,
+                        'price' => $pm->variant->price,
+                        'sale_price' => $pm->variant->sale_price,
+                        'attributes' => $pm->variant->attributes,
+                    ] : null,
+                    'effective_price' => $pm->effective_price,
+                    'effective_sale_price' => $pm->effective_sale_price,
+                    'effective_sku' => $pm->effective_sku,
+                    'discount_percentage' => $pm->discount_percentage,
+                    'has_discount' => $pm->has_discount,
+                    'final_price' => $pm->final_price,
+                    'last_price_check' => $pm->last_price_check,
+                ];
+            });
     }
 
     public function recordMerchantPriceHistory(int $productId, int $productMerchantId, float $price, int $merchantId, ?float $salePrice = null): ?Model
@@ -388,6 +420,7 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $variantIds = [];
         foreach ($variants as $variantData) {
             $images = $variantData['images'] ?? [];
+            $regionSetIds = $variantData['region_set_ids'] ?? [];
             unset($variantData['images']);
 
             $variant = ProductVariant::create([
@@ -405,6 +438,10 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
 
             if (!empty($images)) {
                 $this->syncVariantImages($variant->id, $productId, $images);
+            }
+
+            if (!empty($regionSetIds)) {
+                $this->syncVariantRegionSets($variant->id, $regionSetIds);
             }
         }
 
@@ -427,16 +464,29 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         }
     }
 
+    /**
+     * Sync a variant's region set associations.
+     * Passing an empty array removes all restrictions (globally visible).
+     *
+     * @param int $variantId
+     * @param int[] $regionSetIds
+     */
+    public function syncVariantRegionSets(int $variantId, array $regionSetIds): void
+    {
+        $variant = ProductVariant::find($variantId);
+
+        if (!$variant) {
+            return;
+        }
+
+        $variant->regionSets(true)->sync($regionSetIds);
+    }
+
     public function getVariantImages(int $variantId): Collection
     {
         return ProductImage::where('variant_id', $variantId)
             ->orderBy('sort_order')
             ->get();
-    }
-
-    public function deleteVariantImages(int $variantId): void
-    {
-        ProductImage::where('variant_id', $variantId)->delete();
     }
 
     public function getVariants(int $productId): Collection
@@ -541,46 +591,14 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         return $variant->delete();
     }
 
+    public function deleteVariantImages(int $variantId): void
+    {
+        ProductImage::where('variant_id', $variantId)->delete();
+    }
+
     public function getAllMerchantLookups(): Collection
     {
         return Merchant::orderBy('name')->get();
-    }
-
-    public function getProductMerchantsWithDetails(int $productId): Collection
-    {
-        return ProductMerchant::with(['merchant', 'variant'])
-            ->where('product_id', $productId)
-            ->get()
-            ->map(function($pm) {
-                return [
-                    'id' => $pm->id,
-                    'merchant_id' => $pm->merchant_id,
-                    'name' => $pm->merchant->name,
-                    'url' => $pm->url,
-                    'price' => $pm->price,
-                    'sale_price' => $pm->sale_price,
-                    'override_price' => $pm->override_price,
-                    'override_sale_price' => $pm->override_sale_price,
-                    'variant_sku' => $pm->variant_sku,
-                    'is_available' => $pm->is_available,
-                    'variant_id' => $pm->variant_id,
-                    'variant' => $pm->variant ? [
-                        'id' => $pm->variant->id,
-                        'sku' => $pm->variant->sku,
-                        'name' => $pm->variant->name,
-                        'price' => $pm->variant->price,
-                        'sale_price' => $pm->variant->sale_price,
-                        'attributes' => $pm->variant->attributes,
-                    ] : null,
-                    'effective_price' => $pm->effective_price,
-                    'effective_sale_price' => $pm->effective_sale_price,
-                    'effective_sku' => $pm->effective_sku,
-                    'discount_percentage' => $pm->discount_percentage,
-                    'has_discount' => $pm->has_discount,
-                    'final_price' => $pm->final_price,
-                    'last_price_check' => $pm->last_price_check,
-                ];
-            });
     }
 
     public function searchByName(string $name, ?int $siteId, int $limit = 10): Collection
@@ -754,21 +772,8 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         $product->regionSets(true)->sync($regionSetIds);
     }
 
-    /**
-     * Sync a variant's region set associations.
-     * Passing an empty array removes all restrictions (globally visible).
-     *
-     * @param int $variantId
-     * @param int[] $regionSetIds
-     */
-    public function syncVariantRegionSets(int $variantId, array $regionSetIds): void
+    protected function getModelClass(): string
     {
-        $variant = ProductVariant::find($variantId);
-
-        if (!$variant) {
-            return;
-        }
-
-        $variant->regionSets(true)->sync($regionSetIds);
+        return Product::class;
     }
 }

@@ -7,6 +7,19 @@ use App\Repositories\Cms\AuthorRepository;
 use App\Services\Cms\ImageUploadService;
 use Exception;
 
+/**
+ * MergeAuthor reassigns all pages from the source author to the target author
+ * and then deletes the source.
+ *
+ * The new expertise / location / education / awards / seniority_date / is_active
+ * fields require no special merge handling here: the target author retains its
+ * own values for those fields, which is the correct semantic for a merge
+ * (the surviving author keeps their own profile data).
+ *
+ * If a future requirement arises to merge profile fields (e.g. concatenate
+ * award lists), that logic should live in a dedicated ProfileMergeStrategy
+ * collaborator, not in this action.
+ */
 class MergeAuthor
 {
     private Database $database;
@@ -14,7 +27,7 @@ class MergeAuthor
     public function __construct(
         private AuthorRepository $authorRepository,
         private ImageUploadService $imageUploadService,
-        ?Database $database = null
+        ?Database                $database = null
     ) {
         $this->database = $database ?? Database::getInstance();
     }
@@ -25,11 +38,11 @@ class MergeAuthor
             throw new Exception("Cannot merge an author with itself");
         }
 
-        return $this->database->transaction(function() use ($sourceAuthorId, $targetAuthorId) {
+        return $this->database->transaction(function () use ($sourceAuthorId, $targetAuthorId) {
             $results = [
                 'success' => [],
                 'failed' => [],
-                'pages_reassigned' => 0
+                'pages_reassigned' => 0,
             ];
 
             $sourceAuthor = $this->authorRepository->find($sourceAuthorId);
@@ -51,14 +64,14 @@ class MergeAuthor
                     $results['failed'][] = [
                         'operation' => 'reassign_page',
                         'page_id' => $page->id,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ];
                 }
             }
 
             $results['success'][] = 'pages_reassigned';
 
-            // Add merge history
+            // Record merge history on both sides
             try {
                 $targetAuthor->addCloneRecord('merged_from', $sourceAuthor->id, null);
                 $sourceAuthor->addCloneRecord('merged_to', $targetAuthor->id, null);
@@ -66,11 +79,11 @@ class MergeAuthor
             } catch (Exception $e) {
                 $results['failed'][] = [
                     'operation' => 'merge_history',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ];
             }
 
-            // Delete source author's avatar
+            // Delete source author's avatar (non-critical — log and continue)
             if ($sourceAuthor->avatar) {
                 try {
                     $this->imageUploadService->delete($sourceAuthor->avatar);
@@ -78,28 +91,28 @@ class MergeAuthor
                 } catch (Exception $e) {
                     $results['failed'][] = [
                         'operation' => 'delete_avatar',
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ];
                 }
             }
 
-            // Delete source author
+            // Delete source author (critical — re-throw to rollback)
             try {
                 $this->authorRepository->delete($sourceAuthorId);
                 $results['success'][] = 'author_deleted';
             } catch (Exception $e) {
                 $results['failed'][] = [
                     'operation' => 'delete_author',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ];
-                throw $e; // Re-throw to rollback transaction
+                throw $e;
             }
 
             return [
                 'success' => true,
                 'results' => $results,
                 'source_author_id' => $sourceAuthorId,
-                'target_author_id' => $targetAuthorId
+                'target_author_id' => $targetAuthorId,
             ];
         });
     }
