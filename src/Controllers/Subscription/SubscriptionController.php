@@ -112,6 +112,7 @@ class SubscriptionController extends Controller
 
         try {
             $data = $request->validated();
+            $data['site_id'] = $siteId;
 
             // Handle image uploads
             if ($request->hasFile('print_image')) {

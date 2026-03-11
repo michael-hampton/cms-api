@@ -6,11 +6,13 @@ use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\DateRangeFilter;
 use App\Search\Filters\EqualsFilter;
 use App\Search\Filters\InFilter;
+use App\Search\HasSite;
 use App\Search\SearchConfiguration;
 use App\Search\SortSpecification;
 
 class ProductOfferSearchConfiguration extends SearchConfiguration implements SearchConfigurationInterface
 {
+    use HasSite;
     public function configure(): void
     {
         $this->addFilter(new EqualsFilter('product_id', 'product_id'))

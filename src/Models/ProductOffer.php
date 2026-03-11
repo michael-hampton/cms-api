@@ -4,12 +4,13 @@ namespace App\Models;
 
 use App\Contracts\Boost\BoostableInterface;
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\HasRegionSetVisibility;
 use App\Models\Concerns\IsBoostable;
 use App\Models\Concerns\TracksCreator;
 
 class ProductOffer extends Model implements BoostableInterface
 {
-    use TracksCreator, IsBoostable;
+    use TracksCreator, IsBoostable, HasRegionSetVisibility;
 
     const BOOSTABLE_TYPE = 'offer';
 
@@ -38,7 +39,8 @@ class ProductOffer extends Model implements BoostableInterface
         'eligibility_rules',
         'reward_definition_id',
         'original_price',
-        'link'
+        'link',
+        'site_id'
     ];
 
     protected $casts = [
@@ -152,5 +154,16 @@ class ProductOffer extends Model implements BoostableInterface
             ->where('is_active', true)
             ->where('starts_at', '<=', $now)
             ->where('ends_at', '>=', $now);
+    }
+
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            RegionSet::class,
+            'product_offer_region_sets',
+            'product_offer_id',
+            'region_set_id',
+            $relation
+        );
     }
 }

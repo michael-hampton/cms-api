@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controllers\Offers;
 
 use App\Models\ProductOffer;
+use App\Models\ProductOfferRegionSet;
+use App\Models\RegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -944,4 +946,119 @@ class ProductOfferControllerTest extends FunctionalTestCase
         $this->assertCount(1, $data['failed']);
         $this->assertEquals(2, $data['total']);
     }
+
+    public function testStoreAttachesRegionSetsOnCreate(): void
+    {
+        $product = $this->createProduct();
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->postForSite("/api/products/{$product->id}/offers", [
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'link' => 'https://www.test.com/product',
+            'original_price' => 99.99,
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $offerId = $data['offer']['id'];
+
+        $regions = ProductOfferRegionSet::where('product_offer_id', $offerId)->get();
+
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testStoreWithEmptyRegionSetIdsClearsRelation(): void
+    {
+        $product = $this->createProduct();
+
+        $response = $this->postForSite("/api/products/{$product->id}/offers", [
+            'sale_price' => 79.99,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'link' => 'https://www.test.com/product',
+            'original_price' => 99.99,
+            'region_set_ids' => [],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $regions = ProductOfferRegionSet::where('product_offer_id', $data['offer']['id'])->get();
+        $this->assertCount(0, $regions);
+    }
+
+    public function testUpdateSyncsRegionSets(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk-update', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu-update', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = ProductOfferRegionSet::where('product_offer_id', $offer->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testUpdateReplacesExistingRegionSets(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $old = RegionSet::create(['name' => 'Old', 'slug' => 'old-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+        $new = RegionSet::create(['name' => 'New', 'slug' => 'new-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        // Attach old first
+        $offer->regionSets(true)->sync([$old->id]);
+
+        // Replace via update endpoint
+        $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
+            'region_set_ids' => [$new->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = ProductOfferRegionSet::where('product_offer_id', $offer->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+        $this->assertNotContains($old->id, $syncedIds);
+        $this->assertContains($new->id, $syncedIds);
+    }
+
+    public function testUpdateWithEmptyRegionSetIdsDetachesAll(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        $regionSet = RegionSet::create(['name' => 'UK', 'slug' => 'uk-detach-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+        $offer->regionSets(true)->sync([$regionSet->id]);
+
+        $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
+            'region_set_ids' => [],
+        ]);
+
+        $regions = ProductOfferRegionSet::where('product_offer_id', $offer->id)->get();
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(0, $regions);
+    }
+
 }

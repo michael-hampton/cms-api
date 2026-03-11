@@ -7,6 +7,7 @@ use App\Enums\Offers\OfferStatus;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Date;
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\ProductOffer;
 use App\Repositories\Offers\ProductOfferRepository;
@@ -148,11 +149,15 @@ class ProductOfferService
         ];
     }
 
-    public function getActiveOffers(int $limit = 10): array
+    public function getActiveOffers(int $limit = 10, ?Member $member = null): array //todo needs to be based on site
     {
-        $offers = $this->repository->all()
-            ->filter(fn($offer) => $offer->isCurrentlyActive())
-            ->take($limit);
+        $query = ProductOffer::active();
+
+        if ($member) {
+            $query->visibleToMember($member);
+        }
+
+        $offers = $query->take($limit)->get();
 
         return $offers->map(function ($offer) {
             $product = $offer->product;

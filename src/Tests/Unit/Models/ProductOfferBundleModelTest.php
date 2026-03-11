@@ -2,8 +2,10 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\ProductOfferBundle;
 use App\Models\ProductOfferBundleItem;
+use App\Models\ProductOfferBundleRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -338,5 +340,138 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
         $savings = $bundle->calculateSavings();
 
         $this->assertEquals(50.00, $savings);
+    }
+
+    public function testProductOfferWithNoRegionSetsIsVisibleToAnyMember(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+
+        $member = new Member(['territory_id' => 99]);
+
+        $bundle->setRelation('regionSets', new \App\Framework\Support\Collection([]));
+
+        $this->assertTrue($bundle->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsVisibleToMemberWithMatchingTerritory(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = $this->createMember(['territory_id' => $territory->id]);
+
+        $this->assertTrue($bundle->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsNotVisibleToMemberWithNonMatchingTerritory(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $otherTerritory = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $otherTerritory->id]);
+
+        $this->assertFalse($bundle->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsVisibleToNullMember(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+        $regionSet = $this->createRegionSet();
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $this->assertTrue($bundle->isVisibleToMember(null));
+    }
+
+    public function testProductOfferIsVisibleToMemberWithNoTerritory(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+        $regionSet = $this->createRegionSet();
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = new Member(); // no territory_id
+
+        $this->assertTrue($bundle->isVisibleToMember($member));
+    }
+
+    public function testScopeVisibleToMemberFiltersRestrictedOffers(): void
+    {
+        $bundle1 = $this->createProductOfferBundle();
+        $bundle2 = $this->createProductOfferBundle();
+
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle1->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $otherTerritory = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $otherTerritory->id]);
+
+        $results = ProductOfferBundle::visibleToMember($member)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($bundle2->id, $ids);
+        $this->assertNotContains($bundle1->id, $ids);
+    }
+
+    public function testScopeVisibleToMemberShowsAllForNullMember(): void
+    {
+        $bundle1 = $this->createProductOfferBundle();
+        $bundle2 = $this->createProductOfferBundle();
+
+        $regionSet = $this->createRegionSet();
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle1->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $results = ProductOfferBundle::visibleToMember(null)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($bundle2->id, $ids);
+        $this->assertContains($bundle1->id, $ids);
+    }
+
+    public function testRegionSetsRelationshipForProductOffer(): void
+    {
+        $bundle = $this->createProductOfferBundle();
+        $regionSet = $this->createRegionSet();
+
+        ProductOfferBundleRegionSet::create([
+            'product_offer_bundle_id' => $bundle->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $bundle->load(['regionSets']);
+
+        $this->assertCount(1, $bundle->regionSets);
+        $this->assertEquals($regionSet->id, $bundle->regionSets->first()->id);
     }
 }

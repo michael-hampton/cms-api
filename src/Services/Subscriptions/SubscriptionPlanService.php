@@ -58,6 +58,7 @@ class SubscriptionPlanService
     {
         return $this->database->transaction(function () use ($data, $siteId) {
             $planDataDto = SubscriptionPlanData::fromArray($data, $siteId);
+
             $plan = $this->createPlanAction->execute($planDataDto->toArray());
 
             if ($this->hasPriceData($data)) {
@@ -100,7 +101,8 @@ class SubscriptionPlanService
             'is_default' => true,
             'sort_order' => $data['sort_order'] ?? 1,
             'label' => $data['name'],
-            'period_description' => $this->billingPeriodToInterval($data['billing_period'])
+            'period_description' => $this->billingPeriodToInterval($data['billing_period']),
+            'site_id' => $data['site_id']
         ];
     }
 

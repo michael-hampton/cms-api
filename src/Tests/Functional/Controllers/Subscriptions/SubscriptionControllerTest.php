@@ -3,7 +3,9 @@
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
 use App\Models\Payment;
+use App\Models\RegionSet;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -551,5 +553,118 @@ class SubscriptionControllerTest extends FunctionalTestCase
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testStorePlanAttachesRegionSetsOnCreate(): void
+    {
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->postForSite("/api/subscriptions/plans", [
+            'name' => 'Auto Slug Plan',
+            'billing_period' => 'monthly',
+            'price' => 22,
+            'currency' => 'GBP',
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $offerId = $data['data']['plan']['id'];
+
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $offerId)->get();
+
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testStorePlanWithEmptyRegionSetIdsClearsRelation(): void
+    {
+        $response = $this->postForSite('/api/subscriptions/plans', [
+            'name' => 'Auto Slug Plan',
+            'billing_period' => 'monthly',
+            'price' => 22,
+            'currency' => 'GBP'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $data['bundle']['id'])->get();
+        $this->assertCount(0, $regions);
+    }
+
+    public function testUpdatePlanSyncsRegionSets(): void
+    {
+        $offer = $this->createSubscriptionPlan();
+
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk-update', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu-update', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->putForSite("/api/subscriptions/plans/{$offer->id}", [
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+            'price' => 22.99,
+            'currency' => 'GBP'
+        ]);
+
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $offer->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testUpdatePlanReplacesExistingRegionSets(): void
+    {
+        $offer = $this->createSubscriptionPlan();
+
+        $old = RegionSet::create(['name' => 'Old', 'slug' => 'old-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+        $new = RegionSet::create(['name' => 'New', 'slug' => 'new-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        // Attach old first
+        $offer->regionSets(true)->sync([$old->id]);
+
+        // Replace via update endpoint
+        $response = $this->putForSite("/api/subscriptions/plans/{$offer->id}", [
+            'region_set_ids' => [$new->id],
+            'price' => 22.99,
+            'currency' => 'GBP'
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $offer->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+        $this->assertNotContains($old->id, $syncedIds);
+        $this->assertContains($new->id, $syncedIds);
+    }
+
+    public function testUpdateWithEmptyRegionSetIdsDetachesAll(): void
+    {
+        $offer = $this->createSubscriptionPlan();
+
+        $regionSet = RegionSet::create(['name' => 'UK', 'slug' => 'uk-detach-offer', 'is_active' => true, 'site_id' => $this->siteId]);
+        $offer->regionSets(true)->sync([$regionSet->id]);
+
+        $response = $this->putForSite("/api/subscriptions/plans/{$offer->id}", [
+            'price' => 22.99,
+            'currency' => 'GBP',
+            'region_set_ids' => [],
+        ]);
+
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $offer->id)->get();
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(0, $regions);
     }
 }

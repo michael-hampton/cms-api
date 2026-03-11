@@ -69,8 +69,20 @@ class ProductOfferController extends Controller
     public function store(int $productId, CreateProductOfferRequest $request, string $siteName): JsonResponse
     {
         try {
+            $siteId = SiteContext::getId();
             $data = array_merge($request->validated(), ['product_id' => $productId]);
+            $data['site_id'] = $siteId;
             $offer = $this->offerService->createOffer($data);
+
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $offer->regionSets(true)->sync(array_map('intval', $ids));
+                $offer->load(['regionSets']);
+            }
 
             return $this->resourceResponse([
                 'success' => true,
@@ -87,10 +99,25 @@ class ProductOfferController extends Controller
     public function update(int $productId, int $offerId, UpdateProductOfferRequest $request, string $siteName): JsonResponse
     {
         try {
-            $offer = $this->offerService->updateOffer($offerId, $request->validated());
+            $siteId = SiteContext::getId();
+            $data = $request->validated();
+            $data['site_id'] = $siteId;
+            unset($data['region_set_ids']);
+            $offer = $this->offerService->updateOffer($offerId, $data);
 
             if (!$offer) {
                 return $this->jsonResponse(['message' => 'Offer not found'], 404);
+            }
+
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $offer->regionSets(true)->sync(array_map('intval', $ids));
+
+                $offer->load(['regionSets']);
             }
 
             return $this->resourceResponse([

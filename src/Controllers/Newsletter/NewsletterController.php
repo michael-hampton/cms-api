@@ -135,8 +135,9 @@ class NewsletterController extends Controller
                     ? json_decode($value, true)
                     : ($value ?? []);
                 $newsletter->regionSets(true)->sync(array_map('intval', $ids));
+
+                $newsletter->load(['regionSets']);
             }
-            $newsletter->load(['regionSets']);
 
             $contentDto = NewsletterContentDTO::fromRequest($request->all());
             $this->contentService->saveContent($newsletter->id, $contentDto);
@@ -198,8 +199,10 @@ class NewsletterController extends Controller
                     ? json_decode($value, true)
                     : ($value ?? []);
                 $newsletter->regionSets(true)->sync(array_map('intval', $ids));
+
+                $newsletter->load(['regionSets']);
             }
-            $newsletter->load(['regionSets']);
+
             $data = $request->validated();
 
             $data = array_filter([

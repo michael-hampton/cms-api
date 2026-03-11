@@ -7,6 +7,8 @@ use App\Framework\Mail\MailManager;
 use App\Framework\Support\Config;
 use App\Models\Newsletter;
 use App\Models\NewsletterIssue;
+use App\Models\NewsletterRegionSet;
+use App\Models\RegionSet;
 use App\Models\Site;
 use App\Models\Subscriber;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -1023,4 +1025,150 @@ class NewsletterControllerTest extends FunctionalTestCase
         $response = $this->postForSite('/api/newsletters/99999/pause');
         $this->assertEquals(404, $response->getStatusCode());
     }
+
+    public function testCreateNewsletterAttachesRegionSetsOnCreate(): void
+    {
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk-nl-create', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu-nl-create', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'Region Test Newsletter',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $newsletterId = $data['data']['newsletter']['id'];
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletterId)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testCreateNewsletterWithEmptyRegionSetIdsAttachesNone(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'No Regions Newsletter',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+            'region_set_ids' => [],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $newsletterId = $data['data']['newsletter']['id'];
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletterId)->get();
+        $this->assertCount(0, $regions);
+    }
+
+    public function testCreateNewsletterWithoutRegionSetIdsKeyAttachesNone(): void
+    {
+        $response = $this->postForSite('/api/newsletters', [
+            'title' => 'No Key Newsletter',
+            'interval' => Newsletter::INTERVAL_WEEKLY,
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $newsletterId = $data['data']['newsletter']['id'];
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletterId)->get();
+        $this->assertCount(0, $regions);
+    }
+
+    public function testUpdateNewsletterSyncsRegionSets(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk-nl-update', 'is_active' => true, 'site_id' => $this->siteId]);
+        $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu-nl-update', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'title' => $newsletter->title,
+            'interval' => $newsletter->interval,
+            'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletter->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertEquals(
+            collect([$regionSet1->id, $regionSet2->id])->sort()->values()->toArray(),
+            $syncedIds
+        );
+    }
+
+    public function testUpdateNewsletterReplacesExistingRegionSets(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $old = RegionSet::create(['name' => 'Old', 'slug' => 'old-nl', 'is_active' => true, 'site_id' => $this->siteId]);
+        $new = RegionSet::create(['name' => 'New', 'slug' => 'new-nl', 'is_active' => true, 'site_id' => $this->siteId]);
+
+        $newsletter->regionSets(true)->sync([$old->id]);
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'title' => $newsletter->title,
+            'interval' => $newsletter->interval,
+            'region_set_ids' => [$new->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletter->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->sort()->values()->toArray();
+
+        $this->assertNotContains($old->id, $syncedIds);
+        $this->assertContains($new->id, $syncedIds);
+    }
+
+    public function testUpdateNewsletterWithEmptyRegionSetIdsDetachesAll(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $regionSet = RegionSet::create(['name' => 'UK', 'slug' => 'uk-nl-detach', 'is_active' => true, 'site_id' => $this->siteId]);
+        $newsletter->regionSets(true)->sync([$regionSet->id]);
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'title' => $newsletter->title,
+            'interval' => $newsletter->interval,
+            'region_set_ids' => [],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletter->id)->get();
+        $this->assertCount(0, $regions);
+    }
+
+    public function testUpdateNewsletterWithoutRegionSetIdsKeyLeavesRelationIntact(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $regionSet = RegionSet::create(['name' => 'UK', 'slug' => 'uk-nl-intact', 'is_active' => true, 'site_id' => $this->siteId]);
+        $newsletter->regionSets(true)->sync([$regionSet->id]);
+
+        $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
+            'title' => 'Updated Title Only',
+            'interval' => $newsletter->interval,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $regions = NewsletterRegionSet::where('newsletter_id', $newsletter->id)->get();
+        $syncedIds = $regions->pluck('region_set_id')->toArray();
+
+        $this->assertContains($regionSet->id, $syncedIds);
+    }
+
 }

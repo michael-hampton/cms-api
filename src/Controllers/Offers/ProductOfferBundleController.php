@@ -9,6 +9,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Models\ProductOfferBundle;
 use App\Requests\BulkActionRequest;
 use App\Requests\StoreProductOfferBundleRequest;
@@ -55,8 +56,21 @@ class ProductOfferBundleController extends Controller
     public function store(StoreProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
+            $siteId = SiteContext::getId();
             $data = $request->validated();
+            $data['site_id'] = $siteId;
+
             $bundle = $this->bundleService->createBundle($data);
+
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $bundle->regionSets(true)->sync(array_map('intval', $ids));
+                $bundle->load(['regionSets']);
+            }
 
             return $this->resourceResponse([
                 'success' => true,
@@ -91,10 +105,25 @@ class ProductOfferBundleController extends Controller
     public function update(int $bundleId, UpdateProductOfferBundleRequest $request, string $siteName): JsonResponse
     {
         try {
-            $bundle = $this->bundleService->updateBundle($bundleId, $request->validated());
+            $siteId = SiteContext::getId();
+            $data = $request->validated();
+            $data['site_id'] = $siteId;
+            unset($data['region_set_ids']);
+            $bundle = $this->bundleService->updateBundle($bundleId, $data);
 
             if (!$bundle) {
                 return $this->jsonResponse(['message' => 'Bundle not found'], 404);
+            }
+
+            if ($request->has('region_set_ids')) {
+                $value = $request->get('region_set_ids');
+
+                $ids = is_string($value)
+                    ? json_decode($value, true)
+                    : ($value ?? []);
+                $bundle->regionSets(true)->sync(array_map('intval', $ids));
+
+                $bundle->load(['regionSets']);
             }
 
             return $this->resourceResponse([

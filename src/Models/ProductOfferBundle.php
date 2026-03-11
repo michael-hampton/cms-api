@@ -3,11 +3,12 @@
 namespace App\Models;
 
 use App\Framework\Database\QueryBuilder;
+use App\Models\Concerns\HasRegionSetVisibility;
 use App\Models\Concerns\TracksCreator;
 
 class ProductOfferBundle extends Model
 {
-    use TracksCreator;
+    use TracksCreator, HasRegionSetVisibility;
 
     protected $table = 'product_offer_bundles';
 
@@ -29,6 +30,7 @@ class ProductOfferBundle extends Model
         'rejected_by',
         'created_by',
         'updated_by',
+        'site_id'
     ];
 
     protected $casts = [
@@ -97,5 +99,16 @@ class ProductOfferBundle extends Model
     public function calculateSavings(): float
     {
         return $this->total_price - $this->bundle_price;
+    }
+
+    public function regionSets(bool $relation = false)
+    {
+        return $this->belongsToMany(
+            RegionSet::class,
+            'product_offer_bundle_region_sets',
+            'product_offer_bundle_id',
+            'region_set_id',
+            $relation
+        );
     }
 }

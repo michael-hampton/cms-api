@@ -61,6 +61,7 @@ use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductOffer;
+use App\Models\ProductOfferBundle;
 use App\Models\ProductPriceHistory;
 use App\Models\ProductSpecification;
 use App\Models\ProductVariant;
@@ -81,14 +82,19 @@ trait CreatesTestData
 {
     use HasFactories;
 
-    /**
-     * Create a test page
-     */
-    protected function createPage(array $overrides = []): Page
+    private int $creationScheduleCounter = 0;
+    private int $sendScheduleCounter = 0;
+
+    public function createIssueSchedule()
     {
-        return $this->factory(Page::class)
-            ->forSite($this->siteId)
-            ->create($overrides);
+        return IssueDelivery::create([
+            'site_id' => $this->siteId,
+            'issue_number' => 1,
+            'issue_title' => 'Test Issue',
+            'on_sale_date' => now(),
+            'estimated_delivery_date' => now(),
+            'status' => 'active'
+        ]);
     }
 
     protected function createRegionSet(array $overrides = []): RegionSet
@@ -110,16 +116,6 @@ trait CreatesTestData
     }
 
     /**
-     * Create a test block
-     */
-    protected function createBlock(int $pageId, array $overrides = []): Block
-    {
-        return $this->factory(Block::class)
-            ->forPage($pageId)
-            ->create($overrides);
-    }
-
-    /**
      * Create multiple blocks for a page
      */
     protected function createBlocks(int $pageId, int $count, array $overrides = []): array
@@ -132,6 +128,16 @@ trait CreatesTestData
             ]));
         }
         return $blocks;
+    }
+
+    /**
+     * Create a test block
+     */
+    protected function createBlock(int $pageId, array $overrides = []): Block
+    {
+        return $this->factory(Block::class)
+            ->forPage($pageId)
+            ->create($overrides);
     }
 
     /**
@@ -280,6 +286,8 @@ trait CreatesTestData
         return RelationshipFactory::attach($page, $author, PageAuthor::class, $overrides);
     }
 
+    // Product-related factories
+
     /**
      * Create custom field definition
      */
@@ -298,18 +306,6 @@ trait CreatesTestData
         return $this->factory(PageCustomField::class)
             ->forDefinition($definition->id)
             ->forPage($pageId)
-            ->create($overrides);
-    }
-
-    // Product-related factories
-
-    /**
-     * Create a test product
-     */
-    protected function createProduct(array $overrides = []): Product
-    {
-        return $this->factory(Product::class)
-            ->forSite($this->siteId)
             ->create($overrides);
     }
 
@@ -397,13 +393,6 @@ trait CreatesTestData
             ->create($overrides);
     }
 
-    protected function createMember(array $overrides = []): Member
-    {
-        return $this->factory(Member::class)
-            ->forSite($this->siteId)
-            ->create($overrides);
-    }
-
     /**
      * Create multiple test members
      */
@@ -412,12 +401,6 @@ trait CreatesTestData
         return $this->factory(Member::class)
             ->forSite($this->siteId)
             ->count($count)
-            ->create($overrides);
-    }
-
-    protected function createMerchant(array $overrides = []): Model
-    {
-        return $this->factory(Merchant::class)
             ->create($overrides);
     }
 
@@ -438,6 +421,27 @@ trait CreatesTestData
         ]);
     }
 
+    protected function createMemberBadge(array $attributes = []): MemberBadge
+    {
+        $member = $attributes['member_id'] ?? $this->createMember()->id;
+        $badge = $attributes['badge_id'] ?? $this->createBadge()->id;
+
+        return MemberBadge::create(array_merge([
+            'member_id' => $member,
+            'badge_id' => $badge,
+            'earned_at' => now(),
+            'criteria_met' => [],
+            'is_visible' => true
+        ], $attributes));
+    }
+
+    protected function createMember(array $overrides = []): Member
+    {
+        return $this->factory(Member::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
+    }
+
     protected function createBadge(array $attributes = []): Badge
     {
         return Badge::create(array_merge([
@@ -451,20 +455,6 @@ trait CreatesTestData
             'is_active' => true,
             'sort_order' => 0,
             'category' => 'test'
-        ], $attributes));
-    }
-
-    protected function createMemberBadge(array $attributes = []): MemberBadge
-    {
-        $member = $attributes['member_id'] ?? $this->createMember()->id;
-        $badge = $attributes['badge_id'] ?? $this->createBadge()->id;
-
-        return MemberBadge::create(array_merge([
-            'member_id' => $member,
-            'badge_id' => $badge,
-            'earned_at' => now(),
-            'criteria_met' => [],
-            'is_visible' => true
         ], $attributes));
     }
 
@@ -509,6 +499,16 @@ trait CreatesTestData
         ], $attributes));
     }
 
+    /**
+     * Create a test page
+     */
+    protected function createPage(array $overrides = []): Page
+    {
+        return $this->factory(Page::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
+    }
+
     protected function createPageView(array $attributes = []): PageView
     {
         return PageView::create(array_merge([
@@ -530,20 +530,6 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    protected function createConsentType(array $attributes = []): ConsentType
-    {
-        return ConsentType::create(array_merge([
-            'code' => 'test_consent_' . uniqid(),
-            'name' => 'Test Consent',
-            'description' => 'Test description',
-            'category' => 'marketing',
-            'required' => false,
-            'retention_days' => 365,
-            'data_purposes' => ['Test purpose'],
-            'is_active' => true
-        ], $attributes));
-    }
-
     protected function createMemberConsent(array $attributes = []): MemberConsent
     {
         $member = $attributes['member'] ?? $this->createMember();
@@ -557,6 +543,20 @@ trait CreatesTestData
             'is_granted' => true,
             'channel' => 'web',
             'granted_at' => now_datetime()
+        ], $attributes));
+    }
+
+    protected function createConsentType(array $attributes = []): ConsentType
+    {
+        return ConsentType::create(array_merge([
+            'code' => 'test_consent_' . uniqid(),
+            'name' => 'Test Consent',
+            'description' => 'Test description',
+            'category' => 'marketing',
+            'required' => false,
+            'retention_days' => 365,
+            'data_purposes' => ['Test purpose'],
+            'is_active' => true
         ], $attributes));
     }
 
@@ -600,18 +600,6 @@ trait CreatesTestData
             'is_active' => true,
             'is_default' => false,
             'site_id' => $this->siteId ?? 1
-        ], $attributes));
-    }
-
-    protected function createNewsletter(array $attributes = []): Newsletter
-    {
-        return Newsletter::create(array_merge([
-            'title' => 'Test Newsletter',
-            'content' => 'Test content',
-            'interval' => 'weekly',
-            'active' => true,
-            'site_id' => $this->siteId,
-            'last_sent_at' => null
         ], $attributes));
     }
 
@@ -713,17 +701,6 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    protected function createMemberGiftAllowance(array $attributes = []): Model
-    {
-        return MemberGiftAllowance::create(array_merge([
-            'member_id' => $this->createMember()->id,
-            'site_id' => $this->siteId,
-            'annual_gift_limit' => 10,
-            'gifts_used_this_year' => 0,
-            'year_start_date' => now_datetime()->format('Y-m-d')
-        ], $attributes));
-    }
-
     protected function createRewardDefinition(array $attributes = []): Model
     {
         return RewardDefinition::create(array_merge([
@@ -738,6 +715,17 @@ trait CreatesTestData
             'status' => 'active',
             'slug' => 'test-reward',
             'criteria' => []
+        ], $attributes));
+    }
+
+    protected function createMemberGiftAllowance(array $attributes = []): Model
+    {
+        return MemberGiftAllowance::create(array_merge([
+            'member_id' => $this->createMember()->id,
+            'site_id' => $this->siteId,
+            'annual_gift_limit' => 10,
+            'gifts_used_this_year' => 0,
+            'year_start_date' => now_datetime()->format('Y-m-d')
         ], $attributes));
     }
 
@@ -805,6 +793,12 @@ trait CreatesTestData
         ], $attributes));
     }
 
+    protected function createMerchant(array $overrides = []): Model
+    {
+        return $this->factory(Merchant::class)
+            ->create($overrides);
+    }
+
     protected function createMerchantUrl(array $attributes = []): Model
     {
         if (empty($attributes['merchant_id'])) {
@@ -843,7 +837,8 @@ trait CreatesTestData
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
-            'original_price' => 0
+            'original_price' => 0,
+            'site_id' => $this->siteId
         ], $attributes));
     }
 
@@ -859,16 +854,14 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    public function createIssueSchedule()
+    /**
+     * Create a test product
+     */
+    protected function createProduct(array $overrides = []): Product
     {
-        return IssueDelivery::create([
-            'site_id' => $this->siteId,
-            'issue_number' => 1,
-            'issue_title' => 'Test Issue',
-            'on_sale_date' => now(),
-            'estimated_delivery_date' => now(),
-            'status' => 'active'
-        ]);
+        return $this->factory(Product::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
     }
 
     protected function createMemberWithSubscription(array $memberData = [], array $planData = [], array $subscriptionData = []): Member
@@ -897,9 +890,6 @@ trait CreatesTestData
         return $member->fresh();
     }
 
-    private int $creationScheduleCounter = 0;
-    private int $sendScheduleCounter = 0;
-
     protected function createNewsletterCreationSchedule(array $overrides = []): \App\Models\NewsletterCreationSchedule
     {
         $this->creationScheduleCounter++;
@@ -917,6 +907,18 @@ trait CreatesTestData
         ];
 
         return \App\Models\NewsletterCreationSchedule::create(array_merge($defaults, $overrides));
+    }
+
+    protected function createNewsletter(array $attributes = []): Newsletter
+    {
+        return Newsletter::create(array_merge([
+            'title' => 'Test Newsletter',
+            'content' => 'Test content',
+            'interval' => 'weekly',
+            'active' => true,
+            'site_id' => $this->siteId,
+            'last_sent_at' => null
+        ], $attributes));
     }
 
     protected function createNewsletterSendSchedule(array $overrides = []): \App\Models\NewsletterSendSchedule
@@ -953,20 +955,6 @@ trait CreatesTestData
 
     // ─── Gift Promotion ──────────────────────────────────────────────────────────
 
-    protected function createGiftPromotion(array $overrides = []): Model
-    {
-        return GiftPromotion::create(array_merge([
-            'site_id' => $this->siteId,
-            'name' => 'Test Promotion ' . uniqid(),
-            'type' => 'gift',
-            'gift_type' => 'subscription',
-            'website' => 'standalone',
-            'is_active' => true,
-            'start_date' => null,
-            'end_date' => null,
-        ], $overrides));
-    }
-
     protected function createGiftPromotionWithTriggers(array $promotionOverrides = [], array $triggers = []): GiftPromotion
     {
         $promotion = $this->createGiftPromotion($promotionOverrides);
@@ -984,6 +972,20 @@ trait CreatesTestData
         return $promotion;
     }
 
+    protected function createGiftPromotion(array $overrides = []): Model
+    {
+        return GiftPromotion::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Promotion ' . uniqid(),
+            'type' => 'gift',
+            'gift_type' => 'subscription',
+            'website' => 'standalone',
+            'is_active' => true,
+            'start_date' => null,
+            'end_date' => null,
+        ], $overrides));
+    }
+
     protected function createPromotionIssueExclusion(GiftPromotion $promotion, IssueDelivery $issue): Model
     {
         return PromotionIssueExclusion::create([
@@ -991,5 +993,20 @@ trait CreatesTestData
             'issue_delivery_id' => $issue->id,
             'created_at' => now(),
         ]);
+    }
+
+    protected function createProductOfferBundle(array $attributes = [])
+    {
+        return ProductOfferBundle::create(array_merge([
+            'name' => 'Pending Bundle',
+            'slug' => 'pending-bundle',
+            'total_price' => 200.00,
+            'bundle_price' => 150.00,
+            'start_date' => date('Y-m-d H:i:s'),
+            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+            'is_active' => true,
+            'status' => 'pending',
+            'site_id' => $this->siteId
+        ], $attributes));
     }
 }

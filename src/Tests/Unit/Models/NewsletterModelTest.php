@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Models;
 
 use App\Models\Member;
 use App\Models\Newsletter;
-use App\Models\NewsletterRegionSet;
+use App\Models\ProductOfferBundleRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -195,7 +195,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $regionSet = $this->createRegionSet();
         $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $newsletter->id,
             'region_set_id' => $regionSet->id,
         ]);
@@ -211,7 +211,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $regionSet = $this->createRegionSet();
         $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $newsletter->id,
             'region_set_id' => $regionSet->id,
         ]);
@@ -226,7 +226,7 @@ class NewsletterModelTest extends FunctionalTestCase
     {
         $newsletter = $this->createNewsletter();
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $newsletter->id,
             'region_set_id' => $this->createRegionSet()->id,
         ]);
@@ -239,7 +239,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $newsletter = $this->createNewsletter();
         $regionSet = $this->createRegionSet();
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $newsletter->id,
             'region_set_id' => $regionSet->id,
         ]);
@@ -257,7 +257,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $regionSet = $this->createRegionSet();
         $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $restricted->id,
             'region_set_id' => $regionSet->id,
         ]);
@@ -281,7 +281,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $restricted = $this->createNewsletter(['slug' => 'restricted2-' . uniqid()]);
 
         $regionSet = $this->createRegionSet();
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $restricted->id,
             'region_set_id' => $regionSet->id,
         ]);
@@ -301,7 +301,7 @@ class NewsletterModelTest extends FunctionalTestCase
         $newsletter = $this->createNewsletter();
         $regionSet = $this->createRegionSet();
 
-        NewsletterRegionSet::create([
+        ProductOfferBundleRegionSet::create([
             'newsletter_id' => $newsletter->id,
             'region_set_id' => $regionSet->id,
         ]);

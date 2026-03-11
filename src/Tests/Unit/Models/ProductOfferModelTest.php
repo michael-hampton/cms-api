@@ -2,7 +2,9 @@
 
 namespace App\Tests\Unit\Models;
 
+use App\Models\Member;
 use App\Models\ProductOffer;
+use App\Models\ProductOfferRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -300,5 +302,145 @@ class ProductOfferModelTest extends FunctionalTestCase
         $this->assertTrue($pendingOffer->canBePublished());
         $this->assertFalse($publishedOffer->canBePublished());
     }
+
+    public function testProductOfferWithNoRegionSetsIsVisibleToAnyMember(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+        $member = new Member(['territory_id' => 99]);
+
+        $offer->setRelation('regionSets', new \App\Framework\Support\Collection([]));
+
+        $this->assertTrue($offer->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsVisibleToMemberWithMatchingTerritory(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $offer->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = $this->createMember(['territory_id' => $territory->id]);
+
+        $this->assertTrue($offer->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsNotVisibleToMemberWithNonMatchingTerritory(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $offer->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $otherTerritory = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $otherTerritory->id]);
+
+        $this->assertFalse($offer->isVisibleToMember($member));
+    }
+
+    public function testProductOfferIsVisibleToNullMember(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $offer->id,
+            'region_set_id' => $this->createRegionSet()->id,
+        ]);
+
+        $this->assertTrue($offer->isVisibleToMember(null));
+    }
+
+    public function testProductOfferIsVisibleToMemberWithNoTerritory(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+        $regionSet = $this->createRegionSet();
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $offer->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $member = new Member(); // no territory_id
+
+        $this->assertTrue($offer->isVisibleToMember($member));
+    }
+
+    public function testScopeVisibleToMemberFiltersRestrictedOffers(): void
+    {
+        $product = $this->createProduct();
+        $open = $this->createProductOffer($product->id, ['slug' => 'open-' . uniqid()]);
+        $restricted = $this->createProductOffer($product->id, ['slug' => 'restricted-' . uniqid()]);
+
+        $regionSet = $this->createRegionSet();
+        $territory = $this->createTerritory(['region_set_id' => $regionSet->id]);
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $restricted->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $otherTerritory = $this->createTerritory();
+        $member = $this->createMember(['territory_id' => $otherTerritory->id]);
+
+        $results = ProductOffer::visibleToMember($member)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($open->id, $ids);
+        $this->assertNotContains($restricted->id, $ids);
+    }
+
+    public function testScopeVisibleToMemberShowsAllForNullMember(): void
+    {
+        $product = $this->createProduct();
+        $open = $this->createProductOffer($product->id, ['slug' => 'open2-' . uniqid()]);
+        $restricted = $this->createProductOffer($product->id, ['slug' => 'restricted2-' . uniqid()]);
+
+        $regionSet = $this->createRegionSet();
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $restricted->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $results = ProductOffer::visibleToMember(null)
+            ->get();
+
+        $ids = $results->pluck('id')->toArray();
+
+        $this->assertContains($open->id, $ids);
+        $this->assertContains($restricted->id, $ids);
+    }
+
+    public function testRegionSetsRelationshipForProductOffer(): void
+    {
+        $product = $this->createProduct();
+        $offer = $this->createProductOffer($product->id);
+        $regionSet = $this->createRegionSet();
+
+        ProductOfferRegionSet::create([
+            'product_offer_id' => $offer->id,
+            'region_set_id' => $regionSet->id,
+        ]);
+
+        $offer->load(['regionSets']);
+
+        $this->assertCount(1, $offer->regionSets);
+        $this->assertEquals($regionSet->id, $offer->regionSets->first()->id);
+    }
+
 
 }

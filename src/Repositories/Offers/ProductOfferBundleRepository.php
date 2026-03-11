@@ -3,6 +3,7 @@
 namespace App\Repositories\Offers;
 
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\ProductOfferBundle;
 use App\Models\ProductOfferBundleItem;
@@ -10,9 +11,9 @@ use App\Repositories\Repository;
 
 class ProductOfferBundleRepository extends Repository
 {
-    public function getActiveBundles(): Collection
+    public function getActiveBundles(?Member $member = null): Collection
     {
-        return ProductOfferBundle::active()
+        $query = ProductOfferBundle::active()
             ->with([
                 'items.productOffer.product',
                 'items.productOffer.merchant',
@@ -20,8 +21,13 @@ class ProductOfferBundleRepository extends Repository
                 'items.product.merchant'
             ])
             ->published()
-            ->orderBy('start_date', 'desc')
-            ->get();
+            ->orderBy('start_date', 'desc');
+
+        if ($member) {
+            $query->visibleToMember($member);
+        }
+
+        return $query->get();
     }
 
     public function publish(int $id, int $userId): ?ProductOfferBundle
@@ -109,6 +115,7 @@ class ProductOfferBundleRepository extends Repository
             'is_active' => $data['is_active'] ?? true,
             'status' => $data['status'] ?? 'pending',
             'created_by' => $data['created_by'] ?? null,
+            'site_id' => $data['site_id']
         ];
 
         $bundle = ProductOfferBundle::create($bundleData);
