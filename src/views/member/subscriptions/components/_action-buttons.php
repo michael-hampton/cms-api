@@ -1,22 +1,21 @@
 <?php
-$isCancelling =
-        $activeSubscription &&
-        $activeSubscription->status === 'active' &&
-        $activeSubscription->cancelled_at !== null &&
-        $activeSubscription->end_date > new \DateTime('today');
 
-echo $activeSubscription->status;
+$today = new DateTime('today');;
 
-if ($activeSubscription && $activeSubscription->status === 'cancelled') {
-    $isCancelling = true;
-}
+$isCancelling = $activeSubscription
+        && $activeSubscription->status === 'active'
+        && $activeSubscription->cancelled_at !== null
+        && !$activeSubscription->isExpired();
+
 ?>
 
 <?php if ($activeSubscription->hasStripeSubscription() && $activeSubscription->auto_renew): ?>
     <div class="btn-group">
-        <!-- existing buttons -->
         <button class="btn btn-secondary"
-                onclick="openChangeBillingDateModal(<?= $activeSubscription->id ?>, '<?= $activeSubscription->next_billing_date?->format('d') ?>')">
+                onclick="openChangeBillingDateModal(
+                <?= $activeSubscription->id ?>,
+                        '<?= $activeSubscription->next_billing_date?->format('d') ?>'
+                        )">
             📅 Change Billing Date
         </button>
     </div>
@@ -31,22 +30,30 @@ if ($activeSubscription && $activeSubscription->status === 'cancelled') {
     </div>
 <?php endif; ?>
 
-<div class="btn-group">
-    <?php if ($isCancelling): ?>
-        <button class="btn btn-primary"
-                onclick="reactivateSubscription(<?= $activeSubscription->id ?>)">
-            Reactivate Subscription
-        </button>
-    <?php else: ?>
-        <button class="btn btn-danger" onclick="cancelSubscription(<?= $activeSubscription->id ?>)">
-            Cancel Subscription
-        </button>
-    <?php endif; ?>
-</div>
+    <div class="btn-group">
 
-<div class="info-row">
-    <span class="info-label">Auto-Renewal</span>
-    <span class="info-value">
+        <?php if ($isCancelling): ?>
+
+            <button class="btn btn-primary"
+                    onclick="reactivateSubscription(<?= $activeSubscription->id ?>)">
+                Reactivate Subscription
+            </button>
+
+        <?php elseif (!$activeSubscription->isExpired()): ?>
+
+            <button class="btn btn-danger"
+                    onclick="cancelSubscription(<?= $activeSubscription->id ?>)">
+                Cancel Subscription
+            </button>
+
+        <?php endif; ?>
+
+    </div>
+
+<?php if (!$activeSubscription->isExpired()): ?>
+    <div class="info-row">
+        <span class="info-label">Auto-Renewal</span>
+        <span class="info-value">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
             <input type="checkbox"
                    id="auto-renew-toggle"
@@ -58,4 +65,5 @@ if ($activeSubscription && $activeSubscription->status === 'cancelled') {
             </span>
         </label>
     </span>
-</div>
+    </div>
+<?php endif ?>

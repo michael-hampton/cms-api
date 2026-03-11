@@ -949,8 +949,9 @@ ${optionsHTML}
 
     async function loadCurrentAddress() {
         try {
-            const response = await fetch('/<?= SiteContext::slug() ?>/api/member/current-address');
-            const data = await response.json();
+            const response = await fetch('/api/<?= SiteContext::slug() ?>/member/current-address');
+            const responseData = await response.json();
+            const data = responseData?.data;
 
             if (data.success && data.address) {
                 const addr = data.address;

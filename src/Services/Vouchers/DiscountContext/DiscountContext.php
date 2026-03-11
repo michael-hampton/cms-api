@@ -17,7 +17,8 @@ class DiscountContext
         public readonly bool    $isFirstSubscriptionCycle = false,
         public readonly ?int   $siteId = null,
         public ?RewardContext  $rewardContext = null,
-        public ?VoucherContext $voucherContext = null
+        public ?VoucherContext $voucherContext = null,
+        public array           $freeGiftItems = []
     )
     {
     }

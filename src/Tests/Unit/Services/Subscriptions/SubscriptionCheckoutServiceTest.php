@@ -65,35 +65,6 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         parent::tearDown();
     }
 
-    public function testGetSubscriptionPlanReturnsplan(): void
-    {
-        $plan = m::mock(SubscriptionPlan::class);
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($plan);
-
-        $result = $this->service->getSubscriptionPlan(1);
-
-        $this->assertSame($plan, $result);
-    }
-
-    public function testHasActiveSubscriptionReturnsTrueWhenActive(): void
-    {
-        $subscription = m::mock(Subscription::class)->makePartial();
-        $subscription->plan_id = 1;
-
-        $this->subscriptionRepository->shouldReceive('getActiveSubscriptionForMember')
-            ->with(1)
-            ->once()
-            ->andReturn($subscription);
-
-        $result = $this->service->hasActiveSubscription(1, 1);
-
-        $this->assertTrue($result);
-    }
-
     public function testProcessSubscriptionCheckoutSucceeds(): void
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
@@ -423,33 +394,6 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $result = $this->service->getSubscriptionPlanBySlug('nonexistent');
 
         $this->assertNull($result);
-    }
-
-    public function testHasActiveSubscriptionReturnsFalseWhenNoSubscription(): void
-    {
-        $this->subscriptionRepository->shouldReceive('getActiveSubscriptionForMember')
-            ->with(1)
-            ->once()
-            ->andReturn(null);
-
-        $result = $this->service->hasActiveSubscription(1, 1);
-
-        $this->assertFalse($result);
-    }
-
-    public function testHasActiveSubscriptionReturnsFalseWhenDifferentPlan(): void
-    {
-        $subscription = m::mock(Subscription::class)->makePartial();
-        $subscription->plan_id = 99; // Different plan
-
-        $this->subscriptionRepository->shouldReceive('getActiveSubscriptionForMember')
-            ->with(1)
-            ->once()
-            ->andReturn($subscription);
-
-        $result = $this->service->hasActiveSubscription(1, 1);
-
-        $this->assertFalse($result);
     }
 
     public function testProcessSubscriptionCheckoutMarksSubscriptionFailedOnPaymentFailure(): void

@@ -17,22 +17,31 @@ class SubscriptionRepository extends Repository
         return Subscription::class;
     }
 
-    public function getActiveSubscriptionForMember(int $memberId, ?int $siteId = null): ?Subscription
+    public function getActiveSubscriptionForMember(
+        int  $memberId,
+        ?int $siteId = null,
+        bool $includeRecentlyExpired = false
+    ): ?Subscription
     {
         $siteId = $siteId ?? SiteContext::getId();
 
         return Subscription::where('member_id', $memberId)
             ->where('site_id', $siteId)
             ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereNull('end_date')
-                    ->orWhereRaw('end_date >= NOW()');
+            ->where(function ($query) use ($includeRecentlyExpired) {
+                $query->whereNull('end_date');
+
+                // Only include recently expired if flag is true
+                if ($includeRecentlyExpired) {
+                    $query->orWhereRaw('end_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)');
+                } else {
+                    $query->orWhereRaw('end_date >= NOW()');
+                }
             })
             ->where(function ($query) {
                 $query->whereNull('start_date')
                     ->orWhereRaw('start_date <= NOW()');
             })
-
             ->first();
     }
 
@@ -329,8 +338,42 @@ class SubscriptionRepository extends Repository
             ->where('site_id', $siteId)
             ->whereIn('plan_id', $planIds)
             ->whereIn('status', Subscription::ACTIVE_STATUSES)
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', now());
+            })
             ->get()
             ->pluck('plan_id')
             ->all();
+    }
+
+    /**
+     * Returns all subscriptions whose status is Scheduled and whose
+     * start_date has already passed (i.e. they are due to go active).
+     *
+     * The limit is a safety guard against unbounded result sets when the
+     * job falls behind. Tune it to match your expected batch size.
+     */
+    public function getScheduledDue(\DateTimeImmutable $asOf, int $limit = 500): Collection
+    {
+        return Subscription::query()
+            ->where('status', SubscriptionStatus::SCHEDULED->value)
+            ->where('start_date', '<=', $asOf->format('Y-m-d H:i:s'))
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Persist the status transition to Active.
+     *
+     * Only `status` is updated here. If an `activated_at` timestamp column
+     * is added to the subscriptions table in the future, add it to
+     * Subscription::$fillable and include it in the array below.
+     */
+    public function markAsActive(Subscription $subscription, \DateTimeImmutable $asOf): void
+    {
+        $subscription->update([
+            'status' => SubscriptionStatus::ACTIVE->value,
+        ]);
     }
 }

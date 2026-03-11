@@ -79,6 +79,7 @@ class SubscriptionBatchFactory
                 'subscription' => $subscription,
                 'pricing' => $pricing,
                 'meta' => $this->mergeMetaData($item),
+                'selected_start_date' => $item['options']['start_date'] ?? null,
             ];
         }
 

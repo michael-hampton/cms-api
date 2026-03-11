@@ -73,6 +73,7 @@ class SubscriptionListingService
             'newsletters' => $newsletters,
             'archive_url' => $this->getArchiveUrl($subscription),
             'premium_access' => $this->getPremiumAccessList($subscription),
+            'plan_id' => $subscription->plan_id
         ];
     }
 

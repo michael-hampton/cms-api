@@ -7,6 +7,7 @@
  *   next_billing_date, auto_renew, can_renew, should_show_renew,
  *   newsletters, archive_url, premium_access
  */
+
 $isActive = $sub['is_active'] ?? false;
 $status = $sub['status'] ?? 'unknown';
 $isCancelled = $status === 'cancelled';
@@ -257,7 +258,7 @@ if (!empty($sub['end_date'])) {
             <?php endif; ?>
 
             <?php if ($sub['should_show_renew'] ?? false): ?>
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/<?= (int)($sub['plan_id'] ?? 0) ?>"
+                <a href="/checkout?plan_id=<?= $sub['plan_id'] ?>&renewal=true&type=fixed&delivery=<?= $sub['type'] ?>"
                    class="btn btn--gold btn--sm">
                     Renew
                 </a>

@@ -49,8 +49,9 @@ $nextDelivery = $issueDeliveryRepo->getUpcomingDeliveries($activeSubscription->i
     </div>
 <?php endif; ?>
 
-<?php if ($activeSubscription->isDeliveryPaused()): ?>
-    <div style="background: #fef3c7;
+<?php if ($activeSubscription && !$activeSubscription->isExpired()): ?>
+    <?php if ($activeSubscription->isDeliveryPaused()): ?>
+        <div style="background: #fef3c7;
             border-left: 4px solid #f59e0b;
             padding: 16px;
             border-radius: 8px;
@@ -58,31 +59,34 @@ $nextDelivery = $issueDeliveryRepo->getUpcomingDeliveries($activeSubscription->i
             display: flex;
             align-items: center;
             gap: 12px;">
-        <span style="font-size: 24px;">⏸️</span>
-        <div>
-            <div style="font-weight: 600; color: #92400e;">
-                Delivery Paused
-            </div>
-            <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
-                Your deliveries are paused
-                until <?= $activeSubscription->delivery_pause_end->format('F d, Y') ?>
-                (<?= $activeSubscription->getDaysUntilPauseEnds() ?> days remaining)
+            <span style="font-size: 24px;">⏸️</span>
+            <div>
+                <div style="font-weight: 600; color: #92400e;">
+                    Delivery Paused
+                </div>
+                <div style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                    Your deliveries are paused
+                    until <?= $activeSubscription->delivery_pause_end->format('F d, Y') ?>
+                    (<?= $activeSubscription->getDaysUntilPauseEnds() ?> days remaining)
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="btn-group">
-        <button class="btn btn-primary" onclick="resumeDeliveryNow(<?= $activeSubscription->id ?>)">
-            ▶️ Resume Delivery Now
-        </button>
-    </div>
-<?php else: ?>
-    <div class="btn-group">
-        <button class="btn btn-secondary"
-                onclick="openPauseDeliveryModal(<?= $activeSubscription->id ?>)">
-            ⏸️ Pause Delivery
-        </button>
-    </div>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="resumeDeliveryNow(<?= $activeSubscription->id ?>)">
+                ▶️ Resume Delivery Now
+            </button>
+        </div>
+    <?php else: ?>
+        <div class="btn-group">
+            <button class="btn btn-secondary"
+                    onclick="openPauseDeliveryModal(<?= $activeSubscription->id ?>)">
+                ⏸️ Pause Delivery
+            </button>
+        </div>
+    <?php endif; ?>
 <?php endif; ?>
+
+
 
 @include('member.subscriptions.components._shipping-address')

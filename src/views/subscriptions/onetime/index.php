@@ -909,6 +909,7 @@ $selectedTags = !empty($filters['tags'])
     const PLANS_WRAP = document.getElementById('plans-wrap');
     let cartData = {items: [], total: 0, count: 0};
     const API_BASE = '/api/press-stack';
+    CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
     let selectedCategories = new Set(<?= json_encode($selectedCategories) ?>);
     let selectedTags = new Set(<?= json_encode($selectedTags) ?>);

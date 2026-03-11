@@ -11,5 +11,6 @@ enum SubscriptionStatus: string
     case EXPIRED = 'expired';
     case FAILED = 'failed';
     case TRIALING = 'trialing';
+    case SCHEDULED = 'scheduled';
     case GRACE_PERIOD = 'grace_period';
 }

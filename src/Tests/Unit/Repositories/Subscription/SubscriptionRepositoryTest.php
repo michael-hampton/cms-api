@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\Subscription;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Subscription;
@@ -31,7 +32,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -54,7 +55,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertNotNull($result);
         $this->assertEquals($active->id, $result->id);
-        $this->assertEquals('active', $result->status);
+        $this->assertEquals(SubscriptionStatus::ACTIVE->value, $result->status);
     }
 
     public function test_get_active_subscription_returns_null_when_none_active(): void
@@ -85,7 +86,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -126,7 +127,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'New Plan',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -146,7 +147,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -176,7 +177,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'auto_renew' => true,
             'price' => 29.99,
@@ -212,7 +213,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Site 1 Plan',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -222,7 +223,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $otherSite->id,
             'plan_name' => 'Site 2 Plan',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 19.99,
             'currency' => 'USD'
@@ -243,7 +244,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
             'next_billing_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'auto_renew' => true,
@@ -256,7 +257,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Basic',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'next_billing_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
             'auto_renew' => true,
@@ -276,7 +277,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'next_billing_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
             'price' => 29.99,
@@ -301,7 +302,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -326,7 +327,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Premium',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 29.99,
             'currency' => 'USD'
@@ -356,7 +357,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'member_id' => $this->testMember->id,
             'site_id' => $this->siteId,
             'plan_name' => 'Basic',
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => 9.99,
             'currency' => 'USD'
@@ -498,7 +499,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'plan_id' => $plan->id,
             'site_id' => $this->siteId,
             'plan_name' => $plan->name,
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => $plan->price,
             'currency' => $plan->currency,
@@ -660,7 +661,7 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'plan_id' => $plan->id,
             'site_id' => $this->siteId,
             'plan_name' => $plan->name,
-            'status' => 'active',
+            'status' => SubscriptionStatus::ACTIVE->value,
             'start_date' => date('Y-m-d H:i:s'),
             'price' => $plan->price,
             'currency' => $plan->currency,
@@ -743,6 +744,113 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
         $this->assertNull($result);
     }
 
+    public function test_get_scheduled_due_returns_due_subscriptions(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        $due = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => SubscriptionStatus::SCHEDULED->value,
+            'start_date' => $now->format('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Future Plan',
+            'status' => SubscriptionStatus::SCHEDULED->value,
+            'start_date' => $now->modify('+2 days')->format('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->getScheduledDue($now);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals($due->id, $result->first()->id);
+    }
+
+    public function test_get_scheduled_due_ignores_non_scheduled_status(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Active Plan',
+            'status' => SubscriptionStatus::ACTIVE->value,
+            'start_date' => $now->modify('-1 day')->format('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->getScheduledDue($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_get_scheduled_due_respects_limit(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        for ($i = 0; $i < 5; $i++) {
+            Subscription::create([
+                'member_id' => $this->testMember->id,
+                'site_id' => $this->siteId,
+                'plan_name' => 'Scheduled ' . $i,
+                'status' => SubscriptionStatus::SCHEDULED->value,
+                'start_date' => $now->modify('-1 day')->format('Y-m-d H:i:s'),
+                'price' => 29.99,
+                'currency' => 'USD'
+            ]);
+        }
+
+        $result = $this->repository->getScheduledDue($now, 2);
+
+        $this->assertCount(2, $result);
+    }
+
+    public function test_get_scheduled_due_does_not_return_future_start_dates(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Future Plan',
+            'status' => SubscriptionStatus::SCHEDULED->value,
+            'start_date' => $now->modify('+1 day')->format('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $result = $this->repository->getScheduledDue($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_mark_as_active_updates_status(): void
+    {
+        $subscription = Subscription::create([
+            'member_id' => $this->testMember->id,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => SubscriptionStatus::SCHEDULED->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD'
+        ]);
+
+        $this->repository->markAsActive($subscription, new \DateTimeImmutable());
+
+        $subscription->refresh();
+
+        $this->assertEquals(SubscriptionStatus::ACTIVE->value, $subscription->status);
+    }
 
     protected function createSubscriptionPlan(array $attributes = []): Model
     {

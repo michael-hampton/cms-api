@@ -40,7 +40,8 @@ class MemberSubscriptionsController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId);
+        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId, true);
+
         $subscriptionHistory = $this->subscriptionRepository->getSubscriptionHistory($member->id, $siteId);
 
         // Get email subscription preferences

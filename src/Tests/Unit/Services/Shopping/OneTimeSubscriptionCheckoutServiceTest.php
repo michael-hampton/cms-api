@@ -5,7 +5,10 @@ namespace App\Tests\Unit\Services\Shopping;
 use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Subscriptions\SubscriptionPricing;
+use App\Enums\PaymentStatus;
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
@@ -88,7 +91,29 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             })->byDefault();
     }
 
-    public function test_process_checkout_fails_when_not_authenticated(): void
+    public function test_throws_when_cart_has_no_subscriptions(): void
+    {
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn([['product_id' => 1, 'price' => 25.00]]);
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_throws_when_cart_is_empty(): void
+    {
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([]);
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_throws_when_member_not_authenticated(): void
     {
         $this->cartService->shouldReceive('getItems')
             ->once()
@@ -96,15 +121,34 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 ['subscription_plan_id' => 1, 'price' => 50.00, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]]
             ]);
 
-        $this->memberAuth->shouldReceive('check')
+        $this->memberAuth->shouldReceive('check')->once()->andReturn(false);
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Please login to purchase a subscription');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_throws_when_all_items_removed_by_eligibility(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setupCartWithSingleSubscription();
+
+        $this->eligibilityService->shouldReceive('validate')
             ->once()
-            ->andReturn(false);
+            ->andReturn(new EligibilityResult(valid: [], removed: [['subscription_plan_id' => 1]]));
 
-        $result = $this->service->processCheckout([], 1);
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Please login to purchase a subscription', $result['message']);
-        $this->assertArrayHasKey('redirect', $result);
+        $this->setDeliveryEstimateExpectations();
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('All items were invalid and removed from the cart.');
+
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_fails_when_no_subscription_in_cart(): void
@@ -112,13 +156,13 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn([
-                ['product_id' => 1, 'price' => 25.00] // Not a subscription
+                ['product_id' => 1, 'price' => 25.00]
             ]);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('No subscription in cart', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_creates_subscriptions_in_transaction(): void
@@ -129,15 +173,12 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
-
         $this->setDeliveryEstimateExpectations();
 
-        // Critical: verify transaction wraps subscription + order creation
+        // Phase 1: creation transaction (discount resolution now happens inside)
         $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) use ($order, $subscription) {
-                return $callback();
-            });
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $this->setResolvedDiscountExpectations();
 
@@ -154,6 +195,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn($order);
 
+        // setupSuccessfulPayment now covers the activation transaction (Phase 4)
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
@@ -175,16 +217,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $transactionCallOrder = [];
 
-        // Verify transaction completes BEFORE Stripe call
+        // Phase 1: creation transaction
         $this->database->shouldReceive('transaction')
             ->once()
-            ->andReturnUsing(function ($callback) use (&$transactionCallOrder, $order, $subscription) {
+            ->andReturnUsing(function ($callback) use (&$transactionCallOrder) {
                 $transactionCallOrder[] = 'transaction_start';
                 $result = $callback();
                 $transactionCallOrder[] = 'transaction_end';
                 return $result;
             });
-
 
         $subscriptionsWithPricing = [[
             'subscription' => $subscription,
@@ -199,7 +240,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn($order);
 
-        // Stripe call happens AFTER transaction
+        // Stripe is called AFTER creation transaction closes
         $this->paymentIntentService->shouldReceive('createForOrder')
             ->once()
             ->andReturnUsing(function () use (&$transactionCallOrder) {
@@ -212,8 +253,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 ];
             });
 
-        $this->orderDraftService->shouldReceive('attachPaymentIntent')
-            ->once();
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+
+        // ADDED: Phase 4 activation transaction runs after Stripe, also outside creation transaction
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function ($callback) use (&$transactionCallOrder) {
+                $transactionCallOrder[] = 'activation_transaction';
+                return $callback();
+            });
 
         $this->cartService->shouldReceive('clear')->once();
 
@@ -221,19 +269,20 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->service->processCheckout([], 1);
 
-        // Verify order: transaction ends before Stripe call
+        // CHANGED: activation_transaction added to expected order — proves both Stripe
+        // and activation are outside the creation transaction
         $this->assertEquals([
             'transaction_start',
             'transaction_end',
-            'stripe_call'
+            'stripe_call',
+            'activation_transaction',
         ], $transactionCallOrder);
     }
 
     public function test_process_checkout_handles_stripe_failure_gracefully(): void
     {
-        // 1. Create the specific instances once
         $subscriptionMock = Mockery::mock(Subscription::class)->makePartial();
         $orderMock = Mockery::mock(Order::class)->makePartial();
         $member = $this->createMockMember();
@@ -242,57 +291,45 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setResolvedDiscountExpectations();
         $this->setDeliveryEstimateExpectations();
 
-        // Ensure cart returns the expected structure
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn([
                 ['subscription_plan_id' => 1, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]]
             ]);
 
-        // 2. Setup Database to execute BOTH transaction closures
+        // Creation transaction + failure rollback transaction (no activation — payment failed)
         $this->database->shouldReceive('transaction')
             ->times(2)
             ->andReturnUsing(fn($cb) => $cb());
 
-        // 3. Inject the EXACT mocks into the factory and draft service
-        $subscriptionsWithPricing = [[
-            'subscription' => $subscriptionMock, // Match this instance
-            'pricing' => $this->createMockPricing()
-        ]];
-
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
-            ->andReturn($subscriptionsWithPricing);
+            ->andReturn([['subscription' => $subscriptionMock, 'pricing' => $this->createMockPricing()]]);
 
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
-            ->andReturn($orderMock); // Match this instance
+            ->andReturn($orderMock);
 
-        // 4. Simulate Stripe failure
         $this->paymentIntentService->shouldReceive('createForOrder')
             ->once()
-            ->andReturn([
-                'success' => false,
-                'message' => 'Card declined'
-            ]);
+            ->andReturn(['success' => false, 'message' => 'Card declined']);
 
-        // 5. Set expectations on the instances injected above
+        // CHANGED: enum values instead of magic strings
         $orderMock->shouldReceive('update')
             ->once()
-            ->with(['payment_status' => 'failed'])
+            ->with(['payment_status' => PaymentStatus::FAILED->value])
             ->andReturn(true);
 
         $subscriptionMock->shouldReceive('update')
             ->once()
-            ->with(['status' => 'cancelled'])
+            ->with(['status' => SubscriptionStatus::CANCELLED->value])
             ->andReturn(true);
 
-        // 6. Execute
-        $result = $this->service->processCheckout([], 1);
+        // CHANGED: now throws CheckoutException instead of returning ['success' => false]
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Payment processing failed');
 
-        // 7. Assertions
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Payment processing failed', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_applies_voucher_only_once(): void
@@ -304,7 +341,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setResolvedDiscountExpectations();
         $this->setDeliveryEstimateExpectations();
 
-        // Cart with 3 subscriptions
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn([
@@ -313,21 +349,16 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 ['subscription_plan_id' => 3, 'price' => 70.00, 'options' => ['delivery_type' => SubscriptionType::PRINTED->value]]
             ]);
 
-        // FIXED: Only one transaction for successful path
+        // CHANGED: once() — creation only; setupSuccessfulPayment adds the activation transaction
         $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
 
-        // Verify factory is called with voucher code
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
             ->with(
                 Mockery::any(),
-                Mockery::on(function ($data) {
-                    return $data['voucher_code'] === 'SAVE10';
-                }),
+                Mockery::on(fn($data) => $data['voucher_code'] === 'SAVE10'),
                 $member,
                 1,
                 Mockery::any()
@@ -340,13 +371,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
 
-        $subscriptionsWithPricing = [
-            ['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing()],
-            ['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing()],
-            ['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing()]
-        ];
-
-        $this->setupSuccessfulPayment($order, $subscriptionsWithPricing);
+        $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
         $result = $this->service->processCheckout(['voucher_code' => 'SAVE10'], 1);
@@ -367,7 +392,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['subscription_plan_id' => 2]
         ]);
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: twice() — creation + activation
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
 
         $subs = [
             ['subscription' => $this->createMockSubscription(101), 'pricing' => $this->createMockPricing()],
@@ -381,7 +407,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
         $this->cartService->shouldReceive('clear')->once();
 
-        // Ensure the response builder is actually called with the multi-sub data
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
             ->andReturn(['success' => true, 'multiple_subscriptions' => true]);
@@ -402,7 +427,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]]
         ]);
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: twice() — creation + activation
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
 
         $subs = [['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing('digital')]];
         $order = $this->createMockOrder();
@@ -414,7 +440,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
         $this->cartService->shouldReceive('clear')->once();
 
-        // The builder logic (which you provided) returns requires_shipping => false for digital
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
             ->andReturn(['success' => true, 'requires_shipping' => false]);
@@ -436,7 +461,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['subscription_plan_id' => 1, 'options' => ['delivery_type' => SubscriptionType::PRINTED->value]]
         ]);
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: twice() — creation + activation
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
 
         $subs = [['subscription' => $this->createMockSubscription(), 'pricing' => $this->createMockPricing(SubscriptionType::PRINTED->value)]];
         $order = $this->createMockOrder();
@@ -458,6 +484,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->assertTrue($result['requires_shipping']);
     }
 
+
     /**
      * Rewritten to fix argument order for createPendingOrder.
      */
@@ -472,7 +499,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['subscription_plan_id' => 1, 'price' => 22]
         ]);
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: twice() — creation + activation
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
 
         $voucherCode = 'SAVE50';
         $inputData = ['voucher_code' => $voucherCode];
@@ -490,33 +518,19 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             originalAmount: 20
         );
 
-        $subs = [[
-            'subscription' => $this->createMockSubscription(),
-            'pricing' => $discountedPricing
-        ]];
-
+        $subs = [['subscription' => $this->createMockSubscription(), 'pricing' => $discountedPricing]];
         $order = $this->createMockOrder();
 
-        // 1. Verify Factory call
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
             ->with(Mockery::any(), Mockery::subset(['voucher_code' => $voucherCode]), $member, $siteId, Mockery::any())
             ->andReturn($subs);
 
-        // 2. FIX: Order matching signature: ($subscriptions, $member, $siteId, $data)
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
-            ->with(
-                $subs,                               // 1st: array $subscriptions
-                $member,                             // 2nd: Member $member
-                $siteId,                             // 3rd: int $siteId
-                Mockery::subset($inputData),          // 4th: array $data (contains voucher)
-                Mockery::any(),
-                false
-            )
+            ->with($subs, $member, $siteId, Mockery::subset($inputData), Mockery::any(), false)
             ->andReturn($order);
 
-        // 3. Complete the rest of the flow
         $paymentResult = ['success' => true, 'client_secret' => 'pi_test', 'payment_intent_id' => 'pi_123'];
         $this->paymentIntentService->shouldReceive('createForOrder')->once()->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
@@ -538,7 +552,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
      */
     public function test_process_checkout_handles_stripe_failure(): void
     {
-        // 1. Create your ONE TRUE mock instance
         $subscriptionMock = Mockery::mock(Subscription::class)->makePartial();
         $orderMock = Mockery::mock(Order::class)->makePartial();
         $member = $this->createMockMember();
@@ -548,22 +561,10 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupAuthenticatedMember($member);
         $this->setupCartWithSingleSubscription();
 
-        // 2. Mock the internal service used by the Factory
-        // This is the missing link that ensures the hashes match
-        $internalSubService = Mockery::mock(\App\Services\Shopping\OneTimeSubscriptionService::class);
-        $internalSubService->shouldReceive('createOneTimeSubscription')
-            ->andReturn($subscriptionMock);
-
-        // Re-initialize the factory with the mocked internal service if necessary,
-        // or just ensure the factory mock returns the correct instance:
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
-            ->andReturn([[
-                'subscription' => $subscriptionMock,
-                'pricing' => $this->createMockPricing()
-            ]]);
+            ->andReturn([['subscription' => $subscriptionMock, 'pricing' => $this->createMockPricing()]]);
 
-        // 3. Database and Order expectations
         $this->database->shouldReceive('transaction')
             ->times(2)
             ->andReturnUsing(fn($cb) => $cb());
@@ -572,25 +573,25 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn($orderMock);
 
-        // 4. Force failure
         $this->paymentIntentService->shouldReceive('createForOrder')
             ->once()
             ->andReturn(['success' => false]);
 
-        // 5. Assertions on the SPECIFIC instances
+        // CHANGED: enum values
         $orderMock->shouldReceive('update')
             ->once()
-            ->with(['payment_status' => 'failed']);
+            ->with(['payment_status' => PaymentStatus::FAILED->value]);
 
         $subscriptionMock->shouldReceive('update')
             ->once()
-            ->with(['status' => 'cancelled'])
+            ->with(['status' => SubscriptionStatus::CANCELLED->value])
             ->andReturn(true);
 
-        // 6. Execute
-        $result = $this->service->processCheckout([], 1);
+        // CHANGED: throws instead of returning ['success' => false]
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Payment processing failed');
 
-        $this->assertFalse($result['success']);
+        $this->service->processCheckout([], 1);
     }
 
     protected function tearDown(): void
@@ -678,51 +679,45 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
     public function testProcessCheckoutFailsWithNoSubscriptions(): void
     {
-        $items = [
-            ['type' => 'product', 'product_id' => 1]
-        ];
-
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn($items);
+            ->andReturn([['type' => 'product', 'product_id' => 1]]);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('No subscription in cart', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
+    // CHANGED: service now throws CheckoutException instead of returning ['success' => false]
     public function testProcessCheckoutFailsWithEmptyCart(): void
     {
         $this->cartService->shouldReceive('getItems')
             ->once()
             ->andReturn([]);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('No subscription in cart', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
     public function testProcessCheckoutFailsWhenNotAuthenticated(): void
     {
-        $items = [
-            ['subscription_plan_id' => 1, 'delivery_type' => SubscriptionType::DIGITAL->value]
-        ];
-
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn($items);
+            ->andReturn([
+                ['subscription_plan_id' => 1, 'delivery_type' => SubscriptionType::DIGITAL->value]
+            ]);
 
         $this->memberAuth->shouldReceive('check')
             ->once()
             ->andReturn(false);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Please login to purchase a subscription');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('Please login to purchase a subscription', $result['message']);
-        $this->assertArrayHasKey('redirect', $result);
+        $this->service->processCheckout([], 1);
     }
 
     private function setupCartClear(): void
@@ -758,30 +753,25 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     public function test_process_checkout_returns_error_when_no_subscription_items(): void
     {
         $this->cartService->shouldReceive('getItems')
-            ->andReturn([
-                ['id' => 1, 'price' => 100] // No subscription_plan_id
-            ]);
+            ->andReturn([['id' => 1, 'price' => 100]]);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('No subscription in cart');
 
-        $this->assertFalse($result['success']);
-        $this->assertEquals('No subscription in cart', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_returns_error_when_not_authenticated(): void
     {
         $this->cartService->shouldReceive('getItems')
-            ->andReturn([
-                ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
-            ]);
+            ->andReturn([['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]]);
 
         $this->memberAuth->shouldReceive('check')->andReturn(false);
 
-        $result = $this->service->processCheckout([], 1);
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Please login to purchase a subscription');
 
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('login', $result['message']);
-        $this->assertArrayHasKey('redirect', $result);
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_resolves_discounts(): void
@@ -795,8 +785,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
         ];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
@@ -815,55 +804,32 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             customerCreditCents: 0
         );
 
-        $this->discountResolver->shouldReceive('resolve')
-            ->once()
-            ->andReturn($resolvedDiscounts);
+        $this->discountResolver->shouldReceive('resolve')->once()->andReturn($resolvedDiscounts);
 
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 1;
-        $subscriptions = [['subscription' => Mockery::mock()]];
+        $subscriptions = [['subscription' => $this->createMockSubscription()]];
 
+        // CHANGED: twice() — creation + activation
         $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
-            ->with(
-                Mockery::any(),
-                [],
-                $member,
-                1,
-                $resolvedDiscounts
-            )
+            ->with(Mockery::any(), [], $member, 1, $resolvedDiscounts)
             ->andReturn($subscriptions);
 
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
-            ->with(
-                $subscriptions,
-                $member,
-                1,
-                [],
-                $resolvedDiscounts,
-                false
-            )
+            ->with($subscriptions, $member, 1, [], $resolvedDiscounts, false)
             ->andReturn($order);
 
         $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
-
-        $this->orderDraftService->shouldReceive('attachPaymentIntent')
-            ->once();
-
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
         $this->cartService->shouldReceive('clear')->once();
-
-        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
-            ->andReturn(['success' => true]);
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout([], 1);
 
@@ -879,9 +845,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100, 'quantity' => 1]
         ];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
-
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
         $this->setDeliveryEstimateExpectations();
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
@@ -892,14 +856,12 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 1;
-        $subscriptions = [['subscription' => Mockery::mock()]];
+        $subscriptions = [['subscription' => $this->createMockSubscription()]];
 
+        // CHANGED: twice() — creation + activation
         $this->database->shouldReceive('transaction')
-            ->once()
-            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
@@ -910,31 +872,25 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->andReturn($order);
 
         $paymentResult = ['success' => true];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
-
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
         $this->cartService->shouldReceive('clear')->once();
-        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
-            ->andReturn(['success' => true]);
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout([], 1);
 
         $this->assertTrue($result['success']);
     }
 
+
     public function test_process_checkout_handles_payment_failure(): void
     {
         $member = Mockery::mock(Member::class)->makePartial();
         $member->id = 1;
 
-        $subscriptionItems = [
-            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
-        ];
+        $subscriptionItems = [['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
-
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
         $this->setDeliveryEstimateExpectations();
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
@@ -944,34 +900,28 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
 
         $order = Mockery::mock(Order::class)->makePartial();
-        $order->shouldReceive('update')->once();
+        // CHANGED: enum value
+        $order->shouldReceive('update')->once()->with(['payment_status' => PaymentStatus::FAILED->value]);
 
-        $subscription = Mockery::mock();
-        $subscription->shouldReceive('update')->once();
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        // CHANGED: enum value
+        $subscription->shouldReceive('update')->once()->with(['status' => SubscriptionStatus::CANCELLED->value]);
 
         $subscriptions = [['subscription' => $subscription]];
 
         $this->database->shouldReceive('transaction')
-            ->twice() // Once for creation, once for failure handling
-            ->andReturnUsing(function ($callback) use ($order, $subscriptions) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
 
-        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
-            ->andReturn($subscriptions);
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subscriptions);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn(['success' => false]);
 
-        $this->orderDraftService->shouldReceive('createPendingOrder')
-            ->andReturn($order);
+        // CHANGED: throws instead of returning ['success' => false]
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Payment processing failed');
 
-        $paymentResult = ['success' => false];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
-
-        $result = $this->service->processCheckout([], 1);
-
-        $this->assertFalse($result['success']);
-        $this->assertStringContainsString('Payment', $result['message']);
+        $this->service->processCheckout([], 1);
     }
 
     public function test_process_checkout_handles_payment_exception(): void
@@ -1031,12 +981,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setDeliveryEstimateExpectations();
 
-        $subscriptionItems = [
-            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
-        ];
+        $subscriptionItems = [['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
@@ -1045,32 +992,24 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
 
         $order = Mockery::mock(Order::class)->makePartial();
-        $subscriptions = [['subscription' => Mockery::mock()]];
+        $subscriptions = [['subscription' => $this->createMockSubscription()]];
 
+        // CHANGED: no count constraint — handles both creation and activation transparently
         $this->database->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->andReturnUsing(fn($callback) => $callback());
 
-        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
-            ->andReturn($subscriptions);
-
-        $this->orderDraftService->shouldReceive('createPendingOrder')
-            ->andReturn($order);
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subscriptions);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
 
         $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
 
         $this->orderDraftService->shouldReceive('attachPaymentIntent')
             ->once()
             ->with($order, $paymentResult);
 
         $this->cartService->shouldReceive('clear')->once();
-
-        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
-            ->andReturn(['success' => true]);
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout([], 1);
 
@@ -1084,12 +1023,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setDeliveryEstimateExpectations();
 
-        $subscriptionItems = [
-            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
-        ];
+        $subscriptionItems = [['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
@@ -1098,31 +1034,22 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
 
         $order = Mockery::mock(Order::class)->makePartial();
-        $subscriptions = [['subscription' => Mockery::mock()]];
+        $subscriptions = [['subscription' => $this->createMockSubscription()]];
 
+        // CHANGED: no count constraint — handles both creation and activation transparently
         $this->database->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->andReturnUsing(fn($callback) => $callback());
 
-        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
-            ->andReturn($subscriptions);
-
-        $this->orderDraftService->shouldReceive('createPendingOrder')
-            ->andReturn($order);
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subscriptions);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
 
         $paymentResult = ['success' => true];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
-
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
 
-        $this->cartService->shouldReceive('clear')
-            ->once();
+        $this->cartService->shouldReceive('clear')->once();
 
-        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
-            ->andReturn(['success' => true]);
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout([], 1);
 
@@ -1136,12 +1063,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->setDeliveryEstimateExpectations();
 
-        $subscriptionItems = [
-            ['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]
-        ];
+        $subscriptionItems = [['id' => 1, 'subscription_plan_id' => 123, 'price' => 100]];
 
-        $this->cartService->shouldReceive('getItems')
-            ->andReturn($subscriptionItems);
+        $this->cartService->shouldReceive('getItems')->andReturn($subscriptionItems);
 
         $this->memberAuth->shouldReceive('check')->andReturn(true);
         $this->memberAuth->shouldReceive('getMember')->andReturn($member);
@@ -1150,33 +1074,23 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->discountResolver->shouldReceive('resolve')->andReturn($resolvedDiscounts);
 
         $order = Mockery::mock(Order::class)->makePartial();
-        $subscriptions = [['subscription' => Mockery::mock()]];
+        $subscriptions = [['subscription' => $this->createMockSubscription()]];
 
+        // CHANGED: no count constraint — handles both creation and activation transparently
         $this->database->shouldReceive('transaction')
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            })
-            ->andReturn([$order, $subscriptions]);
+            ->andReturnUsing(fn($callback) => $callback());
 
-        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
-            ->andReturn($subscriptions);
-
-        $this->orderDraftService->shouldReceive('createPendingOrder')
-            ->andReturn($order);
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subscriptions);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
 
         $paymentResult = ['success' => true];
-        $this->paymentIntentService->shouldReceive('createForOrder')
-            ->andReturn($paymentResult);
-
+        $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
         $this->cartService->shouldReceive('clear')->once();
 
-        $expectedResponse = [
-            'success' => true,
-            'order_id' => 1,
-            'redirect_url' => '/success'
-        ];
+        $expectedResponse = ['success' => true, 'order_id' => 1, 'redirect_url' => '/success'];
 
+        // CHANGED: 4th arg is now !empty($eligibility->removed); false when nothing removed
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
             ->with($order, $subscriptions, $paymentResult, false)
@@ -1218,14 +1132,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn([
-                ['subscription_plan_id' => 999, 'price' => 50.00, 'options' => []]
-            ]);
+            ->andReturn([['subscription_plan_id' => 999, 'price' => 50.00, 'options' => []]]);
 
         $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')
             ->with(999)
             ->once()
             ->andReturn(null);
+
+        // ADDED: validateAndAttachEstimates now runs inside the transaction
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Subscription plan not found');
@@ -1240,9 +1155,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn([
-                ['subscription_plan_id' => 1, 'price' => 50.00, 'options' => []]
-            ]);
+            ->andReturn([['subscription_plan_id' => 1, 'price' => 50.00, 'options' => []]]);
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->once()->andReturn(false);
@@ -1265,6 +1178,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             new \App\DTO\Checkout\EstimatedDelivery(false, new \DateTimeImmutable(), new \DateTimeImmutable(), new \DateTimeImmutable())
         );
 
+        // ADDED: validateAndAttachEstimates now runs inside the transaction
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Subscription not available: Plan is sold out');
 
@@ -1278,9 +1194,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn([
-                ['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 1, 'options' => []]
-            ]);
+            ->andReturn([['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 1, 'options' => []]]);
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->once()->andReturn(true);
@@ -1298,6 +1212,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn($plan);
 
+        // ADDED: validateAndAttachEstimates now runs inside the transaction
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('No issues scheduled for Test Magazine');
 
@@ -1311,9 +1228,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn([
-                ['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 2, 'options' => []]
-            ]);
+            ->andReturn([['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 2, 'options' => []]]);
 
         $planPolicy = Mockery::mock(AvailabilityPolicyInterface::class);
         $planPolicy->shouldReceive('canPurchase')->once()->andReturn(true);
@@ -1325,7 +1240,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $issuePolicy->shouldReceive('isPreOrder')->once()->andReturn(false);
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
-        $nextIssue->stock_quantity = 1; // less than requested quantity of 2
+        $nextIssue->stock_quantity = 1;
         $nextIssue->issue_number = 42;
         $nextIssue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
 
@@ -1338,6 +1253,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->with(1)
             ->once()
             ->andReturn($plan);
+
+        // ADDED: validateAndAttachEstimates now runs inside the transaction
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('out of stock');
@@ -1352,9 +1270,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->cartService->shouldReceive('getItems')
             ->once()
-            ->andReturn([
-                ['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 2, 'options' => []]
-            ]);
+            ->andReturn([['subscription_plan_id' => 1, 'price' => 50.00, 'quantity' => 2, 'options' => []]]);
 
         $planPolicy = Mockery::mock(AvailabilityPolicyInterface::class);
         $planPolicy->shouldReceive('canPurchase')->once()->andReturn(true);
@@ -1364,10 +1280,10 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
         $issuePolicy->shouldReceive('canPurchase')->once()->andReturn(true);
         $issuePolicy->shouldReceive('isPreOrder')->once()->andReturn(true);
-        $issuePolicy->shouldReceive('getExpectedShipDate')->once()->andReturn(null); // No date configured
+        $issuePolicy->shouldReceive('getExpectedShipDate')->once()->andReturn(null);
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
-        $nextIssue->stock_quantity = 0; // triggers preorder path
+        $nextIssue->stock_quantity = 0;
         $nextIssue->issue_number = 42;
         $nextIssue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
 
@@ -1380,6 +1296,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->with(1)
             ->once()
             ->andReturn($plan);
+
+        // ADDED: validateAndAttachEstimates now runs inside the transaction
+        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Pre-order requires expected ship date');
@@ -1408,7 +1327,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 ]
             ]);
 
-        // Verify the discount resolver receives a context that has a VoucherContext set
         $this->discountResolver->shouldReceive('resolve')
             ->once()
             ->with(Mockery::on(function ($context) {
@@ -1433,8 +1351,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $subscription = $this->createMockSubscription();
         $subscriptions = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
 
+        // CHANGED: twice() — creation + activation
         $this->database->shouldReceive('transaction')
-            ->once()
+            ->twice()
             ->andReturnUsing(fn($cb) => $cb());
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
@@ -1474,7 +1393,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn([$kept, $removed]);
 
-        // Eligibility strips plan 2 — member already has it
         $this->eligibilityService->shouldReceive('validate')
             ->once()
             ->with($member, Mockery::any())
@@ -1484,7 +1402,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $subscription = $this->createMockSubscription();
         $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: once() for creation; setupSuccessfulPayment adds the activation transaction
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
         $this->setupSuccessfulPayment();
@@ -1512,7 +1431,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ]
         ]);
 
-        $this->database->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+        // CHANGED: once() for creation; setupSuccessfulPayment adds the activation transaction
+        $this->database->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
 
         $order = $this->createMockOrder();
         $subscription = $this->createMockSubscription();
@@ -1520,17 +1440,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
 
-        // Verify isFreeOrder=true is passed through — createPendingOrder receives true as 6th arg
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
-            ->with(
-                $subs,
-                $member,
-                1,
-                Mockery::any(),
-                Mockery::any(),
-                true  // isFreeOrder flag
-            )
+            ->with($subs, $member, 1, Mockery::any(), Mockery::any(), true)
             ->andReturn($order);
 
         $this->setupSuccessfulPayment();
@@ -1540,4 +1452,5 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->assertTrue($result['success']);
     }
+
 }

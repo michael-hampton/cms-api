@@ -34,17 +34,6 @@ class SubscriptionCheckoutService
     {
     }
 
-    public function getSubscriptionPlan(int $planId): ?SubscriptionPlan
-    {
-        return $this->planRepository->find($planId);
-    }
-
-    public function hasActiveSubscription(int $memberId, int $planId): bool
-    {
-        $subscription = $this->subscriptionRepository->getActiveSubscriptionForMember($memberId);
-        return $subscription && $subscription->plan_id === $planId;
-    }
-
     public function processSubscriptionCheckout(int $memberId, array $data, int $siteId): array
     {
         try {

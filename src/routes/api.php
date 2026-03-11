@@ -736,7 +736,6 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
-        $router->get('/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
 
         $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
         $router->get('/pages/like-status/{pageId}', [PageLikeController::class, 'status']);
@@ -906,4 +905,6 @@ $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportContro
 
 //reccommendations
 $router->get('/api/{siteName}/recommendations/products', [RecommendationController::class, 'products']);
+
+$router->get('/api/{site}/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
 

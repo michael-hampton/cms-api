@@ -67,8 +67,8 @@ class OneTimeSubscriptionsController extends Controller
         if ($request->header('X-Requested-With') === 'XMLHttpRequest' || $request->input('ajax')) {
             return $this->jsonResponse([
                 'success' => true,
-                'currency_code' => $currencyCode,
-                'currency_symbol' => $currencySymbol,
+                'currencyCode' => $currencyCode,
+                'currencySymbol' => $currencySymbol,
                 'plans' => $catalogData['data']->map(function ($plan) {
                     $plan->delivery_type = !empty($plan->digital_download_url)
                         ? SubscriptionType::DIGITAL->value
@@ -136,6 +136,8 @@ class OneTimeSubscriptionsController extends Controller
         );
 
         return $this->view('subscriptions/onetime/index', [
+            'currencyCode' => $currencyCode,
+            'currencySymbol' => $currencySymbol,
             'plans' => $catalogData['data']->map(function ($plan) {
                 $plan->delivery_type = !empty($plan->digital_download_url)
                     ? SubscriptionType::DIGITAL->value

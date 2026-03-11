@@ -4,6 +4,7 @@ namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -15,6 +16,7 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\Payments\SavedPaymentMethodService;
@@ -49,7 +51,8 @@ class CartController extends Controller
         private readonly OTPRepository                      $OTPRepository,
         private readonly CheckoutIdentityService            $identityService,
         private readonly CartPersistenceService             $cartPersistence,
-        private GiftResolutionService                       $giftResolutionService
+        private GiftResolutionService           $giftResolutionService,
+        private readonly SubscriptionRepository $subscriptionRepository
 
     )
     {
@@ -255,6 +258,48 @@ class CartController extends Controller
         return $this->view('checkout/index', $cartData);
     }
 
+    private function subscriptionCheckout(int $planId, bool $isRenewal = false)
+    {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login?redirect=/checkout?plan_id=' . $planId);
+        }
+
+        $member = MemberAuth::member();
+        $plan = $this->subscriptionPlanRepository->find($planId);
+
+        if (!$plan || !$plan->is_active) {
+            $_SESSION['flash_error'] = 'Subscription plan not found or unavailable.';
+            return $this->redirect('/');
+        }
+
+        // Check if already subscribed (skip for renewals)
+        if (!$isRenewal && $this->subscriptionRepository->hasActiveSubscriptionToPlan($member->id, $planId)) {
+            $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
+            return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
+        }
+
+        $items = $this->cartService->getItems();
+
+        $hasPlan = collect($items)->contains(fn($item) => $item['subscription_plan_id'] === $planId);
+
+        if ($isRenewal && !$hasPlan) {
+            $this->cartService->addSubscriptionToCart(
+                $planId,
+                in_array(
+                    SubscriptionType::DIGITAL->value,
+                    $plan->getDeliveryOptions()
+                ) ? SubscriptionType::DIGITAL->value : SubscriptionType::PRINTED->value
+            );
+        }
+
+        return $this->view('checkout/subscription', [
+            'plan' => $plan,
+            'member' => $member,
+            'isSubscription' => true,
+            'requiresShipping' => empty($plan->digital_download_url),
+        ]);
+    }
+
     private function detectPreOrders(array $items): array
     {
         $preOrderItems = [];
@@ -372,6 +417,29 @@ class CartController extends Controller
         return $this->resourceResponse($result, $statusCode);
     }
 
+    private function processSubscription(Request $request): array
+    {
+        if (!MemberAuth::check()) {
+            return [
+                'success' => false,
+                'message' => 'Authentication required'
+            ];
+        }
+
+        $data = $request->all();
+        $member = MemberAuth::member();
+        $siteId = SiteContext::getId();
+
+        $result = $this->subscriptionCheckoutService->processCheckout(
+            $data,
+            $siteId
+        );
+
+        Session::forget('applied_voucher_code');
+
+        return $result;
+    }
+
     public function add(Request $request)
     {
         $productId = $request->input('product_id');
@@ -458,57 +526,6 @@ class CartController extends Controller
             'status' => $order->status,
             'createdAt' => $order->created_at
         ]);
-    }
-
-    private function subscriptionCheckout(int $planId, bool $isRenewal = false)
-    {
-        if (!MemberAuth::check()) {
-            return $this->redirect('/member/login?redirect=/checkout?plan_id=' . $planId);
-        }
-
-        $member = MemberAuth::member();
-        $plan = $this->subscriptionCheckoutService->getSubscriptionPlan($planId);
-
-        if (!$plan || !$plan->is_active) {
-            $_SESSION['flash_error'] = 'Subscription plan not found or unavailable.';
-            return $this->redirect('/');
-        }
-
-        // Check if already subscribed (skip for renewals)
-        if (!$isRenewal && $this->subscriptionCheckoutService->hasActiveSubscription($member->id, $planId)) {
-            $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
-            return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
-        }
-
-        return $this->view('checkout/subscription', [
-            'plan' => $plan,
-            'member' => $member,
-            'isSubscription' => true,
-            'requiresShipping' => empty($plan->digital_download_url),
-        ]);
-    }
-
-    private function processSubscription(Request $request): array
-    {
-        if (!MemberAuth::check()) {
-            return [
-                'success' => false,
-                'message' => 'Authentication required'
-            ];
-        }
-
-        $data = $request->all();
-        $member = MemberAuth::member();
-        $siteId = SiteContext::getId();
-
-        $result = $this->subscriptionCheckoutService->processCheckout(
-            $data,
-            $siteId
-        );
-
-        Session::forget('applied_voucher_code');
-
-        return $result;
     }
 
     public function addSubscription(Request $request)
