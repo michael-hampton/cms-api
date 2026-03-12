@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Offers;
 
 use App\Framework\Http\FormRequest;
 
@@ -17,8 +17,8 @@ class StoreProductOfferBundleRequest extends FormRequest
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after:start_date'],
             'is_active' => ['boolean'],
-            'status' => ['in:draft,published,rejected'],
-            'items' => ['required', 'array', 'min_number:2'],
+            'status' => ['in:pending,published,rejected'],
+            'items' => ['required', 'array', 'min:2'],
             'items.*.product_id' => ['integer', 'required_without:items.*.product_offer_id'],
             'items.*.product_offer_id' => ['integer', 'required_without:items.*.product_id'],
             'items.*.quantity' => ['integer', 'min_number:1'],

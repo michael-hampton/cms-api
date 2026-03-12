@@ -534,4 +534,220 @@ class RegionSetControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(422, $response);
     }
+
+    public function testUpdateAllowsNullableFieldsToBeNull(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'name' => 'Europe',
+            'description' => null,
+            'is_active' => null,
+            'sort_order' => 0,
+            'territories' => null,
+        ]);
+
+        $this->assertResponseOk($response);
+    }
+
+    public function testUpdateRequiresName(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'is_active' => true,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNullName(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'name' => null,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'name' => '',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsSlugExceeding255Characters(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'slug' => str_repeat('x', 256),
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsDuplicateSlug(): void
+    {
+        $regionSet1 = $this->createRegionSet(['slug' => 'europe']);
+        $regionSet2 = $this->createRegionSet(['slug' => 'americas']);
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet2->id}", $this->validUpdatePayload([
+            'slug' => 'europe',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateAllowsSameSlugOnSameRecord(): void
+    {
+        $regionSet = $this->createRegionSet(['name' => 'Europe', 'slug' => 'europe']);
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", [
+            'name' => 'Europe Updated',
+            'slug' => 'europe',
+        ]);
+
+        $this->assertResponseOk($response);
+    }
+
+    public function testUpdateRejectsNonIntegerSortOrder(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'sort_order' => 'not-an-int',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonBooleanIsActive(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'is_active' => 'yes-please',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateValidatesEmptyPayload(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", []);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsTerritoryWithoutName(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                ['code' => 'GB', 'is_active' => true],
+            ],
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsTerritoryWithNullName(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                ['name' => null, 'code' => 'GB'],
+            ],
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsTerritoryNameExceeding255Characters(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                ['name' => str_repeat('x', 256), 'code' => 'GB'],
+            ],
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsTerritoryCodeExceeding50Characters(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                ['name' => 'United Kingdom', 'code' => str_repeat('x', 51)],
+            ],
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonIntegerTerritoryId(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                ['id' => 'not-an-int', 'name' => 'United Kingdom'],
+            ],
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateAllowsTerritoryNullableFieldsToBeNull(): void
+    {
+        $regionSet = $this->createRegionSet();
+
+        $response = $this->putForSite("/api/region-sets/{$regionSet->id}", $this->validUpdatePayload([
+            'territories' => [
+                [
+                    'name' => 'United Kingdom',
+                    'code' => 'UK',
+                    'slug' => 'uk',
+                    'is_active' => null,
+                    'sort_order' => null,
+                ],
+            ],
+        ]));
+
+        $this->assertResponseOk($response);
+    }
+
+    private function validUpdatePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Updated Region Set',
+        ], $overrides);
+    }
 }

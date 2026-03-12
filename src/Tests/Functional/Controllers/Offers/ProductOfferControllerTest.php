@@ -27,6 +27,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'original_price' => 80,
+            'site_id' => $this->siteId
         ]);
 
         ProductOffer::create([
@@ -36,6 +37,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => false,
             'original_price' => 80,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?is_active=true");
@@ -58,6 +60,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'original_price' => 80,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite("/api/products/{$product->id}/offers?search=test");
@@ -139,6 +142,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('-3 days')),
             'is_active' => true,
             'original_price' => 0,
+            'site_id' => $this->siteId
         ]);
 
         ProductOffer::create([
@@ -148,6 +152,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+5 days')),
             'is_active' => true,
             'original_price' => 0,
+            'site_id' => $this->siteId
         ]);
 
         $startDate = date('Y-m-d', strtotime('now'));
@@ -176,7 +181,7 @@ class ProductOfferControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'link' => 'https://www.test.com/product',
-            'original_price' => 99.99,
+            'original_price' => 99.99
         ];
 
         $response = $this->postForSite("/api/products/{$product->id}/offers", $data);
@@ -437,7 +442,10 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
             'sale_price' => 69.99,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s')
         ]);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -451,6 +459,8 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite("/api/products/{$product->id}/offers/9999", [
             'sale_price' => 69.99,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s')
         ]);
 
         $this->assertEquals(404, $response->getStatusCode());
@@ -549,6 +559,9 @@ class ProductOfferControllerTest extends FunctionalTestCase
         // Only updating is_active — no other required fields
         $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
             'is_active' => false,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'sale_price' => 22
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1007,6 +1020,9 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'sale_price' => 22
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1034,6 +1050,9 @@ class ProductOfferControllerTest extends FunctionalTestCase
         // Replace via update endpoint
         $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
             'region_set_ids' => [$new->id],
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'sale_price' => 22
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1054,6 +1073,9 @@ class ProductOfferControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite("/api/products/{$product->id}/offers/{$offer->id}", [
             'region_set_ids' => [],
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'sale_price' => 22
         ]);
 
         $regions = ProductOfferRegionSet::where('product_offer_id', $offer->id)->get();

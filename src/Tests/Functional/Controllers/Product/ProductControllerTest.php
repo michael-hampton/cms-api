@@ -104,6 +104,7 @@ class ProductControllerTest extends FunctionalTestCase
         ];
 
         $response = $this->postForSite('/api/products', $data, $files);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -119,14 +120,15 @@ class ProductControllerTest extends FunctionalTestCase
             'name' => 'Updated Product',
             'description' => 'test',
             'price' => 99.99,
-            'brand' => 'TestBrand'
+            'brand' => 'TestBrand',
         ];
 
         $files = [
             'image' => $this->createUploadedFile('new-product.jpg', 'image/jpeg')
         ];
 
-        $response = $this->putForSite("/api/products/{$product->id}", $data, $files);
+        $response = $this->putForSite("/api/products/{$product->id}", $data);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -232,13 +234,11 @@ class ProductControllerTest extends FunctionalTestCase
     public function testItReturns404WhenUpdatingNonExistentProduct()
     {
         $response = $this->putForSite('/api/products/9999', [
-            'name' => 'Test'
+            'name' => 'Test',
+            'price' => 22
         ]);
 
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertEquals(422, $response->getStatusCode());
-        $this->assertEquals('Validation failed', $data['error']);
+        $this->assertEquals(404, $response->getStatusCode());
     }
 
     public function testItCanDeleteAProduct()
@@ -432,6 +432,7 @@ class ProductControllerTest extends FunctionalTestCase
         ];
 
         $response = $this->postForSite('/api/products', $data);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -485,6 +486,7 @@ class ProductControllerTest extends FunctionalTestCase
         ];
 
         $response = $this->postForSite('/api/products', $data);
+
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -691,6 +693,7 @@ class ProductControllerTest extends FunctionalTestCase
 
 
         $response = $this->postForSite('/api/products', $data, $files);
+
         $responseData = json_decode($response->getContent(), true);
 
         $productId = $responseData['data']['product']['id'];
@@ -1526,6 +1529,7 @@ class ProductControllerTest extends FunctionalTestCase
         ];
 
         $response = $this->putForSite("/api/products/{$product->id}", $updateData);
+
         $this->assertEquals(200, $response->getStatusCode());
 
         // Verify new price history entry
@@ -1718,5 +1722,78 @@ class ProductControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertStringContainsString('Color', $response->getContent());
+    }
+
+    public function test_store_rejects_duplicate_product_name(): void
+    {
+        $this->createProduct(['name' => 'Existing Product']);
+
+        $response = $this->postForSite('/api/products', [
+            'name' => 'Existing Product',
+            'price' => 49.99,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Validation failed', $data['error']);
+        $this->assertArrayHasKey('name', $data['errors']);
+        $this->assertStringContainsString('already exists', $data['errors']['name']);
+    }
+
+    public function test_store_accepts_product_with_unique_name(): void
+    {
+        $this->createProduct(['name' => 'Widget A']);
+
+        $response = $this->postForSite('/api/products', [
+            'name' => 'Widget B',
+            'price' => 49.99,
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function test_update_rejects_name_already_used_by_another_product(): void
+    {
+        $this->createProduct(['name' => 'Taken Name']);
+        $product = $this->createProduct(['name' => 'My Product']);
+
+        $response = $this->putForSite("/api/products/{$product->id}", [
+            'name' => 'Taken Name',
+            'price' => $product->price,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('name', $data['errors']);
+    }
+
+    public function test_update_allows_saving_with_own_existing_name(): void
+    {
+        $product = $this->createProduct(['name' => 'My Product', 'price' => 20.00]);
+
+        // Saving the same name on the same record must not trigger the uniqueness error
+        $response = $this->putForSite("/api/products/{$product->id}", [
+            'name' => 'My Product',
+            'price' => 25.00,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function test_update_accepts_new_unique_name(): void
+    {
+        $product = $this->createProduct(['name' => 'Old Name']);
+
+        $response = $this->putForSite("/api/products/{$product->id}", [
+            'name' => 'Brand New Name',
+            'price' => $product->price,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Brand New Name', $data['data']['product']['name']);
     }
 }

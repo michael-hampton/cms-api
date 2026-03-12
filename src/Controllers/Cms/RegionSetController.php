@@ -91,6 +91,7 @@ class RegionSetController extends Controller
     {
         try {
             $requestData = $request->validated();
+            $requestData['site_id'] = SiteContext::getId();
             $regionSet = $this->service->update($id, $requestData);
 
             return $this->jsonResponse(['region_set' => $regionSet->toArrayWithRelations()]);

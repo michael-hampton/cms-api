@@ -20,8 +20,8 @@ use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
-use App\Requests\CreateNewsletterRequest;
-use App\Requests\UpdateNewsletterRequest;
+use App\Requests\Newsletter\CreateNewsletterRequest;
+use App\Requests\Newsletter\UpdateNewsletterRequest;
 use App\Resources\NewsletterResource;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
@@ -104,7 +104,7 @@ class NewsletterController extends Controller
             $data = [
                 'site_id' => $siteId,
                 'title' => $data['title'],
-                'content' => $data['content'],
+                'content' => $data['content'] ?? '',
                 'interval' => $data['interval'],
                 'active' => $data['active'] ?? true,
                 'is_default' => false, // Will be set below if needed
@@ -113,12 +113,14 @@ class NewsletterController extends Controller
                 'sort_by' => $data['sort_by'] ?? 'published_at',
                 'sort_order' => $data['sort_order'] ?? 'desc',
                 'template' => $data['template'] ?? 'default',
-                'layout_id' => $data['layout_id'],
-                'design_config' => $data['design_config']
-                    ? is_string($data['design_config'])
+                'layout_id' => $data['layout_id'] ?? null,
+                'design_config' => !isset($data['design_config'])
+                    ? []
+                    : (
+                    is_string($data['design_config'])
                         ? $data['design_config']
-                        : json_encode($data['design_config'])
-                    : null,
+                        : ($data['design_config'] ? json_encode($data['design_config']) : null)
+                    ),
             ];
 
             $newsletter = $this->newsletterRepository->create($data);
@@ -216,11 +218,13 @@ class NewsletterController extends Controller
                 'sort_order' => $data['sort_order'],
                 'template' => $data['template'],
                 'layout_id' => $data['layout_id'],
-                'design_config' => $data['design_config']
-                    ? is_string($data['design_config'])
+                'design_config' => !isset($data['design_config'])
+                    ? []
+                    : (
+                    is_string($data['design_config'])
                         ? $data['design_config']
-                        : json_encode($data['design_config'])
-                    : null,
+                        : ($data['design_config'] ? json_encode($data['design_config']) : null)
+                    ),
             ], fn($value) => $value !== null);
 
             $updated = $this->newsletterRepository->update($id, $data);

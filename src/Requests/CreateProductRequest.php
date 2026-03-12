@@ -4,9 +4,22 @@ namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
+use App\Framework\Validation\UniqueNameValidation;
+use App\Repositories\Product\ProductRepository;
 
 class CreateProductRequest extends FormRequest
 {
+    use UniqueNameValidation;
+
+    private ProductRepository $productRepository;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->productRepository = app(ProductRepository::class);
+    }
+
     public function authorize(): bool
     {
         return $this->user() && $this->user()->can('create', 'Product');
@@ -17,8 +30,8 @@ class CreateProductRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['numeric', 'min:0'],
+            'price' => ['required', 'numeric', 'min_number:0'],
+            'sale_price' => ['numeric', 'min_number:0'],
             'category_id' => ['string', 'max:255'],
             'brand' => ['string', 'max:255'],
             'image' => ['string'],
@@ -37,7 +50,7 @@ class CreateProductRequest extends FormRequest
             'merchants' => ['nullable', 'array', 'min:1'],
             'merchants.*.name' => ['required', 'string'],
             'merchants.*.url' => ['required', 'url'],
-            'merchants.*.price' => ['required', 'numeric', 'min:0'],
+            'merchants.*.price' => ['required', 'numeric', 'min_number:0'],
             'merchants.*.is_available' => ['boolean'],
 
             // Variants
@@ -56,17 +69,24 @@ class CreateProductRequest extends FormRequest
         ];
     }
 
+    public function after(): array
+    {
+        return [
+            ...$this->uniqueNameAfterHooks(
+                repository: $this->productRepository,
+                field: 'name',
+                errorMessage: 'A product with this name already exists.',
+            ),
+        ];
+    }
+
     public function messages(): array
     {
         return [
             'name.required' => 'Product name is required',
-            'description.required' => 'Product description is required',
             'price.required' => 'Price is required',
             'price.min' => 'Price must be greater than or equal to 0',
-            'sale_price.required' => 'Sale price is required',
             'sale_price.min' => 'Sale price must be greater than or equal to 0',
-            'category.required' => 'Category is required',
-            'brand.required' => 'Brand is required',
         ];
     }
 

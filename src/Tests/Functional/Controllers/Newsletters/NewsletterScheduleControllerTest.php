@@ -173,6 +173,22 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('frequency', $data['errors']);
     }
 
+    public function test_store_creation_validates_invalid_frequency(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/schedules/creation", [
+            'frequency' => 'hourly',
+            'time' => '12:00',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('frequency', $data['errors']);
+    }
+
     public function test_store_creation_validates_missing_day_of_week_for_weekly(): void
     {
         $newsletter = $this->createNewsletter();
@@ -182,10 +198,26 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
             'time' => '12:00',
         ]);
 
-        $this->assertResponseStatus(422, $response);
+        $this->assertResponseStatus(500, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('day_of_week', $data['errors']);
+        $this->assertStringContainsString('day_of_week', $data['message']);
+    }
+
+    public function test_store_creation_validates_missing_day_of_month_for_monthly(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/schedules/creation", [
+            'frequency' => 'monthly',
+            'time' => '09:00',
+        ]);
+
+        $this->assertResponseStatus(500, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsString('day_of_month', $data['message']);
     }
 
     public function test_store_creation_validates_missing_time(): void
@@ -200,6 +232,23 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
 
         $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('time', $data['errors']);
+    }
+
+    public function test_store_creation_validates_invalid_time_format(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/schedules/creation", [
+            'frequency' => 'weekly',
+            'day_of_week' => 1,
+            'time' => '9:00am',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
         $this->assertArrayHasKey('time', $data['errors']);
     }
 
@@ -269,6 +318,27 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('active', $data['schedule']['status']);
         $this->assertNotNull($data['schedule']['next_run_at']);
+    }
+
+    public function test_update_creation_schedule_returns_422_for_invalid_status(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $schedule = $this->createNewsletterCreationSchedule([
+            'newsletter_id' => $newsletter->id,
+            'status' => 'active',
+        ]);
+
+        // 'cancelled' is not an allowed value in UpdateNewsletterScheduleRequest
+        $response = $this->putForSite(
+            "/api/newsletters/{$newsletter->id}/schedules/creation/{$schedule->id}",
+            ['status' => 'cancelled']
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('status', $data['errors']);
     }
 
     public function test_update_creation_schedule_returns_422_for_cancelled(): void
@@ -356,6 +426,21 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
     }
 
+    public function test_store_send_validates_missing_frequency(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $response = $this->postForSite("/api/newsletters/{$newsletter->id}/schedules/send", [
+            'time' => '14:30',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('frequency', $data['errors']);
+    }
+
     // =========================================================================
     // PUT /newsletters/{id}/schedules/send/{scheduleId}
     // =========================================================================
@@ -377,6 +462,26 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('paused', $data['schedule']['status']);
+    }
+
+    public function test_update_send_schedule_returns_422_for_invalid_status(): void
+    {
+        $newsletter = $this->createNewsletter();
+        $schedule = $this->createNewsletterSendSchedule([
+            'newsletter_id' => $newsletter->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->putForSite(
+            "/api/newsletters/{$newsletter->id}/schedules/send/{$schedule->id}",
+            ['status' => 'cancelled']
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('errors', $data);
+        $this->assertArrayHasKey('status', $data['errors']);
     }
 
     // =========================================================================

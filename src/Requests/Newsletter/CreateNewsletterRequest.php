@@ -1,25 +1,26 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Newsletter;
 
 use App\Framework\Http\FormRequest;
 
-class UpdateNewsletterRequest extends FormRequest
+class CreateNewsletterRequest extends FormRequest
 {
     public function rules(): array
     {
         return [
-            'title' => ['string', 'max:255'],
+            'title' => ['required', 'string', 'max:255'],
             'content' => ['string'],
-            'interval' => ['in:daily,weekly,biweekly,monthly'],
+            'interval' => ['required', 'in:daily,weekly,biweekly,monthly'],
             'active' => ['boolean'],
             'is_default' => ['boolean'],
-            'content_type' => ['in:manual,automatic'],
+            'content_type' => ['required', 'in:manual,auto_pages'],
             'max_pages' => ['integer', 'min:1'],
             'sort_by' => ['string'],
             'sort_order' => ['in:asc,desc'],
             'template' => ['string'],
             'layout_id' => ['integer'],
+            // NewsletterContentDTO fields
             'subject' => ['string', 'max:255'],
             'preview_text' => ['string', 'max:255'],
             'header_content' => ['string'],

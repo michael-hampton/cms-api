@@ -146,7 +146,9 @@ class NewsletterControllerTest extends FunctionalTestCase
             $response = $this->postForSite('/api/newsletters', [
                 'title' => "Test {$interval}",
                 'interval' => $interval,
+                'content_type' => 'auto_pages'
             ]);
+
             $this->assertResponseStatus(201, $response, "Failed for interval: {$interval}");
         }
     }
@@ -194,7 +196,9 @@ class NewsletterControllerTest extends FunctionalTestCase
         $response = $this->postForSite('/api/newsletters', [
             'title' => 'First Newsletter',
             'interval' => 'weekly',
+            'content_type' => 'auto_pages'
         ]);
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertResponseStatus(201, $response);
@@ -258,8 +262,11 @@ class NewsletterControllerTest extends FunctionalTestCase
         $newsletter1 = $this->createNewsletter(['is_default' => true]);
         $newsletter2 = $this->createNewsletter(['is_default' => false]);
 
-        $this->putForSite("/api/newsletters/{$newsletter2->id}", [
+        $response = $this->putForSite("/api/newsletters/{$newsletter2->id}", [
             'is_default' => true,
+            'content_type' => 'auto_pages',
+            'title' => 'test',
+            'interval' => 'monthly'
         ]);
 
         $newsletter2 = $newsletter2->fresh();
@@ -358,7 +365,8 @@ class NewsletterControllerTest extends FunctionalTestCase
         $updateData = [
             'title' => 'Updated Title',
             'interval' => Newsletter::INTERVAL_MONTHLY,
-            'active' => false
+            'active' => false,
+            'content_type' => 'auto_pages'
         ];
 
         // Act
@@ -1035,6 +1043,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             'title' => 'Region Test Newsletter',
             'interval' => Newsletter::INTERVAL_WEEKLY,
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -1057,6 +1066,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             'title' => 'No Regions Newsletter',
             'interval' => Newsletter::INTERVAL_WEEKLY,
             'region_set_ids' => [],
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -1073,6 +1083,7 @@ class NewsletterControllerTest extends FunctionalTestCase
         $response = $this->postForSite('/api/newsletters', [
             'title' => 'No Key Newsletter',
             'interval' => Newsletter::INTERVAL_WEEKLY,
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(201, $response->getStatusCode());
@@ -1095,6 +1106,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             'title' => $newsletter->title,
             'interval' => $newsletter->interval,
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1121,6 +1133,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             'title' => $newsletter->title,
             'interval' => $newsletter->interval,
             'region_set_ids' => [$new->id],
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1143,6 +1156,7 @@ class NewsletterControllerTest extends FunctionalTestCase
             'title' => $newsletter->title,
             'interval' => $newsletter->interval,
             'region_set_ids' => [],
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -1161,6 +1175,7 @@ class NewsletterControllerTest extends FunctionalTestCase
         $response = $this->putForSite("/api/newsletters/{$newsletter->id}", [
             'title' => 'Updated Title Only',
             'interval' => $newsletter->interval,
+            'content_type' => 'auto_pages'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());

@@ -229,12 +229,29 @@ class OrderRepository extends Repository
      *
      * @return array{data: Collection, pagination: array{total: int, per_page: int, current_page: int, total_pages: int}}
      */
-    public function getByUserPaginated(int $userId, int $page = 1, int $perPage = 10): array
+    public function getByUserPaginated(int $userId, int $page = 1, int $perPage = 10, array $filters = []): array
     {
         $page = max(1, $page);
         $perPage = min(100, max(1, $perPage)); // Guard against absurd values
 
-        $base = Order::where('user_id', $userId);
+        $base = Order::where('user_id', $userId)
+            ->whereNotNull('one_time_subscription_id');
+
+        if (!empty($filters['search'])) {
+            $base->where('order_number', 'LIKE', '%' . $filters['search'] . '%');
+        }
+
+        if (!empty($filters['status'])) {
+            $base->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['date_from'])) {
+            $base->where('created_at', '>=', $filters['date_from'] . ' 00:00:00');
+        }
+
+        if (!empty($filters['date_to'])) {
+            $base->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
+        }
 
         $total = (clone $base)->count();
 
@@ -243,9 +260,8 @@ class OrderRepository extends Repository
                 'items.product',
                 'shippingAddress',
                 'billingAddress',
-                'items.subscription'
+                'items.subscription',
             ])
-            ->whereNotNull('one_time_subscription_id')
             ->orderBy('created_at', 'desc')
             ->limit($perPage)
             ->offset(($page - 1) * $perPage)

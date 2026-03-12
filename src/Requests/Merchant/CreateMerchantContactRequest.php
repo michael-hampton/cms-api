@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Merchant;
 
 use App\Framework\Http\FormRequest;
 

@@ -30,6 +30,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -70,6 +71,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -88,6 +90,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         // Pending bundle
@@ -100,6 +103,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $bundles = $this->repository->getActiveBundles();
@@ -125,6 +129,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
             'items' => [
                 [
                     'product_offer_id' => $offer1->id,
@@ -160,6 +165,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -208,6 +214,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $deleted = $this->repository->delete($bundle->id);
@@ -236,6 +243,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $item = ProductOfferBundleItem::create([
@@ -261,6 +269,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->publish($bundle->id, $user->id);
@@ -284,6 +293,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->publish($bundle->id, $user->id);
@@ -303,6 +313,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $reason = 'Pricing too low';
@@ -328,6 +339,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->reject($bundle->id, $user->id, 'Test');
@@ -346,6 +358,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         $pendingBundle = ProductOfferBundle::create([
@@ -357,6 +370,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $published = $this->repository->getByStatus('published');
@@ -385,6 +399,7 @@ class ProductOfferBundleRepositoryTest extends RepositoryTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([

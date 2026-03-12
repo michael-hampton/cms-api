@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Subscription;
 
 use App\Framework\Http\FormRequest;
 

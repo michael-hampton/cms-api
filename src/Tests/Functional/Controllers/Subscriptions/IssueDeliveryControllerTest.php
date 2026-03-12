@@ -57,6 +57,14 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         ], $overrides);
     }
 
+    private function validUpdatePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'issue_title' => 'Updated Title',
+            'issue_number' => 1
+        ], $overrides);
+    }
+
     // =========================================================================
     // GET /api/issue-deliveries
     // =========================================================================
@@ -244,7 +252,13 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite(
             "/api/issue-deliveries/{$schedule->id}",
-            ['issue_title' => 'Updated Title', 'status' => 'active']
+            [
+                'issue_title' => 'Updated Title',
+                'status' => 'active',
+                'issue_number' => 1,
+                'label' => 'test',
+                'on_sale_date' => now()
+            ]
         );
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -257,6 +271,77 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         $this->assertEquals('Updated Title', $schedule->issue_title);
         $this->assertEquals(IssueScheduleStatus::ACTIVE->value, $schedule->status);
     }
+
+    public function testUpdateAllowsNullableFieldsToBeNull(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            [
+                'issue_title' => 'Updated Title',
+                'issue_number' => 1,
+                'issue_code' => null,
+                'subscription_plan_id' => null,
+                'on_sale_date' => now(),
+                'cut_off_date' => null,
+                'fulfilment_date' => null,
+                'notes' => null,
+                'status' => 'active'
+            ]
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testUpdateRequiresIssueTitle(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['status' => 'active']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullIssueTitle(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_title' => null]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsEmptyIssueTitle(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            ['issue_title' => '']
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateValidatesEmptyPayload(): void
+    {
+        $schedule = $this->createIssueSchedule();
+
+        $response = $this->putForSite(
+            "/api/issue-deliveries/{$schedule->id}",
+            []
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
 
     // =========================================================================
     // PUT — UpdateIssueDeliveryRequest validation
@@ -341,7 +426,12 @@ class IssueDeliveryControllerTest extends FunctionalTestCase
         // UpdateIssueDeliveryRequest has no required fields — partial update is valid
         $response = $this->putForSite(
             "/api/issue-deliveries/{$schedule->id}",
-            ['issue_title' => 'Partial Update']
+            [
+                'issue_title' => 'Partial Update',
+                'issue_number' => 1,
+                'status' => 'active',
+                'on_sale_date' => now()
+            ]
         );
 
         $this->assertEquals(200, $response->getStatusCode());

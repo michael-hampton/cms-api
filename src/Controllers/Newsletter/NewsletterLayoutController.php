@@ -11,9 +11,9 @@ use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
-use App\Requests\CloneNewsletterLayoutRequest;
-use App\Requests\NewsletterLayoutMigrationReportRequest;
-use App\Requests\StoreNewsletterLayoutRequest;
+use App\Requests\Newsletter\CloneNewsletterLayoutRequest;
+use App\Requests\Newsletter\NewsletterLayoutMigrationReportRequest;
+use App\Requests\Newsletter\StoreNewsletterLayoutRequest;
 use App\Services\Newsletter\NewsletterLayoutService;
 
 class NewsletterLayoutController extends Controller

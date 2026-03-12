@@ -22,6 +22,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $product = $this->createProduct();
@@ -49,6 +50,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $product = $this->createProduct();
@@ -76,6 +78,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $product = $this->createProduct();
@@ -105,6 +108,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $product = $this->createProduct();
@@ -133,6 +137,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $item = ProductOfferBundleItem::create([
@@ -155,6 +160,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $item = ProductOfferBundleItem::create([
@@ -181,6 +187,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $item = ProductOfferBundleItem::create([
@@ -206,6 +213,7 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $item = ProductOfferBundleItem::create([

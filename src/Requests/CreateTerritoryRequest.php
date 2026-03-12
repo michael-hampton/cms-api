@@ -31,7 +31,7 @@ class CreateTerritoryRequest extends FormRequest
     {
         return [
             'name' => 'required|string|max:255',
-            'code' => 'string|max:50',
+            'code' => 'required|string|max:50',
             'slug' => 'string|max:255',
             'region_set_id' => 'required|integer|exists:region_sets,id',
             'is_active' => 'boolean',

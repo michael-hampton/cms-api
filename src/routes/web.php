@@ -61,6 +61,7 @@ use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\Subscription\OneTimeSubscriptionsController;
+use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
@@ -433,6 +434,18 @@ $router->get('/press-stack/account/orders/{id}', [ShopAccountController::class, 
     ->name('account.order.detail');
 $router->get('/press-stack/account/billing', [ShopAccountController::class, 'billing'])
     ->name('account.billing');
+
+$router->post('/press-stack/account/subscriptions/{id}/cancel', [ShopAccountApiController::class, 'cancelSubscription']);
+$router->post('/press-stack/account/subscriptions/{id}/pause', [ShopAccountApiController::class, 'pauseSubscription']);
+$router->post('/press-stack/account/subscriptions/{id}/resume', [ShopAccountApiController::class, 'resumeSubscription']);
+
+// Orders
+$router->post('/press-stack/account/orders/{id}/cancel', [ShopAccountApiController::class, 'cancelOrder']);
+
+// Billing / payment methods
+$router->get('/press-stack/account/billing/payment-methods', [ShopAccountApiController::class, 'paymentMethods']);
+$router->post('/press-stack/account/billing/set-default', [ShopAccountApiController::class, 'setDefaultCard']);
+$router->post('/press-stack/account/billing/remove-card', [ShopAccountApiController::class, 'removeCard']);
 
 $router->post('/cart/subscription', [CartController::class, 'addSubscription']);
 $router->post('/api/{site}/cart/subscription', [CartController::class, 'addSubscription']);

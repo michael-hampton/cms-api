@@ -95,7 +95,7 @@ class ReplacePlanPriceAction
                 $plan->stripe_product_id,
                 $newPricingData['amount_cents'],
                 $currency,
-                $newPricingData['interval'],
+                $newPricingData['interval'] ?? 'month',
             );
         } else {
             $stripePriceId = uniqid();

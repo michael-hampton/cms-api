@@ -73,8 +73,8 @@ class OrderManager
         return $this->orderRepository->find($orderId);
     }
 
-    public function getByUserPaginated(int $userId, int $page = 1, int $perPage = 10): array
+    public function getByUserPaginated(int $userId, int $page = 1, int $perPage = 10, array $filters = []): array
     {
-        return $this->orderRepository->getByUserPaginated($userId, $page, $perPage);
+        return $this->orderRepository->getByUserPaginated($userId, $page, $perPage, $filters);
     }
 }

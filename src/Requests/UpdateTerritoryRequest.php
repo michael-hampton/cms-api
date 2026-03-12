@@ -30,12 +30,12 @@ class UpdateTerritoryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'string|max:255',
-            'code' => 'string|max:50',
-            'slug' => 'string|max:255',
-            'region_set_id' => 'integer|exists:region_sets,id',
-            'is_active' => 'boolean',
-            'sort_order' => 'integer'
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'region_set_id' => ['nullable', 'integer', 'exists:region_sets,id'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer'],
         ];
     }
 
@@ -46,7 +46,7 @@ class UpdateTerritoryRequest extends FormRequest
                 $id = $request->route('id');
 
                 // Check if region set exists
-                if ($request->has('region_set_id')) {
+                if (!empty($request->get('region_set_id'))) {
                     $regionSetId = $request->get('region_set_id');
                     $regionSet = $this->regionSetRepository->find($regionSetId);
                     if (!$regionSet) {

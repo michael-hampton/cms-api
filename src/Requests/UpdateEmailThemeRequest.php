@@ -10,16 +10,16 @@ class UpdateEmailThemeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'string|max:255',
-            'slug' => 'string|max:255',
-            'description' => 'string',
-            'is_active' => 'boolean',
-            'is_default' => 'boolean',
-            'colors' => 'array',
-            'colors.*' => 'string',
-            'fonts' => 'array',
-            'assets' => 'array',
-            'settings' => 'array',
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
+            'is_default' => ['nullable', 'boolean'],
+            'colors' => ['nullable', 'array'],
+            'colors.*' => ['string'],
+            'fonts' => ['nullable', 'array'],
+            'assets' => ['nullable', 'array'],
+            'settings' => ['nullable', 'array'],
         ];
     }
 }

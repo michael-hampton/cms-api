@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Offers;
 
 use App\Framework\Http\FormRequest;
 

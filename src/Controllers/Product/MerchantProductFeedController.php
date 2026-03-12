@@ -6,8 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Repositories\Product\MerchantProductFeedRepository;
-use App\Requests\CreateMerchantProductFeedRequest;
-use App\Requests\UpdateMerchantProductFeedRequest;
+use App\Requests\Merchant\CreateMerchantProductFeedRequest;
+use App\Requests\Merchant\UpdateMerchantProductFeedRequest;
 use App\Services\Product\MerchantProductFeedService;
 use Exception;
 

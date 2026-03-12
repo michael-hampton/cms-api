@@ -125,6 +125,102 @@ class BrandControllerTest extends FunctionalTestCase
         $this->assertNull(Brand::find($brand->id));
     }
 
+    public function testUpdateBrandAllowsNullableFieldsToBeNull(): void
+    {
+        $brand = $this->createBrand(['name' => 'Nike', 'website' => 'https://nike.com']);
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => 'Nike',
+            'website' => null,
+            'description' => null,
+            'seo_title' => null,
+            'seo_description' => null,
+            'canonical_url' => null,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testUpdateRequiresName(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'description' => 'Some description',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullName(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => null,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => '',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidWebsiteUrl(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => 'Nike',
+            'website' => 'not-a-url',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidCanonicalUrl(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => 'Nike',
+            'canonical_url' => 'not-a-url',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsSeoTitleExceeding255Characters(): void
+    {
+        $brand = $this->createBrand();
+
+        $response = $this->putForSite("/api/brands/{$brand->id}", [
+            'name' => 'Nike',
+            'seo_title' => str_repeat('x', 256),
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
     public function testDestroyReturns404ForNonexistent()
     {
         $response = $this->deleteForSite('/api/brands/999');

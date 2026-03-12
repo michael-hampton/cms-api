@@ -13,7 +13,7 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterIssueRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Requests\CreateNewsletterIssueRequest;
+use App\Requests\Newsletter\CreateNewsletterIssueRequest;
 use App\Services\Newsletter\NewsletterIssueService;
 
 /**

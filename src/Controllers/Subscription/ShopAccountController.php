@@ -106,10 +106,15 @@ class ShopAccountController extends Controller
         $page = max(1, (int)$request->input('page', 1));
         $perPage = 10;
 
-        // DB-level pagination — never loads full order history into memory
-        $result = $this->orderManager->getByUserPaginated($member->id, $page, $perPage);
+        $filters = [
+            'search' => trim($request->input('search', '')),
+            'date_from' => trim($request->input('date_from', '')),
+            'date_to' => trim($request->input('date_to', '')),
+            'status' => trim($request->input('status', '')),
+        ];
 
-        // Annotate each order with server-computed cancel eligibility
+        $result = $this->orderManager->getByUserPaginated($member->id, $page, $perPage, $filters);
+
         $orders = $result['data']->map(function ($order) {
             $order->can_cancel = $order->canBeCancelled();
             return $order;
@@ -119,6 +124,7 @@ class ShopAccountController extends Controller
             'member' => $member,
             'orders' => $orders,
             'pagination' => $result['pagination'],
+            'filters' => $filters,
             'active_tab' => 'orders',
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Repositories\Offers;
 
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\OfferClicks;
 use App\Models\ProductOffer;
@@ -27,46 +28,6 @@ class ProductOfferRepository extends Repository implements TrackableRepository
             ->active()
             ->orderBy('start_date', 'desc')
             ->get();
-    }
-
-    public function create(array $data): Model
-    {
-        // If this offer is active, deactivate other offers for this product
-        if ($data['is_active'] ?? true) {
-            $this->deactivateOtherOffers($data['product_id']);
-        }
-
-        return ProductOffer::create($data);
-    }
-
-    public function deactivateOtherOffers(int $productId, ?int $excludeOfferId = null): void
-    {
-        $query = ProductOffer::where('product_id', $productId)
-            ->active();
-
-        if ($excludeOfferId) {
-            $query->where('id', '!=', $excludeOfferId);
-        }
-
-        $query->update(['is_active' => 0]);
-    }
-
-    public function update(int $id, array $data): ?ProductOffer
-    {
-        $offer = $this->find($id);
-
-        if (!$offer) {
-            return null;
-        }
-
-        // If activating this offer, deactivate others
-        if (isset($data['is_active']) && $data['is_active']) {
-            $this->deactivateOtherOffers($offer->product_id, $id);
-        }
-
-        $offer->update($data);
-
-        return ProductOffer::with(['product', 'merchant'])->find($id);
     }
 
     public function delete(int $id): bool
@@ -110,6 +71,36 @@ class ProductOfferRepository extends Repository implements TrackableRepository
         ]);
 
         return $offer->fresh(['product', 'merchant', 'voucher']);
+    }
+
+    public function update(int $id, array $data): ?ProductOffer
+    {
+        $offer = $this->find($id);
+
+        if (!$offer) {
+            return null;
+        }
+
+        // If activating this offer, deactivate others
+        if (isset($data['is_active']) && $data['is_active']) {
+            $this->deactivateOtherOffers($offer->product_id, $id);
+        }
+
+        $offer->update($data);
+
+        return ProductOffer::with(['product', 'merchant'])->find($id);
+    }
+
+    public function deactivateOtherOffers(int $productId, ?int $excludeOfferId = null): void
+    {
+        $query = ProductOffer::where('product_id', $productId)
+            ->active();
+
+        if ($excludeOfferId) {
+            $query->where('id', '!=', $excludeOfferId);
+        }
+
+        $query->update(['is_active' => 0]);
     }
 
     public function reject(int $id, int $userId, string $reason): ?ProductOffer
@@ -176,6 +167,16 @@ class ProductOfferRepository extends Repository implements TrackableRepository
             'deal_id' => $metadata['deal_id'] ?? null,
             'clicked_at' => date('Y-m-d H:i:s'),
         ]);
+    }
+
+    public function create(array $data): Model
+    {
+        // If this offer is active, deactivate other offers for this product
+        if ($data['is_active'] ?? true) {
+            $this->deactivateOtherOffers($data['product_id']);
+        }
+
+        return ProductOffer::create($data);
     }
 
     public function getClickStatistics(array $offerIds): array
@@ -316,18 +317,25 @@ class ProductOfferRepository extends Repository implements TrackableRepository
         ];
     }
 
-    public function getActiveOffers(): Collection
+    public function getActiveOffers(int $limit = 10, ?Member $member = null, ?int $siteId = null): Collection
     {
         return ProductOffer::where('is_active', true)
             ->where(function ($query) {
                 $query->whereNull('start_date')
                     ->orWhere('start_date', '<=', now());
             })
+            ->when($member, function ($query) use ($member) {
+                $query->visibleToMember($member);
+            })
+            ->when($siteId, function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->where(function ($query) {
                 $query->whereNull('end_date')
                     ->orWhere('end_date', '>=', now());
             })
             ->orderBy('created_at', 'desc')
+            ->limit($limit)
             ->get();
     }
 
@@ -336,11 +344,6 @@ class ProductOfferRepository extends Repository implements TrackableRepository
         return ProductOffer::where('product_id', $productId)
             ->where('merchant_id', $merchantId)
             ->first();
-    }
-
-    protected function getModelClass(): string
-    {
-        return ProductOffer::class;
     }
 
     public function hasTracked(
@@ -357,5 +360,10 @@ class ProductOfferRepository extends Repository implements TrackableRepository
             ->where('surface_type', $surfaceType)
             ->where('surface_id', $surfaceId)
             ->exists();
+    }
+
+    protected function getModelClass(): string
+    {
+        return ProductOffer::class;
     }
 }

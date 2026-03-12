@@ -242,4 +242,127 @@ class EmailThemeControllerTest extends FunctionalTestCase
         $this->assertCount(0, $data['result']['deleted']);
         $this->assertCount(1, $data['result']['failed']);
     }
+
+    public function testUpdateEmailThemeAllowsNullableFieldsToBeNull(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", [
+            'name' => 'Theme Name',
+            'description' => null,
+            'is_active' => null,
+            'is_default' => null,
+            'colors' => null,
+            'fonts' => null,
+            'assets' => null,
+            'settings' => null,
+        ]);
+
+        $this->assertResponseOk($response);
+    }
+
+    public function testUpdateRequiresName(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", [
+            'is_active' => true,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNullName(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", [
+            'name' => null,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", [
+            'name' => '',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsSlugExceeding255Characters(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", $this->validUpdatePayload([
+            'slug' => str_repeat('x', 256),
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonArrayColors(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", $this->validUpdatePayload([
+            'colors' => 'not-an-array',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonArrayFonts(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", $this->validUpdatePayload([
+            'fonts' => 'not-an-array',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonBooleanIsActive(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", $this->validUpdatePayload([
+            'is_active' => 'yes-please',
+        ]));
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateValidatesEmptyPayload(): void
+    {
+        $theme = $this->createEmailTheme();
+
+        $response = $this->putForSite("/api/email-themes/{$theme->id}", []);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    private function validUpdatePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Updated Theme',
+        ], $overrides);
+    }
+
 }

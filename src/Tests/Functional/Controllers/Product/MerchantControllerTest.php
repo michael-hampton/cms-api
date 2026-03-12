@@ -139,6 +139,21 @@ class MerchantControllerTest extends FunctionalTestCase
         $this->assertEquals('New Name', $data['data']['merchant']['name']);
     }
 
+    public function testUpdateMerchantAllowsNullableFieldsToBeNull(): void
+    {
+        $merchant = $this->createMerchant(['name' => 'Test']);
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => 'Test',
+            'description' => null,
+            'contact_id' => null,
+            'urls' => null,
+            'site_ids' => null,
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
     public function testUpdateMerchantReturns404WhenNotFound()
     {
         $response = $this->putForSite('/api/merchants/9999', [
@@ -147,6 +162,77 @@ class MerchantControllerTest extends FunctionalTestCase
 
         $this->assertEquals(404, $response->getStatusCode());
     }
+
+    public function testUpdateRequiresName(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'description' => 'Some description',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullName(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => null,
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => '',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsInvalidUrlInUrls(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => 'Test',
+            'urls' => [
+                ['url' => 'not-a-url', 'is_primary' => true],
+            ],
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNonIntegerSiteIds(): void
+    {
+        $merchant = $this->createMerchant();
+
+        $response = $this->putForSite("/api/merchants/{$merchant->id}", [
+            'name' => 'Test',
+            'site_ids' => ['not-an-int'],
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
 
     public function testDeleteMerchant()
     {

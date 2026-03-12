@@ -100,6 +100,20 @@ class SiteControllerTest extends FunctionalTestCase
         $this->assertEquals('dark', $data['data']['theme']);
     }
 
+    public function testUpdateAllowsNullableFieldsToBeNull(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => 'Test Site',
+            'domain' => null,
+            'subdomain' => null,
+            'theme' => null,
+            'logo' => null,
+            'favicon' => null,
+        ]);
+
+        $this->assertResponseOk($response);
+    }
+
     public function testUpdateCurrentSite(): void
     {
         $updateData = [
@@ -114,6 +128,70 @@ class SiteControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertEquals('Updated Current Site', $data['data']['name']);
     }
+
+    public function testUpdateSiteRequiresName(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'theme' => 'dark',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateSiteRejectsNullName(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => null,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => '',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsDomainExceeding255Characters(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => 'Valid Name',
+            'domain' => str_repeat('x', 256),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsThemeExceeding100Characters(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, [
+            'name' => 'Valid Name',
+            'theme' => str_repeat('x', 101),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateSiteValidatesEmptyPayload(): void
+    {
+        $response = $this->putForSite('/api/sites/' . $this->siteId, []);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
 
     public function testGetContactInfo(): void
     {

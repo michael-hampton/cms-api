@@ -93,6 +93,7 @@ class ProductOfferBundle extends Model
         }
 
         $now = now_datetime();
+
         return $this->start_date <= $now && $this->end_date >= $now;
     }
 

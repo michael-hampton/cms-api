@@ -20,7 +20,7 @@ use App\Repositories\Product\MerchantProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Repositories\Rewards\RewardDefinitionRepository;
 use App\Repositories\Vouchers\VoucherRepository;
-use App\Requests\MerchantImportRequest;
+use App\Requests\Merchant\MerchantImportRequest;
 use Exception;
 
 class MerchantImportController extends Controller

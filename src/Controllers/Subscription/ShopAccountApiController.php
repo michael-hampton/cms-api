@@ -3,11 +3,15 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Enums\Orders\OrderCancellationReason;
+use App\Enums\Subscriptions\SubscriptionCancellationReason;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderUpdateService;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionPauseService;
 
@@ -23,9 +27,9 @@ use App\Services\Subscriptions\SubscriptionPauseService;
  *   POST /account/subscriptions/{id}/pause     → pauseSubscription()
  *   POST /account/subscriptions/{id}/resume    → resumeSubscription()
  *   POST /account/orders/{id}/cancel           → cancelOrder()
- *   GET  /account/billing/payment-methods      → paymentMethods()   [Stripe stub]
- *   POST /account/billing/set-default          → setDefaultCard()   [Stripe stub]
- *   POST /account/billing/remove-card          → removeCard()       [Stripe stub]
+ *   GET  /account/billing/payment-methods      → paymentMethods()
+ *   POST /account/billing/set-default          → setDefaultCard()
+ *   POST /account/billing/remove-card          → removeCard()
  */
 class ShopAccountApiController extends Controller
 {
@@ -35,6 +39,8 @@ class ShopAccountApiController extends Controller
         private readonly OrderUpdateService              $orderUpdateService,
         private readonly SubscriptionRepository          $subscriptionRepository,
         private readonly OrderRepository                 $orderRepository,
+        private readonly StripePaymentProcessor $stripePaymentService,
+        private readonly AddressRepository      $addressRepository
     )
     {
         parent::__construct();
@@ -60,9 +66,6 @@ class ShopAccountApiController extends Controller
         }
 
         try {
-            // The existing service handles Stripe cancellation, refunds, and
-            // premium access revocation. cancel_at_period_end = true means the
-            // member keeps access until their current period ends.
             $result = $this->subscriptionCancellationService->cancelSubscription($id, [
                 'cancel_at_period_end' => true,
                 'cancellation_reason' => $reason,
@@ -79,6 +82,7 @@ class ShopAccountApiController extends Controller
             }
 
             return $this->jsonResponse(['success' => true]);
+
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -86,37 +90,9 @@ class ShopAccountApiController extends Controller
         }
     }
 
-    private function isValidSubscriptionReason(string $value): bool
-    {
-        return SubscriptionCancellationReason::tryFrom($value) !== null;
-    }
-
-    /**
-     * Ownership guard for subscriptions.
-     * Returns false for both "not found" and "wrong member" — avoids IDOR leaks.
-     */
-    private function subscriptionOwnedByMember(int $subscriptionId, int $memberId): bool
-    {
-        $subscription = $this->subscriptionRepository->find($subscriptionId);
-        return $subscription && (int)$subscription->member_id === $memberId;
-    }
-
-    // ── Order actions ─────────────────────────────────────────────────────────
-
-    private function sanitize(?string $text): ?string
-    {
-        if ($text === null) {
-            return null;
-        }
-        $trimmed = trim($text);
-        return $trimmed === '' ? null : mb_substr($trimmed, 0, 1000);
-    }
-
-    // ── Billing stubs ─────────────────────────────────────────────────────────
-
     public function pauseSubscription(int $id, Request $request): mixed
     {
-        $member = $this->memberAuth->getMember();
+        $member = MemberAuth::getMember();
         $pauseUntil = $request->input('pause_until');
 
         // canPause() checks both ownership and status eligibility
@@ -135,6 +111,7 @@ class ShopAccountApiController extends Controller
                 'status' => $subscription->status,
                 'pause_until' => $subscription->pause_until,
             ]);
+
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -144,7 +121,7 @@ class ShopAccountApiController extends Controller
 
     public function resumeSubscription(int $id, Request $request): mixed
     {
-        $member = $this->memberAuth->getMember();
+        $member = MemberAuth::getMember();
 
         // canResume() checks both ownership and status eligibility
         if (!$this->subscriptionPauseService->canResume($id, $member->id)) {
@@ -162,6 +139,7 @@ class ShopAccountApiController extends Controller
                 'status' => $subscription->status,
                 'next_billing_date' => $subscription->next_billing_date,
             ]);
+
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -169,9 +147,11 @@ class ShopAccountApiController extends Controller
         }
     }
 
+    // ── Order actions ─────────────────────────────────────────────────────────
+
     public function cancelOrder(int $id, Request $request): mixed
     {
-        $member = $this->memberAuth->getMember();
+        $member = MemberAuth::getMember();
         $reason = $request->input('reason', '');
 
         if (!$this->isValidOrderReason($reason)) {
@@ -189,13 +169,10 @@ class ShopAccountApiController extends Controller
         }
 
         try {
-            // OrderUpdateService::cancel() handles status transitions, history
-            // logging, and emits OrderCancelledEvent. The reason is appended to
-            // admin_notes as the service doesn't have a structured reason field.
-            // TODO: Add cancellation_reason column + structured storage to OrderUpdateService.
             $this->orderUpdateService->cancel($id, $reason, $member->id);
 
             return $this->jsonResponse(['success' => true]);
+
         } catch (\Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable) {
@@ -203,11 +180,85 @@ class ShopAccountApiController extends Controller
         }
     }
 
+    // ── Billing ───────────────────────────────────────────────────────────────
+
+    public function paymentMethods(Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+
+        $methods = $this->stripePaymentService->getCustomerPaymentMethods($member->stripe_customer_id);
+        //$defaultMethod  = $this->stripePaymentService->getCustomerPaymentMethods($member->stripe_customer_id);
+        $billingAddress = !empty($member) ? $this->addressRepository->getBillingAddressesForMember($member->id) : null;
+
+        return $this->jsonResponse([
+            'success' => true,
+            'payment_methods' => $methods,
+            'default_method' => null, //todo
+            'billing_address' => $billingAddress,
+        ]);
+    }
+
+    public function setDefaultCard(Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+        $paymentMethodId = $request->input('payment_method_id');
+
+        if (empty($paymentMethodId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
+        }
+
+        // Guard: ensure the payment method belongs to this customer before
+        // promoting it — prevents a member from setting another member's card.
+        if (!$this->stripePaymentService->paymentMethodBelongsToCustomer($member->stripe_customer_id, $paymentMethodId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
+        }
+
+        $this->stripePaymentService->setDefaultPaymentMethod($member->stripe_customer_id, $paymentMethodId);
+
+        return $this->jsonResponse(['success' => true]);
+    }
+
+    public function removeCard(Request $request): mixed
+    {
+        $member = MemberAuth::getMember();
+        $paymentMethodId = $request->input('payment_method_id');
+
+        if (empty($paymentMethodId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
+        }
+
+        // Guard: verify the payment method belongs to this customer before
+        // detaching — prevents a member from removing another member's card.
+        if (!$this->stripePaymentService->paymentMethodBelongsToCustomer($member->stripe_customer_id, $paymentMethodId)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
+        }
+
+        $this->stripePaymentService->detachPaymentMethod($paymentMethodId);
+
+        return $this->jsonResponse(['success' => true]);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function isValidSubscriptionReason(string $value): bool
+    {
+        return SubscriptionCancellationReason::tryFrom($value) !== null;
+    }
 
     private function isValidOrderReason(string $value): bool
     {
         return OrderCancellationReason::tryFrom($value) !== null;
+    }
+
+    /**
+     * Ownership guard for subscriptions.
+     * Returns false for both "not found" and "wrong member" — avoids IDOR leaks.
+     */
+    private function subscriptionOwnedByMember(int $subscriptionId, int $memberId): bool
+    {
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        return $subscription && (int)$subscription->member_id === $memberId;
     }
 
     /**
@@ -225,41 +276,13 @@ class ShopAccountApiController extends Controller
         return $order->canBeCancelled();
     }
 
-    public function paymentMethods(Request $request): mixed
+    private function sanitize(?string $text): ?string
     {
-        $this->memberAuth->getMember();
-        // TODO: Inject StripePaymentProcessor, call listPaymentMethods($member->stripe_customer_id)
-        return $this->jsonResponse([
-            'success' => true,
-            'payment_methods' => [],
-            'billing_address' => null,
-        ]);
-    }
-
-    public function setDefaultCard(Request $request): mixed
-    {
-        $this->memberAuth->getMember();
-        $paymentMethodId = $request->input('payment_method_id');
-
-        if (empty($paymentMethodId)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
+        if ($text === null) {
+            return null;
         }
+        $trimmed = trim($text);
 
-        // TODO: $this->stripeProcessor->setDefaultPaymentMethod($member->stripe_customer_id, $paymentMethodId)
-        return $this->jsonResponse(['success' => true]);
-    }
-
-    public function removeCard(Request $request): mixed
-    {
-        $this->memberAuth->getMember();
-        $paymentMethodId = $request->input('payment_method_id');
-
-        if (empty($paymentMethodId)) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Payment method ID required.'], 422);
-        }
-
-        // TODO: Verify payment method belongs to this customer before detaching.
-        // $this->stripeProcessor->detachPaymentMethod($paymentMethodId)
-        return $this->jsonResponse(['success' => true]);
+        return $trimmed === '' ? null : mb_substr($trimmed, 0, 1000);
     }
 }

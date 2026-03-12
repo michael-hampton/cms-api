@@ -220,6 +220,7 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => "Plan {$period}",
             'billing_period' => trim($period),
             'price' => 9.99,
+            'currency' => 'GBP'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -255,9 +256,12 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => 'Test Plan',
             'billing_period' => 'monthly',
             'price' => -1,
+            'currency' => 'GBP'
         ]);
 
-        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('price', $data['errors']);
     }
 
     public function testCreatePlanRequiresCurrency(): void
@@ -328,7 +332,8 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $response = $this->postForSite('/api/subscriptions/plans', [
             'name' => 'Auto Slug Plan',
             'billing_period' => 'monthly',
-            'price' => 22
+            'price' => 22,
+            'currency' => 'GBP'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -365,6 +370,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
                 ['type' => 'newsletter', 'identifier' => 'insider'],
                 ['type' => 'newsletter', 'identifier' => 'full'],
             ],
+            'currency' => 'GBP',
+            'billing_period' => 'monthly',
+            'price' => 22
         ];
 
         $response = $this->putForSite('/api/subscriptions/plans/' . $plan->id, $payload);
@@ -454,21 +462,13 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
-    public function testUpdatePlanAcceptsEmptyPayload(): void
-    {
-        // UpdateSubscriptionPlanRequest has no required fields — empty body is valid
-        $plan = $this->createSubscriptionPlan(['name' => 'Unchanged']);
-
-        $response = $this->putForSite('/api/subscriptions/plans/' . $plan->id, []);
-
-        $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('Unchanged', $plan->fresh()->name);
-    }
-
     public function testUpdatePlanReturns404ForNonExistentPlan(): void
     {
         $response = $this->putForSite('/api/subscriptions/plans/99999', [
             'name' => 'Ghost Plan',
+            'currency' => 'GBP',
+            'price' => 22,
+            'billing_period' => 'monthly'
         ]);
 
         $this->assertEquals(500, $response->getStatusCode());
@@ -610,9 +610,10 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $response = $this->putForSite("/api/subscriptions/plans/{$offer->id}", [
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
             'price' => 22.99,
-            'currency' => 'GBP'
+            'currency' => 'GBP',
+            'name' => 'Test',
+            'billing_period' => 'monthly'
         ]);
-
 
         $this->assertEquals(200, $response->getStatusCode());
 
@@ -639,7 +640,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $response = $this->putForSite("/api/subscriptions/plans/{$offer->id}", [
             'region_set_ids' => [$new->id],
             'price' => 22.99,
-            'currency' => 'GBP'
+            'currency' => 'GBP',
+            'name' => 'Test',
+            'billing_period' => 'monthly'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -661,6 +664,8 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'price' => 22.99,
             'currency' => 'GBP',
             'region_set_ids' => [],
+            'name' => 'test',
+            'billing_period' => 'monthly'
         ]);
 
         $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $offer->id)->get();

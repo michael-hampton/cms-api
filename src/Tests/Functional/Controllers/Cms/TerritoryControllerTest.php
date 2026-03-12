@@ -98,7 +98,8 @@ class TerritoryControllerTest extends FunctionalTestCase
 
         $updateData = [
             'name' => 'United Kingdom (GB)',
-            'is_active' => false
+            'is_active' => false,
+            'code' => 'GB'
         ];
 
         $response = $this->putForSite("/api/territories/{$territory->id}", $updateData);
@@ -109,6 +110,104 @@ class TerritoryControllerTest extends FunctionalTestCase
 
         $this->assertEquals('United Kingdom (GB)', $data['data']['territory']['name']);
         $this->assertFalse($data['data']['territory']['is_active']);
+    }
+
+    public function testUpdateAllowsNullableFieldsToBeOmitted(): void
+    {
+        $territory = $this->createTerritory();
+
+        // name is required; optional fields can be absent entirely
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => 'France',
+            'code' => 'FR'
+        ]);
+
+        $this->assertResponseOk($response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('France', $data['data']['territory']['name']);
+    }
+
+    public function testUpdateAllowsNullableFieldsToBeNull(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => 'France',
+            'code' => 'TES',
+            'region_set_id' => null,
+            'sort_order' => 0,
+        ]);
+
+        $this->assertResponseOk($response);
+    }
+
+    public function testUpdateRequiresName(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'is_active' => true,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsEmptyName(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => '',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNameExceeding255Characters(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => str_repeat('x', 256),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsCodeExceeding50Characters(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => 'France',
+            'code' => str_repeat('x', 51),
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonIntegerRegionSetId(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => 'France',
+            'region_set_id' => 'not-an-int',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testUpdateRejectsNonBooleanIsActive(): void
+    {
+        $territory = $this->createTerritory();
+
+        $response = $this->putForSite("/api/territories/{$territory->id}", [
+            'name' => 'France',
+            'is_active' => 'yes-please',
+        ]);
+
+        $this->assertResponseStatus(422, $response);
     }
 
     public function testDestroyDeletesTerritory()

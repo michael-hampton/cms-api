@@ -7,6 +7,7 @@ use App\Exceptions\BundleValidationException;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Model;
 use App\Models\Product;
 use App\Models\ProductOffer;
@@ -36,9 +37,9 @@ class ProductOfferBundleService
         return $this->repository->find($id);
     }
 
-    public function getActiveBundles(): Collection
+    public function getActiveBundles(int $limit = 10, ?Member $member = null, ?int $siteId = null): Collection
     {
-        return $this->repository->getActiveBundles();
+        return $this->repository->getActiveBundles($member, $limit, $siteId);
     }
 
     public function createBundle(array $data): Model

@@ -1,18 +1,19 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Subscription;
 
 use App\Framework\Http\FormRequest;
+use App\Framework\Support\Str;
 
-class UpdateSubscriptionPlanRequest extends FormRequest
+class CreateSubscriptionPlanRequest extends FormRequest
 {
     public function rules(): array
     {
         return [
-            'name' => ['string', 'max:255'],
+            'name' => ['required', 'string', 'max:255'],
             'slug' => ['string', 'max:255'],
             'description' => ['string'],
-            'billing_period' => ['in:weekly,monthly,quarterly,yearly,annual'],
+            'billing_period' => ['required', 'in:weekly,monthly,quarterly,yearly'],
             'price' => ['required', 'numeric', 'min_number:0'],
             'currency' => ['required', 'string', 'max:3'],
             'duration_months' => ['integer', 'min_number:1'],
@@ -20,6 +21,14 @@ class UpdateSubscriptionPlanRequest extends FormRequest
             'sort_order' => ['integer'],
             'is_active' => ['boolean'],
             'is_featured' => ['boolean'],
+            // Image uploads handled separately via hasFile() checks
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (empty($this->data['slug']) && !empty($this->data['name'])) {
+            $this->data['slug'] = Str::slug($this->data['name']);
+        }
     }
 }

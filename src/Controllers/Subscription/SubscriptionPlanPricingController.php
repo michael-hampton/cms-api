@@ -9,8 +9,8 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
-use App\Requests\CreatePricingTierRequest;
-use App\Requests\UpdatePricingTierRequest;
+use App\Requests\Offers\CreatePricingTierRequest;
+use App\Requests\Subscription\UpdatePricingTierRequest;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 
 class SubscriptionPlanPricingController extends Controller

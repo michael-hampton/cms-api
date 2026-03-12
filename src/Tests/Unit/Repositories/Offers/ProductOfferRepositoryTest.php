@@ -78,7 +78,8 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
-            'original_price' => 0
+            'original_price' => 0,
+            'site_id' => $this->siteId
         ];
 
         $offer = $this->repository->create($data);
@@ -100,7 +101,8 @@ class ProductOfferRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
             'is_active' => true,
-            'original_price' => 0
+            'original_price' => 0,
+            'site_id' => $this->siteId
         ];
 
         $this->repository->create($data);

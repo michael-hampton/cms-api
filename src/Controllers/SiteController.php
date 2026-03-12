@@ -83,6 +83,8 @@ class SiteController extends Controller
             $site = $this->siteService->updateSite($id, $data);
 
             return $this->jsonResponse($site);
+        } catch (ValidationException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

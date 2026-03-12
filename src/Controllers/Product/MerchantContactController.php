@@ -7,8 +7,8 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Repositories\Product\MerchantContactRepository;
-use App\Requests\CreateMerchantContactRequest;
-use App\Requests\UpdateMerchantContactRequest;
+use App\Requests\Merchant\CreateMerchantContactRequest;
+use App\Requests\Merchant\UpdateMerchantContactRequest;
 use App\Services\Product\MerchantContactService;
 use Exception;
 

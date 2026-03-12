@@ -13,7 +13,7 @@ use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Requests\StoreIssueDeliveryRequest;
-use App\Requests\UpdateIssueDeliveryRequest;
+use App\Requests\Subscription\UpdateIssueDeliveryRequest;
 use App\Resources\IssueDeliveryResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\Subscriptions\IssueDeliveryService;

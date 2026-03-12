@@ -364,14 +364,15 @@ class ProductOfferServiceTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
-            'original_price' => 100.00
+            'original_price' => 100.00,
+            'site_id' => $this->siteId
         ]);
 
-        $this->repository->shouldReceive('all')
+        $this->repository->shouldReceive('getActiveOffers')
             ->once()
             ->andReturn(collect([$offer->load(['product'])]));
 
-        $result = $this->service->getActiveOffers(10);
+        $result = $this->service->getActiveOffers(10, null, $this->siteId);
 
         $this->assertIsArray($result);
         $this->assertCount(1, $result);
@@ -393,17 +394,18 @@ class ProductOfferServiceTest extends FunctionalTestCase
                 'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
                 'is_active' => true,
                 'status' => 'published',
-                'original_price' => 100.00
+                'original_price' => 100.00,
+                'site_id' => $this->siteId
             ]);
 
             $offers->push($offer->load(['product']));
         }
 
-        $this->repository->shouldReceive('all')
+        $this->repository->shouldReceive('getActiveOffers')
             ->once()
-            ->andReturn($offers);
+            ->andReturn($offers->slice(0, 5));
 
-        $result = $this->service->getActiveOffers(5);
+        $result = $this->service->getActiveOffers(5, null, $this->siteId);
 
         $this->assertCount(5, $result);
     }

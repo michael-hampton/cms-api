@@ -26,15 +26,15 @@ class UpdateBrandRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'string|max:255',
-            'slug' => 'string|max:255',
-            'description' => 'string',
-            'website' => 'url',
-            'is_active' => 'boolean',
-            'seo_title' => 'string|max:255',
-            'seo_description' => 'string',
-            'no_index' => 'boolean',
-            'canonical_url' => 'url'
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'website' => ['nullable', 'url'],
+            'is_active' => ['nullable', 'boolean'],
+            'seo_title' => ['nullable', 'string', 'max:255'],
+            'seo_description' => ['nullable', 'string'],
+            'no_index' => ['nullable', 'boolean'],
+            'canonical_url' => ['nullable', 'url'],
         ];
     }
 

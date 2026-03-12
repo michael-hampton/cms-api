@@ -643,6 +643,11 @@ class StripePaymentProcessor
         }
     }
 
+    public function paymentMethodBelongsToCustomer(string $stripe_customer_id, string $paymentMethodId)
+    {
+        return false;
+    }
+
     /**
      * Create a refund record in the refunds table
      */

@@ -9,7 +9,7 @@ use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Requests\SaveNewsletterBrandingRequest;
+use App\Requests\Newsletter\SaveNewsletterBrandingRequest;
 use App\Services\Newsletter\NewsletterBrandingService;
 
 class NewsletterBrandingController extends Controller

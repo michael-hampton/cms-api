@@ -3,13 +3,103 @@
  * View: account/orders.php
  *
  * Variables from ShopAccountController::orders():
- *   $member     – authenticated member
- *   $orders     – sliced Collection of Order models
- *   $pagination – ['current_page', 'total_pages', 'total', 'per_page']
- *   $active_tab – 'orders'
+ *   $member      – authenticated member
+ *   $orders      – Collection of Order models (already filtered/paginated)
+ *   $pagination  – ['current_page', 'total_pages', 'total', 'per_page']
+ *   $filters     – ['search' => string, 'date_from' => string, 'date_to' => string, 'status' => string]
+ *   $active_tab  – 'orders'
  */
 ?>
 <style>
+    /* ── Filter bar ──────────────────────────────────────────────── */
+    .orders-filters {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        padding: 16px 16px 0;
+    }
+
+    .orders-filters__group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 160px;
+    }
+
+    .orders-filters__group label {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .07em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+    }
+
+    .orders-filters__input {
+        height: 36px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xs);
+        background: var(--white);
+        font-family: var(--font-body);
+        font-size: 13px;
+        color: var(--ink);
+        transition: border-color var(--transition);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .orders-filters__input:focus {
+        outline: none;
+        border-color: var(--ink);
+    }
+
+    .orders-filters__input::placeholder {
+        color: var(--ink-muted);
+        opacity: .6;
+    }
+
+    .orders-filters__actions {
+        display: flex;
+        gap: 6px;
+        align-items: flex-end;
+        flex-shrink: 0;
+    }
+
+    .orders-filters__clear {
+        font-size: 12px;
+        color: var(--ink-muted);
+        text-decoration: underline;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0 4px;
+        height: 36px;
+        font-family: var(--font-body);
+        transition: color var(--transition);
+    }
+
+    .orders-filters__clear:hover {
+        color: var(--ink);
+    }
+
+    .orders-filters__divider {
+        height: 1px;
+        background: var(--border-soft);
+        margin: 14px 16px 0;
+    }
+
+    .orders-filter-summary {
+        padding: 8px 16px 0;
+        font-size: 12px;
+        color: var(--ink-muted);
+    }
+
+    .orders-filter-summary strong {
+        color: var(--ink);
+    }
+
     /* ── Orders table ────────────────────────────────────────────── */
     .orders-table {
         width: 100%;
@@ -75,8 +165,44 @@
         align-items: center;
     }
 
+    /* ── Empty search state ──────────────────────────────────────── */
+    .empty-search-state {
+        padding: 48px 24px;
+        text-align: center;
+    }
+
+    .empty-search-state__icon {
+        font-size: 36px;
+        margin-bottom: 12px;
+    }
+
+    .empty-search-state__title {
+        font-family: var(--font-display);
+        font-size: 18px;
+        margin-bottom: 6px;
+    }
+
+    .empty-search-state__sub {
+        font-size: 13px;
+        color: var(--ink-muted);
+    }
+
     /* Mobile card fallback */
     @media (max-width: 680px) {
+        .orders-filters {
+            flex-direction: column;
+        }
+
+        .orders-filters__group {
+            min-width: unset;
+            width: 100%;
+        }
+
+        .orders-filters__actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+
         .orders-table thead {
             display: none;
         }
@@ -254,16 +380,127 @@
     </div>
 
     <div class="card">
-        <?php if ($orders->isEmpty()): ?>
-            <div class="card__body">
-                <div class="empty-state">
-                    <div class="empty-state__icon">🛍️</div>
-                    <div class="empty-state__title">No orders yet</div>
-                    <div class="empty-state__sub">Your purchase history will appear here.</div>
-                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions" class="btn btn--primary">Start
-                        shopping</a>
+
+        <!-- ── Filters ───────────────────────────────────────────────────── -->
+        <form id="orders-filter-form" method="GET" action="">
+            <div class="orders-filters">
+
+                <div class="orders-filters__group" style="max-width:260px;">
+                    <label for="filter-search">Order number</label>
+                    <input
+                            id="filter-search"
+                            type="search"
+                            name="search"
+                            class="orders-filters__input"
+                            placeholder="e.g. ORD-1234"
+                            value="<?= htmlspecialchars($filters['search'] ?? '') ?>"
+                            autocomplete="off"
+                    >
                 </div>
+
+                <div class="orders-filters__group" style="max-width:180px;">
+                    <label for="filter-date-from">From</label>
+                    <input
+                            id="filter-date-from"
+                            type="date"
+                            name="date_from"
+                            class="orders-filters__input"
+                            value="<?= htmlspecialchars($filters['date_from'] ?? '') ?>"
+                    >
+                </div>
+
+                <div class="orders-filters__group" style="max-width:180px;">
+                    <label for="filter-date-to">To</label>
+                    <input
+                            id="filter-date-to"
+                            type="date"
+                            name="date_to"
+                            class="orders-filters__input"
+                            value="<?= htmlspecialchars($filters['date_to'] ?? '') ?>"
+                    >
+                </div>
+
+                <div class="orders-filters__group" style="max-width:160px;">
+                    <label for="filter-status">Status</label>
+                    <select
+                            id="filter-status"
+                            name="status"
+                            class="orders-filters__input"
+                            onchange="document.getElementById('orders-filter-form').submit()"
+                    >
+                        <option value="">All statuses</option>
+                        <?php
+                        $statusOptions = [
+                                'pending' => 'Pending',
+                                'processing' => 'Processing',
+                                'completed' => 'Completed',
+                                'cancelled' => 'Cancelled',
+                                'refunded' => 'Refunded',
+                        ];
+                        foreach ($statusOptions as $val => $label): ?>
+                            <option value="<?= $val ?>" <?= ($filters['status'] ?? '') === $val ? 'selected' : '' ?>>
+                                <?= $label ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="orders-filters__actions">
+                    <button type="submit" class="btn btn--primary btn--sm">Search</button>
+                    <?php if (!empty($filters['search']) || !empty($filters['date_from']) || !empty($filters['date_to']) || !empty($filters['status'])): ?>
+                        <button type="button" class="orders-filters__clear" onclick="clearOrderFilters()">Clear</button>
+                    <?php endif; ?>
+                </div>
+
             </div>
+        </form>
+
+        <?php
+        $hasActiveFilters = !empty($filters['search']) || !empty($filters['date_from']) || !empty($filters['date_to']) || !empty($filters['status']);
+        if ($hasActiveFilters): ?>
+            <div class="orders-filter-summary">
+                Showing <strong><?= number_format($pagination['total']) ?></strong>
+                result<?= $pagination['total'] !== 1 ? 's' : '' ?>
+                <?php if (!empty($filters['search'])): ?>
+                    for <strong>"<?= htmlspecialchars($filters['search']) ?>"</strong>
+                <?php endif; ?>
+                <?php if (!empty($filters['status'])): ?>
+                    &mdash; status <strong><?= htmlspecialchars(ucfirst($filters['status'])) ?></strong>
+                <?php endif; ?>
+                <?php if (!empty($filters['date_from']) || !empty($filters['date_to'])): ?>
+                    <?php if (!empty($filters['date_from']) && !empty($filters['date_to'])): ?>
+                        between <strong><?= htmlspecialchars($filters['date_from']) ?></strong> and
+                        <strong><?= htmlspecialchars($filters['date_to']) ?></strong>
+                    <?php elseif (!empty($filters['date_from'])): ?>
+                        from <strong><?= htmlspecialchars($filters['date_from']) ?></strong>
+                    <?php else: ?>
+                        up to <strong><?= htmlspecialchars($filters['date_to']) ?></strong>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="orders-filters__divider"></div>
+
+        <!-- ── Table ─────────────────────────────────────────────────────── -->
+        <?php if ($orders->isEmpty()): ?>
+            <?php if ($hasActiveFilters): ?>
+                <div class="empty-search-state">
+                    <div class="empty-search-state__icon">🔍</div>
+                    <div class="empty-search-state__title">No orders found</div>
+                    <div class="empty-search-state__sub">Try adjusting your search or date range.</div>
+                </div>
+            <?php else: ?>
+                <div class="card__body">
+                    <div class="empty-state">
+                        <div class="empty-state__icon">🛍️</div>
+                        <div class="empty-state__title">No orders yet</div>
+                        <div class="empty-state__sub">Your purchase history will appear here.</div>
+                        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions"
+                           class="btn btn--primary">Start shopping</a>
+                    </div>
+                </div>
+            <?php endif; ?>
         <?php else: ?>
             <div style="overflow-x:auto;">
                 <table class="orders-table">
@@ -311,7 +548,7 @@
                             </td>
                             <td data-label="Actions">
                                 <div class="table-actions">
-                                    <a href="/press-stack/account/orders/<?= $order->id ?>"
+                                    <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account/orders/<?= $order->id ?>"
                                        class="btn btn--ghost btn--sm">View</a>
                                     <?php if ($canCancel): ?>
                                         <button
@@ -331,17 +568,25 @@
                 </table>
             </div>
 
-            <!-- Pagination -->
-            <?php if ($pagination['total_pages'] > 1): ?>
+            <!-- Pagination (preserves active filters across pages) -->
+            <?php if ($pagination['total_pages'] > 1):
+                $paginationBase = '?' . http_build_query(array_filter([
+                                'search' => $filters['search'] ?? '',
+                                'date_from' => $filters['date_from'] ?? '',
+                                'date_to' => $filters['date_to'] ?? '',
+                                'status' => $filters['status'] ?? '',
+                        ]));
+                $paginationBase = $paginationBase === '?' ? '?' : $paginationBase . '&';
+                ?>
                 <div style="padding:0 16px 20px;">
                     <nav class="pagination">
-                        <a href="?page=<?= max(1, $pagination['current_page'] - 1) ?>"
+                        <a href="<?= $paginationBase ?>page=<?= max(1, $pagination['current_page'] - 1) ?>"
                            class="pag-btn <?= $pagination['current_page'] <= 1 ? 'disabled' : '' ?>">←</a>
                         <?php for ($p = 1; $p <= $pagination['total_pages']; $p++): ?>
-                            <a href="?page=<?= $p ?>"
+                            <a href="<?= $paginationBase ?>page=<?= $p ?>"
                                class="pag-btn <?= $p === $pagination['current_page'] ? 'active' : '' ?>"><?= $p ?></a>
                         <?php endfor; ?>
-                        <a href="?page=<?= min($pagination['total_pages'], $pagination['current_page'] + 1) ?>"
+                        <a href="<?= $paginationBase ?>page=<?= min($pagination['total_pages'], $pagination['current_page'] + 1) ?>"
                            class="pag-btn <?= $pagination['current_page'] >= $pagination['total_pages'] ? 'disabled' : '' ?>">→</a>
                     </nav>
                 </div>
@@ -419,6 +664,44 @@
 
 
 <script>
+    // ── Filter helpers ────────────────────────────────────────────────────────
+
+    function clearOrderFilters() {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-date-from').value = '';
+        document.getElementById('filter-date-to').value = '';
+        document.getElementById('filter-status').value = '';
+        document.getElementById('orders-filter-form').submit();
+    }
+
+    // Auto-submit on date change so the user doesn't need to click Search
+    document.getElementById('filter-date-from').addEventListener('change', function () {
+        validateDateRange();
+        document.getElementById('orders-filter-form').submit();
+    });
+
+    document.getElementById('filter-date-to').addEventListener('change', function () {
+        validateDateRange();
+        document.getElementById('orders-filter-form').submit();
+    });
+
+    /**
+     * Swaps date_from / date_to if the user enters them in the wrong order,
+     * preventing a confusing empty result set.
+     */
+    function validateDateRange() {
+        const from = document.getElementById('filter-date-from');
+        const to = document.getElementById('filter-date-to');
+
+        if (from.value && to.value && from.value > to.value) {
+            const tmp = from.value;
+            from.value = to.value;
+            to.value = tmp;
+        }
+    }
+
+    // ── Order cancellation modal ──────────────────────────────────────────────
+
     let ocOrderId = null;
     let ocOrderNum = '';
     let ocOrderTotal = '';

@@ -27,18 +27,18 @@ class UpdateRegionSetRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => 'string|max:255',
-            'slug' => 'string|max:255',
-            'description' => 'string',
-            'is_active' => 'boolean',
-            'sort_order' => 'integer',
-            'territories' => 'array',
-            'territories.*.id' => 'integer',
-            'territories.*.name' => 'required|string|max:255',
-            'territories.*.code' => 'string|max:50',
-            'territories.*.slug' => 'string|max:255',
-            'territories.*.is_active' => 'boolean',
-            'territories.*.sort_order' => 'integer'
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
+            'sort_order' => ['nullable', 'integer'],
+            'territories' => ['nullable', 'array'],
+            'territories.*.id' => ['nullable', 'integer'],
+            'territories.*.name' => ['required', 'string', 'max:255'],
+            'territories.*.code' => ['nullable', 'string', 'max:50'],
+            'territories.*.slug' => ['nullable', 'string', 'max:255'],
+            'territories.*.is_active' => ['nullable', 'boolean'],
+            'territories.*.sort_order' => ['nullable', 'integer'],
         ];
     }
 

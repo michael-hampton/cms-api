@@ -25,9 +25,7 @@ class MinLengthRule extends BaseValidationRule
         }
 
         if (is_array($value)) {
-            // Flatten the array recursively and count all elements
-            $count = $this->countElementsRecursive($value);
-            return $count >= $this->minLength;
+            return count($value) >= $this->minLength;
         }
 
         // For scalar values, check string length

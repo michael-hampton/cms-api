@@ -3,6 +3,7 @@
 namespace App\Controllers\Offers;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Brand;
@@ -44,6 +45,9 @@ class DealsController extends Controller
         // Get all categories
         $categories = Category::orderBy('name')->get();
 
+        $siteId = SiteContext::getId();
+        $member = MemberAuth::getMember();
+
         // Get product counts for each category using groupBy
         $categoryProducts = Product::select('category_id')
             ->groupBy('category_id')
@@ -59,8 +63,8 @@ class DealsController extends Controller
             $categoryCounts[$categoryId]++;
         }
 
-        $offers = $this->offerService->getActiveOffers();
-        $bundles = $this->bundleService->getActiveBundles();
+        $offers = $this->offerService->getActiveOffers(10, $member, $siteId);
+        $bundles = $this->bundleService->getActiveBundles(10, $member, $siteId);
 
         // Alternative approach using raw SQL if the above doesn't work
         // $db = Database::getInstance();

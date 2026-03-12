@@ -173,6 +173,7 @@ class WishlistRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         Wishlist::create([
@@ -207,6 +208,7 @@ class WishlistRepositoryTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         Wishlist::create([

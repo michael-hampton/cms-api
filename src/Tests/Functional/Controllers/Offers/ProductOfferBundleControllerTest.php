@@ -32,6 +32,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -59,6 +60,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundle::create([
@@ -70,6 +72,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite('/api/bundles?status=published');
@@ -352,7 +355,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
 
     public function testStoreAcceptsValidStatusValues(): void
     {
-        foreach (['draft', 'published', 'rejected'] as $status) {
+        foreach (['pending', 'published', 'rejected'] as $status) {
             $offer1 = $this->createProductOffer($this->createProduct()->id);
             $offer2 = $this->createProductOffer($this->createProduct()->id);
 
@@ -407,6 +410,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->getForSite("/api/bundles/{$bundle->id}");
@@ -440,11 +444,22 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
+
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
 
         $response = $this->putForSite("/api/bundles/{$bundle->id}", [
             'name' => 'Updated Bundle',
             'bundle_price' => 140.00,
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(2)->format('Y-m-d H:i:s')
         ]);
 
         $responseData = json_decode($response->getContent(), true);
@@ -463,11 +478,25 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'total_price' => 150
         ]);
+
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
 
         // Only updating is_active — all fields are optional on update
         $response = $this->putForSite("/api/bundles/{$bundle->id}", [
             'is_active' => false,
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(2)->format('Y-m-d H:i:s'),
+            'bundle_price' => 22,
+            'name' => 'Test'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -482,6 +511,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'total_price' => 150
         ]);
 
         $response = $this->putForSite("/api/bundles/{$bundle->id}", [
@@ -503,11 +534,14 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'total_price' => 150
         ]);
 
         $response = $this->putForSite("/api/bundles/{$bundle->id}", [
             'bundle_price' => -50.00,
         ]);
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(422, $response->getStatusCode());
@@ -523,6 +557,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'total_price' => 150
         ]);
 
         $response = $this->putForSite("/api/bundles/{$bundle->id}", [
@@ -543,6 +579,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'total_price' => 150
         ]);
 
         $offer = $this->createProductOffer($this->createProduct()->id);
@@ -552,6 +590,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
                 ['product_offer_id' => $offer->id, 'quantity' => 1],
             ],
         ]);
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(422, $response->getStatusCode());
@@ -560,7 +599,20 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
 
     public function testUpdateReturns404ForNonexistentBundle(): void
     {
-        $response = $this->putForSite('/api/bundles/99999', ['name' => 'Updated']);
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
+
+        $response = $this->putForSite('/api/bundles/99999', [
+            'name' => 'Updated',
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'bundle_price' => 22,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(2)->format('Y-m-d H:i:s')
+        ]);
 
         $data = json_decode($response->getContent(), true);
 
@@ -582,6 +634,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->deleteForSite("/api/bundles/{$bundle->id}");
@@ -607,6 +660,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite("/api/bundles/{$bundle->id}/publish");
@@ -635,6 +689,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $reason = 'Pricing too low';
@@ -662,6 +717,7 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite("/api/bundles/{$bundle->id}/reject", []);
@@ -683,7 +739,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $bundle2 = ProductOfferBundle::create([
@@ -694,7 +751,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite('/api/bundles/bulk/publish', [
@@ -721,7 +779,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'pending',
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $published = ProductOfferBundle::create([
@@ -732,7 +791,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
             'status' => 'published',
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite('/api/bundles/bulk/publish', [
@@ -782,7 +842,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $bundle2 = ProductOfferBundle::create([
@@ -792,7 +853,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => [$bundle1->id, $bundle2->id]]);
@@ -833,7 +895,8 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
-            'total_price' => 100
+            'total_price' => 100,
+            'site_id' => $this->siteId
         ]);
 
         $response = $this->postForSite('/api/bundles/bulk/delete', ['ids' => [$bundle->id, 99999]]);
@@ -915,12 +978,23 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
     public function testUpdateSyncsRegionSets(): void
     {
         $offer = $this->createProductOfferBundle();
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
 
         $regionSet1 = RegionSet::create(['name' => 'UK', 'slug' => 'uk-update', 'is_active' => true, 'site_id' => $this->siteId]);
         $regionSet2 = RegionSet::create(['name' => 'EU', 'slug' => 'eu-update', 'is_active' => true, 'site_id' => $this->siteId]);
 
         $response = $this->putForSite("/api/bundles/{$offer->id}", [
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'bundle_price' => 22,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'name' => 'test'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -937,6 +1011,9 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
     public function testUpdateReplacesExistingRegionSets(): void
     {
         $offer = $this->createProductOfferBundle();
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
 
         $old = RegionSet::create(['name' => 'Old', 'slug' => 'old-offer', 'is_active' => true, 'site_id' => $this->siteId]);
         $new = RegionSet::create(['name' => 'New', 'slug' => 'new-offer', 'is_active' => true, 'site_id' => $this->siteId]);
@@ -947,6 +1024,14 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
         // Replace via update endpoint
         $response = $this->putForSite("/api/bundles/{$offer->id}", [
             'region_set_ids' => [$new->id],
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'bundle_price' => 22,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'name' => 'test'
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -961,11 +1046,23 @@ class ProductOfferBundleControllerTest extends FunctionalTestCase
     {
         $offer = $this->createProductOfferBundle();
 
+        $product = $this->createProduct();
+        $offer1 = $this->createProductOffer($product->id);
+        $offer2 = $this->createProductOffer($product->id);
+
         $regionSet = RegionSet::create(['name' => 'UK', 'slug' => 'uk-detach-offer', 'is_active' => true, 'site_id' => $this->siteId]);
         $offer->regionSets(true)->sync([$regionSet->id]);
 
         $response = $this->putForSite("/api/bundles/{$offer->id}", [
             'region_set_ids' => [],
+            'items' => [
+                ['product_offer_id' => $offer1->id, 'quantity' => 1],
+                ['product_offer_id' => $offer2->id, 'quantity' => 1],
+            ],
+            'bundle_price' => 22,
+            'start_date' => now(),
+            'end_date' => now_datetime()->addDays(3)->format('Y-m-d H:i:s'),
+            'name' => 'test'
         ]);
 
         $regions = ProductOfferBundleRegionSet::where('product_offer_bundle_id', $offer->id)->get();

@@ -21,24 +21,16 @@ class UpdateSiteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['string', 'max:255'],
-            'slug' => ['string', 'max:255'],
-            'domain' => ['string', 'max:255'],
-            'subdomain' => ['string', 'max:255'],
-            'theme' => ['string', 'max:100'],
-            'logo' => ['string', 'max:500'],
-            'favicon' => ['string', 'max:500'],
-            'is_active' => ['boolean'],
-            'is_default' => ['boolean']
+            'name' => ['required', 'string', 'max:255'],
+            'slug' => ['nullable', 'string', 'max:255'],
+            'domain' => ['nullable', 'string', 'max:255'],
+            'subdomain' => ['nullable', 'string', 'max:255'],
+            'theme' => ['nullable', 'string', 'max:100'],
+            'logo' => ['nullable', 'string', 'max:500'],
+            'favicon' => ['nullable', 'string', 'max:500'],
+            'is_active' => ['nullable', 'boolean'],
+            'is_default' => ['nullable', 'boolean'],
         ];
-    }
-
-    protected function prepareForValidation(): void
-    {
-        // Auto-generate slug if name is provided but slug is not
-        if (empty($this->data['slug']) && !empty($this->data['name'])) {
-            $this->data['slug'] = Str::slug($this->data['name']);
-        }
     }
 
     public function after(): array
@@ -72,5 +64,13 @@ class UpdateSiteRequest extends FormRequest
             'domain.max' => 'Domain must not exceed 255 characters',
             'theme.max' => 'Theme must not exceed 100 characters'
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        // Auto-generate slug if name is provided but slug is not
+        if (empty($this->data['slug']) && !empty($this->data['name'])) {
+            $this->data['slug'] = Str::slug($this->data['name']);
+        }
     }
 }

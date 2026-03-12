@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Newsletter;
 
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;

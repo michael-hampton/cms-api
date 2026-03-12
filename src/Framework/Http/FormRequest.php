@@ -21,10 +21,12 @@ use App\Framework\Validation\Rules\ExistsRule;
 use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
+use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\NumericRule;
+use App\Framework\Validation\Rules\RegexRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\RequiredWithoutRule;
@@ -354,6 +356,8 @@ abstract class FormRequest extends Request
             'after' => AfterRule::class,
             'after_or_equal' => AfterOrEqualRule::class,
             'min_number' => MinRule::class,
+            'max_number' => MaxRule::class,
+            'regex' => RegexRule::class
         ];
 
         if (!isset($ruleMap[$ruleName])) {

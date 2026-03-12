@@ -3,12 +3,25 @@
 namespace App\Requests;
 
 use App\Framework\Http\FormRequest;
+use App\Framework\Validation\UniqueNameValidation;
+use App\Repositories\Product\ProductRepository;
 
 class UpdateProductRequest extends FormRequest
 {
+    use UniqueNameValidation;
+
+    private ProductRepository $productRepository;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->productRepository = app(ProductRepository::class);
+    }
+
     public function authorize(): bool
     {
-        return $this->user() && $this->user()->can('create', 'Product');
+        return $this->user() && $this->user()->can('update', 'Product');
     }
 
     public function rules(): array
@@ -16,9 +29,9 @@ class UpdateProductRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'description' => ['string'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'sale_price' => ['numeric', 'min:0'],
-            'category_id' => ['integer', 'max:255'],
+            'price' => ['required', 'numeric', 'min_number:0'],
+            'sale_price' => ['numeric', 'min_number:0'],
+            'category_id' => ['integer'],
             'brand' => ['string', 'max:255'],
             'image' => ['string'],
             'meta_title' => ['string', 'max:255'],
@@ -36,7 +49,7 @@ class UpdateProductRequest extends FormRequest
             'merchants' => ['nullable', 'array', 'min:1'],
             'merchants.*.name' => ['required', 'string'],
             'merchants.*.url' => ['required', 'url'],
-            'merchants.*.price' => ['required', 'numeric', 'min:0'],
+            'merchants.*.price' => ['required', 'numeric', 'min_number:0'],
             'merchants.*.is_available' => ['boolean'],
 
             // Variants
@@ -48,10 +61,21 @@ class UpdateProductRequest extends FormRequest
 
             // Specifications
             'specifications' => ['nullable', 'array'],
-//            'specifications.*.category' => ['required', 'string'],
             'specifications.*.key' => ['required', 'string'],
             'specifications.*.value' => ['required', 'string'],
             'specifications.*.sort_order' => ['integer'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [
+            ...$this->uniqueNameAfterHooks(
+                repository: $this->productRepository,
+                routeIdParam: 'id',      // ProductController routes the product as {id}
+                field: 'name',
+                errorMessage: 'A product with this name already exists.',
+            ),
         ];
     }
 

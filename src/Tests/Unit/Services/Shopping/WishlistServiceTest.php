@@ -298,6 +298,7 @@ class WishlistServiceTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $this->productOfferBundleRepository->shouldReceive('find')
@@ -333,6 +334,7 @@ class WishlistServiceTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
+            'site_id' => $this->siteId
         ]);
 
         $this->productOfferBundleRepository->shouldReceive('find')
@@ -360,6 +362,7 @@ class WishlistServiceTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $existingWishlist = Mockery::mock(Wishlist::class);

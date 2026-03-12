@@ -11,23 +11,24 @@ use App\Repositories\Repository;
 
 class ProductOfferBundleRepository extends Repository
 {
-    public function getActiveBundles(?Member $member = null): Collection
+    public function getActiveBundles(?Member $member = null, int $limit = 10, ?int $siteId = null): Collection
     {
-        $query = ProductOfferBundle::active()
+        return ProductOfferBundle::active()
+            ->when($siteId, function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->with([
                 'items.productOffer.product',
                 'items.productOffer.merchant',
                 'items.product',
                 'items.product.merchant'
             ])
+            ->when($member, function ($query) use ($member) {
+                $query->visibleToMember($member);
+            })
             ->published()
-            ->orderBy('start_date', 'desc');
-
-        if ($member) {
-            $query->visibleToMember($member);
-        }
-
-        return $query->get();
+            ->orderBy('start_date', 'desc')
+            ->get();
     }
 
     public function publish(int $id, int $userId): ?ProductOfferBundle

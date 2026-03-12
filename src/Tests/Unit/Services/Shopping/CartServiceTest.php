@@ -698,6 +698,7 @@ class CartServiceTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -747,6 +748,7 @@ class CartServiceTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
+            'site_id' => $this->siteId
         ]);
 
         $this->bundleRepository->shouldReceive('find')

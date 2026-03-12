@@ -149,15 +149,9 @@ class ProductOfferService
         ];
     }
 
-    public function getActiveOffers(int $limit = 10, ?Member $member = null): array //todo needs to be based on site
+    public function getActiveOffers(int $limit = 10, ?Member $member = null, ?int $siteId = null): array
     {
-        $query = ProductOffer::active();
-
-        if ($member) {
-            $query->visibleToMember($member);
-        }
-
-        $offers = $query->take($limit)->get();
+        $offers = $this->repository->getActiveOffers($limit, $member, $siteId);
 
         return $offers->map(function ($offer) {
             $product = $offer->product;

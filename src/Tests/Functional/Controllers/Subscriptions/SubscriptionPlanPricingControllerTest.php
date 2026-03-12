@@ -269,6 +269,100 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $this->assertEquals(20, $responseData['data']['discount_percentage']);
     }
 
+    public function testUpdateAllowsNullableFieldsToBeNull(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            array_merge($this->validUpdatePayload(), [
+                'original_price' => null,
+                'digital_price' => null,
+                'discount_percentage' => null,
+                'label' => 'required',
+                'period_description' => 'test',
+                'is_default' => null,
+                'is_active' => null,
+                'sort_order' => 0,
+                'currency' => 'GBP'
+            ])
+        );
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    public function testUpdateRequiresDurationMonths(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            ['issue_count' => 3, 'price' => 29.99]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRequiresIssueCount(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            ['duration_months' => 3, 'price' => 29.99]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRequiresPrice(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            ['duration_months' => 3, 'issue_count' => 3]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullDurationMonths(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            $this->validUpdatePayload(['duration_months' => null])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullIssueCount(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            $this->validUpdatePayload(['issue_count' => null])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateRejectsNullPrice(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            $this->validUpdatePayload(['price' => null])
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
     // =========================================================================
     // PUT — UpdatePricingTierRequest validation
     // =========================================================================
@@ -315,10 +409,16 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
 
         $response = $this->putForSite(
             "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
-            ['discount_percentage' => 101]
+            [
+                'discount_percentage' => 101,
+                'duration_months' => 12,
+                'issue_count' => 2,
+                'price' => 20,
+                'currency' => 'GBP'
+            ]
         );
 
-        $this->assertEquals(500, $response->getStatusCode());
+        $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function testUpdateRejectsDiscountPercentageBelow0(): void
@@ -352,6 +452,18 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $response = $this->putForSite(
             "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
             ['period_description' => str_repeat('x', 256)]
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testUpdateValidatesEmptyPayload(): void
+    {
+        $pricing = $this->createPricingTier();
+
+        $response = $this->putForSite(
+            "/api/subscription-plans/{$this->plan->id}/pricing/{$pricing->id}",
+            []
         );
 
         $this->assertEquals(422, $response->getStatusCode());
@@ -465,5 +577,14 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $this->assertEquals(1, $pricing1->fresh()->sort_order);
         $this->assertEquals(2, $pricing2->fresh()->sort_order);
         $this->assertEquals(0, $pricing3->fresh()->sort_order);
+    }
+
+    private function validUpdatePayload(array $overrides = []): array
+    {
+        return array_merge([
+            'duration_months' => 3,
+            'issue_count' => 3,
+            'price' => 29.99,
+        ], $overrides);
     }
 }
