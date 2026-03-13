@@ -6,6 +6,28 @@ use App\Framework\Http\FormRequest;
 
 class UpdateSubscriptionPlanRequest extends FormRequest
 {
+    public function prepareForValidation(): void
+    {
+        $booleanFields = [
+            'is_active',
+            'is_featured',
+            'is_upgrade_option',
+            'print_shipping_required',
+            'pre_release_enabled',
+        ];
+
+        $cast = [];
+        foreach ($booleanFields as $field) {
+            if ($this->has($field)) {
+                $cast[$field] = filter_var($this->input($field), FILTER_VALIDATE_BOOLEAN);
+            }
+        }
+
+        if (!empty($cast)) {
+            $this->merge($cast);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -20,6 +42,9 @@ class UpdateSubscriptionPlanRequest extends FormRequest
             'sort_order' => ['integer'],
             'is_active' => ['boolean'],
             'is_featured' => ['boolean'],
+            'is_upgrade_option' => ['boolean'],
+            'print_shipping_required' => ['boolean'],
+            'pre_release_enabled' => ['boolean'],
         ];
     }
 }

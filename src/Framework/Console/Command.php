@@ -5,7 +5,7 @@ namespace App\Framework\Console;
 abstract class Command
 {
     protected $signature;
-    protected $description;
+    public $description;
     protected $arguments = [];
     protected $options = [];
 

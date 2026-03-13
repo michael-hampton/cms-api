@@ -19,7 +19,7 @@ class ApplyDuePricingChangesCommand extends Command
     const SUCCESS = 1;
     const FAILURE = 0;
     protected $signature = 'subscriptions:apply-price-changes';
-    protected $description = 'Applies subscription pricing changes that have passed their effective date.';
+    public $description = 'Applies subscription pricing changes that have passed their effective date.';
 
     public function __construct(
         private readonly SubscriptionPricingChangeRepository $repository,

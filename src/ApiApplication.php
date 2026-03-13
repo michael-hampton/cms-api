@@ -2,6 +2,8 @@
 
 namespace App;
 
+use App\Console\SyncStripePlansCommand;
+use App\Console\SyncStripePricesCommand;
 use App\Contracts\ClockInterface;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\ArticleGifting\GiftClaimedEvent;
@@ -326,6 +328,8 @@ class ApiApplication
             'db:seed' => SeedCommand::class,
             'schedule:run' => ScheduleRunCommand::class,
             'queue:work' => QueueWorkCommand::class,
+            'sync:stripe-plans' => SyncStripePlansCommand::class,
+            'sync:stripe-prices' => SyncStripePricesCommand::class
         ];
 
         foreach ($commands as $name => $commandClass) {

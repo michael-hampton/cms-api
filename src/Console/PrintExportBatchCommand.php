@@ -13,7 +13,7 @@ class PrintExportBatchCommand extends Command
     const SUCCESS = 1;
     protected $signature = 'print:export-batch {batchId : The ID of the print batch to export}';
 
-    protected $description = 'Re-generate and export a print batch. Useful for debugging or recovering from transport failures.';
+    public $description = 'Re-generate and export a print batch. Useful for debugging or recovering from transport failures.';
 
     public function __construct(
         private readonly PrintBatchRepository    $batchRepository,

@@ -10,7 +10,7 @@ use Exception;
 class MigrateCommand extends Command
 {
     protected $signature = 'migrate';
-    protected $description = 'Run database migrations';
+    public $description = 'Run database migrations';
 
     public function handle(): int
     {
