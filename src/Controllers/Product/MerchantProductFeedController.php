@@ -8,21 +8,17 @@ use App\Framework\Http\JsonResponse;
 use App\Repositories\Product\MerchantProductFeedRepository;
 use App\Requests\Merchant\CreateMerchantProductFeedRequest;
 use App\Requests\Merchant\UpdateMerchantProductFeedRequest;
+use App\Resources\MerchantProductFeedResource;
 use App\Services\Product\MerchantProductFeedService;
 use Exception;
 
 class MerchantProductFeedController extends Controller
 {
-    protected MerchantProductFeedService $feedService;
-    private MerchantProductFeedRepository $feedRepository;
-
     public function __construct(
-        MerchantProductFeedService    $feedService,
-        MerchantProductFeedRepository $feedRepository
+        private readonly MerchantProductFeedService    $feedService,
+        private readonly MerchantProductFeedRepository $feedRepository
     )
     {
-        $this->feedService = $feedService;
-        $this->feedRepository = $feedRepository;
         parent::__construct();
     }
 
@@ -31,10 +27,7 @@ class MerchantProductFeedController extends Controller
         try {
             $feeds = $this->feedRepository->getByMerchant($merchantId);
 
-            return $this->resourceResponse([
-                'success' => true,
-                'items' => $feeds->toArray()
-            ]);
+            return $this->resourceResponse(MerchantProductFeedResource::collection($feeds)->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -48,14 +41,10 @@ class MerchantProductFeedController extends Controller
 
             return $this->jsonResponse([
                 'message' => 'Feed created successfully',
-                'feed' => $feed->toArray()
+                'feed' => MerchantProductFeedResource::make($feed)->toArray(),
             ], 201);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -63,15 +52,21 @@ class MerchantProductFeedController extends Controller
 
     public function show(int $merchantId, int $feedId): JsonResponse
     {
-        $feed = $this->feedService->getFeed($feedId);
+        try {
+            $feed = $this->feedService->getFeed($feedId);
 
-        if (!$feed || $feed->merchant_id !== $merchantId) {
-            return $this->jsonResponse([
-                'message' => 'Feed not found'
-            ], 404);
+            if (!$feed || $feed->merchant_id !== $merchantId) {
+                return $this->jsonResponse([
+                    'message' => 'Feed not found'
+                ], 404);
+            }
+
+            return $this->resourceResponse([
+                'feed' => MerchantProductFeedResource::make($feed)->toArray(),
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
-
-        return $this->jsonResponse(['feed' => $feed]);
     }
 
     public function update(UpdateMerchantProductFeedRequest $request, int $merchantId, int $feedId, string $siteName): JsonResponse
@@ -85,16 +80,12 @@ class MerchantProductFeedController extends Controller
                 ], 404);
             }
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'message' => 'Feed updated successfully',
-                'feed' => $updated
+                'feed' => MerchantProductFeedResource::make($updated)->toArray(),
             ]);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

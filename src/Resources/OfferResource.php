@@ -8,6 +8,12 @@ class OfferResource extends JsonResource
 {
     public function toArray(): array
     {
+        $regionSets = $this->getAttribute('regionSets');
+
+        $regionSets = $regionSets === null
+            ? null
+            : (is_array($regionSets) ? collect($regionSets) : $regionSets);
+
         return [
             'id' => $this->getAttribute('id'),
             'merchant' => $this->getAttribute('merchant'),
@@ -28,6 +34,11 @@ class OfferResource extends JsonResource
             'voucher_id' => $this->getAttribute('voucher_id'),
             'sale_price' => $this->getAttribute('sale_price'),
             'product' => $this->getAttribute('product'),
+            'region_set_ids' => $regionSets?->pluck('id')->toArray() ?? [],
+            'region_sets' => $regionSets?->map(fn($rs) => [
+                    'id' => $rs['id'],
+                    'name' => $rs['name'],
+                ])->toArray() ?? [],
         ];
     }
 }

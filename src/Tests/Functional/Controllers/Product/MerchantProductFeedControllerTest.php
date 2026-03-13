@@ -28,7 +28,7 @@ class MerchantProductFeedControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
-        $this->assertCount(2, $data['items']);
+        $this->assertCount(2, $data['data']);
     }
 
     // =========================================================================
@@ -131,8 +131,8 @@ class MerchantProductFeedControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertArrayHasKey('feed', $data['data']);
-        $this->assertEquals($feed->id, $data['data']['feed']['id']);
+        $this->assertArrayHasKey('feed', $data);
+        $this->assertEquals($feed->id, $data['feed']['id']);
     }
 
     public function testShowReturns404WhenFeedBelongsToOtherMerchant(): void
@@ -175,7 +175,7 @@ class MerchantProductFeedControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('https://new-url.com/feed.xml', $data['data']['feed']['feed_url']);
+        $this->assertEquals('https://new-url.com/feed.xml', $data['feed']['feed_url']);
     }
 
     public function testUpdateValidatesFeedUrlIsValidUrlWhenProvided(): void

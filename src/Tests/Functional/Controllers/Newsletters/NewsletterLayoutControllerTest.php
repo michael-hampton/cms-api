@@ -24,9 +24,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('layouts', $data);
-        $this->assertIsArray($data['layouts']);
-        $this->assertCount(2, $data['layouts']);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertIsArray($data['data']);
+        $this->assertCount(2, $data['data']);
     }
 
     private function createLayout(array $overrides = []): Model
@@ -79,8 +79,8 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertIsArray($data['layouts']);
-        $this->assertCount(0, $data['layouts']);
+        $this->assertIsArray($data['data']);
+        $this->assertCount(0, $data['data']);
     }
 
     public function test_index_does_not_return_layouts_from_other_sites(): void
@@ -93,7 +93,7 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
         $response = $this->getForSite('/api/newsletter-layouts');
 
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(1, $data['layouts']);
+        $this->assertCount(1, $data['data']);
     }
 
     public function test_system_layouts_returns_200_with_system_layouts_only(): void
@@ -106,9 +106,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('layouts', $data);
+        $this->assertArrayHasKey('data', $data);
 
-        foreach ($data['layouts'] as $layout) {
+        foreach ($data['data'] as $layout) {
             $this->assertTrue($layout['is_system_layout']);
         }
     }
@@ -134,8 +134,8 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
         $response = $this->getForSite('/api/newsletter-layouts/system');
 
         $data = json_decode($response->getContent(), true);
-        $this->assertIsArray($data['layouts']);
-        $this->assertCount(0, $data['layouts']);
+        $this->assertIsArray($data['data']);
+        $this->assertCount(0, $data['data']);
     }
 
     // ── POST /api/newsletter-layouts ──────────────────────────────────────────
@@ -153,9 +153,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $this->assertArrayHasKey('layout', $data['data']);
-        $this->assertEquals('My New Layout', $data['data']['layout']['name']);
-        $this->assertEquals('my-new-layout', $data['data']['layout']['slug']);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('My New Layout', $data['data']['name']);
+        $this->assertEquals('my-new-layout', $data['data']['slug']);
     }
 
     public function test_store_assigns_layout_to_current_site(): void
@@ -168,7 +168,7 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertEquals($this->siteId, $data['data']['layout']['site_id']);
+        $this->assertEquals($this->siteId, $data['data']['site_id']);
     }
 
     public function test_store_returns_422_when_name_is_missing(): void
@@ -211,9 +211,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $stored = is_string($data['data']['layout']['layout_definition_json'])
-            ? json_decode($data['data']['layout']['layout_definition_json'], true)
-            : $data['data']['layout']['layout_definition_json'];
+        $stored = is_string($data['data']['layout_definition_json'])
+            ? json_decode($data['data']['layout_definition_json'], true)
+            : $data['data']['layout_definition_json'];
 
         $this->assertEquals(640, $stored['settings']['max_width']);
     }
@@ -231,8 +231,8 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(201, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('layout', $data);
-        $this->assertEquals('Cloned Layout', $data['layout']['name']);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals('Cloned Layout', $data['data']['name']);
     }
 
     public function test_clone_creates_independent_copy(): void
@@ -244,7 +244,7 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
             'slug' => 'forked-layout-' . uniqid(),
         ]);
 
-        $cloneId = json_decode($response->getContent(), true)['data']['layout']['id'];
+        $cloneId = json_decode($response->getContent(), true)['data']['id'];
 
         // Verify it is a distinct DB record
         $this->assertNotEquals($source->id, $cloneId);
@@ -281,9 +281,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $stored = is_string($data['data']['layout']['layout_definition_json'])
-            ? json_decode($data['data']['layout']['layout_definition_json'], true)
-            : $data['data']['layout']['layout_definition_json'];
+        $stored = is_string($data['data']['layout_definition_json'])
+            ? json_decode($data['data']['layout_definition_json'], true)
+            : $data['data']['layout_definition_json'];
 
         $this->assertEquals(600, $stored['settings']['max_width']);
     }

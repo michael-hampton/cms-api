@@ -6,24 +6,18 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Repositories\Product\MerchantContactRepository;
 use App\Requests\Merchant\CreateMerchantContactRequest;
 use App\Requests\Merchant\UpdateMerchantContactRequest;
+use App\Resources\MerchantContactResource;
 use App\Services\Product\MerchantContactService;
 use Exception;
 
 class MerchantContactController extends Controller
 {
-    protected MerchantContactService $contactService;
-    private MerchantContactRepository $contactRepository;
-
     public function __construct(
-        MerchantContactService    $contactService,
-        MerchantContactRepository $contactRepository
+        private readonly MerchantContactService $contactService,
     )
     {
-        $this->contactService = $contactService;
-        $this->contactRepository = $contactRepository;
         parent::__construct();
     }
 
@@ -32,10 +26,7 @@ class MerchantContactController extends Controller
         try {
             $contacts = $this->contactService->getAllContacts();
 
-            return $this->resourceResponse([
-                'success' => true,
-                'items' => $contacts->toArray()
-            ]);
+            return $this->resourceResponse(MerchantContactResource::collection($contacts)->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -48,14 +39,10 @@ class MerchantContactController extends Controller
 
             return $this->jsonResponse([
                 'message' => 'Contact created successfully',
-                'contact' => $contact->toArray()
+                'contact' => MerchantContactResource::make($contact)->toArray(),
             ], 201);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -63,38 +50,36 @@ class MerchantContactController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        $contact = $this->contactService->getContact($id);
+        try {
+            $contact = $this->contactService->getContact($id);
 
-        if (!$contact) {
-            return $this->jsonResponse([
-                'message' => 'Contact not found'
-            ], 404);
+            if (!$contact) {
+                return $this->errorResponse('Contact not found', 404);
+            }
+
+            return $this->resourceResponse([
+                'contact' => MerchantContactResource::make($contact)->toArray(),
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
-
-        return $this->jsonResponse(['contact' => $contact]);
     }
 
     public function update(UpdateMerchantContactRequest $request, int $id, string $siteName): JsonResponse
     {
         try {
-            $updated = $this->contactService->updateContact($id, $request->validated());
+            $contact = $this->contactService->updateContact($id, $request->validated());
 
-            if (!$updated) {
-                return $this->jsonResponse([
-                    'message' => 'Contact not found'
-                ], 404);
+            if (!$contact) {
+                return $this->errorResponse('Contact not found', 404);
             }
 
-            return $this->jsonResponse([
+            return $this->resourceResponse([
                 'message' => 'Contact updated successfully',
-                'contact' => $updated
+                'contact' => MerchantContactResource::make($contact)->toArray(),
             ]);
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -102,28 +87,25 @@ class MerchantContactController extends Controller
 
     public function destroy(int $id, string $siteName): JsonResponse
     {
-        $deleted = $this->contactService->deleteContact($id);
+        try {
+            $deleted = $this->contactService->deleteContact($id);
 
-        if (!$deleted) {
-            return $this->jsonResponse([
-                'message' => 'Contact not found'
-            ], 404);
+            if (!$deleted) {
+                return $this->errorResponse('Contact not found', 404);
+            }
+
+            return $this->successResponse('Contact deleted successfully');
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
-
-        return $this->jsonResponse([
-            'message' => 'Contact deleted successfully'
-        ], 200);
     }
 
     public function getByMerchant(int $merchantId, string $siteName): JsonResponse
     {
         try {
-            $contacts = $this->contactRepository->getByMerchant($merchantId);
+            $contacts = $this->contactService->getContactsByMerchant($merchantId);
 
-            return $this->resourceResponse([
-                'success' => true,
-                'items' => $contacts->toArray()
-            ]);
+            return $this->resourceResponse(MerchantContactResource::collection($contacts)->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

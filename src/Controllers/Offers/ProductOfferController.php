@@ -203,7 +203,7 @@ class ProductOfferController extends Controller
             $configuration = SearchConfigurationFactory::create('product_offer');
             $engine = new SearchEngine($configuration);
 
-            $queryBuilder = ProductOffer::with(['merchant', 'product']);
+            $queryBuilder = ProductOffer::with(['merchant', 'product', 'regionSets']);
             $result = $engine->search($queryBuilder, $criteria);
 
             $collection = new PaginatedResourceCollection($result, OfferResource::class);

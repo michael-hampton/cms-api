@@ -14,6 +14,7 @@ use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Requests\Newsletter\CloneNewsletterLayoutRequest;
 use App\Requests\Newsletter\NewsletterLayoutMigrationReportRequest;
 use App\Requests\Newsletter\StoreNewsletterLayoutRequest;
+use App\Resources\NewsletterLayoutResource;
 use App\Services\Newsletter\NewsletterLayoutService;
 
 class NewsletterLayoutController extends Controller
@@ -21,7 +22,7 @@ class NewsletterLayoutController extends Controller
     public function __construct(
         private readonly NewsletterLayoutService    $layoutService,
         private readonly Logger                     $logger,
-        private readonly NewsletterLayoutRepository $newsletterLayoutRepository
+        private readonly NewsletterLayoutRepository $newsletterLayoutRepository,
     )
     {
         parent::__construct();
@@ -33,7 +34,7 @@ class NewsletterLayoutController extends Controller
             $siteId = (int)$request->input('site_id') ?: SiteContext::getId();
             $layouts = $this->layoutService->getAllLayouts($siteId);
 
-            return $this->resourceResponse(['layouts' => $layouts->toArray()]);
+            return $this->resourceResponse(NewsletterLayoutResource::collection($layouts)->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -43,7 +44,8 @@ class NewsletterLayoutController extends Controller
     {
         try {
             $layouts = $this->layoutService->getSystemLayouts();
-            return $this->resourceResponse(['layouts' => $layouts->toArray()]);
+
+            return $this->resourceResponse(NewsletterLayoutResource::collection($layouts)->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -52,23 +54,21 @@ class NewsletterLayoutController extends Controller
     public function store(StoreNewsletterLayoutRequest $request): JsonResponse
     {
         try {
-
             $data = $request->validated();
-
             $layout = $this->layoutService->createLayout(
                 name: $data['name'],
                 slug: $data['slug'],
                 layoutDefinition: $data['layout_definition'] ?? [],
                 isSystemLayout: false,
-                createdBy: $data['created_by'],
-                siteId: (int)$data['site_id'] ?: SiteContext::getId(),  // ← NEW
+                createdBy: $data['created_by'] ?? null,
+                siteId: SiteContext::getId(),
             );
 
-            return $this->jsonResponse(['layout' => $layout->toArray()], 201);
+            return $this->jsonResponse(NewsletterLayoutResource::make($layout)->toArray(), 201);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\Exception $e) {
             $this->logger->error('Failed to create newsletter layout', ['error' => $e->getMessage()]);
             return $this->errorResponse('Failed to create layout', 500);
@@ -87,7 +87,7 @@ class NewsletterLayoutController extends Controller
                 siteId: (int)$data['site_id'] ?? SiteContext::getId(),
             );
 
-            return $this->jsonResponse(['layout' => $cloned->toArray()], 201);
+            return $this->jsonResponse(NewsletterLayoutResource::make($cloned)->toArray(), 201);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
@@ -121,6 +121,7 @@ class NewsletterLayoutController extends Controller
             }
 
             $versions = $this->layoutService->getLayoutVersionHistory($id);
+
             return $this->resourceResponse(['versions' => $versions->toArray()]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -165,7 +166,7 @@ class NewsletterLayoutController extends Controller
         } catch (\Exception $e) {
             $this->logger->error('Failed to transition layout version state', [
                 'version_id' => $versionId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             return $this->errorResponse('Failed to transition state', 500);
         }
@@ -181,8 +182,8 @@ class NewsletterLayoutController extends Controller
             );
 
             return $this->resourceResponse(['report' => $report]);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {

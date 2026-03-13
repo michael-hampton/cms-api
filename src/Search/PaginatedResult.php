@@ -21,6 +21,11 @@ class PaginatedResult
         $this->data = $data;
     }
 
+    public function transform(callable $callback): void
+    {
+        $this->data = array_map($callback, $this->data);
+    }
+
     public function getTotal(): int
     {
         return $this->total;

@@ -14,20 +14,9 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterIssueRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Requests\Newsletter\CreateNewsletterIssueRequest;
+use App\Resources\NewsletterIssueResource;
 use App\Services\Newsletter\NewsletterIssueService;
 
-/**
- * Handles newsletter issue CRUD and dispatch endpoints.
- *
- * Routes (all scoped to the current site via middleware):
- *
- *   GET    /api/newsletters/{newsletterId}/issues
- *   POST   /api/newsletters/{newsletterId}/issues
- *   GET    /api/newsletters/{newsletterId}/issues/{issueId}
- *   POST   /api/newsletters/{newsletterId}/issues/{issueId}/revert
- *   POST   /api/newsletters/{newsletterId}/issues/{issueId}/send   (pipeline send)
- *   POST   /api/newsletter-issues/{issueId}/send                    (manual ad-hoc send)
- */
 class NewsletterIssueController extends Controller
 {
     public function __construct(
@@ -39,14 +28,8 @@ class NewsletterIssueController extends Controller
         parent::__construct();
     }
 
-    // =========================================================================
-    // List
-    // =========================================================================
-
     /**
      * GET /api/newsletters/{newsletterId}/issues
-     *
-     * Returns all issues for a newsletter, newest-first.
      */
     public function index(Request $request, int $newsletterId): JsonResponse
     {
@@ -59,27 +42,15 @@ class NewsletterIssueController extends Controller
 
             $issues = $this->issueService->listIssues($newsletterId, $siteId);
 
-            return $this->resourceResponse(['issues' => $issues]);
+            return $this->resourceResponse(NewsletterIssueResource::collection($issues)->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    // =========================================================================
-    // Create
-    // =========================================================================
-
-    private function newsletterBelongsToSite(int $newsletterId, int $siteId): bool
-    {
-        $newsletter = $this->newsletterRepository->find($newsletterId);
-
-        return $newsletter !== null && $newsletter->site_id === $siteId;
-    }
-
-    // =========================================================================
-    // Show
-    // =========================================================================
-
+    /**
+     * POST /api/newsletters/{newsletterId}/issues
+     */
     public function store(CreateNewsletterIssueRequest $request, int $newsletterId): JsonResponse
     {
         try {
@@ -92,9 +63,11 @@ class NewsletterIssueController extends Controller
             $dto = NewsletterIssueDTO::fromArray($request->validated());
             $issue = $this->issueService->createIssue($newsletterId, $siteId, $dto);
 
-            return $this->resourceResponse(['issue' => $issue->toArray()], 201);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+            return $this->resourceResponse([
+                'issue' => NewsletterIssueResource::make($issue)->toArray(),
+            ], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\RuntimeException $e) {
@@ -104,14 +77,9 @@ class NewsletterIssueController extends Controller
                 'newsletter_id' => $newsletterId,
                 'error' => $e->getMessage(),
             ]);
-
             return $this->errorResponse('Failed to create issue: ' . $e->getMessage(), 500);
         }
     }
-
-    // =========================================================================
-    // Revert
-    // =========================================================================
 
     /**
      * GET /api/newsletters/{newsletterId}/issues/{issueId}
@@ -126,31 +94,25 @@ class NewsletterIssueController extends Controller
                 return $this->errorResponse('Issue not found', 404);
             }
 
-            return $this->resourceResponse(['issue' => $issue->toArray()]);
+            return $this->resourceResponse([
+                'issue' => NewsletterIssueResource::make($issue)->toArray(),
+            ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    // =========================================================================
-    // Pipeline send (existing — routes to standard send pipeline)
-    // =========================================================================
-
     /**
      * POST /api/newsletters/{newsletterId}/issues/{issueId}/revert
-     *
-     * Read-only operation — returns the issue snapshot so the frontend can
-     * reload the editor.  Does NOT mutate the newsletter record.
      */
     public function revert(Request $request, int $newsletterId, int $issueId): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
-
             $result = $this->issueService->getIssueSnapshot($newsletterId, $issueId, $siteId);
 
             return $this->resourceResponse([
-                'issue' => $result['issue']->toArray(),
+                'issue' => NewsletterIssueResource::make($result['issue'])->toArray(),
                 'snapshot_json' => $result['snapshot_json'],
             ]);
         } catch (\RuntimeException $e) {
@@ -161,19 +123,12 @@ class NewsletterIssueController extends Controller
                 'issue_id' => $issueId,
                 'error' => $e->getMessage(),
             ]);
-
             return $this->errorResponse('Failed to load snapshot: ' . $e->getMessage(), 500);
         }
     }
 
-    // =========================================================================
-    // Manual ad-hoc send
-    // =========================================================================
-
     /**
      * POST /api/newsletters/{newsletterId}/issues/{issueId}/send
-     *
-     * Sends via the standard pipeline and transitions issue status to "sent".
      */
     public function send(Request $request, int $newsletterId, int $issueId): JsonResponse
     {
@@ -184,11 +139,7 @@ class NewsletterIssueController extends Controller
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            $result = $this->issueService->sendIssue(
-                $issueId,
-                $siteId,
-                MemberAuth::getMember()
-            );
+            $result = $this->issueService->sendIssue($issueId, $siteId, MemberAuth::getMember());
 
             if (!$result['success'] && empty($result['partial_failure'])) {
                 return $this->errorResponse($result['error'] ?? 'Send failed', 400);
@@ -212,37 +163,20 @@ class NewsletterIssueController extends Controller
                 'issue_id' => $issueId,
                 'error' => $e->getMessage(),
             ]);
-
             return $this->errorResponse('Failed to send issue: ' . $e->getMessage(), 500);
         }
     }
 
-    // =========================================================================
-    // Private helpers
-    // =========================================================================
-
     /**
      * POST /api/newsletter-issues/{issueId}/send
-     *
-     * Dispatches an issue to all subscribers or a custom email list without
-     * transitioning the issue status.  Queued asynchronously.
-     *
-     * Body:
-     *   send_type     "all" | "custom"
-     *   custom_emails string[]   — required when send_type = "custom"
      */
     public function manualSend(Request $request, int $issueId): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
-
             $dto = IssueManualSendDTO::fromArray($request->all());
-            $result = $this->issueService->manualSendIssue(
-                $issueId,
-                $siteId,
-                $dto,
-                MemberAuth::getMember()
-            );
+
+            $result = $this->issueService->manualSendIssue($issueId, $siteId, $dto, MemberAuth::getMember());
 
             return $this->successResponse($result['message'] ?? 'Issue queued', [
                 'queued' => true,
@@ -262,8 +196,15 @@ class NewsletterIssueController extends Controller
                 'issue_id' => $issueId,
                 'error' => $e->getMessage(),
             ]);
-
             return $this->errorResponse('Failed to queue send: ' . $e->getMessage(), 500);
         }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function newsletterBelongsToSite(int $newsletterId, int $siteId): bool
+    {
+        $newsletter = $this->newsletterRepository->find($newsletterId);
+        return $newsletter !== null && $newsletter->site_id === $siteId;
     }
 }

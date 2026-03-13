@@ -30,8 +30,8 @@ class NewsletterBrandingControllerTest extends FunctionalTestCase
         $response = $this->getForSite("/api/newsletters/{$newsletter->id}/branding");
 
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('design_config', $data['branding']);
-        $this->assertNull($data['branding']['design_config']);
+
+        $this->assertArrayNotHasKey('data', $data);
     }
 
     // ── GET branding ───────────────────────────────────────────────────────────

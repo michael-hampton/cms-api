@@ -14,6 +14,12 @@ class MerchantContact extends Model
         'role',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'is_active' => 'boolean',
+    ];
+
     public function merchant()
     {
         return $this->belongsTo(Merchant::class);

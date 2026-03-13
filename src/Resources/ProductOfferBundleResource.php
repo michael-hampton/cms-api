@@ -10,6 +10,12 @@ class ProductOfferBundleResource extends JsonResource
 {
     public function toArray(): array
     {
+        $regionSets = $this->getAttribute('regionSets');
+
+        $regionSets = $regionSets === null
+            ? null
+            : (is_array($regionSets) ? collect($regionSets) : $regionSets);
+
         return [
             'id' => $this->getAttribute('id'),
             'name' => $this->getAttribute('name'),
@@ -31,51 +37,33 @@ class ProductOfferBundleResource extends JsonResource
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
             'created_by' => $this->getAttribute('created_by'),
             'updated_by' => $this->getAttribute('updated_by'),
-            'items' => collect($this->getAttribute('items') ?? [])?->map(function ($item) {
+            'region_set_ids' => $regionSets?->pluck('id')->toArray() ?? [],
+            'region_sets' => $regionSets?->map(fn($rs) => [
+                    'id' => $rs['id'],
+                    'name' => $rs['name'],
+                ])->toArray() ?? [],
+            'items' => collect($this->getAttribute('items') ?? [])
+                ->map(function ($item) {
+                    $productId = $item['product_id'] ?? $item['productOffer']['product_id'] ?? null;
+                    $merchantId = $item['productOffer']['merchant_id'] ?? null;
+                    $product = $productId ? Product::find($productId) : null;
+                    $merchant = $merchantId ? Merchant::find($merchantId) : ($product?->merchants->first() ?? null);
 
-                $productId =
-                    $item['product_id']
-                    ?? $item['productOffer']['product_id']
-                    ?? null;
-
-                $merchantId = $item['productOffer']['merchant_id'] ?? null;
-
-                $product = $productId ? Product::find($productId) : null;
-
-                $merchant = $merchantId
-                    ? Merchant::find($merchantId)
-                    : ($product?->merchants->first() ?? null);
-
-                return [
-                    'id' => $item['id'],
-                    'product_offer_id' => $item['product_offer_id'] ?? null,
-                    'product_id' => $productId ?? null,
-                    'quantity' => $item['quantity'],
-                    'product_offer' => $item['productOffer'] ? [
-                        'id' => $item['productOffer']['id'],
-                        'sale_price' => $item['productOffer']['sale_price'],
-                        'product' => $product ? [
-                            'id' => $product->id,
-                            'name' => $product->name,
-                            'price' => $product->price,
+                    return [
+                        'id' => $item['id'],
+                        'product_offer_id' => $item['product_offer_id'] ?? null,
+                        'product_id' => $productId,
+                        'quantity' => $item['quantity'],
+                        'product_offer' => $item['productOffer'] ? [
+                            'id' => $item['productOffer']['id'],
+                            'sale_price' => $item['productOffer']['sale_price'],
+                            'product' => $product ? ['id' => $product->id, 'name' => $product->name, 'price' => $product->price] : null,
+                            'merchant' => $merchant ? ['id' => $merchant->id, 'name' => $merchant->name] : null,
                         ] : null,
-                        'merchant' => $merchant ? [
-                            'id' => $merchant->id,
-                            'name' => $merchant->name,
-                        ] : null,
-                    ] : null,
-                    'product' => $product ? [
-                        'id' => $product->id,
-                        'name' => $product->name,
-                        'price' => $product->price,
-                    ] : null,
-                    'merchant' => $merchant ? [
-                        'id' => $merchant->id,
-                        'name' => $merchant->name,
-                    ] : null,
-                ];
-            })->toArray(),
-            //'savings' => $this->calculateSavings(),
+                        'product' => $product ? ['id' => $product->id, 'name' => $product->name, 'price' => $product->price] : null,
+                        'merchant' => $merchant ? ['id' => $merchant->id, 'name' => $merchant->name] : null,
+                    ];
+                })->toArray(),
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Requests\Briefs\AddBriefAttachmentRequest;
 use App\Requests\Briefs\AddBriefCollaboratorRequest;
@@ -18,6 +19,7 @@ use App\Requests\Briefs\StoreBriefRequest;
 use App\Requests\Briefs\UpdateBriefCommentRequest;
 use App\Requests\Briefs\UpdateBriefRequest;
 use App\Requests\Briefs\UpdateBriefTaskRequest;
+use App\Resources\BriefResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\Cms\BriefService;
 use Exception;
@@ -25,7 +27,7 @@ use Exception;
 class BriefController extends Controller
 {
     public function __construct(
-        private readonly BriefService $briefService
+        private readonly BriefService $briefService,
     )
     {
         parent::__construct();
@@ -37,7 +39,8 @@ class BriefController extends Controller
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
             $result = $this->briefService->search($criteria);
 
-            return $this->searchResponse($result);
+            $collection = new PaginatedResourceCollection($result, BriefResource::class);
+            return $this->resourceResponse($collection->toArray(), 200);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -52,7 +55,9 @@ class BriefController extends Controller
                 return $this->errorResponse('Brief not found', 404);
             }
 
-            return $this->resourceResponse(['data' => $brief->toArray()]);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($brief)->toArray(),
+            ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -66,7 +71,9 @@ class BriefController extends Controller
 
             $brief = $this->briefService->createBrief($data);
 
-            return $this->resourceResponse(['data' => $brief->toArray()], 201);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($brief)->toArray(),
+            ], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -80,7 +87,9 @@ class BriefController extends Controller
 
             $brief = $this->briefService->updateBrief($id, $data, $userId);
 
-            return $this->resourceResponse(['data' => $brief->toArray()]);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($brief)->toArray(),
+            ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -104,8 +113,7 @@ class BriefController extends Controller
     public function addAttachment(int $id, AddBriefAttachmentRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $attachment = $this->briefService->addAttachment($id, $data);
+            $attachment = $this->briefService->addAttachment($id, $request->all());
 
             return $this->resourceResponse(['data' => $attachment->toArray()], 201);
         } catch (Exception $e) {
@@ -116,8 +124,7 @@ class BriefController extends Controller
     public function updateAttachment(int $id, int $attachmentId, Request $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $attachment = $this->briefService->updateAttachment($id, $attachmentId, $data);
+            $attachment = $this->briefService->updateAttachment($id, $attachmentId, $request->all());
 
             if (!$attachment) {
                 return $this->errorResponse('Attachment not found', 404);
@@ -161,8 +168,9 @@ class BriefController extends Controller
     public function updateComment(int $id, int $commentId, UpdateBriefCommentRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $comment = $this->briefService->updateComment($id, $commentId, ['content' => $data['content'] ?? '']);
+            $comment = $this->briefService->updateComment($id, $commentId, [
+                'content' => $request->all()['content'] ?? '',
+            ]);
 
             if (!$comment) {
                 return $this->errorResponse('Comment not found', 404);
@@ -192,8 +200,7 @@ class BriefController extends Controller
     public function resolveComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
     {
         try {
-            $userId = $request->get('user_id');
-            $comment = $this->briefService->resolveComment($id, $commentId, $userId);
+            $comment = $this->briefService->resolveComment($id, $commentId, $request->get('user_id'));
 
             return $this->resourceResponse(['data' => $comment->toArray()]);
         } catch (Exception $e) {
@@ -219,8 +226,7 @@ class BriefController extends Controller
     public function convertToPage(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $result = $this->briefService->convertToPage($id, $data);
+            $result = $this->briefService->convertToPage($id, $request->all());
 
             return $this->resourceResponse(['data' => $result]);
         } catch (ValidationException $e) {
@@ -250,7 +256,9 @@ class BriefController extends Controller
         try {
             $newBrief = $this->briefService->duplicateBrief($id, $request->get('user_id'));
 
-            return $this->resourceResponse(['data' => $newBrief->toArray()], 201);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($newBrief)->toArray(),
+            ], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -259,12 +267,11 @@ class BriefController extends Controller
     public function updateStatus(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $newStatus = $request->get('status');
-            $userId = $request->get('user_id');
+            $brief = $this->briefService->updateStatus($id, $request->get('status'), $request->get('user_id'));
 
-            $brief = $this->briefService->updateStatus($id, $newStatus, $userId);
-
-            return $this->resourceResponse(['data' => $brief->toArray()]);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($brief)->toArray(),
+            ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -331,8 +338,7 @@ class BriefController extends Controller
 
             $this->briefService->bulkDelete($briefIds);
 
-            $count = count($briefIds);
-            return $this->successResponse("Deleted {$count} briefs");
+            return $this->successResponse('Deleted ' . count($briefIds) . ' briefs');
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -341,8 +347,7 @@ class BriefController extends Controller
     public function getTemplates(Request $request, string $siteName): JsonResponse
     {
         try {
-            $siteId = SiteContext::getId();
-            $templates = $this->briefService->getTemplatesForSite($siteId);
+            $templates = $this->briefService->getTemplatesForSite(SiteContext::getId());
 
             return $this->resourceResponse(['items' => $templates]);
         } catch (Exception $e) {
@@ -358,7 +363,9 @@ class BriefController extends Controller
 
             $brief = $this->briefService->createFromTemplate($templateId, $data);
 
-            return $this->resourceResponse(['data' => $brief->toArray()], 201);
+            return $this->resourceResponse([
+                'data' => BriefResource::make($brief)->toArray(),
+            ], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -367,14 +374,12 @@ class BriefController extends Controller
     public function saveAsTemplate(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $templateData = [
+            $template = $this->briefService->saveAsTemplate($id, [
                 'name' => $request->get('name'),
                 'description' => $request->get('description'),
                 'type' => $request->get('type', 'custom'),
-                'created_by' => $request->get('user_id')
-            ];
-
-            $template = $this->briefService->saveAsTemplate($id, $templateData);
+                'created_by' => $request->get('user_id'),
+            ]);
 
             return $this->resourceResponse(['data' => $template->toArray()], 201);
         } catch (Exception $e) {
@@ -395,8 +400,7 @@ class BriefController extends Controller
     public function addCollaborator(int $id, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $collaborator = $this->briefService->addCollaborator($id, $data, $request->get('user_id'));
+            $collaborator = $this->briefService->addCollaborator($id, $request->all(), $request->get('user_id'));
 
             return $this->resourceResponse(['data' => $collaborator->toArray()], 201);
         } catch (Exception $e) {
@@ -407,8 +411,7 @@ class BriefController extends Controller
     public function updateCollaborator(int $id, int $collaboratorId, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $updated = $this->briefService->updateCollaborator($id, $collaboratorId, $data);
+            $updated = $this->briefService->updateCollaborator($id, $collaboratorId, $request->all());
 
             return $this->resourceResponse(['data' => $updated->toArray()]);
         } catch (Exception $e) {
@@ -444,9 +447,7 @@ class BriefController extends Controller
     public function createTask(int $id, CreateBriefTaskRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $task = $this->briefService->createTask($id, $data);
-
+            $task = $this->briefService->createTask($id, $request->all());
             $taskData = $task->toArray();
             $taskData['due_date'] = $task->due_date?->format('Y-m-d') ?? '';
 
@@ -459,8 +460,7 @@ class BriefController extends Controller
     public function updateTask(int $id, int $taskId, UpdateBriefTaskRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $task = $this->briefService->updateTask($taskId, $data);
+            $task = $this->briefService->updateTask($taskId, $request->all());
 
             return $this->resourceResponse(['data' => $task->toArray()]);
         } catch (Exception $e) {
@@ -526,8 +526,7 @@ class BriefController extends Controller
     public function addRelationship(int $id, AddBriefRelationshipRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $relationship = $this->briefService->addRelationship($id, $data);
+            $relationship = $this->briefService->addRelationship($id, $request->all());
 
             return $this->resourceResponse(['data' => $relationship->toArray()], 201);
         } catch (Exception $e) {
@@ -553,8 +552,7 @@ class BriefController extends Controller
     public function addWorkflowChange(int $id, AddBriefWorkflowChangeRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $workflow = $this->briefService->addWorkflowChange($id, $data);
+            $workflow = $this->briefService->addWorkflowChange($id, $request->all());
 
             return $this->resourceResponse(['data' => $workflow->toArray()], 201);
         } catch (Exception $e) {
@@ -575,9 +573,7 @@ class BriefController extends Controller
     public function setDeadline(int $id, SetBriefDeadlineRequest $request, string $siteName): JsonResponse
     {
         try {
-            $data = $request->all();
-            $deadline = $this->briefService->setDeadline($id, $data);
-
+            $deadline = $this->briefService->setDeadline($id, $request->all());
             $deadlineData = $deadline->toArray();
             $deadlineData['due_date'] = $deadline->due_date?->format('Y-m-d H:i:s') ?? '';
 
@@ -621,33 +617,22 @@ class BriefController extends Controller
                 return $this->errorResponse('No file provided', 400);
             }
 
-            $fileUpload = new \App\Framework\FileUpload\FileUpload(
-                $file,
-                'uploads/briefs/' . $id
-            );
-
-            $fileUpload->setAllowedExtensions([
-                'pdf', 'doc', 'docx', 'xls', 'xlsx',
-                'ppt', 'pptx', 'txt', 'csv'
-            ]);
-
+            $fileUpload = new \App\Framework\FileUpload\FileUpload($file, 'uploads/briefs/' . $id);
+            $fileUpload->setAllowedExtensions(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv']);
             $fileUpload->setMaxSize(10 * 1024 * 1024);
-
             $filePath = $fileUpload->store();
 
-            $attachmentData = [
+            $attachment = $this->briefService->addAttachment($id, [
                 'type' => 'document',
                 'file_url' => $filePath,
                 'file_name' => $file->getClientOriginalName(),
                 'filesize' => $file->getSize(),
                 'metadata' => [
                     'description' => $request->get('description', ''),
-                    'mime_type' => $file->getMimeType()
+                    'mime_type' => $file->getMimeType(),
                 ],
-                'sort_order' => 0
-            ];
-
-            $attachment = $this->briefService->addAttachment($id, $attachmentData);
+                'sort_order' => 0,
+            ]);
 
             return $this->resourceResponse(['data' => $attachment->toArray()], 201);
         } catch (Exception $e) {

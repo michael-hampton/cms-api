@@ -24,7 +24,7 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertCount(2, $data['issues']);
+        $this->assertCount(2, $data['data']);
     }
 
     private function createNewsletterIssue(Newsletter $newsletter, array $attributes = []): NewsletterIssue
@@ -45,8 +45,8 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertIsArray($data['issues']);
-        $this->assertCount(0, $data['issues']);
+        $this->assertIsArray($data['data']);
+        $this->assertCount(0, $data['data']);
     }
 
     public function test_index_returns_404_for_nonexistent_newsletter(): void
@@ -83,8 +83,8 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $response = $this->getForSite("/api/newsletters/{$newsletterA->id}/issues");
 
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(1, $data['issues']);
-        $this->assertEquals('A Issue', $data['issues'][0]['subject']);
+        $this->assertCount(1, $data['data']);
+        $this->assertEquals('A Issue', $data['data'][0]['subject']);
     }
 
     public function test_create_issue_returns_201_with_draft_issue(): void

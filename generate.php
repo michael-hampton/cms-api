@@ -21,6 +21,7 @@ require_once __DIR__ . '/src/OpenApiGenerator/RequestAnalyzer.php';
 require_once __DIR__ . '/src/OpenApiGenerator/ResponseInferer.php';
 require_once __DIR__ . '/src/OpenApiGenerator/SchemaBuilder.php';
 require_once __DIR__ . '/src/OpenApiGenerator/OpenApiBuilder.php';
+require_once __DIR__ . '/src/OpenApiGenerator/ResourceInspector.php';
 
 use App\OpenApiGenerator\OpenApiBuilder;
 use App\OpenApiGenerator\Reflector;
@@ -55,7 +56,13 @@ $reflector = new Reflector($srcPath);
 $routeParser = new RouteParser($srcPath, $reflector);
 $requestAnalyzer = new RequestAnalyzer($reflector);
 $responseInferer = new ResponseInferer($reflector);
-$schemaBuilder = new SchemaBuilder();
+
+$srcPath = __DIR__ . '/src';
+$reflector = new Reflector($srcPath);
+$inspector = new \App\OpenApiGenerator\ResourceInspector($reflector);
+
+$schemaBuilder = new SchemaBuilder($inspector);
+
 $builder = new OpenApiBuilder($reflector, $requestAnalyzer, $responseInferer, $schemaBuilder);
 
 // ── Parse routes ──────────────────────────────────────────────────────────────

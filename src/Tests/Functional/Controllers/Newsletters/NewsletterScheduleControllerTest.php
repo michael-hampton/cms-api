@@ -156,7 +156,7 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(422, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('already exists', $data['message']);
+        $this->assertStringContainsString('already exists', $data['error']);
     }
 
     public function test_store_creation_validates_missing_frequency(): void
@@ -201,7 +201,7 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(500, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('day_of_week', $data['message']);
+        $this->assertStringContainsString('day_of_week', $data['error']);
     }
 
     public function test_store_creation_validates_missing_day_of_month_for_monthly(): void
@@ -217,7 +217,7 @@ class NewsletterScheduleControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertStringContainsString('day_of_month', $data['message']);
+        $this->assertStringContainsString('day_of_month', $data['error']);
     }
 
     public function test_store_creation_validates_missing_time(): void

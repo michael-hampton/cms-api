@@ -353,9 +353,10 @@ class OpenApiBuilder
     private function registerResponseComponents(array $route, array $response): void
     {
         $resource = $this->guessResourceName($route);
+        $tag = $route['tag'] ?? '';
 
         if (!isset($this->components['schemas'][$resource])) {
-            $baseSchema = $this->schemaBuilder->buildResourceSchema($resource);
+            $baseSchema = $this->schemaBuilder->buildResourceSchema($resource, $tag);
 
             // For write operations, enrich the resource schema with request fields
             $httpMethod = strtoupper($route['method']);

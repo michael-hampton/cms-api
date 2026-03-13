@@ -20,11 +20,12 @@ class MerchantContactControllerTest extends FunctionalTestCase
         $this->createMerchantContact(['name' => 'Contact 2']);
 
         $response = $this->getForSite('/api/merchant-contacts');
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
-        $this->assertGreaterThanOrEqual(2, count($data['items']));
+        $this->assertGreaterThanOrEqual(2, count($data['data']));
     }
 
     // =========================================================================
@@ -141,8 +142,8 @@ class MerchantContactControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertArrayHasKey('contact', $data['data']);
-        $this->assertEquals($contact->id, $data['data']['contact']['id']);
+        $this->assertArrayHasKey('contact', $data);
+        $this->assertEquals($contact->id, $data['contact']['id']);
     }
 
     public function testShowContactReturns404WhenNotFound(): void
@@ -166,7 +167,7 @@ class MerchantContactControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('New Name', $data['data']['contact']['name']);
+        $this->assertEquals('New Name', $data['contact']['name']);
 
         $updated = MerchantContact::find($contact->id);
         $this->assertEquals('New Name', $updated->name);
@@ -233,6 +234,6 @@ class MerchantContactControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(2, $data['items']);
+        $this->assertCount(2, $data['data']);
     }
 }

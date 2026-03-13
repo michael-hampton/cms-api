@@ -444,7 +444,8 @@ class CampaignControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(1, $data['campaigns']);
-        $this->assertEquals('active', $data['campaigns'][0]['slug']);
+
+        $this->assertCount(1, $data['data']);
+        $this->assertEquals('active', $data['data'][0]['slug']);
     }
 }

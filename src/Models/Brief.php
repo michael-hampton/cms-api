@@ -22,11 +22,15 @@ class Brief extends Model
         'last_activity_user_id',
         'parent_brief_id',
         'target_audience',
-        'is_active'
+        'is_active',
+        'created_at',
+        'updated_at'
     ];
 
     protected $casts = [
-        'converted_at' => 'datetime'
+        'converted_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
 
     protected $alwaysInclude = [

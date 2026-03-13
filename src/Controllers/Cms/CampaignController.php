@@ -12,13 +12,15 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CampaignRepository;
 use App\Requests\CreateCampaignRequest;
 use App\Requests\UpdateBrandRequest;
+use App\Resources\CampaignResource;
 use App\Services\Cms\CampaignService;
 
 class CampaignController extends Controller
 {
     public function __construct(
+        private readonly CampaignService $campaignService,
         private readonly CampaignRepository $campaignRepository,
-        private readonly CampaignService    $campaignService
+        private readonly Logger          $logger,
     )
     {
         parent::__construct();
@@ -30,25 +32,14 @@ class CampaignController extends Controller
             $siteId = $request->getSiteId();
             $campaigns = $this->campaignRepository->getBySite($siteId);
 
-            $campaignsData = $campaigns->map(function ($campaign) {
-                return array_merge($campaign->toArray(), [
-                    'subscriber_count' => $this->campaignRepository->getSubscriberCount($campaign->id),
-                    'is_currently_active' => $campaign->isActive(),
-                    'has_ended' => $campaign->hasEnded(),
-                    'created_at' => $campaign->created_at->format('Y-m-d H:i:s'),
-                    'start_date' => $campaign->start_date?->format('Y-m-d H:i:s'),
-                    'end_date' => $campaign->end_date?->format('Y-m-d H:i:s'),
-                ]);
-            });
-
-            $stats = $this->buildStats($campaigns);
+            $campaignResults = CampaignResource::collection($campaigns)->toArray();
 
             return $this->resourceResponse([
-                'campaigns' => $campaignsData->toArray(),
-                'stats' => $stats,
+                'campaigns' => $campaignResults['data'],
+                'stats' => $this->buildStats($campaigns),
             ]);
         } catch (\Exception $e) {
-            Logger::error('Failed to fetch campaigns', ['error' => $e->getMessage()]);
+            $this->logger->error('Failed to fetch campaigns', ['error' => $e->getMessage()]);
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
@@ -56,20 +47,21 @@ class CampaignController extends Controller
     public function show(Request $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
-            $campaign = $this->campaignRepository->find($id);
+            $result = $this->campaignService->getCampaignWithStats($id, $request->getSiteId());
 
-            if (!$campaign || $campaign->site_id !== $siteId) {
+            if (!$result) {
                 return $this->errorResponse('Campaign not found', 404);
             }
 
-            $data = array_merge($campaign->toArray(), [
-                'subscriber_count' => $this->campaignRepository->getSubscriberCount($campaign->id),
-                'is_currently_active' => $campaign->isActive(),
-                'has_ended' => $campaign->hasEnded(),
-            ]);
+            // getCampaignWithStats returns campaign as array — wrap the model for Resource
+            $campaign = $this->campaignRepository->find($id);
 
-            return $this->resourceResponse(['campaign' => $data]);
+            return $this->resourceResponse([
+                'campaign' => CampaignResource::make($campaign)->toArray(),
+                'subscriber_count' => $result['subscriber_count'],
+                'is_active' => $result['is_currently_active'],
+                'has_ended' => $result['has_ended'],
+            ]);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -78,22 +70,17 @@ class CampaignController extends Controller
     public function create(CreateCampaignRequest $request): JsonResponse
     {
         try {
-            $siteId = SiteContext::getId();
-            $data = $request->validated();
-            $slug = $data['slug'];
+            $campaign = $this->campaignRepository->create(
+                array_merge($request->validated(), ['site_id' => SiteContext::getId()])
+            );
 
-            $existing = $this->campaignRepository->findBySlug($slug, $siteId);
-            if ($existing) {
-                return $this->errorResponse('Campaign with this slug already exists', 400);
-            }
-
-            $campaign = $this->campaignRepository->create($data);
-
-            return $this->jsonResponse(['campaign' => $campaign->toArray()], 201);
+            return $this->jsonResponse([
+                'campaign' => CampaignResource::make($campaign)->toArray(),
+            ], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\Exception $e) {
-            Logger::error('Failed to create campaign', ['error' => $e->getMessage()]);
+            $this->logger->error('Failed to create campaign', ['error' => $e->getMessage()]);
             return $this->errorResponse('Failed to create campaign: ' . $e->getMessage(), 500);
         }
     }
@@ -108,21 +95,13 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign not found', 404);
             }
 
-            $newSlug = $request->input('slug');
-            if ($newSlug && $newSlug !== $campaign->slug) {
-                $existing = $this->campaignRepository->findBySlug($newSlug, $siteId);
-                if ($existing && $existing->id !== $id) {
-                    return $this->errorResponse('Campaign with this slug already exists', 400);
-                }
-            }
-
             $updated = $this->campaignRepository->update($id, $request->validated());
 
             return $this->successResponse('Campaign updated successfully', [
-                'campaign' => $updated->toArray(),
+                'campaign' => CampaignResource::make($updated)->toArray(),
             ]);
         } catch (\Exception $e) {
-            Logger::error('Failed to update campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->logger->error('Failed to update campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to update campaign: ' . $e->getMessage(), 500);
         }
     }
@@ -130,26 +109,23 @@ class CampaignController extends Controller
     public function delete(Request $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
-            $campaign = $this->campaignRepository->find($id);
+            $check = $this->campaignService->canDeleteCampaign($id);
 
-            if (!$campaign || $campaign->site_id !== $siteId) {
-                return $this->errorResponse('Campaign not found', 404);
+            if (!$check['can_delete']) {
+                return $this->errorResponse($check['reason'], 400);
             }
 
-            $subscriberCount = $this->campaignRepository->getSubscriberCount($id);
-            if ($subscriberCount > 0) {
-                return $this->errorResponse(
-                    "Cannot delete campaign with {$subscriberCount} subscribers. Deactivate instead.",
-                    400
-                );
+            $campaign = $this->campaignRepository->find($id);
+
+            if (!$campaign || $campaign->site_id !== $request->getSiteId()) {
+                return $this->errorResponse('Campaign not found', 404);
             }
 
             $this->campaignRepository->delete($id);
 
             return $this->successResponse('Campaign deleted successfully');
         } catch (\Exception $e) {
-            Logger::error('Failed to delete campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->logger->error('Failed to delete campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to delete campaign: ' . $e->getMessage(), 500);
         }
     }
@@ -184,10 +160,11 @@ class CampaignController extends Controller
     public function getActive(Request $request): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
-            $campaigns = $this->campaignService->getActiveCampaignsForDisplay($siteId);
+            $campaigns = $this->campaignRepository->getActiveCampaigns($request->getSiteId());
 
-            return $this->resourceResponse(['campaigns' => $campaigns]);
+            return $this->resourceResponse(
+                CampaignResource::collection($campaigns)->toArray(),
+            );
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -196,18 +173,17 @@ class CampaignController extends Controller
     public function pause(Request $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
-            $result = $this->campaignService->pauseCampaign($id, $siteId);
+            $result = $this->campaignService->pauseCampaign($id, $request->getSiteId());
 
             if (!$result['success']) {
-                return $this->errorResponse($result['error'], $result['code']);
+                return $this->errorResponse($result['error'], $result['code'] ?? 422);
             }
 
-            return $this->successResponse($result['message'], [
-                'campaign' => $result['campaign']->toArray(),
+            return $this->successResponse('Campaign paused', [
+                'campaign' => CampaignResource::make($result['campaign'])->toArray(),
             ]);
         } catch (\Exception $e) {
-            Logger::error('Failed to pause campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->logger->error('Failed to pause campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to pause campaign: ' . $e->getMessage(), 500);
         }
     }
@@ -215,18 +191,17 @@ class CampaignController extends Controller
     public function resume(Request $request, int $id): JsonResponse
     {
         try {
-            $siteId = $request->getSiteId();
-            $result = $this->campaignService->resumeCampaign($id, $siteId);
+            $result = $this->campaignService->resumeCampaign($id, $request->getSiteId());
 
             if (!$result['success']) {
-                return $this->errorResponse($result['error'], $result['code']);
+                return $this->errorResponse($result['error'], $result['code'] ?? 422);
             }
 
-            return $this->successResponse($result['message'], [
-                'campaign' => $result['campaign']->toArray(),
+            return $this->successResponse('Campaign resumed', [
+                'campaign' => CampaignResource::make($result['campaign'])->toArray(),
             ]);
         } catch (\Exception $e) {
-            Logger::error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->logger->error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to resume campaign: ' . $e->getMessage(), 500);
         }
     }

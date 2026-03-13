@@ -4,11 +4,13 @@ namespace App\Controllers\Newsletter;
 
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterCreationScheduleRepository;
 use App\Repositories\Newsletters\NewsletterSendScheduleRepository;
 use App\Requests\Newsletter\CreateNewsletterScheduleRequest;
 use App\Requests\Newsletter\UpdateNewsletterScheduleRequest;
+use App\Resources\NewsletterSendScheduleResource;
 use App\Services\Newsletter\NewsletterScheduleService;
 use DomainException;
 
@@ -27,19 +29,16 @@ class NewsletterScheduleController extends Controller
     // GET /newsletters/{newsletterId}/schedules
     // =========================================================================
 
-    /**
-     * Returns both schedules for the given newsletter.
-     * Frontend expects: { schedules: { creation: {...}|null, send: {...}|null } }
-     */
-    public function index(int $newsletterId): mixed
+    public function index(int $newsletterId): JsonResponse
     {
         $creation = $this->creationRepo->findByNewsletterId($newsletterId);
         $send = $this->sendRepo->findByNewsletterId($newsletterId);
 
         return $this->resourceResponse([
             'schedules' => [
+                // TODO: Replace ->toArray() with NewsletterCreationScheduleResource once model is available
                 'creation' => $creation?->toArray(),
-                'send' => $send?->toArray(),
+                'send' => $send ? NewsletterSendScheduleResource::make($send)->toArray() : null,
             ],
         ]);
     }
@@ -48,10 +47,7 @@ class NewsletterScheduleController extends Controller
     // Creation Schedule
     // =========================================================================
 
-    /**
-     * POST /newsletters/{newsletterId}/schedules/creation
-     */
-    public function storeCreation(CreateNewsletterScheduleRequest $request, int $newsletterId): mixed
+    public function storeCreation(CreateNewsletterScheduleRequest $request, int $newsletterId): JsonResponse
     {
         try {
             $schedule = $this->scheduleService->createCreationSchedule(
@@ -60,49 +56,43 @@ class NewsletterScheduleController extends Controller
                 $request->validated()
             );
 
+            // TODO: Replace ->toArray() with NewsletterCreationScheduleResource once model is available
             return $this->resourceResponse(['schedule' => $schedule->toArray()], 201);
-
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+            return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * PUT /newsletters/{newsletterId}/schedules/creation/{scheduleId}
-     */
-    public function updateCreation(UpdateNewsletterScheduleRequest $request, int $newsletterId, int $scheduleId): mixed
+    public function updateCreation(UpdateNewsletterScheduleRequest $request, int $newsletterId, int $scheduleId): JsonResponse
     {
         try {
             $schedule = $this->scheduleService->updateCreationSchedule($scheduleId, $request->validated());
 
+            // TODO: Replace ->toArray() with NewsletterCreationScheduleResource once model is available
             return $this->resourceResponse(['schedule' => $schedule->toArray()]);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+            return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * DELETE /newsletters/{newsletterId}/schedules/creation/{scheduleId}
-     */
-    public function destroyCreation(int $newsletterId, int $scheduleId): mixed
+    public function destroyCreation(int $newsletterId, int $scheduleId): JsonResponse
     {
         try {
             $this->scheduleService->cancelCreationSchedule($scheduleId);
 
-            return $this->resourceResponse(['success' => true, 'message' => 'Creation schedule cancelled']);
-
+            return $this->successResponse('Creation schedule cancelled');
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 404);
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
@@ -110,10 +100,7 @@ class NewsletterScheduleController extends Controller
     // Send Schedule
     // =========================================================================
 
-    /**
-     * POST /newsletters/{newsletterId}/schedules/send
-     */
-    public function storeSend(CreateNewsletterScheduleRequest $request, int $newsletterId): mixed
+    public function storeSend(CreateNewsletterScheduleRequest $request, int $newsletterId): JsonResponse
     {
         try {
             $schedule = $this->scheduleService->createSendSchedule(
@@ -122,49 +109,45 @@ class NewsletterScheduleController extends Controller
                 $request->validated()
             );
 
-            return $this->resourceResponse(['schedule' => $schedule->toArray()], 201);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+            return $this->resourceResponse([
+                'schedule' => NewsletterSendScheduleResource::make($schedule)->toArray(),
+            ], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+            return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * PUT /newsletters/{newsletterId}/schedules/send/{scheduleId}
-     */
-    public function updateSend(UpdateNewsletterScheduleRequest $request, int $newsletterId, int $scheduleId): mixed
+    public function updateSend(UpdateNewsletterScheduleRequest $request, int $newsletterId, int $scheduleId): JsonResponse
     {
         try {
             $schedule = $this->scheduleService->updateSendSchedule($scheduleId, $request->validated());
 
-            return $this->resourceResponse(['schedule' => $schedule->toArray()]);
-
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+            return $this->resourceResponse([
+                'schedule' => NewsletterSendScheduleResource::make($schedule)->toArray(),
+            ]);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+            return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * DELETE /newsletters/{newsletterId}/schedules/send/{scheduleId}
-     */
-    public function destroySend(int $newsletterId, int $scheduleId): mixed
+    public function destroySend(int $newsletterId, int $scheduleId): JsonResponse
     {
         try {
             $this->scheduleService->cancelSendSchedule($scheduleId);
 
-            return $this->resourceResponse(['success' => true, 'message' => 'Send schedule cancelled']);
-
+            return $this->successResponse('Send schedule cancelled');
         } catch (DomainException $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 404);
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 500);
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 }

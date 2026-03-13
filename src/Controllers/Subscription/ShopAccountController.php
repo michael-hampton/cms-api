@@ -36,6 +36,10 @@ class ShopAccountController extends Controller
 
     public function overview(Request $request): mixed
     {
+        if (!MemberAuth::check()) {
+            return $this->errorResponse('Unauthorized');
+        }
+
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 

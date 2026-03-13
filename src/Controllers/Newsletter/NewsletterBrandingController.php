@@ -10,6 +10,7 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Requests\Newsletter\SaveNewsletterBrandingRequest;
+use App\Resources\NewsletterBrandingConfigurationResource;
 use App\Services\Newsletter\NewsletterBrandingService;
 
 class NewsletterBrandingController extends Controller
@@ -17,7 +18,7 @@ class NewsletterBrandingController extends Controller
     public function __construct(
         private readonly NewsletterBrandingService $brandingService,
         private readonly Logger                    $logger,
-        private readonly NewsletterRepository $newsletterRepository
+        private readonly NewsletterRepository $newsletterRepository,
     )
     {
         parent::__construct();
@@ -26,24 +27,28 @@ class NewsletterBrandingController extends Controller
     public function show(int $newsletterId): JsonResponse
     {
         try {
-
             $newsletter = $this->newsletterRepository->find($newsletterId);
 
             if (!$newsletter) {
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            $branding = $this->brandingService->getBranding($newsletterId)?->toArray();
+            $branding = $this->brandingService->getBranding($newsletterId);
 
-            $branding['design_config'] = $newsletter->design_config
-                ? (is_string($newsletter->design_config)
-                    ? json_decode($newsletter->design_config, true)
-                    : $newsletter->design_config)
+            $brandingData = $branding
+                ? NewsletterBrandingConfigurationResource::make($branding)->toArray()
                 : null;
 
-            return $this->resourceResponse([
-                'branding' => $branding
-            ]);
+            // design_config lives on the newsletter itself, not the branding record
+            if ($brandingData !== null) {
+                $brandingData['design_config'] = $newsletter->design_config
+                    ? (is_string($newsletter->design_config)
+                        ? json_decode($newsletter->design_config, true)
+                        : $newsletter->design_config)
+                    : null;
+            }
+
+            return $this->resourceResponse($brandingData ?? []);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -66,22 +71,18 @@ class NewsletterBrandingController extends Controller
             }
 
             $branding = $this->brandingService->saveBranding($newsletterId, $data);
+            $brandingData = NewsletterBrandingConfigurationResource::make($branding)->toArray();
 
             $brandingJson = $request->input('branding_json', []);
 
-            $branding = $branding->toArray();
-
             if (isset($brandingJson['design_config'])) {
-                $newsletter->update([
-                    'design_config' => json_encode($brandingJson['design_config'])
-                ]);
-                $branding['design_config'] = $brandingJson['design_config'];
+                $newsletter->update(['design_config' => json_encode($brandingJson['design_config'])]);
+                $brandingData['design_config'] = $brandingJson['design_config'];
             }
 
-
-            return $this->successResponse('Branding saved', ['branding' => $branding]);
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+            return $this->successResponse('Branding saved', ['branding' => $brandingData]);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\Exception $e) {
@@ -109,7 +110,9 @@ class NewsletterBrandingController extends Controller
             $versionNumber = (int)$request->input('version_number');
             $branding = $this->brandingService->restoreBrandingVersion($newsletterId, $versionNumber);
 
-            return $this->successResponse('Branding version restored', ['branding' => $branding->toArray()]);
+            return $this->successResponse('Branding version restored', [
+                'branding' => NewsletterBrandingConfigurationResource::make($branding)->toArray(),
+            ]);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
