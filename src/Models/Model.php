@@ -30,6 +30,8 @@ abstract class Model
 
     protected static $observers = [];
     protected static $globalEvents = [];
+
+    protected array $defaults = [];
     /**
      * @var mixed|null
      */
@@ -102,6 +104,7 @@ abstract class Model
         );
 
         if (!empty($attributes)) {
+            $attributes = array_merge($this->defaults, $attributes);
             $this->fill($attributes);
         }
     }

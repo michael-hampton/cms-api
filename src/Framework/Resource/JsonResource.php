@@ -37,20 +37,25 @@ abstract class JsonResource
 
     protected function whenLoaded(string $relationship, $value = null, $default = null)
     {
-        if (is_array($this->resource) && isset($this->resource[$relationship])) {
+        $relation = null;
 
-            if (is_callable($value)) {
-                return $value(collect($this->resource[$relationship]));
-            }
-
-            return $value ?: $this->resource[$relationship];
+        if (is_array($this->resource) && array_key_exists($relationship, $this->resource)) {
+            $relation = $this->resource[$relationship];
         }
 
-        if (is_object($this->resource) && property_exists($this->resource, $relationship)) {
-            return $value ?: $this->resource->{$relationship};
+        if (is_object($this->resource) && $this->resource->{$relationship}) {
+            $relation = $this->resource->{$relationship};
         }
 
-        return $default;
+        if ($relation === null) {
+            return $default;
+        }
+
+        if (is_callable($value)) {
+            return $value($relation);
+        }
+
+        return $relation;
     }
 
     /**
@@ -86,7 +91,7 @@ abstract class JsonResource
         foreach ($keys as $segment) {
             if (is_array($value) && isset($value[$segment])) {
                 $value = $value[$segment];
-            } elseif (is_object($value) && property_exists($value, $segment)) {
+            } elseif (is_object($value) && $value->{$segment}) {
                 $value = $value->{$segment};
             } else {
                 return $default;

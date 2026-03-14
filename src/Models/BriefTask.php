@@ -2,8 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\TracksCreator;
+
 class BriefTask extends Model
 {
+    use TracksCreator;
+
     protected $table = 'brief_tasks';
 
     protected $fillable = [

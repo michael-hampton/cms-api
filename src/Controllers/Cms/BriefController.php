@@ -641,6 +641,91 @@ class BriefController extends Controller
         }
     }
 
+    public function clone(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $brief = $this->briefService->getCompleteBrief($id);
+
+            if (!$brief) {
+                return $this->errorResponse('Brief not found', 404);
+            }
+
+            $clone = $this->briefService->cloneBrief(
+                $id,
+                $request->get('user_id'),
+                $request->get('title'),
+                (bool)($request->get('includeSubtasks', true))
+            );
+
+            return $this->resourceResponse(
+                ['data' => BriefResource::make($clone)->toArray()],
+                201
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function createSchedule(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $schedule = $this->briefService->createSchedule($id, $request->all());
+
+            $data = $schedule->toArray();
+
+            foreach (['created_at', 'updated_at', 'end_date'] as $f) {
+                $data[$f] = isset($data[$f]) ? ($data[$f])->format('Y-m-d') : null;
+            }
+
+            return $this->resourceResponse(['data' => $data], 201);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function getSchedule(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $schedule = $this->briefService->getSchedule($id);
+
+            return $this->resourceResponse([
+                'data' => $schedule?->toArray(),
+            ]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function updateSchedule(int $id, Request $request, string $siteName): JsonResponse
+    {
+        try {
+            $schedule = $this->briefService->updateSchedule($id, $request->all());
+
+            if (!$schedule) {
+                return $this->errorResponse('Schedule not found', 404);
+            }
+
+            return $this->resourceResponse(['data' => $schedule->toArray()]);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function deleteSchedule(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $deactivated = $this->briefService->deactivateSchedule($id);
+
+            if (!$deactivated) {
+                return $this->errorResponse('Schedule not found', 404);
+            }
+
+            return $this->noContentResponse(); // 204
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
     public function convertBriefToArticle(
         int                          $id,
         ConvertBriefToArticleRequest $request,
@@ -660,6 +745,29 @@ class BriefController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function runSchedule(int $id, string $siteName): JsonResponse
+    {
+        try {
+            $schedule = $this->briefService->getSchedule($id);
+
+            if (!$schedule || !$schedule->active) {
+                return $this->errorResponse('No active schedule found', 404);
+            }
+
+            // Clone immediately without mutating the schedule's nextRunAt
+            $this->briefService->cloneBrief(
+                $schedule->source_brief_id,
+                $schedule->owner_id,
+                null,
+                true
+            );
+
+            return $this->resourceResponse(['data' => $schedule->toArray()]);
+        } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

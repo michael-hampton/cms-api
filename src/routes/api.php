@@ -102,6 +102,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/briefs/{id}', [BriefController::class, 'show']);
         $router->put('/briefs/{id}', [BriefController::class, 'update']);
         $router->delete('/briefs/{id}', [BriefController::class, 'destroy']);
+        $router->post('/briefs/{id}/clone', [BriefController::class, 'clone']);
+        $router->post('/briefs/{id}/schedule', [BriefController::class, 'createSchedule']);
+        $router->get('/briefs/{id}/schedule', [BriefController::class, 'getSchedule']);
+        $router->put('/briefs/{id}/schedule', [BriefController::class, 'updateSchedule']);
+        $router->delete('/briefs/{id}/schedule', [BriefController::class, 'deleteSchedule']);
 
         // Brief attachments
         $router->post('/briefs/{id}/attachments', [BriefController::class, 'addAttachment']);

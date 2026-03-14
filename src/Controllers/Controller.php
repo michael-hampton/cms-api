@@ -182,4 +182,9 @@ abstract class Controller
     {
         throw new HttpException($statusCode, $message, $headers);
     }
+
+    protected function noContentResponse()
+    {
+        return new JsonResponse('', 204);
+    }
 }

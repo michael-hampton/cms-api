@@ -3,12 +3,11 @@
 namespace App\Framework\Console\Commands;
 
 use App\Framework\Console\Command;
-use App\Framework\Support\PathHelper;
 
 class MakeMigrationCommand extends Command
 {
     protected $signature = 'make:migration {name}';
-    protected $description = 'Create a new migration file';
+    public $description = 'Create a new migration file';
 
     public function handle(): int
     {

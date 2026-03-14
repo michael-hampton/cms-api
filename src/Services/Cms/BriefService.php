@@ -12,10 +12,12 @@ use App\Framework\Support\Collection;
 use App\Models\Brief;
 use App\Models\BriefDeadline;
 use App\Models\BriefRelationship;
+use App\Models\BriefSchedule;
 use App\Models\BriefWorkflowHistory;
 use App\Models\Model;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefScheduleRepository;
 use App\Repositories\Cms\Briefs\BriefTaskRepository;
 use App\Repositories\Cms\Briefs\BriefTemplateRepository;
 use App\Repositories\Cms\Briefs\BriefVersionRepository;
@@ -36,7 +38,9 @@ class BriefService
         private readonly DuplicateBrief              $duplicateBrief,
         private readonly BulkAssignCollaborator      $bulkAssignCollaborator,
         private readonly ConvertBriefToPage          $convertBriefToPage,
-        private readonly Database                    $database
+        private readonly Database                $database,
+        private readonly BriefScheduleRepository $scheduleRepository,
+
     )
     {
     }
@@ -617,5 +621,52 @@ class BriefService
                 'conversion_type' => $conversionType,
             ];
         })->values()->toArray();
+    }
+
+    public function cloneBrief(int $briefId, int $userId, ?string $title, bool $includeSubtasks): Brief
+    {
+        $brief = $this->briefRepository->find($briefId);
+
+        if (!$brief) {
+            throw new \Exception("Brief not found: {$briefId}");
+        }
+
+        return $this->duplicateBrief->handle($briefId, $userId, $title, $includeSubtasks);
+    }
+
+    public function createSchedule(int $briefId, array $data): Model
+    {
+        $data['source_brief_id'] = $briefId;
+        $data['site_id'] = $data['site_id'] ?? $this->briefRepository->find($briefId)?->site_id;
+
+        return $this->scheduleRepository->create($data);
+    }
+
+    public function getSchedule(int $briefId): ?BriefSchedule
+    {
+        return $this->scheduleRepository->findForBrief($briefId);
+    }
+
+    public function updateSchedule(int $briefId, array $data): ?Model
+    {
+        $schedule = $this->scheduleRepository->findForBrief($briefId);
+
+        if (!$schedule) {
+            return null;
+        }
+
+        return $this->scheduleRepository->update($schedule->id, $data);
+    }
+
+    public function deactivateSchedule(int $briefId): bool
+    {
+        $schedule = $this->scheduleRepository->findForBrief($briefId);
+
+        if (!$schedule) {
+            return false;
+        }
+
+        $this->scheduleRepository->deactivate($schedule->id);
+        return true;
     }
 }

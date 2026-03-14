@@ -18,6 +18,7 @@ use App\Models\Model;
 use App\Models\User;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
+use App\Repositories\Cms\Briefs\BriefScheduleRepository;
 use App\Repositories\Cms\Briefs\BriefTaskRepository;
 use App\Repositories\Cms\Briefs\BriefTemplateRepository;
 use App\Repositories\Cms\Briefs\BriefVersionRepository;
@@ -42,6 +43,46 @@ class BriefServiceTest extends TestCase
     private BulkAssignCollaborator $bulkAssignCollaborator;
     private ConvertBriefToPage $convertBriefToPage;
     private Database $database;
+    private BriefScheduleRepository $briefScheduleRepository;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->briefRepository = Mockery::mock(BriefRepository::class);
+        $this->templateRepository = Mockery::mock(BriefTemplateRepository::class);
+        $this->collaboratorRepository = Mockery::mock(BriefCollaboratorRepository::class);
+        $this->taskRepository = Mockery::mock(BriefTaskRepository::class);
+        $this->versionRepository = Mockery::mock(BriefVersionRepository::class);
+        $this->createBriefVersion = Mockery::mock(CreateBriefVersion::class);
+        $this->logBriefActivity = Mockery::mock(LogBriefActivity::class);
+        $this->duplicateBrief = Mockery::mock(DuplicateBrief::class);
+        $this->bulkAssignCollaborator = Mockery::mock(BulkAssignCollaborator::class);
+        $this->convertBriefToPage = Mockery::mock(ConvertBriefToPage::class);
+        $this->database = Mockery::mock(Database::class);
+        $this->briefScheduleRepository = Mockery::mock(BriefScheduleRepository::class);
+
+        $this->service = new BriefService(
+            $this->briefRepository,
+            $this->templateRepository,
+            $this->collaboratorRepository,
+            $this->taskRepository,
+            $this->versionRepository,
+            $this->createBriefVersion,
+            $this->logBriefActivity,
+            $this->duplicateBrief,
+            $this->bulkAssignCollaborator,
+            $this->convertBriefToPage,
+            $this->database,
+            $this->briefScheduleRepository
+        );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 
     public function test_it_can_search_briefs(): void
     {
@@ -347,10 +388,10 @@ class BriefServiceTest extends TestCase
         $this->bulkAssignCollaborator
             ->shouldReceive('handle')
             ->once()
-            ->with($briefIds, $userId, $role)
+            ->with($briefIds, $userId, $role, 1)
             ->andReturn(3);
 
-        $result = $this->service->bulkAssignCollaborator($briefIds, $userId, $role);
+        $result = $this->service->bulkAssignCollaborator($briefIds, $userId, $role, 1);
 
         $this->assertEquals(3, $result);
     }
@@ -485,7 +526,7 @@ class BriefServiceTest extends TestCase
         $data = ['role' => 'editor'];
 
         $collaborator = Mockery::mock(BriefCollaborator::class)->makePartial();
-        $collaborator->brief_id = $briefId;
+        $collaborator->collaboratable_id = $briefId;
 
         $updatedCollaborator = Mockery::mock(BriefCollaborator::class);
 
@@ -628,43 +669,6 @@ class BriefServiceTest extends TestCase
             ->andReturn($version);
 
         $this->service->restoreVersion(1, 1, 1);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->briefRepository = Mockery::mock(BriefRepository::class);
-        $this->templateRepository = Mockery::mock(BriefTemplateRepository::class);
-        $this->collaboratorRepository = Mockery::mock(BriefCollaboratorRepository::class);
-        $this->taskRepository = Mockery::mock(BriefTaskRepository::class);
-        $this->versionRepository = Mockery::mock(BriefVersionRepository::class);
-        $this->createBriefVersion = Mockery::mock(CreateBriefVersion::class);
-        $this->logBriefActivity = Mockery::mock(LogBriefActivity::class);
-        $this->duplicateBrief = Mockery::mock(DuplicateBrief::class);
-        $this->bulkAssignCollaborator = Mockery::mock(BulkAssignCollaborator::class);
-        $this->convertBriefToPage = Mockery::mock(ConvertBriefToPage::class);
-        $this->database = Mockery::mock(Database::class);
-
-        $this->service = new BriefService(
-            $this->briefRepository,
-            $this->templateRepository,
-            $this->collaboratorRepository,
-            $this->taskRepository,
-            $this->versionRepository,
-            $this->createBriefVersion,
-            $this->logBriefActivity,
-            $this->duplicateBrief,
-            $this->bulkAssignCollaborator,
-            $this->convertBriefToPage,
-            $this->database
-        );
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
     }
 
 //    public function test_it_can_set_deadline_creating_new(): void

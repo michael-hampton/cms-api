@@ -34,6 +34,7 @@ class BriefResource extends JsonResource
                 'id' => $this->getAttribute('owner.id'),
                 'name' => $this->getAttribute('owner.name'),
             ]),
+
             'category' => $this->whenLoaded('category', fn() => [
                 'id' => $this->getAttribute('category.id'),
                 'name' => $this->getAttribute('category.name'),

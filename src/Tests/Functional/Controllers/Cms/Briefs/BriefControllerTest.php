@@ -9,6 +9,7 @@ use App\Models\BriefCollaborator;
 use App\Models\BriefComment;
 use App\Models\BriefDeadline;
 use App\Models\BriefRelationship;
+use App\Models\BriefSchedule;
 use App\Models\BriefTask;
 use App\Models\BriefTemplate;
 use App\Models\BriefVersion;
@@ -2081,4 +2082,337 @@ class BriefControllerTest extends FunctionalTestCase
 
         $this->assertCount(2, $data['items']);
     }
+
+    public function test_clone_creates_new_brief(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id, 'title' => 'Original']);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertNotNull($data['data']['id']);
+    }
+
+    public function test_clone_sets_status_to_new(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id, 'status' => 'ready']);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('draft', $data['data']['status']);
+    }
+
+    public function test_clone_sets_converted_article_id_to_null(): void
+    {
+        $user = $this->createUser();
+        $page = $this->createPage();
+        $brief = $this->createBrief([
+            'owner_id' => $user->id,
+            'converted_page_id' => $page->id,
+            'status' => 'converted',
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNull($data['data']['converted_page_id']);
+    }
+
+    public function test_cloned_brief_has_different_id_from_source(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotEquals($brief->id, $data['data']['id']);
+    }
+
+    public function test_clone_with_include_subtasks_true_clones_subtasks(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $this->actingAs($user);
+
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Subtask A',
+            'status' => 'pending',
+            'created_by' => $user->id
+        ]);
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Subtask B',
+            'status' => 'pending',
+            'created_by' => $user->id
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+            'includeSubtasks' => true,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+
+        $cloneId = $data['data']['id'];
+
+        $clonedSubtasks = BriefTask::where('brief_id', $cloneId)->get();
+
+        $this->assertCount(2, $clonedSubtasks);
+
+        // Subtasks must point to new brief, not source
+        foreach ($clonedSubtasks as $subtask) {
+            $this->assertEquals($cloneId, $subtask->brief_id);
+        }
+    }
+
+    public function test_clone_with_include_subtasks_false_skips_subtasks(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Should not clone',
+            'status' => 'pending',
+            'created_by' => $user->id
+        ]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+            'includeSubtasks' => false,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $cloneId = $data['data']['id'];
+
+        $clonedSubtasks = BriefTask::where('brief_id', $cloneId)->get();
+        $this->assertCount(0, $clonedSubtasks);
+    }
+
+    public function test_clone_accepts_title_override(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id, 'title' => 'Original Title']);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+            'title' => 'Copy of My Brief',
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('Copy of My Brief', $data['data']['title']);
+    }
+
+    public function test_clone_uses_source_title_with_copy_suffix_when_no_override(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id, 'title' => 'My Brief']);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('My Brief', $data['data']['title']);
+    }
+
+    public function test_clone_returns_404_for_nonexistent_brief(): void
+    {
+        $response = $this->postForSite('/api/briefs/999/clone', ['user_id' => 1]);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function test_clone_includes_subtasks_by_default(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefTask::create([
+            'brief_id' => $brief->id,
+            'title' => 'Default subtask',
+            'status' => 'pending',
+            'created_by' => $user->id
+        ]);
+
+        // No includeSubtasks sent — default is true
+        $response = $this->postForSite("/api/briefs/{$brief->id}/clone", [
+            'user_id' => $user->id,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $cloneId = $data['data']['id'];
+
+        $this->assertCount(1, BriefTask::where('brief_id', $cloneId)->get());
+    }
+
+    public function test_create_schedule_returns_201(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/schedule", [
+            'frequency' => 'daily',
+            'next_run_at' => '2026-06-01 09:00:00',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('daily', $data['data']['frequency']);
+        $this->assertTrue($data['data']['active']);
+    }
+
+    public function test_get_schedule_returns_schedule(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefSchedule::create([
+            'source_brief_id' => $brief->id,
+            'frequency' => 'weekly',
+            'week_days' => json_encode([1, 3, 5]),
+            'next_run_at' => '2026-06-01 09:00:00',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->getForSite("/api/briefs/{$brief->id}/schedule");
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('weekly', $data['data']['frequency']);
+    }
+
+    public function test_get_schedule_returns_null_when_none_exists(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->getForSite("/api/briefs/{$brief->id}/schedule");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNull(json_decode($response->getContent(), true)['data']);
+    }
+
+    public function test_update_schedule_modifies_frequency(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefSchedule::create([
+            'source_brief_id' => $brief->id,
+            'frequency' => 'daily',
+            'next_run_at' => '2026-06-01 09:00:00',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->putForSite("/api/briefs/{$brief->id}/schedule", [
+            'frequency' => 'monthly',
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('monthly', $data['data']['frequency']);
+    }
+
+    public function test_update_schedule_modifies_end_conditions(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefSchedule::create([
+            'source_brief_id' => $brief->id,
+            'frequency' => 'daily',
+            'next_run_at' => '2026-06-01 09:00:00',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->putForSite("/api/briefs/{$brief->id}/schedule", [
+            'end_type' => 'after_occurrences',
+            'end_after_occurrences' => 10,
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('after_occurrences', $data['data']['end_type']);
+        $this->assertEquals(10, $data['data']['end_after_occurrences']);
+    }
+
+    public function test_delete_schedule_sets_active_false(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        BriefSchedule::create([
+            'source_brief_id' => $brief->id,
+            'frequency' => 'daily',
+            'next_run_at' => '2026-06-01 09:00:00',
+            'site_id' => $this->siteId,
+        ]);
+
+        $response = $this->deleteForSite("/api/briefs/{$brief->id}/schedule");
+
+        $this->assertEquals(204, $response->getStatusCode());
+
+        $schedule = BriefSchedule::where('source_brief_id', $brief->id)->first();
+        $this->assertFalse($schedule->active);
+    }
+
+    public function test_create_schedule_with_after_occurrences_end_type(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/schedule", [
+            'frequency' => 'weekly',
+            'next_run_at' => '2026-06-01 09:00:00',
+            'end_type' => 'after_occurrences',
+            'end_after_occurrences' => 5,
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals('after_occurrences', $data['data']['end_type']);
+        $this->assertEquals(5, $data['data']['end_after_occurrences']);
+    }
+
+    public function test_create_schedule_with_on_date_end_type(): void
+    {
+        $user = $this->createUser();
+        $brief = $this->createBrief(['owner_id' => $user->id]);
+
+        $response = $this->postForSite("/api/briefs/{$brief->id}/schedule", [
+            'frequency' => 'monthly',
+            'next_run_at' => '2026-06-01 09:00:00',
+            'end_type' => 'on_date',
+            'end_date' => '2026-12-31 00:00:00',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals('on_date', $data['data']['end_type']);
+        $this->assertStringContainsString('2026-12-31', $data['data']['end_date']);
+    }
+
 }
