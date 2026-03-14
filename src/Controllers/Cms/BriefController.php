@@ -8,6 +8,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
+use App\Repositories\Cms\Briefs\BriefTaskRepository;
 use App\Requests\Briefs\AddBriefAttachmentRequest;
 use App\Requests\Briefs\AddBriefCollaboratorRequest;
 use App\Requests\Briefs\AddBriefCommentRequest;
@@ -29,6 +30,7 @@ class BriefController extends Controller
 {
     public function __construct(
         private readonly BriefService $briefService,
+        private readonly BriefTaskRepository $taskRepository
     )
     {
         parent::__construct();
@@ -156,7 +158,7 @@ class BriefController extends Controller
     {
         try {
             $data = $request->all();
-            $data['user_id'] = $request->get('user_id');
+            $data['user_id'] = $request->get('user_id') ?? auth()->id();
 
             $comment = $this->briefService->addComment($id, $data);
 
@@ -484,6 +486,36 @@ class BriefController extends Controller
         }
     }
 
+    public function searchTasks(Request $request)
+    {
+
+        $ownerId = $request->get('ownerId') ?: null;
+        $reviewerId = $request->get('reviewerId') ?: null;
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        if (!$ownerId && !$reviewerId) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Either ownerId or reviewerId is required.',
+            ], 422);
+        }
+
+        $subtasks = $this->taskRepository
+            ->getForUser(
+                ownerId: $ownerId,
+                reviewerId: $reviewerId,
+                startDate: $startDate,
+                endDate: $endDate,
+            )
+            ->map(fn($subtask) => $this->formatSubtask($subtask));
+
+        return $this->jsonResponse([
+            'success' => true,
+            'data' => $subtasks,
+        ]);
+    }
+
     public function getVersions(int $id, string $siteName): JsonResponse
     {
         try {
@@ -771,5 +803,35 @@ class BriefController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    private function formatSubtask(mixed $subtask): array
+    {
+        $data = $subtask->toArray();
+
+        // Serialise Carbon dates to plain strings so Angular receives
+        // "YYYY-MM-DD HH:mm:ss" rather than a Carbon object.
+        $data['due_date'] = $subtask->due_date?->format('Y-m-d H:i:s') ?? null;
+        $data['created_at'] = $subtask->created_at?->format('Y-m-d H:i:s') ?? null;
+        $data['updated_at'] = $subtask->updated_at?->format('Y-m-d H:i:s') ?? null;
+
+        // Eager-load brief summary so the calendar card can show "View Brief"
+        if ($subtask->relationLoaded('brief') && $subtask->brief) {
+            $data['brief'] = [
+                'id' => $subtask->brief->id,
+                'title' => $subtask->brief->title,
+            ];
+        }
+
+        // Eager-load createdBy (owner) so the calendar card can show the avatar
+        if ($subtask->relationLoaded('creator') && $subtask->creator) {
+            $data['owner'] = [
+                'id' => $subtask->creator['id'],
+                'name' => $subtask->creator['name'],
+                'email' => $subtask->creator['email'],
+            ];
+        }
+
+        return $data;
     }
 }

@@ -148,6 +148,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/briefs/{id}/tasks', [BriefController::class, 'createTask']);;
         $router->put('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'updateTask']);
         $router->delete('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'deleteTask']);
+        $router->get('/brief-subtask', [BriefController::class, 'searchTasks']);
 
 // Versions
         $router->get('/briefs/{id}/versions', [BriefController::class, 'getVersions']);
