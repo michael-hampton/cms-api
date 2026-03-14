@@ -465,6 +465,7 @@ class PageService
             'forms.main.subtitle' => 'subtitle',
             'forms.main.owner' => 'owner_id',
             'hero_type' => 'hero_type',
+            'brief_id' => 'brief_id',
             'hero_image_id' => 'hero_image_id',
             'hero_video_url' => 'hero_video_url',
             'forms.meta.slug' => 'slug',

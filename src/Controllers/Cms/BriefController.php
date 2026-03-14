@@ -669,6 +669,7 @@ class BriefController extends Controller
     public function createSchedule(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
+
             $schedule = $this->briefService->createSchedule($id, $request->all());
 
             $data = $schedule->toArray();

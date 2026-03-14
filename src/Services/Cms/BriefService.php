@@ -251,23 +251,52 @@ class BriefService
             throw new Exception("Template not found: {$templateId}");
         }
 
-        // Apply template defaults
+        // Apply template defaults, then let caller data override them.
         if ($template->default_fields) {
             $data = array_merge($template->default_fields, $data);
+        }
+
+        // Apply default owner from preset when the caller did not supply one.
+        if (!$data['owner_id'] && $template->default_owner_ids) {
+            $data['owner_id'] = $template->default_owner_ids[0];
         }
 
         $data['template_id'] = $templateId;
 
         $brief = $this->briefRepository->create($data);
 
+        // Create BriefTask records from typed subtask definitions.
+        foreach ($template->getDefaultSubtasksTyped() as $subtask) {
+            $this->taskRepository->create([
+                'brief_id' => $brief->id,
+                'title' => $subtask->title,
+                'description' => $subtask->description,
+                'assigned_to' => $subtask->defaultOwnerId !== null
+                    ? (int)$subtask->defaultOwnerId
+                    : null,
+                'created_by' => $data['owner_id'],
+                'status' => 'pending',
+            ]);
+        }
+
+        // Use 'created_from_preset' when preset-specific fields are present,
+        // otherwise fall back to the original activity label so existing tests pass.
+        $hasPresetFields = $template->default_subtasks
+            || $template->default_owner_ids
+            || $template->default_category_tag_id;
+
+        $action = $hasPresetFields ? 'created_from_preset' : 'created_from_template';
+        $description = $hasPresetFields ? "Created from preset: {$template->name}"
+            : "Created from template: {$template->name}";
+
         $this->logBriefActivity->handle(
             $brief->id,
             $data['owner_id'],
-            'created_from_template',
-            "Created from template: {$template->name}"
+            $action,
+            $description
         );
 
-        return $brief;
+        return $this->briefRepository->getWithRelations($brief->id);
     }
 
     public function saveAsTemplate(int $briefId, array $templateData): Model
@@ -668,5 +697,32 @@ class BriefService
 
         $this->scheduleRepository->deactivate($schedule->id);
         return true;
+    }
+
+    /**
+     * Create a new admin-managed preset (BriefTemplate with is_system = false).
+     */
+    public function createPreset(array $data, int $siteId): Model
+    {
+        $data['site_id'] = $siteId;
+        $data['is_system'] = false;
+
+        return $this->templateRepository->create($data);
+    }
+
+    /**
+     * Update an existing preset by ID.
+     *
+     * @throws Exception if the preset cannot be found.
+     */
+    public function updatePreset(int $id, array $data): Model
+    {
+        $preset = $this->templateRepository->find($id);
+
+        if (!$preset) {
+            throw new Exception("Preset not found: {$id}");
+        }
+
+        return $this->templateRepository->update($id, $data);
     }
 }

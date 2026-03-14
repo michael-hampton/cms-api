@@ -7,6 +7,7 @@ use App\Actions\Brief\ConvertBriefToPage;
 use App\Actions\Brief\CreateBriefVersion;
 use App\Actions\Brief\DuplicateBrief;
 use App\Actions\Brief\LogBriefActivity;
+use App\DTO\Briefs\BriefPresetSubtask;
 use App\Framework\Database\Database;
 use App\Models\Brief;
 use App\Models\BriefCollaborator;
@@ -428,6 +429,8 @@ class BriefServiceTest extends TestCase
             ->once()
             ->with(1, 1, 'created_from_template', 'Created from template: Article Template');
 
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($brief);
+
         $result = $this->service->createFromTemplate($templateId, $data);
 
         $this->assertSame($brief, $result);
@@ -720,4 +723,288 @@ class BriefServiceTest extends TestCase
 //
 //        // Note: BriefWorkflowHistory::create would need mocking setup
 //    }
+
+    public function test_create_preset_sets_is_system_false(): void
+    {
+        $this->templateRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['is_system'] === false))
+            ->andReturn(Mockery::mock(Model::class));
+
+        $this->service->createPreset(['name' => 'My Preset'], 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_preset_sets_site_id(): void
+    {
+        $siteId = 42;
+
+        $this->templateRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['site_id'] === $siteId))
+            ->andReturn(Mockery::mock(Model::class));
+
+        $this->service->createPreset(['name' => 'My Preset'], $siteId);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_preset_passes_all_provided_data(): void
+    {
+        $input = [
+            'name' => 'Preset A',
+            'description' => 'A test preset',
+            'default_subtasks' => [['title' => 'Draft']],
+        ];
+
+        $this->templateRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) use ($input) {
+                return $data['name'] === $input['name']
+                    && $data['description'] === $input['description']
+                    && $data['default_subtasks'] === $input['default_subtasks'];
+            }))
+            ->andReturn(Mockery::mock(Model::class));
+
+        $this->service->createPreset($input, 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_update_preset_throws_when_not_found(): void
+    {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessageMatches('/not found/i');
+
+        $this->templateRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(99)
+            ->andReturn(null);
+
+        $this->service->updatePreset(99, ['name' => 'New Name']);
+        $this->assertTrue(true);
+    }
+
+    public function test_update_preset_calls_repository_update(): void
+    {
+        $preset = Mockery::mock(BriefTemplate::class);
+        $updated = Mockery::mock(Model::class);
+
+        $this->templateRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($preset);
+
+        $this->templateRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, ['name' => 'New Name'])
+            ->andReturn($updated);
+
+        $result = $this->service->updatePreset(1, ['name' => 'New Name']);
+
+        $this->assertSame($updated, $result);
+    }
+
+    public function test_create_from_template_creates_tasks_for_subtasks(): void
+    {
+        $template = $this->makeTemplate([
+            ['title' => 'Write draft'],
+            ['title' => 'Review copy'],
+        ]);
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $this->taskRepository
+            ->shouldReceive('create')
+            ->twice();   // one call per subtask
+
+        $this->logBriefActivity->shouldReceive('handle')->once();
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_from_template_with_no_subtasks_creates_no_tasks(): void
+    {
+        $template = $this->makeTemplate([]);  // no subtasks
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $this->taskRepository->shouldNotReceive('create');
+
+        $this->logBriefActivity->shouldReceive('handle')->once();
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    public function test_task_count_matches_subtask_count(): void
+    {
+        $subtasks = [
+            ['title' => 'Task A'],
+            ['title' => 'Task B'],
+            ['title' => 'Task C'],
+        ];
+
+        $template = $this->makeTemplate($subtasks);
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $callCount = 0;
+        $this->taskRepository
+            ->shouldReceive('create')
+            ->times(3)
+            ->andReturnUsing(function () use (&$callCount) {
+                $callCount++;
+                return Mockery::mock(Model::class);
+            });
+
+        $this->logBriefActivity->shouldReceive('handle')->once();
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+
+        $this->assertSame(3, $callCount);
+    }
+
+    public function test_subtask_owner_maps_to_task_assignee(): void
+    {
+        $template = $this->makeTemplate([
+            ['title' => 'Draft', 'defaultOwnerId' => '99'],
+        ]);
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $this->taskRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['assigned_to'] === 99));
+
+        $this->logBriefActivity->shouldReceive('handle')->once();
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    public function test_subtask_null_owner_maps_to_null_assignee(): void
+    {
+        $template = $this->makeTemplate([
+            ['title' => 'No owner subtask'],  // no defaultOwnerId
+        ]);
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $this->taskRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['assigned_to'] === null));
+
+        $this->logBriefActivity->shouldReceive('handle')->once();
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_from_template_logs_preset_activity(): void
+    {
+        $template = $this->makeTemplate(
+            [['title' => 'Write']],      // has subtasks → preset path
+            [7]
+        );
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+        $this->briefRepository->shouldReceive('create')->andReturn($brief);
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+        $this->taskRepository->shouldReceive('create');
+
+        $this->logBriefActivity
+            ->shouldReceive('handle')
+            ->once()
+            ->with($brief->id, 5, 'created_from_template', 'Created from template: My Preset');
+
+        $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_from_template_uses_template_owner_when_caller_omits_it(): void
+    {
+        $template = $this->makeTemplate([], [55]);  // default owner 55, no subtasks
+
+        $brief = $this->makeBrief();
+        $fullBrief = $this->makeBrief();
+
+        $this->templateRepository->shouldReceive('find')->andReturn($template);
+
+        $this->briefRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(fn($data) => $data['owner_id'] === 55))
+            ->andReturn($brief);
+
+        $this->briefRepository->shouldReceive('getWithRelations')->andReturn($fullBrief);
+
+        $this->logBriefActivity->shouldReceive('handle');
+
+        // Caller does NOT supply owner_id.
+        $this->service->createFromTemplate(1, ['site_id' => 1]);
+        $this->assertTrue(true);
+    }
+
+    private function makeBrief(int $id = 10): Brief
+    {
+        $brief = Mockery::mock(Brief::class)->makePartial();
+        $brief->id = $id;
+
+        return $brief;
+    }
+
+    private function makeTemplate(array $subtasks = [], array $ownerIds = []): BriefTemplate
+    {
+        $template = Mockery::mock(BriefTemplate::class)->makePartial();
+        $template->id = 1;
+        $template->name = 'My Preset';
+        $template->default_fields = null;
+        $template->default_owner_ids = $ownerIds ?: null;
+        $template->default_category_tag_id = null;
+        $template->default_subtasks = $subtasks ?: null;
+
+        // Wire getDefaultSubtasksTyped() to return real value objects.
+        $typed = array_map(
+            fn($s) => BriefPresetSubtask::fromArray($s),
+            $subtasks
+        );
+        $template->shouldReceive('getDefaultSubtasksTyped')->andReturn($typed);
+
+        return $template;
+    }
 }

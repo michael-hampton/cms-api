@@ -37,6 +37,7 @@ class ConvertBriefToPage
 
             // Prepare page data
             $pageData = [
+                'brief_id' => $briefId,
                 'forms' => [
                     'main' => [
                         'title' => $conversionData['title'] ?? $brief->title
@@ -67,7 +68,7 @@ class ConvertBriefToPage
 
                 $pageData['blocks'][] = [
                     'type' => 'image',
-                    'src' => $image->file_path,
+                    'src' => $image->url,
                     'url' => $image->file_path,
                     'image_id' => $image->id,
                     'alt' => $metadata['alt_text'] ?? $imageData['alt_text'] ?? '',
@@ -97,7 +98,7 @@ class ConvertBriefToPage
 
                 // Common fields for both types
                 $commonFields = [
-                    'product_id' => $metadata['product_id'] ?? null,
+                    'product_id' => (int)$metadata['product_id'] ?? null,
                     'variant_id' => $metadata['variant_id'] ?? null,
                     'productName' => $metadata['productName'] ?? '',
                     'brand' => $metadata['brand'] ?? '',

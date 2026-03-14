@@ -121,6 +121,7 @@ class BriefRepository extends Repository
         return $brief->update([
             'status' => 'converted',
             'converted_page_id' => $pageId,
+            'page_id' => $pageId,
             'converted_at' => date('Y-m-d H:i:s')
         ]);
     }

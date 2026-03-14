@@ -10,6 +10,7 @@ use App\Controllers\Cms\AuthorController;
 use App\Controllers\Cms\BlockController;
 use App\Controllers\Cms\BrandController;
 use App\Controllers\Cms\BriefController;
+use App\Controllers\Cms\Briefs\BriefPresetController;
 use App\Controllers\Cms\CampaignController;
 use App\Controllers\Cms\CategoryController;
 use App\Controllers\Cms\CustomFieldDefinitionController;
@@ -103,10 +104,18 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/briefs/{id}', [BriefController::class, 'update']);
         $router->delete('/briefs/{id}', [BriefController::class, 'destroy']);
         $router->post('/briefs/{id}/clone', [BriefController::class, 'clone']);
+        $router->post('/briefs/{id}/convert-article', [BriefController::class, 'convertBriefToArticle']);
         $router->post('/briefs/{id}/schedule', [BriefController::class, 'createSchedule']);
         $router->get('/briefs/{id}/schedule', [BriefController::class, 'getSchedule']);
         $router->put('/briefs/{id}/schedule', [BriefController::class, 'updateSchedule']);
         $router->delete('/briefs/{id}/schedule', [BriefController::class, 'deleteSchedule']);
+        $router->post('/brief-preset', [BriefPresetController::class, 'store']);
+        $router->get('/brief-preset', [BriefPresetController::class, 'index']);
+        $router->put('/brief-preset/{id}', [BriefPresetController::class, 'update']);
+        $router->delete('/brief-preset/{id}', [BriefPresetController::class, 'destroy']);
+        $router->get('/brief-preset/{id}', [BriefPresetController::class, 'show']);
+        $router->post('/brief/from-preset/{id}', [BriefPresetController::class, 'createFromPreset']);
+
 
         // Brief attachments
         $router->post('/briefs/{id}/attachments', [BriefController::class, 'addAttachment']);

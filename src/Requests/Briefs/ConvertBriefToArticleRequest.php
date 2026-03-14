@@ -2,9 +2,9 @@
 
 namespace App\Requests\Briefs;
 
-use App\Framework\Http\Request;
+use App\Framework\Http\FormRequest;
 
-class ConvertBriefToArticleRequest extends Request
+class ConvertBriefToArticleRequest extends FormRequest
 {
     public function rules(): array
     {
