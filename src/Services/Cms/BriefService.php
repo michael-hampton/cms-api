@@ -524,4 +524,98 @@ class BriefService
     {
         return BriefDeadline::where('brief_id', $briefId)->delete();
     }
+
+    /**
+     * Convert a Brief to a Draft Article (Page).
+     *
+     * Accepts the ticket's simplified shape:
+     *   - images: string[] of attachment IDs
+     *   - blockType: single default conversion type for all product links
+     *   - products: optional per-product overrides [['attachment_id' => x, 'conversion_type' => 'deal']]
+     *
+     * Per-product conversion_type overrides blockType when present.
+     */
+    public function convertBriefToArticle(
+        int     $briefId,
+        string  $title,
+        array   $imageIds,
+        ?string $blockType,
+        array   $productOverrides
+    ): array
+    {
+        $brief = $this->briefRepository->getCompleteBriefData($briefId);
+
+        if (!$brief) {
+            throw new Exception("Brief not found: {$briefId}");
+        }
+
+        // Build images array in the shape ConvertBriefToPage expects
+        $images = $this->buildImageConversionData($brief, $imageIds);
+
+        // Build products array, merging blockType default with per-product overrides
+        $products = $this->buildProductConversionData($brief, $blockType, $productOverrides);
+
+        $conversionData = [
+            'title' => $title,
+            'owner_id' => $brief->owner_id,
+            'category_id' => $brief->category_id,
+            'images' => $images,
+            'products' => $products,
+        ];
+
+        return $this->convertBriefToPage->handle($briefId, $conversionData);
+    }
+
+    private function buildImageConversionData(Brief $brief, array $imageIds): array
+    {
+        // imageIds may be attachment IDs (strings or ints) or empty (meaning all images)
+        $imageAttachments = $brief->attachments->filter(
+            fn($a) => $a->type === 'image'
+                && (empty($imageIds) || in_array((string)$a->id, array_map('strval', $imageIds)))
+        );
+
+        return $imageAttachments->map(fn($attachment) => [
+            'attachment_id' => $attachment->id,
+            'image_id' => $attachment->image_id,
+            'alt_text' => $attachment->metadata['alt_text'] ?? '',
+            'credit' => $attachment->metadata['credit'] ?? '',
+            'caption' => $attachment->metadata['caption'] ?? '',
+        ])->values()->toArray();
+    }
+
+    private function buildProductConversionData(
+        Brief   $brief,
+        ?string $defaultBlockType,
+        array   $perProductOverrides
+    ): array
+    {
+        $productAttachments = $brief->attachments->filter(
+            fn($a) => in_array($a->type, ['product', 'deal'])
+        );
+
+        if ($productAttachments->isEmpty()) {
+            return [];
+        }
+
+        // Index overrides by attachment_id for O(1) lookup
+        $overrideIndex = [];
+        foreach ($perProductOverrides as $override) {
+            if (isset($override['attachment_id'])) {
+                $overrideIndex[(string)$override['attachment_id']] = $override['conversion_type'] ?? null;
+            }
+        }
+
+        return $productAttachments->map(function ($attachment) use ($defaultBlockType, $overrideIndex) {
+            $conversionType = $overrideIndex[(string)$attachment->id]
+                ?? $defaultBlockType
+                ?? $attachment->type; // fall back to the attachment's own type
+
+            return [
+                'attachment_id' => $attachment->id,
+                'product_id' => $attachment->product_id,
+                'url' => $attachment->url,
+                'conversion_type' => $conversionType,
+            ];
+        })->values()->toArray();
+    }
 }

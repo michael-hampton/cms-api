@@ -28,7 +28,7 @@ class MerchantProductFeedControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
-        $this->assertCount(2, $data['data']);
+        $this->assertCount(2, $data['items']);
     }
 
     // =========================================================================

@@ -6,20 +6,20 @@ use App\Actions\SubscriptionPlan\BulkTogglePlanActive;
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Requests\BulkToggleActiveRequest;
 use App\Requests\Subscription\CreateSubscriptionPlanRequest;
 use App\Requests\Subscription\UpdateSubscriptionPlanRequest;
+use App\Resources\PaymentResource;
+use App\Resources\SubscriptionPlanResource;
 use App\Resources\SubscriptionResource;
-use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteriaParser;
-use App\Search\SearchEngine;
 use App\Services\Subscriptions\SubscriptionPlanService;
 use Exception;
 
@@ -48,29 +48,15 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function payments()
+    public function payments(Request $request, string $siteName)
     {
         try {
-            $result = $this->paymentRepository->getAllPayments();
-            return $this->resourceResponse(['payments' => $result->map(function ($payment) {
-                return [
-                    'id' => $payment->id,
-                    'subscription_id' => $payment->subscription_id,
-                    'order_id' => $payment->order_id,
-                    'site_id' => $payment->site_id,
-                    'amount' => $payment->amount,
-                    'currency' => $payment->currency,
-                    'status' => $payment->status,
-                    'payment_method' => $payment->payment_method,
-                    'transaction_id' => $payment->transaction_id,
-                    'payment_intent_id' => $payment->payment_intent_id,
-                    'error_message' => $payment->error_message,
-                    'error_data' => $payment->error_data,
-                    'paid_at' => $payment->paid_at->format('Y-m-d H:i:s'),
-                    'created_at' => $payment->created_at->format('Y-m-d H:i:s'),
-                    'updated_at' => $payment->updated_at
-                ];
-            })]);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->paymentRepository->search($criteria);
+
+            $collection = new PaginatedResourceCollection($result, PaymentResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -79,28 +65,14 @@ class SubscriptionController extends Controller
     public function plans(Request $request, string $siteName)
     {
         try {
-            $configuration = SearchConfigurationFactory::create('subscription_plan');
-            $engine = new SearchEngine($configuration);
             $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
-            $queryBuilder = SubscriptionPlan::with(['regionSets']);
-            $result = $engine->search($queryBuilder, $criteria);
+            // Eager-load regionSets at the query level so the resource can read them
+            $result = $this->subscriptionPlanRepository->search($criteria);
 
-            $plans = array_map(function ($plan) {
-                $planModel = SubscriptionPlan::with(['regionSets'])->find($plan['id']);
-                return array_merge($plan, [
-                    'release_date' => !empty($plan['release_date'])
-                        ? $plan['release_date']->format('Y-m-d H:i:s')
-                        : null,
-                    'region_sets' => $planModel?->regionSets->map(fn($rs) => ['id' => $rs->id, 'name' => $rs->name])->toArray() ?? [],
-                    'region_set_ids' => $planModel?->regionSets->pluck('id')->toArray() ?? [],
-                ]);
-            }, $result->getData());
+            $collection = new PaginatedResourceCollection($result, SubscriptionPlanResource::class);
 
-            return $this->resourceResponse([
-                'plans' => $plans,
-                'pagination' => $result->toArray()['pagination'],
-            ]);
+            return $this->resourceResponse($collection->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

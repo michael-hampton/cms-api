@@ -20,6 +20,7 @@ namespace App\OpenApiGenerator;
  *   - Extracts array keys and their value expressions.
  *   - Infers OpenAPI types from value expressions (getAttribute calls, casts, suffixes).
  *   - Handles whenLoaded() relations as nullable sub-objects.
+ *   - Handles getAttribute() with dot-notation paths as nested object properties.
  *   - Does NOT execute code — purely static source analysis.
  */
 class ResourceInspector
@@ -249,20 +250,29 @@ class ResourceInspector
      * OpenAPI property definitions.
      *
      * Handles the common patterns:
-     *   'field'  => $this->getAttribute('field')
-     *   'field'  => $this->resource['field']
-     *   'field'  => $this->field
-     *   'field'  => $this->getAttribute('field')?->format('Y-m-d H:i:s')
-     *   'field'  => $this->whenLoaded('relation', ...)
-     *   'field'  => SomeResource::make(...)->toArray()
-     *   'count'  => $this->getCount()
+     *   'field'           => $this->getAttribute('field')
+     *   'field'           => $this->resource['field']
+     *   'field'           => $this->field
+     *   'field'           => $this->getAttribute('field')?->format('Y-m-d H:i:s')
+     *   'field'           => $this->whenLoaded('relation', ...)
+     *   'field'           => SomeResource::make(...)->toArray()
+     *   'count'           => $this->getCount()
+     *
+     *   // Nested getAttribute — key stays flat, value expands into nested schema:
+     *   'city'            => $this->getAttribute('address.city')
+     *   'street'          => $this->getAttribute('address.street')
+     *
+     *   // Deep nesting:
+     *   'country_code'    => $this->getAttribute('address.country.code')
+     *
+     * When a dot-path is detected the flat key is replaced with the dot-path so
+     * that SchemaBuilder::buildProperties() can nest it into the correct object
+     * hierarchy via its existing tree-building logic.
      *
      * @return array<string, array> OpenAPI property map
      */
     private function extractProperties(string $body): array
     {
-        // Find the start of the returned array using depth-aware extraction
-        // instead of a greedy regex — prevents nested arrays from corrupting the match.
         $arrayBody = $this->extractReturnArrayBody($body);
         if ($arrayBody === null) {
             return [];
@@ -284,7 +294,18 @@ class ResourceInspector
             $key = $keyMatch[1];
             $valueRaw = trim(substr($entry, strlen($keyMatch[0])));
 
-            $properties[$key] = $this->inferPropertySchema($key, $valueRaw);
+            $schema = $this->inferPropertySchema($key, $valueRaw);
+
+            // When inferPropertySchema detects a dot-path inside getAttribute(),
+            // it tags the schema with 'x-nested-path'.  We use that path as the
+            // property key so SchemaBuilder can nest it correctly, then strip the
+            // internal annotation before storing.
+            if (isset($schema['x-nested-path'])) {
+                $key = $schema['x-nested-path'];
+                unset($schema['x-nested-path']);
+            }
+
+            $properties[$key] = $schema;
         }
 
         return $properties;
@@ -459,6 +480,11 @@ class ResourceInspector
     /**
      * Infer an OpenAPI schema fragment for a single property based on its key name
      * and the raw value expression from the source.
+     *
+     * When the value contains getAttribute('a.b') or getAttribute('a.b.c'), the
+     * schema is tagged with 'x-nested-path' so extractProperties() can promote
+     * the flat array key to the full dot-notation path.  SchemaBuilder already
+     * knows how to expand dot paths into nested object hierarchies.
      */
     private function inferPropertySchema(string $key, string $value): array
     {
@@ -495,8 +521,53 @@ class ResourceInspector
             return ['type' => 'number'];
         }
 
+        // getAttribute with dot-notation path — expand into nested schema.
+        //
+        // Supported patterns:
+        //   $this->getAttribute('address.city')
+        //   $this->getAttribute('address.country.code')
+        //   $this->getAttribute('meta.settings.theme')?->value  (enum unwrap)
+        //
+        // The schema is inferred from the leaf key name (e.g. 'city', 'code').
+        // An internal 'x-nested-path' annotation tells extractProperties() to
+        // use the full dot path as the property key instead of the flat array key,
+        // so SchemaBuilder::buildProperties() nests it correctly.
+        $dotPath = $this->extractDotAttributePath($value);
+        if ($dotPath !== null) {
+            $leaf = substr($dotPath, strrpos($dotPath, '.') + 1);
+            $schema = $this->inferByKeyName($leaf, $value);
+            $schema['x-nested-path'] = $dotPath;
+            return $schema;
+        }
+
         // Type inference by key name suffix
         return $this->inferByKeyName($key, $value);
+    }
+
+    /**
+     * Extract a dot-notation path from a getAttribute() call, if present.
+     *
+     * Matches all of:
+     *   $this->getAttribute('relation.field')
+     *   $this->getAttribute('a.b.c')
+     *   getAttribute('a.b')          (static or bare call)
+     *
+     * Also handles chained calls such as:
+     *   $this->getAttribute('address.country')?->name
+     *   $this->getAttribute('meta.type')?->value
+     *
+     * Returns null when the path has no dot (plain single-level attribute).
+     */
+    private function extractDotAttributePath(string $value): ?string
+    {
+        if (!preg_match('/getAttribute\(\s*[\'"]([^\'"]+)[\'"]\s*\)/', $value, $m)) {
+            return null;
+        }
+
+        $path = $m[1];
+
+        // Only treat as nested when the path actually contains a dot
+        return str_contains($path, '.') ? $path : null;
     }
 
     /**

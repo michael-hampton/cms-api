@@ -6,9 +6,12 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
+use App\Repositories\Product\MerchantContactRepository;
 use App\Requests\Merchant\CreateMerchantContactRequest;
 use App\Requests\Merchant\UpdateMerchantContactRequest;
 use App\Resources\MerchantContactResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Product\MerchantContactService;
 use Exception;
 
@@ -16,6 +19,7 @@ class MerchantContactController extends Controller
 {
     public function __construct(
         private readonly MerchantContactService $contactService,
+        private readonly MerchantContactRepository $merchantContactRepository
     )
     {
         parent::__construct();
@@ -24,9 +28,12 @@ class MerchantContactController extends Controller
     public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $contacts = $this->contactService->getAllContacts();
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->merchantContactRepository->search($criteria);
 
-            return $this->resourceResponse(MerchantContactResource::collection($contacts)->toArray());
+            $collection = new PaginatedResourceCollection($result, MerchantContactResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

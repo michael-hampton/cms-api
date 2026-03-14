@@ -24,9 +24,9 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('data', $data);
-        $this->assertIsArray($data['data']);
-        $this->assertCount(2, $data['data']);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertIsArray($data['items']);
+        $this->assertCount(2, $data['items']);
     }
 
     private function createLayout(array $overrides = []): Model
@@ -79,8 +79,8 @@ class NewsletterLayoutControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertIsArray($data['data']);
-        $this->assertCount(0, $data['data']);
+        $this->assertIsArray($data['items']);
+        $this->assertCount(0, $data['items']);
     }
 
     public function test_index_does_not_return_layouts_from_other_sites(): void

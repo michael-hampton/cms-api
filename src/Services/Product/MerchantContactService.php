@@ -56,4 +56,8 @@ class MerchantContactService
     {
         return $this->repository->getByMerchant($merchantId);
     }
+
+    public function searchContacts(\App\Search\SearchCriteria $criteria)
+    {
+    }
 }

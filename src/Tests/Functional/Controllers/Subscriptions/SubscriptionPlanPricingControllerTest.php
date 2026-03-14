@@ -54,7 +54,7 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
         $responseData = json_decode($response->getContent(), true);
 
         $this->assertTrue($responseData['success']);
-        $this->assertCount(2, $responseData['data']);
+        $this->assertCount(2, $responseData['items']);
     }
 
     public function testIndexFiltersResultsByStatus(): void
@@ -66,8 +66,8 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
 
         $responseData = json_decode($response->getContent(), true);
         $this->assertTrue($responseData['success']);
-        $this->assertCount(1, $responseData['data']);
-        $this->assertTrue($responseData['data'][0]['is_active']);
+        $this->assertCount(1, $responseData['items']);
+        $this->assertTrue($responseData['items'][0]['is_active']);
     }
 
     // =========================================================================

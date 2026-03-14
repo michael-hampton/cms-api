@@ -6,6 +6,10 @@ use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class SubscriptionPlanPricingRepository extends Repository
 {
@@ -138,6 +142,16 @@ class SubscriptionPlanPricingRepository extends Repository
             ->where('plan_id', $planId)
             ->where('is_active', true)
             ->orderBy('sort_order');
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::create('subscription_plan_pricing');
+        $engine = new SearchEngine($configuration);
+
+        // Replace with however your repository accesses its base query builder,
+        // e.g. Campaign::query() or $this->model->newQuery()
+        return $engine->search($this->query(), $criteria);
     }
 
     protected function getModelClass(): string

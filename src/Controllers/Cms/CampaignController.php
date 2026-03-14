@@ -6,13 +6,14 @@ use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Framework\Support\Collection;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CampaignRepository;
 use App\Requests\CreateCampaignRequest;
 use App\Requests\UpdateBrandRequest;
 use App\Resources\CampaignResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Cms\CampaignService;
 
 class CampaignController extends Controller
@@ -26,18 +27,20 @@ class CampaignController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
-            $campaigns = $this->campaignRepository->getBySite($siteId);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->campaignRepository->search($criteria);
 
-            $campaignResults = CampaignResource::collection($campaigns)->toArray();
+            $collection = new PaginatedResourceCollection($result, CampaignResource::class);
 
             return $this->resourceResponse([
-                'campaigns' => $campaignResults['data'],
-                'stats' => $this->buildStats($campaigns),
-            ]);
+                ...$collection->toArray(),
+                'stats' => $this->campaignRepository->getStatsBySite($siteId)
+            ],
+            );
         } catch (\Exception $e) {
             $this->logger->error('Failed to fetch campaigns', ['error' => $e->getMessage()]);
             return $this->errorResponse($e->getMessage(), 500);
@@ -53,7 +56,6 @@ class CampaignController extends Controller
                 return $this->errorResponse('Campaign not found', 404);
             }
 
-            // getCampaignWithStats returns campaign as array — wrap the model for Resource
             $campaign = $this->campaignRepository->find($id);
 
             return $this->resourceResponse([
@@ -152,7 +154,7 @@ class CampaignController extends Controller
                 'message' => 'Campaign cloned successfully',
             ], 201);
         } catch (\Exception $e) {
-            Logger::error('Failed to clone campaign', ['id' => $id, 'error' => $e->getMessage()]);
+            $this->logger->error('Failed to clone campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to clone campaign: ' . $e->getMessage(), 500);
         }
     }
@@ -204,28 +206,5 @@ class CampaignController extends Controller
             $this->logger->error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to resume campaign: ' . $e->getMessage(), 500);
         }
-    }
-
-    // =========================================================================
-    // Private helpers
-    // =========================================================================
-
-    /**
-     * Derive lightweight stats from the already-loaded campaign collection.
-     * No extra queries — uses the isActive() domain method already available.
-     *
-     * @param Collection $campaigns
-     */
-    private function buildStats(Collection $campaigns): array
-    {
-        $total = $campaigns->count();
-        $active = $campaigns->filter(fn($c) => $c->isActive())->count();
-        $approved = $campaigns->filter(fn($c) => $c->status === 'active')->count();
-
-        return [
-            'total' => $total,
-            'active' => $active,
-            'approved' => $approved,
-        ];
     }
 }

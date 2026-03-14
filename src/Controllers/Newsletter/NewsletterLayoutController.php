@@ -8,6 +8,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
@@ -15,6 +16,7 @@ use App\Requests\Newsletter\CloneNewsletterLayoutRequest;
 use App\Requests\Newsletter\NewsletterLayoutMigrationReportRequest;
 use App\Requests\Newsletter\StoreNewsletterLayoutRequest;
 use App\Resources\NewsletterLayoutResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Newsletter\NewsletterLayoutService;
 
 class NewsletterLayoutController extends Controller
@@ -28,13 +30,14 @@ class NewsletterLayoutController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, string $siteName): JsonResponse
     {
         try {
-            $siteId = (int)$request->input('site_id') ?: SiteContext::getId();
-            $layouts = $this->layoutService->getAllLayouts($siteId);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $result = $this->newsletterLayoutRepository->search($criteria);
+            $collection = new PaginatedResourceCollection($result, NewsletterLayoutResource::class);
 
-            return $this->resourceResponse(NewsletterLayoutResource::collection($layouts)->toArray());
+            return $this->resourceResponse($collection->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

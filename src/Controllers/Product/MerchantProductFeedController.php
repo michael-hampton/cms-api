@@ -5,10 +5,13 @@ namespace App\Controllers\Product;
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Repositories\Product\MerchantProductFeedRepository;
 use App\Requests\Merchant\CreateMerchantProductFeedRequest;
 use App\Requests\Merchant\UpdateMerchantProductFeedRequest;
 use App\Resources\MerchantProductFeedResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Product\MerchantProductFeedService;
 use Exception;
 
@@ -22,12 +25,16 @@ class MerchantProductFeedController extends Controller
         parent::__construct();
     }
 
-    public function index(int $merchantId, string $siteName): JsonResponse
+    public function index(Request $request, int $merchantId, string $siteName): JsonResponse
     {
         try {
-            $feeds = $this->feedRepository->getByMerchant($merchantId);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria->addFilter('merchant_id', $merchantId);
 
-            return $this->resourceResponse(MerchantProductFeedResource::collection($feeds)->toArray());
+            $result = $this->feedRepository->search($criteria);
+            $collection = new PaginatedResourceCollection($result, MerchantProductFeedResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

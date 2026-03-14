@@ -82,9 +82,10 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('payments', $data);
-        $this->assertNotEmpty($data['payments']);
-        $this->assertEquals($subscription->id, $data['payments'][0]['subscription_id']);
+
+        $this->assertArrayHasKey('items', $data);
+        $this->assertNotEmpty($data['items']);
+        $this->assertEquals($subscription->id, $data['items'][0]['subscription_id']);
     }
 
     // =========================================================================
@@ -108,10 +109,10 @@ class SubscriptionControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('plans', $data);
-        $this->assertNotEmpty($data['plans']);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertNotEmpty($data['items']);
 
-        $planNames = array_column($data['plans'], 'name');
+        $planNames = array_column($data['items'], 'name');
         $this->assertContains('Active Plan', $planNames);
     }
 

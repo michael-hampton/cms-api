@@ -25,7 +25,7 @@ class MerchantContactControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertTrue($data['success']);
-        $this->assertGreaterThanOrEqual(2, count($data['data']));
+        $this->assertGreaterThanOrEqual(2, count($data['items']));
     }
 
     // =========================================================================

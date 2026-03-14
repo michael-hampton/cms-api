@@ -5,6 +5,10 @@ namespace App\Repositories\Billing;
 use App\Framework\Support\Collection;
 use App\Models\Payment;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class PaymentRepository extends Repository
 {
@@ -109,6 +113,16 @@ class PaymentRepository extends Repository
         }
 
         return $query->count();
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::create('payment');
+        $engine = new SearchEngine($configuration);
+
+        // Replace with however your repository accesses its base query builder,
+        // e.g. Campaign::query() or $this->model->newQuery()
+        return $engine->search($this->query(), $criteria);
     }
 
     protected function getModelClass(): string

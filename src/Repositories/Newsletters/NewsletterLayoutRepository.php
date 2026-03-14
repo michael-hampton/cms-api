@@ -8,6 +8,10 @@ use App\Models\Model;
 use App\Models\NewsletterLayout;
 use App\Models\NewsletterLayoutVersion;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class NewsletterLayoutRepository extends Repository
 {
@@ -143,5 +147,15 @@ class NewsletterLayoutRepository extends Repository
         }
 
         return $clone;
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::create('newsletter_layout');
+        $engine = new SearchEngine($configuration);
+
+        // Replace with however your repository accesses its base query builder,
+        // e.g. Campaign::query() or $this->model->newQuery()
+        return $engine->search($this->query(), $criteria);
     }
 }

@@ -159,4 +159,9 @@ abstract class Repository
         $query = $this->model::where('slug', $slug);
         return $this->applySiteFilter($query)->first();
     }
+
+    public function query()
+    {
+        return $this->model->newQuery();
+    }
 }

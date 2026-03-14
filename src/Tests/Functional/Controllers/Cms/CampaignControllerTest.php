@@ -37,8 +37,8 @@ class CampaignControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $this->assertArrayHasKey('campaigns', $data);
-        $this->assertCount(2, $data['campaigns']);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertCount(2, $data['items']);
     }
 
     public function test_index_includes_stats(): void

@@ -13,6 +13,7 @@ use App\Requests\Briefs\AddBriefCollaboratorRequest;
 use App\Requests\Briefs\AddBriefCommentRequest;
 use App\Requests\Briefs\AddBriefRelationshipRequest;
 use App\Requests\Briefs\AddBriefWorkflowChangeRequest;
+use App\Requests\Briefs\ConvertBriefToArticleRequest;
 use App\Requests\Briefs\CreateBriefTaskRequest;
 use App\Requests\Briefs\SetBriefDeadlineRequest;
 use App\Requests\Briefs\StoreBriefRequest;
@@ -635,6 +636,29 @@ class BriefController extends Controller
             ]);
 
             return $this->resourceResponse(['data' => $attachment->toArray()], 201);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function convertBriefToArticle(
+        int                          $id,
+        ConvertBriefToArticleRequest $request,
+        string                       $siteName
+    ): JsonResponse
+    {
+        try {
+            $result = $this->briefService->convertBriefToArticle(
+                $id,
+                $request->input('title'),
+                $request->input('images', []),
+                $request->input('blockType'),
+                $request->input('products', [])
+            );
+
+            return $this->resourceResponse(['data' => $result], 201);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

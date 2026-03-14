@@ -18,9 +18,6 @@ class NewsletterLayoutResource extends JsonResource
             'created_by' => $this->getAttribute('created_by'),
             'created_at' => $this->getAttribute('created_at'),
             'updated_at' => $this->getAttribute('updated_at'),
-
-            // Computed
-            'is_deletable' => $this->resource->isDeletable(),
         ];
     }
 }

@@ -8,6 +8,10 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanRegionSet;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class SubscriptionPlanRepository extends Repository
 {
@@ -272,5 +276,15 @@ class SubscriptionPlanRepository extends Repository
                 'region_set_id' => $regionSetId,
             ]);
         }
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::create('subscription_plan');
+        $engine = new SearchEngine($configuration);
+
+        // Replace with however your repository accesses its base query builder,
+        // e.g. Campaign::query() or $this->model->newQuery()
+        return $engine->search($this->query(), $criteria);
     }
 }

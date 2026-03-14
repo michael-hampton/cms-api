@@ -9,12 +9,14 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterIssueRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Requests\Newsletter\CreateNewsletterIssueRequest;
 use App\Resources\NewsletterIssueResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Newsletter\NewsletterIssueService;
 
 class NewsletterIssueController extends Controller
@@ -31,7 +33,7 @@ class NewsletterIssueController extends Controller
     /**
      * GET /api/newsletters/{newsletterId}/issues
      */
-    public function index(Request $request, int $newsletterId): JsonResponse
+    public function index(Request $request, int $newsletterId, string $siteName): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
@@ -40,9 +42,13 @@ class NewsletterIssueController extends Controller
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            $issues = $this->issueService->listIssues($newsletterId, $siteId);
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria->addFilter('newsletter_id', $newsletterId);
 
-            return $this->resourceResponse(NewsletterIssueResource::collection($issues)->toArray());
+            $result = $this->issueRepository->search($criteria);
+            $collection = new PaginatedResourceCollection($result, NewsletterIssueResource::class);
+
+            return $this->resourceResponse($collection->toArray());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

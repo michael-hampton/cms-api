@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\Newsletters;
 
 use App\Framework\Mail\ArrayMailer;
+use App\Models\Model;
 use App\Models\Newsletter;
 use App\Models\NewsletterIssue;
 use App\Models\Site;
@@ -24,17 +25,7 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertCount(2, $data['data']);
-    }
-
-    private function createNewsletterIssue(Newsletter $newsletter, array $attributes = []): NewsletterIssue
-    {
-        return NewsletterIssue::create(array_merge([
-            'newsletter_id' => $newsletter->id,
-            'site_id' => $this->siteId,
-            'subject' => 'Test Issue',
-            'status' => 'draft',
-        ], $attributes));
+        $this->assertCount(2, $data['items']);
     }
 
     public function test_index_returns_empty_array_when_no_issues_exist(): void
@@ -45,8 +36,8 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertIsArray($data['data']);
-        $this->assertCount(0, $data['data']);
+        $this->assertIsArray($data['items']);
+        $this->assertCount(0, $data['items']);
     }
 
     public function test_index_returns_404_for_nonexistent_newsletter(): void
@@ -83,8 +74,8 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
         $response = $this->getForSite("/api/newsletters/{$newsletterA->id}/issues");
 
         $data = json_decode($response->getContent(), true);
-        $this->assertCount(1, $data['data']);
-        $this->assertEquals('A Issue', $data['data'][0]['subject']);
+        $this->assertCount(1, $data['items']);
+        $this->assertEquals('A Issue', $data['items'][0]['subject']);
     }
 
     public function test_create_issue_returns_201_with_draft_issue(): void
@@ -751,5 +742,15 @@ class NewsletterIssueControllerTest extends FunctionalTestCase
     {
         ArrayMailer::clear();
         parent::tearDown();
+    }
+
+    private function createNewsletterIssue(Newsletter $newsletter, array $attributes = []): Model
+    {
+        return NewsletterIssue::create(array_merge([
+            'newsletter_id' => $newsletter->id,
+            'site_id' => $this->siteId,
+            'subject' => 'Test Issue',
+            'status' => 'draft',
+        ], $attributes));
     }
 }

@@ -7,6 +7,10 @@ use App\Models\Campaign;
 use App\Models\CampaignSignup;
 use App\Models\Model;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class CampaignRepository extends Repository
 {
@@ -117,6 +121,37 @@ class CampaignRepository extends Repository
                 'created_at' => now(),
             ]
         );
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $configuration = SearchConfigurationFactory::create('campaign');
+        $engine = new SearchEngine($configuration);
+
+        // Replace with however your repository accesses its base query builder,
+        // e.g. Campaign::query() or $this->model->newQuery()
+        return $engine->search($this->query(), $criteria);
+    }
+
+    /**
+     * Returns aggregate counts for the campaign index stats block.
+     *
+     * NOTE: The original buildStats() in CampaignController mixed two different
+     * "active" concepts — isActive() (domain method, likely date-aware) and
+     * status === 'active' (raw string). These have been separated into explicit,
+     * named keys. Align with your CampaignStatus enum once confirmed.
+     */
+    public function getStatsBySite(int $siteId): array
+    {
+        $base = $this->query()->where('site_id', $siteId);
+
+        return [
+            'total' => (clone $base)->count(),
+            'active' => (clone $base)->where('is_active', true)->count(),
+            'approved' => (clone $base)->where('status', 'active')->count(),
+            'paused' => (clone $base)->where('status', 'paused')->count(),
+            'ended' => (clone $base)->where('status', 'ended')->count(),
+        ];
     }
 
 

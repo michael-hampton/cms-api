@@ -5,12 +5,15 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
+use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Requests\Offers\CreatePricingTierRequest;
 use App\Requests\Subscription\UpdatePricingTierRequest;
+use App\Resources\SubscriptionPlanPricingResource;
+use App\Search\SearchCriteriaParser;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 
 class SubscriptionPlanPricingController extends Controller
@@ -23,27 +26,23 @@ class SubscriptionPlanPricingController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, ?int $planId = null)
+    public function index(Request $request, ?int $planId = null, string $siteName = '')
     {
-        $siteId = SiteContext::getId();
-        $filters = [
-            //'plan_id' => $planId,
-            'status' => $request->input('status'),
-            'search' => $request->input('search')
-        ];
+        try {
+            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
 
-        $result = $this->pricingRepository->searchPricingTiersPaginated($filters, $siteId);
+            if (!empty($planId)) {
+                $criteria->addFilter('plan_id', $planId);
+            }
 
-        return $this->resourceResponse([
-            'success' => true,
-            'data' => $result['data']->toArray(),
-            'pagination' => [
-                'total' => $result['pagination']['total'],
-                'page' => $result['pagination']['current_page'],
-                'per_page' => $result['pagination']['per_page'],
-                'total_pages' => $result['pagination']['total_pages'],
-            ]
-        ]);
+            $result = $this->pricingRepository->search($criteria);
+            $collection = new PaginatedResourceCollection($result, SubscriptionPlanPricingResource::class);
+
+            return $this->resourceResponse($collection->toArray());
+        } catch (\Exception $e) {
+            Logger::error('Failed to fetch pricing tiers', ['plan_id' => $planId, 'error' => $e->getMessage()]);
+            return $this->errorResponse($e->getMessage(), 500);
+        }
     }
 
     public function store(CreatePricingTierRequest $request, int $planId)
