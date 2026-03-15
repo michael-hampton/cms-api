@@ -248,7 +248,8 @@ class BriefRepository extends Repository
             'activityLog.user',
             'lastActivityUser',
             'parentBrief',
-            'childBriefs'
+            'childBriefs',
+            'deadlines'
         ])->find($briefId);
     }
 
@@ -274,6 +275,22 @@ class BriefRepository extends Repository
             ->with(['image', 'product'])
             ->get()
             ->toArray();
+    }
+
+    public function addRelationship(int $briefId, array $data): Model
+    {
+        return BriefRelationship::create([
+            'brief_id' => $briefId,
+            ...$data,
+        ]);
+    }
+
+    public function addDeadline(int $briefId, array $data): Model
+    {
+        return BriefDeadline::create([
+            'brief_id' => $briefId,
+            ...$data,
+        ]);
     }
 
     protected function getModelClass(): string

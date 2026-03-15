@@ -31,6 +31,7 @@ class BriefTemplate extends Model
         'is_system' => 'boolean',
         'default_owner_ids' => 'array',
         'default_subtasks' => 'array',
+        'structure' => 'array'
     ];
 
     public function creator()

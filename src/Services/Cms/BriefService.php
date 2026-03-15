@@ -7,6 +7,7 @@ use App\Actions\Brief\ConvertBriefToPage;
 use App\Actions\Brief\CreateBriefVersion;
 use App\Actions\Brief\DuplicateBrief;
 use App\Actions\Brief\LogBriefActivity;
+use App\DTO\Briefs\DuplicateBriefOptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Brief;
@@ -652,15 +653,9 @@ class BriefService
         })->values()->toArray();
     }
 
-    public function cloneBrief(int $briefId, int $userId, ?string $title, bool $includeSubtasks): Brief
+    public function cloneBrief(int $briefId, int $userId, ?string $title, ?DuplicateBriefOptions $options = null): Brief
     {
-        $brief = $this->briefRepository->find($briefId);
-
-        if (!$brief) {
-            throw new \Exception("Brief not found: {$briefId}");
-        }
-
-        return $this->duplicateBrief->handle($briefId, $userId, $title, $includeSubtasks);
+        return $this->duplicateBrief->handle($briefId, $userId, $title, $options);
     }
 
     public function createSchedule(int $briefId, array $data): Model

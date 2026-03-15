@@ -3,6 +3,7 @@
 namespace App\Controllers\Cms;
 
 use App\Controllers\Controller;
+use App\DTO\Briefs\DuplicateBriefOptions;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -676,25 +677,26 @@ class BriefController extends Controller
     public function clone(int $id, Request $request, string $siteName): JsonResponse
     {
         try {
-            $brief = $this->briefService->getCompleteBrief($id);
-
-            if (!$brief) {
-                return $this->errorResponse('Brief not found', 404);
-            }
-
             $clone = $this->briefService->cloneBrief(
                 $id,
-                $request->get('user_id'),
+                $request->get('user_id') ?? auth()->id(),
                 $request->get('title'),
-                (bool)($request->get('includeSubtasks', true))
+                new DuplicateBriefOptions(
+                    includeSubtasks: (bool)$request->get('includeSubtasks', true),
+                    includeCollaborators: (bool)$request->get('includeCollaborators', true),
+                    includeComments: (bool)$request->get('includeComments', true),
+                    includeRelationships: (bool)$request->get('includeRelationships', true),
+                    includeDeadlines: (bool)$request->get('includeDeadlines', true),
+                ),
             );
 
             return $this->resourceResponse(
                 ['data' => BriefResource::make($clone)->toArray()],
-                201
+                201,
             );
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage(), 500);
+        } catch (\RuntimeException $e) {
+            $notFound = str_contains($e->getMessage(), 'Brief not found');
+            return $this->errorResponse($e->getMessage(), $notFound ? 404 : 500);
         }
     }
 
@@ -706,7 +708,7 @@ class BriefController extends Controller
 
             $data = $schedule->toArray();
 
-            foreach (['created_at', 'updated_at', 'end_date'] as $f) {
+            foreach (['created_at', 'updated_at', 'end_date', 'next_run_at'] as $f) {
                 $data[$f] = isset($data[$f]) ? ($data[$f])->format('Y-m-d') : null;
             }
 

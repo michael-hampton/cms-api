@@ -159,7 +159,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/briefs/{id}/status', [BriefController::class, 'updateStatus']);
 
 // Duplicate
-        $router->post('/briefs/{id}/duplicate', [BriefController::class, 'duplicate']);
+        $router->post('/briefs/{id}/duplicate', [BriefController::class, 'clone']);
 
 // Activity Log
         $router->get('/briefs/{id}/activity', [BriefController::class, 'getActivityLog']);
