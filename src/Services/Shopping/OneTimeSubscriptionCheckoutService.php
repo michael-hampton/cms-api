@@ -2,6 +2,7 @@
 
 namespace App\Services\Shopping;
 
+use App\Actions\Stock\FulfilSubscriptionAction;
 use App\DTO\Checkout\DeliveryMethodConfig;
 use App\Enums\CartItemType;
 use App\Enums\Orders\OrderLineStatus;
@@ -10,6 +11,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Order\OrderDraftService;
 use App\Services\Billing\Payments\PaymentIntentService;
@@ -36,6 +38,8 @@ class OneTimeSubscriptionCheckoutService
         private readonly FulfilmentResolver         $fulfilmentResolver,
         private readonly SubscriptionPlanRepository $subscriptionPlanRepository,
         private readonly CheckoutEligibilityService $eligibilityService,
+        // ── Stock allocation ─────────────────────────────────────────────────
+        private readonly FulfilSubscriptionAction $fulfilSubscriptionAction,
     )
     {
     }
@@ -59,19 +63,24 @@ class OneTimeSubscriptionCheckoutService
 
         $member = $this->memberAuth->getMember();
 
-        // 3. PHASE 1: Lock plans, validate availability, create subscriptions + order atomically.
-        //    lockForUpdate() must live inside the transaction to hold the row lock through the write.
-        [$order, $subscriptions, $eligibility] = $this->database->transaction(
+        // 3. PHASE 1: Lock plans, validate availability, reserve issue stock,
+        //    create subscriptions + order — all atomically.
+        //
+        //    $stockReservations shape: array<array{reservationId: int, issue: IssueDelivery, quantity: int}>
+        //    We carry the model reference so Phase 3 / failure can call release() without
+        //    re-querying and without any app() / container calls.
+        [$order, $subscriptions, $eligibility, $stockReservations] = $this->database->transaction(
             function () use ($subscriptionItems, $data, $member, $siteId) {
 
-                // Validates availability, locks plans, and attaches delivery estimates.
-                // Must run inside the transaction so the FOR UPDATE lock is held through the write.
-                $subscriptionItems = $this->validateAndAttachEstimates($subscriptionItems);
+                [$subscriptionItems, $stockReservations] = $this->validateAttachEstimatesAndReserveStock(
+                    $subscriptionItems
+                );
 
                 $eligibility = $this->eligibilityService->validate($member, $subscriptionItems);
                 $subscriptionItems = $eligibility->valid;
 
                 if (empty($subscriptionItems)) {
+                    // Decrements roll back automatically with the transaction.
                     throw new CheckoutException('All items were invalid and removed from the cart.');
                 }
 
@@ -136,7 +145,7 @@ class OneTimeSubscriptionCheckoutService
                     (bool)$allFreeGifts
                 );
 
-                return [$order, $subscriptions, $eligibility];
+                return [$order, $subscriptions, $eligibility, $stockReservations];
             }
         );
 
@@ -150,38 +159,40 @@ class OneTimeSubscriptionCheckoutService
             );
 
             if (!$paymentResult['success']) {
-                $this->handlePaymentFailure($order, $subscriptions);
+                $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
                 throw new CheckoutException('Payment processing failed');
             }
         } catch (CheckoutException $e) {
             throw $e;
         } catch (\Exception $e) {
-            $this->handlePaymentFailure($order, $subscriptions);
+            $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
             throw $e;
         }
 
-        // 5. PHASE 3: Attach payment intent to order
-        $this->orderDraftService->attachPaymentIntent($order, $paymentResult);
-
-        // 6. PHASE 4: Activate subscriptions now that payment is confirmed.
-        //    If the member selected a future start date, the subscription is SCHEDULED
-        //    rather than ACTIVE — a scheduler will transition it on the start date.
-        //    Same-day start (start_date === today) is treated as immediately active.
+        // 5. PHASE 3: Attach payment intent + activate subscriptions + confirm stock.
         $today = new DateTimeImmutable('today');
 
-        $this->database->transaction(function () use ($subscriptions, $today) {
+        $this->database->transaction(function () use ($subscriptions, $today, $stockReservations) {
             foreach ($subscriptions as $subData) {
                 $startDate = !empty($subData['selected_start_date'])
                     ? new DateTimeImmutable($subData['selected_start_date'])
                     : null;
 
-                $status = ($startDate && $startDate > $today)
+                $status = !$startDate || $startDate > $today
                     ? SubscriptionStatus::PENDING
                     : SubscriptionStatus::SCHEDULED;
 
                 $subData['subscription']->update(['status' => $status->value]);
             }
+
+            // Confirm all stock reservations now that payment has succeeded.
+            foreach ($stockReservations as $reservation) {
+                $this->fulfilSubscriptionAction->confirm($reservation['reservationId']);
+            }
         });
+
+        // 6. Attach payment intent to order (outside transaction — metadata only)
+        $this->orderDraftService->attachPaymentIntent($order, $paymentResult);
 
         // 7. Clear cart
         $this->cartService->clear();
@@ -195,44 +206,30 @@ class OneTimeSubscriptionCheckoutService
         );
     }
 
-    private function calculateBaseSubtotalCents(array $items): int
-    {
-        $totalCents = 0;
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
 
-        foreach ($items as $item) {
-            if (($item['options']['type'] ?? '') === CartItemType::FREE_GIFT->value) {
-                continue;
-            }
-            $priceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
-            $quantity = $item['quantity'] ?? 1;
-            $totalCents += $priceCents * $quantity;
-        }
-
-        return $totalCents;
-    }
-
-    private function getSubscriptionItems(): array
-    {
-        return array_values(array_filter(
-            $this->cartService->getItems(),
-            fn($item) => !empty($item['subscription_plan_id'])
-        ));
-    }
-
-    private function handlePaymentFailure($order, array $subscriptions): void
-    {
-        $this->database->transaction(function () use ($order, $subscriptions) {
-            $order->update(['payment_status' => PaymentStatus::FAILED->value]);
-
-            foreach ($subscriptions as $subData) {
-                $subData['subscription']->update(['status' => SubscriptionStatus::CANCELLED->value]);
-            }
-        });
-    }
-
-    private function validateAndAttachEstimates(array $subscriptionItems): array
+    /**
+     * Validate availability, attach delivery estimates, and reserve stock for
+     * any print subscription issues.
+     *
+     * Returns [$itemsWithEstimates, $stockReservations].
+     *
+     * $stockReservations shape:
+     *   array<array{reservationId: int, issue: IssueDelivery, quantity: int}>
+     *
+     * The model reference is kept alongside the reservation ID so that
+     * handlePaymentFailure() can call release() without any container calls.
+     *
+     * MUST be called inside an open transaction (owned by processCheckout Phase 1).
+     *
+     * @return array{0: array, 1: array<array{reservationId: int, issue: IssueDelivery, quantity: int}>}
+     */
+    private function validateAttachEstimatesAndReserveStock(array $subscriptionItems): array
     {
         $itemsWithEstimates = [];
+        $stockReservations = [];
         $deliveryMethod = DeliveryMethodConfig::default();
         $orderDate = new DateTimeImmutable();
 
@@ -243,7 +240,6 @@ class OneTimeSubscriptionCheckoutService
                 throw new CheckoutException("Subscription plan not found");
             }
 
-            // STEP 1: Check plan availability via policy
             $policy = $plan->availabilityPolicy();
 
             if (!$policy->canPurchase()) {
@@ -252,7 +248,6 @@ class OneTimeSubscriptionCheckoutService
                 );
             }
 
-            // STEP 2: For PRINT subscriptions, validate next issue
             $orderLineStatus = null;
             $expectedShipDate = null;
             $isPreorder = false;
@@ -277,6 +272,20 @@ class OneTimeSubscriptionCheckoutService
 
                 if ($nextIssue->stock_quantity >= $quantity) {
                     $orderLineStatus = OrderLineStatus::READY_TO_SHIP->value;
+
+                    // ── Reserve stock (Phase 1) ──────────────────────────────────────
+                    // Decrement stock optimistically inside this transaction.
+                    // If the transaction rolls back, the decrement is undone automatically.
+                    // We keep both the reservation ID and the model so that
+                    // handlePaymentFailure() can call release() without re-querying.
+                    $reservationId = $this->fulfilSubscriptionAction->reserve($nextIssue, $quantity);
+                    $stockReservations[] = [
+                        'reservationId' => $reservationId,
+                        'issue' => $nextIssue,
+                        'quantity' => $quantity,
+                    ];
+                    // ────────────────────────────────────────────────────────────────
+
                 } elseif ($issuePolicy->isPreOrder()) {
                     $orderLineStatus = OrderLineStatus::PENDING_PREORDER->value;
                     $expectedShipDate = $issuePolicy->getExpectedShipDate();
@@ -285,6 +294,7 @@ class OneTimeSubscriptionCheckoutService
                     if (!$expectedShipDate) {
                         throw new CheckoutException('Pre-order requires expected ship date');
                     }
+                    // Pre-orders: stock decremented when the issue ships, not now.
                 } else {
                     throw new CheckoutException(
                         "Issue #{$nextIssue->issue_number} out of stock. " .
@@ -293,37 +303,20 @@ class OneTimeSubscriptionCheckoutService
                 }
             }
 
-            // STEP 3: Calculate delivery estimates
             $fulfilment = $this->fulfilmentResolver->resolve($plan);
+            $estimate = $this->deliveryEstimator->estimate($fulfilment, $deliveryMethod, $orderDate);
 
-            $estimate = $this->deliveryEstimator->estimate(
-                $fulfilment,
-                $deliveryMethod,
-                $orderDate
-            );
-
-            // STEP 4: Attach all metadata to cart item.
-            // This data flows through to SubscriptionBatchFactory and OrderDraftService.
             $itemsWithEstimates[] = array_merge($item, [
-                // Plan-level pre-release (content not ready)
                 'is_pre_release' => $policy->isPreRelease(),
                 'release_date' => $plan->release_date?->format('Y-m-d'),
-
-                // Issue-level pre-order (stock not ready) - ONLY for print
                 'order_line_status' => $orderLineStatus,
                 'expected_ship_date' => $expectedShipDate?->format('Y-m-d'),
                 'is_preorder' => $isPreorder,
-
-                // Next issue info (for display and order item metadata)
                 'next_issue_id' => $nextIssue?->id,
                 'next_issue_number' => $nextIssue?->issue_number,
                 'next_issue_title' => $nextIssue?->issue_title,
                 'next_issue_on_sale_date' => $nextIssue?->on_sale_date?->format('Y-m-d'),
-
-                // Availability message for UI
                 'availability_message' => $policy->getAvailabilityMessage(),
-
-                // Delivery estimates for UI
                 'estimated_dispatch' => $estimate->dispatchDate?->format('Y-m-d'),
                 'estimated_delivery_from' => $estimate->from?->format('Y-m-d'),
                 'estimated_delivery_to' => $estimate->to?->format('Y-m-d'),
@@ -332,6 +325,53 @@ class OneTimeSubscriptionCheckoutService
             ]);
         }
 
-        return $itemsWithEstimates;
+        return [$itemsWithEstimates, $stockReservations];
+    }
+
+    /**
+     * Handle payment failure: cancel order + subscriptions and release any
+     * stock that was reserved in Phase 1 back to available inventory.
+     *
+     * @param array<array{reservationId: int, issue: IssueDelivery, quantity: int}> $stockReservations
+     */
+    private function handlePaymentFailure(object $order, array $subscriptions, array $stockReservations): void
+    {
+        $this->database->transaction(function () use ($order, $subscriptions, $stockReservations) {
+            $order->update(['payment_status' => PaymentStatus::FAILED->value]);
+
+            foreach ($subscriptions as $subData) {
+                $subData['subscription']->update(['status' => SubscriptionStatus::CANCELLED->value]);
+            }
+
+            // Restore stock for every reservation made in Phase 1.
+            // We have the IssueDelivery model reference from Phase 1 so no re-query is needed.
+            foreach ($stockReservations as $reservation) {
+                $this->fulfilSubscriptionAction->release($reservation['issue'], $reservation['quantity']);
+            }
+        });
+    }
+
+    private function calculateBaseSubtotalCents(array $items): int
+    {
+        $totalCents = 0;
+
+        foreach ($items as $item) {
+            if (($item['options']['type'] ?? '') === CartItemType::FREE_GIFT->value) {
+                continue;
+            }
+            $priceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
+            $quantity = $item['quantity'] ?? 1;
+            $totalCents += $priceCents * $quantity;
+        }
+
+        return $totalCents;
+    }
+
+    private function getSubscriptionItems(): array
+    {
+        return array_values(array_filter(
+            $this->cartService->getItems(),
+            fn($item) => !empty($item['subscription_plan_id'])
+        ));
     }
 }

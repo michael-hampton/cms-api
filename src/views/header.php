@@ -170,7 +170,7 @@ $siteSlug = $site ? $site->slug : 'default';
                     <span class="badge" id="wishlist-count" style="display: block;">4</span>
                 </button>
             <?php endif; ?>
-            <button class="icon-btn" id="cart-btn">
+            <button class="icon-btn" id="cart-btn" onclick="MiniCart.open()">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <circle cx="9" cy="21" r="1"></circle>
                     <circle cx="20" cy="21" r="1"></circle>

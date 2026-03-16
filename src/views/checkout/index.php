@@ -39,9 +39,7 @@
             padding: 0 20px;
         }
 
-        /* Header */
         .site-header {
-            ƒleme
             background: white;
             box-shadow: var(--shadow);
             position: sticky;
@@ -111,7 +109,6 @@
             font-weight: 600;
         }
 
-        /* Page Header */
         .page-header {
             background: white;
             padding: 2rem 0;
@@ -138,7 +135,6 @@
             text-decoration: none;
         }
 
-        /* Progress Steps */
         .checkout-progress {
             background: white;
             border-radius: 0.75rem;
@@ -218,7 +214,6 @@
             color: var(--primary-color);
         }
 
-        /* Checkout Layout */
         .checkout-layout {
             display: grid;
             grid-template-columns: 1fr 400px;
@@ -226,7 +221,6 @@
             margin-bottom: 3rem;
         }
 
-        /* Checkout Form */
         .checkout-form {
             background: white;
             border-radius: 0.75rem;
@@ -305,7 +299,17 @@
             font-size: 0.875rem;
         }
 
-        /* Payment Methods */
+        /* Payment error shown inline beneath the card element */
+        #card-errors:not(:empty) {
+            margin-top: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            border-radius: 0.375rem;
+            color: #991b1b;
+            font-size: 0.875rem;
+        }
+
         .payment-methods {
             display: grid;
             gap: 1rem;
@@ -351,7 +355,6 @@
             color: var(--text-secondary);
         }
 
-        /* Order Summary */
         .order-summary {
             background: white;
             border-radius: 0.75rem;
@@ -375,7 +378,6 @@
             align-items: center;
             gap: 1rem;
             padding: 1rem 0;
-            /*border-bottom: 1px solid var(--border-color);*/
         }
 
         .item-image {
@@ -420,6 +422,19 @@
             margin-top: 1rem;
         }
 
+        .currency-badge {
+            display: inline-block;
+            background: #eff6ff;
+            color: var(--primary-color);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.125rem 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid #bfdbfe;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
         .btn {
             width: 100%;
             padding: 1rem;
@@ -446,6 +461,24 @@
         .btn-primary:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary.processing {
+            position: relative;
+        }
+
+        .btn-primary.processing::after {
+            content: '';
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin-left: 0.5rem;
+            vertical-align: middle;
         }
 
         .btn-secondary {
@@ -459,7 +492,52 @@
             background: var(--bg-light);
         }
 
-        /* Loading State */
+        /* Auto-renewal consent blocks — global (all users) and US-specific */
+        .auto-renewal-consent {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .auto-renewal-consent label {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            cursor: pointer;
+        }
+
+        .auto-renewal-consent input[type="checkbox"] {
+            margin-top: 0.2rem;
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+
+        .auto-renewal-consent .consent-text {
+            font-size: 0.8125rem;
+            color: #0c4a6e;
+            line-height: 1.6;
+        }
+
+        .auto-renewal-consent .consent-text strong {
+            display: block;
+            margin-bottom: 0.375rem;
+            font-size: 0.875rem;
+        }
+
+        .auto-renewal-consent.consent-error {
+            border-color: var(--danger-color);
+            background: #fff1f2;
+        }
+
+        .auto-renewal-consent.consent-error .consent-text {
+            color: #7f1d1d;
+        }
+
         .loading-overlay {
             position: fixed;
             top: 0;
@@ -500,7 +578,6 @@
             }
         }
 
-        /* Alert */
         .alert {
             padding: 1rem;
             border-radius: 0.5rem;
@@ -519,7 +596,6 @@
             border: 1px solid #ef4444;
         }
 
-        /* Security Badge */
         .security-badge {
             display: flex;
             align-items: center;
@@ -532,7 +608,6 @@
             color: var(--text-secondary);
         }
 
-        /* Footer */
         .site-footer {
             background: white;
             padding: 2rem 0;
@@ -540,44 +615,6 @@
             color: var(--text-secondary);
             margin-top: 4rem;
             box-shadow: var(--shadow);
-        }
-
-        /* Responsive */
-        @media (max-width: 968px) {
-            .checkout-layout {
-                grid-template-columns: 1fr;
-            }
-
-            .order-summary {
-                position: static;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .progress-steps {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .progress-steps::before {
-                display: none;
-            }
-
-            .progress-line {
-                display: none;
-            }
-        }
-
-        @media (max-width: 640px) {
-            .main-nav {
-                display: none;
-            }
-
-            .page-title {
-                font-size: 1.5rem;
-            }
         }
 
         .saved-address-card {
@@ -608,15 +645,6 @@
         .saved-address-card .address-details strong {
             display: block;
             margin-bottom: 0.25rem;
-        }
-
-        .saved-address-card .badge {
-            background: var(--primary-color);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
         }
 
         .section-header {
@@ -676,17 +704,47 @@
             border-color: var(--primary-color);
             background: rgba(37, 99, 235, 0.05);
         }
+
+        @media (max-width: 968px) {
+            .checkout-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .order-summary {
+                position: static;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .progress-steps {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .progress-steps::before, .progress-line {
+                display: none;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .main-nav {
+                display: none;
+            }
+
+            .page-title {
+                font-size: 1.5rem;
+            }
+        }
     </style>
     @css('checkout-auth.css')
 </head>
 <body>
-<!-- Header -->
 <header class="site-header">
     <div class="container">
         <div class="header-content">
-            <div class="logo">
-                <a href="/">YourStore</a>
-            </div>
+            <div class="logo"><a href="/">YourStore</a></div>
             <nav class="main-nav">
                 <a href="/">Home</a>
                 <a href="/shop">Shop</a>
@@ -713,25 +771,19 @@
     </div>
 </header>
 
-<!-- Page Header -->
 <div class="page-header">
     <div class="container">
         <h1 class="page-title">Checkout</h1>
         <div class="breadcrumb">
-            <a href="/">Home</a>
-            <span>/</span>
-            <a href="/cart">Cart</a>
-            <span>/</span>
+            <a href="/">Home</a><span>/</span>
+            <a href="/cart">Cart</a><span>/</span>
             <span>Checkout</span>
         </div>
     </div>
 </div>
 
-
-<!-- Main Content -->
 <main>
     <div class="container">
-        <!-- Progress Steps -->
         <div class="checkout-progress">
             <div class="progress-steps">
                 <div class="progress-line" id="progress-line"></div>
@@ -756,12 +808,28 @@
 
         <div id="alert-container"></div>
 
+        <?php
+        // Detect mixed cart server-side — subscriptions and physical products cannot
+        // be purchased together. Show a blocking warning before the user submits.
+        $cartSubscriptionItems = array_filter($items, fn($item) => !empty($item['subscription_plan_id']));
+        $cartProductItems = array_filter($items, fn($item) => empty($item['subscription_plan_id']));
+        $isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
+        ?>
+
+        <?php if ($isMixedCart): ?>
+            <div class="alert alert-error" id="mixed-cart-warning" style="margin-bottom:1.5rem;">
+                <strong>Your cart contains both subscription and physical items.</strong>
+                These cannot be purchased together in a single order. Please
+                <a href="/cart" style="color:inherit;font-weight:600;text-decoration:underline;">return to your cart</a>
+                and complete them as separate orders.
+            </div>
+        <?php endif; ?>
+
         <div class="login-prompt">
             <p>Already have an account? <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses</p>
         </div>
 
         <div class="checkout-layout">
-            <!-- Checkout Form -->
             <div class="checkout-form">
                 <form id="checkout-form">
                     <!-- Contact Information -->
@@ -769,17 +837,13 @@
                         <h2 class="section-title">Contact Information</h2>
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">
-                                    First Name <span class="required">*</span>
-                                </label>
+                                <label class="form-label">First Name <span class="required">*</span></label>
                                 <input type="text" name="first_name" class="form-input"
                                        value="<?= $member?->first_name ?? '' ?>" required>
                                 <span class="form-error" id="error-first_name"></span>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">
-                                    Last Name <span class="required">*</span>
-                                </label>
+                                <label class="form-label">Last Name <span class="required">*</span></label>
                                 <input type="text" name="last_name" class="form-input"
                                        value="<?= $member?->last_name ?? '' ?>" required>
                                 <span class="form-error" id="error-last_name"></span>
@@ -787,25 +851,20 @@
                         </div>
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label">
-                                    Email <span class="required">*</span>
-                                </label>
-                                <input type="email" name="email" class="form-input" value="<?= $member?->email ?? '' ?>"
-                                       required>
+                                <label class="form-label">Email <span class="required">*</span></label>
+                                <input type="email" name="email" class="form-input"
+                                       value="<?= $member?->email ?? '' ?>" required>
                                 <span class="form-error" id="error-email"></span>
                             </div>
                             <div class="form-group">
-                                <label class="form-label">
-                                    Phone <span class="required">*</span>
-                                </label>
-                                <input type="tel" name="phone" class="form-input" required>
+                                <label class="form-label">Phone</label>
+                                <input type="tel" name="phone" class="form-input">
                                 <span class="form-error" id="error-phone"></span>
                             </div>
                         </div>
                     </div>
 
                     <?php if ($requiresShipping ?? true): ?>
-
                         <div class="form-section" id="saved-addresses-section" style="display: none;">
                             <h2 class="section-title">Saved Addresses</h2>
                             <div id="saved-addresses-list"></div>
@@ -814,59 +873,45 @@
                             </button>
                         </div>
 
-                        <!-- Shipping Address -->
                         <div class="form-section" id="shipping-address-form">
-                            <div class="section-header"
-                                 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <h2 class="section-title" style="margin-bottom: 0; padding-bottom: 0; border: none;">
-                                    Shipping Address</h2>
+                            <div class="section-header">
+                                <h2 class="section-title" style="margin-bottom:0;padding-bottom:0;border:none;">Shipping
+                                    Address</h2>
                                 <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
-                                        class="btn btn-secondary"
-                                        style="display: none; width: auto; padding: 0.5rem 1rem;">
+                                        class="btn btn-secondary" style="display:none;width:auto;padding:0.5rem 1rem;">
                                     ← Back to Saved Addresses
                                 </button>
                             </div>
                             <div class="form-group full-width">
-                                <label class="form-label">
-                                    Address <span class="required">*</span>
-                                </label>
+                                <label class="form-label">Address <span class="required">*</span></label>
                                 <input type="text" name="address" class="form-input" required>
                                 <span class="form-error" id="error-address"></span>
                             </div>
                             <div class="form-group full-width">
-                                <label class="form-label">
-                                    Apartment, suite, etc. (optional)
-                                </label>
+                                <label class="form-label">Apartment, suite, etc. (optional)</label>
                                 <input type="text" name="address2" class="form-input">
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label class="form-label">
-                                        City <span class="required">*</span>
-                                    </label>
+                                    <label class="form-label">City <span class="required">*</span></label>
                                     <input type="text" name="city" class="form-input" required>
                                     <span class="form-error" id="error-city"></span>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">
-                                        State / Province
-                                    </label>
+                                    <label class="form-label">State / Province</label>
                                     <input type="text" name="state" class="form-input">
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label class="form-label">
-                                        Postal Code <span class="required">*</span>
-                                    </label>
+                                    <label class="form-label">Postal Code <span class="required">*</span></label>
                                     <input type="text" name="postal_code" class="form-input" required>
                                     <span class="form-error" id="error-postal_code"></span>
                                 </div>
                                 <div class="form-group">
-                                    <label class="form-label">
-                                        Country <span class="required">*</span>
-                                    </label>
-                                    <select name="country" class="form-select" required>
+                                    <label class="form-label">Country <span class="required">*</span></label>
+                                    <select name="country" id="country-select" class="form-select"
+                                            required onchange="handleCountryChange(this.value)">
                                         <option value="">Select Country</option>
                                         <option value="US">United States</option>
                                         <option value="CA">Canada</option>
@@ -911,7 +956,6 @@
 
                     <h2 class="section-title">Card Details</h2>
 
-                    <!-- Saved Payment Methods -->
                     <div class="form-section" id="saved-cards-section" style="display: none;">
                         <h2 class="section-title">Saved Payment Methods</h2>
                         <div id="saved-cards-list"></div>
@@ -922,30 +966,27 @@
 
                     <div id="payment-request-button"></div>
 
-                    <!-- Card Details Section (modify existing) -->
                     <div class="form-section" id="new-card-section">
                         <div class="section-header">
                             <h2 class="section-title">Card Details</h2>
                             <button type="button" id="back-to-saved-cards-btn" onclick="showSavedCards()"
-                                    class="btn btn-secondary" style="display: none; width: auto; padding: 0.5rem 1rem;">
+                                    class="btn btn-secondary" style="display:none;width:auto;padding:0.5rem 1rem;">
                                 ← Back to Saved Cards
                             </button>
                         </div>
                         <div class="form-group full-width">
                             <label class="form-label">Card Information <span class="required">*</span></label>
                             <div id="card-element"
-                                 style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;"></div>
-                            <div id="card-errors" class="form-error" role="alert"></div>
+                                 style="padding:0.75rem;border:1px solid var(--border-color);border-radius:0.5rem;"></div>
+                            <!-- Inline payment error — shown immediately beneath the card element -->
+                            <div id="card-errors" class="form-error" role="alert" aria-live="polite"></div>
                         </div>
                     </div>
 
-                    <!-- Order Notes -->
                     <div class="form-section">
                         <h2 class="section-title">Order Notes (Optional)</h2>
                         <div class="form-group full-width">
-                            <label class="form-label">
-                                Special instructions for delivery
-                            </label>
+                            <label class="form-label">Special instructions for delivery</label>
                             <textarea name="notes" class="form-textarea"
                                       placeholder="Add any special instructions..."></textarea>
                         </div>
@@ -955,114 +996,113 @@
 
             <!-- Order Summary -->
             <div class="order-summary">
-                <h3>Order Summary</h3>
+                <h3>
+                    Order Summary
+                    <?php
+                    // Currency is resolved server-side from the site config.
+                    // It is locked to the plan/site currency and will not change
+                    // if the user updates their billing country.
+                    $displayCurrency = strtoupper($currency ?? 'GBP');
+                    ?>
+                    <span class="currency-badge"><?= htmlspecialchars($displayCurrency) ?></span>
+                </h3>
 
                 <div id="order-items">
-
                     <?php
-                    // Group items by merchant
                     $itemsByMerchant = [];
-
                     foreach ($items as $item) {
                         $merchantId = $item['options']['merchant_id'] ?? 0;
                         $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
-
                         if (!isset($itemsByMerchant[$merchantId])) {
-                            $itemsByMerchant[$merchantId] = [
-                                    'name' => $merchantName,
-                                    'items' => [],
-                                    'subtotal' => 0
-                            ];
+                            $itemsByMerchant[$merchantId] = ['name' => $merchantName, 'items' => [], 'subtotal' => 0];
                         }
                         $itemsByMerchant[$merchantId]['items'][] = $item;
                         $itemsByMerchant[$merchantId]['subtotal'] += $item['subtotal'];
                     }
                     ?>
 
-                    <?php foreach ($itemsByMerchant
-
-                                   as $merchantId => $merchantData): ?>
-                    <div class="merchant-group"
-                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem;">
-                        <div class="merchant-header" style="margin-bottom: 1rem;">
-                            <strong style="font-size: 0.875rem; color: var(--text-primary);">
-                                <?= htmlspecialchars($merchantData['name']) ?>
-                            </strong>
-                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
-                    (<?= count($merchantData['items']) ?> items)
-                </span>
-                        </div>
-
-                        <?php foreach ($items as $item): ?>
-                            <div class="summary-item">
-                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                     class="item-image">
-                                <div class="item-details">
-                                    <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
-
-                                    <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
-                                        <div class="variant-options"
-                                             style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
-                                            <?php
-                                            $variantParts = [];
-                                            foreach ($item['variant_options'] as $optionName => $optionValue) {
-                                                $variantParts[] = htmlspecialchars(ucfirst($optionName)) . ': <strong>' . htmlspecialchars($optionValue) . '</strong>';
-                                            }
-                                            echo implode(' • ', $variantParts);
-                                            ?>
-                                        </div>
-                                        <?php if (!empty($item['variant_sku'])): ?>
-                                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.125rem;">
-                                                SKU: <?= htmlspecialchars($item['variant_sku']) ?>
-                                            </div>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-
-                                    <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
-                                </div>
-                                <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
-
-                                <?php if (!empty($item['options']['subscription_plan_id'])): ?>
-                                    <input type="hidden" name="plan_id"
-                                           value="<?= $item['options']['subscription_plan_id'] ?>">
-                                <?php endif; ?>
-                                <?php if (!empty($item['estimated_delivery'])): ?>
-                                    <div class="item-delivery"
-                                         style="font-size: 0.75rem; color: var(--success-color); margin-top: 0.25rem;">
-                                        📦 Delivery: <?= htmlspecialchars($item['estimated_delivery']) ?>
-                                    </div>
-                                <?php endif; ?>
+                    <?php foreach ($itemsByMerchant as $merchantId => $merchantData): ?>
+                        <div class="merchant-group" style="margin-bottom:1.5rem;padding-bottom:1.5rem;">
+                            <div class="merchant-header" style="margin-bottom:1rem;">
+                                <strong style="font-size:0.875rem;color:var(--text-primary);">
+                                    <?= htmlspecialchars($merchantData['name']) ?>
+                                </strong>
+                                <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:0.5rem;">
+                                (<?= count($merchantData['items']) ?> items)
+                            </span>
                             </div>
 
-                        <?php endforeach; ?>
-                        <?php endforeach; ?>
-                    </div>
+                            <?php foreach ($merchantData['items'] as $item): ?>
+                                <div class="summary-item">
+                                    <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
+                                         alt="<?= htmlspecialchars($item['product_name']) ?>"
+                                         class="item-image">
+                                    <div class="item-details">
+                                        <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+
+                                        <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                                            <div class="variant-options"
+                                                 style="margin-top:0.25rem;font-size:0.75rem;color:var(--text-secondary);">
+                                                <?php
+                                                $variantParts = [];
+                                                foreach ($item['variant_options'] as $optionName => $optionValue) {
+                                                    $variantParts[] = htmlspecialchars(ucfirst($optionName)) . ': <strong>' . htmlspecialchars($optionValue) . '</strong>';
+                                                }
+                                                echo implode(' • ', $variantParts);
+                                                ?>
+                                            </div>
+                                            <?php if (!empty($item['variant_sku'])): ?>
+                                                <div style="font-size:0.7rem;color:var(--text-secondary);margin-top:0.125rem;">
+                                                    SKU: <?= htmlspecialchars($item['variant_sku']) ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+
+                                        <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
+
+                                        <?php if (!empty($item['estimated_delivery'])): ?>
+                                            <div style="font-size:0.75rem;color:var(--success-color);margin-top:0.25rem;">
+                                                📦 <?= htmlspecialchars($item['estimated_delivery']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="item-price">
+                                        <?= htmlspecialchars($displayCurrency) ?> <?= number_format($item['subtotal'], 2) ?>
+                                    </div>
+
+                                    <?php if (!empty($item['options']['subscription_plan_id'])): ?>
+                                        <input type="hidden" name="plan_id"
+                                               value="<?= $item['options']['subscription_plan_id'] ?>">
+                                    <?php endif; ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endforeach; ?>
 
                     <div class="voucher-section"
-                         style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
-                        <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 1rem;">Voucher Code</h4>
-                        <div style="display: flex; gap: 0.5rem;">
+                         style="margin:1.5rem 0;padding:1.5rem 0;border-top:1px solid var(--border-color);border-bottom:1px solid var(--border-color);">
+                        <h4 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">Voucher Code</h4>
+                        <div style="display:flex;gap:0.5rem;">
                             <input type="text" id="voucher-input" placeholder="Enter code"
-                                   style="flex: 1; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem; font-size: 0.875rem;"
+                                   style="flex:1;padding:0.75rem;border:1px solid var(--border-color);border-radius:0.5rem;font-size:0.875rem;"
                                    value="<?= htmlspecialchars($_SESSION['applied_voucher_code']['code'] ?? '') ?>">
                             <button onclick="applyVoucher()" class="btn btn-secondary"
-                                    style="width: auto; padding: 0.75rem 1.5rem; font-size: 0.875rem;">Apply
+                                    style="width:auto;padding:0.75rem 1.5rem;font-size:0.875rem;">Apply
                             </button>
                         </div>
-                        <div id="voucher-message" style="margin-top: 0.5rem; font-size: 0.875rem;"></div>
+                        <div id="voucher-message" style="margin-top:0.5rem;font-size:0.875rem;"></div>
                         <div id="applied-voucher"
-                             style="<?= !empty($_SESSION['applied_voucher_code']) ? 'display: block;' : 'display: none;' ?> margin-top: 1rem; padding: 1rem; background: #d1fae5; border-radius: 0.5rem; border: 1px solid #10b981;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                             style="<?= !empty($_SESSION['applied_voucher_code']) ? 'display:block;' : 'display:none;' ?> margin-top:1rem;padding:1rem;background:#d1fae5;border-radius:0.5rem;border:1px solid #10b981;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <div>
-                                    <strong id="voucher-code-display" style="color: #065f46;"></strong>
-                                    <p style="font-size: 0.875rem; color: #065f46; margin: 0.25rem 0 0 0;">
+                                    <strong id="voucher-code-display" style="color:#065f46;"></strong>
+                                    <p style="font-size:0.875rem;color:#065f46;margin:0.25rem 0 0 0;">
                                         Discount: <span
                                                 id="voucher-discount-display"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
                                     </p>
                                 </div>
                                 <button onclick="removeVoucher()"
-                                        style="background: none; border: none; color: #065f46; cursor: pointer; padding: 0.5rem;">
+                                        style="background:none;border:none;color:#065f46;cursor:pointer;padding:0.5rem;">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <line x1="18" y1="6" x2="6" y2="18"></line>
                                         <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -1072,44 +1112,45 @@
                         </div>
                     </div>
 
-                    <div class="summary-row" id="discount-row" style="display: none; color: var(--success-color);">
+                    <div class="summary-row" id="discount-row"
+                         style="display:none;color:var(--success-color);">
                         <span>Discount:</span>
                         <span id="discount-amount"><?= htmlspecialchars($_SESSION['applied_voucher_code']['discount'] ?? '') ?></span>
                     </div>
 
                     <?php
                     $finalTotal = $subtotal + $tax + $shipping;
-
                     if (!empty($_SESSION['applied_voucher_code'])) {
                         $finalTotal -= $_SESSION['applied_voucher_code']['discount'];
                     }
-
                     ?>
 
                     <div class="summary-row">
                         <span>Subtotal:</span>
-                        <span id="subtotal">$<?= number_format($subtotal, 2) ?></span>
+                        <span id="subtotal"><?= htmlspecialchars($displayCurrency) ?> <?= number_format($subtotal, 2) ?></span>
                     </div>
                     <div class="summary-row">
                         <span>Shipping:</span>
-                        <span id="shipping"><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 0 ?></span>
+                        <span id="shipping"><?= $shipping > 0 ? htmlspecialchars($displayCurrency) . ' ' . number_format($shipping, 2) : 'Free' ?></span>
                     </div>
                     <div class="summary-row">
-                        <span>Tax (10%):</span>
-                        <span id="tax">$<?= number_format($tax, 2) ?></span>
+                        <span>Tax:</span>
+                        <span id="tax"><?= htmlspecialchars($displayCurrency) ?> <?= number_format($tax, 2) ?></span>
                     </div>
                     <div class="summary-row total">
                         <span>Total:</span>
-                        <span id="total" data-total="<?= $finalTotal ?>">$<?= number_format($finalTotal, 2) ?></span>
+                        <span id="total" data-total="<?= $finalTotal ?>">
+                            <?= htmlspecialchars($displayCurrency) ?> <?= number_format($finalTotal, 2) ?>
+                        </span>
                     </div>
 
                     <?php if (!empty($hasPreOrders)): ?>
-                        <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
-                            <div style="font-weight: 600; color: #92400e; margin-bottom: 0.75rem;">
-                                ⚠️ Pre-Order Items in Cart
+                        <div style="background:#fef3c7;border:1px solid #f59e0b;padding:1rem;border-radius:0.5rem;margin-bottom:1.5rem;">
+                            <div style="font-weight:600;color:#92400e;margin-bottom:0.75rem;">⚠️ Pre-Order Items in
+                                Cart
                             </div>
                             <?php foreach ($hasPreOrders as $preOrder): ?>
-                                <div style="font-size: 0.875rem; color: #78350f; margin-bottom: 0.5rem;">
+                                <div style="font-size:0.875rem;color:#78350f;margin-bottom:0.5rem;">
                                     <strong><?= htmlspecialchars($preOrder['name']) ?></strong><br>
                                     <?= htmlspecialchars($preOrder['message']) ?>
                                     <?php if ($preOrder['ship_date']): ?>
@@ -1117,16 +1158,64 @@
                                     <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
-
-                            <label style="display: flex; align-items: start; gap: 0.75rem; cursor: pointer; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #fbbf24;">
+                            <label style="display:flex;align-items:start;gap:0.75rem;cursor:pointer;margin-top:1rem;padding-top:1rem;border-top:1px solid #fbbf24;">
                                 <input type="checkbox" id="accept-pre-order" name="accept_pre_order" required
-                                       style="margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0;">
-                                <span style="flex: 1; font-size: 0.875rem; color: #92400e;">
-                I understand this order contains pre-order items and accept the delivery timelines shown above.
-            </span>
+                                       style="margin-top:0.25rem;width:18px;height:18px;cursor:pointer;flex-shrink:0;">
+                                <span style="flex:1;font-size:0.875rem;color:#92400e;">
+                                    I understand this order contains pre-order items and accept the delivery timelines shown above.
+                                </span>
                             </label>
                         </div>
                     <?php endif; ?>
+
+                    <!--
+                        AUTO-RENEWAL CONSENT — ALL USERS
+                        Shown to every user regardless of country.
+                        Required before submission.
+                        Covers EU/UK Consumer Rights, Australian ACCC, Canadian provincial requirements.
+                        NOTE: Final wording must be reviewed and approved by Legal prior to release.
+                    -->
+                    <div id="global-renewal-consent-block" class="auto-renewal-consent">
+                        <label>
+                            <input type="checkbox" id="global-renewal-consent"
+                                   name="global_renewal_consent" value="1">
+                            <div class="consent-text">
+                                <strong>Subscription Terms</strong>
+                                I understand this is a recurring subscription that will automatically renew
+                                until cancelled. I can cancel at any time via my account settings before
+                                the next renewal date.
+                                <em style="display:block;margin-top:0.5rem;font-size:0.75rem;opacity:0.8;">
+                                    [Pending Legal review — final wording TBC]
+                                </em>
+                            </div>
+                        </label>
+                    </div>
+
+                    <!--
+                        AUTO-RENEWAL CONSENT — US USERS ONLY
+                        Shown only when billing country is United States.
+                        Additional explicit double opt-in required by US state legislation
+                        (California ARL, New York, and others).
+                        NOTE: Final wording must be reviewed and approved by Legal prior to release.
+                    -->
+                    <div id="us-renewal-consent-block" class="auto-renewal-consent"
+                         style="display:none;margin-top:0.75rem;">
+                        <label>
+                            <input type="checkbox" id="us-renewal-consent"
+                                   name="us_renewal_consent" value="1">
+                            <div class="consent-text">
+                                <strong>Auto-Renewal Notice (Required for US customers)</strong>
+                                This is an automatically renewing subscription that will continue until
+                                you cancel. You may cancel at any time via your account settings. Your
+                                payment will be charged at the then-current rate on the same date each
+                                billing period and will continue until cancelled. We may update pricing
+                                with advance notice; you may cancel before any change takes effect.
+                                <em style="display:block;margin-top:0.5rem;font-size:0.75rem;opacity:0.8;">
+                                    [Pending Legal review — final wording TBC]
+                                </em>
+                            </div>
+                        </label>
+                    </div>
 
                     <button type="button" class="btn btn-primary" id="place-order-btn">
                         Place Order
@@ -1144,16 +1233,15 @@
                 </div>
             </div>
         </div>
+    </div>
 </main>
 
-<!-- Footer -->
 <footer class="site-footer">
     <div class="container">
         <p>&copy; 2025 YourStore. All rights reserved.</p>
     </div>
 </footer>
 
-<!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay">
     <div class="loading-content">
         <div class="spinner"></div>
@@ -1168,11 +1256,15 @@
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
-    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
+    // Currency is locked to the site/plan — it does NOT change when billing country changes.
+    const PLAN_CURRENCY = '<?= htmlspecialchars($displayCurrency) ?>';
 
-    const INITIAL_SUBTOTAL = parseFloat(document.getElementById('subtotal').textContent.replace('$', ''));
-    const INITIAL_SHIPPING = parseFloat(document.getElementById('shipping').textContent.replace('$', '') || '0');
-    const INITIAL_TAX = parseFloat(document.getElementById('tax').textContent.replace('$', ''));
+    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
+    const isMixedCart = <?= json_encode($isMixedCart) ?>;
+
+    const INITIAL_SUBTOTAL = parseFloat('<?= $subtotal ?>');
+    const INITIAL_SHIPPING = parseFloat('<?= $shipping ?>');
+    const INITIAL_TAX = parseFloat('<?= $tax ?>');
 
     let isLoggedIn = false;
     let currentMember = null;
@@ -1191,19 +1283,42 @@
     let savedCards = [];
     let selectedCardId = null;
 
-    // Check if cart has one-time subscription
+    // -------------------------------------------------------------------------
+    // Country / consent handling
+    // -------------------------------------------------------------------------
+
+    function handleCountryChange(countryCode) {
+        const usBlock = document.getElementById('us-renewal-consent-block');
+        if (!usBlock) return;
+
+        if (countryCode === 'US') {
+            usBlock.style.display = 'block';
+            usBlock.classList.remove('consent-error');
+        } else {
+            usBlock.style.display = 'none';
+            const cb = document.getElementById('us-renewal-consent');
+            if (cb) cb.checked = false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Saved cards
+    // -------------------------------------------------------------------------
+
     function checkCartForSubscription() {
         const urlParams = new URLSearchParams(window.location.search);
         isOneTimeSubscription = urlParams.get('type') === 'subscription';
+
+        if (!isOneTimeSubscription) {
+            document.getElementById('global-renewal-consent-block').style.display = 'none';
+        }
     }
 
     async function loadSavedCards() {
         if (!isLoggedIn || !currentMember) return;
-
         try {
             const response = await fetch(`/api/${SITE}/member/payment-methods`);
             const data = await response.json();
-
             if (data.success && data.data.payment_methods && data.data.payment_methods.length > 0) {
                 savedCards = data.data.payment_methods;
                 displaySavedCards();
@@ -1218,88 +1333,61 @@
         const section = document.getElementById('saved-cards-section');
 
         container.innerHTML = savedCards.map(card => `
-        <label class="saved-card ${card.id === selectedCardId ? 'selected' : ''}"
-               for="card-${card.id}">
-            <input type="radio" name="saved_card" value="${card.id}"
-                   id="card-${card.id}" onchange="selectSavedCard('${card.id}')">
-            <div class="card-details">
-                <div class="card-brand">${card.card.brand}</div>
-                <div class="card-number">•••• •••• •••• ${card.card.last4}</div>
-                <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
-            </div>
-        </label>
-    `).join('');
+            <label class="saved-card ${card.id === selectedCardId ? 'selected' : ''}" for="card-${card.id}">
+                <input type="radio" name="saved_card" value="${card.id}"
+                       id="card-${card.id}" onchange="selectSavedCard('${card.id}')">
+                <div class="card-details">
+                    <div class="card-brand">${card.card.brand}</div>
+                    <div class="card-number">•••• •••• •••• ${card.card.last4}</div>
+                    <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
+                </div>
+            </label>
+        `).join('');
 
         section.style.display = 'block';
-
-        // Hide new card form initially
         const newCardSection = document.getElementById('new-card-section');
-        if (newCardSection) {
-            newCardSection.style.display = 'none';
-        }
+        if (newCardSection) newCardSection.style.display = 'none';
     }
 
     function selectSavedCard(cardId) {
         selectedCardId = cardId;
-
-        // Update UI
-        document.querySelectorAll('.saved-card').forEach(card => {
-            card.classList.remove('selected');
-        });
+        document.querySelectorAll('.saved-card').forEach(c => c.classList.remove('selected'));
         document.getElementById(`card-${cardId}`).closest('.saved-card').classList.add('selected');
     }
 
     function showNewCardForm() {
         selectedCardId = null;
-
         const savedCardsSection = document.getElementById('saved-cards-section');
-        if (savedCardsSection) {
-            savedCardsSection.style.display = 'none';
-        }
-
+        if (savedCardsSection) savedCardsSection.style.display = 'none';
         const newCardSection = document.getElementById('new-card-section');
-        if (newCardSection) {
-            newCardSection.style.display = 'block';
-        }
-
+        if (newCardSection) newCardSection.style.display = 'block';
         const backBtn = document.getElementById('back-to-saved-cards-btn');
-        if (backBtn) {
-            backBtn.style.display = 'block';
-        }
-
-        document.querySelectorAll('[name="saved_card"]').forEach(radio => radio.checked = false);
+        if (backBtn) backBtn.style.display = 'block';
+        document.querySelectorAll('[name="saved_card"]').forEach(r => r.checked = false);
     }
 
     function showSavedCards() {
         selectedCardId = null;
-
         const savedCardsSection = document.getElementById('saved-cards-section');
-        if (savedCardsSection) {
-            savedCardsSection.style.display = 'block';
-        }
-
+        if (savedCardsSection) savedCardsSection.style.display = 'block';
         const newCardSection = document.getElementById('new-card-section');
-        if (newCardSection) {
-            newCardSection.style.display = 'none';
-        }
-
+        if (newCardSection) newCardSection.style.display = 'none';
         const backBtn = document.getElementById('back-to-saved-cards-btn');
-        if (backBtn) {
-            backBtn.style.display = 'none';
-        }
+        if (backBtn) backBtn.style.display = 'none';
     }
 
     function getCurrentOrderAmount() {
         const discount = appliedVoucher ? appliedVoucher.discount : 0;
         const taxRate = <?= $tax_rate ?>;
-
         const taxable = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING;
         const tax = taxable * taxRate;
-
         return Math.round((taxable + tax) * 100);
     }
 
-    // Initialize Stripe
+    // -------------------------------------------------------------------------
+    // Stripe init
+    // -------------------------------------------------------------------------
+
     async function initStripe() {
         if (!STRIPE_KEY) {
             console.error('Stripe key not configured');
@@ -1309,58 +1397,37 @@
         stripe = Stripe(STRIPE_KEY);
         elements = stripe.elements();
 
-        // Create card element
         cardElement = elements.create('card', {
             hidePostalCode: true,
             style: {
                 base: {
                     fontSize: '16px',
                     color: '#1e293b',
-                    '::placeholder': {
-                        color: '#64748b',
-                    },
+                    '::placeholder': {color: '#64748b'},
                 },
             },
         });
 
-        /*
-|--------------------------------------------------------------------------
-| Apple Pay / Wallet Support
-|--------------------------------------------------------------------------
-*/
-
-        paymentRequest = stripe.paymentRequest({
+        // Apple Pay / Wallet
+        const paymentRequest = stripe.paymentRequest({
             country: 'GB',
-            currency: 'gbp',
-            total: {
-                label: 'Order Total',
-                amount: getCurrentOrderAmount()
-            },
+            currency: PLAN_CURRENCY.toLowerCase(),
+            total: {label: 'Order Total', amount: getCurrentOrderAmount()},
             requestPayerName: true,
             requestPayerEmail: true
         });
 
-        const prButton = elements.create('paymentRequestButton', {
-            paymentRequest
-        });
+        const prButton = elements.create('paymentRequestButton', {paymentRequest});
 
         paymentRequest.canMakePayment().then(result => {
-            console.log('Wallet availability:', result);
-
-            if (result) {
-                prButton.mount('#payment-request-button');
-            }
+            if (result) prButton.mount('#payment-request-button');
         });
 
         paymentRequest.on('paymentmethod', async (ev) => {
-
             try {
-
                 const {error, paymentIntent} = await stripe.confirmCardPayment(
                     clientSecret,
-                    {
-                        payment_method: ev.paymentMethod.id
-                    },
+                    {payment_method: ev.paymentMethod.id},
                     {handleActions: false}
                 );
 
@@ -1375,47 +1442,33 @@
                 if (paymentIntent.status === 'requires_action') {
                     await stripe.confirmCardPayment(clientSecret);
                 }
-
                 if (paymentIntent.status === 'succeeded') {
                     await confirmPayment(paymentIntent.id);
                 }
-
             } catch (err) {
                 console.error(err);
                 ev.complete('fail');
                 showAlert('Payment failed', 'error');
             }
-
         });
 
-        // Mount card element
         const cardContainer = document.getElementById('card-element');
         if (cardContainer) {
             cardElement.mount('#card-element');
 
-            // Handle validation errors
             cardElement.on('change', (event) => {
                 const displayError = document.getElementById('card-errors');
-                if (event.error) {
-                    displayError.textContent = event.error.message;
-                } else {
-                    displayError.textContent = '';
-                }
+                displayError.textContent = event.error ? event.error.message : '';
             });
         }
 
-        // Hide old card fields
-        const oldCardDetails = document.getElementById('card-details');
-        if (oldCardDetails) {
-            oldCardDetails.style.display = 'none';
-        }
-
-        // Hide payment method selection
         const paymentSection = document.getElementById('payment-form-section');
-        if (paymentSection) {
-            paymentSection.style.display = 'none';
-        }
+        if (paymentSection) paymentSection.style.display = 'none';
     }
+
+    // -------------------------------------------------------------------------
+    // Login / address loading
+    // -------------------------------------------------------------------------
 
     async function checkLoginStatus() {
         try {
@@ -1425,16 +1478,11 @@
                 if (data.member) {
                     isLoggedIn = true;
                     currentMember = data.member;
-
-                    if (requiresShipping) {
-                        loadSavedAddresses();
-                    }
-
+                    if (requiresShipping) loadSavedAddresses();
                     loadSavedCards();
                 }
             }
-        } catch (error) {
-            console.log('Not logged in');
+        } catch (error) { /* guest */
         }
     }
 
@@ -1442,10 +1490,7 @@
         try {
             const response = await fetch(`/${SITE}/member/${currentMember.id}/addresses?type=shipping`);
             const data = await response.json();
-
-            if (data.items && data.items.length > 0) {
-                displaySavedAddresses(data.items);
-            }
+            if (data.items && data.items.length > 0) displaySavedAddresses(data.items);
         } catch (error) {
             console.error('Failed to load saved addresses:', error);
         }
@@ -1456,85 +1501,50 @@
         const section = document.getElementById('saved-addresses-section');
 
         container.innerHTML = addresses.map(addr => `
-        <label class="saved-address-card" for="addr-${addr.id}">
-            <input type="radio" name="saved_address" value="${addr.id}" id="addr-${addr.id}"
-                   onchange="selectAddress(${addr.id})">
-            <div class="address-details">
-                <strong>${addr.label || 'Address'}</strong>
-                <p>${addr.formatted}</p>
-            </div>
-            ${addr.is_default ? '<span class="badge">Default</span>' : ''}
-        </label>
-    `).join('');
+            <label class="saved-address-card" for="addr-${addr.id}">
+                <input type="radio" name="saved_address" value="${addr.id}" id="addr-${addr.id}"
+                       onchange="selectAddress(${addr.id})">
+                <div class="address-details">
+                    <strong>${addr.label || 'Address'}</strong>
+                    <p>${addr.formatted}</p>
+                </div>
+                ${addr.is_default ? '<span class="badge" style="position:static;background:var(--primary-color);">Default</span>' : ''}
+            </label>
+        `).join('');
 
         section.style.display = 'block';
-
-        // Hide manual form initially when saved addresses are loaded
         const shippingForm = document.getElementById('shipping-address-form');
-        if (shippingForm) {
-            shippingForm.style.display = 'none';
-        }
-
-        // Ensure back button is hidden
+        if (shippingForm) shippingForm.style.display = 'none';
         const backBtn = document.getElementById('back-to-saved-btn');
-        if (backBtn) {
-            backBtn.style.display = 'none';
-        }
+        if (backBtn) backBtn.style.display = 'none';
     }
 
     function selectAddress(addressId) {
         selectedAddressId = addressId;
         const shippingForm = document.getElementById('shipping-address-form');
-
-        if (shippingForm) {
-            shippingForm.style.display = 'none';
-        }
+        if (shippingForm) shippingForm.style.display = 'none';
     }
 
     function showNewAddressForm() {
         selectedAddressId = null;
-
         const savedAddressesSection = document.getElementById('saved-addresses-section');
-        if (savedAddressesSection) {
-            savedAddressesSection.style.display = 'none';
-        }
-
+        if (savedAddressesSection) savedAddressesSection.style.display = 'none';
         const shippingForm = document.getElementById('shipping-address-form');
-        if (shippingForm) {
-            shippingForm.style.display = 'block';
-        }
-
+        if (shippingForm) shippingForm.style.display = 'block';
         const backBtn = document.getElementById('back-to-saved-btn');
-        if (backBtn) {
-            backBtn.style.display = 'block';
-        }
-
-        document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
+        if (backBtn) backBtn.style.display = 'block';
+        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
     }
 
     function showSavedAddresses() {
         selectedAddressId = null;
-
-        // Show the saved addresses section
         const savedAddressesSection = document.getElementById('saved-addresses-section');
-        if (savedAddressesSection) {
-            savedAddressesSection.style.display = 'block';
-        }
-
-        // Hide the manual shipping address form
+        if (savedAddressesSection) savedAddressesSection.style.display = 'block';
         const shippingForm = document.getElementById('shipping-address-form');
-        if (shippingForm) {
-            shippingForm.style.display = 'none';
-        }
-
-        // Hide the back button
+        if (shippingForm) shippingForm.style.display = 'none';
         const backBtn = document.getElementById('back-to-saved-btn');
-        if (backBtn) {
-            backBtn.style.display = 'none';
-        }
-
-        // Uncheck all saved address radios
-        document.querySelectorAll('[name="saved_address"]').forEach(radio => radio.checked = false);
+        if (backBtn) backBtn.style.display = 'none';
+        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
     }
 
     // Payment method selection
@@ -1543,54 +1553,77 @@
             document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
             this.classList.add('selected');
             this.querySelector('input[type="radio"]').checked = true;
-
-            // Show/hide card details
-            const cardDetails = document.getElementById('card-details');
-            if (this.dataset.method === 'card') {
-                cardDetails.style.display = 'block';
-            } else {
-                cardDetails.style.display = 'none';
-            }
         });
     });
 
-    // Card number formatting
-    const cardNumberInput = document.querySelector('input[name="card_number"]');
-    if (cardNumberInput) {
-        cardNumberInput.addEventListener('input', function (e) {
-            let value = e.target.value.replace(/\s/g, '');
-            let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-            e.target.value = formattedValue;
-        });
-    }
-
-    // Card expiry formatting
-    const cardExpiryInput = document.querySelector('input[name="card_expiry"]');
-    if (cardExpiryInput) {
-        cardExpiryInput.addEventListener('input', function (e) {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + '/' + value.substring(2, 4);
-            }
-            e.target.value = value;
-        });
-    }
-
+    // -------------------------------------------------------------------------
     // Place order
+    // -------------------------------------------------------------------------
+
+    function setProcessingState(processing) {
+        const btn = document.getElementById('place-order-btn');
+        const overlay = document.getElementById('loading-overlay');
+
+        btn.disabled = processing;
+
+        if (processing) {
+            btn.classList.add('processing');
+            btn.textContent = 'Processing…';
+            overlay.classList.add('show');
+        } else {
+            btn.classList.remove('processing');
+            btn.textContent = 'Place Order';
+            overlay.classList.remove('show');
+        }
+    }
+
     document.getElementById('place-order-btn').addEventListener('click', async function () {
+        if (isMixedCart) {
+            showAlert('Your cart contains both subscription and physical items. Please return to your cart and complete them as separate orders.', 'error');
+            return;
+        }
+
         const form = document.getElementById('checkout-form');
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
 
-        const acceptPreOrder = document.getElementById('accept-pre-order');
-        if (acceptPreOrder && !acceptPreOrder.checked) {
-            showAlert('You must accept the pre-order terms to continue', 'error');
-            return;
-        }
-
         // Clear previous errors
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
+        document.getElementById('card-errors').textContent = '';
+
+        // Pre-order consent
+        const acceptPreOrder = document.getElementById('accept-pre-order');
+        if (acceptPreOrder && !acceptPreOrder.checked) {
+            showAlert('You must accept the pre-order terms to continue.', 'error');
+            return;
+        }
+
+        // Global auto-renewal consent — required for all users
+        const globalConsentBlock = document.getElementById('global-renewal-consent-block');
+        const globalConsentCb = document.getElementById('global-renewal-consent');
+        if (!globalConsentCb.checked && isOneTimeSubscription) {
+            globalConsentBlock.classList.add('consent-error');
+            showAlert('Please confirm the subscription terms before placing your order.', 'error');
+            globalConsentBlock.scrollIntoView({behavior: 'smooth', block: 'center'});
+            return;
+        }
+        globalConsentBlock.classList.remove('consent-error');
+        data.global_renewal_consent = '1';
+
+        // US auto-renewal consent — additional requirement for US users
+        const usConsentBlock = document.getElementById('us-renewal-consent-block');
+        if (usConsentBlock && usConsentBlock.style.display !== 'none') {
+            const usConsentCb = document.getElementById('us-renewal-consent');
+            if (!usConsentCb.checked) {
+                usConsentBlock.classList.add('consent-error');
+                showAlert('Please confirm the auto-renewal terms before placing your order.', 'error');
+                usConsentBlock.scrollIntoView({behavior: 'smooth', block: 'center'});
+                return;
+            }
+            usConsentBlock.classList.remove('consent-error');
+            data.us_renewal_consent = '1';
+        }
 
         if (selectedAddressId) {
             data.saved_address = selectedAddressId;
@@ -1604,26 +1637,19 @@
 
         if (requiresShipping) {
             const required = selectedAddressId
-                ? ['first_name', 'last_name', 'email', 'phone']
-                : ['first_name', 'last_name', 'email', 'phone', 'address', 'city', 'postal_code', 'country'];
+                ? ['first_name', 'last_name', 'email']
+                : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
 
             let hasErrors = false;
-
             for (const field of required) {
                 if (!data[field] || data[field].trim() === '') {
                     const errorEl = document.getElementById(`error-${field}`);
-                    if (errorEl) {
-                        errorEl.textContent = 'This field is required';
-                    }
+                    if (errorEl) errorEl.textContent = 'This field is required';
                     hasErrors = true;
                 }
             }
-
-            if (hasErrors) {
-                return;
-            }
+            if (hasErrors) return;
         }
-
 
         if (appliedVoucher) {
             data.voucher_code = appliedVoucher.code;
@@ -1633,25 +1659,26 @@
 
         data.multi_merchant = true;
 
-        // Show loading
-        document.getElementById('loading-overlay').classList.add('show');
-        this.disabled = true;
+        setProcessingState(true);
 
-        // Both flows now use Stripe
-        if (isOneTimeSubscription) {
-            data.isOneTimeSubscription = true;
-            await handleStripeCheckout(data);
-        } else {
-            await handleRegularCheckout(data);
+        try {
+            if (isOneTimeSubscription) {
+                data.isOneTimeSubscription = true;
+                await handleStripeCheckout(data);
+            } else {
+                await handleRegularCheckout(data);
+            }
+        } finally {
+            setProcessingState(false);
         }
     });
 
-    async function handleStripeCheckout(data) {
-        document.getElementById('loading-overlay').classList.add('show');
-        document.getElementById('place-order-btn').disabled = true;
+    // -------------------------------------------------------------------------
+    // Stripe checkout flows
+    // -------------------------------------------------------------------------
 
+    async function handleStripeCheckout(data) {
         try {
-            // Process checkout to get payment intent
             const response = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1665,30 +1692,27 @@
                 return;
             }
 
+            // ?type=subscription hits /api/{site}/subscriptions/onetime/checkout
+            // which returns jsonResponse — wrapped in result.data
             const responseData = result.data;
 
-            const contexts = data.stripe_contexts;
-            let firstValue = null;
-
+            const contexts = responseData.stripe_contexts;
             if (contexts && Object.keys(contexts).length > 0) {
-                // Get the first key (e.g., "1") and use it to get the value
-                const firstKey = Object.keys(contexts)[0]; //todo
-                console.log('test', contexts[firstKey])
+                const firstKey = Object.keys(contexts)[0];
                 clientSecret = contexts[firstKey].client_secret;
             } else {
                 clientSecret = responseData.client_secret;
             }
 
-            subscriptionId = responseData.subscription_ids || responseData.subscription_id; // Handle both
+            subscriptionId = responseData.subscription_ids || responseData.subscription_id;
             orderId = responseData.order_id;
 
+            let paymentResult;
             if (selectedCardId) {
-                // Use saved card
                 paymentResult = await stripe.confirmCardPayment(clientSecret, {
                     payment_method: selectedCardId,
                 });
             } else {
-                // Use new card
                 paymentResult = await stripe.confirmCardPayment(clientSecret, {
                     payment_method: {
                         card: cardElement,
@@ -1705,32 +1729,26 @@
             const {error, paymentIntent} = paymentResult;
 
             if (error) {
+                // Show inline beneath card element AND as an alert
+                document.getElementById('card-errors').textContent = error.message;
                 showAlert(error.message, 'error');
                 return;
             }
 
             if (paymentIntent.status === 'succeeded') {
-                // Confirm payment on backend
                 await confirmPayment(paymentIntent.id);
             }
 
         } catch (error) {
             console.error('Stripe checkout error:', error);
             showAlert('Payment failed. Please try again.', 'error');
-        } finally {
-            document.getElementById('loading-overlay').classList.remove('show');
-            document.getElementById('place-order-btn').disabled = false;
         }
     }
 
     async function confirmPayment(paymentIntentId) {
         try {
-            const body = {
-                payment_intent_id: paymentIntentId,
-                order_id: orderId
-            };
+            const body = {payment_intent_id: paymentIntentId, order_id: orderId};
 
-            // Handle both single and multiple subscriptions
             if (Array.isArray(subscriptionId)) {
                 body.subscription_ids = subscriptionId;
             } else if (subscriptionId) {
@@ -1746,13 +1764,8 @@
             const result = await response.json();
 
             if (result.success) {
-                // Handle redirect for single or multiple subscriptions
-                if (Array.isArray(subscriptionId) && subscriptionId.length > 1) {
-                    window.location.href = `/press-stack/multiple?ids=${subscriptionId.join(',')}`;
-                } else {
-                    const singleId = Array.isArray(subscriptionId) ? subscriptionId[0] : subscriptionId;
-                    window.location.href = `/press-stack/${singleId}`;
-                }
+                const ids = Array.isArray(subscriptionId) ? subscriptionId : [subscriptionId];
+                window.location.href = `/subscription-confirmation?ids=${ids.join(',')}`;
             } else {
                 showAlert(result.message || 'Payment confirmation failed', 'error');
             }
@@ -1764,13 +1777,9 @@
 
     async function handleRegularCheckout(data) {
         try {
-
-            // First create the order and get payment intent
             const response = await fetch(`${API_BASE}/checkout/process`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
 
@@ -1781,28 +1790,23 @@
                 return;
             }
 
+            // FIXED: use result.stripe_contexts and result.client_secret (not data.client_secret)
             const contexts = result.stripe_contexts;
-
             if (contexts && Object.keys(contexts).length > 0) {
-                // Get the first key (e.g., "1") and use it to get the value
-                const firstKey = Object.keys(contexts)[0]; //todo
-                console.log('test', contexts[firstKey])
+                const firstKey = Object.keys(contexts)[0];
                 clientSecret = contexts[firstKey].client_secret;
             } else {
-                clientSecret = data.client_secret;
+                clientSecret = result.client_secret;
             }
 
-            const orderId = result.checkout_id;
+            const checkoutId = result.checkout_id;
 
             let paymentResult;
-
             if (selectedCardId) {
-                // Use saved card
                 paymentResult = await stripe.confirmCardPayment(clientSecret, {
                     payment_method: selectedCardId,
                 });
             } else {
-                // Use new card
                 paymentResult = await stripe.confirmCardPayment(clientSecret, {
                     payment_method: {
                         card: cardElement,
@@ -1818,24 +1822,23 @@
             const {error, paymentIntent} = paymentResult;
 
             if (error) {
+                // Show inline beneath card element AND as an alert so user can retry
+                document.getElementById('card-errors').textContent = error.message;
                 showAlert(error.message, 'error');
                 return;
             }
 
             if (paymentIntent.status === 'succeeded') {
-                // Confirm payment on backend
                 const confirmResponse = await fetch(`${API_BASE}/checkout/confirm-payment`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         payment_intent_id: paymentIntent.id,
-                        checkout_id: orderId
+                        checkout_id: checkoutId
                     })
                 });
 
                 const confirmResult = await confirmResponse.json();
-
-                console.log('confirmResult', confirmResult)
 
                 if (confirmResult.success) {
                     window.location.href = `/order-confirmation?checkout_id=${confirmResult.checkout_id}`;
@@ -1847,70 +1850,12 @@
         } catch (error) {
             console.error('Checkout error:', error);
             showAlert('An error occurred. Please try again.', 'error');
-        } finally {
-            document.getElementById('loading-overlay').classList.remove('show');
-            document.getElementById('place-order-btn').disabled = false;
         }
     }
 
-    function showAlert(message, type = 'success') {
-        const alertHtml = `
-            <div class="alert alert-${type}">
-                ${message}
-            </div>
-        `;
-        document.getElementById('alert-container').innerHTML = alertHtml;
-
-        // Scroll to top
-        window.scrollTo({top: 0, behavior: 'smooth'});
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            document.getElementById('alert-container').innerHTML = '';
-        }, 5000);
-    }
-
-    // Update cart count
-    async function loadCartCount() {
-        try {
-            const response = await fetch(`${API_BASE}/cart`);
-            const data = await response.json();
-            document.getElementById('cart-count').textContent = data.count || 0;
-        } catch (error) {
-            console.error('Error loading cart count:', error);
-        }
-    }
-
-    // Load wishlist count
-    async function loadWishlistCount() {
-        try {
-            const response = await fetch(`${API_BASE}/wishlist`);
-            const data = await response.json();
-            document.getElementById('wishlist-count').textContent = data.data.count || 0;
-        } catch (error) {
-            console.error('Error loading wishlist count:', error);
-        }
-    }
-
-    function checkForAppliedVoucher() {
-        const savedVoucher = sessionStorage.getItem('appliedVoucher');
-        if (savedVoucher) {
-            appliedVoucher = JSON.parse(savedVoucher);
-            displayAppliedVoucher();
-            sessionStorage.removeItem('appliedVoucher');
-        }
-    }
-
-    function displayAppliedVoucher() {
-        if (appliedVoucher) {
-            document.getElementById('voucher-code-display').textContent = appliedVoucher.code;
-            document.getElementById('voucher-discount-display').textContent = '$' + appliedVoucher.discount.toFixed(2);
-            document.getElementById('applied-voucher').style.display = 'block';
-            document.getElementById('discount-row').style.display = 'flex';
-            document.getElementById('discount-amount').textContent = '-$' + appliedVoucher.discount.toFixed(2);
-            updateTotals();
-        }
-    }
+    // -------------------------------------------------------------------------
+    // Vouchers
+    // -------------------------------------------------------------------------
 
     async function applyVoucher() {
         const voucherCode = document.getElementById('voucher-input').value.trim();
@@ -1919,10 +1864,7 @@
             return;
         }
 
-        const totalElement = document.getElementById('total')
-        const totalAmount = totalElement.dataset.total;
-
-        // Detect if this is a subscription checkout
+        const totalAmount = document.getElementById('total').dataset.total;
         const isSubscription = window.location.search.includes('type=subscription') ||
             document.querySelector('[name="plan_id"]');
 
@@ -1932,18 +1874,9 @@
             order_value: parseFloat(totalAmount)
         };
 
-        // Add plan_id if this is a subscription
         if (isSubscription) {
             const planIdInput = document.querySelector('[name="plan_id"]');
-            if (planIdInput) {
-                requestBody.plan_id = parseInt(planIdInput.value);
-            } else {
-                // Try to get from cart items
-                const cartItems = getCartItems(); // You'll need to implement this
-                if (cartItems.length > 0 && cartItems[0].subscription_plan_id) {
-                    requestBody.plan_id = cartItems[0].subscription_plan_id;
-                }
-            }
+            if (planIdInput) requestBody.plan_id = parseInt(planIdInput.value);
         }
 
         const messageEl = document.getElementById('voucher-message');
@@ -1955,9 +1888,8 @@
                 body: JSON.stringify(requestBody)
             });
 
+            // FIXED: use `result` consistently throughout
             const result = await response.json();
-
-            console.log('result', result.data)
 
             if (result.data.valid) {
                 appliedVoucher = {
@@ -1965,27 +1897,35 @@
                     discount: result.data.discount,
                     voucher_id: result.data.voucher_id
                 };
-
                 displayAppliedVoucher();
                 document.getElementById('voucher-input').value = '';
                 messageEl.textContent = '';
                 showAlert('Voucher applied successfully!', 'success');
             } else {
-                messageEl.textContent = data.data.message;
+                // FIXED: was `data.data.message` — now `result.data.message`
+                messageEl.textContent = result.data.message || 'Invalid voucher code';
                 messageEl.style.color = 'var(--danger-color)';
             }
         } catch (error) {
             console.error('Error:', error);
-            showVoucherMessage('Error applying voucher', 'error');
+            messageEl.textContent = 'Error applying voucher';
+            messageEl.style.color = 'var(--danger-color)';
         }
+    }
+
+    function displayAppliedVoucher() {
+        if (!appliedVoucher) return;
+        document.getElementById('voucher-code-display').textContent = appliedVoucher.code;
+        document.getElementById('voucher-discount-display').textContent = PLAN_CURRENCY + ' ' + appliedVoucher.discount.toFixed(2);
+        document.getElementById('applied-voucher').style.display = 'block';
+        document.getElementById('discount-row').style.display = 'flex';
+        document.getElementById('discount-amount').textContent = '-' + PLAN_CURRENCY + ' ' + appliedVoucher.discount.toFixed(2);
+        updateTotals();
     }
 
     async function removeVoucher() {
         try {
-            const response = await fetch(`${API_BASE}/vouchers/remove-voucher`, {
-                method: 'POST'
-            });
-
+            const response = await fetch(`${API_BASE}/vouchers/remove-voucher`, {method: 'POST'});
             const result = await response.json();
 
             if (result.success) {
@@ -2006,29 +1946,45 @@
         const tax = (INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING) * taxRate;
         const total = INITIAL_SUBTOTAL - discount + INITIAL_SHIPPING + tax;
 
-        document.getElementById('subtotal').textContent = '$' + INITIAL_SUBTOTAL.toFixed(2);
-        if (appliedVoucher) {
-            document.getElementById('discount-amount').textContent = '-$' + discount.toFixed(2);
-        }
-        document.getElementById('shipping').textContent = INITIAL_SHIPPING > 0 ? '$' + INITIAL_SHIPPING.toFixed(2) : 'Free';
-        document.getElementById('tax').textContent = '$' + tax.toFixed(2);
-        document.getElementById('total').textContent = '$' + total.toFixed(2);
+        document.getElementById('subtotal').textContent = PLAN_CURRENCY + ' ' + INITIAL_SUBTOTAL.toFixed(2);
+        if (appliedVoucher) document.getElementById('discount-amount').textContent = '-' + PLAN_CURRENCY + ' ' + discount.toFixed(2);
+        document.getElementById('shipping').textContent = INITIAL_SHIPPING > 0 ? PLAN_CURRENCY + ' ' + INITIAL_SHIPPING.toFixed(2) : 'Free';
+        document.getElementById('tax').textContent = PLAN_CURRENCY + ' ' + tax.toFixed(2);
+        document.getElementById('total').textContent = PLAN_CURRENCY + ' ' + total.toFixed(2);
     }
 
-    // Update the place order button click handler to include voucher
-    // Modify the existing place order handler to add:
-    if (appliedVoucher) {
-        //data.voucher_code = appliedVoucher.code;
-        //data.voucher_id = appliedVoucher.voucher_id;
-        //data.discount_amount = appliedVoucher.discount;
+    function showAlert(message, type = 'success') {
+        const alertHtml = `<div class="alert alert-${type}">${message}</div>`;
+        document.getElementById('alert-container').innerHTML = alertHtml;
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        setTimeout(() => {
+            document.getElementById('alert-container').innerHTML = '';
+        }, 5000);
     }
 
+    function showVoucherMessage(msg, type) {
+        const el = document.getElementById('voucher-message');
+        el.textContent = msg;
+        el.style.color = type === 'error' ? 'var(--danger-color)' : 'var(--success-color)';
+    }
+
+    // -------------------------------------------------------------------------
+    // Init
+    // -------------------------------------------------------------------------
     checkLoginStatus();
-
-    checkForAppliedVoucher();
-    //loadWishlistCount();
     checkCartForSubscription();
     initStripe();
+
+    if (isMixedCart) {
+        const btn = document.getElementById('place-order-btn');
+        btn.disabled = true;
+        btn.title = 'Remove subscription or physical items from your cart to continue';
+    }
+
+    // If member is pre-authenticated as US, show US consent block immediately
+    <?php if (($member?->country ?? '') === 'US'): ?>
+    handleCountryChange('US');
+    <?php endif; ?>
 </script>
 </body>
 </html>

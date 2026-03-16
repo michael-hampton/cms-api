@@ -839,6 +839,7 @@ $selectedTags = !empty($filters['tags'])
                                        style="flex:1;">
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
+
                                     <button class="plan-card__btn plan-card__btn--cart"
                                             data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
                                             title="Add to cart"

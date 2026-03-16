@@ -60,6 +60,7 @@ use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
 use App\Controllers\Shopping\ProductListController;
+use App\Controllers\Shopping\SubscriptionConfirmationController;
 use App\Controllers\Subscription\OneTimeSubscriptionsController;
 use App\Controllers\Subscription\ShopAccountApiController;
 use App\Controllers\Subscription\ShopAccountController;
@@ -277,6 +278,7 @@ $router->post('/api/{site}/wishlist', [WishlistController::class, 'add']);
 $router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 'remove']);
 
 $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
+$router->get('/subscription-confirmation', [SubscriptionConfirmationController::class, 'show']);
 
 $router->get('/{site}/member/addresses', [MemberAddressController::class, 'index']);
 $router->get('/{site}/member/addresses/search', [MemberAddressController::class, 'search']);

@@ -145,11 +145,6 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
             ->get();
     }
 
-    public function lockForUpdate(int $id): ?Model
-    {
-        return $this->find($id);
-    }
-
     public function totalImpressionsForMerchant(int $id, ?int $monthsAgo = null)
     {
         $query = ProductImpression::query()
@@ -770,6 +765,46 @@ class ProductRepository extends Repository implements ProductRepositoryInterface
         }
 
         $product->regionSets(true)->sync($regionSetIds);
+    }
+
+    /**
+     * Atomically decrement stock_quantity and return the refreshed Product.
+     *
+     * Must be called inside an open transaction (caller-owned).
+     *
+     * @throws \App\Exceptions\Stock\StockException if the product is not found.
+     */
+    public function decrementStock(int $id, int $quantity): \App\Models\Product
+    {
+        $product = $this->lockForUpdate($id);
+
+        if (!$product) {
+            throw \App\Exceptions\Stock\StockException::itemNotFound("Product#{$id}");
+        }
+
+        $product->decrementStock($quantity);
+
+        return $product;
+    }
+
+    /**
+     * Atomically increment stock_quantity and return the refreshed Product.
+     *
+     * Must be called inside an open transaction (caller-owned).
+     *
+     * @throws \App\Exceptions\Stock\StockException if the product is not found.
+     */
+    public function incrementStock(int $id, int $quantity): \App\Models\Product
+    {
+        $product = $this->lockForUpdate($id);
+
+        if (!$product) {
+            throw \App\Exceptions\Stock\StockException::itemNotFound("Product#{$id}");
+        }
+
+        $product->incrementStock($quantity);
+
+        return $product;
     }
 
     protected function getModelClass(): string

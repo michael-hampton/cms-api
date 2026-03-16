@@ -289,4 +289,44 @@ class IssueDeliveryRepository extends Repository
             ->get();
     }
 
+    /**
+     * Atomically decrement stock_quantity and return the refreshed IssueDelivery.
+     *
+     * Must be called inside an open transaction (caller-owned).
+     *
+     * @throws \App\Exceptions\Stock\StockException if the issue delivery is not found.
+     */
+    public function decrementStock(int $id, int $quantity): \App\Models\IssueDelivery
+    {
+        $issue = $this->lockForUpdate($id);
+
+        if (!$issue) {
+            throw \App\Exceptions\Stock\StockException::itemNotFound("IssueDelivery#{$id}");
+        }
+
+        $issue->decrementStock($quantity);
+
+        return $issue;
+    }
+
+    /**
+     * Atomically increment stock_quantity and return the refreshed IssueDelivery.
+     *
+     * Must be called inside an open transaction (caller-owned).
+     *
+     * @throws \App\Exceptions\Stock\StockException if the issue delivery is not found.
+     */
+    public function incrementStock(int $id, int $quantity): \App\Models\IssueDelivery
+    {
+        $issue = $this->lockForUpdate($id);
+
+        if (!$issue) {
+            throw \App\Exceptions\Stock\StockException::itemNotFound("IssueDelivery#{$id}");
+        }
+
+        $issue->incrementStock($quantity);
+
+        return $issue;
+    }
+
 }

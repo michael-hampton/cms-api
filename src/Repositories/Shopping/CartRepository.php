@@ -35,7 +35,7 @@ class CartRepository extends Repository
             $query->where('session_id', $sessionId);
         }
 
-        return $query->with(['product'])->get();
+        return $query->with(['product', 'merchant'])->get();
     }
 
     public function findItemByProduct(int $productId, ?int $userId, string $sessionId): ?Model

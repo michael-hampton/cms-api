@@ -64,12 +64,14 @@ class CartService
 
         return $items->map(function ($item) {
             $product = $item->product;
+            $merchant = $item->merchant;
 
             $itemData = [
                 'id' => $item->id,
                 'product_id' => $item->product_id,
                 'variant_id' => $item->variant_id,
                 'product_name' => $product->name ?? 'Unknown',
+                'merchant_name' => $merchant?->name ?? 'Unknown',
                 'product_slug' => $product->slug ?? '',
                 'product_image' => $product->image ?? '',
                 'price' => $item->price,

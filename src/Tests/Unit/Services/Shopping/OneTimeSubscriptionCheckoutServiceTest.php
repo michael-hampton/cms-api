@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
+use App\Actions\Stock\FulfilSubscriptionAction;
 use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Subscriptions\SubscriptionPricing;
@@ -9,6 +10,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Checkout\CheckoutException;
+use App\Exceptions\Stock\StockException;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
@@ -52,6 +54,8 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
     private FulfilmentResolver $fulfilmentResolver;
     private SubscriptionPlanRepository $subscriptionPlanRepository;
     private CheckoutEligibilityService|MockInterface $eligibilityService;
+    private FulfilSubscriptionAction|MockInterface $fulfilSubscriptionAction;
+
 
     protected function setUp(): void
     {
@@ -69,6 +73,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
         $this->subscriptionPlanRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->eligibilityService = Mockery::mock(CheckoutEligibilityService::class);
+        $this->fulfilSubscriptionAction = Mockery::mock(FulfilSubscriptionAction::class);
 
         $this->service = new OneTimeSubscriptionCheckoutService(
             $this->cartService,
@@ -82,13 +87,19 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             $this->businessDayEstimator,
             $this->fulfilmentResolver,
             $this->subscriptionPlanRepository,
-            $this->eligibilityService
+            $this->eligibilityService,
+            $this->fulfilSubscriptionAction,
         );
 
         $this->eligibilityService->shouldReceive('validate')
             ->andReturnUsing(function ($member, array $cartItems) {
                 return new EligibilityResult(valid: $cartItems, removed: []);
             })->byDefault();
+
+        // Default: reserve succeeds silently for digital subscription tests
+        $this->fulfilSubscriptionAction->shouldReceive('reserve')->andReturn(1)->byDefault();
+        $this->fulfilSubscriptionAction->shouldReceive('confirm')->andReturn(null)->byDefault();
+        $this->fulfilSubscriptionAction->shouldReceive('release')->andReturn(null)->byDefault();
     }
 
     public function test_throws_when_cart_has_no_subscriptions(): void
@@ -1451,6 +1462,342 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $result = $this->service->processCheckout([], 1);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function test_reserve_is_called_in_phase_1_for_print_subscription_with_stock(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 1, 'price' => 50.00, 'options' => []],
+        ]);
+
+        $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
+
+        $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $nextIssue->id = 77;
+        $nextIssue->stock_quantity = 10;
+        $nextIssue->issue_number = 1;
+        $nextIssue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
+
+        $planPolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $planPolicy->shouldReceive('canPurchase')->andReturn(true);
+        $planPolicy->shouldReceive('isPreRelease')->andReturn(false);
+        $planPolicy->shouldReceive('getAvailabilityMessage')->andReturn('Available');
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+        $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
+        $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
+
+        $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')->with(1)->andReturn($plan);
+
+        $fulfilment = Mockery::mock(FulfilmentTypeInterface::class);
+        $this->fulfilmentResolver->shouldReceive('resolve')->andReturn($fulfilment);
+        $today = new \DateTimeImmutable();
+        $this->businessDayEstimator->shouldReceive('estimate')
+            ->andReturn(new EstimatedDelivery(false, $today, $today, $today));
+
+        // ── Core assertion: reserve() must be called with the issue and qty ──
+        $this->fulfilSubscriptionAction->shouldReceive('reserve')
+            ->once()
+            ->with($nextIssue, 1)
+            ->andReturn(42);
+        // ────────────────────────────────────────────────────────────────────
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
+        $this->setupSuccessfulPayment();
+        $this->setupCartClear();
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_confirm_is_called_in_phase_3_after_successful_payment(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 1, 'price' => 50.00, 'options' => []],
+        ]);
+
+        $this->setupPrintSubscriptionWithStock(reservationId: 55);
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
+
+        // ── Core assertion: confirm() called with the reservation ID ─────────
+        $this->fulfilSubscriptionAction->shouldReceive('confirm')->once()->with(1);
+        // ────────────────────────────────────────────────────────────────────
+
+        $this->setupSuccessfulPayment();
+        $this->setupCartClear();
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_release_is_called_on_payment_failure_for_print_subscription(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 2, 'price' => 50.00, 'options' => []],
+        ]);
+
+        $nextIssue = $this->setupPrintSubscriptionWithStock(reservationId: 10, quantity: 2);
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->shouldReceive('update')->andReturn(true);
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('update')->andReturn(true);
+        $subs = [['subscription' => $subscription]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
+
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn(['success' => false, 'message' => 'Declined']);
+
+        // ── Core assertion: release() called with the issue model and qty ────
+        $this->fulfilSubscriptionAction->shouldReceive('release')
+            ->once()
+            ->with($nextIssue, 2);
+        // confirm() must NOT be called
+        $this->fulfilSubscriptionAction->shouldNotReceive('confirm');
+        // ────────────────────────────────────────────────────────────────────
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage('Payment processing failed');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_release_is_called_on_payment_exception_for_print_subscription(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 1, 'price' => 50.00, 'options' => []],
+        ]);
+
+        $nextIssue = $this->setupPrintSubscriptionWithStock(reservationId: 7, quantity: 1);
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->shouldReceive('update')->andReturn(true);
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('update')->andReturn(true);
+        $subs = [['subscription' => $subscription]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
+
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andThrow(new \Exception('Payment gateway timeout'));
+
+        // ── Core assertion: release() called even when an exception is thrown ─
+        $this->fulfilSubscriptionAction->shouldReceive('release')->once()->with($nextIssue, 1);
+        // ────────────────────────────────────────────────────────────────────
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Payment gateway timeout');
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_reserve_is_not_called_for_digital_subscription(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 1, 'price' => 50.00,
+                'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]],
+        ]);
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $subs = [['subscription' => $subscription, 'pricing' => $this->createMockPricing()]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
+        $this->setupSuccessfulPayment();
+        $this->setupCartClear();
+
+        // ── Digital subscriptions carry no issue stock — reserve must not fire
+        $this->fulfilSubscriptionAction->shouldNotReceive('reserve');
+        // ────────────────────────────────────────────────────────────────────
+
+        $result = $this->service->processCheckout([], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_reserve_throws_stock_exception_causes_transaction_to_propagate(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 5, 'price' => 50.00, 'options' => []],
+        ]);
+
+        $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
+
+        $issuePolicy->shouldReceive('isPreOrder')->andReturn(false);
+
+        $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $nextIssue->id = 77;
+        $nextIssue->stock_quantity = 2;   // less than requested
+        $nextIssue->issue_number = 1;
+        $nextIssue->issue_title = 'Winter Issue';
+        $nextIssue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
+
+        $planPolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $planPolicy->shouldReceive('canPurchase')->andReturn(true);
+        $planPolicy->shouldReceive('isPreRelease')->andReturn(false);
+        $planPolicy->shouldReceive('getAvailabilityMessage')->andReturn('Available');
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+        $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
+        $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
+
+        $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')->with(1)->andReturn($plan);
+
+        $fulfilment = Mockery::mock(FulfilmentTypeInterface::class);
+        $this->fulfilmentResolver->shouldReceive('resolve')->andReturn($fulfilment);
+        $today = new \DateTimeImmutable();
+        $this->businessDayEstimator->shouldReceive('estimate')
+            ->andReturn(new EstimatedDelivery(false, $today, $today, $today));
+
+        // reserve() throws — transaction rolls back
+        $this->fulfilSubscriptionAction->shouldNotReceive('reserve')
+            ->andThrow(StockException::insufficientStock('Winter Issue', 2, 5));
+
+        $this->database->shouldReceive('transaction')->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->expectException(CheckoutException::class);
+        $this->expectExceptionMessage("Issue #1 out of stock. Available: 2, Requested: 5");
+
+        $this->service->processCheckout([], 1);
+    }
+
+    public function test_no_release_called_when_no_print_subscriptions_on_payment_failure(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setDeliveryEstimateExpectations();
+        $this->setResolvedDiscountExpectations();
+
+        // Digital only — no stock was reserved
+        $this->cartService->shouldReceive('getItems')->once()->andReturn([
+            ['subscription_plan_id' => 1, 'quantity' => 1, 'price' => 50.00,
+                'options' => ['delivery_type' => SubscriptionType::DIGITAL->value]],
+        ]);
+
+        $this->database->shouldReceive('transaction')->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = Mockery::mock(Order::class)->makePartial();
+        $order->shouldReceive('update')->andReturn(true);
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('update')->andReturn(true);
+        $subs = [['subscription' => $subscription]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->andReturn($subs);
+        $this->orderDraftService->shouldReceive('createPendingOrder')->andReturn($order);
+        $this->paymentIntentService->shouldReceive('createForOrder')
+            ->andReturn(['success' => false]);
+
+        // ── No reservations → release must never be called ───────────────────
+        $this->fulfilSubscriptionAction->shouldNotReceive('release');
+        // ────────────────────────────────────────────────────────────────────
+
+        $this->expectException(CheckoutException::class);
+
+        $this->service->processCheckout([], 1);
+    }
+
+
+    /**
+     * Set up a print subscription plan with a next issue that has stock.
+     * Wires fulfilSubscriptionAction::reserve() to return $reservationId.
+     * Returns the $nextIssue mock so callers can assert release() against it.
+     */
+    private function setupPrintSubscriptionWithStock(int $reservationId = 1, int $quantity = 1): IssueDelivery
+    {
+        $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
+
+        $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
+        $nextIssue->id = 77;
+        $nextIssue->stock_quantity = 10;
+        $nextIssue->issue_number = 1;
+        $nextIssue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
+
+        $planPolicy = Mockery::mock(AvailabilityPolicyInterface::class);
+        $planPolicy->shouldReceive('canPurchase')->andReturn(true);
+        $planPolicy->shouldReceive('isPreRelease')->andReturn(false);
+        $planPolicy->shouldReceive('getAvailabilityMessage')->andReturn('Available');
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+        $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
+        $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
+
+        $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')->with(1)->andReturn($plan);
+
+        $fulfilment = Mockery::mock(FulfilmentTypeInterface::class);
+        $this->fulfilmentResolver->shouldReceive('resolve')->andReturn($fulfilment);
+        $today = new \DateTimeImmutable();
+        $this->businessDayEstimator->shouldReceive('estimate')
+            ->andReturn(new EstimatedDelivery(false, $today, $today, $today));
+
+        $this->fulfilSubscriptionAction->shouldReceive('reserve')
+            ->with($nextIssue, $quantity, 5)
+            ->andReturn($reservationId);
+
+        return $nextIssue;
     }
 
 }

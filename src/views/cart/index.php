@@ -507,6 +507,167 @@
                 font-size: 1.5rem;
             }
         }
+
+        /* ── Merchant group header ─────────────────────────────────── */
+        .cs-merchant-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .cs-merchant-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .cs-merchant-header {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            padding: 0.625rem 0.875rem;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e8eef6 100%);
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            border-left: 3px solid #2563eb;
+        }
+
+        .cs-merchant-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 6px;
+            background: #2563eb;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .cs-merchant-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .cs-merchant-name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #1e293b;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .cs-merchant-pill {
+            display: inline-block;
+            font-size: 0.68rem;
+            color: #64748b;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            padding: 0.05rem 0.4rem;
+            border-radius: 99px;
+            margin-top: 0.1rem;
+        }
+
+        .cs-merchant-subtotal {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #1e293b;
+            flex-shrink: 0;
+        }
+
+        /* ── Summary item row ──────────────────────────────────────── */
+        .cs-item {
+            display: grid;
+            grid-template-columns: 52px 1fr auto;
+            gap: 0.75rem;
+            padding: 0.625rem 0;
+            border-bottom: 1px dashed #f0f4f8;
+            align-items: center;
+        }
+
+        .cs-item:last-child {
+            border-bottom: none;
+        }
+
+        .cs-item-img {
+            width: 52px;
+            height: 52px;
+            object-fit: cover;
+            border-radius: 0.4rem;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .cs-item-img-placeholder {
+            width: 52px;
+            height: 52px;
+            border-radius: 0.4rem;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #cbd5e1;
+            flex-shrink: 0;
+        }
+
+        .cs-item-details {
+            min-width: 0;
+        }
+
+        .cs-item-name {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.35;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .cs-item-variant {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 0.15rem;
+        }
+
+        .cs-item-sku {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-top: 0.1rem;
+        }
+
+        .cs-item-meta {
+            font-size: 0.72rem;
+            color: #64748b;
+            margin-top: 0.1rem;
+        }
+
+        .cs-item-delivery {
+            font-size: 0.7rem;
+            color: #059669;
+            margin-top: 0.15rem;
+        }
+
+        .cs-item-price {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+
+        .cs-item-free {
+            color: #059669;
+        }
+
+        /* ── Separator between merchant groups ─────────────────────── */
+        .cs-group-divider {
+            height: 1px;
+            background: linear-gradient(90deg, #2563eb22, #e2e8f0, transparent);
+            margin: 1rem 0;
+        }
     </style>
 </head>
 <body>
@@ -594,7 +755,7 @@
                     // Group items by merchant
                     $itemsByMerchant = [];
                     foreach ($items as $item) {
-                        $merchantId = $item['options']['merchant_id'] ?? 0;
+                        $merchantId = $item['merchant_id'] ?? $item['options']['merchant_id'] ?? 0;
                         $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
 
                         if (!isset($itemsByMerchant[$merchantId])) {
@@ -835,87 +996,134 @@
                 <h3>Order Summary</h3>
 
                 <div id="order-items">
-
                     <?php
-                    // Group items by merchant
+                    /* ── Build merchant groups ──────────────────────────────────── */
                     $itemsByMerchant = [];
-
                     foreach ($items as $item) {
-                        $merchantId = $item['options']['merchant_id'] ?? 0;
-                        $merchantName = $merchantId ? ($item['merchant_name'] ?? 'Merchant ' . $merchantId) : 'Direct';
+                        $merchantId = $item['merchant_id'] ?? $item['options']['merchant_id'] ?? 0;
+                        /* Prefer merchant_name set on the item; fall back to a readable label. */
+                        $merchantName = ($merchantId && !empty($item['merchant_name']))
+                                ? $item['merchant_name']
+                                : ($merchantId ? 'Merchant ' . $merchantId : 'Direct');
 
                         if (!isset($itemsByMerchant[$merchantId])) {
                             $itemsByMerchant[$merchantId] = [
+                                    'id' => $merchantId,
                                     'name' => $merchantName,
                                     'items' => [],
-                                    'subtotal' => 0
+                                    'subtotal' => 0.0,
                             ];
                         }
                         $itemsByMerchant[$merchantId]['items'][] = $item;
-                        $itemsByMerchant[$merchantId]['subtotal'] += $item['subtotal'];
+                        $itemsByMerchant[$merchantId]['subtotal'] += (float)($item['subtotal'] ?? 0);
                     }
-                    ?>
 
-                    <?php foreach ($itemsByMerchant
+                    $groupCount = count($itemsByMerchant);
+                    $groupIndex = 0;
 
-                                   as $merchantId => $merchantData): ?>
-                    <div class="merchant-group"
-                         style="margin-bottom: 1.5rem; padding-bottom: 1.5rem;">
-                        <div class="merchant-header" style="margin-bottom: 1rem;">
-                            <strong style="font-size: 0.875rem; color: var(--text-primary);">
-                                <?= htmlspecialchars($merchantData['name']) ?>
-                            </strong>
-                            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
-                                (<?= count($merchantData['items']) ?> items)
-                            </span>
-                        </div>
+                    foreach ($itemsByMerchant as $merchantId => $merchantData):
+                        $groupIndex++;
 
-                        <?php foreach ($items as $item): ?>
-                            <div class="summary-item">
-                                <img src="<?= htmlspecialchars($item['product_image'] ?? '/images/placeholder.jpg') ?>"
-                                     alt="<?= htmlspecialchars($item['product_name']) ?>"
-                                     class="item-image">
-                                <div class="item-details">
-                                    <div class="item-name"><?= htmlspecialchars($item['product_name']) ?></div>
+                        /* Avatar initials from merchant name */
+                        $words = array_filter(explode(' ', $merchantData['name']));
+                        $initials = implode('', array_map(fn($w) => strtoupper($w[0]), array_slice($words, 0, 2)));
+                        $initials = $initials ?: '?';
 
-                                    <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
-                                        <div class="variant-options"
-                                             style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
-                                            <?php
-                                            $variantParts = [];
-                                            foreach ($item['variant_options'] as $optionName => $optionValue) {
-                                                $variantParts[] = htmlspecialchars(ucfirst($optionName)) . ': <strong>' . htmlspecialchars($optionValue) . '</strong>';
-                                            }
-                                            echo implode(' • ', $variantParts);
-                                            ?>
+                        $itemCount = count($merchantData['items']);
+                        ?>
+
+                        <div class="cs-merchant-group">
+
+                            <!-- Merchant header — only rendered when there is more than one group
+                                 OR when the group is a real merchant (not the direct/fallback bucket) -->
+                            <?php if ($groupCount > 1 || $merchantId !== 0): ?>
+                                <div class="cs-merchant-header">
+                                    <div class="cs-merchant-avatar"><?= htmlspecialchars($initials) ?></div>
+                                    <div class="cs-merchant-meta">
+                                        <div class="cs-merchant-name"><?= htmlspecialchars($merchantData['name']) ?></div>
+                                        <span class="cs-merchant-pill"><?= $itemCount ?> item<?= $itemCount !== 1 ? 's' : '' ?></span>
+                                    </div>
+                                    <div class="cs-merchant-subtotal">
+                                        £<?= number_format($merchantData['subtotal'], 2) ?>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
+
+                            <!-- Items belonging to this merchant -->
+                            <?php foreach ($merchantData['items'] as $item):
+                                $isFreeGift = ($item['options']['type'] ?? '') === 'free_gift'
+                                        || ($item['options']['is_gift'] ?? false) === true
+                                        || (float)($item['price'] ?? 0) === 0.0;
+
+                                $productName = $item['product_name'] ?? ($item['name'] ?? 'Item');
+                                $productImg = $item['product_image'] ?? null;
+                                ?>
+
+                                <div class="cs-item">
+                                    <!-- Thumbnail -->
+                                    <?php if ($productImg): ?>
+                                        <img src="<?= htmlspecialchars($productImg) ?>"
+                                             alt="<?= htmlspecialchars($productName) ?>"
+                                             class="cs-item-img">
+                                    <?php else: ?>
+                                        <div class="cs-item-img-placeholder">
+                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor" stroke-width="1.5">
+                                                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                <polyline points="21 15 16 10 5 21"/>
+                                            </svg>
                                         </div>
-                                        <?php if (!empty($item['variant_sku'])): ?>
-                                            <div style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 0.125rem;">
-                                                SKU: <?= htmlspecialchars($item['variant_sku']) ?>
-                                            </div>
-                                        <?php endif; ?>
                                     <?php endif; ?>
 
-                                    <div class="item-meta">Qty: <?= $item['quantity'] ?></div>
-                                </div>
-                                <div class="item-price">$<?= number_format($item['subtotal'], 2) ?></div>
+                                    <!-- Details -->
+                                    <div class="cs-item-details">
+                                        <div class="cs-item-name"><?= htmlspecialchars($productName) ?></div>
 
-                                <?php if (!empty($item['options']['subscription_plan_id'])): ?>
-                                    <input type="hidden" name="plan_id"
-                                           value="<?= $item['options']['subscription_plan_id'] ?>">
-                                <?php endif; ?>
-                                <?php if (!empty($item['estimated_delivery'])): ?>
-                                    <div class="item-delivery"
-                                         style="font-size: 0.75rem; color: var(--success-color); margin-top: 0.25rem;">
-                                        📦 Delivery: <?= htmlspecialchars($item['estimated_delivery']) ?>
+                                        <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                                            <div class="cs-item-variant">
+                                                <?php
+                                                $parts = [];
+                                                foreach ($item['variant_options'] as $k => $v) {
+                                                    $parts[] = htmlspecialchars(ucfirst($k)) . ': <strong>' . htmlspecialchars($v) . '</strong>';
+                                                }
+                                                echo implode(' · ', $parts);
+                                                ?>
+                                            </div>
+                                            <?php if (!empty($item['variant_sku'])): ?>
+                                                <div class="cs-item-sku">
+                                                    SKU: <?= htmlspecialchars($item['variant_sku']) ?></div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+
+                                        <div class="cs-item-meta">Qty: <?= (int)($item['quantity'] ?? 1) ?></div>
+
+                                        <?php if (!empty($item['estimated_delivery'])): ?>
+                                            <div class="cs-item-delivery">
+                                                📦 <?= htmlspecialchars($item['estimated_delivery']) ?></div>
+                                        <?php endif; ?>
+
+                                        <?php if (!empty($item['options']['subscription_plan_id'])): ?>
+                                            <input type="hidden" name="plan_id"
+                                                   value="<?= (int)$item['options']['subscription_plan_id'] ?>">
+                                        <?php endif; ?>
                                     </div>
-                                <?php endif; ?>
-                            </div>
 
-                        <?php endforeach; ?>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+                                    <!-- Price -->
+                                    <div class="cs-item-price <?= $isFreeGift ? 'cs-item-free' : '' ?>">
+                                        <?= $isFreeGift ? 'FREE' : '£' . number_format((float)($item['subtotal'] ?? 0), 2) ?>
+                                    </div>
+                                </div>
+
+                            <?php endforeach; ?>
+                        </div><!-- /.cs-merchant-group -->
+
+                        <?php if ($groupIndex < $groupCount): ?>
+                        <div class="cs-group-divider"></div>
+                    <?php endif; ?>
+
+                    <?php endforeach; ?>
+                </div><!-- /#order-items -->
 
                 <div class="voucher-section"
                      style="margin: 1.5rem 0; padding: 1.5rem 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">

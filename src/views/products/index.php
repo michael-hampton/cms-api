@@ -11,6 +11,7 @@
 <div class="page-wrapper">
     <!-- Header -->
     @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])]
+    @include('components/mini-cart')
 
     @include('components/member-badge')
 

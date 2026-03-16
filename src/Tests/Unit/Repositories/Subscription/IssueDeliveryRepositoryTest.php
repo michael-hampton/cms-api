@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Repositories\Subscription;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Exceptions\Stock\StockException;
 use App\Models\IssueDelivery;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -486,6 +487,168 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
         ]);
 
         $this->assertEquals('Delivered', $delivered->calculateStatus());
+    }
+
+    public function test_decrement_stock_reduces_quantity_in_database(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'issue_title' => 'Spring Issue',
+            'stock_quantity' => 10,
+            'status' => 'active',
+        ]);
+
+        $updated = $this->repository->decrementStock($issue->id, 3);
+
+        $this->assertEquals(7, $updated->stock_quantity);
+        $this->assertEquals(7, IssueDelivery::find($issue->id)->stock_quantity);
+    }
+
+    public function test_decrement_stock_by_one(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 5,
+            'status' => 'active',
+        ]);
+
+        $updated = $this->repository->decrementStock($issue->id, 1);
+
+        $this->assertEquals(4, $updated->stock_quantity);
+    }
+
+    public function test_decrement_stock_to_zero(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 2,
+            'status' => 'active',
+        ]);
+
+        $updated = $this->repository->decrementStock($issue->id, 2);
+
+        $this->assertEquals(0, $updated->stock_quantity);
+        $this->assertEquals(0, IssueDelivery::find($issue->id)->stock_quantity);
+    }
+
+    public function test_decrement_stock_returns_issue_delivery_model(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 10,
+            'status' => 'active',
+        ]);
+
+        $result = $this->repository->decrementStock($issue->id, 1);
+
+        $this->assertInstanceOf(IssueDelivery::class, $result);
+        $this->assertEquals($issue->id, $result->id);
+    }
+
+    public function test_decrement_stock_throws_when_issue_not_found(): void
+    {
+        $this->expectException(StockException::class);
+        $this->expectExceptionMessage('IssueDelivery#99999');
+
+        $this->repository->decrementStock(99999, 1);
+    }
+
+    public function test_multiple_sequential_decrements_are_cumulative(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 20,
+            'status' => 'active',
+        ]);
+
+        $this->repository->decrementStock($issue->id, 5);
+        $this->repository->decrementStock($issue->id, 3);
+        $final = $this->repository->decrementStock($issue->id, 2);
+
+        $this->assertEquals(10, $final->stock_quantity);
+        $this->assertEquals(10, IssueDelivery::find($issue->id)->stock_quantity);
+    }
+
+    public function test_increment_stock_increases_quantity_in_database(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 5,
+            'status' => 'active',
+        ]);
+
+        $updated = $this->repository->incrementStock($issue->id, 3);
+
+        $this->assertEquals(8, $updated->stock_quantity);
+        $this->assertEquals(8, IssueDelivery::find($issue->id)->stock_quantity);
+    }
+
+    public function test_increment_stock_from_zero(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 0,
+            'status' => 'active',
+        ]);
+
+        $updated = $this->repository->incrementStock($issue->id, 10);
+
+        $this->assertEquals(10, $updated->stock_quantity);
+    }
+
+    public function test_increment_stock_returns_issue_delivery_model(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 5,
+            'status' => 'active',
+        ]);
+
+        $result = $this->repository->incrementStock($issue->id, 1);
+
+        $this->assertInstanceOf(IssueDelivery::class, $result);
+        $this->assertEquals($issue->id, $result->id);
+    }
+
+    public function test_increment_stock_throws_when_issue_not_found(): void
+    {
+        $this->expectException(StockException::class);
+        $this->expectExceptionMessage('IssueDelivery#99999');
+
+        $this->repository->incrementStock(99999, 1);
+    }
+
+    public function test_decrement_then_increment_returns_to_original_quantity(): void
+    {
+        $subscription = $this->createSubscription();
+        $issue = IssueDelivery::create([
+            'subscription_id' => $subscription->id,
+            'issue_number' => 1,
+            'stock_quantity' => 15,
+            'status' => 'active',
+        ]);
+
+        $this->repository->decrementStock($issue->id, 4);
+        $restored = $this->repository->incrementStock($issue->id, 4);
+
+        $this->assertEquals(15, $restored->stock_quantity);
+        $this->assertEquals(15, IssueDelivery::find($issue->id)->stock_quantity);
     }
 
     protected function setUp(): void

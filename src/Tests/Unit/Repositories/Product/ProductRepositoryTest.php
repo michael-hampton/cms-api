@@ -2,8 +2,10 @@
 
 namespace App\Tests\Unit\Repositories\Product;
 
+use App\Exceptions\Stock\StockException;
 use App\Framework\Support\Str;
 use App\Models\Merchant;
+use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
 use App\Models\ProductSpecification;
@@ -1835,5 +1837,114 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertContains('Amazon Only', $names);
         $this->assertNotContains('eBay Only', $names);
     }
+
+    public function test_decrement_stock_reduces_quantity_in_database(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 10]);
+
+        $updated = $this->repository->decrementStock($product->id, 3);
+
+        $this->assertEquals(7, $updated->stock_quantity);
+        $this->assertEquals(7, Product::find($product->id)->stock_quantity);
+    }
+
+    public function test_decrement_stock_by_one(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 5]);
+
+        $updated = $this->repository->decrementStock($product->id, 1);
+
+        $this->assertEquals(4, $updated->stock_quantity);
+    }
+
+    public function test_decrement_stock_to_zero(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 2]);
+
+        $updated = $this->repository->decrementStock($product->id, 2);
+
+        $this->assertEquals(0, $updated->stock_quantity);
+        $this->assertEquals(0, Product::find($product->id)->stock_quantity);
+    }
+
+    public function test_decrement_stock_returns_product_model(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 10]);
+
+        $result = $this->repository->decrementStock($product->id, 1);
+
+        $this->assertInstanceOf(Product::class, $result);
+        $this->assertEquals($product->id, $result->id);
+    }
+
+    public function test_decrement_stock_throws_when_product_not_found(): void
+    {
+        $this->expectException(StockException::class);
+        $this->expectExceptionMessage('Product#99999');
+
+        $this->repository->decrementStock(99999, 1);
+    }
+
+    public function test_multiple_sequential_decrements_are_cumulative(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 20]);
+
+        $this->repository->decrementStock($product->id, 5);
+        $this->repository->decrementStock($product->id, 3);
+        $final = $this->repository->decrementStock($product->id, 2);
+
+        $this->assertEquals(10, $final->stock_quantity);
+        $this->assertEquals(10, Product::find($product->id)->stock_quantity);
+    }
+
+    public function test_increment_stock_increases_quantity_in_database(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 5]);
+
+        $updated = $this->repository->incrementStock($product->id, 3);
+
+        $this->assertEquals(8, $updated->stock_quantity);
+        $this->assertEquals(8, Product::find($product->id)->stock_quantity);
+    }
+
+    public function test_increment_stock_from_zero(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 0]);
+
+        $updated = $this->repository->incrementStock($product->id, 10);
+
+        $this->assertEquals(10, $updated->stock_quantity);
+    }
+
+    public function test_increment_stock_returns_product_model(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 5]);
+
+        $result = $this->repository->incrementStock($product->id, 1);
+
+        $this->assertInstanceOf(Product::class, $result);
+        $this->assertEquals($product->id, $result->id);
+    }
+
+    public function test_increment_stock_throws_when_product_not_found(): void
+    {
+        $this->expectException(StockException::class);
+        $this->expectExceptionMessage('Product#99999');
+
+        $this->repository->incrementStock(99999, 1);
+    }
+
+    public function test_decrement_then_increment_returns_to_original_quantity(): void
+    {
+        $product = $this->createProduct(['stock_quantity' => 15]);
+
+        $this->repository->decrementStock($product->id, 4);
+        $restored = $this->repository->incrementStock($product->id, 4);
+
+        $this->assertEquals(15, $restored->stock_quantity);
+        $this->assertEquals(15, Product::find($product->id)->stock_quantity);
+    }
+
+
 
 }

@@ -310,8 +310,8 @@ class OneTimeSubscriptionsController extends Controller
             return $this->view('subscriptions/onetime/details', array_merge([
                 'plan' => $plan,
                 'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
-                'currency_code' => $currencyCode,
-                'currency_symbol' => $currencySymbol,
+                'currencyCode' => $currencyCode,
+                'currencySymbol' => $currencySymbol,
             ], $subscriptionDetails));
         }
 
@@ -326,8 +326,8 @@ class OneTimeSubscriptionsController extends Controller
             'canReview' => $canReview,
             'isAuthenticated' => MemberAuth::check(),
             'stripe_key' => $_ENV['STRIPE_PUBLISHABLE_KEY'] ?? config('payment.stripe.publishable_key'),
-            'currency_code' => $currencyCode,
-            'currency_symbol' => $currencySymbol,
+            'currencyCode' => $currencyCode,
+            'currencySymbol' => $currencySymbol,
         ]);
     }
 }

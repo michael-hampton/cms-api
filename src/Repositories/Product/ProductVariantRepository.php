@@ -12,11 +12,6 @@ class ProductVariantRepository extends Repository
         return $this->model->where('product_id', $productId)->get();
     }
 
-    public function lockForUpdate(int $id)
-    {
-        return $this->model->lockForUpdate()->find($id);
-    }
-
     protected function getModelClass(): string
     {
         return ProductVariant::class;

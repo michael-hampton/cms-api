@@ -4,11 +4,14 @@ namespace App\Models;
 
 use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Models\Concerns\HasStockHelpers;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Billing\Preorder\IssueAvailabilityPolicy;
 
 class IssueDelivery extends Model
 {
+    use HasStockHelpers;
+
     protected $table = 'issue_deliveries';
 
     protected $fillable = [

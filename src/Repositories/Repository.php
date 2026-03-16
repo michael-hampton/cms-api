@@ -164,4 +164,9 @@ abstract class Repository
     {
         return $this->model->newQuery();
     }
+
+    public function lockForUpdate(int $id)
+    {
+        return $this->model->lockForUpdate()->find($id);
+    }
 }
