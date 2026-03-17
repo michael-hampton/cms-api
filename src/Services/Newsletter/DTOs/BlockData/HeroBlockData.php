@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class HeroBlockData extends BaseBlockData
@@ -12,14 +14,14 @@ class HeroBlockData extends BaseBlockData
         public readonly ?string $secondaryCtaText,
         public readonly ?string $secondaryCtaUrl,
         public readonly ?string $backgroundImage,
-        public readonly bool    $showSearch
+        public readonly bool $showSearch,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? '',
             subtitle: $data['subtitle'] ?? null,
             ctaText: $data['ctaText'] ?? null,
@@ -27,7 +29,11 @@ class HeroBlockData extends BaseBlockData
             secondaryCtaText: $data['secondaryCtaText'] ?? null,
             secondaryCtaUrl: $data['secondaryCtaUrl'] ?? null,
             backgroundImage: $data['backgroundImage'] ?? null,
-            showSearch: (bool)($data['showSearch'] ?? false)
+            showSearch: (bool)($data['showSearch'] ?? false),
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

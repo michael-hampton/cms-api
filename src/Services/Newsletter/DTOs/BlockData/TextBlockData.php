@@ -1,19 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class TextBlockData extends BaseBlockData
 {
     public function __construct(
-        public readonly array $paragraphs
+        public readonly array $paragraphs,
     )
     {
     }
 
     public static function fromArray(array $data): self
     {
-        return new self(
-            paragraphs: $data['paragraphs'] ?? []
+        $instance = new static(
+            paragraphs: $data['paragraphs'] ?? [],
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

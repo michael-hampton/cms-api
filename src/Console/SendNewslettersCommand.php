@@ -2,53 +2,53 @@
 
 namespace App\Console;
 
+use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Models\Site;
-use App\Parsers\EmailService;
-use App\Parsers\NewsletterSendService;
-use App\Repositories\Newsletters\NewsletterRepository;
-use App\Repositories\Newsletters\NewsletterSendRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
-use App\Services\Cms\Pages\BlockParserService;
+use App\Services\Newsletter\NewsletterSendService;
 
-class SendNewslettersCommand
+class SendNewslettersCommand extends Command
 {
-    public function handle(): void
-    {
-        echo "Checking for newsletters to send...\n";
+    use ReportsCommandResult;
 
+    const SUCCESS = 1;
+    const FAILURE = 0;
+
+    protected $signature = 'newsletters:send';
+    public $description = 'Processes and sends due newsletters for all sites.';
+
+    public function handle(): int
+    {
+        $result = $this->createResult('newsletters:send');
         $sites = Site::all();
 
-        foreach ($sites as $siteData) {
-            $site = new Site($siteData);
-            echo "Processing site: {$site->name} (ID: {$site->id})\n";
+        foreach ($sites as $site) {
 
-            // Get dependencies - adjust based on your DI container
-            $parser = new BlockParserService(/* inject dependencies */);
-            $emailService = new EmailService();
-            $subscriberRepo = new SubscriberRepository();
-            $newsletterRepo = new NewsletterRepository();
-            $sendRepo = new NewsletterSendRepository();
+            try {
+                // Dependency instantiation (consider moving to constructor if DI is available)
+                $service = app(NewsletterSendService::class);
 
-            $service = new NewsletterSendService(
-                $parser,
-                $emailService,
-                $subscriberRepo,
-                $newsletterRepo,
-                $sendRepo,
-                $site->id
-            );
+                $sendResults = $service->sendDueNewsletters();
 
-            $results = $service->sendDueNewsletters();
-
-            foreach ($results as $result) {
-                if ($result['success']) {
-                    echo "  Sent newsletter {$result['newsletter_id']} to {$result['recipients']} recipients\n";
-                } else {
-                    echo "  Failed to send newsletter {$result['newsletter_id']}: {$result['error']}\n";
+                foreach ($sendResults as $sendResult) {
+                    if ($sendResult['success']) {
+                        $result->incrementSucceeded();
+                        $result->addMessage("Site #{$site->id}: Sent newsletter {$sendResult['newsletter_id']} to {$sendResult['recipients']} recipients");
+                    } else {
+                        $result->addMessage("Site #{$site->id}: Failed newsletter {$sendResult['newsletter_id']} - {$sendResult['error']}");
+                    }
                 }
+            } catch (\Throwable $e) {
+                $this->reportFailure(
+                    result: $result,
+                    message: "Critical failure processing site #{$site->id}: {$e->getMessage()}",
+                    context: ['site_id' => $site->id],
+                    throwable: $e
+                );
             }
         }
 
-        echo "Done!\n";
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

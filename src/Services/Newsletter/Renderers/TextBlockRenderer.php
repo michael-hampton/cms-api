@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -12,6 +14,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class TextBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'text';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;
@@ -23,13 +26,25 @@ class TextBlockRenderer implements EmailBlockRenderer
             return RenderedBlock::skipped();
         }
 
-        $html = [];
+        // Build the base paragraph style, then merge any block-level overrides.
+        $baseParaStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;';
+        $paraStyle = $blockData->style->mergeIntoCss($baseParaStyle);
+
+        // If the block has a background colour or padding, wrap paragraphs in a container div.
+        $needsWrapper = $blockData->style->backgroundColor !== null || $blockData->style->padding !== null;
+
+        $paragraphsHtml = '';
         foreach ($blockData->paragraphs as $paragraph) {
-            $html[] = '<p style="color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;">';
-            $html[] = Str::sanitize($paragraph);
-            $html[] = '</p>';
+            $paragraphsHtml .= '<p style="' . $paraStyle . '">' . Str::sanitize($paragraph) . '</p>' . "\n";
         }
 
-        return RenderedBlock::rendered(implode("\n", $html));
+        if ($needsWrapper) {
+            $wrapperCss = $blockData->style->toWrapperCss();
+            $html = "<div style=\"{$wrapperCss}\">{$paragraphsHtml}</div>";
+        } else {
+            $html = $paragraphsHtml;
+        }
+
+        return RenderedBlock::rendered($html);
     }
 }

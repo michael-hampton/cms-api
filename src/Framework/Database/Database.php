@@ -21,11 +21,30 @@ class Database
     private $queryLog = [];
     private $enableQueryLog = false;
 
+    /**
+     * Callbacks registered via beforeCommit().
+     * Indexed by transaction level so nested savepoints can be unwound correctly.
+     * Only fired when level drops back to 0.
+     *
+     * @var array<int, callable[]>
+     */
+    private array $beforeCommitCallbacks = [];
+
+    /**
+     * Callbacks registered via afterCommit().
+     * All callbacks are deferred until the outermost transaction commits.
+     * Nested savepoint releases do NOT fire them.
+     *
+     * @var callable[]
+     */
+    private array $afterCommitCallbacks = [];
+
     public function __construct()
     {
     }
 
-    public function initialize(array $config = []) {
+    public function initialize(array $config = []): void
+    {
         $this->config = $this->normalizeConfig(
             !empty($config) ? $config : $this->getConfigFromFile()
         );
@@ -45,319 +64,55 @@ class Database
         return self::$instance;
     }
 
-    private function getConfigFromFile(): array
-    {
-        $databaseConfig = DatabaseConfig::getConfig();
-        $defaultConnection = $databaseConfig['default'];
+    // -------------------------------------------------------------------------
+    // Transaction lifecycle hooks
+    // -------------------------------------------------------------------------
 
-        return $databaseConfig['connections'][$defaultConnection];
-    }
-
-    private function connect(): void
+    /**
+     * Register a callback to run just before the outermost transaction commits.
+     *
+     * If called inside a nested savepoint the callback is still deferred to the
+     * outermost commit, matching the afterCommit semantics.
+     *
+     * If no transaction is active the callback is invoked immediately.
+     */
+    public function beforeCommit(callable $callback): void
     {
-        if ($this->connection) {
+        if ($this->transactionLevel === 0) {
+            // No active transaction — run immediately.
+            $callback($this);
             return;
         }
 
-        $startTime = microtime(true);
-
-        try {
-            $dsn = $this->buildDsn();
-
-            $this->connection = new PDO($dsn, $this->config['username'], $this->config['password'], [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-                PDO::ATTR_PERSISTENT => false
-            ]);
-
-
-            $connectionTime = round((microtime(true) - $startTime) * 1000, 2);
-
-            Logger::info('Database connection established', [
-                'driver' => $this->config['driver'],
-                'host' => $this->config['host'],
-                'database' => $this->config['database'],
-                'connection_time' => $connectionTime . 'ms'
-            ]);
-
-        } catch (PDOException $e) {
-            Logger::error("Database connection failed", [
-                'driver' => $this->config['driver'],
-                'host' => $this->config['host'],
-                'database' => $this->config['database'],
-                'error' => $e->getMessage()
-            ]);
-            throw new Exception("Database connection failed: " . $e->getMessage());
-        }
-    }
-
-    private function buildDsn(): string
-    {
-        $driver = $this->config['driver'];
-
-        switch ($driver) {
-            case 'mysql':
-                return "mysql:host={$this->config['host']};port={$this->config['port']};dbname={$this->config['database']};charset={$this->config['charset']}";
-
-            case 'pgsql':
-                return "pgsql:host={$this->config['host']};port={$this->config['port']};dbname={$this->config['database']}";
-
-            case 'sqlite':
-                return "sqlite:{$this->config['database']}";
-
-            default:
-                throw new Exception("Unsupported database driver: {$driver}");
-        }
-    }
-
-    public static function raw($value)
-    {
-        return new RawExpression($value);
-    }
-
-    public function getConnection(): PDO
-    {
-        return $this->connection;
-    }
-
-    public function query(string $sql, array $params = []): PDOStatement
-    {
-        $startTime = microtime(true);
-
-        try {
-            // Detect schema queries that cannot use bound parameters
-            $schemaQueries = [
-                'SHOW TABLES',
-                'DESCRIBE',
-                'EXPLAIN',
-                'SHOW COLUMNS',
-            ];
-
-            $isSchemaQuery = false;
-            foreach ($schemaQueries as $keyword) {
-                if (stripos($sql, $keyword) === 0) {
-                    $isSchemaQuery = true;
-                    break;
-                }
-            }
-
-            if ($isSchemaQuery) {
-                // Manually replace simple placeholders for schema queries
-                foreach ($params as $key => $value) {
-                    // Escape single quotes in value
-                    $escaped = str_replace("'", "''", $value);
-                    // Replace named placeholders (e.g., :table) with quoted value
-                    $sql = str_replace(":{$key}", "'{$escaped}'", $sql);
-                }
-
-                $stmt = $this->connection->prepare($sql);
-                $stmt->execute();
-                return $stmt;
-            }
-
-            // Normal queries use prepared statements safely
-            $stmt = $this->connection->prepare($sql);
-            $stmt->execute($params);
-
-            $executionTime = round((microtime(true) - $startTime) * 1000, 2);
-
-            // Log query if enabled
-            $this->logQuery($sql, $params, $executionTime);
-
-            // Log slow queries (configurable threshold)
-            $slowQueryThreshold = Config::get('database.slow_query_threshold', 1000); // 1 second
-            if ($executionTime > $slowQueryThreshold) {
-                Logger::warning('Slow query detected', [
-                    'sql' => $sql,
-                    'params' => $params,
-                    'execution_time' => $executionTime . 'ms'
-                ]);
-            }
-
-            return $stmt;
-        } catch (PDOException $e) {
-            Logger::error('Database query failed', [
-                'sql' => $sql,
-                'params' => $params,
-                'error' => $e->getMessage()
-            ]);
-            throw new Exception("Query failed: " . $e->getMessage());
-        }
-    }
-
-    public function fetchOne(
-        string $sql,
-        array  $params = [],
-        int    $fetchMode = PDO::FETCH_ASSOC
-    ): ?array
-    {
-        $stmt = $this->query($sql, $params);
-        $row = $stmt->fetch($fetchMode);
-
-        return $row !== false ? $row : null;
-    }
-
-    public function insert(string $table, array $data): int
-    {
-        try {
-            // Cast boolean values and handle reserved words
-            $processedData = [];
-            foreach ($data as $key => $value) {
-                // Cast booleans to integers
-                if (is_bool($value)) {
-                    $value = $value ? 1 : 0;
-                }
-                $processedData[$key] = $value;
-            }
-
-            $columns = array_keys($processedData);
-
-            // Quote column names to handle reserved words
-            $quotedColumns = array_map(function($col) {
-                return "`{$col}`";
-            }, $columns);
-
-            $placeholders = ':' . implode(', :', $columns);
-            $sql = "INSERT INTO `{$table}` (" . implode(', ', $quotedColumns) . ") VALUES ({$placeholders})";
-
-            $this->query($sql, $processedData);
-            $insertId = (int)$this->connection->lastInsertId();
-
-            Logger::debug('Record inserted', [
-                'table' => $table,
-                'insert_id' => $insertId,
-                'data_keys' => array_keys($processedData)
-            ]);
-
-            return $insertId;
-
-        } catch (Exception $e) {
-            Logger::error('Insert operation failed', [
-                'table' => $table,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-
-    public function lastInsertId() {
-        return $this->connection->lastInsertId();
-    }
-
-    public function update(string $table, array $data, array $where): int
-    {
-        try {
-            // Process data (cast booleans)
-            $processedData = [];
-            foreach ($data as $key => $value) {
-                if (is_bool($value)) {
-                    $value = $value ? 1 : 0;
-                }
-                $processedData[$key] = $value;
-            }
-
-            $setParts = [];
-            foreach (array_keys($processedData) as $column) {
-                $setParts[] = "`{$column}` = :{$column}";
-            }
-
-            $whereParts = [];
-            foreach (array_keys($where) as $column) {
-                $whereParts[] = "`{$column}` = :where_{$column}";
-            }
-
-            $sql = "UPDATE `{$table}` SET " . implode(', ', $setParts) . " WHERE " . implode(' AND ', $whereParts);
-
-            $whereParams = [];
-            foreach ($where as $key => $value) {
-                $whereParams["where_{$key}"] = $value;
-            }
-
-            $params = array_merge($processedData, $whereParams);
-            $stmt = $this->query($sql, $params);
-            $affectedRows = $stmt->rowCount();
-
-            Logger::debug('Records updated', [
-                'table' => $table,
-                'affected_rows' => $affectedRows,
-                'where_conditions' => array_keys($where)
-            ]);
-
-            return $affectedRows;
-
-        } catch (Exception $e) {
-            Logger::error('Update operation failed', [
-                'table' => $table,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-    }
-
-    public function delete(string $table, array $where): int
-    {
-        try {
-            $whereParts = [];
-            foreach (array_keys($where) as $column) {
-                $whereParts[] = "{$column} = :{$column}";
-            }
-
-            $sql = "DELETE FROM {$table} WHERE " . implode(' AND ', $whereParts);
-            $stmt = $this->query($sql, $where);
-            $affectedRows = $stmt->rowCount();
-
-            Logger::debug('Records deleted', [
-                'table' => $table,
-                'affected_rows' => $affectedRows,
-                'where_conditions' => array_keys($where)
-            ]);
-
-            return $affectedRows;
-
-        } catch (Exception $e) {
-            Logger::error('Delete operation failed', [
-                'table' => $table,
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
+        $this->beforeCommitCallbacks[] = $callback;
     }
 
     /**
-     * Execute a non-SELECT SQL statement (INSERT, UPDATE, DELETE, etc.)
+     * Register a callback to run after the outermost transaction successfully
+     * commits.  Callbacks are deferred regardless of nesting depth — they only
+     * fire when transactionLevel returns to 0 after a real COMMIT.
      *
-     * @param string $sql    The SQL query to execute
-     * @param array  $params Optional associative array of bound parameters
-     *
-     * @return int Number of affected rows
+     * If no transaction is active the callback is invoked immediately.
      */
-    public function exec(string $sql, array $params = []): int
+    public function afterCommit(callable $callback): void
     {
-        if (empty($params)) {
-            // Direct exec for simple statements (faster)
-            return $this->connection->exec($sql);
+        if ($this->transactionLevel === 0) {
+            // No active transaction — run immediately.
+            $callback($this);
+            return;
         }
 
-        // Prepared statement for parameterized queries
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute($params);
-
-        return $stmt->rowCount();
+        $this->afterCommitCallbacks[] = $callback;
     }
 
-    public function find(string $table, $id, string $primaryKey = 'id'): ?array
-    {
-        $sql = "SELECT * FROM {$table} WHERE {$primaryKey} = :id LIMIT 1";
-        $stmt = $this->query($sql, ['id' => $id]);
-        $result = $stmt->fetch();
-        return $result ?: null;
-    }
+    // -------------------------------------------------------------------------
+    // Core transaction methods
+    // -------------------------------------------------------------------------
 
     public function beginTransaction(): bool
     {
         try {
-            if ($this->transactionLevel == 0) {
+            if ($this->transactionLevel === 0) {
                 $result = $this->connection->beginTransaction();
                 Logger::debug('Database transaction started');
             } else {
@@ -380,13 +135,24 @@ class Database
         try {
             $this->transactionLevel--;
 
-            if ($this->transactionLevel == 0) {
+            if ($this->transactionLevel === 0) {
+                // About to commit the outermost transaction — run beforeCommit hooks first.
+                $this->runBeforeCommitCallbacks();
+
                 $result = $this->connection->commit();
                 Logger::debug('Database transaction committed');
+
+                // Transaction is now committed — run afterCommit hooks.
+                $this->runAfterCommitCallbacks();
+
                 return $result;
-            } elseif ($this->transactionLevel > 0) {
+            }
+
+            if ($this->transactionLevel > 0) {
                 $this->connection->exec("RELEASE SAVEPOINT trans{$this->transactionLevel}");
                 Logger::debug('Database savepoint released', ['level' => $this->transactionLevel]);
+                // Savepoint release does NOT fire before/afterCommit callbacks.
+                // They stay queued until the outermost commit.
                 return true;
             }
 
@@ -401,21 +167,24 @@ class Database
     public function rollBack(): bool
     {
         try {
-            if ($this->transactionLevel == 0) {
+            if ($this->transactionLevel === 0) {
                 throw new Exception("Cannot rollback transaction - no active transaction");
             }
 
             $this->transactionLevel--;
 
-            if ($this->transactionLevel == 0) {
+            if ($this->transactionLevel === 0) {
+                // Full rollback — discard all pending hooks.
+                $this->discardPendingCallbacks();
+
                 $result = $this->connection->rollBack();
                 Logger::debug('Database transaction rolled back');
                 return $result;
-            } else {
-                $this->connection->exec("ROLLBACK TO SAVEPOINT trans{$this->transactionLevel}");
-                Logger::debug('Database rolled back to savepoint', ['level' => $this->transactionLevel]);
-                return true;
             }
+
+            $this->connection->exec("ROLLBACK TO SAVEPOINT trans{$this->transactionLevel}");
+            Logger::debug('Database rolled back to savepoint', ['level' => $this->transactionLevel]);
+            return true;
 
         } catch (Exception $e) {
             Logger::error('Failed to rollback transaction', ['error' => $e->getMessage()]);
@@ -423,104 +192,20 @@ class Database
         }
     }
 
-    public function enableQueryLog(): void
-    {
-        $this->enableQueryLog = true;
-        Logger::debug('Query logging enabled');
-    }
-
-    public function disableQueryLog(): void
-    {
-        $this->enableQueryLog = false;
-        Logger::debug('Query logging disabled');
-    }
-
-    public function getQueryLog(): array
-    {
-        return $this->queryLog;
-    }
-
-    public function flushQueryLog(): void
-    {
-        $this->queryLog = [];
-        Logger::debug('Query log flushed');
-    }
-
-    private function logQuery(string $sql, array $params, float $executionTime): void
-    {
-        if ($this->enableQueryLog) {
-            $this->queryLog[] = [
-                'sql' => $sql,
-                'params' => $params,
-                'execution_time' => $executionTime,
-                'timestamp' => microtime(true)
-            ];
-        }
-
-        // Always log to application log if debug level
-        if (Config::get('app.debug', false)) {
-            Logger::debug('Database query executed', [
-                'sql' => $sql,
-                'params' => $params,
-                'execution_time' => $executionTime . 'ms'
-            ]);
-        }
-    }
-
-    public function __destruct()
-    {
-        //$this->close();
-    }
-
-    public function close(): void
-    {
-        if ($this->connection && $this->transactionLevel > 0) {
-            $this->connection->rollBack();
-        }
-        $this->connection = null;
-        $this->transactionLevel = 0;
-    }
-
-    public function getConnectionInfo(): array
-    {
-        return [
-            'driver' => $this->config['driver'],
-            'host' => $this->config['host'],
-            'database' => $this->config['database'],
-            'transaction_level' => $this->transactionLevel,
-            'query_log_enabled' => $this->enableQueryLog,
-            'query_count' => count($this->queryLog)
-        ];
-    }
-
-    private function normalizeConfig(array $config): array
-    {
-        // If running from CLI and DB_HOST_CLI is set, override
-        if (PHP_SAPI === 'cli' && !empty($config['host_cli'])) {
-            $config['host'] = $config['host_cli'];
-        }
-
-        return $config;
-    }
-
-    public function select(string $sql, array $params = []): array
-    {
-        $stmt = $this->query($sql, $params);
-        return $stmt->fetchAll();
-    }
-
     /**
      * Execute a callback inside a transaction.
+     * beforeCommit callbacks registered inside the closure will run just before
+     * the real COMMIT.  afterCommit callbacks run after the COMMIT succeeds.
      *
-     * @param callable $callback The code to execute within the transaction.
-     * @return mixed The result of the callback if successful.
-     * @throws Exception If the transaction fails.
+     * @param callable $callback
+     * @return mixed The result of the callback.
+     * @throws Exception on failure (rolls back and discards pending hooks).
      */
-    public function transaction(callable $callback)
+    public function transaction(callable $callback): mixed
     {
         $this->beginTransaction();
         try {
-            $result = $callback($this); // Pass the Database instance if needed
+            $result = $callback($this);
             $this->commit();
             return $result;
         } catch (Exception $e) {
@@ -530,7 +215,67 @@ class Database
         }
     }
 
-    public static function runTransaction(callable $callback)
+    // -------------------------------------------------------------------------
+    // Hook runners
+    // -------------------------------------------------------------------------
+
+    private function runBeforeCommitCallbacks(): void
+    {
+        $callbacks = $this->beforeCommitCallbacks;
+        $this->beforeCommitCallbacks = [];
+
+        foreach ($callbacks as $callback) {
+            try {
+                $callback($this);
+            } catch (\Throwable $e) {
+                Logger::error('beforeCommit callback threw — rolling back', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Re-throw so the outer transaction() call rolls back.
+                throw $e;
+            }
+        }
+    }
+
+    private function runAfterCommitCallbacks(): void
+    {
+        $callbacks = $this->afterCommitCallbacks;
+        $this->afterCommitCallbacks = [];
+
+        foreach ($callbacks as $callback) {
+            try {
+                $callback($this);
+            } catch (\Throwable $e) {
+                // afterCommit is post-commit — we cannot roll back.
+                // Log and continue so remaining callbacks still run.
+                Logger::error('afterCommit callback threw (transaction already committed)', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    private function discardPendingCallbacks(): void
+    {
+        $discardedBefore = count($this->beforeCommitCallbacks);
+        $discardedAfter = count($this->afterCommitCallbacks);
+
+        $this->beforeCommitCallbacks = [];
+        $this->afterCommitCallbacks = [];
+
+        if ($discardedBefore > 0 || $discardedAfter > 0) {
+            Logger::debug('Pending transaction callbacks discarded on rollback', [
+                'before_commit' => $discardedBefore,
+                'after_commit' => $discardedAfter,
+            ]);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Static helpers
+    // -------------------------------------------------------------------------
+
+    public static function runTransaction(callable $callback): mixed
     {
         $instance = static::getInstance();
 
@@ -541,64 +286,241 @@ class Database
         return $instance->transaction($callback);
     }
 
-    /**
-     * Begin a fluent query against a database table.
-     *
-     * @param string $table
-     * @return QueryBuilder
-     */
-    public static function table(string $table): QueryBuilder
-    {
-        $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
+    // -------------------------------------------------------------------------
+    // Connection
+    // -------------------------------------------------------------------------
 
-        return new QueryBuilder($table, $eagerLoader, self::getInstance());
+    private function getConfigFromFile(): array
+    {
+        $databaseConfig = DatabaseConfig::getConfig();
+        $defaultConnection = $databaseConfig['default'];
+        return $databaseConfig['connections'][$defaultConnection];
     }
 
-    public function prepare(string $sql): PDOStatement
+    private function connect(): void
     {
+        if ($this->connection) {
+            return;
+        }
+
+        $startTime = microtime(true);
+
         try {
-            return $this->connection->prepare($sql);
-        } catch (Exception $e) {
-            Logger::error('Failed to prepare statement', [
-                'sql' => $sql,
-                'error' => $e->getMessage()
+            $dsn = $this->buildDsn();
+
+            $this->connection = new PDO($dsn, $this->config['username'], $this->config['password'], [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_PERSISTENT => false,
             ]);
-            throw $e;
+
+            $connectionTime = round((microtime(true) - $startTime) * 1000, 2);
+
+            Logger::info('Database connection established', [
+                'driver' => $this->config['driver'],
+                'host' => $this->config['host'],
+                'database' => $this->config['database'],
+                'connection_time' => $connectionTime . 'ms',
+            ]);
+
+        } catch (PDOException $e) {
+            Logger::error("Database connection failed", [
+                'driver' => $this->config['driver'],
+                'host' => $this->config['host'],
+                'database' => $this->config['database'],
+                'error' => $e->getMessage(),
+            ]);
+            throw new Exception("Database connection failed: " . $e->getMessage());
         }
     }
 
-    public function execute(PDOStatement $stmt, array $params = []): PDOStatement
+    private function buildDsn(): string
     {
-        try {
-            $start = microtime(true);
+        $driver = $this->config['driver'];
 
+        return match ($driver) {
+            'mysql' => "mysql:host={$this->config['host']};port={$this->config['port']};dbname={$this->config['database']};charset={$this->config['charset']}",
+            'pgsql' => "pgsql:host={$this->config['host']};port={$this->config['port']};dbname={$this->config['database']}",
+            'sqlite' => "sqlite:{$this->config['database']}",
+            default => throw new Exception("Unsupported database driver: {$driver}"),
+        };
+    }
+
+    // -------------------------------------------------------------------------
+    // Query execution
+    // -------------------------------------------------------------------------
+
+    public static function raw($value): RawExpression
+    {
+        return new RawExpression($value);
+    }
+
+    public function getConnection(): PDO
+    {
+        return $this->connection;
+    }
+
+    public function query(string $sql, array $params = []): PDOStatement
+    {
+        $startTime = microtime(true);
+
+        try {
+            $schemaQueries = ['SHOW TABLES', 'DESCRIBE', 'EXPLAIN', 'SHOW COLUMNS'];
+            $isSchemaQuery = false;
+            foreach ($schemaQueries as $keyword) {
+                if (stripos($sql, $keyword) === 0) {
+                    $isSchemaQuery = true;
+                    break;
+                }
+            }
+
+            if ($isSchemaQuery) {
+                foreach ($params as $key => $value) {
+                    $escaped = str_replace("'", "''", $value);
+                    $sql = str_replace(":{$key}", "'{$escaped}'", $sql);
+                }
+                $stmt = $this->connection->prepare($sql);
+                $stmt->execute();
+                return $stmt;
+            }
+
+            $stmt = $this->connection->prepare($sql);
             $stmt->execute($params);
 
-            $executionTime = round((microtime(true) - $start) * 1000, 2);
+            $executionTime = round((microtime(true) - $startTime) * 1000, 2);
+            $this->logQuery($sql, $params, $executionTime);
 
-            $this->logQuery(
-                $stmt->queryString,
-                $params,
-                $executionTime
-            );
+            $slowQueryThreshold = Config::get('database.slow_query_threshold', 1000);
+            if ($executionTime > $slowQueryThreshold) {
+                Logger::warning('Slow query detected', [
+                    'sql' => $sql,
+                    'params' => $params,
+                    'execution_time' => $executionTime . 'ms',
+                ]);
+            }
 
             return $stmt;
 
-        } catch (Exception $e) {
-            Logger::error('Statement execution failed', [
-                'sql' => $stmt->queryString,
+        } catch (PDOException $e) {
+            Logger::error('Database query failed', [
+                'sql' => $sql,
                 'params' => $params,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
+            throw new Exception("Query failed: " . $e->getMessage());
+        }
+    }
+
+    public function fetchOne(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): ?array
+    {
+        $stmt = $this->query($sql, $params);
+        $row = $stmt->fetch($fetchMode);
+        return $row !== false ? $row : null;
+    }
+
+    public function insert(string $table, array $data): int
+    {
+        try {
+            $processedData = [];
+            foreach ($data as $key => $value) {
+                $processedData[$key] = is_bool($value) ? (int)$value : $value;
+            }
+
+            $columns = array_keys($processedData);
+            $quotedColumns = array_map(fn($col) => "`{$col}`", $columns);
+            $placeholders = ':' . implode(', :', $columns);
+            $sql = "INSERT INTO `{$table}` (" . implode(', ', $quotedColumns) . ") VALUES ({$placeholders})";
+
+            $this->query($sql, $processedData);
+            $insertId = (int)$this->connection->lastInsertId();
+
+            Logger::debug('Record inserted', ['table' => $table, 'insert_id' => $insertId]);
+            return $insertId;
+
+        } catch (Exception $e) {
+            Logger::error('Insert operation failed', ['table' => $table, 'error' => $e->getMessage()]);
             throw $e;
         }
     }
 
-    public function fetch(
-        string $sql,
-        array  $params = [],
-        int    $fetchMode = PDO::FETCH_ASSOC
-    ): array
+    public function lastInsertId(): string|false
+    {
+        return $this->connection->lastInsertId();
+    }
+
+    public function update(string $table, array $data, array $where): int
+    {
+        try {
+            $processedData = [];
+            foreach ($data as $key => $value) {
+                $processedData[$key] = is_bool($value) ? (int)$value : $value;
+            }
+
+            $setParts = array_map(fn($col) => "`{$col}` = :{$col}", array_keys($processedData));
+            $whereParts = array_map(fn($col) => "`{$col}` = :where_{$col}", array_keys($where));
+
+            $sql = "UPDATE `{$table}` SET " . implode(', ', $setParts) . " WHERE " . implode(' AND ', $whereParts);
+            $whereParams = [];
+            foreach ($where as $key => $value) {
+                $whereParams["where_{$key}"] = $value;
+            }
+
+            $stmt = $this->query($sql, array_merge($processedData, $whereParams));
+            $affectedRows = $stmt->rowCount();
+
+            Logger::debug('Records updated', ['table' => $table, 'affected_rows' => $affectedRows]);
+            return $affectedRows;
+
+        } catch (Exception $e) {
+            Logger::error('Update operation failed', ['table' => $table, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function delete(string $table, array $where): int
+    {
+        try {
+            $whereParts = array_map(fn($col) => "{$col} = :{$col}", array_keys($where));
+            $sql = "DELETE FROM {$table} WHERE " . implode(' AND ', $whereParts);
+            $stmt = $this->query($sql, $where);
+            $affected = $stmt->rowCount();
+
+            Logger::debug('Records deleted', ['table' => $table, 'affected_rows' => $affected]);
+            return $affected;
+
+        } catch (Exception $e) {
+            Logger::error('Delete operation failed', ['table' => $table, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function exec(string $sql, array $params = []): int
+    {
+        if (empty($params)) {
+            return $this->connection->exec($sql);
+        }
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount();
+    }
+
+    public function find(string $table, mixed $id, string $primaryKey = 'id'): ?array
+    {
+        $sql = "SELECT * FROM {$table} WHERE {$primaryKey} = :id LIMIT 1";
+        $stmt = $this->query($sql, ['id' => $id]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    public function select(string $sql, array $params = []): array
+    {
+        $stmt = $this->query($sql, $params);
+        return $stmt->fetchAll();
+    }
+
+    public function fetch(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): array
     {
         $stmt = $this->query($sql, $params);
         return $stmt->fetchAll($fetchMode);
@@ -607,9 +529,121 @@ class Database
     public function cursor(string $sql, array $params = []): \Generator
     {
         $stmt = $this->query($sql, $params);
-
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             yield $row;
         }
+    }
+
+    public function prepare(string $sql): PDOStatement
+    {
+        try {
+            return $this->connection->prepare($sql);
+        } catch (Exception $e) {
+            Logger::error('Failed to prepare statement', ['sql' => $sql, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function execute(PDOStatement $stmt, array $params = []): PDOStatement
+    {
+        try {
+            $start = microtime(true);
+            $stmt->execute($params);
+            $this->logQuery($stmt->queryString, $params, round((microtime(true) - $start) * 1000, 2));
+            return $stmt;
+        } catch (Exception $e) {
+            Logger::error('Statement execution failed', ['sql' => $stmt->queryString, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Query log
+    // -------------------------------------------------------------------------
+
+    public function enableQueryLog(): void
+    {
+        $this->enableQueryLog = true;
+    }
+
+    public function disableQueryLog(): void
+    {
+        $this->enableQueryLog = false;
+    }
+
+    public function getQueryLog(): array
+    {
+        return $this->queryLog;
+    }
+
+    public function flushQueryLog(): void
+    {
+        $this->queryLog = [];
+    }
+
+    private function logQuery(string $sql, array $params, float $executionTime): void
+    {
+        if ($this->enableQueryLog) {
+            $this->queryLog[] = [
+                'sql' => $sql,
+                'params' => $params,
+                'execution_time' => $executionTime,
+                'timestamp' => microtime(true),
+            ];
+        }
+
+        if (Config::get('app.debug', false)) {
+            Logger::debug('Database query executed', [
+                'sql' => $sql,
+                'params' => $params,
+                'execution_time' => $executionTime . 'ms',
+            ]);
+        }
+    }
+
+    public function getConnectionInfo(): array
+    {
+        return [
+            'driver' => $this->config['driver'],
+            'host' => $this->config['host'],
+            'database' => $this->config['database'],
+            'transaction_level' => $this->transactionLevel,
+            'query_log_enabled' => $this->enableQueryLog,
+            'query_count' => count($this->queryLog),
+            'pending_before_commit_callbacks' => count($this->beforeCommitCallbacks),
+            'pending_after_commit_callbacks' => count($this->afterCommitCallbacks),
+        ];
+    }
+
+    private function normalizeConfig(array $config): array
+    {
+        if (PHP_SAPI === 'cli' && !empty($config['host_cli'])) {
+            $config['host'] = $config['host_cli'];
+        }
+        return $config;
+    }
+
+    /**
+     * Begin a fluent query against a database table.
+     */
+    public static function table(string $table): QueryBuilder
+    {
+        $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
+        return new QueryBuilder($table, $eagerLoader, self::getInstance());
+    }
+
+    public function close(): void
+    {
+        if ($this->connection && $this->transactionLevel > 0) {
+            $this->connection->rollBack();
+            $this->discardPendingCallbacks();
+        }
+        $this->connection = null;
+        $this->transactionLevel = 0;
+    }
+
+    public function __destruct()
+    {
+        // Intentionally left empty — close() must be called explicitly.
     }
 }

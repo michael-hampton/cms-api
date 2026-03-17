@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class SchemaBlockData extends BaseBlockData
@@ -11,21 +13,25 @@ class SchemaBlockData extends BaseBlockData
         public readonly ?string $question,
         public readonly ?string $answer,
         public readonly ?string $expansion,
-        public readonly ?array  $image
+        public readonly ?array $image,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             schemaType: $data['schemaType'] ?? 'how-to',
             title: $data['title'] ?? null,
             description: $data['description'] ?? null,
             question: $data['question'] ?? null,
             answer: $data['answer'] ?? null,
             expansion: $data['expansion'] ?? null,
-            image: $data['image'] ?? null
+            image: $data['image'] ?? null,
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -18,28 +20,32 @@ class ServicesBlockRenderer implements EmailBlockRenderer
         return $type === $this->type;
     }
 
-    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $context): RenderedBlock
     {
         if (!$blockData instanceof ServicesBlockData) {
             return RenderedBlock::skipped();
         }
 
+        $baseStyle = 'margin: 30px 0;';
+        $wrapperStyle = $blockData->style->mergeIntoCss($baseStyle);
+
         $html = [];
-        $html[] = '<div style="margin: 30px 0;">';
+        $html[] = "<div style=\"{$wrapperStyle}\">";
 
         if ($blockData->title) {
-            $html[] = '<h3 style="color: #333; margin: 0 0 10px 0; font-size: 24px; text-align: center;">' . Str::sanitize($blockData->title) . '</h3>';
+            $baseTitleStyle = 'color: #333; margin: 0 0 10px 0; font-size: 24px; text-align: center;';
+            $titleStyle = $blockData->style->mergeIntoCss($baseTitleStyle);
+            $html[] = "<h3 style=\"{$titleStyle}\">" . Str::sanitize($blockData->title) . '</h3>';
         }
-
         if ($blockData->subtitle) {
             $html[] = '<p style="color: #666; margin: 0 0 30px 0; font-size: 16px; text-align: center;">' . Str::sanitize($blockData->subtitle) . '</p>';
         }
 
         $html[] = '<table style="width: 100%;"><tr>';
 
-        $serviceCount = count($blockData->services);
-        $columns = min($serviceCount, 3);
-        $cellWidth = floor(100 / $columns);
+        $count = count($blockData->services);
+        $columns = min($count, 3);
+        $cellWidth = $columns > 0 ? floor(100 / $columns) : 100;
 
         foreach ($blockData->services as $index => $service) {
             if ($index > 0 && $index % $columns === 0) {
@@ -67,8 +73,7 @@ class ServicesBlockRenderer implements EmailBlockRenderer
             $html[] = '</td>';
         }
 
-        $html[] = '</tr></table>';
-        $html[] = '</div>';
+        $html[] = '</tr></table></div>';
 
         return RenderedBlock::rendered(implode("\n", $html));
     }

@@ -37,14 +37,14 @@ class SubscriptionEligibilityRule
         $removed = [];
 
         foreach ($cartItems as $item) {
-//            if (
-//                !empty($item['subscription_plan_id']) &&
-//                isset($activePlanIds[$item['subscription_plan_id']])
-//            ) {
-//                $removed[] = $item;
-//            } else {
+            if (
+                !empty($item['subscription_plan_id']) &&
+                isset($activePlanIds[$item['subscription_plan_id']])
+            ) {
+                $removed[] = $item;
+            } else {
                 $valid[] = $item;
-            //}
+            }
         }
 
         return new EligibilityResult(

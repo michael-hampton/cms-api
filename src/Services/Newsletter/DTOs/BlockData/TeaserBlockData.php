@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class TeaserBlockData extends BaseBlockData
@@ -9,19 +11,23 @@ class TeaserBlockData extends BaseBlockData
         public readonly string  $theme,
         public readonly ?string $copy,
         public readonly array   $items,
-        public readonly ?string $footerText
+        public readonly ?string $footerText,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             componentId: $data['componentId'] ?? null,
             theme: $data['theme'] ?? 'default',
             copy: $data['copy'] ?? null,
             items: $data['items'] ?? [],
-            footerText: $data['footerText'] ?? null
+            footerText: $data['footerText'] ?? null,
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

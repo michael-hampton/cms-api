@@ -1,45 +1,37 @@
-#!/usr/bin/env php
 <?php
-
-/**
- * Sync subscription plans that have no stripe_product_id to Stripe.
- *
- * Usage:
- *   php artisan sync:stripe-plans [--dry-run] [--site-id=<id>]
- *
- * Options:
- *   --dry-run    Print what would be synced without writing anything
- *   --site-id    Restrict sync to a single site
- */
 
 namespace App\Console;
 
-use App\Actions\Subscriptions\CreatePlanAction;
 use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Billing\Stripe\StripeProductGateway;
 
 class SyncStripePlansCommand extends Command
 {
+    use ReportsCommandResult;
+
+    const SUCCESS = 1;
+    const FAILURE = 0;
+
     public $description = 'Sync subscription plans without a stripe_product_id to Stripe';
     protected $signature = 'sync:stripe-plans {--dry-run} {--site-id=}';
 
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,
-        private readonly CreatePlanAction           $createPlanAction,
+        private readonly StripeProductGateway       $gateway
     )
     {
     }
 
     public function handle(): int
     {
+        $result = $this->createResult('sync:stripe-plans');
         $dryRun = (bool)$this->option('dry-run');
         $siteId = $this->option('site-id') ? (int)$this->option('site-id') : null;
 
-        $this->info('Fetching unsynced plans…');
-
         $query = SubscriptionPlan::whereNull('stripe_product_id');
-
         if ($siteId !== null) {
             $query->where('site_id', $siteId);
         }
@@ -47,59 +39,36 @@ class SyncStripePlansCommand extends Command
         $plans = $query->get();
 
         if ($plans->isEmpty()) {
-            $this->info('No unsynced plans found. Nothing to do.');
-            return 0;
+            $this->info('No unsynced plans found.');
+            return self::SUCCESS;
         }
 
-        $this->info(sprintf('Found %d plan(s) without a stripe_product_id.', $plans->count()));
-
-        $synced = 0;
-        $skipped = 0;
-        $failed = 0;
-
         foreach ($plans as $plan) {
-            $label = sprintf('[Plan %d] "%s" (site %d)', $plan->id, $plan->name, $plan->site_id);
+            $label = "[Plan #{$plan->id}] \"{$plan->name}\"";
 
             if ($dryRun) {
-                echo "  [DRY-RUN] Would sync {$label}";
-                $synced++;
+                $result->addMessage("[DRY-RUN] Would sync {$label}");
+                $result->incrementSucceeded();
                 continue;
             }
 
             try {
-                // CreatePlanAction expects the plan to NOT yet exist, so we call the
-                // gateway directly here rather than re-creating the DB row.
-                // We use the action's injected gateway via a dedicated sync method.
-                $this->syncPlan($plan);
-                echo "  ✔ Synced {$label}";
-                $synced++;
+                $stripeProductId = $this->gateway->createProduct($plan->name);
+                $this->planRepository->update($plan->id, ['stripe_product_id' => $stripeProductId]);
+
+                $result->incrementSucceeded();
+                $result->addMessage("Synced {$label} → {$stripeProductId}");
             } catch (\Throwable $e) {
-                $this->error("  ✘ Failed {$label}: {$e->getMessage()}");
-                $failed++;
+                $this->reportFailure(
+                    result: $result,
+                    message: "Failed to sync {$label}: {$e->getMessage()}",
+                    context: ['plan_id' => $plan->id],
+                    throwable: $e
+                );
             }
         }
 
-        $this->info(sprintf(
-            'Done. Synced: %d | Failed: %d | Skipped: %d',
-            $synced, $failed, $skipped,
-        ));
-
-        return $failed > 0 ? 1 : 0;
-    }
-
-    /**
-     * Create a Stripe product for an already-persisted plan and store the ID.
-     */
-    private function syncPlan(mixed $plan): void
-    {
-        // Re-uses the action's dependencies by calling the action with a stub
-        // that skips the DB insert step — we only need the Stripe product created.
-        // The cleanest way: resolve the gateway and repository directly.
-        /** @var \App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface $gateway */
-        $gateway = app(\App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface::class);
-
-        $stripeProductId = $gateway->createProduct($plan->name);
-
-        $this->planRepository->update($plan->id, ['stripe_product_id' => $stripeProductId]);
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

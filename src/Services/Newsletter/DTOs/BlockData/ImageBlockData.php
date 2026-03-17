@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class ImageBlockData extends BaseBlockData
@@ -15,14 +17,14 @@ class ImageBlockData extends BaseBlockData
         public readonly bool    $openInNewTab,
         public readonly string  $layout,
         public readonly string  $alignment,
-        public readonly array   $endorsements
+        public readonly array $endorsements,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             src: $data['src'] ?? '',
             alt: $data['alt'] ?? '',
             caption: $data['caption'] ?? null,
@@ -33,7 +35,11 @@ class ImageBlockData extends BaseBlockData
             openInNewTab: (bool)($data['openInNewTab'] ?? false),
             layout: $data['layout'] ?? 'full',
             alignment: $data['alignment'] ?? 'fullscreen',
-            endorsements: $data['endorsements'] ?? []
+            endorsements: $data['endorsements'] ?? [],
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

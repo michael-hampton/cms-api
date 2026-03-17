@@ -12,6 +12,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class ProductComparisonBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'product-comparison';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;

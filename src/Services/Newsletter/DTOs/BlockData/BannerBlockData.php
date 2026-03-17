@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class BannerBlockData extends BaseBlockData
@@ -17,15 +19,15 @@ class BannerBlockData extends BaseBlockData
         public readonly float  $rating,
         public readonly int    $reviewCount,
         public readonly bool   $showDismiss,
-        public readonly bool $dismissible,
-        public ?array        $navLinks = []
+        public readonly bool   $dismissible,
+        public ?array          $navLinks = [],
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             bannerType: $data['bannerType'] ?? 'promo-header',
             title: $data['title'] ?? '',
             subtitle: $data['subtitle'] ?? null,
@@ -41,5 +43,9 @@ class BannerBlockData extends BaseBlockData
             dismissible: (bool)($data['dismissible'] ?? false),
             navLinks: $data['navLinks'] ?? [],
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

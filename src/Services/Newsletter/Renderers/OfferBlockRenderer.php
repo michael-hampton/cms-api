@@ -14,10 +14,12 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\OfferTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
+use Exception;
 
 class OfferBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'offer';
+
     public function __construct(
         private readonly ProductOfferRepository  $offerRepository,
         private readonly OfferVisibilityResolver $offerVisibilityResolver,
@@ -74,7 +76,7 @@ class OfferBlockRenderer implements EmailBlockRenderer
             $html = $this->renderHtml($offer, $newsletterRenderContext);
             return RenderedBlock::rendered($html);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to render offer block', [
                 'error' => $e->getMessage(),
                 'offer_id' => $blockData->offerId

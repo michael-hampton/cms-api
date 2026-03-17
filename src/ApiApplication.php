@@ -172,7 +172,7 @@ class ApiApplication
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
         $this->container->bind(QueueDriverInterface::class, DatabaseQueueDriver::class);
-
+        $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
 
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 

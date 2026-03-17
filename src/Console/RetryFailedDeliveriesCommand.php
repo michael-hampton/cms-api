@@ -2,13 +2,21 @@
 
 namespace App\Console\Commands\Subscriptions;
 
-use App\Framework\Support\Logger;
+use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 
-class RetryFailedDeliveriesCommand
+class RetryFailedDeliveriesCommand extends Command
 {
+    use ReportsCommandResult;
+
+    const SUCCESS = 1;
+    const FAILURE = 0;
     private const MAX_ATTEMPTS = 3;
+
+    protected $signature = 'subscriptions:retry-failed-deliveries';
+    public $description = 'Retries failed issue deliveries that haven\'t exceeded max attempts.';
 
     public function __construct(
         private readonly IssuesDeliveredRepository $repository
@@ -18,27 +26,31 @@ class RetryFailedDeliveriesCommand
 
     public function handle(): int
     {
+        $result = $this->createResult('subscriptions:retry-failed-deliveries');
         $failed = $this->repository->getFailedRetriable(self::MAX_ATTEMPTS);
 
-        $retried = 0;
+        if ($failed->isEmpty()) {
+            $this->info('No failed deliveries to retry.');
+            return self::SUCCESS;
+        }
 
         foreach ($failed as $delivery) {
             try {
                 dispatch(new DeliverIssueDeliveryJob($delivery->id));
-                $retried++;
-            } catch (\Exception $e) {
-                Logger::error('Failed to dispatch retry job', [
-                    'issues_delivered_id' => $delivery->id,
-                    'error' => $e->getMessage(),
-                ]);
+
+                $result->incrementSucceeded();
+                $result->addMessage("Dispatched retry job for delivery #{$delivery->id}");
+            } catch (\Throwable $e) {
+                $this->reportFailure(
+                    result: $result,
+                    message: "Failed to dispatch retry for delivery #{$delivery->id}: {$e->getMessage()}",
+                    context: ['delivery_id' => $delivery->id],
+                    throwable: $e
+                );
             }
         }
 
-        Logger::info('Failed deliveries retried', [
-            'total_failed' => $failed->count(),
-            'retried' => $retried,
-        ]);
-
-        return 0;
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

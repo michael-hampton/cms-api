@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Rating;
@@ -13,12 +15,13 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class AwardBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'award';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;
     }
 
-    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $context): RenderedBlock
     {
         if (!$blockData instanceof AwardBlockData) {
             return RenderedBlock::skipped();
@@ -27,8 +30,11 @@ class AwardBlockRenderer implements EmailBlockRenderer
         $borderColor = $blockData->winner ? '#FFD700' : '#ddd';
         $backgroundColor = $blockData->winner ? '#fffef0' : '#ffffff';
 
+        $baseWrapperStyle = "border: 2px solid {$borderColor}; border-radius: 8px; padding: 20px; margin: 20px 0; background-color: {$backgroundColor};";
+        $wrapperStyle = $blockData->style->mergeIntoCss($baseWrapperStyle);
+
         $html = [];
-        $html[] = "<div style=\"border: 2px solid {$borderColor}; border-radius: 8px; padding: 20px; margin: 20px 0; background-color: {$backgroundColor};\">";
+        $html[] = "<div style=\"{$wrapperStyle}\">";
 
         if ($blockData->winner) {
             $html[] = '<div style="background-color: #FFD700; color: #333; padding: 8px 16px; border-radius: 4px; display: inline-block; font-weight: bold; margin-bottom: 15px;">🏆 Winner</div>';
@@ -44,7 +50,10 @@ class AwardBlockRenderer implements EmailBlockRenderer
 
         $html[] = '<div style="display: table-cell; vertical-align: top;">';
         $html[] = '<div style="color: #666; font-size: 12px; text-transform: uppercase; margin-bottom: 5px;">' . Str::sanitize($blockData->subcategory) . '</div>';
-        $html[] = '<h3 style="color: #333; margin: 0 0 10px 0; font-size: 20px;">' . Str::sanitize($blockData->productName) . '</h3>';
+
+        $baseNameStyle = 'color: #333; margin: 0 0 10px 0; font-size: 20px;';
+        $nameStyle = $blockData->style->mergeIntoCss($baseNameStyle);
+        $html[] = "<h3 style=\"{$nameStyle}\">" . Str::sanitize($blockData->productName) . '</h3>';
 
         if ($blockData->strapline) {
             $html[] = '<p style="color: #666; margin: 0 0 10px 0; font-size: 14px; font-style: italic;">' . Str::sanitize($blockData->strapline) . '</p>';

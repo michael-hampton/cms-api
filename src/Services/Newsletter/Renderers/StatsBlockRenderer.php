@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -12,26 +14,31 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class StatsBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'stats';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;
     }
 
-    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $context): RenderedBlock
     {
         if (!$blockData instanceof StatsBlockData) {
             return RenderedBlock::skipped();
         }
 
+        $baseStyle = 'margin: 30px 0;';
+        $wrapperStyle = $blockData->style->mergeIntoCss($baseStyle);
+
         $html = [];
-        $html[] = '<div style="margin: 30px 0;">';
+        $html[] = "<div style=\"{$wrapperStyle}\">";
 
         if ($blockData->title) {
-            $html[] = '<h3 style="color: #333; margin: 0 0 20px 0; font-size: 24px; text-align: center;">' . Str::sanitize($blockData->title) . '</h3>';
+            $baseTitleStyle = 'color: #333; margin: 0 0 20px 0; font-size: 24px; text-align: center;';
+            $titleStyle = $blockData->style->mergeIntoCss($baseTitleStyle);
+            $html[] = "<h3 style=\"{$titleStyle}\">" . Str::sanitize($blockData->title) . '</h3>';
         }
 
-        $html[] = '<table style="width: 100%;">';
-        $html[] = '<tr>';
+        $html[] = '<table style="width: 100%;"><tr>';
 
         $statCount = count($blockData->stats);
         $cellWidth = $statCount > 0 ? floor(100 / $statCount) : 100;
@@ -42,24 +49,22 @@ class StatsBlockRenderer implements EmailBlockRenderer
             $description = isset($stat['description']) ? Str::sanitize($stat['description']) : null;
             $icon = $stat['icon'] ?? '';
 
-            $html[] = "<td style=\"width: {$cellWidth}%; text-align: center; padding: 20px; vertical-align: top;\">";
+            $baseNumberStyle = 'color: #007bff; font-size: 36px; font-weight: bold; margin-bottom: 5px;';
+            $numberStyle = $blockData->style->mergeIntoCss($baseNumberStyle);
 
+            $html[] = "<td style=\"width: {$cellWidth}%; text-align: center; padding: 20px; vertical-align: top;\">";
             if ($icon) {
                 $html[] = "<div style=\"font-size: 32px; margin-bottom: 10px;\">{$icon}</div>";
             }
-
-            $html[] = "<div style=\"color: #007bff; font-size: 36px; font-weight: bold; margin-bottom: 5px;\">{$number}</div>";
+            $html[] = "<div style=\"{$numberStyle}\">{$number}</div>";
             $html[] = "<div style=\"color: #333; font-size: 16px; font-weight: bold; margin-bottom: 5px;\">{$label}</div>";
-
             if ($description) {
                 $html[] = "<div style=\"color: #666; font-size: 14px;\">{$description}</div>";
             }
-
             $html[] = '</td>';
         }
 
-        $html[] = '</tr>';
-        $html[] = '</table>';
+        $html[] = '</tr></table>';
         $html[] = '</div>';
 
         return RenderedBlock::rendered(implode("\n", $html));

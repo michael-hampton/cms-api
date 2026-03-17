@@ -12,6 +12,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class ContactFormBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'contact-form';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;

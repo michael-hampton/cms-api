@@ -10,69 +10,69 @@ use App\Framework\Http\Response;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Support\Logger;
+use App\Repositories\Jobs\JobExecutionLogRepository;
 use App\Requests\WorkflowRequest;
 
 /**
- * Triggers any registered job or console handler on demand via HTTP or CLI.
+ * Triggers any registered job or console handler on demand via HTTP.
  *
- * Intended for:
- *   - Internal tooling / admin dashboards
- *   - Manual re-runs of scheduled work without touching the queue
- *   - Console commands that need to invoke existing job logic
- *
- * Route (example):
- *   POST /internal/workflow/run
+ * Every execution — success or failure — is recorded in job_execution_logs
+ * so the Angular dashboard can display history and per-job logs.
  *
  * Security: protect this route with internal/admin middleware at the router.
- * The controller enforces a namespace allowlist as a second line of defence.
- *
- * ─── Resolution contract ────────────────────────────────────────────────────
- *
- *   CONSTRUCTOR  — resolved 100% by the container.
- *                  The request payload MUST NOT supply constructor arguments.
- *                  This keeps all infrastructure deps (repos, services, etc.)
- *                  properly injected.
- *
- *   handle() / execute()
- *                — receives ONLY the primitive values from the request payload.
- *                  Typed objects (models, value objects) must be resolved by
- *                  the job itself from the primitives it receives (e.g. look up
- *                  a model by ID inside handle()).
- *
- * ─── Execution modes ────────────────────────────────────────────────────────
- *
- *   "sync"  (default) — runs handle()/execute() in the current process.
- *                        Returns whatever the method returns.
- *
- *   "queue"           — pushes the job to the queue driver and returns
- *                        immediately. Only works for Job subclasses.
- *                        Console handlers (which use execute()) cannot be queued.
- *
- * ─── Request body (JSON) ────────────────────────────────────────────────────
- *
- *   {
- *     "job":    "App\\Jobs\\Subscriptions\\GenerateIssueDeliveriesJob",
- *     "params": { "issueDeliveryId": 42 },
- *     "mode":   "sync"
- *   }
  */
 class WorkflowController extends Controller
 {
-    /**
-     * Only classes under these namespaces may be dispatched.
-     */
     private const ALLOWED_NAMESPACES = [
         'App\\Jobs\\',
         'App\\Console\\',
     ];
 
     public function __construct(
-        private readonly Container  $container,
-        private readonly Dispatcher $dispatcher,
-        private readonly Logger     $logger,
+        private readonly Container                 $container,
+        private readonly Dispatcher                $dispatcher,
+        private readonly Logger                    $logger,
+        private readonly JobExecutionLogRepository $logRepository,
     )
     {
         parent::__construct();
+    }
+
+    public function logs(Request $request)
+    {
+        $logs = $this->logRepository->paginate(
+            (int)$request->get('page') ?? 0,
+            (int)$request->get('per_page') ?? 20,
+            $request->get('job_class') ?? '',
+            $request->get('status') ?? ''
+        );
+
+        return $this->resourceResponse($logs);
+    }
+
+    /**
+     * Returns all concrete, instantiable classes within the allowed namespaces,
+     * each paired with a human-readable short name derived from the class basename.
+     *
+     * The list is sorted alphabetically by short name so the dropdown is easy to
+     * scan.  Only classes that have a handle() or execute() entry point are
+     * included, matching exactly what execute() would accept.
+     *
+     * @return Response  JSON: { classes: Array<{ fqn: string, name: string }> }
+     */
+    public function classes(): Response
+    {
+        try {
+            $discovered = $this->discoverJobClasses();
+        } catch (\Throwable $e) {
+            $this->logger->error('WorkflowController: class discovery failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->jsonResponse(['error' => 'Class discovery failed.'], 500);
+        }
+
+        return $this->resourceResponse(['classes' => $discovered]);
     }
 
     // -------------------------------------------------------------------------
@@ -82,7 +82,6 @@ class WorkflowController extends Controller
     public function run(WorkflowRequest $request): Response
     {
         $body = $this->parseBody($request);
-
         $jobClass = trim((string)($body['job'] ?? ''));
         $params = (array)($body['params'] ?? []);
         $mode = (string)($body['mode'] ?? 'sync');
@@ -91,12 +90,10 @@ class WorkflowController extends Controller
             return $this->jsonResponse(['error' => 'Missing required field: job'], 422);
         }
 
-        // Guard early against bare class names — the allowlist check would catch
-        // this too, but this gives a clearer actionable message to the caller.
         if (!str_contains($jobClass, '\\')) {
             return $this->jsonResponse([
                 'error' => 'Invalid job class format.',
-                'message' => "'{$jobClass}' looks like a bare class name. Send the fully-qualified class name, e.g. App\\Jobs\\Subscriptions\\GenerateIssueDeliveriesJob.",
+                'message' => "'{$jobClass}' looks like a bare class name. Send the fully-qualified class name.",
             ], 422);
         }
 
@@ -129,23 +126,14 @@ class WorkflowController extends Controller
     // Console entry point
     // -------------------------------------------------------------------------
 
-    /**
-     * Parse the request body robustly.
-     *
-     * Request::all() only returns parsed JSON when Content-Type: application/jsonResponse
-     * is set. This method falls back to reading php://input directly so callers
-     * that forget the header still work.
-     */
     private function parseBody(Request $request): array
     {
-        // If the framework already parsed JSON body data, use it.
         $data = $request->all();
 
         if (!empty($data)) {
             return $data;
         }
 
-        // Fallback: attempt to parse raw body as JSON regardless of Content-Type.
         $raw = file_get_contents('php://input');
 
         if ($raw === false || $raw === '') {
@@ -162,35 +150,76 @@ class WorkflowController extends Controller
     }
 
     // -------------------------------------------------------------------------
-    // Core
+    // Core execution (with logging)
     // -------------------------------------------------------------------------
 
     /**
      * @throws \InvalidArgumentException on allowlist / class / signature violations
-     * @throws \Throwable                on job execution failure (caller decides whether to catch)
+     * @throws \Throwable                on job execution failure
      */
     private function execute(string $jobClass, array $params, string $mode): mixed
     {
         $this->guardAllowlist($jobClass);
         $this->guardExists($jobClass);
 
-        // Resolve the job via the container so the constructor receives all
-        // typed dependencies (services, repositories, etc.) properly.
-        // The payload params are intentionally NOT passed to the constructor.
-        $job = Container::getInstance()->resolve($jobClass);
+        if ($mode === 'queue') {
+            $job = $this->container->resolve($jobClass);
+            return $this->pushToQueue($job, $jobClass);
+        }
+
+        // Create a log entry and record the execution.
+        $logId = $this->logRepository->create($jobClass, $params, 'api');
+        $startedAt = hrtime(true);
+
+        $this->logRepository->markRunning($logId);
+
+        $outputBuffer = '';
+        $job = $this->container->resolve($jobClass);
 
         $this->logger->info('WorkflowController: executing job', [
             'job' => $jobClass,
             'mode' => $mode,
             'params' => $params,
+            'log_id' => $logId,
         ]);
 
-        if ($mode === 'queue') {
-            return $this->pushToQueue($job, $jobClass);
-        }
+        try {
+            ob_start();
+            $result = $this->callEntryPoint($job, $jobClass, $params);
+            $outputBuffer = (string)ob_get_clean();
 
-        return $this->callEntryPoint($job, $jobClass, $params);
+            $durationMs = (int)((hrtime(true) - $startedAt) / 1_000_000);
+
+            $resultArray = null;
+            if (is_array($result)) {
+                $resultArray = $result;
+            } elseif (is_object($result) && method_exists($result, 'toLogContext')) {
+                $resultArray = $result->toLogContext();
+            }
+
+            $this->logRepository->markSucceeded($logId, $resultArray, $outputBuffer, $durationMs);
+
+            return $result;
+
+        } catch (\Throwable $e) {
+            $outputBuffer = (string)ob_get_clean();
+            $durationMs = (int)((hrtime(true) - $startedAt) / 1_000_000);
+
+            $this->logRepository->markFailed(
+                id: $logId,
+                errorMessage: $e->getMessage(),
+                errorTrace: $e->getTraceAsString(),
+                output: $outputBuffer,
+                durationMs: $durationMs,
+            );
+
+            throw $e;
+        }
     }
+
+    // -------------------------------------------------------------------------
+    // Guards
+    // -------------------------------------------------------------------------
 
     private function guardAllowlist(string $jobClass): void
     {
@@ -202,9 +231,7 @@ class WorkflowController extends Controller
 
         throw new \InvalidArgumentException(
             "Received class '{$jobClass}' is outside the allowed namespaces (" .
-            implode(', ', self::ALLOWED_NAMESPACES) . "). " .
-            "Ensure you are sending the fully-qualified class name with double-escaped backslashes in JSON, " .
-            "e.g. \"job\": \"App\\\\Jobs\\\\Subscriptions\\\\GenerateIssueDeliveriesJob\"."
+            implode(', ', self::ALLOWED_NAMESPACES) . ")."
         );
     }
 
@@ -219,35 +246,27 @@ class WorkflowController extends Controller
     {
         if (!$job instanceof Job) {
             throw new \InvalidArgumentException(
-                "Class {$jobClass} does not extend " . Job::class . " and cannot be pushed to the queue. " .
-                "Use mode=sync, or extend Job if queueing is needed."
+                "Class {$jobClass} does not extend " . Job::class . " and cannot be pushed to the queue."
             );
         }
 
         $this->dispatcher->dispatch($job);
-
         return null;
     }
 
-    /**
-     * Calls handle() for Job subclasses, execute() for console handlers.
-     * Only primitive values from the payload are forwarded — no typed object
-     * injection from HTTP params, ever.
-     */
+    // -------------------------------------------------------------------------
+    // Entry point resolution
+    // -------------------------------------------------------------------------
+
     private function callEntryPoint(object $job, string $jobClass, array $params): mixed
     {
         $method = $this->resolveEntryPointMethod($job, $jobClass);
-
         $reflection = new \ReflectionMethod($job, $method);
         $args = $this->buildPrimitiveArgs($reflection, $params, $jobClass);
 
         return $job->{$method}(...$args);
     }
 
-    /**
-     * Determine whether the class uses handle() (Job pattern) or execute()
-     * (console handler pattern). Throws if neither is defined.
-     */
     private function resolveEntryPointMethod(object $job, string $jobClass): string
     {
         if (method_exists($job, 'handle')) {
@@ -263,21 +282,6 @@ class WorkflowController extends Controller
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Guards
-    // -------------------------------------------------------------------------
-
-    /**
-     * Maps payload primitives to the method's parameters by name.
-     *
-     * Rules:
-     *   - Typed, non-builtin parameters are REJECTED — jobs must resolve their
-     *     own objects internally from the primitives they receive.
-     *   - Named primitive found in payload → cast to declared type and use it.
-     *   - Parameter has a default → use the default.
-     *   - Nullable without a default → pass null.
-     *   - Required primitive missing from payload → throw clearly.
-     */
     private function buildPrimitiveArgs(\ReflectionMethod $method, array $params, string $jobClass): array
     {
         $args = [];
@@ -286,18 +290,11 @@ class WorkflowController extends Controller
             $name = $param->getName();
             $type = $param->getType();
 
-            // Typed non-builtin (e.g. IssueDelivery, Site): the job must
-            // resolve these itself. We never inject objects from HTTP params.
-            // Exception: nullable typed params and those with defaults are
-            // satisfiable without a value — pass null or the default rather
-            // than rejecting the job outright.
             if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
-                // Try container resolution first — handles Laravel-style service injection.
                 try {
                     $args[] = Container::getInstance()->resolve($type->getName());
                     continue;
                 } catch (\Throwable) {
-                    // Not resolvable from container — fall through to null/default/throw.
                 }
 
                 if ($param->isDefaultValueAvailable()) {
@@ -312,25 +309,20 @@ class WorkflowController extends Controller
 
                 throw new \InvalidArgumentException(
                     "Parameter '\${$name}' on {$jobClass}::{$method->getName()}() " .
-                    "is a typed object ({$type->getName()}) that could not be resolved " .
-                    "from the container, has no default, and is not nullable. " .
-                    "The job must accept primitives or ensure this type is container-bound."
+                    "is a typed object that could not be resolved from the container."
                 );
             }
 
-            // Primitive present in payload — cast to declared type.
             if (array_key_exists($name, $params)) {
                 $args[] = $this->castPrimitive($params[$name], $type);
                 continue;
             }
 
-            // Optional parameter — use its default value.
             if ($param->isDefaultValueAvailable()) {
                 $args[] = $param->getDefaultValue();
                 continue;
             }
 
-            // Nullable without a default — pass null.
             if ($param->allowsNull()) {
                 $args[] = null;
                 continue;
@@ -338,17 +330,13 @@ class WorkflowController extends Controller
 
             throw new \InvalidArgumentException(
                 "Required parameter '\${$name}' for {$jobClass}::{$method->getName()}() " .
-                "was not found in the request payload. Pass it under params.{$name}."
+                "was not found in the request payload."
             );
         }
 
         return $args;
     }
 
-    /**
-     * Casts a scalar payload value to the declared primitive type.
-     * Untyped or mixed parameters receive the raw value unchanged.
-     */
     private function castPrimitive(mixed $value, ?\ReflectionType $type): mixed
     {
         if (!$type instanceof \ReflectionNamedType) {
@@ -368,13 +356,145 @@ class WorkflowController extends Controller
     // Request parsing
     // -------------------------------------------------------------------------
 
-    /**
-     * Invoke a job or console handler directly from a console command.
-     *
-     *   $workflow->runFromConsole(MyJob::class, ['id' => 1]);
-     */
     public function runFromConsole(string $jobClass, array $params = [], string $mode = 'sync'): mixed
     {
         return $this->execute($jobClass, $params, $mode);
+    }
+
+    /**
+     * Walk the filesystem roots that correspond to the allowed namespaces and
+     * collect every class that is instantiable and has a handle() or execute()
+     * method.
+     *
+     * @return array<int, array{fqn: string, name: string}>
+     */
+    private function discoverJobClasses(): array
+    {
+        // Map each allowed namespace prefix to its filesystem root.
+        // Adjust the paths to match your project layout.
+        $namespacePaths = [
+            'App\\Jobs\\' => __DIR__ . '/../Jobs',
+            'App\\Console\\' => __DIR__ . '/../Console',
+        ];
+
+        $results = [];
+
+        foreach ($namespacePaths as $namespacePrefix => $directory) {
+            if (!is_dir($directory)) {
+                continue;
+            }
+
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            );
+
+            /** @var \SplFileInfo $file */
+            foreach ($iterator as $file) {
+                if ($file->getExtension() !== 'php') {
+                    continue;
+                }
+
+                $fqn = $this->fileToFqn($file->getRealPath(), $directory, $namespacePrefix);
+
+                if ($fqn === null) {
+                    continue;
+                }
+
+                // Autoload the class so reflection works without manual require.
+                if (!class_exists($fqn, true)) {
+                    continue;
+                }
+
+                try {
+                    $ref = new \ReflectionClass($fqn);
+                } catch (\ReflectionException) {
+                    continue;
+                }
+
+                // Skip abstract classes, interfaces, traits, and enums.
+                if (!$ref->isInstantiable()) {
+                    continue;
+                }
+
+                // Only include classes the controller can actually call.
+                if (!$ref->hasMethod('handle') && !$ref->hasMethod('execute')) {
+                    continue;
+                }
+
+                $results[] = [
+                    'fqn' => $fqn,
+                    'name' => $this->buildHumanName($fqn),
+                ];
+            }
+        }
+
+        usort($results, static fn(array $a, array $b) => strcmp($a['name'], $b['name']));
+
+        return $results;
+    }
+
+    /**
+     * Convert an absolute file path back to a fully-qualified class name.
+     *
+     * @param string $filePath Absolute path to the PHP file.
+     * @param string $directoryRoot The filesystem root for this namespace.
+     * @param string $namespaceRoot The corresponding namespace prefix (with trailing \\).
+     */
+    private function fileToFqn(string $filePath, string $directoryRoot, string $namespaceRoot): ?string
+    {
+        $filePath = realpath($filePath);
+        $directoryRoot = realpath($directoryRoot);
+
+        if (!$filePath || !$directoryRoot) {
+            return null;
+        }
+
+        if (!str_starts_with($filePath, $directoryRoot)) {
+            return null;
+        }
+
+        $relative = substr($filePath, strlen($directoryRoot) + 1);
+
+        if (!str_ends_with($relative, '.php')) {
+            return null;
+        }
+
+        $relative = substr($relative, 0, -4);
+
+        $relative = str_replace(DIRECTORY_SEPARATOR, '\\', $relative);
+
+        return rtrim($namespaceRoot, '\\') . '\\' . $relative;
+    }
+
+    /**
+     * Turn a fully-qualified class name into a readable label.
+     *
+     * App\Jobs\Subscriptions\GenerateIssueDeliveriesJob
+     *   → "Generate Issue Deliveries (Subscriptions)"
+     */
+    private function buildHumanName(string $fqn): string
+    {
+        $parts = explode('\\', $fqn);
+        $className = array_pop($parts);
+
+        // Strip common suffixes so they don't pollute every label.
+        $basename = preg_replace('/(Job|Command|Handler)$/', '', $className) ?? $className;
+
+        // Split PascalCase into words.
+        $label = (string)preg_replace('/(?<=[a-z])(?=[A-Z])/', ' ', $basename);
+
+        // Use the immediate parent namespace as a context hint if it is not a
+        // generic segment (Jobs / Console).
+        $skip = ['Jobs', 'Console', 'Commands', 'Handlers', 'App'];
+        $context = null;
+
+        foreach (array_reverse($parts) as $part) {
+            if (!in_array($part, $skip, true)) {
+                $context = $part;
+                break;
+            }
+        }
+
+        return $context ? trim($label) . " ({$context})" : trim($label);
     }
 }

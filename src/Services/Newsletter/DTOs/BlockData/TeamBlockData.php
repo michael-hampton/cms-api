@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class TeamBlockData extends BaseBlockData
@@ -8,18 +10,22 @@ class TeamBlockData extends BaseBlockData
         public readonly ?string $title,
         public readonly ?string $subtitle,
         public readonly array   $members,
-        public readonly string  $layout
+        public readonly string $layout,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? null,
             subtitle: $data['subtitle'] ?? null,
             members: $data['members'] ?? [],
-            layout: $data['layout'] ?? 'grid'
+            layout: $data['layout'] ?? 'grid',
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

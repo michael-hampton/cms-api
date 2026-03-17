@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -12,28 +14,30 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class ListBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'list';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;
     }
 
-    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $context): RenderedBlock
     {
         if (!$blockData instanceof ListBlockData) {
             return RenderedBlock::skipped();
         }
 
-        $listType = $blockData->listType;
+        $tag = $blockData->listType;
+        $baseListStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 15px 0; padding-left: 30px;';
+        $listStyle = $blockData->style->mergeIntoCss($baseListStyle);
+
         $html = [];
-        $html[] = "<{$listType} style=\"color: #333; font-size: 16px; line-height: 1.6; margin: 15px 0; padding-left: 30px;\">";
+        $html[] = "<{$tag} style=\"{$listStyle}\">";
 
         foreach ($blockData->items as $item) {
-            $html[] = '<li style="margin-bottom: 8px;">';
-            $html[] = Str::sanitize($item);
-            $html[] = '</li>';
+            $html[] = '<li style="margin-bottom: 8px;">' . Str::sanitize($item) . '</li>';
         }
 
-        $html[] = "</{$listType}>";
+        $html[] = "</{$tag}>";
 
         return RenderedBlock::rendered(implode("\n", $html));
     }

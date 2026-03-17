@@ -5,6 +5,7 @@ namespace App\Services\Newsletter\Renderers;
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
 use App\Services\Newsletter\DTOs\BlockData\BaseBlockData;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
+use InvalidArgumentException;
 
 final class DefaultEmailBlockRendererRegistry implements EmailBlockRendererRegistry
 {
@@ -28,9 +29,14 @@ final class DefaultEmailBlockRendererRegistry implements EmailBlockRendererRegis
         return array_values($this->renderers);
     }
 
-    public function getFor(string $blockType): ?EmailBlockRenderer
+    public function render(string $type, BaseBlockData $data, ?NewsletterRenderContext $context)
     {
-        return $this->renderers[$blockType] ?? null;
+        if (!$this->has($type)) {
+            throw new InvalidArgumentException("Renderer for type '$type' not found");
+        }
+
+        $renderer = $this->getFor($type);
+        return $renderer->render($data, $context);
     }
 
     public function has(string $type): bool
@@ -38,13 +44,8 @@ final class DefaultEmailBlockRendererRegistry implements EmailBlockRendererRegis
         return !empty($this->renderers[$type]);
     }
 
-    public function render(string $type, BaseBlockData $data, ?NewsletterRenderContext $context)
+    public function getFor(string $blockType): ?EmailBlockRenderer
     {
-        if (!$this->has($type)) {
-            throw new \InvalidArgumentException("Renderer for type '$type' not found");
-        }
-
-        $renderer = $this->getFor($type);
-        return $renderer->render($data, $context);
+        return $this->renderers[$blockType] ?? null;
     }
 }

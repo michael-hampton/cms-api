@@ -2,6 +2,8 @@
 
 namespace App\Services\Newsletter\DTOs\BlockData;
 
+use InvalidArgumentException;
+
 class RewardBlockData extends BaseBlockData
 {
     public function __construct(
@@ -13,7 +15,7 @@ class RewardBlockData extends BaseBlockData
     public static function fromArray(array $data): self
     {
         if (!isset($data['reward_id'])) {
-            throw new \InvalidArgumentException('Missing required field: reward_id');
+            throw new InvalidArgumentException('Missing required field: reward_id');
         }
 
         return new self((int)$data['reward_id']);

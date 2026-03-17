@@ -2,27 +2,43 @@
 
 namespace App\Console;
 
+use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Jobs\PublishScheduledPagesJob;
 
-class PublishScheduledPagesCommand
+class PublishScheduledPagesCommand extends Command
 {
-    private PublishScheduledPagesJob $job;
+    use ReportsCommandResult;
 
-    public function __construct()
+    const SUCCESS = 1;
+    const FAILURE = 0;
+
+    protected $signature = 'cms:publish-scheduled';
+    public $description = 'Publishes pages that are scheduled for the current time.';
+
+    public function handle(): int
     {
-        $this->job = new PublishScheduledPagesJob();
-    }
+        $result = $this->createResult('cms:publish-scheduled');
+        $job = new PublishScheduledPagesJob();
 
-    public function execute(): void
-    {
-        echo "Running scheduled page publisher...\n";
+        try {
+            $count = $job->handle();
 
-        $count = $this->job->handle();
-
-        if ($count > 0) {
-            echo "Successfully published {$count} page(s)\n";
-        } else {
-            echo "No pages to publish at this time\n";
+            if ($count > 0) {
+                $result->incrementSucceeded();
+                $result->addMessage("Successfully published {$count} page(s).");
+            } else {
+                $result->addMessage("No pages to publish at this time.");
+            }
+        } catch (\Throwable $e) {
+            $this->reportFailure(
+                result: $result,
+                message: "Failed to publish scheduled pages: {$e->getMessage()}",
+                throwable: $e
+            );
         }
+
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

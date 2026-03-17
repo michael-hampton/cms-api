@@ -2,7 +2,6 @@
 
 namespace App\Services\Adverts\Boost;
 
-use App\Contracts\ClockInterface;
 use App\DTO\Boost\AutoBoostPlanDTO;
 use App\Framework\Database\Database;
 use App\Framework\Support\Config;
@@ -10,6 +9,7 @@ use App\Framework\Support\Logger;
 use App\Repositories\Adverts\Boost\MerchantAutoBoostSettingRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
+use App\Services\SystemClock;
 
 class AutoBoostService
 {
@@ -21,7 +21,7 @@ class AutoBoostService
         private readonly ProductRepository                  $productRepository,
         private readonly ProductOfferRepository             $offerRepository,
         private readonly Database                           $database,
-        private readonly ClockInterface                     $clock,
+        private readonly SystemClock $clock,
     )
     {
     }

@@ -12,6 +12,7 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 class StaticDealBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'deal';
+
     public function supports(string $type): bool
     {
         return $type === $this->type;

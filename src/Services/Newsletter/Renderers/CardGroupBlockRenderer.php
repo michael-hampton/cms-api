@@ -4,6 +4,7 @@ namespace App\Services\Newsletter\Renderers;
 
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
 use App\Services\Newsletter\DTOs\BlockData\BaseBlockData;
+use App\Services\Newsletter\DTOs\BlockData\CardBlockData;
 use App\Services\Newsletter\DTOs\BlockData\CardGroupBlockData;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
@@ -52,7 +53,7 @@ class CardGroupBlockRenderer implements EmailBlockRenderer
             $html[] = "<td style=\"width: {$cellWidth}%; padding: {$gapPadding}; vertical-align: top;\">";
 
             // Render individual card
-            $cardData = \App\Services\Newsletter\DTOs\BlockData\CardBlockData::fromArray($card);
+            $cardData = CardBlockData::fromArray($card);
             $rendered = $this->cardRenderer->render($cardData, $newsletterRenderContext);
 
             if ($rendered->wasRendered) {

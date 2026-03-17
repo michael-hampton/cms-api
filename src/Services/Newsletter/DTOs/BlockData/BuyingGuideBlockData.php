@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class BuyingGuideBlockData extends BaseBlockData
@@ -14,14 +16,14 @@ class BuyingGuideBlockData extends BaseBlockData
         public readonly ?string $url,
         public readonly string  $linkText,
         public readonly bool    $sponsored,
-        public readonly ?array  $image
+        public readonly ?array $image,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? '',
             subtitle: $data['subtitle'] ?? null,
             specs: $data['specs'] ?? [],
@@ -31,7 +33,11 @@ class BuyingGuideBlockData extends BaseBlockData
             url: $data['url'] ?? null,
             linkText: $data['linkText'] ?? 'Learn More',
             sponsored: (bool)($data['sponsored'] ?? false),
-            image: $data['image'] ?? null
+            image: $data['image'] ?? null,
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class CardBlockData extends BaseBlockData
@@ -18,14 +20,14 @@ class CardBlockData extends BaseBlockData
         public readonly ?array  $sponsorDeclaration,
         public readonly string  $layout,
         public readonly string  $alignment,
-        public readonly int     $itemsPerRow
+        public readonly int $itemsPerRow,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? '',
             description: $data['description'] ?? null,
             image: $data['image'] ?? null,
@@ -39,7 +41,11 @@ class CardBlockData extends BaseBlockData
             sponsorDeclaration: $data['sponsorDeclaration'] ?? null,
             layout: $data['layout'] ?? 'full',
             alignment: $data['alignment'] ?? 'center',
-            itemsPerRow: (int)($data['itemsPerRow'] ?? 3)
+            itemsPerRow: (int)($data['itemsPerRow'] ?? 3),
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

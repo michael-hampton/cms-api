@@ -14,16 +14,18 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\DealTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
+use Exception;
 
 class DealOfferRenderer implements EmailBlockRenderer
 {
     public $type = 'offer-deal';
+
     public function __construct(
-        private readonly ProductRepository $productRepository,
-        private readonly DealVisibilityResolver     $dealVisibilityResolver,
-        private readonly DealTrackingService        $trackingService,
-        private readonly TrackingUrlBuilder         $trackingUrlBuilder,
-        private readonly Logger            $logger
+        private readonly ProductRepository      $productRepository,
+        private readonly DealVisibilityResolver $dealVisibilityResolver,
+        private readonly DealTrackingService    $trackingService,
+        private readonly TrackingUrlBuilder     $trackingUrlBuilder,
+        private readonly Logger                 $logger
     )
     {
     }
@@ -77,7 +79,7 @@ class DealOfferRenderer implements EmailBlockRenderer
             $html = $this->renderHtml($product, $newsletterRenderContext);
             return RenderedBlock::rendered($html);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to render deal block', [
                 'error' => $e->getMessage(),
                 'product_id' => $blockData->productId

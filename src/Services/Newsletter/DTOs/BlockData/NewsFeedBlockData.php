@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class NewsFeedBlockData extends BaseBlockData
@@ -15,14 +17,14 @@ class NewsFeedBlockData extends BaseBlockData
         public readonly bool    $showCategory,
         public readonly bool    $showReadTime,
         public readonly array   $items,
-        public readonly int     $limit
+        public readonly int $limit,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? null,
             subtitle: $data['subtitle'] ?? null,
             layout: $data['layout'] ?? 'grid',
@@ -33,7 +35,11 @@ class NewsFeedBlockData extends BaseBlockData
             showCategory: (bool)($data['showCategory'] ?? true),
             showReadTime: (bool)($data['showReadTime'] ?? true),
             items: $data['items'] ?? [],
-            limit: (int)($data['limit'] ?? 6)
+            limit: (int)($data['limit'] ?? 6),
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

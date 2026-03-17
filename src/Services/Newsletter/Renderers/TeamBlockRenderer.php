@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -18,28 +20,32 @@ class TeamBlockRenderer implements EmailBlockRenderer
         return $type === $this->type;
     }
 
-    public function render(BaseBlockData $blockData, NewsletterRenderContext $newsletterRenderContext): RenderedBlock
+    public function render(BaseBlockData $blockData, NewsletterRenderContext $context): RenderedBlock
     {
         if (!$blockData instanceof TeamBlockData) {
             return RenderedBlock::skipped();
         }
 
+        $baseStyle = 'margin: 30px 0;';
+        $wrapperStyle = $blockData->style->mergeIntoCss($baseStyle);
+
         $html = [];
-        $html[] = '<div style="margin: 30px 0;">';
+        $html[] = "<div style=\"{$wrapperStyle}\">";
 
         if ($blockData->title) {
-            $html[] = '<h3 style="color: #333; margin: 0 0 10px 0; font-size: 24px; text-align: center;">' . Str::sanitize($blockData->title) . '</h3>';
+            $baseTitleStyle = 'color: #333; margin: 0 0 10px 0; font-size: 24px; text-align: center;';
+            $titleStyle = $blockData->style->mergeIntoCss($baseTitleStyle);
+            $html[] = "<h3 style=\"{$titleStyle}\">" . Str::sanitize($blockData->title) . '</h3>';
         }
-
         if ($blockData->subtitle) {
             $html[] = '<p style="color: #666; margin: 0 0 30px 0; font-size: 16px; text-align: center;">' . Str::sanitize($blockData->subtitle) . '</p>';
         }
 
         $html[] = '<table style="width: 100%;"><tr>';
 
-        $memberCount = count($blockData->members);
-        $columns = min($memberCount, 3);
-        $cellWidth = floor(100 / $columns);
+        $count = count($blockData->members);
+        $columns = min($count, 3);
+        $cellWidth = $columns > 0 ? floor(100 / $columns) : 100;
 
         foreach ($blockData->members as $index => $member) {
             if ($index > 0 && $index % $columns === 0) {
@@ -59,7 +65,10 @@ class TeamBlockRenderer implements EmailBlockRenderer
             }
 
             if (!empty($member['bio'])) {
-                $html[] = '<p style="margin: 0 0 15px 0; font-size: 14px; color: #666; line-height: 1.5;">' . Str::sanitize(substr($member['bio'], 0, 100)) . '...</p>';
+                $baseBioStyle = 'margin: 0 0 15px 0; font-size: 14px; color: #666; line-height: 1.5;';
+                $bioStyle = $blockData->style->mergeIntoCss($baseBioStyle);
+                $truncated = mb_strlen($member['bio']) > 100 ? mb_substr($member['bio'], 0, 100) . '…' : $member['bio'];
+                $html[] = "<p style=\"{$bioStyle}\">" . Str::sanitize($truncated) . '</p>';
             }
 
             if (!empty($member['email']) || !empty($member['phone'])) {
@@ -76,8 +85,7 @@ class TeamBlockRenderer implements EmailBlockRenderer
             $html[] = '</td>';
         }
 
-        $html[] = '</tr></table>';
-        $html[] = '</div>';
+        $html[] = '</tr></table></div>';
 
         return RenderedBlock::rendered(implode("\n", $html));
     }

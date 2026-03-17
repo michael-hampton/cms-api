@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\Renderers;
 
 use App\Framework\Support\Str;
@@ -11,15 +13,15 @@ use App\Services\Newsletter\DTOs\RenderedBlock;
 
 class HeadingBlockRenderer implements EmailBlockRenderer
 {
-    public $type = 'heading';
     private const SIZES = [
         1 => '32px',
         2 => '28px',
         3 => '24px',
         4 => '20px',
         5 => '18px',
-        6 => '16px'
+        6 => '16px',
     ];
+    public $type = 'heading';
 
     public function supports(string $type): bool
     {
@@ -32,20 +34,32 @@ class HeadingBlockRenderer implements EmailBlockRenderer
             return RenderedBlock::skipped();
         }
 
-        $size = self::SIZES[$blockData->level] ?? '24px';
+        $defaultSize = self::SIZES[$blockData->level] ?? '24px';
         $level = $blockData->level;
 
-        $html = [];
-        $html[] = "<h{$level} style=\"color: #333; font-size: {$size}; margin: 20px 0 10px 0; font-weight: bold;\">";
-        $html[] = Str::sanitize($blockData->text);
-        $html[] = "</h{$level}>";
+        // Start from renderer defaults, then merge block-level style overrides.
+        $baseHeadingStyle = "color: #333; font-size: {$defaultSize}; margin: 20px 0 10px 0; font-weight: bold;";
+        $headingStyle = $blockData->style->mergeIntoCss($baseHeadingStyle);
+
+        $html = "<h{$level} style=\"{$headingStyle}\">" . Str::sanitize($blockData->text) . "</h{$level}>\n";
 
         if ($blockData->subtitle) {
-            $html[] = '<p style="color: #666; font-size: 16px; margin: 0 0 20px 0;">';
-            $html[] = Str::sanitize($blockData->subtitle);
-            $html[] = '</p>';
+            $baseSubStyle = 'color: #666; font-size: 16px; margin: 0 0 20px 0;';
+            $subStyle = $blockData->style->mergeIntoCss($baseSubStyle);
+            $html .= "<p style=\"{$subStyle}\">" . Str::sanitize($blockData->subtitle) . "</p>\n";
         }
 
-        return RenderedBlock::rendered(implode("\n", $html));
+        // If padding or background colour is set, wrap the heading group.
+        if ($blockData->style->padding !== null || $blockData->style->backgroundColor !== null) {
+            $wrapperCss = $blockData->style->toWrapperCss();
+            // Strip font-size and color from the wrapper to avoid double-applying.
+            $wrapperOnly = preg_replace('/font-size:[^;]+;?/', '', $wrapperCss);
+            $wrapperOnly = preg_replace('/color:[^;]+;?/', '', $wrapperOnly ?? '');
+            if (trim($wrapperOnly ?? '', ';') !== '') {
+                $html = "<div style=\"{$wrapperOnly}\">{$html}</div>";
+            }
+        }
+
+        return RenderedBlock::rendered($html);
     }
 }

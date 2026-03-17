@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Console;
 
 use App\Framework\Console\Command;
-use App\Framework\Support\Logger;
+use App\Framework\Console\ReportsCommandResult;
 use App\Repositories\Subscriptions\SubscriptionPricingChangeRepository;
 use App\Services\Subscriptions\SubscriptionPricingChangeService;
 
@@ -16,8 +16,11 @@ use App\Services\Subscriptions\SubscriptionPricingChangeService;
  */
 class ApplyDuePricingChangesCommand extends Command
 {
+    use ReportsCommandResult;
+
     const SUCCESS = 1;
     const FAILURE = 0;
+
     protected $signature = 'subscriptions:apply-price-changes';
     public $description = 'Applies subscription pricing changes that have passed their effective date.';
 
@@ -30,6 +33,7 @@ class ApplyDuePricingChangesCommand extends Command
 
     public function handle(): int
     {
+        $result = $this->createResult('subscriptions:apply-price-changes');
         $changes = $this->repository->findDueToApply();
 
         if (empty($changes)) {
@@ -37,27 +41,28 @@ class ApplyDuePricingChangesCommand extends Command
             return self::SUCCESS;
         }
 
-        $applied = 0;
-        $failed = 0;
-
         foreach ($changes as $change) {
             try {
                 $this->service->apply($change);
-                $applied++;
-                $this->info("Applied pricing change #{$change->id} (plan #{$change->plan_id}: {$change->currency} {$change->old_price} → {$change->new_price})");
+
+                $result->incrementSucceeded();
+                $result->addMessage(
+                    "Applied change #{$change->id} (plan #{$change->plan_id}: "
+                    . "{$change->currency} {$change->old_price} → {$change->new_price})"
+                );
+
             } catch (\Throwable $e) {
-                $failed++;
-                Logger::error('ApplyDuePricingChangesCommand: failed to apply pricing change', [
-                    'pricing_change_id' => $change->id,
-                    'plan_id' => $change->plan_id,
-                    'error' => $e->getMessage(),
-                ]);
-                $this->error("Failed to apply pricing change #{$change->id}: {$e->getMessage()}");
+                $this->reportFailure(
+                    result: $result,
+                    message: "Failed to apply pricing change #{$change->id}: {$e->getMessage()}",
+                    context: ['pricing_change_id' => $change->id, 'plan_id' => $change->plan_id],
+                    throwable: $e,
+                );
             }
         }
 
-        $this->info("Done. Applied: {$applied}, Failed: {$failed}.");
+        $this->reportResult($result);
 
-        return $failed > 0 ? self::FAILURE : self::SUCCESS;
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

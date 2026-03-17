@@ -14,10 +14,12 @@ use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\DTOs\RenderedBlock;
 use App\Services\Newsletter\Services\RewardTrackingService;
 use App\Services\Newsletter\Services\TrackingUrlBuilder;
+use Exception;
 
 class RewardBlockRenderer implements EmailBlockRenderer
 {
     public $type = 'reward';
+
     public function __construct(
         private readonly RewardsRepository        $rewardsRepository,
         private readonly RewardVisibilityResolver $eligibilityService,
@@ -79,7 +81,7 @@ class RewardBlockRenderer implements EmailBlockRenderer
             $html = $this->renderHtml($reward, $eligibility, $newsletterRenderContext);
             return RenderedBlock::rendered($html);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Failed to render reward block', [
                 'error' => $e->getMessage(),
                 'reward_id' => $blockData->rewardId

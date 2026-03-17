@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class EventBlockData extends BaseBlockData
@@ -12,14 +14,14 @@ class EventBlockData extends BaseBlockData
         public readonly ?string $ticketUrl,
         public readonly float   $ticketPrice,
         public readonly string  $currency,
-        public readonly ?array  $image
+        public readonly ?array $image,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             title: $data['title'] ?? '',
             description: $data['description'] ?? '',
             formattedDate: $data['formatted_start_datetime'] ?? '',
@@ -27,7 +29,11 @@ class EventBlockData extends BaseBlockData
             ticketUrl: $data['ticketUrl'] ?? null,
             ticketPrice: (float)($data['ticketPrice'] ?? 0),
             currency: $data['currency'] ?? '£',
-            image: $data['image'] ?? null
+            image: $data['image'] ?? null,
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

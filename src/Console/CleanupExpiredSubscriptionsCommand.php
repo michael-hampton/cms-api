@@ -2,11 +2,21 @@
 
 namespace App\Console;
 
+use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
-class CleanupExpiredSubscriptionsCommand
+class CleanupExpiredSubscriptionsCommand extends Command
 {
+    use ReportsCommandResult;
+
+    const SUCCESS = 1;
+    const FAILURE = 0;
+
+    protected $signature = 'subscriptions:cleanup-expired';
+    public $description = 'Updates status of active subscriptions that have reached their end date.';
+
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly Database               $database
@@ -14,30 +24,40 @@ class CleanupExpiredSubscriptionsCommand
     {
     }
 
-    public function handle(): void
+    public function handle(): int
     {
-        $this->database->transaction(function () {
-            // Find all subscriptions that should be expired
-            $expiredSubscriptions = $this->subscriptionRepository
-                ->query()
-                ->where('status', 'active')
-                ->whereNotNull('end_date')
-                ->where('end_date', '<', (new \DateTime())->format('Y-m-d H:i:s'))
-                ->get();
+        $result = $this->createResult('subscriptions:cleanup-expired');
 
-            $count = 0;
-            foreach ($expiredSubscriptions as $subscription) {
-                $this->subscriptionRepository->update($subscription->id, [
-                    'status' => 'expired',
-                    'auto_renew' => false
-                ]);
+        $expiredSubscriptions = $this->subscriptionRepository
+            ->query()
+            ->where('status', 'active')
+            ->whereNotNull('end_date')
+            ->where('end_date', '<', (new \DateTime())->format('Y-m-d H:i:s'))
+            ->get();
 
-                // Close the subscription window
-                $subscription->closeWindow();
-                $count++;
+        foreach ($expiredSubscriptions as $subscription) {
+            try {
+                $this->database->transaction(function () use ($subscription) {
+                    $this->subscriptionRepository->update($subscription->id, [
+                        'status' => 'expired',
+                        'auto_renew' => false
+                    ]);
+                    $subscription->closeWindow();
+                });
+
+                $result->incrementSucceeded();
+                $result->addMessage("Expired subscription #{$subscription->id}");
+            } catch (\Throwable $e) {
+                $this->reportFailure(
+                    result: $result,
+                    message: "Failed to expire subscription #{$subscription->id}: {$e->getMessage()}",
+                    context: ['subscription_id' => $subscription->id],
+                    throwable: $e
+                );
             }
+        }
 
-            echo "Updated {$count} expired subscriptions\n";
-        });
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }

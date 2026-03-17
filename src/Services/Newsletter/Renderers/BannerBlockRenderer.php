@@ -237,40 +237,6 @@ HTML;
     // Content renderers (unchanged)
     // -------------------------------------------------------------------------
 
-    private function renderPromoBanner(BannerBlockData $blockData): RenderedBlock
-    {
-        $html = [];
-        $html[] = "<div style=\"background-color: {$blockData->backgroundColor}; color: {$blockData->textColor}; padding: 25px; border-radius: 8px; margin: 20px 0; position: relative;\">";
-
-        if ($blockData->dismissible) {
-            $html[] = '<div style="position: absolute; top: 10px; right: 10px; color: ' . $blockData->textColor . '; cursor: pointer; font-size: 20px; line-height: 1;">×</div>';
-        }
-
-        if (!empty($blockData->image['src'])) {
-            $html[] = sprintf(
-                '<img src="%s" alt="%s" style="width:100%%;height:auto;display:block;margin-bottom:15px;border-radius:4px;">',
-                Str::sanitize($blockData->image['src']),
-                Str::sanitize($blockData->title)
-            );
-        }
-
-        $html[] = "<h3 style=\"color: {$blockData->textColor}; margin: 0 0 10px 0; font-size: 24px;\">" . Str::sanitize($blockData->title) . "</h3>";
-
-        if ($blockData->subtitle) {
-            $html[] = "<p style=\"color: {$blockData->textColor}; margin: 0 0 15px 0; font-size: 16px;\">" . Str::sanitize($blockData->subtitle) . "</p>";
-        }
-
-        if ($blockData->ctaText && $blockData->ctaUrl) {
-            $html[] = '<a href="' . Str::sanitize($blockData->ctaUrl) . '" style="display: inline-block; padding: 10px 20px; background-color: white; color: ' . $blockData->backgroundColor . '; text-decoration: none; border-radius: 4px; font-weight: bold;">';
-            $html[] = Str::sanitize($blockData->ctaText);
-            $html[] = '</a>';
-        }
-
-        $html[] = '</div>';
-
-        return RenderedBlock::rendered(implode("\n", $html));
-    }
-
     private function renderReviewBanner(BannerBlockData $blockData): RenderedBlock
     {
         $html = [];
@@ -342,6 +308,40 @@ HTML;
             $html[] = Str::sanitize($blockData->ctaText);
             $html[] = '</a>';
             $html[] = '</div>';
+        }
+
+        $html[] = '</div>';
+
+        return RenderedBlock::rendered(implode("\n", $html));
+    }
+
+    private function renderPromoBanner(BannerBlockData $blockData): RenderedBlock
+    {
+        $html = [];
+        $html[] = "<div style=\"background-color: {$blockData->backgroundColor}; color: {$blockData->textColor}; padding: 25px; border-radius: 8px; margin: 20px 0; position: relative;\">";
+
+        if ($blockData->dismissible) {
+            $html[] = '<div style="position: absolute; top: 10px; right: 10px; color: ' . $blockData->textColor . '; cursor: pointer; font-size: 20px; line-height: 1;">×</div>';
+        }
+
+        if (!empty($blockData->image['src'])) {
+            $html[] = sprintf(
+                '<img src="%s" alt="%s" style="width:100%%;height:auto;display:block;margin-bottom:15px;border-radius:4px;">',
+                Str::sanitize($blockData->image['src']),
+                Str::sanitize($blockData->title)
+            );
+        }
+
+        $html[] = "<h3 style=\"color: {$blockData->textColor}; margin: 0 0 10px 0; font-size: 24px;\">" . Str::sanitize($blockData->title) . "</h3>";
+
+        if ($blockData->subtitle) {
+            $html[] = "<p style=\"color: {$blockData->textColor}; margin: 0 0 15px 0; font-size: 16px;\">" . Str::sanitize($blockData->subtitle) . "</p>";
+        }
+
+        if ($blockData->ctaText && $blockData->ctaUrl) {
+            $html[] = '<a href="' . Str::sanitize($blockData->ctaUrl) . '" style="display: inline-block; padding: 10px 20px; background-color: white; color: ' . $blockData->backgroundColor . '; text-decoration: none; border-radius: 4px; font-weight: bold;">';
+            $html[] = Str::sanitize($blockData->ctaText);
+            $html[] = '</a>';
         }
 
         $html[] = '</div>';

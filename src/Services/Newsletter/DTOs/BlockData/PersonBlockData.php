@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Newsletter\DTOs\BlockData;
 
 class PersonBlockData extends BaseBlockData
@@ -10,20 +12,24 @@ class PersonBlockData extends BaseBlockData
         public readonly ?string $bio,
         public readonly ?string $email,
         public readonly ?string $phone,
-        public readonly ?array  $image
+        public readonly ?array $image,
     )
     {
     }
 
-    public static function fromArray(array $data): self
+    public static function fromArray(array $data): static
     {
-        return new self(
+        $instance = new static(
             name: $data['name'] ?? '',
             role: $data['role'] ?? null,
             bio: $data['bio'] ?? null,
             email: $data['email'] ?? null,
             phone: $data['phone'] ?? null,
-            image: $data['image'] ?? null
+            image: $data['image'] ?? null,
         );
+
+        $instance->resolveStyle($data);
+
+        return $instance;
     }
 }

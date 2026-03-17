@@ -2,27 +2,46 @@
 
 namespace App\Console;
 
+use App\Framework\Console\Command;
+use App\Framework\Console\ReportsCommandResult;
 use App\Services\Offers\PriceAlertService;
 
-class CheckPriceAlerts
+class CheckPriceAlerts extends Command
 {
-    private PriceAlertService $priceAlertService;
+    use ReportsCommandResult;
 
-    public function __construct()
+    const SUCCESS = 1;
+    const FAILURE = 0;
+
+    protected $signature = 'offers:check-price-alerts';
+    public $description = 'Checks and triggers price alerts for users.';
+
+    public function __construct(
+        private readonly PriceAlertService $priceAlertService
+    )
     {
-        $this->priceAlertService = new PriceAlertService();
     }
 
-    public function handle(): void
+    public function handle(): int
     {
-        echo "Checking price alerts...\n";
+        $result = $this->createResult('offers:check-price-alerts');
 
-        $triggeredCount = $this->priceAlertService->checkAlerts();
+        try {
+            $triggeredCount = $this->priceAlertService->checkAlerts();
+            $stats = $this->priceAlertService->getAlertStats();
 
-        echo "Triggered {$triggeredCount} price alerts\n";
+            $result->incrementSucceeded();
+            $result->addMessage("Triggered {$triggeredCount} price alerts.");
+            $result->addMessage("Stats - Active: {$stats['active_alerts']}, Pending Notification: {$stats['triggered_alerts']}");
+        } catch (\Throwable $e) {
+            $this->reportFailure(
+                result: $result,
+                message: "Failed to process price alerts: {$e->getMessage()}",
+                throwable: $e
+            );
+        }
 
-        $stats = $this->priceAlertService->getAlertStats();
-        echo "Active alerts: {$stats['active_alerts']}\n";
-        echo "Triggered (not notified): {$stats['triggered_alerts']}\n";
+        $this->reportResult($result);
+        return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 }
