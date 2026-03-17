@@ -57,6 +57,25 @@ class ImageBlockRenderer implements EmailBlockRenderer
             ? '<a href="' . Str::sanitize($blockData->linkUrl) . '"' . $linkAttrs . '>' . $imgTag . '</a>'
             : $imgTag;
 
+        // Endorsements
+        if (!empty($blockData->endorsements)) {
+            $html[] = '<div style="position: relative; margin-top: -30px;">';
+            foreach ($blockData->endorsements as $position => $endorsement) {
+                $positionStyle = match ($position) {
+                    'top-left' => 'top: 10px; left: 10px;',
+                    'top-right' => 'top: 10px; right: 10px;',
+                    'bottom-left' => 'bottom: 10px; left: 10px;',
+                    'bottom-right' => 'bottom: 10px; right: 10px;',
+                    default => 'top: 10px; right: 10px;'
+                };
+
+                if (isset($endorsement['url'])) {
+                    $html[] = '<img src="' . Str::sanitize($endorsement['url']) . '" alt="' . Str::sanitize($endorsement['alt'] ?? 'Endorsement') . '" style="position: absolute; ' . $positionStyle . ' max-width: 100px; height: auto;">';
+                }
+            }
+            $html[] = '</div>';
+        }
+
         if ($blockData->caption) {
             $html[] = '<p style="color: #666; font-size: 14px; font-style: italic; margin: 10px 0 0 0; text-align: center;">' . Str::sanitize($blockData->caption) . '</p>';
         }

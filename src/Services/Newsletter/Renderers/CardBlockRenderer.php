@@ -27,13 +27,46 @@ class CardBlockRenderer implements EmailBlockRenderer
         $titleStyle = $blockData->style->mergeIntoCss($baseTitleStyle);
         $html = [];
         $html[] = "<div style=\"{$wrapperStyle}\">";
-        if ($blockData->image && isset($blockData->image['src'])) {
-            $html[] = '<div style="position:relative;">';
-            if ($blockData->linkUrl) $html[] = '<a href="' . Str::sanitize($blockData->linkUrl) . '">';
-            $html[] = '<img src="' . Str::sanitize($blockData->image['src']) . '" alt="' . Str::sanitize($blockData->title) . '" style="width:100%;height:auto;border-radius:4px;margin-bottom:15px;">';
-            if ($blockData->linkUrl) $html[] = '</a>';
+
+        if ($blockData->sponsorDeclaration) {
+            $decl = $blockData->sponsorDeclaration;
+            $html[] = '<div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0;">';
+
+            if (isset($decl['sponsorLogo']['src'])) {
+                $html[] = '<img src="' . Str::sanitize($decl['sponsorLogo']['src']) . '" alt="' . Str::sanitize($decl['sponsorName'] ?? 'Sponsor') . '" style="max-width: 100px; height: auto; margin-bottom: 5px;">';
+            }
+
+            if (!empty($decl['sponsoredText'])) {
+                $html[] = '<div style="color: #666; font-size: 12px;">' . Str::sanitize($decl['sponsoredText']) . '</div>';
+            }
+
+            if (!empty($decl['sponsorName'])) {
+                $html[] = '<div style="color: #333; font-size: 14px; font-weight: bold;">' . Str::sanitize($decl['sponsorName']) . '</div>';
+            }
+
             $html[] = '</div>';
         }
+
+        if ($blockData->image && isset($blockData->image['src'])) {
+            $html[] = '<div style="position: relative;">';
+
+            if ($blockData->linkUrl) {
+                $html[] = '<a href="' . Str::sanitize($blockData->linkUrl) . '">';
+            }
+
+            $html[] = '<img src="' . Str::sanitize($blockData->image['src']) . '" alt="' . Str::sanitize($blockData->title) . '" style="width: 100%; height: auto; border-radius: 4px; margin-bottom: 15px;">';
+
+            if ($blockData->endorsement && isset($blockData->endorsement['src'])) {
+                $html[] = '<img src="' . Str::sanitize($blockData->endorsement['src']) . '" alt="Endorsement" style="position: absolute; top: 10px; right: 10px; max-width: 80px; height: auto;">';
+            }
+
+            if ($blockData->linkUrl) {
+                $html[] = '</a>';
+            }
+
+            $html[] = '</div>';
+        }
+
         $html[] = "<h3 style=\"{$titleStyle}\">" . Str::sanitize($blockData->title) . '</h3>';
         if ($blockData->description) {
             $baseDescStyle = 'margin: 0 0 15px 0; font-size: 14px; color: #666; line-height: 1.6;';
