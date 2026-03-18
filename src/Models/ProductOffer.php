@@ -100,7 +100,7 @@ class ProductOffer extends Model implements BoostableInterface
 
     public function getDiscountPercentageAttribute(): int
     {
-        if (!$this->product || $this->product->price == 0) {
+        if (!$this->product || $this->original_price == 0) {
             return 0;
         }
 

@@ -41,15 +41,22 @@ abstract class JsonResource
 
         if (is_array($this->resource) && array_key_exists($relationship, $this->resource)) {
             $relation = $this->resource[$relationship];
-        }
-
-        if (is_object($this->resource) && $this->resource->{$relationship}) {
-            $relation = $this->resource->{$relationship};
+        } elseif (is_object($this->resource)) {
+            try {
+                $val = $this->resource->{$relationship};
+                if ($val !== null) {
+                    $relation = $val;
+                }
+            } catch (\Throwable $e) {
+                // relation not accessible
+            }
         }
 
         if ($relation === null) {
             return $default;
         }
+
+        $relation = is_array($relation) ? collect($relation) : $relation;
 
         if (is_callable($value)) {
             return $value($relation);

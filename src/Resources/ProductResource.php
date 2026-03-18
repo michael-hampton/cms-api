@@ -60,6 +60,7 @@ class ProductResource extends JsonResource
                 ];
             }),
             'images' => $this->whenLoaded('images', function ($images) {
+                // $images = is_array($images) ? collect($images) : $images;
                 return $images->map(fn($image) => [
                     'id' => $image['id'],
                     'product_id' => $image['product_id'],
