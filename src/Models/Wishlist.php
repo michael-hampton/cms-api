@@ -12,7 +12,8 @@ class Wishlist extends Model
         'product_id',
         'site_id',
         'item_type',
-        'item_id'
+        'item_id',
+        'wishlistable_type'
     ];
 
     protected $casts = [

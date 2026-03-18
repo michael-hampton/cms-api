@@ -18,7 +18,8 @@ class ProductOffer extends Model implements BoostableInterface
         'product_id',
         'merchant_id',
         'sale_price',
-        'start_date', 'status',
+        'start_date',
+        'status',
         'rejection_reason',
         'published_at',
         'published_by',
@@ -103,7 +104,7 @@ class ProductOffer extends Model implements BoostableInterface
             return 0;
         }
 
-        return (int)round((($this->product->price - $this->sale_price) / $this->product->price) * 100);
+        return (int)round((($this->original_price - $this->sale_price) / $this->original_price) * 100);
     }
 
     public function scopePublished(QueryBuilder $query): QueryBuilder

@@ -161,4 +161,9 @@ class Date extends \DateTime
 
         return 'just now';
     }
+
+    public function copy(): static
+    {
+        return clone $this;
+    }
 }

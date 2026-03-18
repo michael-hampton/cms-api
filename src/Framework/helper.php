@@ -45,6 +45,14 @@ if (!function_exists('dd')) {
     }
 }
 
+if (!function_exists('dump')) {
+    function dump(mixed $value): ?string
+    {
+        var_dump($value);
+        die;
+    }
+}
+
 if (!function_exists('request')) {
     function request(): Request
     {
