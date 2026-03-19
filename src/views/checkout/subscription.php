@@ -395,10 +395,29 @@
                         </div>
                     </div>
 
-                    <?php if ($plan->trial_days > 0): ?>
-                        <div style="background: #d1fae5; color: #065f46; padding: 1rem;
-                                    border-radius: 0.5rem; margin-bottom: 1rem; text-align: center;">
-                            🎉 <?= $plan->trial_days ?> Day Free Trial
+                    <?php if ($plan->hasTrial()): ?>
+                        <div style="
+                            display: flex;
+                            align-items: flex-start;
+                            gap: .875rem;
+                            background: #f0fdf4;
+                            border: 1.5px solid #6ee7b7;
+                            border-radius: .625rem;
+                            padding: 1rem 1.25rem;
+                            margin-bottom: 1.25rem;
+                        " role="note" aria-label="Free trial information">
+                            <span style="font-size: 1.75rem; line-height: 1; flex-shrink: 0; margin-top: .1rem;"
+                                  aria-hidden="true">🎁</span>
+                            <div>
+                                <div style="font-weight: 700; font-size: 1rem; color: #065f46;">
+                                    <?= $plan->trial_days ?>-day free trial included
+                                </div>
+                                <div style="font-size: .875rem; color: #047857; margin-top: .25rem; line-height: 1.6;">
+                                    You won't be charged until
+                                    <strong><?= (new DateTimeImmutable())->modify("+{$plan->trial_days} days")->format('F j, Y') ?></strong>.
+                                    Cancel any time during the trial period at no cost.
+                                </div>
+                            </div>
                         </div>
                     <?php endif; ?>
 
@@ -412,7 +431,11 @@
                     <?php endif; ?>
 
                     <button type="button" class="btn btn-primary" id="subscribe-btn">
-                        Subscribe Now
+                        <?php if ($plan->hasTrial()): ?>
+                            Start <?= $plan->trial_days ?>-Day Free Trial
+                        <?php else: ?>
+                            Subscribe Now
+                        <?php endif; ?>
                     </button>
                 </div>
             </div>

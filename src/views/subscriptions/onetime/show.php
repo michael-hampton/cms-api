@@ -1,14 +1,10 @@
 <?php
 /*
  * View: subscriptions/onetime/show.php
- *
- * Variables injected by SubscriptionController::show():
- *   $plan            – SubscriptionPlan with pricingTiers, features
- *   $reviews         – array from ReviewService::getPlanReviews()
- *                      keys: reviews[], pagination, average_rating,
- *                            total_reviews, rating_breakdown, rating_percentages
- *   $canReview       – array: ['can_review' => bool, 'reason' => ?string]
- *   $isAuthenticated – bool
+ * Changes from original:
+ *   - Trial banner added inside the subscription card (after card-title)
+ *   - "Add to Cart" button label changes to "Start Free N-Day Trial" when plan has trial
+ *   - delivery tab / duration option blocks unchanged
  */
 
 foreach ($plan->pricingTiers as $tier) {
@@ -1030,6 +1026,37 @@ $pagination = $reviewData['pagination'] ?? [];
                 grid-template-columns: 1fr;
             }
         }
+
+        .trial-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: .875rem;
+            background: #f0fdf4;
+            border: 1.5px solid #6ee7b7;
+            border-radius: var(--radius);
+            padding: 1rem 1.1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .trial-banner__icon {
+            font-size: 1.5rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: .1rem;
+        }
+
+        .trial-banner__title {
+            font-weight: 700;
+            font-size: .95rem;
+            color: #065f46;
+        }
+
+        .trial-banner__body {
+            font-size: .8rem;
+            color: #047857;
+            margin-top: .2rem;
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -1106,6 +1133,25 @@ $pagination = $reviewData['pagination'] ?? [];
             <!-- Subscription card -->
             <div class="card">
                 <div class="card-title">Choose Your Subscription</div>
+
+                <!-- ── Trial banner ───────────────────────────────────── -->
+                <?php if ($plan->hasTrial()): ?>
+                    <div class="trial-banner" role="note" aria-label="Free trial information">
+                        <span class="trial-banner__icon" aria-hidden="true">🎁</span>
+                        <div>
+                            <div class="trial-banner__title">
+                                <?= $plan->trial_days ?>-day free trial
+                            </div>
+                            <div class="trial-banner__body">
+                                Try <?= htmlspecialchars($plan->name) ?> risk-free.
+                                No charge until
+                                <strong><?= (new DateTimeImmutable())->modify("+{$plan->trial_days} days")->format('F j, Y') ?></strong>.
+                                Cancel any time during the trial at no cost.
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+                <!-- ── End trial banner ───────────────────────────────── -->
 
                 <?php
                 $deliveryOptions = $plan->getDeliveryOptions();
@@ -1196,7 +1242,11 @@ $pagination = $reviewData['pagination'] ?? [];
                 </div>
 
                 <button class="btn-add-cart" onclick="addToCart(<?= $plan->id ?>)">
-                    Add to Cart
+                    <?php if ($plan->hasTrial()): ?>
+                        Start <?= $plan->trial_days ?>-Day Free Trial
+                    <?php else: ?>
+                        Add to Cart
+                    <?php endif; ?>
                 </button>
             </div>
             <!-- /subscription card -->

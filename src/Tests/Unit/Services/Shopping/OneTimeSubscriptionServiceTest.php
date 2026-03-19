@@ -453,5 +453,243 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->assertNull($result);
     }
 
+    /**
+     * A plan with trial_days > 0 must produce a TRIALING subscription.
+     * end_date must equal start_date + trial_days.
+     * trial_ends_at must be set to the same value.
+     * calculateEndDate must NOT be called (billing period end is irrelevant
+     * until the trial converts).
+     */
+    public function testCreateSubscriptionWithTrialSetsTRIALINGStatusAndTrialEndsAt(): void
+    {
+        $plan = $this->makePlan(trial_days: 30);
+
+        $this->planRepository->shouldReceive('find')->with(1)->once()->andReturn($plan);
+        $this->validator->shouldReceive('validatePlanForSubscription')->once();
+        $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
+
+        $startDate = new \DateTimeImmutable('2024-06-01 00:00:00');
+        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
+
+        // calculateEndDate must NOT be called for trialing subscriptions
+        $this->dateCalculator->shouldNotReceive('calculateEndDate');
+
+        $basePrice = Money::fromDecimal(99.99, 'USD');
+        $this->pricingCalculator->shouldReceive('validateDiscount')->once();
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')->andReturn($basePrice);
+
+        $expectedTrialEnd = '2024-07-01 00:00:00'; // start + 30 days
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('generateDownloadUrl')->once();
+
+        $this->subscriptionRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) use ($expectedTrialEnd) {
+                // Status must be TRIALING
+                if ($data['status'] !== SubscriptionStatus::TRIALING->value) {
+                    return false;
+                }
+                // end_date must be trial expiry, not billing period end
+                if ($data['end_date'] !== $expectedTrialEnd) {
+                    return false;
+                }
+                // trial_ends_at must be persisted and match end_date
+                if ($data['trial_ends_at'] !== $expectedTrialEnd) {
+                    return false;
+                }
+                return true;
+            }))
+            ->andReturn($subscription);
+
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $pricing = new SubscriptionPricing(9999, 0, 0, 0, 9999, SubscriptionType::DIGITAL->value);
+
+        $result = $this->service->createOneTimeSubscription(
+            memberId: 1,
+            planId: 1,
+            deliveryType: SubscriptionType::DIGITAL->value,
+            siteId: 1,
+            pricing: $pricing,
+        );
+
+        $this->assertInstanceOf(Subscription::class, $result);
+    }
+
+    /**
+     * A plan without trial_days uses the caller-supplied status (PENDING)
+     * and delegates end_date to calculateEndDate.
+     * trial_ends_at must be null.
+     */
+    public function testCreateSubscriptionWithoutTrialUsesBillingPeriodEndAndNullTrialEndsAt(): void
+    {
+        $plan = $this->makePlan(trial_days: 0);
+
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->validator->shouldReceive('validatePlanForSubscription')->once();
+        $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
+
+        $startDate = new \DateTimeImmutable('2024-01-01');
+        $endDate = new \DateTimeImmutable('2025-01-01');
+        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
+        $this->dateCalculator->shouldReceive('calculateEndDate')
+            ->with($startDate, BillingPeriod::YEARLY)
+            ->once()
+            ->andReturn($endDate);
+
+        $basePrice = Money::fromDecimal(99.99, 'USD');
+        $this->pricingCalculator->shouldReceive('validateDiscount')->once();
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')->andReturn($basePrice);
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('generateDownloadUrl')->once();
+
+        $this->subscriptionRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(function ($data) {
+                // Status must be PENDING (caller default, no trial)
+                if ($data['status'] !== SubscriptionStatus::PENDING->value) {
+                    return false;
+                }
+                // trial_ends_at must not be set
+                if (!array_key_exists('trial_ends_at', $data) || $data['trial_ends_at'] !== null) {
+                    return false;
+                }
+                return true;
+            }))
+            ->andReturn($subscription);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $pricing = new SubscriptionPricing(9999, 0, 0, 0, 9999, SubscriptionType::DIGITAL->value);
+
+        $this->service->createOneTimeSubscription(
+            memberId: 1,
+            planId: 1,
+            deliveryType: SubscriptionType::DIGITAL->value,
+            siteId: 1,
+            status: SubscriptionStatus::PENDING,
+            pricing: $pricing,
+        );
+        $this->assertTrue(true);
+    }
+
+    /**
+     * TRIALING status takes precedence over a caller-supplied status.
+     * Even if the caller passes PENDING, the trial plan wins.
+     */
+    public function testTrialStatusOverridesCallerSuppliedStatus(): void
+    {
+        $plan = $this->makePlan(trial_days: 14);
+
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->validator->shouldReceive('validatePlanForSubscription')->once();
+        $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::MONTHLY);
+        $this->dateCalculator->shouldReceive('normalizeStartDate')
+            ->andReturn(new \DateTimeImmutable('2024-03-01'));
+        $this->dateCalculator->shouldNotReceive('calculateEndDate');
+
+        $this->pricingCalculator->shouldReceive('validateDiscount')->once();
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')
+            ->andReturn(Money::fromDecimal(9.99, 'USD'));
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->shouldReceive('generateDownloadUrl')->once();
+
+        $this->subscriptionRepository->shouldReceive('create')
+            ->once()
+            ->with(m::on(fn($d) => $d['status'] === SubscriptionStatus::TRIALING->value))
+            ->andReturn($subscription);
+
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+
+        $pricing = new SubscriptionPricing(999, 0, 0, 0, 999, SubscriptionType::DIGITAL->value);
+
+        // Caller supplies PENDING — trial plan must override to TRIALING
+        $this->service->createOneTimeSubscription(
+            memberId: 1,
+            planId: 1,
+            deliveryType: SubscriptionType::DIGITAL->value,
+            siteId: 1,
+            status: SubscriptionStatus::PENDING,
+            pricing: $pricing,
+        );
+    }
+
+    /**
+     * activateSubscription must reject a TRIALING subscription.
+     * Trial conversion is the job of TrialConversionService, not this method.
+     */
+    public function testActivateSubscriptionRejectsTrialingStatus(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 5;
+        $subscription->status = SubscriptionStatus::TRIALING->value;
+
+        $this->subscriptionRepository->shouldReceive('find')->with(5)->once()->andReturn($subscription);
+        $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot activate subscription with status: trialing');
+
+        $this->service->activateSubscription(5, 99);
+    }
+
+    /**
+     * getSubscriptionSummary returns trial metadata when the subscription
+     * is in TRIALING status.
+     */
+    public function testGetSubscriptionSummaryIncludesTrialFields(): void
+    {
+        $trialEndsAt = (new \DateTime('+20 days'));
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->price = 19.99;
+        $subscription->discount_amount = 0;
+        $subscription->delivery_type = SubscriptionType::DIGITAL->value;
+        $subscription->status = SubscriptionStatus::TRIALING->value;
+        $subscription->trial_ends_at = $trialEndsAt;
+        $subscription->download_expires_at = null;
+        $subscription->plan = null;
+
+        $subscription->shouldReceive('isTrialing')->andReturn(true);
+        $subscription->shouldReceive('getDaysRemainingInTrial')->andReturn(20);
+        $subscription->shouldReceive('getTrialEndsAt')->andReturn($trialEndsAt);
+        $subscription->shouldReceive('hasValidDownload')->andReturn(false);
+        $subscription->shouldReceive('toArray')->andReturn(['id' => 1]);
+
+        $orderRelation = m::mock();
+        $orderRelation->shouldReceive('last')->andReturn(null);
+        $subscription->shouldReceive('order')->andReturn($orderRelation);
+
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+
+        $result = $this->service->getSubscriptionSummary(1);
+
+        $this->assertNotNull($result);
+        $this->assertTrue($result['is_trialing']);
+        $this->assertEquals(20, $result['days_remaining_in_trial']);
+        $this->assertNotNull($result['trial_ends_at']);
+    }
+
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private function makePlan(int $trial_days = 0): SubscriptionPlan
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->name = 'Test Magazine';
+        $plan->price = 99.99;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'yearly';
+        $plan->trial_days = $trial_days;
+        $plan->shouldReceive('hasTrial')->andReturn($trial_days > 0);
+        return $plan;
+    }
 
 }

@@ -52,8 +52,7 @@ class CartController extends Controller
         private readonly CheckoutIdentityService            $identityService,
         private readonly CartPersistenceService             $cartPersistence,
         private GiftResolutionService           $giftResolutionService,
-        private readonly SubscriptionRepository $subscriptionRepository
-
+        private readonly SubscriptionRepository $subscriptionRepository,
     )
     {
         parent::__construct();
@@ -65,27 +64,32 @@ class CartController extends Controller
 
         $items = $this->cartService->getItems();
         $subtotal = collect($items)->sum('subtotal');
+
         $startOptions = $this->calculateStartOptions($items);
 
-        // ← CREATE VALUE OBJECT FROM CONFIG OR DEFAULTS
         $deliveryMethod = DeliveryMethodConfig::default();
 
-        // Enrich items with delivery estimates
         $items = array_map(function ($item) use ($deliveryMethod) {
-            $product = !empty($item['subscription_plan_id']) ?
-                $this->subscriptionPlanRepository->find($item['subscription_plan_id']) :
-                $this->productRepository->find($item['product_id']);
+            $product = !empty($item['subscription_plan_id'])
+                ? $this->subscriptionPlanRepository->find($item['subscription_plan_id'])
+                : $this->productRepository->find($item['product_id']);
 
             $fulfilment = $this->fulfilmentResolver->resolve($product);
-
             $estimate = $this->businessDayEstimator->estimate(
                 $fulfilment,
-                $deliveryMethod, // ← VALUE OBJECT PASSED HERE
+                $deliveryMethod,
                 new DateTimeImmutable()
             );
 
+            // Expose trial_days so the view can render the trial pill without
+            // making its own repository call.
+            $trialDays = ($product instanceof SubscriptionPlan && $product->hasTrial())
+                ? $product->trial_days
+                : null;
+
             return array_merge($item, [
-                'estimated_delivery' => $estimate->formattedRange()
+                'estimated_delivery' => $estimate->formattedRange(),
+                'trial_days' => $trialDays,
             ]);
         }, $items);
 
@@ -104,7 +108,7 @@ class CartController extends Controller
             'tax' => $tax->taxCents / 100,
             'tax_rate' => $tax->rate,
             'subtotal' => $subtotal,
-            'startOptions' => $startOptions
+            'startOptions' => $startOptions,
         ];
 
         return $this->view('cart/index', $cartData);
@@ -116,7 +120,6 @@ class CartController extends Controller
 
         $now = new DateTimeImmutable('first day of this month 00:00:00');
 
-// 2. Pre-calculate the allowed start dates once
         $allowedStartDates = [
             $now,
             $now->modify('first day of next month'),
@@ -141,7 +144,6 @@ class CartController extends Controller
                 },
             ], $allowedStartDates);
 
-            // Keying by planId here
             $carry[$planId] = [
                 'item' => $item,
                 'start_date_options' => $startDateOptions,
@@ -161,13 +163,11 @@ class CartController extends Controller
             null,
             MemberAuth::getMember()
         );
-
     }
 
     public function index()
     {
         $items = $this->cartService->getItems();
-
         $subtotal = collect($items)->sum('subtotal');
 
         $shipping = $this->cartService->requiresShipping()
@@ -184,7 +184,7 @@ class CartController extends Controller
             'shipping' => $shipping,
             'tax' => $tax->taxCents / 100,
             'tax_rate' => $tax->rate,
-            'subtotal' => $subtotal
+            'subtotal' => $subtotal,
         ]);
     }
 
@@ -194,8 +194,8 @@ class CartController extends Controller
         $planSlug = $request->query('plan_slug');
         $isRenewal = $request->query('renewal') === 'true';
 
-        $savedCards = MemberAuth::check() ?
-            $this->savedPaymentMethodService->getMemberPaymentMethods(MemberAuth::getMember())
+        $savedCards = MemberAuth::check()
+            ? $this->savedPaymentMethodService->getMemberPaymentMethods(MemberAuth::getMember())
             : [];
 
         if ($planId || $planSlug) {
@@ -205,7 +205,6 @@ class CartController extends Controller
             }
 
             if ($planId) {
-                // Handle renewal differently
                 if ($isRenewal) {
                     return $this->subscriptionCheckout($planId, true);
                 }
@@ -214,22 +213,27 @@ class CartController extends Controller
         }
 
         $items = $this->cartService->getItems();
-
         $deliveryMethod = DeliveryMethodConfig::default();
 
-        // Enrich items with delivery estimates
         $items = array_map(function ($item) use ($deliveryMethod) {
-            $product = !empty($item['subscription_plan_id']) ? $this->subscriptionPlanRepository->find($item['subscription_plan_id']) : $this->productRepository->find($item['product_id']);
-            $fulfilment = $this->fulfilmentResolver->resolve($product);
+            $product = !empty($item['subscription_plan_id'])
+                ? $this->subscriptionPlanRepository->find($item['subscription_plan_id'])
+                : $this->productRepository->find($item['product_id']);
 
+            $fulfilment = $this->fulfilmentResolver->resolve($product);
             $estimate = $this->businessDayEstimator->estimate(
                 $fulfilment,
-                $deliveryMethod, // ← VALUE OBJECT PASSED HERE
+                $deliveryMethod,
                 new DateTimeImmutable()
             );
 
+            $trialDays = ($product instanceof SubscriptionPlan && $product->hasTrial())
+                ? $product->trial_days
+                : null;
+
             return array_merge($item, [
-                'estimated_delivery' => $estimate->formattedRange()
+                'estimated_delivery' => $estimate->formattedRange(),
+                'trial_days' => $trialDays,
             ]);
         }, $items);
 
@@ -252,7 +256,7 @@ class CartController extends Controller
             'tax' => $tax->taxCents / 100,
             'tax_rate' => $tax->rate,
             'hasPreOrders' => $this->detectPreOrders($items),
-            'member' => MemberAuth::check() ? MemberAuth::getMember() : null
+            'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
         ];
 
         return $this->view('checkout/index', $cartData);
@@ -272,14 +276,12 @@ class CartController extends Controller
             return $this->redirect('/');
         }
 
-        // Check if already subscribed (skip for renewals)
         if (!$isRenewal && $this->subscriptionRepository->hasActiveSubscriptionToPlan($member->id, $planId)) {
             $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
             return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
         }
 
         $items = $this->cartService->getItems();
-
         $hasPlan = collect($items)->contains(fn($item) => $item['subscription_plan_id'] === $planId);
 
         if ($isRenewal && !$hasPlan) {
@@ -349,18 +351,13 @@ class CartController extends Controller
     {
         $data = $request->all();
         $siteId = SiteContext::getId();
-
-        // Check if member is authenticated
         $member = MemberAuth::getMember();
 
-        // If not authenticated and email provided, create anonymous member
         if (!$member && !empty($data['email'])) {
             $email = $data['email'];
 
             try {
                 $result = $this->identityService->createAnonymous($email, $siteId, $data);
-
-                // Temporarily authenticate for this checkout
                 $member = \App\Models\Member::find($result->userId);
                 MemberAuth::login($member);
             } catch (\RuntimeException $e) {
@@ -380,12 +377,11 @@ class CartController extends Controller
         $subscriptionItems = array_filter($items, fn($item) => !empty($item['subscription_plan_id']));
         $productItems = array_filter($items, fn($item) => empty($item['subscription_plan_id']));
 
-        // Check if this is a subscription checkout
         if (!empty($subscriptionItems)) {
             $result = $this->processSubscription($request);
 
             Session::forget('applied_voucher_code');
-            Session::forget('checkout_token'); // Clean up after successful checkout
+            Session::forget('checkout_token');
             Session::forget('pending_otp_email');
             $statusCode = $result['success'] ? 200 : 400;
             return $this->resourceResponse($result, $statusCode);
@@ -395,45 +391,37 @@ class CartController extends Controller
             return $this->errorResponse('No product items in cart', 400);
         }
 
-        // Check if this is a multi-merchant checkout
         if (!empty($data['multi_merchant']) && $data['multi_merchant'] === true) {
             $result = $this->checkoutService->processMultiMerchantCheckout($data, $siteId);
             $statusCode = $result['success'] ? 200 : 400;
 
             Session::forget('applied_voucher_code');
-            Session::forget('checkout_token'); // Clean up after successful checkout
+            Session::forget('checkout_token');
             Session::forget('pending_otp_email');
 
             return $this->resourceResponse($result, $statusCode);
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
+        $statusCode = $result['success'] ? 200 : 400;
 
         Session::forget('applied_voucher_code');
-        Session::forget('checkout_token'); // Clean up after successful checkout
+        Session::forget('checkout_token');
         Session::forget('pending_otp_email');
 
-        $statusCode = $result['success'] ? 200 : 400;
         return $this->resourceResponse($result, $statusCode);
     }
 
     private function processSubscription(Request $request): array
     {
         if (!MemberAuth::check()) {
-            return [
-                'success' => false,
-                'message' => 'Authentication required'
-            ];
+            return ['success' => false, 'message' => 'Authentication required'];
         }
 
         $data = $request->all();
-        $member = MemberAuth::member();
         $siteId = SiteContext::getId();
 
-        $result = $this->subscriptionCheckoutService->processCheckout(
-            $data,
-            $siteId
-        );
+        $result = $this->subscriptionCheckoutService->processCheckout($data, $siteId);
 
         Session::forget('applied_voucher_code');
 
@@ -505,7 +493,8 @@ class CartController extends Controller
             return $this->redirect('/');
         }
 
-        $order = !empty($checkoutId) ? $this->orderRepository->getOrdersByCheckoutId($checkoutId)?->first()
+        $order = !empty($checkoutId)
+            ? $this->orderRepository->getOrdersByCheckoutId($checkoutId)?->first()
             : $this->orderService->getOrderByNumber($orderNumber);
 
         if (!$order) {
@@ -524,7 +513,7 @@ class CartController extends Controller
             'shippingAddress' => $order->shipping_address,
             'paymentMethod' => $order->payment_method,
             'status' => $order->status,
-            'createdAt' => $order->created_at
+            'createdAt' => $order->created_at,
         ]);
     }
 
@@ -532,7 +521,6 @@ class CartController extends Controller
     {
         $planId = $request->input('plan_id');
         $deliveryType = $request->input('delivery_type');
-        $options = $request->input('options', []);
         $requestData = $request->all();
 
         $data = [
@@ -540,13 +528,13 @@ class CartController extends Controller
             'duration_months' => $requestData['duration_months'] ?? null,
             'issue_count' => $requestData['issues'] ?? null,
             'voucher_code' => $requestData['voucher_code'] ?? null,
-            'delivery_type' => $requestData['delivery_type']
+            'delivery_type' => $requestData['delivery_type'],
         ];
 
         if (!$planId || !$deliveryType) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => 'Plan ID and delivery type required'
+                'message' => 'Plan ID and delivery type required',
             ], 400);
         }
 
@@ -562,7 +550,6 @@ class CartController extends Controller
     public function addSubscriptionBundle(Request $request)
     {
         $bundleId = $request->input('bundle_id');
-
         $result = $this->cartService->addSubscriptionBundleToCart($bundleId);
 
         return $this->resourceResponse(array_merge($result, [
@@ -587,16 +574,13 @@ class CartController extends Controller
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Offer added to cart',
-                'cart_item' => $cartItem
+                'cart_item' => $cartItem,
             ], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * Add bundle to cart
-     */
     public function addBundle(Request $request): JsonResponse
     {
         try {
@@ -611,7 +595,7 @@ class CartController extends Controller
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'Bundle added to cart',
-                'cart_items' => $cartItems
+                'cart_items' => $cartItems,
             ], 201);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
@@ -630,18 +614,11 @@ class CartController extends Controller
             }
 
             return $this->jsonResponse(['success' => true]);
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * Verify email and initiate appropriate flow
-     *
-     * POST /api/{site}/checkout/verify-email
-     * Body: { "email": "user@example.com" }
-     */
     public function verifyEmail(Request $request)
     {
         $email = $request->input('email');
@@ -650,7 +627,6 @@ class CartController extends Controller
 
         Session::put('cart_items', $this->cartService->getItems());
 
-        // Validate email
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return $this->errorResponse('Valid email is required', 422);
         }
@@ -659,16 +635,7 @@ class CartController extends Controller
             $result = $this->identityService->resolveIdentity($email, $sessionId, $siteId);
 
             if ($result->requiresOTP()) {
-
-                // CRITICAL: Snapshot cart before OTP flow
-                // This prevents cart loss during OTP authentication
-                $checkoutToken = $this->cartPersistence->snapshotCartForOTP(
-                    $email,
-                    $sessionId,
-                    $siteId
-                );
-
-                // Store token and email in session for continuity
+                $checkoutToken = $this->cartPersistence->snapshotCartForOTP($email, $sessionId, $siteId);
                 $this->cartPersistence->setCheckoutToken($checkoutToken);
                 Session::put('pending_otp_email', $email);
             }
@@ -677,20 +644,13 @@ class CartController extends Controller
                 'success' => true,
                 'flow' => $result->requiresOTP() ? 'otp' : 'anonymous',
                 'message' => $result->message,
-                'expires_in' => $result->expiresIn
+                'expires_in' => $result->expiresIn,
             ]);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 429);
         }
     }
 
-    /**
-     * Check if there's a pending OTP verification
-     *
-     * GET /api/{site}/checkout/pending-otp
-     *
-     * Called when checkout page loads to detect interrupted OTP flow
-     */
     public function checkPendingOTP()
     {
         $pendingEmail = Session::get('pending_otp_email');
@@ -698,13 +658,9 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
 
         if (!$pendingEmail) {
-            return $this->jsonResponse([
-                'success' => true,
-                'has_pending' => false
-            ]);
+            return $this->jsonResponse(['success' => true, 'has_pending' => false]);
         }
 
-        // Check if there's an active (not expired, not verified) OTP
         $activeOTP = $this->OTPRepository->getActiveOTP($pendingEmail, $siteId, $sessionId);
 
         if ($activeOTP) {
@@ -718,25 +674,15 @@ class CartController extends Controller
                 'email' => $pendingEmail,
                 'expires_in' => $remainingSeconds,
                 'attempts_remaining' => 5 - $activeOTP->attempts,
-                'resends_remaining' => 5 - $activeOTP->resend_count
+                'resends_remaining' => 5 - $activeOTP->resend_count,
             ]);
         }
 
-        // No active OTP - clean up stale session data
         Session::forget('pending_otp_email');
 
-        return $this->jsonResponse([
-            'success' => true,
-            'has_pending' => false
-        ]);
+        return $this->jsonResponse(['success' => true, 'has_pending' => false]);
     }
 
-    /**
-     * Verify OTP code
-     *
-     * POST /api/{site}/checkout/verify-otp
-     * Body: { "email": "user@example.com", "otp": "123456" }
-     */
     public function verifyOTP(Request $request)
     {
         $email = $request->input('email');
@@ -744,15 +690,12 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
         $sessionId = Session::getId();
 
-        // Validate inputs
         if (!$email || !$otp) {
             return $this->errorResponse('Email and OTP are required', 422);
         }
 
         try {
             $result = $this->identityService->verifyOTP($email, $otp, $sessionId, $siteId);
-
-            // Authenticate member
             $member = \App\Models\Member::find($result->userId);
 
             if (!$member) {
@@ -761,11 +704,8 @@ class CartController extends Controller
 
             MemberAuth::login($member);
 
-            // CRITICAL: Restore cart after successful authentication
-            // This ensures cart items are not lost during OTP flow
             $cartRestored = $this->cartPersistence->restoreCartAfterAuth($email, $siteId);
 
-            // Clean up pending OTP session data
             Session::forget('pending_otp_email');
             Session::forget('checkout_token');
 
@@ -778,23 +718,13 @@ class CartController extends Controller
                     'email' => $member->email,
                     'first_name' => $member->first_name ?? '',
                     'last_name' => $member->last_name ?? '',
-                ]
+                ],
             ]);
         } catch (\RuntimeException $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], 400);
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
 
-    /**
-     * Cancel OTP flow
-     *
-     * POST /api/{site}/checkout/cancel-otp
-     *
-     * Allows member to cancel incomplete OTP and start fresh
-     */
     public function cancelOTP(Request $request)
     {
         $email = $request->input('email');
@@ -802,26 +732,15 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
 
         if ($email) {
-            // Invalidate OTPs for this email/session
             $this->OTPRepository->cancelOTP($sessionId, $email);
         }
 
-        // Clean up session
         Session::forget('pending_otp_email');
         Session::forget('checkout_token');
 
-        return $this->jsonResponse([
-            'success' => true,
-            'message' => 'OTP flow cancelled'
-        ]);
+        return $this->jsonResponse(['success' => true, 'message' => 'OTP flow cancelled']);
     }
 
-    /**
-     * Resend OTP
-     *
-     * POST /api/{site}/checkout/resend-otp
-     * Body: { "email": "user@example.com" }
-     */
     public function resendOTP(Request $request)
     {
         $email = $request->input('email');
@@ -836,27 +755,19 @@ class CartController extends Controller
             $result = $this->identityService->resendOTP($email, $sessionId, $siteId);
 
             if (!$result['success']) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => $result['message']
-                ], 429);
+                return $this->jsonResponse(['success' => false, 'message' => $result['message']], 429);
             }
 
             return $this->jsonResponse([
                 'success' => true,
                 'message' => 'New verification code sent',
-                'expires_in' => $result['expires_in'] ?? null
+                'expires_in' => $result['expires_in'] ?? null,
             ]);
         } catch (\RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    /**
-     * Get current checkout session status
-     *
-     * GET /api/{site}/checkout/status
-     */
     public function getStatus()
     {
         $member = MemberAuth::getMember();
@@ -864,13 +775,9 @@ class CartController extends Controller
         $siteId = SiteContext::getId();
         $pendingOTPEmail = Session::get('pending_otp_email');
 
-        // Check if there's a pending cart snapshot
         $pendingCartItems = 0;
         if ($member) {
-            $pendingCartItems = $this->cartPersistence->getSnapshotItemCount(
-                $member->email,
-                $siteId
-            );
+            $pendingCartItems = $this->cartPersistence->getSnapshotItemCount($member->email, $siteId);
         }
 
         return $this->jsonResponse([

@@ -50,6 +50,8 @@ class OneTimeSubscriptionService
                 'digital_only' => $plan->hasDigitalOption() && !$plan->hasPrintOption(),
                 'print_only' => $plan->hasPrintOption() && !$plan->hasDigitalOption(),
                 'both_options' => $plan->hasDigitalOption() && $plan->hasPrintOption(),
+                'has_trial' => $plan->hasTrial(),
+                'trial_days' => $plan->trial_days,
                 'pricing_tiers' => $plan->pricingTiers->map(function ($tier) {
                     return [
                         'id' => $tier->id,
@@ -66,7 +68,7 @@ class OneTimeSubscriptionService
                         'has_discount' => $tier->hasDiscount(),
                         'savings_text' => $tier->getSavingsText(),
                     ];
-                })->toArray()
+                })->toArray(),
             ];
         })->toArray();
     }
@@ -74,15 +76,14 @@ class OneTimeSubscriptionService
     public function createOneTimeSubscription(
         int                 $memberId,
         int                 $planId,
-        string $deliveryType,
+        string              $deliveryType,
         int                 $siteId,
         ?int                $voucherId = null,
         ?SubscriptionPricing $pricing = null,
         ?SubscriptionStatus $status = null,
-        ?string $selectedStartDate = null,
+        ?string             $selectedStartDate = null,
     ): Subscription
     {
-
         return $this->database->transaction(function () use (
             $memberId,
             $planId,
@@ -95,15 +96,38 @@ class OneTimeSubscriptionService
         ) {
             $plan = $this->planRepository->find($planId);
 
-            // Validate plan and delivery type
             $this->validator->validatePlanForSubscription($plan, $deliveryType);
             $billingPeriod = $this->validator->validateBillingPeriod($plan->billing_period);
 
-            // Calculate dates
             $startDate = $this->dateCalculator->normalizeStartDate($selectedStartDate);
-            $endDate = $this->dateCalculator->calculateEndDate($startDate, $billingPeriod);
 
-            // Calculate pricing
+            // ── Trial resolution ──────────────────────────────────────────────
+            // When the plan has a trial, the subscription begins in TRIALING
+            // status.  end_date is set to the trial expiry; trial_ends_at
+            // persists that same value so the conversion job has a stable
+            // source of truth even if the plan's trial_days changes later.
+            //
+            // For non-trial plans the caller-supplied $status is respected
+            // (e.g. PENDING from SubscriptionBatchFactory).
+            //
+            // NOTE: calculating end_date for non-trial plans via
+            // calculateEndDate() is correct only for recurring plans.  For
+            // one-time plans the end_date represents issue access expiry and
+            // is typically computed from the pricing tier.  This path is
+            // unchanged from the original implementation — it is the trial
+            // path that is new.
+            // ─────────────────────────────────────────────────────────────────
+
+            if ($plan->hasTrial()) {
+                $resolvedStatus = SubscriptionStatus::TRIALING;
+                $trialEndsAt = $startDate->modify("+{$plan->trial_days} days");
+                $endDate = $trialEndsAt; // full billing end set by conversion job after payment
+            } else {
+                $resolvedStatus = $status ?? SubscriptionStatus::PENDING;
+                $trialEndsAt = null;
+                $endDate = $this->dateCalculator->calculateEndDate($startDate, $billingPeriod);
+            }
+
             $basePrice = Money::fromCents($pricing->totalCents, $plan->currency);
             $discount = Money::fromCents($pricing->discountCents, $plan->currency);
 
@@ -115,9 +139,10 @@ class OneTimeSubscriptionService
                 'site_id' => $siteId,
                 'plan_id' => $planId,
                 'plan_name' => $plan->name,
-                'status' => ($status ?? SubscriptionStatus::PENDING)->value,
+                'status' => $resolvedStatus->value,
                 'start_date' => $startDate->format('Y-m-d H:i:s'),
                 'end_date' => $endDate->format('Y-m-d H:i:s'),
+                'trial_ends_at' => $trialEndsAt?->format('Y-m-d H:i:s'),
                 'price' => $finalPrice->toDecimal(),
                 'original_price' => $pricing->originalAmount ?: $plan->price,
                 'discount_amount' => $discount->toDecimal(),
@@ -129,7 +154,6 @@ class OneTimeSubscriptionService
 
             $subscription = $this->subscriptionRepository->create($subscriptionData);
 
-            // Generate download URL if digital
             if ($deliveryType === SubscriptionType::DIGITAL->value) {
                 $subscription->generateDownloadUrl('');
             }
@@ -147,7 +171,9 @@ class OneTimeSubscriptionService
                 throw new SubscriptionNotFoundException('Subscription not found');
             }
 
-            // Enforce state transition: only PENDING can become ACTIVE
+            // Enforce state transition: only PENDING can become ACTIVE via
+            // this method.  TRIALING subscriptions are activated by the
+            // TrialConversionService after the first real charge succeeds.
             if ($subscription->status !== SubscriptionStatus::PENDING->value) {
                 throw new \InvalidArgumentException(
                     "Cannot activate subscription with status: {$subscription->status}"
@@ -155,10 +181,9 @@ class OneTimeSubscriptionService
             }
 
             $this->subscriptionRepository->update($subscriptionId, [
-                'status' => SubscriptionStatus::ACTIVE->value
+                'status' => SubscriptionStatus::ACTIVE->value,
             ]);
 
-            // Link order to subscription
             $this->orderRepository->updateSubscriptionForOrder($orderId, $subscriptionId);
         });
     }
@@ -174,7 +199,6 @@ class OneTimeSubscriptionService
         $plan = $subscription->plan;
         $order = $subscription->order()->last();
 
-        // Use order data as source of truth for financials
         if ($order) {
             $subtotalCents = (int)round($subscription->price * 100);
             $discountCents = (int)round(($subscription->discount_amount ?? 0) * 100);
@@ -196,18 +220,16 @@ class OneTimeSubscriptionService
                 'is_estimate' => false,
             ];
         } else {
-            // Estimated calculation when no order exists
             $subtotalCents = (int)round($subscription->price * 100);
             $discountCents = (int)round(($subscription->discount_amount ?? 0) * 100);
 
             $shippingCents = 0;
             if ($subscription->delivery_type === SubscriptionType::PRINTED->value) {
-                $shippingCents = $subscription->price >= 100 ? 0 : 1000; // $10.00
+                $shippingCents = $subscription->price >= 100 ? 0 : 1000;
             }
 
             $taxableAmountCents = $subtotalCents - $discountCents + $shippingCents;
             $taxCents = (int)round($taxableAmountCents * 0.1);
-
             $totalCents = $subtotalCents - $discountCents + $shippingCents + $taxCents;
 
             $breakdown = [
@@ -232,6 +254,9 @@ class OneTimeSubscriptionService
             'can_download' => $subscription->hasValidDownload(),
             'download_expires_at' => $subscription->download_expires_at?->format('Y-m-d H:i:s'),
             'payment_breakdown' => $breakdown,
+            'trial_ends_at' => $subscription->getTrialEndsAt()?->format('Y-m-d H:i:s'),
+            'is_trialing' => $subscription->isTrialing(),
+            'days_remaining_in_trial' => $subscription->getDaysRemainingInTrial(),
         ];
     }
 

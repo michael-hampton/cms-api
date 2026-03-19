@@ -67,6 +67,8 @@ class AuthorService
                 $data['seniority_date'] = null;
             }
 
+            unset($data['total_published_articles'], $data['total_published_reviews']);
+
             return $this->authorRepository->create($data);
         });
     }

@@ -4,6 +4,7 @@ namespace App\Repositories\Billing;
 
 use App\Framework\Support\Collection;
 use App\Models\Order;
+use App\Models\Subscription;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
@@ -86,6 +87,25 @@ class OrderRepository extends Repository
             ->latest()
             ->limit($limit)
             ->get();
+    }
+
+    public function findLatestForSubscription(Subscription $subscription): ?Order
+    {
+        $order = Order::where('one_time_subscription_id', $subscription->id)
+            ->latest()
+            ->first();
+
+        if ($order) {
+            return $order;
+        }
+
+        if ($subscription->payment_intent_id) {
+            return Order::where('payment_intent_id', $subscription->payment_intent_id)
+                ->latest()
+                ->first();
+        }
+
+        return null;
     }
 
     protected function getModelClass(): string

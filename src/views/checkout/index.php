@@ -825,9 +825,11 @@
             </div>
         <?php endif; ?>
 
+        <?php if (!\App\Framework\Authorization\MemberAuth::check()): ?>
         <div class="login-prompt">
             <p>Already have an account? <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses</p>
         </div>
+        <?php endif; ?>
 
         <div class="checkout-layout">
             <div class="checkout-form">

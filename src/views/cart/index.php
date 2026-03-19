@@ -832,6 +832,26 @@
                                                 <?php if (isset($options['billing_period'])): ?>
                                                     • <?= htmlspecialchars($options['billing_period']) ?>
                                                 <?php endif; ?>
+
+                                                <?php if (!empty($item['trial_days'])): ?>
+                                                    <div style="
+                                                        display: inline-flex;
+                                                        align-items: center;
+                                                        gap: .35rem;
+                                                        background: #f0fdf4;
+                                                        border: 1px solid #6ee7b7;
+                                                        border-radius: 100px;
+                                                        padding: .2rem .75rem;
+                                                        font-size: .75rem;
+                                                        font-weight: 600;
+                                                        color: #065f46;
+                                                        margin-top: .4rem;
+                                                        line-height: 1.6;
+                                                    ">
+                                                        <span aria-hidden="true">🎁</span>
+                                                        <?= (int)$item['trial_days'] ?>-day free trial included
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="item-price">
                                                 <?php if ($isFreeGift): ?>
@@ -1097,6 +1117,26 @@
                                         <?php endif; ?>
 
                                         <div class="cs-item-meta">Qty: <?= (int)($item['quantity'] ?? 1) ?></div>
+
+                                        <?php if (!empty($item['trial_days'])): ?>
+                                            <div style="
+                                                display: inline-flex;
+                                                align-items: center;
+                                                gap: .35rem;
+                                                background: #f0fdf4;
+                                                border: 1px solid #6ee7b7;
+                                                border-radius: 100px;
+                                                padding: .2rem .75rem;
+                                                font-size: .75rem;
+                                                font-weight: 600;
+                                                color: #065f46;
+                                                margin-top: .4rem;
+                                                line-height: 1.6;
+                                            ">
+                                                <span aria-hidden="true">🎁</span>
+                                                <?= (int)$item['trial_days'] ?>-day free trial included
+                                            </div>
+                                        <?php endif; ?>
 
                                         <?php if (!empty($item['estimated_delivery'])): ?>
                                             <div class="cs-item-delivery">

@@ -11,18 +11,17 @@ use App\Framework\Database\QueryBuilder;
 class Subscription extends Model
 {
     public const ACTIVE_STATUSES = [SubscriptionStatus::ACTIVE->value, SubscriptionStatus::TRIALING->value, SubscriptionStatus::GRACE_PERIOD->value];
+
     protected static function boot()
     {
         parent::boot();
 
-        // Create window when paid subscription is created
         static::created(function ($subscription) {
             if ($subscription->type === 'paid') {
                 $subscription->createWindow();
             }
         });
 
-        // Update window when subscription status changes
         static::updated(function ($subscription) {
             if ($subscription->type === 'paid') {
                 $subscription->updateWindow();
@@ -39,6 +38,7 @@ class Subscription extends Model
         'status',
         'start_date',
         'end_date',
+        'trial_ends_at',       // ← added: persisted trial expiry, source of truth for conversion job
         'auto_renew',
         'price',
         'currency',
@@ -72,12 +72,13 @@ class Subscription extends Model
         'account_number',
         'is_linked',
         'territory_id',
-        'territory_override_flag'
+        'territory_override_flag',
     ];
 
     protected $casts = [
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'trial_ends_at' => 'datetime',   // ← added
         'auto_renew' => 'boolean',
         'price' => 'float',
         'next_billing_date' => 'datetime',
@@ -95,7 +96,7 @@ class Subscription extends Model
         'premium_access' => 'array',
         'access_starts_at' => 'datetime',
         'first_shipment_at' => 'datetime',
-        'is_linked' => 'boolean'
+        'is_linked' => 'boolean',
     ];
 
     public function member($relation = false)
@@ -105,28 +106,21 @@ class Subscription extends Model
 
     public function isActive(): bool
     {
-        // A subscription is only active if:
-        // 1. Status is 'active'
-        // 2. AND (no end_date OR end_date is in the future)
-        // 3. AND (no start_date OR start_date is in the past or today)
         if ($this->status !== SubscriptionStatus::ACTIVE->value) {
             return false;
         }
 
         $now = new \DateTime();
 
-        // Check if subscription has started
         if ($this->start_date && $this->start_date > $now) {
             return false;
         }
 
-        // Check if subscription has ended
         if ($this->end_date && $this->end_date < $now) {
             return false;
         }
 
         return true;
-
     }
 
     public function isCancelled(): bool
@@ -140,6 +134,79 @@ class Subscription extends Model
             ($this->end_date !== null && $this->end_date <= new \DateTime());
     }
 
+    // =========================================================================
+    // Trial
+    // =========================================================================
+
+    /**
+     * Whether this subscription is currently in a trial period.
+     *
+     * Uses the persisted trial_ends_at rather than recomputing from the plan,
+     * so the answer is stable even if the plan's trial_days changes later.
+     */
+    public function isTrialing(): bool
+    {
+        if ($this->status !== SubscriptionStatus::TRIALING->value) {
+            return false;
+        }
+
+        if (!$this->trial_ends_at) {
+            return false;
+        }
+
+        return $this->trial_ends_at > new \DateTime();
+    }
+
+    /**
+     * Returns the persisted trial end date, or null if the subscription has
+     * no trial.  Prefer this over the computed trialEndsAt() for any logic
+     * that runs after subscription creation.
+     */
+    public function getTrialEndsAt(): ?\DateTime
+    {
+        return $this->trial_ends_at
+            ? \DateTime::createFromInterface($this->trial_ends_at)
+            : null;
+    }
+
+    /**
+     * @deprecated Use getTrialEndsAt() — this computes from the plan relation
+     *             and breaks if the plan is later modified.
+     */
+    public function trialEndsAt(): ?\DateTime
+    {
+        if (!$this->plan || $this->plan->trial_days <= 0) {
+            return null;
+        }
+
+        return (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
+    }
+
+    public function isTrialExpired(): bool
+    {
+        if (!$this->trial_ends_at) {
+            return false;
+        }
+
+        return $this->trial_ends_at <= new \DateTime();
+    }
+
+    public function getDaysRemainingInTrial(): ?int
+    {
+        if (!$this->isTrialing()) {
+            return null;
+        }
+
+        $now = new \DateTime();
+        $diff = $now->diff(\DateTime::createFromInterface($this->trial_ends_at));
+
+        return $diff->invert ? 0 : $diff->days;
+    }
+
+    // =========================================================================
+    // Scopes
+    // =========================================================================
+
     public function scopeActive(QueryBuilder $query): QueryBuilder
     {
         return $query->where('status', SubscriptionStatus::ACTIVE->value);
@@ -150,6 +217,17 @@ class Subscription extends Model
         return $query->where('member_id', $memberId);
     }
 
+    /**
+     * Subscriptions whose trial period has expired and are still in TRIALING
+     * status — these are candidates for the conversion job.
+     */
+    public function scopeReadyForTrialConversion(QueryBuilder $query): QueryBuilder
+    {
+        return $query
+            ->where('status', SubscriptionStatus::TRIALING->value)
+            ->where('trial_ends_at', '<=', now_datetime()->format('Y-m-d H:i:s'));
+    }
+
     public function plan($relation = false)
     {
         return $this->belongsTo(SubscriptionPlan::class, 'plan_id', 'id', $relation);
@@ -158,38 +236,6 @@ class Subscription extends Model
     public function scopeByPlan(QueryBuilder $query, int $planId): QueryBuilder
     {
         return $query->where('plan_id', $planId);
-    }
-
-    public function isTrialing(): bool
-    {
-        if (!$this->plan) {
-            return false;
-        }
-
-        $trialEnds = (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
-        return $this->plan->trial_days > 0 && new \DateTime() <= $trialEnds;
-    }
-
-    public function trialEndsAt(): ?\DateTime
-    {
-        if (!$this->plan || $this->plan->trial_days <= 0) {
-            return null;
-        }
-
-        return (clone $this->start_date)->modify('+' . $this->plan->trial_days . ' days');
-    }
-
-    public function payments($relation = false)
-    {
-        return $this->hasMany(Payment::class, 'subscription_id', 'id', $relation);
-    }
-
-    public function lastPayment($relation = false)
-    {
-        return $this->hasOne(Payment::class, 'subscription_id', 'id', $relation)
-            ->where('status', 'completed')
-            ->orderBy('paid_at', 'desc')
-            ->first();
     }
 
     public function isDueForRenewal(): bool
@@ -275,7 +321,6 @@ class Subscription extends Model
     {
         if ($this->isDigital() && $this->plan && $this->plan->digital_download_url) {
             $this->download_url = $this->plan->digital_download_url;
-            // Set expiration to 30 days from now
             $this->download_expires_at = (new \DateTime())->modify('+30 days')->format('Y-m-d H:i:s');
             $this->save();
         }
@@ -298,27 +343,23 @@ class Subscription extends Model
             'site_id' => $this->site_id,
             'window_start' => $this->start_date?->format('Y-m-d H:i:s'),
             'window_end' => $this->end_date?->format('Y-m-d H:i:s') ?? now(),
-            'type' => 'paid'
+            'type' => 'paid',
         ]);
     }
 
     public function updateWindow(): void
     {
-        // Only update windows for paid subscriptions
         if ($this->type !== 'paid') {
             return;
         }
 
-        // Find existing window
         $window = SubscriptionWindow::where('subscription_id', $this->id)->first();
 
         if (!$window) {
-            // Create if doesn't exist
             $this->createWindow();
             return;
         }
 
-        // Update existing window
         $window->update([
             'window_end' => $this->end_date?->format('Y-m-d H:i:s') ?? $this->start_date->format('Y-m-d H:i:s'),
         ]);
@@ -333,18 +374,15 @@ class Subscription extends Model
         $window = SubscriptionWindow::where('subscription_id', $this->id)->first();
 
         if ($window) {
-            $window->update([
-                'window_end' => now()
-            ]);
+            $window->update(['window_end' => now()]);
         } else {
-            // Create window if it doesn't exist (backfill case)
             SubscriptionWindow::create([
                 'member_id' => $this->member_id,
                 'subscription_id' => $this->id,
                 'site_id' => $this->site_id,
                 'window_start' => $this->start_date?->format('Y-m-d H:i:s'),
                 'window_end' => now(),
-                'type' => 'paid'
+                'type' => 'paid',
             ]);
         }
     }
@@ -354,9 +392,6 @@ class Subscription extends Model
         return $this->hasMany(IssueDelivery::class, 'subscription_id', 'id', $relation);
     }
 
-    /**
-     * Check if delivery is currently paused
-     */
     public function isDeliveryPaused(): bool
     {
         if (!$this->delivery_paused) {
@@ -365,21 +400,17 @@ class Subscription extends Model
 
         $now = new \DateTime();
 
-        // Check if we're within the pause period
         if ($this->delivery_pause_start && $this->delivery_pause_start > $now) {
-            return false; // Pause hasn't started yet
+            return false;
         }
 
         if ($this->delivery_pause_end && $this->delivery_pause_end < $now) {
-            return false; // Pause has ended
+            return false;
         }
 
         return true;
     }
 
-    /**
-     * Get days until pause ends
-     */
     public function getDaysUntilPauseEnds(): ?int
     {
         if (!$this->isDeliveryPaused() || !$this->delivery_pause_end) {
@@ -392,9 +423,6 @@ class Subscription extends Model
         return $interval->invert ? 0 : $interval->days;
     }
 
-    /**
-     * Can delivery be paused?
-     */
     public function canPauseDelivery(): bool
     {
         return $this->isPrint()
@@ -402,9 +430,6 @@ class Subscription extends Model
             && !$this->isDeliveryPaused();
     }
 
-    /**
-     * Can delivery be resumed?
-     */
     public function canResumeDelivery(): bool
     {
         return $this->isPrint()
@@ -412,9 +437,6 @@ class Subscription extends Model
             && $this->isDeliveryPaused();
     }
 
-    /**
-     * Check if subscription includes Insider digital access
-     */
     public function hasInsiderAccess(): bool
     {
         return $this->hasPremiumAccess('newsletter', 'insider') ||
@@ -422,22 +444,16 @@ class Subscription extends Model
             $this->isDigital();
     }
 
-    /**
-     * Check if subscription is eligible for upgrade to any premium content
-     */
     public function canUpgradeToPremium(string $type, string $identifier): bool
     {
-        // Already has this premium access
         if ($this->hasPremiumAccess($type, $identifier)) {
             return false;
         }
 
-        // Must be active
         if (!$this->isActive()) {
             return false;
         }
 
-        // Not cancelled
         if ($this->isCancelled()) {
             return false;
         }
@@ -445,17 +461,11 @@ class Subscription extends Model
         return true;
     }
 
-    /**
-     * Check if this subscription was upgraded
-     */
     public function wasUpgraded(): bool
     {
         return $this->upgraded_from_plan_id !== null;
     }
 
-    /**
-     * Get the original plan if upgraded
-     */
     public function originalPlan()
     {
         if (!$this->upgraded_from_plan_id) {
@@ -465,17 +475,11 @@ class Subscription extends Model
         return $this->belongsTo(SubscriptionPlan::class, 'upgraded_from_plan_id', 'id');
     }
 
-    /**
-     * Backward compatibility wrapper
-     */
     public function canUpgradeToInsider(): bool
     {
         return $this->canUpgradeToPremium('newsletter', 'insider') && $this->isPrint();
     }
 
-    /**
-     * Get available upgrade paths for this subscription
-     */
     public function getAvailableUpgrades(): array
     {
         if (!$this->plan) {
@@ -487,13 +491,12 @@ class Subscription extends Model
             ->map(fn($access) => $access->premium_type . ':' . $access->premium_identifier)
             ->toArray();
 
-        // Get plans that offer premium access this subscription doesn't have
         $upgradePlans = SubscriptionPlan::where('site_id', $this->site_id)
             ->where('is_active', true)
             ->where('is_upgrade_option', true)
             ->where(function ($q) {
                 $q->where('upgrade_from_plan_id', $this->plan_id)
-                    ->orWhereNull('upgrade_from_plan_id'); // Universal upgrades
+                    ->orWhereNull('upgrade_from_plan_id');
             })
             ->get();
 
@@ -501,35 +504,25 @@ class Subscription extends Model
         foreach ($upgradePlans as $plan) {
             $planAccess = $plan->getPremiumAccessGrants();
 
-            // Find what new access this plan would grant
             $newAccess = array_filter($planAccess, function ($access) use ($currentAccess) {
                 $key = $access['type'] . ':' . $access['identifier'];
                 return !in_array($key, $currentAccess);
             });
 
             if (!empty($newAccess)) {
-                $available[] = [
-                    'plan' => $plan,
-                    'new_access' => $newAccess
-                ];
+                $available[] = ['plan' => $plan, 'new_access' => $newAccess];
             }
         }
 
         return $available;
     }
 
-    /**
-     * Get all premium access grants for this subscription
-     */
     public function premiumAccess($relation = false)
     {
         return $this->hasMany(SubscriptionPremiumAccess::class, 'subscription_id', 'id', $relation)
             ->where('is_active', true);
     }
 
-    /**
-     * Check if subscription has specific premium access
-     */
     public function hasPremiumAccess(string $type, string $identifier): bool
     {
         return SubscriptionPremiumAccess::where('subscription_id', $this->id)
@@ -543,28 +536,22 @@ class Subscription extends Model
             ->exists();
     }
 
-    /**
-     * Grant premium access
-     */
     public function grantPremiumAccess(string $type, string $identifier, ?\DateTime $expiresAt = null): SubscriptionPremiumAccess
     {
         return SubscriptionPremiumAccess::updateOrCreate(
             [
                 'subscription_id' => $this->id,
                 'premium_type' => $type,
-                'premium_identifier' => $identifier
+                'premium_identifier' => $identifier,
             ],
             [
                 'granted_at' => now_datetime()->format('Y-m-d H:i:s'),
                 'expires_at' => $expiresAt?->format('Y-m-d H:i:s'),
-                'is_active' => true
+                'is_active' => true,
             ]
         );
     }
 
-    /**
-     * Revoke premium access
-     */
     public function revokePremiumAccess(string $type, string $identifier): bool
     {
         return SubscriptionPremiumAccess::where('subscription_id', $this->id)
@@ -573,9 +560,6 @@ class Subscription extends Model
             ->update(['is_active' => 0]);
     }
 
-    /**
-     * Get all active premium newsletters
-     */
     public function getPremiumNewsletters(): array
     {
         return SubscriptionPremiumAccess::active()
@@ -586,9 +570,6 @@ class Subscription extends Model
             ->toArray();
     }
 
-    /**
-     * Check if has any premium newsletter access
-     */
     public function hasAnyPremiumNewsletter(): bool
     {
         return SubscriptionPremiumAccess::active()
@@ -597,22 +578,17 @@ class Subscription extends Model
             ->exists();
     }
 
-    /**
-     * Grant all lower-tier plans for free when upgrading from a higher-tier plan
-     */
     public function grantLowerTierPlans(): array
     {
         if (!$this->plan) {
             return [];
         }
 
-        // Get all active plans for this site
         $allPlans = SubscriptionPlan::where('site_id', $this->site_id)
             ->where('is_active', true)
             ->where('id', '!=', $this->plan_id)
             ->get();
 
-        // Filter plans that are cheaper than current plan
         $lowerTierPlans = $allPlans->filter(function ($plan) {
             return $plan->price < $this->plan->price;
         });
@@ -623,8 +599,6 @@ class Subscription extends Model
             $premiumGrants = $plan->getPremiumAccessGrants();
 
             foreach ($premiumGrants as $grant) {
-
-                // Check if we already have this access
                 $exists = $this->premiumAccess(true)
                     ->where('premium_type', $grant['type'])
                     ->where('premium_identifier', $grant['identifier'])
@@ -637,10 +611,7 @@ class Subscription extends Model
                         $grant['expires_at'] ?? null
                     );
 
-                    $grantedAccess[] = [
-                        'plan' => $plan->name,
-                        'access' => $access
-                    ];
+                    $grantedAccess[] = ['plan' => $plan->name, 'access' => $access];
                 }
             }
         }
@@ -650,29 +621,28 @@ class Subscription extends Model
 
     public function isEligibleForPaidNewsletter(): bool
     {
-        // Must be a paid subscription
         if ($this->type !== 'paid') {
             return false;
         }
 
-        // Allowed states for paid newsletter delivery
         $allowedStates = ['active', 'grace_period', 'retrying'];
+
+        // Trialing subscriptions also get newsletter access
+        if ($this->isTrialing()) {
+            return true;
+        }
 
         if (!in_array($this->status, $allowedStates)) {
             return false;
         }
 
-        // Check date boundaries
         $now = new \DateTime();
 
-        // Must have started
         if ($this->start_date && $this->start_date > $now) {
             return false;
         }
 
-        // If in grace period or retrying, check grace hasn't expired
         if (in_array($this->status, ['grace_period', 'retrying'])) {
-            // If end_date exists and is in the past, grace period has ended
             if ($this->end_date && $this->end_date < $now) {
                 return false;
             }
@@ -681,17 +651,8 @@ class Subscription extends Model
         return true;
     }
 
-    /**
-     * Comprehensive newsletter access check
-     * Encapsulates ALL newsletter-specific entitlement logic
-     *
-     * @param Newsletter $newsletter
-     * @param Member|null $member Optional for future geographic/time checks
-     * @return NewsletterAccessResult
-     */
     public function canAccessNewsletter(Newsletter $newsletter, ?Member $member = null): NewsletterAccessResult
     {
-        // Phase 1: Subscription eligibility (grace, retry, expiry)
         if (!$this->isEligibleForPaidNewsletter()) {
             return NewsletterAccessResult::denied(
                 'subscription_not_eligible',
@@ -699,20 +660,9 @@ class Subscription extends Model
             );
         }
 
-        // Phase 2: Access level matching
         if ($newsletter->slug) {
-
-            // Check direct premium access
-            $hasDirectAccess = $this->hasPremiumAccess(
-                PremiumAccessType::Newsletter->value,
-                $newsletter->slug
-            );
-
-            $hasAccessThroughPlan = $this->plan?->grantsPremiumAccess(
-                PremiumAccessType::Newsletter->value, $newsletter->slug
-            );
-
-            // Check bundle access
+            $hasDirectAccess = $this->hasPremiumAccess(PremiumAccessType::Newsletter->value, $newsletter->slug);
+            $hasAccessThroughPlan = $this->plan?->grantsPremiumAccess(PremiumAccessType::Newsletter->value, $newsletter->slug);
             $hasBundleAccess = $this->hasBundleAccessToNewsletter($newsletter->slug);
 
             if (!$hasDirectAccess && !$hasAccessThroughPlan && !$hasBundleAccess && !$newsletter->requiresBundle()) {
@@ -723,7 +673,6 @@ class Subscription extends Model
             }
         }
 
-        // Phase 3: Bundle access (if newsletter requires a specific bundle)
         if ($newsletter->requiresBundle()) {
             if (!$this->hasBundle($newsletter->bundle_id)) {
                 $bundle = $newsletter->bundle();
@@ -735,7 +684,6 @@ class Subscription extends Model
             }
         }
 
-        // Phase 4: Geographic restrictions
         if ($newsletter->hasGeographicRestrictions()) {
             if (!$member) {
                 return NewsletterAccessResult::denied(
@@ -755,7 +703,6 @@ class Subscription extends Model
             }
         }
 
-        // Phase 5: Time-based access window
         if ($newsletter->hasTimeWindow()) {
             $now = new \DateTime();
 
@@ -773,17 +720,11 @@ class Subscription extends Model
         return NewsletterAccessResult::allowed();
     }
 
-    /**
-     * Check if subscription grants access to a bundle
-     */
     public function hasBundle(int $bundleId): bool
     {
         return $this->bundle_id === $bundleId;
     }
 
-    /**
-     * Get the bundle granted by this subscription
-     */
     public function bundle()
     {
         if (!$this->bundle_id) {
@@ -793,9 +734,6 @@ class Subscription extends Model
         return SubscriptionBundle::find($this->bundle_id);
     }
 
-    /**
-     * Check if subscription grants access to newsletter via bundle
-     */
     public function hasBundleAccessToNewsletter(string $newsletterSlug): bool
     {
         $bundle = $this->bundle();
@@ -810,7 +748,7 @@ class Subscription extends Model
     public function hasAccess(): bool
     {
         if (!$this->access_starts_at) {
-            return true; // No restriction
+            return true;
         }
 
         return $this->access_starts_at <= now();
@@ -819,10 +757,9 @@ class Subscription extends Model
     public function canShip(): bool
     {
         if (!$this->first_shipment_at) {
-            return true; // No restriction
+            return true;
         }
 
         return $this->first_shipment_at <= now();
     }
-
 }
