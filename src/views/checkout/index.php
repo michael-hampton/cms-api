@@ -166,7 +166,7 @@
             left: 0;
             height: 2px;
             background: var(--primary-color);
-            transition: width 0.3s;
+            transition: width 0.4s ease;
             z-index: 2;
         }
 
@@ -177,6 +177,16 @@
             gap: 0.5rem;
             position: relative;
             z-index: 3;
+        }
+
+        /* Completed steps are clickable */
+        .step.completed {
+            cursor: pointer;
+        }
+
+        .step.completed:hover .step-circle {
+            opacity: 0.8;
+            transform: scale(1.08);
         }
 
         .step-circle {
@@ -212,6 +222,10 @@
 
         .step.active .step-label {
             color: var(--primary-color);
+        }
+
+        .step.completed .step-label {
+            color: var(--success-color);
         }
 
         .checkout-layout {
@@ -490,6 +504,11 @@
 
         .btn-secondary:hover {
             background: var(--bg-light);
+        }
+
+        /* Continue to Payment button — sits at bottom of step 2 */
+        #continue-to-payment-btn {
+            margin-top: 2rem;
         }
 
         /* Auto-renewal consent blocks — global (all users) and US-specific */
@@ -784,33 +803,42 @@
 
 <main>
     <div class="container">
-        <div class="checkout-progress">
-            <div class="progress-steps">
-                <div class="progress-line" id="progress-line"></div>
-                <div class="step completed">
-                    <div class="step-circle">✓</div>
-                    <div class="step-label">Cart</div>
-                </div>
-                <div class="step active">
-                    <div class="step-circle">2</div>
-                    <div class="step-label">Shipping</div>
-                </div>
-                <div class="step">
-                    <div class="step-circle">3</div>
-                    <div class="step-label">Payment</div>
-                </div>
-                <div class="step">
-                    <div class="step-circle">4</div>
-                    <div class="step-label">Confirmation</div>
+        <?php if ($checkoutMode === 'steps'): ?>
+            <div class="checkout-progress">
+                <div class="progress-steps">
+                    <!--
+                        Progress line width per step:
+                          Step 1 (cart, always complete on this page) — we start at step 2 so line begins at 33%
+                          Step 2 (contact + shipping) — 33%
+                          Step 3 (payment)            — 66%
+                          Step 4 (confirmation)       — redirect, never rendered here
+                    -->
+                    <div class="progress-line" id="progress-line" style="width: 33%;"></div>
+
+                    <div class="step completed" id="step-1-indicator" onclick="window.location.href='/cart'"
+                         title="Return to cart">
+                        <div class="step-circle">✓</div>
+                        <div class="step-label">Cart</div>
+                    </div>
+                    <div class="step active" id="step-2-indicator">
+                        <div class="step-circle">2</div>
+                        <div class="step-label">Shipping</div>
+                    </div>
+                    <div class="step" id="step-3-indicator">
+                        <div class="step-circle">3</div>
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="step" id="step-4-indicator">
+                        <div class="step-circle">4</div>
+                        <div class="step-label">Confirmation</div>
+                    </div>
                 </div>
             </div>
-        </div>
+        <?php endif; ?>
 
         <div id="alert-container"></div>
 
         <?php
-        // Detect mixed cart server-side — subscriptions and physical products cannot
-        // be purchased together. Show a blocking warning before the user submits.
         $cartSubscriptionItems = array_filter($items, fn($item) => !empty($item['subscription_plan_id']));
         $cartProductItems = array_filter($items, fn($item) => empty($item['subscription_plan_id']));
         $isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
@@ -826,173 +854,204 @@
         <?php endif; ?>
 
         <?php if (!\App\Framework\Authorization\MemberAuth::check()): ?>
-        <div class="login-prompt">
-            <p>Already have an account? <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses</p>
-        </div>
+            <div class="login-prompt">
+                <p>Already have an account? <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses
+                </p>
+            </div>
         <?php endif; ?>
 
         <div class="checkout-layout">
             <div class="checkout-form">
                 <form id="checkout-form">
-                    <!-- Contact Information -->
-                    <div class="form-section">
-                        <h2 class="section-title">Contact Information</h2>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">First Name <span class="required">*</span></label>
-                                <input type="text" name="first_name" class="form-input"
-                                       value="<?= $member?->first_name ?? '' ?>" required>
-                                <span class="form-error" id="error-first_name"></span>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Last Name <span class="required">*</span></label>
-                                <input type="text" name="last_name" class="form-input"
-                                       value="<?= $member?->last_name ?? '' ?>" required>
-                                <span class="form-error" id="error-last_name"></span>
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Email <span class="required">*</span></label>
-                                <input type="email" name="email" class="form-input"
-                                       value="<?= $member?->email ?? '' ?>" required>
-                                <span class="form-error" id="error-email"></span>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Phone</label>
-                                <input type="tel" name="phone" class="form-input">
-                                <span class="form-error" id="error-phone"></span>
-                            </div>
-                        </div>
-                    </div>
 
-                    <?php if ($requiresShipping ?? true): ?>
-                        <div class="form-section" id="saved-addresses-section" style="display: none;">
-                            <h2 class="section-title">Saved Addresses</h2>
-                            <div id="saved-addresses-list"></div>
-                            <button type="button" onclick="showNewAddressForm()" class="btn btn-secondary">
-                                Use Different Address
+                    <!-- ===================== Contact + Shipping ===================== -->
+                    <?php if ($checkoutMode === 'steps'): ?>
+                    <div id="step-2-section"><?php endif; ?>
+
+                        <!-- Contact Information -->
+                        <div class="form-section">
+                            <h2 class="section-title">Contact Information</h2>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">First Name <span class="required">*</span></label>
+                                    <input type="text" name="first_name" class="form-input"
+                                           value="<?= $member?->first_name ?? '' ?>" required>
+                                    <span class="form-error" id="error-first_name"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Last Name <span class="required">*</span></label>
+                                    <input type="text" name="last_name" class="form-input"
+                                           value="<?= $member?->last_name ?? '' ?>" required>
+                                    <span class="form-error" id="error-last_name"></span>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Email <span class="required">*</span></label>
+                                    <input type="email" name="email" class="form-input"
+                                           value="<?= $member?->email ?? '' ?>" required>
+                                    <span class="form-error" id="error-email"></span>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Phone</label>
+                                    <input type="tel" name="phone" class="form-input">
+                                    <span class="form-error" id="error-phone"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <?php if ($requiresShipping ?? true): ?>
+                            <div class="form-section" id="saved-addresses-section" style="display: none;">
+                                <h2 class="section-title">Saved Addresses</h2>
+                                <div id="saved-addresses-list"></div>
+                                <button type="button" onclick="showNewAddressForm()" class="btn btn-secondary">
+                                    Use Different Address
+                                </button>
+                            </div>
+
+                            <div class="form-section" id="shipping-address-form">
+                                <div class="section-header">
+                                    <h2 class="section-title" style="margin-bottom:0;padding-bottom:0;border:none;">
+                                        Shipping Address</h2>
+                                    <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
+                                            class="btn btn-secondary"
+                                            style="display:none;width:auto;padding:0.5rem 1rem;">
+                                        ← Back to Saved Addresses
+                                    </button>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label class="form-label">Address <span class="required">*</span></label>
+                                    <input type="text" name="address" class="form-input" required>
+                                    <span class="form-error" id="error-address"></span>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label class="form-label">Apartment, suite, etc. (optional)</label>
+                                    <input type="text" name="address2" class="form-input">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">City <span class="required">*</span></label>
+                                        <input type="text" name="city" class="form-input" required>
+                                        <span class="form-error" id="error-city"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">State / Province</label>
+                                        <input type="text" name="state" class="form-input">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label class="form-label">Postal Code <span class="required">*</span></label>
+                                        <input type="text" name="postal_code" class="form-input" required>
+                                        <span class="form-error" id="error-postal_code"></span>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Country <span class="required">*</span></label>
+                                        <select name="country" id="country-select" class="form-select"
+                                                required onchange="handleCountryChange(this.value)">
+                                            <option value="">Select Country</option>
+                                            <option value="US">United States</option>
+                                            <option value="CA">Canada</option>
+                                            <option value="GB">United Kingdom</option>
+                                            <option value="AU">Australia</option>
+                                            <option value="DE">Germany</option>
+                                            <option value="FR">France</option>
+                                        </select>
+                                        <span class="form-error" id="error-country"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <!-- Continue to Payment — steps mode only; validates step 2 fields before advancing -->
+                        <?php if ($checkoutMode === 'steps'): ?>
+                            <button type="button" class="btn btn-primary" id="continue-to-payment-btn"
+                                    onclick="advanceToPayment()">
+                                Continue to Payment
+                            </button>
+                        <?php endif; ?>
+
+                        <?php if ($checkoutMode === 'steps'): ?></div><!-- /#step-2-section --><?php endif; ?>
+
+
+                    <!-- ===================== Payment ===================== -->
+                    <?php if ($checkoutMode === 'steps'): ?>
+                    <div id="step-3-section" style="display: none;"><?php endif; ?>
+
+                        <!-- Payment Method -->
+                        <div class="form-section" id="payment-form-section">
+                            <h2 class="section-title">Payment Method</h2>
+                            <div class="payment-methods">
+                                <label class="payment-method selected" data-method="card">
+                                    <input type="radio" name="payment_method" value="card" class="payment-radio"
+                                           checked>
+                                    <div class="payment-info">
+                                        <div class="payment-name">Credit / Debit Card</div>
+                                        <div class="payment-description">Visa, Mastercard, American Express</div>
+                                    </div>
+                                </label>
+                                <label class="payment-method" data-method="paypal">
+                                    <input type="radio" name="payment_method" value="paypal" class="payment-radio">
+                                    <div class="payment-info">
+                                        <div class="payment-name">PayPal</div>
+                                        <div class="payment-description">Pay securely with your PayPal account</div>
+                                    </div>
+                                </label>
+                                <label class="payment-method" data-method="bank">
+                                    <input type="radio" name="payment_method" value="bank" class="payment-radio">
+                                    <div class="payment-info">
+                                        <div class="payment-name">Bank Transfer</div>
+                                        <div class="payment-description">Direct bank transfer</div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-section" id="saved-cards-section" style="display: none;">
+                            <h2 class="section-title">Saved Payment Methods</h2>
+                            <div id="saved-cards-list"></div>
+                            <button type="button" onclick="showNewCardForm()" class="btn btn-secondary">
+                                Use Different Card
                             </button>
                         </div>
 
-                        <div class="form-section" id="shipping-address-form">
+                        <div id="payment-request-button"></div>
+
+                        <div class="form-section" id="new-card-section">
                             <div class="section-header">
-                                <h2 class="section-title" style="margin-bottom:0;padding-bottom:0;border:none;">Shipping
-                                    Address</h2>
-                                <button type="button" id="back-to-saved-btn" onclick="showSavedAddresses()"
+                                <h2 class="section-title">Card Details</h2>
+                                <button type="button" id="back-to-saved-cards-btn" onclick="showSavedCards()"
                                         class="btn btn-secondary" style="display:none;width:auto;padding:0.5rem 1rem;">
-                                    ← Back to Saved Addresses
+                                    ← Back to Saved Cards
                                 </button>
                             </div>
                             <div class="form-group full-width">
-                                <label class="form-label">Address <span class="required">*</span></label>
-                                <input type="text" name="address" class="form-input" required>
-                                <span class="form-error" id="error-address"></span>
+                                <label class="form-label">Card Information <span class="required">*</span></label>
+                                <div id="card-element"
+                                     style="padding:0.75rem;border:1px solid var(--border-color);border-radius:0.5rem;"></div>
+                                <div id="card-errors" class="form-error" role="alert" aria-live="polite"></div>
                             </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h2 class="section-title">Order Notes (Optional)</h2>
                             <div class="form-group full-width">
-                                <label class="form-label">Apartment, suite, etc. (optional)</label>
-                                <input type="text" name="address2" class="form-input">
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">City <span class="required">*</span></label>
-                                    <input type="text" name="city" class="form-input" required>
-                                    <span class="form-error" id="error-city"></span>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">State / Province</label>
-                                    <input type="text" name="state" class="form-input">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Postal Code <span class="required">*</span></label>
-                                    <input type="text" name="postal_code" class="form-input" required>
-                                    <span class="form-error" id="error-postal_code"></span>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Country <span class="required">*</span></label>
-                                    <select name="country" id="country-select" class="form-select"
-                                            required onchange="handleCountryChange(this.value)">
-                                        <option value="">Select Country</option>
-                                        <option value="US">United States</option>
-                                        <option value="CA">Canada</option>
-                                        <option value="GB">United Kingdom</option>
-                                        <option value="AU">Australia</option>
-                                        <option value="DE">Germany</option>
-                                        <option value="FR">France</option>
-                                    </select>
-                                    <span class="form-error" id="error-country"></span>
-                                </div>
+                                <label class="form-label">Special instructions for delivery</label>
+                                <textarea name="notes" class="form-textarea"
+                                          placeholder="Add any special instructions..."></textarea>
                             </div>
                         </div>
-                    <?php endif; ?>
 
-                    <!-- Payment Method -->
-                    <div class="form-section" id="payment-form-section">
-                        <h2 class="section-title">Payment Method</h2>
-                        <div class="payment-methods">
-                            <label class="payment-method selected" data-method="card">
-                                <input type="radio" name="payment_method" value="card" class="payment-radio" checked>
-                                <div class="payment-info">
-                                    <div class="payment-name">Credit / Debit Card</div>
-                                    <div class="payment-description">Visa, Mastercard, American Express</div>
-                                </div>
-                            </label>
-                            <label class="payment-method" data-method="paypal">
-                                <input type="radio" name="payment_method" value="paypal" class="payment-radio">
-                                <div class="payment-info">
-                                    <div class="payment-name">PayPal</div>
-                                    <div class="payment-description">Pay securely with your PayPal account</div>
-                                </div>
-                            </label>
-                            <label class="payment-method" data-method="bank">
-                                <input type="radio" name="payment_method" value="bank" class="payment-radio">
-                                <div class="payment-info">
-                                    <div class="payment-name">Bank Transfer</div>
-                                    <div class="payment-description">Direct bank transfer</div>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <h2 class="section-title">Card Details</h2>
-
-                    <div class="form-section" id="saved-cards-section" style="display: none;">
-                        <h2 class="section-title">Saved Payment Methods</h2>
-                        <div id="saved-cards-list"></div>
-                        <button type="button" onclick="showNewCardForm()" class="btn btn-secondary">
-                            Use Different Card
-                        </button>
-                    </div>
-
-                    <div id="payment-request-button"></div>
-
-                    <div class="form-section" id="new-card-section">
-                        <div class="section-header">
-                            <h2 class="section-title">Card Details</h2>
-                            <button type="button" id="back-to-saved-cards-btn" onclick="showSavedCards()"
-                                    class="btn btn-secondary" style="display:none;width:auto;padding:0.5rem 1rem;">
-                                ← Back to Saved Cards
+                        <!-- Back to Shipping — steps mode only -->
+                        <?php if ($checkoutMode === 'steps'): ?>
+                            <button type="button" class="btn btn-secondary" onclick="goToStep(2)"
+                                    style="margin-top: 1rem;">
+                                ← Back to Shipping
                             </button>
-                        </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">Card Information <span class="required">*</span></label>
-                            <div id="card-element"
-                                 style="padding:0.75rem;border:1px solid var(--border-color);border-radius:0.5rem;"></div>
-                            <!-- Inline payment error — shown immediately beneath the card element -->
-                            <div id="card-errors" class="form-error" role="alert" aria-live="polite"></div>
-                        </div>
-                    </div>
+                        <?php endif; ?>
 
-                    <div class="form-section">
-                        <h2 class="section-title">Order Notes (Optional)</h2>
-                        <div class="form-group full-width">
-                            <label class="form-label">Special instructions for delivery</label>
-                            <textarea name="notes" class="form-textarea"
-                                      placeholder="Add any special instructions..."></textarea>
-                        </div>
-                    </div>
+                        <?php if ($checkoutMode === 'steps'): ?></div><!-- /#step-3-section --><?php endif; ?>
+
                 </form>
             </div>
 
@@ -1001,9 +1060,6 @@
                 <h3>
                     Order Summary
                     <?php
-                    // Currency is resolved server-side from the site config.
-                    // It is locked to the plan/site currency and will not change
-                    // if the user updates their billing country.
                     $displayCurrency = strtoupper($currency ?? 'GBP');
                     ?>
                     <span class="currency-badge"><?= htmlspecialchars($displayCurrency) ?></span>
@@ -1030,8 +1086,8 @@
                                     <?= htmlspecialchars($merchantData['name']) ?>
                                 </strong>
                                 <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:0.5rem;">
-                                (<?= count($merchantData['items']) ?> items)
-                            </span>
+                                    (<?= count($merchantData['items']) ?> items)
+                                </span>
                             </div>
 
                             <?php foreach ($merchantData['items'] as $item): ?>
@@ -1172,9 +1228,6 @@
 
                     <!--
                         AUTO-RENEWAL CONSENT — ALL USERS
-                        Shown to every user regardless of country.
-                        Required before submission.
-                        Covers EU/UK Consumer Rights, Australian ACCC, Canadian provincial requirements.
                         NOTE: Final wording must be reviewed and approved by Legal prior to release.
                     -->
                     <div id="global-renewal-consent-block" class="auto-renewal-consent">
@@ -1195,9 +1248,6 @@
 
                     <!--
                         AUTO-RENEWAL CONSENT — US USERS ONLY
-                        Shown only when billing country is United States.
-                        Additional explicit double opt-in required by US state legislation
-                        (California ARL, New York, and others).
                         NOTE: Final wording must be reviewed and approved by Legal prior to release.
                     -->
                     <div id="us-renewal-consent-block" class="auto-renewal-consent"
@@ -1251,6 +1301,14 @@
     </div>
 </div>
 
+<?php
+// Checkout display mode.
+// 'steps'       — contact/shipping and payment are revealed progressively with a
+//                 progress indicator (default).
+// 'single-page' — all sections visible at once, no progress bar, original behaviour.
+$checkoutMode = $checkoutMode ?? 'steps';
+?>
+
 <script src="https://js.stripe.com/v3/"></script>
 @js('checkout-auth.js')
 
@@ -1258,8 +1316,8 @@
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const API_BASE = '/api/' + SITE;
     const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
-    // Currency is locked to the site/plan — it does NOT change when billing country changes.
     const PLAN_CURRENCY = '<?= htmlspecialchars($displayCurrency) ?>';
+    const CHECKOUT_MODE = '<?= htmlspecialchars($checkoutMode) ?>';
 
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
     const isMixedCart = <?= json_encode($isMixedCart) ?>;
@@ -1286,6 +1344,99 @@
     let selectedCardId = null;
 
     // -------------------------------------------------------------------------
+    // Shipping field validation — shared by both modes.
+    //
+    // In steps mode:  called by advanceToPayment() before revealing step 3.
+    // In single-page: called by the place-order handler before submission.
+    //
+    // Returns true when all required fields are present, false (+ inline errors)
+    // when any are missing.
+    // -------------------------------------------------------------------------
+
+    function validateShippingFields() {
+        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
+
+        if (!requiresShipping) return true;
+
+        const form = document.getElementById('checkout-form');
+        const data = Object.fromEntries(new FormData(form));
+
+        const required = selectedAddressId
+            ? ['first_name', 'last_name', 'email']
+            : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
+
+        let hasErrors = false;
+        for (const field of required) {
+            if (!data[field] || data[field].trim() === '') {
+                const errorEl = document.getElementById(`error-${field}`);
+                if (errorEl) errorEl.textContent = 'This field is required';
+                hasErrors = true;
+            }
+        }
+
+        return !hasErrors;
+    }
+
+    <?php if ($checkoutMode === 'steps'): ?>
+    // -------------------------------------------------------------------------
+    // Step navigation — steps mode only
+    // -------------------------------------------------------------------------
+
+    let currentStep = 2;
+
+    const STEP_LINE_WIDTH = {2: '33%', 3: '66%'};
+
+    function goToStep(step) {
+        if (step === currentStep) return;
+
+        document.getElementById('step-2-section').style.display = step === 2 ? 'block' : 'none';
+        document.getElementById('step-3-section').style.display = step === 3 ? 'block' : 'none';
+
+        document.getElementById('progress-line').style.width = STEP_LINE_WIDTH[step] ?? '33%';
+
+        const indicators = {
+            2: document.getElementById('step-2-indicator'),
+            3: document.getElementById('step-3-indicator'),
+            4: document.getElementById('step-4-indicator'),
+        };
+
+        Object.values(indicators).forEach(el => {
+            el.classList.remove('active', 'completed');
+            el.style.cursor = '';
+            el.onclick = null;
+        });
+
+        if (step === 2) {
+            indicators[2].classList.add('active');
+        } else if (step === 3) {
+            indicators[2].classList.add('completed');
+            indicators[2].style.cursor = 'pointer';
+            indicators[2].onclick = () => goToStep(2);
+            indicators[3].classList.add('active');
+        }
+
+        currentStep = step;
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function advanceToPayment() {
+        if (isMixedCart) {
+            showAlert('Your cart contains both subscription and physical items. Please return to your cart and complete them as separate orders.', 'error');
+            return;
+        }
+
+        document.getElementById('alert-container').innerHTML = '';
+
+        if (!validateShippingFields()) {
+            showAlert('Please fill in all required fields before continuing.', 'error');
+            return;
+        }
+
+        goToStep(3);
+    }
+    <?php endif; ?>
+
+    // -------------------------------------------------------------------------
     // Country / consent handling
     // -------------------------------------------------------------------------
 
@@ -1304,7 +1455,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // Saved cards
+    // Subscription detection
     // -------------------------------------------------------------------------
 
     function checkCartForSubscription() {
@@ -1315,6 +1466,10 @@
             document.getElementById('global-renewal-consent-block').style.display = 'none';
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Saved cards
+    // -------------------------------------------------------------------------
 
     async function loadSavedCards() {
         if (!isLoggedIn || !currentMember) return;
@@ -1387,7 +1542,8 @@
     }
 
     // -------------------------------------------------------------------------
-    // Stripe init
+    // Stripe init — card element stays mounted for the lifetime of the page;
+    // navigating back to step 2 and forward to step 3 will not re-mount it.
     // -------------------------------------------------------------------------
 
     async function initStripe() {
@@ -1416,7 +1572,7 @@
             currency: PLAN_CURRENCY.toLowerCase(),
             total: {label: 'Order Total', amount: getCurrentOrderAmount()},
             requestPayerName: true,
-            requestPayerEmail: true
+            requestPayerEmail: true,
         });
 
         const prButton = elements.create('paymentRequestButton', {paymentRequest});
@@ -1464,6 +1620,7 @@
             });
         }
 
+        // Hide the alternative payment method selector — we're using card by default.
         const paymentSection = document.getElementById('payment-form-section');
         if (paymentSection) paymentSection.style.display = 'none';
     }
@@ -1589,19 +1746,19 @@
         const formData = new FormData(form);
         const data = Object.fromEntries(formData);
 
-        // Clear previous errors
+        // Clear previous errors.
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
         document.getElementById('card-errors').textContent = '';
 
-        // Pre-order consent
+        // Pre-order consent.
         const acceptPreOrder = document.getElementById('accept-pre-order');
         if (acceptPreOrder && !acceptPreOrder.checked) {
             showAlert('You must accept the pre-order terms to continue.', 'error');
             return;
         }
 
-        // Global auto-renewal consent — required for all users
+        // Global auto-renewal consent.
         const globalConsentBlock = document.getElementById('global-renewal-consent-block');
         const globalConsentCb = document.getElementById('global-renewal-consent');
         if (!globalConsentCb.checked && isOneTimeSubscription) {
@@ -1613,7 +1770,7 @@
         globalConsentBlock.classList.remove('consent-error');
         data.global_renewal_consent = '1';
 
-        // US auto-renewal consent — additional requirement for US users
+        // US auto-renewal consent.
         const usConsentBlock = document.getElementById('us-renewal-consent-block');
         if (usConsentBlock && usConsentBlock.style.display !== 'none') {
             const usConsentCb = document.getElementById('us-renewal-consent');
@@ -1638,19 +1795,15 @@
         }
 
         if (requiresShipping) {
-            const required = selectedAddressId
-                ? ['first_name', 'last_name', 'email']
-                : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
-
-            let hasErrors = false;
-            for (const field of required) {
-                if (!data[field] || data[field].trim() === '') {
-                    const errorEl = document.getElementById(`error-${field}`);
-                    if (errorEl) errorEl.textContent = 'This field is required';
-                    hasErrors = true;
-                }
+            <?php if ($checkoutMode !== 'steps'): ?>
+            // In single-page mode the place-order handler is the first gate,
+            // so shipping validation runs here.
+            if (!validateShippingFields()) {
+                showAlert('Please fill in all required fields.', 'error');
+                setProcessingState(false);
+                return;
             }
-            if (hasErrors) return;
+            <?php endif; ?>
         }
 
         if (appliedVoucher) {
@@ -1684,7 +1837,7 @@
             const response = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
             });
 
             const result = await response.json();
@@ -1694,11 +1847,9 @@
                 return;
             }
 
-            // ?type=subscription hits /api/{site}/subscriptions/onetime/checkout
-            // which returns jsonResponse — wrapped in result.data
             const responseData = result.data;
-
             const contexts = responseData.stripe_contexts;
+
             if (contexts && Object.keys(contexts).length > 0) {
                 const firstKey = Object.keys(contexts)[0];
                 clientSecret = contexts[firstKey].client_secret;
@@ -1731,7 +1882,6 @@
             const {error, paymentIntent} = paymentResult;
 
             if (error) {
-                // Show inline beneath card element AND as an alert
                 document.getElementById('card-errors').textContent = error.message;
                 showAlert(error.message, 'error');
                 return;
@@ -1760,7 +1910,7 @@
             const response = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
             });
 
             const result = await response.json();
@@ -1782,7 +1932,7 @@
             const response = await fetch(`${API_BASE}/checkout/process`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
             });
 
             const result = await response.json();
@@ -1792,7 +1942,6 @@
                 return;
             }
 
-            // FIXED: use result.stripe_contexts and result.client_secret (not data.client_secret)
             const contexts = result.stripe_contexts;
             if (contexts && Object.keys(contexts).length > 0) {
                 const firstKey = Object.keys(contexts)[0];
@@ -1824,7 +1973,6 @@
             const {error, paymentIntent} = paymentResult;
 
             if (error) {
-                // Show inline beneath card element AND as an alert so user can retry
                 document.getElementById('card-errors').textContent = error.message;
                 showAlert(error.message, 'error');
                 return;
@@ -1836,8 +1984,8 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         payment_intent_id: paymentIntent.id,
-                        checkout_id: checkoutId
-                    })
+                        checkout_id: checkoutId,
+                    }),
                 });
 
                 const confirmResult = await confirmResponse.json();
@@ -1873,7 +2021,7 @@
         const requestBody = {
             code: voucherCode,
             is_subscription: !!isSubscription,
-            order_value: parseFloat(totalAmount)
+            order_value: parseFloat(totalAmount),
         };
 
         if (isSubscription) {
@@ -1887,24 +2035,22 @@
             const response = await fetch(`${API_BASE}/vouchers/validate`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(requestBody),
             });
 
-            // FIXED: use `result` consistently throughout
             const result = await response.json();
 
             if (result.data.valid) {
                 appliedVoucher = {
                     code: voucherCode,
                     discount: result.data.discount,
-                    voucher_id: result.data.voucher_id
+                    voucher_id: result.data.voucher_id,
                 };
                 displayAppliedVoucher();
                 document.getElementById('voucher-input').value = '';
                 messageEl.textContent = '';
                 showAlert('Voucher applied successfully!', 'success');
             } else {
-                // FIXED: was `data.data.message` — now `result.data.message`
                 messageEl.textContent = result.data.message || 'Invalid voucher code';
                 messageEl.style.color = 'var(--danger-color)';
             }
@@ -1978,12 +2124,17 @@
     initStripe();
 
     if (isMixedCart) {
-        const btn = document.getElementById('place-order-btn');
-        btn.disabled = true;
-        btn.title = 'Remove subscription or physical items from your cart to continue';
+        <?php if ($checkoutMode === 'steps'): ?>
+        // In steps mode the first gate is the Continue to Payment button.
+        const mixedCartBtn = document.getElementById('continue-to-payment-btn');
+        <?php else: ?>
+        // In single-page mode the first gate is the Place Order button.
+        const mixedCartBtn = document.getElementById('place-order-btn');
+        <?php endif; ?>
+        mixedCartBtn.disabled = true;
+        mixedCartBtn.title = 'Remove subscription or physical items from your cart to continue';
     }
 
-    // If member is pre-authenticated as US, show US consent block immediately
     <?php if (($member?->country ?? '') === 'US'): ?>
     handleCountryChange('US');
     <?php endif; ?>

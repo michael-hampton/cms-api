@@ -257,6 +257,7 @@ class CartController extends Controller
             'tax_rate' => $tax->rate,
             'hasPreOrders' => $this->detectPreOrders($items),
             'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
+            'checkoutMode' => 'steps'
         ];
 
         return $this->view('checkout/index', $cartData);
