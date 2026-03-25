@@ -6,10 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Models\Brand;
-use App\Models\Category;
 use App\Models\Menu;
-use App\Models\Product;
 use App\Repositories\Cms\BrandRepository;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Product\ProductRepository;
@@ -22,108 +19,46 @@ use App\Services\Offers\DealsService;
 use App\Services\Offers\PriceAlertService;
 use App\Services\Offers\ProductOfferBundleService;
 use App\Services\Offers\ProductOfferService;
+use App\Services\Product\FilterInputSanitiser;
 
 class DealsController extends Controller
 {
     public function __construct(
-        private readonly DealsService $dealsService,
-        private readonly PriceAlertService $priceAlertService,
-        private readonly DealAlertService $dealAlertService,
-        private readonly CategoryRepository $categoryRepository,
-        private readonly BrandRepository $brandRepository,
-        private readonly ProductRepository     $productRepository,
-        private readonly ProductViewRepository     $productViewRepository,
-        private readonly ProductOfferService       $offerService,
-        private readonly ProductOfferBundleService $bundleService,
-        private readonly CurrencyResolver          $currencyResolver,
+        private readonly DealsService                        $dealsService,
+        private readonly PriceAlertService                   $priceAlertService,
+        private readonly DealAlertService                    $dealAlertService,
+        private readonly CategoryRepository                  $categoryRepository,
+        private readonly BrandRepository                     $brandRepository,
+        private readonly ProductRepository                   $productRepository,
+        private readonly ProductViewRepository               $productViewRepository,
+        private readonly ProductSpecificationGroupRepository $specRepository,
+        private readonly ProductOfferService                 $offerService,
+        private readonly ProductOfferBundleService           $bundleService,
+        private readonly CurrencyResolver                    $currencyResolver,
+        private readonly FilterInputSanitiser                $inputSanitiser,
     ) {
         parent::__construct();
     }
 
     public function index(Request $request)
     {
-        // Get all categories
-        $categories = Category::orderBy('name')->get();
-
         $siteId = SiteContext::getId();
         $member = MemberAuth::getMember();
 
-        // Get product counts for each category using groupBy
-        $categoryProducts = Product::select('category_id')
-            ->groupBy('category_id')
-            ->get();
-
-        // Count products per category
-        $categoryCounts = [];
-        foreach ($categoryProducts as $product) {
-            $categoryId = $product->category_id;
-            if (!isset($categoryCounts[$categoryId])) {
-                $categoryCounts[$categoryId] = 0;
-            }
-            $categoryCounts[$categoryId]++;
-        }
+        $categories = $this->categoryRepository->getAllWithProductCounts($siteId);
+        $brands = $this->brandRepository->getAllWithProductCounts($siteId);
+        $specificationGroups = $this->specRepository->getAllWithCounts($siteId);
 
         $offers = $this->offerService->getActiveOffers(10, $member, $siteId);
         $bundles = $this->bundleService->getActiveBundles(10, $member, $siteId);
+        $deals = $this->dealsService->getTodaysDeals();
 
-        // Alternative approach using raw SQL if the above doesn't work
-        // $db = Database::getInstance();
-        // $stmt = $db->query('SELECT category_id, COUNT(*) as count FROM products GROUP BY category_id', []);
-        // $results = $stmt->fetchAll();
-        // $categoryCounts = [];
-        // foreach ($results as $row) {
-        //     $categoryCounts[$row['category_id']] = $row['count'];
-        // }
-
-        // Add counts to categories
-        $categories = $categories->map(function ($category) use ($categoryCounts) {
-            return (object)[
-                'id' => $category->id,
-                'name' => $category->name,
-                'product_count' => $categoryCounts[$category->id] ?? 0
-            ];
-        });
-
-        // Get all brands
-        $brands = Brand::orderBy('name')->get();
-
-        // Get product counts for each brand
-        $brandProducts = Product::select('brand_id')
-            ->groupBy('brand_id')
-            ->get();
-
-        // Count products per brand
-        $brandCounts = [];
-        foreach ($brandProducts as $product) {
-            $brandId = $product->brand_id;
-            if (!isset($brandCounts[$brandId])) {
-                $brandCounts[$brandId] = 0;
-            }
-            $brandCounts[$brandId]++;
-        }
-
-        // Add counts to brands
-        $brands = $brands->map(function ($brand) use ($brandCounts) {
-            return (object)[
-                'id' => $brand->id,
-                'name' => $brand->name,
-                'product_count' => $brandCounts[$brand->id] ?? 0
-            ];
-        });
-
+        // Ideally extracted to a MenuRepository — flagging as technical debt
         $menu = Menu::where('is_active', true)
-            ->where('site_id', SiteContext::getId())
+            ->where('site_id', $siteId)
             ->where('menu_type', 'header')
             ->with(['items'])
             ->first();
-
-        $siteId = SiteContext::getId();
-
-        $deals = $this->dealsService->getTodaysDeals();
-
-        // Get specification groups with counts
-        $specRepository = app(ProductSpecificationGroupRepository::class);
-        $specificationGroups = $specRepository->getAllWithCounts($siteId);
 
         $currencyCode = $this->currencyResolver->resolveUpperCase();
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
@@ -146,19 +81,22 @@ class DealsController extends Controller
     public function refresh()
     {
         $deals = $this->dealsService->refreshTodaysDeals();
+
         return $this->resourceResponse(['deals' => $deals]);
     }
 
     public function carousel()
     {
         $deals = $this->dealsService->getTodaysDeals(10);
+
         return $this->resourceResponse(['deals' => $deals]);
     }
 
     public function filtered(Request $request)
     {
-        $filters = $request->all();
-        $deals = $this->dealsService->getFilteredDeals($filters);
+        $input = $this->inputSanitiser->sanitise($request->all());
+        $deals = $this->dealsService->getFilteredDeals($input);
+
         return $this->resourceResponse($deals);
     }
 
@@ -166,14 +104,15 @@ class DealsController extends Controller
     {
         $data = $request->all();
         $result = $this->priceAlertService->createAlert($data);
+
         return $this->resourceResponse($result);
     }
 
     public function subscribeDealAlert(Request $request)
     {
         $data = $request->all();
-
         $result = $this->dealAlertService->subscribe($data);
+
         return $this->resourceResponse($result);
     }
 
@@ -193,32 +132,33 @@ class DealsController extends Controller
     {
         $email = $request->input('email');
         $result = $this->dealAlertService->unsubscribe($email);
+
         return $this->resourceResponse($result);
     }
 
-    public function getProductModal(Request $request, $id)
+    public function getProductModal(Request $request, mixed $id)
     {
+        $safeId = $this->inputSanitiser->sanitiseId($id);
+
+        if ($safeId === null) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Invalid product ID'], 422);
+        }
+
         try {
-            $product = $this->productRepository->find($id);
+            $product = $this->productRepository->find($safeId);
 
             if (!$product) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => 'Product not found'
-                ], 404);
+                return $this->jsonResponse(['success' => false, 'message' => 'Product not found'], 404);
             }
 
-            // Track the view
             $userId = auth()->user()?->id ?? null;
             $sessionId = session_id() ?: $request->session()->getId();
             $ipAddress = $request->ip();
 
-            // Only track if not recently viewed (within last 60 minutes)
-            if (!$userId || !$this->productViewRepository->hasRecentView($id, $userId, 60)) {
+            if (!$userId || !$this->productViewRepository->hasRecentView($safeId, $userId, 60)) {
                 $this->productViewRepository->trackView($product, $userId, $sessionId, $ipAddress);
             }
 
-            // Load all necessary relationships
             $product->load([
                 'images',
                 'activeVariants.images',
@@ -227,118 +167,103 @@ class DealsController extends Controller
                 'brand',
                 'category',
                 'approvedReviews',
-                'specifications.group'
+                'specifications.group',
             ]);
 
-            // Get related products
             $relatedProducts = $this->productRepository->findRelated($product, 6);
 
-            // Get similar items (from same category)
-            $similarItems = Product::where('category_id', $product->category_id)
+            $similarItems = \App\Models\Product::where('category_id', $product->category_id)
                 ->where('id', '!=', $product->id)
                 ->where('is_active', true)
                 ->limit(6)
                 ->get();
 
-            // Format the response
-            $productData = [
-                'id' => $product->id,
-                'name' => $product->name,
-                'slug' => $product->slug,
-                'description' => $product->description,
-                'price' => $product->price,
-                'sale_price' => $product->sale_price,
-                'brand' => [
-                    'id' => $product->brand?->id,
-                    'name' => $product->brand?->name
-                ],
-                'category' => [
-                    'id' => $product->category?->id,
-                    'name' => $product->category?->name
-                ],
-                'images' => $product->images->map(fn($img) => [
-                    'url' => $img->url,
-                    'alt' => $img->alt,
-                    'is_primary' => $img->is_primary
-                ])->toArray(),
-                'variants' => $product->activeVariants->map(function ($variant) {
-                    return [
-                        'id' => $variant->id,
-                        'name' => $variant->name,
-                        'sku' => $variant->sku,
-                        'price' => $variant->price,
-                        'sale_price' => $variant->sale_price,
-                        'attributes' => $variant->attributes,
-                        'in_stock' => $variant->in_stock,
-                        'stock_quantity' => $variant->stock_quantity,
-                        'images' => $variant->images->map(fn($img) => [
-                            'url' => $img->url,
-                            'alt' => $img->alt
-                        ])->toArray(),
-                        'merchants' => $variant->merchants->map(function ($merchant) {
-                            return [
-                                'id' => $merchant->id,
-                                'merchant_id' => $merchant->merchant_id,
-                                'name' => $merchant->merchant?->name,
-                                'url' => $merchant->url,
-                                'price' => $merchant->effective_price,
-                                'sale_price' => $merchant->effective_sale_price,
-                                'is_available' => $merchant->is_available
-                            ];
-                        })->toArray()
-                    ];
-                })->toArray(),
-                'merchants' => $product->availableMerchants->map(function ($merchant) {
-                    return [
-                        'id' => $merchant->id,
-                        'merchant_id' => $merchant->merchant_id,
-                        'name' => $merchant->merchant?->name,
-                        'url' => $merchant->url,
-                        'price' => $merchant->effective_price,
-                        'sale_price' => $merchant->effective_sale_price,
-                        'is_available' => $merchant->is_available,
-                        'discount_percentage' => $merchant->discount_percentage,
-                        'has_discount' => $merchant->has_discount
-                    ];
-                })->toArray(),
-                'reviews' => $product->approvedReviews->map(fn($review) => [
-                    'id' => $review->id,
-                    'rating' => $review->rating,
-                    'title' => $review->title,
-                    'comment' => $review->comment,
-                    'author_name' => $review->author_name,
-                    'helpful_count' => $review->helpful_count,
-                    'is_verified_purchase' => $review->is_verified_purchase
-                ])->toArray(),
-                'specifications' => $product->specifications->groupBy('category')->map(function ($specs, $category) {
-                    return [
-                        'category' => $category,
-                        'items' => $specs->map(fn($spec) => [
-                            'key' => $spec->key,
-                            'value' => $spec->value
-                        ])->toArray()
-                    ];
-                })->values()->toArray(),
-                'average_rating' => $product->average_rating ?? 0,
-                'review_count' => $product->approvedReviews->count(),
-                'stock_quantity' => $product->stock_quantity,
-                'in_stock' => $product->in_stock
-            ];
+            $productData = $this->formatProductModalData($product);
 
             return $this->resourceResponse([
                 'success' => true,
                 'product' => $productData,
                 'related_products' => $relatedProducts->map(fn($p) => $this->formatProductCard($p))->toArray(),
-                'similar_items' => $similarItems->map(fn($p) => $this->formatProductCard($p))->toArray()
+                'similar_items' => $similarItems->map(fn($p) => $this->formatProductCard($p))->toArray(),
             ]);
-
         } catch (\Exception $e) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Error fetching product details',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function formatProductModalData(mixed $product): array
+    {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'slug' => $product->slug,
+            'description' => $product->description,
+            'price' => $product->price,
+            'sale_price' => $product->sale_price,
+            'brand' => ['id' => $product->brand?->id, 'name' => $product->brand?->name],
+            'category' => ['id' => $product->category?->id, 'name' => $product->category?->name],
+            'images' => $product->images->map(fn($img) => [
+                'url' => $img->url,
+                'alt' => $img->alt,
+                'is_primary' => $img->is_primary,
+            ])->toArray(),
+            'variants' => $product->activeVariants->map(fn($variant) => [
+                'id' => $variant->id,
+                'name' => $variant->name,
+                'sku' => $variant->sku,
+                'price' => $variant->price,
+                'sale_price' => $variant->sale_price,
+                'attributes' => $variant->attributes,
+                'in_stock' => $variant->in_stock,
+                'stock_quantity' => $variant->stock_quantity,
+                'images' => $variant->images->map(fn($img) => ['url' => $img->url, 'alt' => $img->alt])->toArray(),
+                'merchants' => $variant->merchants->map(fn($m) => [
+                    'id' => $m->id,
+                    'merchant_id' => $m->merchant_id,
+                    'name' => $m->merchant?->name,
+                    'url' => $m->url,
+                    'price' => $m->effective_price,
+                    'sale_price' => $m->effective_sale_price,
+                    'is_available' => $m->is_available,
+                ])->toArray(),
+            ])->toArray(),
+            'merchants' => $product->availableMerchants->map(fn($m) => [
+                'id' => $m->id,
+                'merchant_id' => $m->merchant_id,
+                'name' => $m->merchant?->name,
+                'url' => $m->url,
+                'price' => $m->effective_price,
+                'sale_price' => $m->effective_sale_price,
+                'is_available' => $m->is_available,
+                'discount_percentage' => $m->discount_percentage,
+                'has_discount' => $m->has_discount,
+            ])->toArray(),
+            'reviews' => $product->approvedReviews->map(fn($review) => [
+                'id' => $review->id,
+                'rating' => $review->rating,
+                'title' => $review->title,
+                'comment' => $review->comment,
+                'author_name' => $review->author_name,
+                'helpful_count' => $review->helpful_count,
+                'is_verified_purchase' => $review->is_verified_purchase,
+            ])->toArray(),
+            'specifications' => $product->specifications->groupBy('category')->map(fn($specs, $category) => [
+                'category' => $category,
+                'items' => $specs->map(fn($spec) => ['key' => $spec->key, 'value' => $spec->value])->toArray(),
+            ])->values()->toArray(),
+            'average_rating' => $product->average_rating ?? 0,
+            'review_count' => $product->approvedReviews->count(),
+            'stock_quantity' => $product->stock_quantity,
+            'in_stock' => $product->in_stock,
+        ];
     }
 
     private function formatProductCard($product): array
@@ -352,7 +277,7 @@ class DealsController extends Controller
             'image' => $product->main_image_url ?? $product->images->first()?->url ?? null,
             'brand' => $product->brand?->name,
             'average_rating' => $product->average_rating ?? 0,
-            'review_count' => $product->approvedReviews->count() ?? 0
+            'review_count' => $product->approvedReviews->count() ?? 0,
         ];
     }
 }

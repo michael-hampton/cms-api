@@ -24,27 +24,24 @@ class CategoryRepository extends Repository
         $this->searchEngine = new SearchEngine($config);
     }
 
-    protected function getModelClass(): string
+    public function getAllWithProductCounts(?int $siteId)
     {
-        return Category::class;
+        return $this->query()
+            ->where('site_id', $siteId)
+            ->withCount('products') // assumes Category has products() relationship
+            ->orderByDesc('products_count')
+            ->get()
+            ->map(fn($category) => (object)[
+                'id' => $category->id,
+                'name' => $category->name,
+                'product_count' => $category->products_count,
+            ]);
     }
 
     public function search(SearchCriteria $criteria): PaginatedResult
     {
         $query = Category::query()->withCount(['pages', 'products']);
         return $this->searchEngine->search($query, $criteria);
-    }
-
-    public function findBySlug(string $slug, ?int $siteId = null): ?Category
-    {
-        $query = Category::bySlug($slug);
-        return $siteId ? $query->where('site_id', $siteId)->first() : $this->applySiteFilter($query)->first();
-    }
-
-    public function getActive(): Collection
-    {
-        $query = Category::active();
-        return $this->applySiteFilter($query)->get();
     }
 
     public function getRootCategories(): Collection
@@ -55,7 +52,6 @@ class CategoryRepository extends Repository
             ->orderBy('name', 'asc')
             ->get();
     }
-
 
     public function getChildCategories(int $parentId): Collection
     {
@@ -70,6 +66,12 @@ class CategoryRepository extends Repository
     {
         $allCategories = $this->getActive();
         return $this->buildTree($allCategories);
+    }
+
+    public function getActive(): Collection
+    {
+        $query = Category::active();
+        return $this->applySiteFilter($query)->get();
     }
 
     private function buildTree(Collection $categories, ?int $parentId = null): array
@@ -105,6 +107,12 @@ class CategoryRepository extends Repository
         ]);
     }
 
+    public function findBySlug(string $slug, ?int $siteId = null): ?Category
+    {
+        $query = Category::bySlug($slug);
+        return $siteId ? $query->where('site_id', $siteId)->first() : $this->applySiteFilter($query)->first();
+    }
+
     public function getPopularCategories(int $limit = 10): Collection
     {
         return Category::withCount('pages')
@@ -125,7 +133,7 @@ class CategoryRepository extends Repository
         $query = PageCategory::where('category_id', $categoryId)
             ->orderBy('created_at', 'desc');
 
-        if(!empty($limit)) {
+        if (!empty($limit)) {
             $query->limit($limit);
         }
 
@@ -146,5 +154,10 @@ class CategoryRepository extends Repository
             return $category->pages_count > 0;
         })->toArray();
 
+    }
+
+    protected function getModelClass(): string
+    {
+        return Category::class;
     }
 }

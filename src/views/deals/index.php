@@ -62,7 +62,11 @@
                 <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All Deals</button>
 
                 <!-- Category Tabs (Dynamic) -->
-                <?php foreach (array_slice($categories ?? [], 0, 8) as $category): ?>
+                <?php
+                $filteredCategories = array_filter($categories ?? [], fn($c) => $c->product_count > 0);
+                ?>
+
+                <?php foreach (array_slice($filteredCategories, 0, 8) as $category): ?>
                     <button class="tab-btn" data-tab="cat-<?= $category->id ?>"
                             onclick="switchTab('cat-<?= $category->id ?>')">
                         <?= htmlspecialchars($category->name) ?>
@@ -108,6 +112,50 @@
                                         <path d="m21 21-4.35-4.35"></path>
                                     </svg>
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Star Rating Filter -->
+                    <div class="sidebar-section collapsible" data-section="ratings">
+                        <button type="button" class="section-toggle" onclick="toggleSection('ratings')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <polygon
+                                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                                Customer Rating
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+
+                        <div class="section-content open">
+                            <div class="filter-list" id="rating-filter-list">
+                                <?php for ($i = 5; $i >= 1; $i--): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="radio" name="min_rating" value="<?= $i ?>" class="filter-checkbox">
+                                        <span class="rating-stars">
+                                        <?php for ($s = 1; $s <= 5; $s++): ?>
+                                            <svg width="14" height="14" viewBox="0 0 24 24"
+                                                 fill="<?= $s <= $i ? '#f59e0b' : 'none' ?>"
+                                                 stroke="<?= $s <= $i ? '#f59e0b' : '#cbd5e1' ?>"
+                                                 stroke-width="2" style="display:inline-block;vertical-align:middle;">
+                                                <polygon
+                                                        points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                            </svg>
+                                        <?php endfor; ?>
+                                    </span>
+                                        <span class="rating-text">&amp; Up</span>
+                                    </label>
+                                <?php endfor; ?>
+                                <label class="filter-option">
+                                    <input type="radio" name="min_rating" value="">
+                                    <span class="rating-text">Any rating</span>
+                                </label>
                             </div>
                         </div>
                     </div>

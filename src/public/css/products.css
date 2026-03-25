@@ -1921,3 +1921,224 @@ body.card-flipped {
     z-index: 2;
 }
 
+/* ============================================================
+   TAB LOADING BAR
+   Append this block to both products.css and deals.css
+   ============================================================ */
+
+.tab-loading-bar {
+    height: 3px;
+    background: var(--border, #E5E7EB);
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.tab-loading-progress {
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    background: var(--primary, #4F46E5);
+    border-radius: 2px;
+    animation: tabLoadingSlide 0.9s ease-in-out infinite;
+}
+
+@keyframes tabLoadingSlide {
+    0% {
+        left: -40%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* ============================================================
+   STAR RATING FILTER — radio inputs styled like checkboxes
+   ============================================================ */
+
+input[type="radio"].filter-checkbox {
+    accent-color: var(--primary, #4F46E5);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#rating-filter-list .filter-checkbox-label {
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#rating-filter-list .filter-name svg {
+    vertical-align: middle;
+}
+
+/* ============================================================
+   TABS — ensure the tab bar scrolls horizontally on mobile
+   and category tabs don't break layout
+   ============================================================ */
+
+.deals-tabs {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+}
+
+.deals-tabs .tab-btn {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+}
+
+/* ============================================================
+   TAB LOADING BAR
+   Append this block to both products.css and deals.css
+   ============================================================ */
+
+.tab-loading-bar {
+    height: 3px;
+    background: var(--border, #E5E7EB);
+    border-radius: 2px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.tab-loading-progress {
+    position: absolute;
+    top: 0;
+    left: -40%;
+    width: 40%;
+    height: 100%;
+    background: var(--primary, #4F46E5);
+    border-radius: 2px;
+    animation: tabLoadingSlide 0.9s ease-in-out infinite;
+}
+
+@keyframes tabLoadingSlide {
+    0% {
+        left: -40%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* ============================================================
+   STAR RATING FILTER — radio inputs styled like checkboxes
+   ============================================================ */
+
+input[type="radio"].filter-checkbox {
+    accent-color: var(--primary, #4F46E5);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#rating-filter-list .filter-checkbox-label {
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#rating-filter-list .filter-name svg {
+    vertical-align: middle;
+}
+
+/* ============================================================
+   TABS — ensure the tab bar scrolls horizontally on mobile
+   and category tabs don't break layout
+   ============================================================ */
+
+.deals-tabs {
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+}
+
+.deals-tabs .tab-btn {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+}
+
+/* Tabs */
+.deals-tabs {
+    display: flex;
+    gap: 0.5rem;
+    background: #fff;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+.tab-btn {
+    padding: 0.625rem 1.25rem;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0f1111;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    background: #f7f7f7;
+}
+
+.tab-btn.active {
+    background: #232f3e;
+    color: #fff;
+    border-color: #232f3e;
+}
+
+.suggested-filters {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.suggested-filters-header h3 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.suggested-filters-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.suggested-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.suggested-filter-chip:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.suggested-filter-chip.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+

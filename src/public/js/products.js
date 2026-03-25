@@ -19,8 +19,13 @@
             specificationIds: [],
             minPrice: '',
             maxPrice: '',
-            onSale: false
+            onSale: false,
+            minRating: null,
+            minDiscount: null,
+            hasVoucher: false,
         },
+        activeSuggestedFilters: new Set(),
+        allDiscoveredFilters: new Map(),
         cartCount: 0,
         wishlistCount: 0,
         debounceTimer: null
@@ -39,6 +44,7 @@
         perPageSelect: document.getElementById('per-page-select'),
         productsGrid: document.getElementById('products-grid'),
         loadingState: document.getElementById('loading-state'),
+        tabLoading: document.getElementById('tab-loading'),
         emptyState: document.getElementById('empty-state'),
         pagination: document.getElementById('pagination'),
         resultsCount: document.getElementById('results-count'),
@@ -51,7 +57,171 @@
     function init() {
         loadFromURL();
         attachEventListeners();
+        attachTabListeners();
         updateCounts();
+    }
+
+    // -------------------------------------------------------------------------
+    // Tab system
+    // -------------------------------------------------------------------------
+
+    function attachTabListeners() {
+        document.querySelectorAll('#product-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        });
+    }
+
+    function switchTab(tab) {
+        // Update active tab
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+
+        // Reset filters
+        state.filters = {
+            search: '',
+            categoryIds: [],
+            brandIds: [],
+            specificationIds: [],
+            minPrice: '',
+            maxPrice: '',
+            onSale: false,
+            minRating: null,
+            minDiscount: null,
+            hasVoucher: false,
+            activeSuggestedFilters: new Set(),
+        };
+
+        // Reset form inputs
+        elements.searchInput.value = '';
+        elements.minPriceInput.value = '';
+        elements.maxPriceInput.value = '';
+        elements.onSaleFilter.checked = false;
+        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="min_rating"]').forEach(r => r.checked = false);
+
+        // Apply tab-specific filters
+        if (tab === 'under25') {
+            state.filters.maxPrice = '25';
+            elements.maxPriceInput.value = '25';
+        } else if (tab === 'under50') {
+            state.filters.maxPrice = '50';
+            elements.maxPriceInput.value = '50';
+        } else if (tab === 'under100') {
+            state.filters.maxPrice = '100';
+            elements.maxPriceInput.value = '100';
+        } else if (tab === 'over50') {
+            // 50% off or more
+            state.filters.onSale = true;
+            state.filters.minDiscountPercent = 50;
+            elements.onSaleFilter.checked = true;
+        } else if (tab === 'vouchers') {
+            state.filters.hasVoucher = true;
+        } else if (tab.startsWith('cat-')) {
+            const categoryId = tab.replace('cat-', '');
+            state.filters.categoryIds = [categoryId];
+            const checkbox = document.querySelector(`input[name="category[]"][value="${categoryId}"]`);
+            if (checkbox) checkbox.checked = true;
+        }
+
+        // Reset to first page
+        state.currentPage = 1;
+
+        if (elements.tabLoading) elements.tabLoading.style.display = 'block';
+
+        // Update URL and load products
+        updateURL();
+        loadProducts();
+    }
+
+    window.switchTab = switchTab;
+
+    function generateSuggestedFilters(products) {
+        if (!products || products.length === 0) {
+            document.getElementById('suggested-filters').style.display = 'none';
+            return;
+        }
+
+        const suggestions = [];
+
+        // Price range suggestions based on data
+        const prices = products.map(p => p.sale_price || p.price).filter(p => p > 0);
+
+        if (prices.length > 0) {
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+
+            if (maxPrice > 100) {
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100});
+            } else if (maxPrice > 50) {
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+            }
+        }
+
+        // Discount suggestions
+        const hasHighDiscounts = products.some(p => p.discount_percentage >= 50);
+        if (hasHighDiscounts) {
+            suggestions.push({type: 'discount', label: '50% Off or More', minDiscount: 50});
+        }
+
+        const hasModerateDiscounts = products.some(p => p.discount_percentage >= 30);
+        if (hasModerateDiscounts) {
+            suggestions.push({type: 'discount', label: '30% Off or More', minDiscount: 30});
+        }
+
+        // Vouchers filter
+        const hasVouchers = products.some(p => p.has_voucher);
+        if (hasVouchers) {
+            suggestions.push({type: 'voucher', label: 'Has Voucher', hasVoucher: true});
+        }
+
+        // Top brands (brands with most products in results)
+        const brandCounts = {};
+        products.forEach(p => {
+            const brandName = p.brand?.name ?? '';
+            if (brandName) {
+                brandCounts[brandName] = (brandCounts[brandName] || 0) + 1;
+            }
+        });
+
+        const topBrands = Object.entries(brandCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3);
+
+        topBrands.forEach(([brand, count]) => {
+            if (count >= 3) {
+                suggestions.push({type: 'brand', label: brand, brand: brand});
+            }
+        });
+
+        // Render suggestions
+        if (suggestions.length > 0) {
+            const html = suggestions.map(s => `
+            <button class="suggested-filter-chip" 
+                    data-type="${s.type}"
+                    data-value='${JSON.stringify(s)}'
+                    onclick="applySuggestedFilter(this)">
+                ${s.label}
+            </button>
+        `).join('');
+
+            document.getElementById('suggested-filters-list').innerHTML = html;
+            document.getElementById('suggested-filters').style.display = 'block';
+        } else {
+            document.getElementById('suggested-filters').style.display = 'none';
+        }
+
+        document.querySelectorAll('.suggested-filter-chip').forEach(btn => {
+            const key = btn.dataset.value; // already JSON
+            if (state.activeSuggestedFilters.has(key)) {
+                btn.classList.add('active');
+            }
+        });
     }
 
     // Add comparison checkbox to product cards
@@ -257,6 +427,7 @@
         state.perPage = parseInt(params.get('per_page')) || 12;
         state.sortBy = params.get('sort_by') || 'created_at';
         state.sortOrder = params.get('sort_order') || 'desc';
+        state.activeTab = params.get('tab') || 'all';
         state.filters.search = params.get('q') || '';
         state.filters.categoryIds = params.get('category_ids') ? params.get('category_ids').split(',') : [];
         state.filters.brandIds = params.get('brand_ids') ? params.get('brand_ids').split(',') : [];
@@ -264,30 +435,41 @@
         state.filters.minPrice = params.get('min_price') || '';
         state.filters.maxPrice = params.get('max_price') || '';
         state.filters.onSale = params.get('on_sale') === '1';
+        state.filters.minRating = params.get('min_rating') ? parseInt(params.get('min_rating')) : null;
+        state.filters.minDiscount = params.get('min_discount') ? parseInt(params.get('min_discount')) : null;
+        state.filters.hasVoucher = params.get('has_voucher') === '1';
 
-        // Update UI to match state
-        elements.searchInput.value = state.filters.search;
-        elements.minPriceInput.value = state.filters.minPrice;
-        elements.maxPriceInput.value = state.filters.maxPrice;
-        elements.onSaleFilter.checked = state.filters.onSale;
-        elements.sortSelect.value = `${state.sortBy}:${state.sortOrder}`;
-        elements.perPageSelect.value = state.perPage.toString();
+        // Restore UI
+        if (elements.searchInput) elements.searchInput.value = state.filters.search;
+        if (elements.minPriceInput) elements.minPriceInput.value = state.filters.minPrice;
+        if (elements.maxPriceInput) elements.maxPriceInput.value = state.filters.maxPrice;
+        if (elements.onSaleFilter) elements.onSaleFilter.checked = state.filters.onSale;
 
-        // Check appropriate checkboxes
+        if (elements.sortSelect) elements.sortSelect.value = `${state.sortBy}:${state.sortOrder}`;
+        if (elements.perPageSelect) elements.perPageSelect.value = state.perPage.toString();
+
+        // Restore active tab button
+        document.querySelectorAll('#product-tabs .tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
+        });
+
+        // Restore checkboxes
         state.filters.categoryIds.forEach(id => {
-            const checkbox = document.querySelector(`input[name="category[]"][value="${id}"]`);
-            if (checkbox) checkbox.checked = true;
+            const cb = document.querySelector(`input[name="category[]"][value="${id}"]`);
+            if (cb) cb.checked = true;
         });
-
         state.filters.brandIds.forEach(id => {
-            const checkbox = document.querySelector(`input[name="brand[]"][value="${id}"]`);
-            if (checkbox) checkbox.checked = true;
+            const cb = document.querySelector(`input[name="brand[]"][value="${id}"]`);
+            if (cb) cb.checked = true;
         });
-
         state.filters.specificationIds.forEach(value => {
-            const checkbox = document.querySelector(`input[name^="spec_"][value="${value}"]`);
-            if (checkbox) checkbox.checked = true;
+            const cb = document.querySelector(`input[name^="spec_"][value="${value}"]`);
+            if (cb) cb.checked = true;
         });
+        if (state.filters.minRating) {
+            const radio = document.querySelector(`input[name="min_rating"][value="${state.filters.minRating}"]`);
+            if (radio) radio.checked = true;
+        }
 
         loadProducts();
     }
@@ -296,6 +478,7 @@
     function updateURL() {
         const params = new URLSearchParams();
 
+        if (state.activeTab && state.activeTab !== 'all') params.set('tab', state.activeTab);
         if (state.currentPage > 1) params.set('page', state.currentPage);
         if (state.perPage !== 12) params.set('per_page', state.perPage);
         if (state.sortBy !== 'created_at' || state.sortOrder !== 'desc') {
@@ -309,6 +492,9 @@
         if (state.filters.minPrice) params.set('min_price', state.filters.minPrice);
         if (state.filters.maxPrice) params.set('max_price', state.filters.maxPrice);
         if (state.filters.onSale) params.set('on_sale', '1');
+        if (state.filters.minRating) params.set('min_rating', state.filters.minRating);
+        if (state.filters.minDiscount) params.set('min_discount', state.filters.minDiscount);
+        if (state.filters.hasVoucher) params.set('has_voucher', '1');
 
         const newURL = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
         window.history.pushState({}, '', newURL);
@@ -325,59 +511,37 @@
 
     // Event Listeners
     function attachEventListeners() {
-        // Search
         elements.searchBtn.addEventListener('click', handleSearch);
-        elements.searchInput.addEventListener('keypress', (e) => {
+        elements.searchInput.addEventListener('keypress', e => {
             if (e.key === 'Enter') handleSearch();
         });
         elements.searchInput.addEventListener('input', debouncedFilterUpdate);
 
-        // Auto-apply filters on change
-        document.querySelectorAll('input[name="category[]"]').forEach(cb => {
-            cb.addEventListener('change', debouncedFilterUpdate);
-        });
-
-        document.querySelectorAll('input[name="brand[]"]').forEach(cb => {
-            cb.addEventListener('change', debouncedFilterUpdate);
-        });
-
-        document.querySelectorAll('input[name^="spec_"]').forEach(cb => {
-            cb.addEventListener('change', debouncedFilterUpdate);
-        });
+        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.addEventListener('change', debouncedFilterUpdate));
+        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.addEventListener('change', debouncedFilterUpdate));
+        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.addEventListener('change', debouncedFilterUpdate));
+        document.querySelectorAll('input[name="min_rating"]').forEach(r => r.addEventListener('change', debouncedFilterUpdate));
 
         elements.minPriceInput.addEventListener('input', debouncedFilterUpdate);
         elements.maxPriceInput.addEventListener('input', debouncedFilterUpdate);
         elements.onSaleFilter.addEventListener('change', debouncedFilterUpdate);
 
-        // Keep apply/reset buttons for manual control
         elements.applyFiltersBtn.addEventListener('click', updateFiltersAndLoad);
         elements.resetFiltersBtn.addEventListener('click', resetFilters);
 
-        // Sorting and pagination
         elements.sortSelect.addEventListener('change', handleSortChange);
         elements.perPageSelect.addEventListener('change', handlePerPageChange);
 
-        // Browser back/forward
         window.addEventListener('popstate', loadFromURL);
 
-        // Product card click to open modal
-        elements.productsGrid.addEventListener('click', (e) => {
-
-            // if(e.target.className === 'btn-add-to-cart' || e.target.className === 'btn-wishlist' || e.target.className === 'btn-share' || e.target.className === 'merchant-count') {
-            //    return
-            // }
-
-            // Don't open modal if clicking action buttons
+        // Product card click → modal
+        elements.productsGrid.addEventListener('click', e => {
             if (e.target.closest('.btn-compare, .btn-flip, .btn-wishlist, .btn-add-to-cart, .btn-show-review, .btn-share, .product-card-back, .merchant-badge, .merchant-count')) {
                 return;
             }
-
             const productCard = e.target.closest('.product-card');
-            if (productCard) {
-                const productId = productCard.dataset.productId;
-                if (window.productModal) {
-                    window.productModal.open(productId);
-                }
+            if (productCard && window.productModal) {
+                window.productModal.open(productCard.dataset.productId);
             }
         });
     }
@@ -391,19 +555,20 @@
 
     // Update filters and load
     function updateFiltersAndLoad() {
-        // Get all checked category checkboxes
         state.filters.categoryIds = Array.from(
             document.querySelectorAll('input[name="category[]"]:checked')
         ).map(cb => cb.value);
 
-        // Get all checked brand checkboxes
         state.filters.brandIds = Array.from(
             document.querySelectorAll('input[name="brand[]"]:checked')
         ).map(cb => cb.value);
 
-        // Get specification filters
-        const specCheckboxes = document.querySelectorAll('[name^="spec_"]:checked');
-        state.filters.specificationIds = Array.from(specCheckboxes).map(cb => cb.value);
+        state.filters.specificationIds = Array.from(
+            document.querySelectorAll('[name^="spec_"]:checked')
+        ).map(cb => cb.value);
+
+        const selectedRating = document.querySelector('input[name="min_rating"]:checked');
+        state.filters.minRating = selectedRating && selectedRating.value ? parseInt(selectedRating.value) : null;
 
         state.filters.search = elements.searchInput.value.trim();
         state.filters.minPrice = elements.minPriceInput.value;
@@ -449,20 +614,20 @@
             specificationIds: [],
             minPrice: '',
             maxPrice: '',
-            onSale: false
+            onSale: false,
         };
+        state.activeSuggestedFilters.clear(); // Only clear the selection
         state.currentPage = 1;
 
+        // Reset UI elements
         elements.searchInput.value = '';
-        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
         elements.minPriceInput.value = '';
         elements.maxPriceInput.value = '';
         elements.onSaleFilter.checked = false;
+        document.querySelectorAll('input[name="category[]"], input[name="brand[]"], input[name^="spec_"]').forEach(cb => cb.checked = false);
 
         updateURL();
-        loadProducts();
+        loadProducts(); // This will trigger the re-render of chips via generateSuggestedFilters
     }
 
     // Handle sort change
@@ -498,8 +663,12 @@
             spec_ids: state.filters.specificationIds.join(','),
             min_price: state.filters.minPrice,
             max_price: state.filters.maxPrice,
-            on_sale: state.filters.onSale ? '1' : ''
+            on_sale: state.filters.onSale ? '1' : '',
         });
+
+        if (state.filters.minRating) params.set('min_rating', state.filters.minRating);
+        if (state.filters.minDiscount) params.set('min_discount', state.filters.minDiscount);
+        if (state.filters.hasVoucher) params.set('has_voucher', '1');
 
         try {
             const response = await fetch(`/api/${SITE}/product-list/search?${params}`);
@@ -509,6 +678,7 @@
                 renderProducts(data.data);
                 renderPagination(data.pagination);
                 updateResultsCount(data.pagination.total);
+                generateSuggestedFilters(data.data)
             } else {
                 showError('Failed to load products');
             }
@@ -517,9 +687,64 @@
             showError('An error occurred while loading products');
         } finally {
             hideLoading();
-            window.refreshRecommendations();
+            hideTabLoading();
+            if (typeof window.refreshRecommendations === 'function') {
+                window.refreshRecommendations();
+            }
         }
     }
+
+    function applySuggestedFilter(btn) {
+        const filter = JSON.parse(btn.dataset.value);
+        const key = JSON.stringify(filter);
+
+        // 1. Check if we are clicking an already active filter to deselect it
+        const isAlreadyActive = state.activeSuggestedFilters.has(key);
+
+        // 2. Clear all previous suggested filter states
+        state.activeSuggestedFilters.clear();
+
+        // Reset specific manual filter values that chips might have touched
+        state.filters.maxPrice = '';
+        elements.maxPriceInput.value = '';
+        state.filters.onSale = false;
+        elements.onSaleFilter.checked = false;
+        delete state.filters.minDiscountPercent;
+        state.filters.hasVoucher = false;
+
+        // 3. If it wasn't already active, activate the new one
+        if (!isAlreadyActive) {
+            state.activeSuggestedFilters.add(key);
+
+            if (filter.type === 'price') {
+                state.filters.maxPrice = filter.maxPrice.toString();
+                elements.maxPriceInput.value = filter.maxPrice;
+            } else if (filter.type === 'discount') {
+                state.filters.minDiscountPercent = filter.minDiscount;
+                state.filters.onSale = true;
+                elements.onSaleFilter.checked = true;
+            } else if (filter.type === 'voucher') {
+                state.filters.hasVoucher = true;
+            } else if (filter.type === 'brand') {
+                // Clear other brands first for single-selection behavior
+                state.filters.brandIds = [];
+                document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
+
+                const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
+                    .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    state.filters.brandIds.push(checkbox.value);
+                }
+            }
+        }
+
+        state.currentPage = 1;
+        updateURL();
+        loadProducts();
+    }
+
+    window.applySuggestedFilter = applySuggestedFilter;
 
     // Render products
     function renderProducts(products) {
@@ -903,6 +1128,18 @@
     function hideLoading() {
         elements.loadingState.style.display = 'none';
         elements.productsGrid.style.display = 'grid';
+    }
+
+    function showTabLoading() {
+        if (elements.tabLoading) {
+            elements.tabLoading.style.display = 'block';
+        }
+    }
+
+    function hideTabLoading() {
+        if (elements.tabLoading) {
+            elements.tabLoading.style.display = 'none';
+        }
     }
 
     // Show empty state

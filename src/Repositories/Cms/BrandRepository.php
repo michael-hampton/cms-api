@@ -28,9 +28,18 @@ class BrandRepository extends Repository
         return $this->searchEngine->search($query, $criteria);
     }
 
-    protected function getModelClass(): string
+    public function getAllWithProductCounts(?int $siteId)
     {
-        return Brand::class;
+        return Brand::query()
+            ->where('site_id', $siteId)
+            ->withCount('products') // assumes Brand has products() relationship
+            ->orderByDesc('products_count')
+            ->get()
+            ->map(fn($brand) => (object)[
+                'id' => $brand->id,
+                'name' => $brand->name,
+                'product_count' => $brand->products_count,
+            ]);
     }
 
     public function findBySlug(string $slug): ?Brand
@@ -54,5 +63,10 @@ class BrandRepository extends Repository
     public function getProductsByBrandId(int $brandId): Collection
     {
         return Product::where('brand_id', $brandId)->get();
+    }
+
+    protected function getModelClass(): string
+    {
+        return Brand::class;
     }
 }

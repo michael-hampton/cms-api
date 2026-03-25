@@ -7,6 +7,7 @@
         perPage: 12,
         sortBy: 'created_at',
         sortOrder: 'desc',
+        activeTab: 'all',
         filters: {
             search: '',
             categoryIds: [],
@@ -14,8 +15,13 @@
             specificationIds: [],
             minPrice: '',
             maxPrice: '',
-            onSale: false
+            onSale: false,
+            minRating: null,
+            minDiscount: null,
+            hasVoucher: false,
         },
+        activeSuggestedFilters: new Set(),
+        allDiscoveredFilters: new Map(),
         cartCount: 0,
         wishlistCount: 0,
         debounceTimer: null
@@ -39,7 +45,8 @@
         resultsCount: document.getElementById('results-count'),
         cartCount: document.getElementById('cart-count'),
         wishlistCount: document.getElementById('wishlist-count'),
-        toast: document.getElementById('toast')
+        toast: document.getElementById('toast'),
+        tabLoading: document.getElementById('tab-loading'),
     };
 
     const comparisonState = {
@@ -128,6 +135,7 @@
         state.currentPage = parseInt(params.get('page')) || 1;
         state.perPage = parseInt(params.get('per_page')) || 12;
         state.sortBy = params.get('sort_by') || 'created_at';
+        state.activeTab = params.get('tab') || 'all';
         state.sortOrder = params.get('sort_order') || 'desc';
         state.filters.search = params.get('q') || '';
         state.filters.categoryIds = params.get('category_ids') ? params.get('category_ids').split(',') : [];
@@ -136,6 +144,9 @@
         state.filters.minPrice = params.get('min_price') || '';
         state.filters.maxPrice = params.get('max_price') || '';
         state.filters.onSale = params.get('on_sale') === '1';
+        state.filters.minRating = params.get('min_rating') ? parseInt(params.get('min_rating')) : null;
+        state.filters.minDiscount = params.get('min_discount') ? parseInt(params.get('min_discount')) : null;
+        state.filters.hasVoucher = params.get('has_voucher') === '1';
 
         // Update UI to match state
         elements.searchInput.value = state.filters.search;
@@ -144,6 +155,11 @@
         elements.onSaleFilter.checked = state.filters.onSale;
         elements.sortSelect.value = `${state.sortBy}:${state.sortOrder}`;
         elements.perPageSelect.value = state.perPage.toString();
+
+        if (state.filters.minRating) {
+            const radio = document.querySelector(`input[name="min_rating"][value="${state.filters.minRating}"]`);
+            if (radio) radio.checked = true;
+        }
 
         // Check appropriate checkboxes
         state.filters.categoryIds.forEach(id => {
@@ -159,6 +175,10 @@
         state.filters.specificationIds.forEach(value => {
             const checkbox = document.querySelector(`input[name^="spec_"][value="${value}"]`);
             if (checkbox) checkbox.checked = true;
+        });
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === state.activeTab);
         });
 
         loadProducts();
@@ -181,6 +201,8 @@
         if (state.filters.minPrice) params.set('min_price', state.filters.minPrice);
         if (state.filters.maxPrice) params.set('max_price', state.filters.maxPrice);
         if (state.filters.onSale) params.set('on_sale', '1');
+        if (state.activeTab && state.activeTab !== 'all') params.set('tab', state.activeTab);
+
 
         console.log('state', state.filters)
 
@@ -215,8 +237,16 @@
             cb.addEventListener('change', debouncedFilterUpdate);
         });
 
+        document.querySelectorAll('input[name="min_rating"]').forEach(r => {
+            r.addEventListener('change', debouncedFilterUpdate);
+        });
+
         document.querySelectorAll('input[name^="spec_"]').forEach(cb => {
             cb.addEventListener('change', debouncedFilterUpdate);
+        });
+
+        document.querySelectorAll('.deals-tabs .tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchTab(btn.dataset.tab));
         });
 
         elements.minPriceInput.addEventListener('input', debouncedFilterUpdate);
@@ -264,6 +294,11 @@
         state.filters.onSale = elements.onSaleFilter.checked;
         state.currentPage = 1;
 
+        const selectedRating = document.querySelector('input[name="min_rating"]:checked');
+
+        state.filters.minRating = selectedRating && selectedRating.value
+            ? parseInt(selectedRating.value) : null;
+
         updateURL();
         loadProducts();
     }
@@ -302,20 +337,20 @@
             specificationIds: [],
             minPrice: '',
             maxPrice: '',
-            onSale: false
+            onSale: false,
         };
+        state.activeSuggestedFilters.clear(); // Only clear the selection
         state.currentPage = 1;
 
+        // Reset UI elements
         elements.searchInput.value = '';
-        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
         elements.minPriceInput.value = '';
         elements.maxPriceInput.value = '';
         elements.onSaleFilter.checked = false;
+        document.querySelectorAll('input[name="category[]"], input[name="brand[]"], input[name^="spec_"]').forEach(cb => cb.checked = false);
 
         updateURL();
-        loadProducts();
+        loadProducts(); // This will trigger the re-render of chips via generateSuggestedFilters
     }
 
     // Handle sort change
@@ -350,7 +385,11 @@
             specificationIds: [],
             minPrice: '',
             maxPrice: '',
-            onSale: false
+            onSale: false,
+            minRating: null,
+            minDiscount: null,
+            hasVoucher: false,
+            activeSuggestedFilters: new Set(),
         };
 
         // Reset form inputs
@@ -361,6 +400,7 @@
         document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
         document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
         document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
+        document.querySelectorAll('input[name="min_rating"]').forEach(r => r.checked = false);
 
         // Apply tab-specific filters
         if (tab === 'under25') {
@@ -389,6 +429,8 @@
         // Reset to first page
         state.currentPage = 1;
 
+        if (elements.tabLoading) elements.tabLoading.style.display = 'block';
+
         // Update URL and load products
         updateURL();
         loadProducts();
@@ -397,89 +439,82 @@
     window.switchTab = switchTab;
 
     function generateSuggestedFilters(products) {
-        if (!products || products.length === 0) {
-            document.getElementById('suggested-filters').style.display = 'none';
+        const suggestionsContainer = document.getElementById('suggested-filters');
+
+        // 1. Identify new potential filters from current products
+        if (products && products.length > 0) {
+            const prices = products.map(p => p.sale_price || p.original_price).filter(p => p > 0);
+            const maxPrice = Math.max(...prices);
+
+            // Define potential chips
+            const potential = [
+                {type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25},
+                {type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50},
+                {type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100},
+                {type: 'discount', label: '50% Off or More', minDiscount: 50},
+                {type: 'voucher', label: 'Has Voucher', hasVoucher: true}
+            ];
+
+            // Add to our permanent "Discovered" map if criteria are met
+            potential.forEach(s => {
+                const meetsCriteria =
+                    (s.type === 'price' && maxPrice > s.maxPrice) ||
+                    (s.type === 'discount' && products.some(p => p.discount_percentage >= s.minDiscount)) ||
+                    (s.type === 'voucher' && products.some(p => p.has_voucher));
+
+                if (meetsCriteria) {
+                    state.allDiscoveredFilters.set(s.label, s);
+                }
+            });
+        }
+
+        // 2. If we have nothing to show yet, hide; otherwise, always show
+        if (state.allDiscoveredFilters.size === 0) {
+            suggestionsContainer.style.display = 'none';
             return;
         }
 
-        const suggestions = [];
+        // 3. Render EVERYTHING in the discovered map
+        const html = Array.from(state.allDiscoveredFilters.values()).map(s => {
+            const filterKey = JSON.stringify(s);
+            const isActive = state.activeSuggestedFilters.has(filterKey);
 
-        // Price range suggestions based on data
-        const prices = products.map(p => p.sale_price || p.original_price).filter(p => p > 0);
-        if (prices.length > 0) {
-            const minPrice = Math.min(...prices);
-            const maxPrice = Math.max(...prices);
-
-            if (maxPrice > 100) {
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100});
-            } else if (maxPrice > 50) {
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
-            }
-        }
-
-        // Discount suggestions
-        const hasHighDiscounts = products.some(p => p.discount_percentage >= 50);
-        if (hasHighDiscounts) {
-            suggestions.push({type: 'discount', label: '50% Off or More', minDiscount: 50});
-        }
-
-        const hasModerateDiscounts = products.some(p => p.discount_percentage >= 30);
-        if (hasModerateDiscounts) {
-            suggestions.push({type: 'discount', label: '30% Off or More', minDiscount: 30});
-        }
-
-        // Vouchers filter
-        const hasVouchers = products.some(p => p.has_voucher);
-        if (hasVouchers) {
-            suggestions.push({type: 'voucher', label: 'Has Voucher', hasVoucher: true});
-        }
-
-        // Top brands (brands with most products in results)
-        const brandCounts = {};
-        products.forEach(p => {
-            if (p.brand) {
-                brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1;
-            }
-        });
-
-        const topBrands = Object.entries(brandCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3);
-
-        topBrands.forEach(([brand, count]) => {
-            if (count >= 3) {
-                suggestions.push({type: 'brand', label: brand, brand: brand});
-            }
-        });
-
-        // Render suggestions
-        if (suggestions.length > 0) {
-            const html = suggestions.map(s => `
-            <button class="suggested-filter-chip" 
+            return `
+            <button class="suggested-filter-chip ${isActive ? 'active' : ''}" 
                     data-type="${s.type}"
-                    data-value='${JSON.stringify(s)}'
+                    data-value='${filterKey}'
                     onclick="applySuggestedFilter(this)">
                 ${s.label}
             </button>
-        `).join('');
+        `;
+        }).join('');
 
-            document.getElementById('suggested-filters-list').innerHTML = html;
-            document.getElementById('suggested-filters').style.display = 'block';
-        } else {
-            document.getElementById('suggested-filters').style.display = 'none';
-        }
+        document.getElementById('suggested-filters-list').innerHTML = html;
+        suggestionsContainer.style.display = 'block';
     }
 
     function applySuggestedFilter(btn) {
         const filter = JSON.parse(btn.dataset.value);
+        const key = JSON.stringify(filter);
 
-        // Toggle active state
-        btn.classList.toggle('active');
+        // 1. Check if we are clicking an already active filter to deselect it
+        const isAlreadyActive = state.activeSuggestedFilters.has(key);
 
-        if (btn.classList.contains('active')) {
+        // 2. Clear all previous suggested filter states
+        state.activeSuggestedFilters.clear();
+
+        // Reset specific manual filter values that chips might have touched
+        state.filters.maxPrice = '';
+        elements.maxPriceInput.value = '';
+        state.filters.onSale = false;
+        elements.onSaleFilter.checked = false;
+        delete state.filters.minDiscountPercent;
+        state.filters.hasVoucher = false;
+
+        // 3. If it wasn't already active, activate the new one
+        if (!isAlreadyActive) {
+            state.activeSuggestedFilters.add(key);
+
             if (filter.type === 'price') {
                 state.filters.maxPrice = filter.maxPrice.toString();
                 elements.maxPriceInput.value = filter.maxPrice;
@@ -490,30 +525,15 @@
             } else if (filter.type === 'voucher') {
                 state.filters.hasVoucher = true;
             } else if (filter.type === 'brand') {
-                // Find and check the brand checkbox
+                // Clear other brands first for single-selection behavior
+                state.filters.brandIds = [];
+                document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
+
                 const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
                     .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);
                 if (checkbox) {
                     checkbox.checked = true;
                     state.filters.brandIds.push(checkbox.value);
-                }
-            }
-        } else {
-            if (filter.type === 'price') {
-                state.filters.maxPrice = '';
-                elements.maxPriceInput.value = '';
-            } else if (filter.type === 'discount') {
-                delete state.filters.minDiscountPercent;
-                state.filters.onSale = false;
-                elements.onSaleFilter.checked = false;
-            } else if (filter.type === 'voucher') {
-                state.filters.hasVoucher = false;
-            } else if (filter.type === 'brand') {
-                const checkbox = Array.from(document.querySelectorAll('input[name="brand[]"]'))
-                    .find(cb => cb.nextElementSibling?.textContent?.trim() === filter.brand);
-                if (checkbox) {
-                    checkbox.checked = false;
-                    state.filters.brandIds = state.filters.brandIds.filter(id => id !== checkbox.value);
                 }
             }
         }
@@ -543,6 +563,10 @@
             on_sale: state.filters.onSale ? '1' : ''
         });
 
+        if (state.filters.minRating) params.set('min_rating', state.filters.minRating);
+        if (state.filters.minDiscount) params.set('min_discount', state.filters.minDiscount);
+        if (state.filters.hasVoucher) params.set('has_voucher', '1');
+
         try {
             const response = await fetch(`/api/${SITE}/deals/filtered?${params}`);
             const data = await response.json();
@@ -551,6 +575,7 @@
                 renderProducts(data.data);
                 renderPagination(data.pagination);
                 updateResultsCount(data.pagination.total);
+                generateSuggestedFilters(data.data);
             } else {
                 showError('Failed to load products');
             }
@@ -558,6 +583,7 @@
             console.error('Error loading products:', error);
             showError('An error occurred while loading products');
         } finally {
+            if (elements.tabLoading) elements.tabLoading.style.display = 'none';
             hideLoading();
             window.refreshRecommendations();
         }

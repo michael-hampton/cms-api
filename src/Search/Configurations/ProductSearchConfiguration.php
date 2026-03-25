@@ -59,6 +59,41 @@ class ProductSearchConfiguration extends SearchConfiguration implements SearchCo
                         ->whereColumn('sale_price', '<', 'price');
                 }
                 return $query;
+            }))
+            ->addFilter(new CustomFilter('min_rating', function ($query, $value) {
+                $minRating = (float)$value;
+                if ($minRating <= 0) {
+                    return $query;
+                }
+
+                return $query->whereHas('approvedReviews', function ($q) use ($minRating) {
+                    $q->havingRaw('AVG(rating) >= ?', [$minRating]);
+                }, '>=', 1);
+            }))
+            ->addFilter(new CustomFilter('min_discount', function ($query, $value) {
+                $minDiscount = (float)$value;
+                if ($minDiscount <= 0) {
+                    return $query;
+                }
+
+                // discount_percentage must be a stored column or a computed expression
+                return $query->whereNotNull('sale_price')
+                    ->whereColumn('sale_price', '<', 'price')
+                    ->whereRaw(
+                        'ROUND((1 - sale_price / price) * 100) >= ?',
+                        [$minDiscount]
+                    );
+            }))
+            ->addFilter(new CustomFilter('has_voucher', function ($query, $value) {
+                if (!filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                    return $query;
+                }
+
+                // Assumes a vouchers / product_vouchers relationship exists
+                return $query->whereHas('vouchers', function ($q) {
+                    $q->where('is_active', true)
+                        ->where('expires_at', '>', now());
+                });
             }));
 
         self::applySiteFilter();

@@ -9,16 +9,13 @@
 </head>
 <body>
 <div class="page-wrapper">
-    <!-- Header -->
-    @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])]
+    @include('header', ['menu' => $menu, 'menuRenderer' => $menuRenderer, 'title' => 'Shop'])
     @include('components/mini-cart')
-
     @include('components/member-badge')
 
-    <!-- Main Content -->
     <main class="main-content">
         <div class="full-container" style="margin: 20px">
-            <!-- Hero Section -->
+
             <section class="hero-section" style="margin-bottom: 20px">
                 <div class="container">
                     <h1 class="hero-title">Discover Amazing Products</h1>
@@ -26,10 +23,36 @@
                 </div>
             </section>
 
+            <!-- Deals Tabs -->
+            <div class="deals-tabs">
+                <button class="tab-btn active" data-tab="all" onclick="switchTab('all')">All Deals</button>
+
+                <!-- Category Tabs (Dynamic) -->
+                <?php
+                $filteredCategories = array_filter($categories ?? [], fn($c) => $c->product_count > 0);
+                ?>
+
+                <?php foreach (array_slice($filteredCategories, 0, 8) as $category): ?>
+                    <button class="tab-btn" data-tab="cat-<?= $category->id ?>"
+                            onclick="switchTab('cat-<?= $category->id ?>')">
+                        <?= htmlspecialchars($category->name) ?>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+
+            <div class="suggested-filters" id="suggested-filters" style="display: none;">
+                <div class="suggested-filters-header">
+                    <h3>Quick Filters:</h3>
+                </div>
+                <div class="suggested-filters-list" id="suggested-filters-list">
+                    <!-- Dynamically populated -->
+                </div>
+            </div>
 
             <div class="shop-layout">
                 <!-- Sidebar -->
                 <aside class="shop-sidebar">
+
                     <div class="sidebar-section collapsible" data-section="search">
                         <button type="button" class="section-toggle" onclick="toggleSection('search')">
                             <h3 class="sidebar-title">
@@ -45,7 +68,6 @@
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
-
                         <div class="section-content open">
                             <div class="search-box">
                                 <input type="text" id="search-input" placeholder="Search products...">
@@ -55,6 +77,50 @@
                                         <path d="m21 21-4.35-4.35"></path>
                                     </svg>
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Star Rating Filter -->
+                    <div class="sidebar-section collapsible" data-section="rating">
+                        <button type="button" class="section-toggle" onclick="toggleSection('rating')">
+                            <h3 class="sidebar-title">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="2">
+                                    <polygon
+                                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                </svg>
+                                Customer Rating
+                            </h3>
+                            <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="section-content open">
+                            <div class="filter-list" id="rating-filter-list">
+                                <?php for ($i = 5; $i >= 1; $i--): ?>
+                                    <label class="filter-checkbox-label">
+                                        <input type="radio" name="min_rating" value="<?= $i ?>" class="filter-checkbox">
+                                        <span class="filter-name">
+                                            <?php for ($s = 1; $s <= 5; $s++): ?>
+                                                <svg width="14" height="14" viewBox="0 0 24 24"
+                                                     fill="<?= $s <= $i ? '#f59e0b' : 'none' ?>"
+                                                     stroke="<?= $s <= $i ? '#f59e0b' : '#cbd5e1' ?>"
+                                                     stroke-width="2"
+                                                     style="display:inline-block;vertical-align:middle;">
+                                                    <polygon
+                                                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                                                </svg>
+                                            <?php endfor; ?>
+                                            &amp; Up
+                                        </span>
+                                    </label>
+                                <?php endfor; ?>
+                                <label class="filter-checkbox-label">
+                                    <input type="radio" name="min_rating" value="" class="filter-checkbox">
+                                    <span class="filter-name">Any rating</span>
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -75,16 +141,15 @@
                             <div class="filter-list" id="category-list">
                                 <?php foreach (array_slice($categories, 0, 5) as $category): ?>
                                     <label class="filter-checkbox-label">
-                                        <input type="checkbox" class="filter-checkbox" name="category[]" value="<?= $category->id ?>">
+                                        <input type="checkbox" class="filter-checkbox" name="category[]"
+                                               value="<?= (int)$category->id ?>">
                                         <span class="filter-name"><?= htmlspecialchars($category->name) ?></span>
-                                        <span class="filter-count"><?= $category->product_count ?? 0 ?></span>
+                                        <span class="filter-count"><?= (int)($category->product_count ?? 0) ?></span>
                                     </label>
                                 <?php endforeach; ?>
                             </div>
                             <?php if (count($categories) > 5): ?>
-                                <button type="button" class="show-more-btn" data-filter="category">
-                                    Show More
-                                </button>
+                                <button type="button" class="show-more-btn" data-filter="category">Show More</button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -105,16 +170,15 @@
                             <div class="filter-list" id="brand-list">
                                 <?php foreach (array_slice($brands, 0, 5) as $brand): ?>
                                     <label class="filter-checkbox-label">
-                                        <input type="checkbox" class="filter-checkbox" name="brand[]" value="<?= $brand->id ?>">
+                                        <input type="checkbox" class="filter-checkbox" name="brand[]"
+                                               value="<?= (int)$brand->id ?>">
                                         <span class="filter-name"><?= htmlspecialchars($brand->name) ?></span>
-                                        <span class="filter-count"><?= $brand->product_count ?? 0 ?></span>
+                                        <span class="filter-count"><?= (int)($brand->product_count ?? 0) ?></span>
                                     </label>
                                 <?php endforeach; ?>
                             </div>
                             <?php if (count($brands) > 5): ?>
-                                <button type="button" class="show-more-btn" data-filter="brand">
-                                    Show More
-                                </button>
+                                <button type="button" class="show-more-btn" data-filter="brand">Show More</button>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -122,17 +186,15 @@
                     <!-- Specification Filters -->
                     <?php if (!empty($specificationGroups)): ?>
                         <?php foreach ($specificationGroups as $specGroup): ?>
-                            <div class="sidebar-section collapsible" data-section="spec-<?= $specGroup['slug'] ?>">
+                            <div class="sidebar-section collapsible"
+                                 data-section="spec-<?= htmlspecialchars($specGroup['slug']) ?>">
                                 <button type="button" class="section-toggle"
-                                        onclick="toggleSection('spec-<?= $specGroup['slug'] ?>')">
+                                        onclick="toggleSection('spec-<?= htmlspecialchars($specGroup['slug']) ?>')">
                                     <h3 class="sidebar-title">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
                                              stroke="currentColor" stroke-width="2">
                                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                             <polyline points="14 2 14 8 20 8"></polyline>
-                                            <line x1="16" y1="13" x2="8" y2="13"></line>
-                                            <line x1="16" y1="17" x2="8" y2="17"></line>
-                                            <polyline points="10 9 9 9 8 9"></polyline>
                                         </svg>
                                         <?= htmlspecialchars($specGroup['name']) ?>
                                     </h3>
@@ -142,25 +204,25 @@
                                     </svg>
                                 </button>
                                 <div class="section-content">
-                                    <div class="filter-list" id="spec-<?= $specGroup['slug'] ?>-list">
+                                    <div class="filter-list" id="spec-<?= htmlspecialchars($specGroup['slug']) ?>-list">
                                         <?php foreach (array_slice($specGroup['specifications'], 0, 5) as $spec): ?>
                                             <?php foreach ($spec['values'] as $value): ?>
                                                 <label class="filter-checkbox-label">
                                                     <input type="checkbox"
                                                            class="filter-checkbox"
-                                                           name="spec_<?= $specGroup['id'] ?>[]"
+                                                           name="spec_<?= (int)$specGroup['id'] ?>[]"
                                                            value="<?= htmlspecialchars($value) ?>"
-                                                           data-group="<?= $specGroup['id'] ?>"
+                                                           data-group="<?= (int)$specGroup['id'] ?>"
                                                            data-key="<?= htmlspecialchars($spec['key']) ?>">
                                                     <span class="filter-name"><?= htmlspecialchars($spec['key']) ?>: <?= htmlspecialchars($value) ?></span>
-                                                    <span class="filter-count"><?= $spec['count'] ?></span>
+                                                    <span class="filter-count"><?= (int)$spec['count'] ?></span>
                                                 </label>
                                             <?php endforeach; ?>
                                         <?php endforeach; ?>
                                     </div>
                                     <?php if (count($specGroup['specifications']) > 5): ?>
                                         <button type="button" class="show-more-btn"
-                                                data-filter="spec-<?= $specGroup['slug'] ?>">
+                                                data-filter="spec-<?= htmlspecialchars($specGroup['slug']) ?>">
                                             Show More
                                         </button>
                                     <?php endif; ?>
@@ -174,7 +236,8 @@
                             <h3 class="sidebar-title">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                      stroke-width="2">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                                 </svg>
                                 Price Range
                             </h3>
@@ -185,9 +248,9 @@
                         </button>
                         <div class="section-content open">
                             <div class="price-range">
-                                <input type="number" id="min-price" placeholder="Min" class="price-input">
-                                <span class="price-separator">-</span>
-                                <input type="number" id="max-price" placeholder="Max" class="price-input">
+                                <input type="number" id="min-price" placeholder="Min" class="price-input" min="0">
+                                <span class="price-separator">–</span>
+                                <input type="number" id="max-price" placeholder="Max" class="price-input" min="0">
                             </div>
                         </div>
                     </div>
@@ -202,17 +265,13 @@
                     <button class="btn btn-primary btn-block" id="apply-filters">Apply Filters</button>
                     <button class="btn btn-secondary btn-block" id="reset-filters">Reset</button>
 
-                    <script id="all-categories" type="application/json">
-                        <?= json_encode($categories) ?>
-                        </script>
-                    <script id="all-brands" type="application/json">
-                        <?= json_encode($brands) ?>
-                    </script>
+                    <!-- Data islands for JS show-more expansion -->
+                    <script id="all-categories" type="application/json"><?= json_encode($categories) ?></script>
+                    <script id="all-brands" type="application/json"><?= json_encode($brands) ?></script>
                 </aside>
 
                 <!-- Products Area -->
                 <div class="shop-content">
-                    <!-- Toolbar -->
                     <div class="shop-toolbar">
                         <div class="results-info">
                             <span id="results-count">0 products</span>
@@ -234,18 +293,19 @@
                         </div>
                     </div>
 
-                    <!-- Products Grid -->
-                    <div id="products-grid" class="products-grid">
-                        <!-- Products will be loaded here -->
+                    <!-- Tab loading indicator (shown during tab switches) -->
+                    <div id="tab-loading" class="tab-loading-bar" style="display:none;" aria-live="polite"
+                         aria-label="Loading products">
+                        <div class="tab-loading-progress"></div>
                     </div>
 
-                    <!-- Loading State -->
+                    <div id="products-grid" class="products-grid"></div>
+
                     <div id="loading-state" class="loading-state" style="display: none;">
                         <div class="spinner"></div>
                         <p>Loading products...</p>
                     </div>
 
-                    <!-- Empty State -->
                     <div id="empty-state" class="empty-state" style="display: none;">
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -256,45 +316,28 @@
                         <p>Try adjusting your filters or search terms</p>
                     </div>
 
-                    <!-- Pagination -->
-                    <div id="pagination" class="pagination">
-                        <!-- Pagination will be loaded here -->
-                    </div>
+                    <div id="pagination" class="pagination"></div>
                 </div>
             </div>
         </div>
     </main>
-
-    <!-- Footer -->
-    <footer class="site-footer">
-        <div class="container">
-            <p>&copy; 2025 YourStore. All rights reserved.</p>
-        </div>
-    </footer>
 </div>
 
-<!-- Toast Notification -->
 <div id="toast" class="toast"></div>
 
-<div id="comparison-bar"
-     style="display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #000; color: white; padding: 1rem; justify-content: space-between; align-items: center; z-index: 1000;">
+<div id="comparison-bar" style="display:none;">
     <div class="comparison-count">0 products selected</div>
     <button onclick="compareProducts()" class="btn btn-primary">Compare Products</button>
 </div>
 
-<script id="all-specification-groups" type="application/json">
-    <?= json_encode($specificationGroups ?? []) ?>
-
-</script>
+<script id="all-specification-groups" type="application/json"><?= json_encode($specificationGroups ?? []) ?></script>
 
 @include('components/share-modal')
 @include('components/footer')
 
 <script>
-    SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
-    CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
-
-    alert(CURRENCY_SYMBOL)
+    SITE = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug(), ENT_QUOTES) ?>';
+    CURRENCY_SYMBOL = '<?= htmlspecialchars($currencySymbol, ENT_QUOTES) ?>';
 </script>
 
 @js('productModal.js')

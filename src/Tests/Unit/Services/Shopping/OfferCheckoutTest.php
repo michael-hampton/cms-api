@@ -3,8 +3,6 @@
 namespace App\Tests\Unit\Services\Shopping;
 
 use App\Enums\CartItemType;
-use App\Models\Product;
-use App\Models\ProductOffer;
 use App\Services\Shopping\CartService;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -46,7 +44,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_can_be_added_to_cart(): void
     {
         $product = $this->createProduct(['is_active' => true, 'price' => 100.0]);
-        $offer = $this->createOffer($product, ['sale_price' => 79.99, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id);
 
         $result = $this->cartService->addOfferToCart($offer->id);
 
@@ -62,7 +60,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_inactive_offer_cannot_be_added_to_cart(): void
     {
         $product = $this->createProduct(['is_active' => true]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => false]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => false, 'site_id' => $this->siteId]);
 
         $result = $this->cartService->addOfferToCart($offer->id);
 
@@ -74,7 +72,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_with_inactive_product_cannot_be_added(): void
     {
         $product = $this->createProduct(['is_active' => false]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id);
 
         $result = $this->cartService->addOfferToCart($offer->id);
 
@@ -85,7 +83,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_cannot_be_added_when_product_already_in_cart(): void
     {
         $product = $this->createProduct(['is_active' => true, 'stock_quantity' => 10]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id);
 
         // Add the product first
         $this->cartService->addItem($product->id, 1);
@@ -100,7 +98,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_uses_sale_price_not_product_price(): void
     {
         $product = $this->createProduct(['is_active' => true, 'price' => 200.0, 'sale_price' => 180.0]);
-        $offer = $this->createOffer($product, ['sale_price' => 99.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 99.0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -111,7 +109,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_falls_back_to_product_price_when_no_sale_price(): void
     {
         $product = $this->createProduct(['is_active' => true, 'price' => 150.0]);
-        $offer = $this->createOffer($product, ['sale_price' => 0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -122,7 +120,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_cart_total_reflects_offer_price(): void
     {
         $product = $this->createProduct(['is_active' => true, 'price' => 100.0]);
-        $offer = $this->createOffer($product, ['sale_price' => 60.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 60.0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -132,7 +130,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_removing_offer_item_clears_cart(): void
     {
         $product = $this->createProduct(['is_active' => true]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
         $items = $this->cartService->getItems();
@@ -147,7 +145,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_item_has_limited_time_badge(): void
     {
         $product = $this->createProduct(['is_active' => true]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -159,7 +157,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     {
         $regularProduct = $this->createProduct(['is_active' => true, 'price' => 40.0, 'stock_quantity' => 5]);
         $offerProduct = $this->createProduct(['is_active' => true, 'price' => 100.0, 'stock_quantity' => 5]);
-        $offer = $this->createOffer($offerProduct, ['sale_price' => 70.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($offerProduct->id, ['sale_price' => 70.0, 'is_active' => true]);
 
         $this->cartService->addItem($regularProduct->id, 1);
         $this->cartService->addOfferToCart($offer->id);
@@ -185,7 +183,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     {
         $merchant = $this->createMerchant();
         $product = $this->createProduct(['is_active' => true]);
-        $offer = $this->createOffer($product, [
+        $offer = $this->createProductOffer($product->id, [
             'sale_price' => 55.0,
             'is_active' => true,
             'merchant_id' => $merchant->id,
@@ -203,7 +201,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_with_no_merchant_groups_under_direct(): void
     {
         $product = $this->createProduct(['is_active' => true]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true, 'merchant_id' => null]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => true, 'merchant_id' => null]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -221,7 +219,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_regular_product_blocks_subsequent_offer_for_same_product(): void
     {
         $product = $this->createProduct(['is_active' => true, 'stock_quantity' => 5]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => true]);
 
         $this->cartService->addItem($product->id, 1);
         $result = $this->cartService->addOfferToCart($offer->id);
@@ -233,7 +231,7 @@ class OfferCheckoutTest extends RepositoryTestCase
     public function test_offer_blocks_subsequent_regular_add_for_same_product(): void
     {
         $product = $this->createProduct(['is_active' => true, 'stock_quantity' => 10]);
-        $offer = $this->createOffer($product, ['sale_price' => 50.0, 'is_active' => true]);
+        $offer = $this->createProductOffer($product->id, ['sale_price' => 50.0, 'is_active' => true]);
 
         $this->cartService->addOfferToCart($offer->id);
 
@@ -244,19 +242,5 @@ class OfferCheckoutTest extends RepositoryTestCase
         $this->assertStringContainsString('promotion', strtolower($result['message']));
     }
 
-    // -------------------------------------------------------------------------
-    // Helper: createOffer
-    // -------------------------------------------------------------------------
 
-    private function createOffer(Product $product, array $attributes = []): ProductOffer
-    {
-        return ProductOffer::create(array_merge([
-            'product_id' => $product->id,
-            'sale_price' => 99.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => true,
-            'original_price' => $product->price ?? 0,
-        ], $attributes));
-    }
 }
