@@ -37,7 +37,7 @@ class MemberOrdersController extends Controller
             return $this->redirect('/member/login');
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $order = $this->orderRepository->getOrderById($orderId);
 
         if (!$order || $order->user_id !== $member->id) {

@@ -30,46 +30,6 @@
             color: var(--text-primary);
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .nav {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        .nav a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav a:hover {
-            color: var(--primary-color);
-        }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -702,18 +662,7 @@
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/" class="logo"><?= htmlspecialchars($site->name) ?></a>
-        <nav class="nav">
-            <a href="/member/dashboard">Dashboard</a>
-            <a href="/member/orders">Orders</a>
-            <a href="/member/addresses">Addresses</a>
-            <a href="/member/settings">Settings</a>
-            <a href="/member/logout">Logout</a>
-        </nav>
-    </div>
-</header>
+@include('member._header')
 
 <main class="container">
     <div class="page-header">
@@ -765,8 +714,8 @@
                         <span class="summary-label">Subscription Period</span>
                         <span class="summary-value">
                 <?php
-                $start = new \DateTime($subscription->start_date);
-                $end = new \DateTime($subscription->end_date);
+                $start = $subscription->start_date;
+                $end = $subscription->end_date;
                 $interval = $start->diff($end);
                 $months = ($interval->y * 12) + $interval->m;
                 echo $months . ' month' . ($months > 1 ? 's' : '');

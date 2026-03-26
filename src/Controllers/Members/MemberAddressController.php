@@ -77,12 +77,12 @@ class MemberAddressController extends Controller
         }
 
         try {
-            $member = MemberAuth::member();
+            $member = MemberAuth::getMember();
             $data = $request->validated();
             $data['member_id'] = $member->id;
             $data['site_id'] = SiteContext::getId();
 
-            $this->addressRepository->createAddressForMember($member->id, $data);
+            $this->addressRepository->createAddressForMember($member->id, $data, SiteContext::getId());
 
             if (!empty($data['postcode'])) {
                 event(new MemberPostcodeUpdated($member, $data['postcode'], null));
@@ -122,7 +122,7 @@ class MemberAddressController extends Controller
         }
 
         try {
-            $member = MemberAuth::member();
+            $member = MemberAuth::getMember();
             $address = $this->addressRepository->find($id);
             $originalPostcode = $address->postcode;
 

@@ -382,7 +382,7 @@
     <!-- Activity Trends Chart -->
     <div class="chart-container">
         <h2 class="section-title">Activity Trends (Last 30 Days)</h2>
-        <canvas id="activityChart" class="chart"></canvas>
+        <canvas id="activityChart" width="1250" height="500"></canvas>
     </div>
 
     <!-- Recent Activity Feed -->
@@ -434,44 +434,121 @@
 </main>
 
 <script>
-    // Activity Trends Chart
-    //const activityData = <?php //= json_encode($activity_trends) ?>//;
-    //
-    //const ctx = document.getElementById('activityChart').getContext('2d');
-    //new Chart(ctx, {
-    //    type: 'line',
-    //    data: {
-    //        labels: activityData.map(d => {
-    //            const date = new Date(d.date);
-    //            return date.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-    //        }),
-    //        datasets: [{
-    //            label: 'Activities',
-    //            data: activityData.map(d => d.count),
-    //            borderColor: '#667eea',
-    //            backgroundColor: 'rgba(102, 126, 234, 0.1)',
-    //            tension: 0.4,
-    //            fill: true
-    //        }]
-    //    },
-    //    options: {
-    //        responsive: true,
-    //        maintainAspectRatio: false,
-    //        plugins: {
-    //            legend: {
-    //                display: false
-    //            }
-    //        },
-    //        scales: {
-    //            y: {
-    //                beginAtZero: true,
-    //                ticks: {
-    //                    precision: 0
-    //                }
-    //            }
-    //        }
-    //    }
-    //});
+    const activityData = <?= json_encode($activity_trends) ?>;
+    const canvas = document.getElementById('activityChart');
+    const ctx = canvas.getContext('2d');
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const padding = 60; // bigger padding for labels
+
+    const labels = activityData.map(d => d.date);
+    const counts = activityData.map(d => d.count);
+
+    // Compute scales
+    const maxCount = Math.max(...counts, 5);
+    const minCount = 0;
+    const xStep = (width - 2 * padding) / (counts.length - 1);
+    const yScale = (height - 2 * padding) / (maxCount - minCount);
+
+    // Draw axes
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1.5;
+
+    // Y-axis
+    ctx.beginPath();
+    ctx.moveTo(padding, padding);
+    ctx.lineTo(padding, height - padding);
+    ctx.stroke();
+
+    // X-axis
+    ctx.beginPath();
+    ctx.moveTo(padding, height - padding);
+    ctx.lineTo(width - padding, height - padding);
+    ctx.stroke();
+
+    // Draw curve and fill
+    ctx.strokeStyle = '#667eea';
+    ctx.fillStyle = 'rgba(102,126,234,0.2)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+
+    counts.forEach((count, i) => {
+        const x = padding + i * xStep;
+        const y = height - padding - (count - minCount) * yScale;
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            const prevX = padding + (i - 1) * xStep;
+            const prevY = height - padding - (counts[i - 1] - minCount) * yScale;
+            const cx = (prevX + x) / 2;
+            const cy = (prevY + y) / 2;
+            ctx.quadraticCurveTo(prevX, prevY, cx, cy);
+        }
+    });
+
+    // Last point
+    const lastX = padding + (counts.length - 1) * xStep;
+    const lastY = height - padding - (counts[counts.length - 1] - minCount) * yScale;
+    ctx.lineTo(lastX, lastY);
+    ctx.stroke();
+
+    // Fill under the curve
+    ctx.lineTo(lastX, height - padding);
+    ctx.lineTo(padding, height - padding);
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw points and labels
+    ctx.fillStyle = '#667eea';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+
+    counts.forEach((count, i) => {
+        const x = padding + i * xStep;
+        const y = height - padding - (count - minCount) * yScale;
+        // Draw point
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        // Draw label above point
+        ctx.fillStyle = '#000';
+        ctx.fillText(count, x, y - 10);
+        ctx.fillStyle = '#667eea';
+    });
+
+    // Draw X labels
+    ctx.fillStyle = '#000';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    labels.forEach((label, i) => {
+        const x = padding + i * xStep;
+        ctx.fillText(new Date(label).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric'
+        }), x, height - padding + 8);
+    });
+
+    // Draw Y labels
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= maxCount; i += Math.ceil(maxCount / 5)) {
+        const y = height - padding - (i - minCount) * yScale;
+        ctx.fillText(i, padding - 10, y);
+    }
+
+    // Optional: draw grid lines
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= 5; i++) {
+        const y = height - padding - i * (height - 2 * padding) / 5;
+        ctx.beginPath();
+        ctx.moveTo(padding, y);
+        ctx.lineTo(width - padding, y);
+        ctx.stroke();
+    }
 </script>
 </body>
 </html>

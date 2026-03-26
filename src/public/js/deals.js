@@ -373,11 +373,14 @@
 
     function switchTab(tab) {
         // Update active tab
+        state.activeTab = tab;
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tab);
         });
 
-        // Reset filters
+        // Reset filters AND discovered chips for the new context
+        state.allDiscoveredFilters.clear();
+        state.activeSuggestedFilters.clear();
         state.filters = {
             search: '',
             categoryIds: [],
@@ -389,20 +392,16 @@
             minRating: null,
             minDiscount: null,
             hasVoucher: false,
-            activeSuggestedFilters: new Set(),
         };
 
-        // Reset form inputs
+        // Reset UI form inputs
         elements.searchInput.value = '';
         elements.minPriceInput.value = '';
         elements.maxPriceInput.value = '';
         elements.onSaleFilter.checked = false;
-        document.querySelectorAll('input[name="category[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name="brand[]"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name^="spec_"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('input[name="min_rating"]').forEach(r => r.checked = false);
+        document.querySelectorAll('input[name="category[]"], input[name="brand[]"], input[name^="spec_"], input[name="min_rating"]').forEach(cb => cb.checked = false);
 
-        // Apply tab-specific filters
+        // Apply tab-specific logic
         if (tab === 'under25') {
             state.filters.maxPrice = '25';
             elements.maxPriceInput.value = '25';
@@ -413,7 +412,6 @@
             state.filters.maxPrice = '100';
             elements.maxPriceInput.value = '100';
         } else if (tab === 'over50') {
-            // 50% off or more
             state.filters.onSale = true;
             state.filters.minDiscountPercent = 50;
             elements.onSaleFilter.checked = true;
@@ -426,12 +424,9 @@
             if (checkbox) checkbox.checked = true;
         }
 
-        // Reset to first page
         state.currentPage = 1;
-
         if (elements.tabLoading) elements.tabLoading.style.display = 'block';
 
-        // Update URL and load products
         updateURL();
         loadProducts();
     }
@@ -440,6 +435,7 @@
 
     function generateSuggestedFilters(products) {
         const suggestionsContainer = document.getElementById('suggested-filters');
+        const listContainer = document.getElementById('suggested-filters-list');
 
         // 1. Identify new potential filters from current products
         if (products && products.length > 0) {
@@ -455,7 +451,7 @@
                 {type: 'voucher', label: 'Has Voucher', hasVoucher: true}
             ];
 
-            // Add to our permanent "Discovered" map if criteria are met
+            // Add Standard Chips to discovered map
             potential.forEach(s => {
                 const meetsCriteria =
                     (s.type === 'price' && maxPrice > s.maxPrice) ||
@@ -466,10 +462,32 @@
                     state.allDiscoveredFilters.set(s.label, s);
                 }
             });
+
+            // BRAND SUGGESTION FIX: Extract brands from current result set
+            const brandCounts = {};
+            products.forEach(p => {
+                const brandName = p.brand?.name ?? '';
+                if (brandName) brandCounts[brandName] = (brandCounts[brandName] || 0) + 1;
+            });
+
+            // Suggest top 3 brands present in current view (threshold >= 1)
+            Object.entries(brandCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .forEach(([brand, count]) => {
+                    if (count >= 1) {
+                        const brandObj = {type: 'brand', label: brand, brand: brand};
+                        state.allDiscoveredFilters.set(`brand-${brand}`, brandObj);
+                    }
+                });
         }
 
-        // 2. If we have nothing to show yet, hide; otherwise, always show
-        if (state.allDiscoveredFilters.size === 0) {
+        // 2. PERSISTENCE FIX:
+        // If we have an active filter, we MUST show the list so the user can deselect.
+        // Otherwise, only show if we have discovered filters.
+        const hasActiveQuickFilter = state.activeSuggestedFilters.size > 0;
+
+        if (state.allDiscoveredFilters.size === 0 && !hasActiveQuickFilter) {
             suggestionsContainer.style.display = 'none';
             return;
         }
@@ -489,7 +507,7 @@
         `;
         }).join('');
 
-        document.getElementById('suggested-filters-list').innerHTML = html;
+        listContainer.innerHTML = html;
         suggestionsContainer.style.display = 'block';
     }
 

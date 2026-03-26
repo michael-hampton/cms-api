@@ -12,12 +12,12 @@
         });
 
         // Wishlist toggle
-        /*document.querySelectorAll('.btn-wishlist').forEach(btn => {
+        document.querySelectorAll('.btn-wishlist').forEach(btn => {
             if (!btn.hasListener) {
                 btn.addEventListener('click', handleToggleWishlist);
                 btn.hasListener = true;
             }
-        });*/
+        });
     }
 
     async function handleAddToCart(e) {

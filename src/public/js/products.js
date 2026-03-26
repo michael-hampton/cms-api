@@ -25,6 +25,7 @@
             hasVoucher: false,
         },
         activeSuggestedFilters: new Set(),
+        lastSuggestions: [],       // persisted so active chips survive filtered reloads
         allDiscoveredFilters: new Map(),
         cartCount: 0,
         wishlistCount: 0,
@@ -89,8 +90,9 @@
             minRating: null,
             minDiscount: null,
             hasVoucher: false,
-            activeSuggestedFilters: new Set(),
         };
+        state.activeSuggestedFilters.clear();
+        state.lastSuggestions = [];
 
         // Reset form inputs
         elements.searchInput.value = '';
@@ -139,89 +141,95 @@
     window.switchTab = switchTab;
 
     function generateSuggestedFilters(products) {
-        if (!products || products.length === 0) {
-            document.getElementById('suggested-filters').style.display = 'none';
-            return;
-        }
-
         const suggestions = [];
 
-        // Price range suggestions based on data
-        const prices = products.map(p => p.sale_price || p.price).filter(p => p > 0);
-
-        if (prices.length > 0) {
-            const minPrice = Math.min(...prices);
-            const maxPrice = Math.max(...prices);
-
-            if (maxPrice > 100) {
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100});
-            } else if (maxPrice > 50) {
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
-                suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+        // 1. Generate new suggestions based on current products
+        if (products && products.length > 0) {
+            const prices = products.map(p => p.sale_price || p.price).filter(p => p > 0);
+            if (prices.length > 0) {
+                const maxPrice = Math.max(...prices);
+                if (maxPrice > 100) {
+                    suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                    suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+                    suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}100`, maxPrice: 100});
+                } else if (maxPrice > 50) {
+                    suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}25`, maxPrice: 25});
+                    suggestions.push({type: 'price', label: `Under ${CURRENCY_SYMBOL}50`, maxPrice: 50});
+                }
             }
-        }
 
-        // Discount suggestions
-        const hasHighDiscounts = products.some(p => p.discount_percentage >= 50);
-        if (hasHighDiscounts) {
-            suggestions.push({type: 'discount', label: '50% Off or More', minDiscount: 50});
-        }
-
-        const hasModerateDiscounts = products.some(p => p.discount_percentage >= 30);
-        if (hasModerateDiscounts) {
-            suggestions.push({type: 'discount', label: '30% Off or More', minDiscount: 30});
-        }
-
-        // Vouchers filter
-        const hasVouchers = products.some(p => p.has_voucher);
-        if (hasVouchers) {
-            suggestions.push({type: 'voucher', label: 'Has Voucher', hasVoucher: true});
-        }
-
-        // Top brands (brands with most products in results)
-        const brandCounts = {};
-        products.forEach(p => {
-            const brandName = p.brand?.name ?? '';
-            if (brandName) {
-                brandCounts[brandName] = (brandCounts[brandName] || 0) + 1;
+            if (products.some(p => p.discount_percentage >= 50)) {
+                suggestions.push({type: 'discount', label: '50% Off or More', minDiscount: 50});
             }
-        });
-
-        const topBrands = Object.entries(brandCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3);
-
-        topBrands.forEach(([brand, count]) => {
-            if (count >= 3) {
-                suggestions.push({type: 'brand', label: brand, brand: brand});
+            if (products.some(p => p.has_voucher)) {
+                suggestions.push({type: 'voucher', label: 'Has Voucher', hasVoucher: true});
             }
-        });
 
-        // Render suggestions
+            // BRAND LOGIC FIX: Lowered threshold to 1 so brands actually show up
+            const brandCounts = {};
+            products.forEach(p => {
+                const brandName = p.brand?.name ?? '';
+                if (brandName) brandCounts[brandName] = (brandCounts[brandName] || 0) + 1;
+            });
+
+            Object.entries(brandCounts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .forEach(([brand, count]) => {
+                    // Changed from (count >= 3) to (count >= 1)
+                    if (count >= 1) {
+                        suggestions.push({type: 'brand', label: brand, brand: brand});
+                    }
+                });
+        }
+
+        // 2. PERSISTENCE LOGIC FIX:
+        // If we found new suggestions, update the cache.
+        // If the current result set is empty but we have an active filter,
+        // we MUST keep the old chips visible so the user can deselect them.
+        const hasActiveQuickFilter = state.activeSuggestedFilters.size > 0;
+
         if (suggestions.length > 0) {
-            const html = suggestions.map(s => `
-            <button class="suggested-filter-chip" 
-                    data-type="${s.type}"
-                    data-value='${JSON.stringify(s)}'
-                    onclick="applySuggestedFilter(this)">
-                ${s.label}
-            </button>
-        `).join('');
-
-            document.getElementById('suggested-filters-list').innerHTML = html;
-            document.getElementById('suggested-filters').style.display = 'block';
-        } else {
-            document.getElementById('suggested-filters').style.display = 'none';
+            state.lastSuggestions = suggestions;
         }
 
-        document.querySelectorAll('.suggested-filter-chip').forEach(btn => {
-            const key = btn.dataset.value; // already JSON
-            if (state.activeSuggestedFilters.has(key)) {
-                btn.classList.add('active');
+        // Use the cached suggestions if the new ones are empty (to prevent disappearing)
+        const toRender = (suggestions.length === 0 && (hasActiveQuickFilter || state.lastSuggestions.length > 0))
+            ? state.lastSuggestions
+            : suggestions;
+
+        const container = document.getElementById('suggested-filters-list');
+        const section = document.getElementById('suggested-filters');
+
+        if (toRender.length > 0) {
+            const incoming = toRender.map(s => JSON.stringify(s));
+            const existing = Array.from(container.querySelectorAll('.suggested-filter-chip'))
+                .map(btn => btn.dataset.value);
+
+            const sameChips = incoming.length === existing.length &&
+                incoming.every((v, i) => v === existing[i]);
+
+            if (!sameChips) {
+                container.innerHTML = toRender.map(s => `
+                    <button class="suggested-filter-chip"
+                            data-type="${s.type}"
+                            data-value='${JSON.stringify(s)}'
+                            onclick="applySuggestedFilter(this)">
+                        ${s.label}
+                    </button>
+                `).join('');
             }
-        });
+
+            // Sync active classes
+            container.querySelectorAll('.suggested-filter-chip').forEach(btn => {
+                btn.classList.toggle('active', state.activeSuggestedFilters.has(btn.dataset.value));
+            });
+
+            section.style.display = 'block';
+        } else {
+            // Only hide if we truly have nothing to show even in cache
+            section.style.display = 'none';
+        }
     }
 
     // Add comparison checkbox to product cards
@@ -616,7 +624,8 @@
             maxPrice: '',
             onSale: false,
         };
-        state.activeSuggestedFilters.clear(); // Only clear the selection
+        state.activeSuggestedFilters.clear();
+        state.lastSuggestions = [];
         state.currentPage = 1;
 
         // Reset UI elements

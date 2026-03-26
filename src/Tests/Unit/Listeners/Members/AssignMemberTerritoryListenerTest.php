@@ -44,7 +44,7 @@ class AssignMemberTerritoryListenerTest extends FunctionalTestCase
             ->with('CF10 3NQ')
             ->andReturn($territory);
 
-        $this->listener->handleMemberCreated(new MemberCreated($member));
+        $this->listener->handle(new MemberCreated($member));
 
         $this->assertDatabaseHas('members', [
             'id' => $member->id,
@@ -71,7 +71,7 @@ class AssignMemberTerritoryListenerTest extends FunctionalTestCase
 
         $this->resolver->shouldNotReceive('resolve');
 
-        $this->listener->handleMemberCreated(new MemberCreated($member));
+        $this->listener->handle(new MemberCreated($member));
 
         $member->refresh();
 
@@ -206,7 +206,7 @@ class AssignMemberTerritoryListenerTest extends FunctionalTestCase
             );
 
         // Must not throw — this is a non-critical side effect
-        $this->listener->handleMemberCreated(new MemberCreated($member));
+        $this->listener->handle(new MemberCreated($member));
 
         $member->refresh();
 

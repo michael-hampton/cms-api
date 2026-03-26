@@ -66,7 +66,7 @@ use App\Listeners\Boost\SendBoostPausedNotification;
 use App\Listeners\Boost\SendBoostResumedNotification;
 use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
-use App\Listeners\Members\AssignMemberTerritoryListener;
+use App\Listeners\Members\MemberPostcodeUpdatedListener;
 use App\Listeners\Members\SendAccountActivationEmailListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
@@ -426,8 +426,8 @@ class ApiApplication
         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
         $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
 
-        $eventDispatcher->listen(MemberAddressImported::class, [AssignMemberTerritoryListener::class, 'handle']);
-        $eventDispatcher->listen(MemberPostcodeUpdated::class, [AssignMemberTerritoryListener::class, 'handle']);
+        $eventDispatcher->listen(MemberAddressImported::class, [MemberPostcodeUpdated::class, 'handle']);
+        $eventDispatcher->listen(MemberPostcodeUpdatedListener::class, [MemberPostcodeUpdated::class, 'handle']);
         $eventDispatcher->listen(StockAllocated::class, [StockAllocatedAnalyticsListener::class, 'handle']);
         $eventDispatcher->listen(StockReleased::class, [StockConfirmedAnalyticsListener::class, 'handle']);
         $eventDispatcher->listen(StockLow::class, [StockLowAlertListener::class, 'handle']);

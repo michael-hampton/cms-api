@@ -2,8 +2,6 @@
 
 namespace App\Listeners\Members;
 
-use App\Events\Members\MemberAddressImported;
-use App\Events\Members\MemberCreated;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Support\Logger;
 use App\Services\Members\TerritoryResolver;
@@ -23,7 +21,7 @@ use App\Services\Members\TerritoryResolver;
  *   - The member has no postcode.
  *   - The postcode prefix has no territory mapping (e.g. international).
  */
-class AssignMemberTerritoryListener
+class MemberPostcodeUpdatedListener
 {
     use AsssignTerritoryTrait;
 
@@ -34,22 +32,8 @@ class AssignMemberTerritoryListener
     {
     }
 
-    public function handle(MemberCreated $event): void
-    {
-        $this->assignTerritory($event->member);
-    }
-
-    public function handleMemberPostcodeUpdated(MemberPostcodeUpdated $event): void
+    public function handle(MemberPostcodeUpdated $event): void
     {
         $this->assignTerritory($event->member, $event->newPostcode);
-    }
-
-    // =========================================================================
-    // Internal
-    // =========================================================================
-
-    public function handleMemberAddressImported(MemberAddressImported $event): void
-    {
-        $this->assignTerritory($event->member);
     }
 }

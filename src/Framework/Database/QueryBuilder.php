@@ -925,16 +925,24 @@ class QueryBuilder
             $havingStrings = [];
 
             foreach ($this->havings as $index => $having) {
-                $paramKey = 'param_' . $paramCounter++;
-                $quotedColumn = $this->quoteColumn($having['column']);
-                $havingString = "{$quotedColumn} {$having['operator']} :{$paramKey}";
+                $havingString = '';
+
+                if (isset($having['type']) && $having['type'] === 'Raw') {
+                    $havingString = $having['sql'];
+                    // Note: Bindings were already merged in havingRaw()
+                    // and will be handled by the database query call
+                } else {
+                    $paramKey = 'param_' . $paramCounter++;
+                    $quotedColumn = $this->quoteColumn($having['column']);
+                    $havingString = "{$quotedColumn} {$having['operator']} :{$paramKey}";
+                    $bindings[$paramKey] = $having['value'];
+                }
 
                 if ($index > 0) {
                     $havingString = "{$having['boolean']} {$havingString}";
                 }
 
                 $havingStrings[] = $havingString;
-                $bindings[$paramKey] = $having['value'];
             }
 
             $sql .= implode(' ', $havingStrings);
@@ -963,6 +971,32 @@ class QueryBuilder
         }
 
         return [$sql, $bindings];
+    }
+
+    public function havingRaw(string $sql, array $bindings = [], string $boolean = 'AND'): self
+    {
+        $this->havings[] = [
+            'type' => 'Raw',
+            'sql' => $sql,
+            'bindings' => $bindings,
+            'boolean' => $boolean
+        ];
+
+        // Merge bindings into the main pool
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                $this->bindings[$key] = $value;
+            } else {
+                $this->bindings[] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    public function orHavingRaw(string $sql, array $bindings = []): self
+    {
+        return $this->havingRaw($sql, $bindings, 'OR');
     }
 
     private function quoteColumn(string $column): string
@@ -1717,6 +1751,29 @@ class QueryBuilder
             $conditions = $this->buildConditionsFromQuery($tempQuery, $bindings);
             if (!empty($conditions)) {
                 $subquery .= " AND (" . implode('', $conditions) . ")";
+            }
+
+            if (!empty($tempQuery->havings)) {
+                $havingParts = [];
+                foreach ($tempQuery->havings as $index => $having) {
+                    $fragment = '';
+                    if (isset($having['type']) && $having['type'] === 'Raw') {
+                        $fragment = $having['sql'];
+                        // Merge the specific bindings for this havingRaw
+                        foreach ($having['bindings'] as $key => $bind) {
+                            $bindings[] = $bind;
+                        }
+                    } else {
+                        // Handle basic having if you use it
+                        $paramName = "h_" . bin2hex(random_bytes(2));
+                        $fragment = "{$this->quoteColumn($having['column'])} {$having['operator']} :{$paramName}";
+                        $bindings[$paramName] = $having['value'];
+                    }
+
+                    $prefix = ($index === 0) ? ' HAVING ' : " {$having['boolean']} ";
+                    $havingParts[] = $prefix . $fragment;
+                }
+                $subquery .= implode('', $havingParts);
             }
         }
 

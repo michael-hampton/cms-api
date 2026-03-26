@@ -30,6 +30,21 @@ class MemberSubscriptionPaymentsController extends Controller
         // Get all member subscriptions
         $subscriptions = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId);
 
+        if (empty($subscriptions)) {
+            return $this->view('member/subscriptions/payments', [
+                'member' => $member,
+                'site' => SiteContext::get(),
+                'payments' => collect(),
+                'paymentSummary' => [
+                    'total_count' => 0,
+                    'currency' => 'GBP',
+                    'total_paid' => 0,
+                    'successful_count' => 0,
+                    'failed_count' => 0
+                ]
+            ]);
+        }
+
         $subscriptionIds = $subscriptions->pluck('id');
 
         // Get all payments for these subscriptions
