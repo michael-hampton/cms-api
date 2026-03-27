@@ -3,6 +3,7 @@
 namespace App\Repositories\Subscriptions;
 
 use App\Enums\Orders\OrderLineStatus;
+use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
@@ -327,6 +328,36 @@ class IssueDeliveryRepository extends Repository
         $issue->incrementStock($quantity);
 
         return $issue;
+    }
+
+    public function findEligibleForPrintRun(int $siteId): Collection
+    {
+        return IssueDelivery::query()
+            ->forSite($siteId)
+            ->where('status', IssueScheduleStatus::ACTIVE->value)
+
+            // Must have passed cut-off
+            ->whereNotNull('cut_off_date')
+            ->whereDate('cut_off_date', '<=', now())
+
+            // Not already dispatched
+            ->where(function ($q) {
+                $q->whereNull('dispatched_at')
+                    ->orWhere('status', '!=', IssueDeliveryStatus::DISPATCHED->value);
+            })
+
+            // Not cancelled
+            ->where('status', '!=', IssueScheduleStatus::CANCELLED->value)
+
+            // 🔥 Critical: avoid duplicates (no active print run)
+            ->whereDoesntHave('printRuns', function ($q) {
+                $q->whereNotIn('status', [
+                    'cancelled',
+                    'failed'
+                ]);
+            })
+            ->orderBy('cut_off_date')
+            ->get();
     }
 
 }

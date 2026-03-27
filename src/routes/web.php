@@ -6,6 +6,8 @@ use App\Controllers\Billing\PaymentController;
 use App\Controllers\Boost\BoostController;
 use App\Controllers\Cms\BlockController;
 use App\Controllers\Cms\PageController;
+use App\Controllers\Crm\CrmAddressController;
+use App\Controllers\Crm\CrmMemberController;
 use App\Controllers\DocsController;
 use App\Controllers\EventController;
 use App\Controllers\FaqController;
@@ -94,6 +96,33 @@ $router->get('/pages/{id}', WebPageController::class, 'show');
 $router->get('/pages/{id}/edit', WebPageController::class, 'edit');
 $router->put('/pages/{id}', WebPageController::class, 'update');
 $router->delete('/pages/{id}', WebPageController::class, 'destroy');
+
+// crm
+$router->get('/crm/members', [CrmMemberController::class, 'index']);
+$router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
+$router->get('/crm/members/{id}/edit', [CrmMemberController::class, 'edit']);
+$router->post('/crm/members/{id}', [CrmMemberController::class, 'update']);
+$router->delete('/crm/members/{id}', [CrmMemberController::class, 'destroy']);
+
+// ── Address sub-resources (CrmAddressController) ──────────────────────────
+
+// Create form
+$router->get('/crm/members/{memberId}/addresses/create', [CrmAddressController::class, 'create']);
+
+// Store new address
+$router->post('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'store']);
+
+// Edit form
+$router->get('/crm/members/{memberId}/addresses/{id}/edit', [CrmAddressController::class, 'edit']);
+
+// Update existing address
+$router->post('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'update']);
+
+// Delete address
+$router->delete('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'destroy']);
+
+// Set address as default
+$router->post('/crm/members/{memberId}/addresses/{id}/default', [CrmAddressController::class, 'setDefault']);
 
 $router->get('/{site}/offers', [OfferListController::class, 'index']);
 $router->get('/{site}/offers/{offerId}', [OfferListController::class, 'show']);

@@ -191,4 +191,9 @@ class IssueDelivery extends Model
             'dispatch_error' => $error,
         ]);
     }
+
+    public function printRuns()
+    {
+        return $this->hasMany(PrintRun::class, 'issue_delivery_id');
+    }
 }

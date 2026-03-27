@@ -7,6 +7,7 @@ use App\Enums\Subscriptions\PrintExportFormat;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PrintBatch;
+use App\Models\PrintRun;
 
 class PrintBatchRepository
 {
@@ -86,5 +87,38 @@ class PrintBatchRepository
     public function find(int $id): ?Model
     {
         return PrintBatch::find($id);
+    }
+
+    public function attachToPrintRun(PrintRun $printRun, ?int $territoryId = null): Collection
+    {
+        $query = PrintBatch::query()
+            ->where('issue_delivery_id', $printRun->issue_delivery_id)
+
+            // Only batches not already attached
+            ->whereNull('print_run_id')
+
+            // Only pending batches
+            ->where('status', PrintBatchStatus::PENDING->value);
+
+        if ($territoryId !== null) {
+            $query->where('territory_id', $territoryId);
+        }
+
+        $batches = $query->get();
+
+        if ($batches->isEmpty()) {
+            return collect();
+        }
+
+        // 🔥 Bulk update (don’t loop like a junior)
+        PrintBatch::whereIn('id', $batches->pluck('id'))
+            ->update([
+                'print_run_id' => $printRun->id,
+            ]);
+
+        // Keep in-memory models correct
+        return $batches->each(function ($batch) use ($printRun) {
+            $batch->print_run_id = $printRun->id;
+        });
     }
 }

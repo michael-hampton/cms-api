@@ -7,6 +7,7 @@ use App\Framework\Support\SiteContext;
 
 class Member extends Model
 {
+    public $table = 'members';
     protected $fillable = [
         'site_id',
         'email',
@@ -31,15 +32,15 @@ class Member extends Model
         'segment',
         'territory_id',
         'anonymous',
-        'password_set_at'
+        'password_set_at',
+        'assigned_agent_id',
+        'crm_notes',
     ];
-
     protected $hidden = [
         'password',
         'email_verification_token',
         'password_reset_token',
     ];
-
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
@@ -48,70 +49,6 @@ class Member extends Model
         'communication_preferences' => 'array',
         'anonymous' => 'boolean'
     ];
-
-    public $table = 'members';
-
-    public function roles($relation = false)
-    {
-        return $this->belongsToMany(
-            MemberRole::class,
-            'member_role_assignments',
-            'member_id',
-            'role_id',
-            true
-        )->withPivot('expires_at');
-    }
-
-    public function hasRole(string $roleSlug): bool
-    {
-        if (!$this->relationLoaded('roles')) {
-            $this->load(['roles']);
-        }
-
-        return $this->roles->contains(function ($role) use ($roleSlug) {
-            // Check if role is not expired
-            $expiresAt = $role->pivot['expires_at'] ?? null;
-            if ($expiresAt && strtotime($expiresAt) < time()) {
-                return false;
-            }
-            return $role->slug === $roleSlug;
-        });
-    }
-
-    public function hasAnyRole(array $roleSlugs): bool
-    {
-        foreach ($roleSlugs as $slug) {
-            if ($this->hasRole($slug)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public function isEmailVerified(): bool
-    {
-        return $this->email_verified_at !== null;
-    }
-
-    public function isActive(): bool
-    {
-        return $this->is_active;
-    }
-
-    public function verifyPassword(string $password): bool
-    {
-        return password_verify($password, $this->password);
-    }
-
-    public function getFullNameAttribute(): string
-    {
-        return trim($this->first_name . ' ' . $this->last_name);
-    }
-
-    public function getDisplayNameAttribute(): string
-    {
-        return $this->attributes['display_name'] ?? $this->getFullNameAttribute();
-    }
 
     public static function findByEmail(string $email, int $siteId): ?self
     {
@@ -134,6 +71,68 @@ class Member extends Model
             //->where('site_id', $siteId)
             ->where('password_reset_expires_at', '>', date('Y-m-d H:i:s'))
             ->first();
+    }
+
+    public function roles($relation = false)
+    {
+        return $this->belongsToMany(
+            MemberRole::class,
+            'member_role_assignments',
+            'member_id',
+            'role_id',
+            true
+        )->withPivot('expires_at');
+    }
+
+    public function hasAnyRole(array $roleSlugs): bool
+    {
+        foreach ($roleSlugs as $slug) {
+            if ($this->hasRole($slug)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function hasRole(string $roleSlug): bool
+    {
+        if (!$this->relationLoaded('roles')) {
+            $this->load(['roles']);
+        }
+
+        return $this->roles->contains(function ($role) use ($roleSlug) {
+            // Check if role is not expired
+            $expiresAt = $role->pivot['expires_at'] ?? null;
+            if ($expiresAt && strtotime($expiresAt) < time()) {
+                return false;
+            }
+            return $role->slug === $roleSlug;
+        });
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->email_verified_at !== null;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->is_active;
+    }
+
+    public function verifyPassword(string $password): bool
+    {
+        return password_verify($password, $this->password);
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->attributes['display_name'] ?? $this->getFullNameAttribute();
+    }
+
+    public function getFullNameAttribute(): string
+    {
+        return trim($this->first_name . ' ' . $this->last_name);
     }
 
     // Add to Member model:
@@ -162,21 +161,6 @@ class Member extends Model
         return $this->hasMany(Subscription::class, 'member_id', 'id', $relation);
     }
 
-    public function activeSubscription($relation = false, ?int $siteId = null)
-    {
-        $siteId = $siteId ?? SiteContext::getId();
-
-        return Subscription::where('member_id', $this->id)
-            ->where('status', 'active')
-            ->where('site_id', $siteId)
-            ->where(function ($query) {
-                $query->whereNull('end_date')
-                    ->orWhere('end_date', '>', date('Y-m-d H:i:s'));
-            })
-            ->orderBy('created_at', 'desc') // Most recent first
-            ->first();
-    }
-
     public function hasActiveSubscriptionOfType(string $type, ?int $siteId = null): bool
     {
         $siteId = $siteId ?? SiteContext::getId();
@@ -203,23 +187,6 @@ class Member extends Model
             ->get();
     }
 
-    public function comments($relation = false)
-    {
-        return $this->hasMany(Comment::class, 'member_id', 'id', $relation);
-    }
-
-    // Add these methods to App\Models\Member.php
-
-    public function pageViews($relation = false)
-    {
-        return $this->hasMany(PageView::class, 'member_id', 'id', $relation);
-    }
-
-    public function pageLikes($relation = false)
-    {
-        return $this->hasMany(PageLike::class, 'member_id', 'id', $relation);
-    }
-
     public function likedPages($relation = false)
     {
         return $this->belongsToMany(
@@ -242,6 +209,8 @@ class Member extends Model
         );
     }
 
+    // Add these methods to App\Models\Member.php
+
     public function badges($relation = false)
     {
         return $this->belongsToMany(
@@ -258,14 +227,14 @@ class Member extends Model
         return $this->hasMany(MemberActivity::class, 'member_id', 'id', $relation);
     }
 
-    public function points($relation = false)
-    {
-        return $this->hasMany(MemberPoint::class, 'member_id', 'id', $relation);
-    }
-
     public function getTotalPointsAttribute(): int
     {
         return $this->points()->sum('points');
+    }
+
+    public function points($relation = false)
+    {
+        return $this->hasMany(MemberPoint::class, 'member_id', 'id', $relation);
     }
 
     public function getActivityStatsAttribute(): array
@@ -277,6 +246,21 @@ class Member extends Model
             'orders' => Order::where('user_id', $this->id)->where('status', 'completed')->count(),
             'member_days' => now_datetime()->diffInDays($this->created_at)
         ];
+    }
+
+    public function comments($relation = false)
+    {
+        return $this->hasMany(Comment::class, 'member_id', 'id', $relation);
+    }
+
+    public function pageViews($relation = false)
+    {
+        return $this->hasMany(PageView::class, 'member_id', 'id', $relation);
+    }
+
+    public function pageLikes($relation = false)
+    {
+        return $this->hasMany(PageLike::class, 'member_id', 'id', $relation);
     }
 
     public function site($relation = false)
@@ -331,20 +315,20 @@ class Member extends Model
     }
 
     /**
+     * Check if member wants to receive marketing emails
+     */
+    public function wantsMarketingEmails(): bool
+    {
+        return $this->getCommunicationPreference('marketing_emails', true);
+    }
+
+    /**
      * Get communication preference for a specific key
      */
     public function getCommunicationPreference(string $key, $default = true): bool
     {
         $preferences = $this->communication_preferences ?? [];
         return $preferences[$key] ?? $default;
-    }
-
-    /**
-     * Check if member wants to receive marketing emails
-     */
-    public function wantsMarketingEmails(): bool
-    {
-        return $this->getCommunicationPreference('marketing_emails', true);
     }
 
     /**
@@ -417,6 +401,21 @@ class Member extends Model
             && $subscription->type === 'paid';
     }
 
+    public function activeSubscription($relation = false, ?int $siteId = null)
+    {
+        $siteId = $siteId ?? SiteContext::getId();
+
+        return Subscription::where('member_id', $this->id)
+            ->where('status', 'active')
+            ->where('site_id', $siteId)
+            ->where(function ($query) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>', date('Y-m-d H:i:s'));
+            })
+            ->orderBy('created_at', 'desc') // Most recent first
+            ->first();
+    }
+
     public function territory($relation = false)
     {
         return $this->belongsTo(Territory::class, 'territory_id', 'id', $relation);
@@ -440,5 +439,10 @@ class Member extends Model
     public function getUnreadCount()
     {
         return 10;
+    }
+
+    public function assignedAgent($relation = false)
+    {
+        return $this->belongsTo(User::class, 'assigned_agent_id', 'id', $relation);
     }
 }

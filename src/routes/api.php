@@ -64,6 +64,7 @@ use App\Controllers\Shopping\GiftPromotionController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
 use App\Controllers\Subscription\IssueDeliveryController;
+use App\Controllers\Subscription\PrintRunController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
@@ -300,6 +301,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->post('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
+
+        $router->get('/issues/{issueId}/print-runs', [PrintRunController::class, 'listByIssue']);
+        $router->get('/print-runs', [PrintRunController::class, 'index']);
+        $router->get('/print-runs/{printRunId}', [PrintRunController::class, 'show']);
+        $router->put('/print-runs/{printRunId}/cancel', [PrintRunController::class, 'cancel']);
+
+
 
         $router->post('/subscriptions/plans/bulk-toggle-active', [SubscriptionController::class, 'bulkToggleActive']);
 
