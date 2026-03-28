@@ -99,11 +99,16 @@ class CreatePrintFulfillmentAction
         $snapshot = $context->addressSnapshot;
         $resolved = $this->buildResolvedAddress($snapshot, $subscription);
 
+        $batch = $this->batchRepository->findOrCreateForIssueDeliveryAndTerritory(
+            $issueDelivery->id,
+            $context->territoryId(),
+        );
+
         // Batch assignment is deferred — BatchBuilderService groups fulfillments
         // into batches by territory after all fulfillments are created.
         // batch_id is intentionally left null here.
         $fulfillment = $this->fulfillmentRepository->createFullfilment(
-            batchId: null,
+            batchId: $batch->id,
             issuesDeliveredId: $issuesDelivered->id,
             subscriptionId: $subscription->id,
             fullName: $resolved['full_name'],

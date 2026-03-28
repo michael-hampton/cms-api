@@ -15,11 +15,11 @@ use App\Models\Territory;
  *   - Changes to what constitutes a decision are visible at the type level.
  *   - Services do not need to agree on array key names.
  */
-final class FulfilmentDecisionContext
+class FulfilmentDecisionContext
 {
     public function __construct(
         public readonly ?Territory $territory,
-        public readonly array      $addressSnapshot,
+        public array $addressSnapshot,
         public readonly array      $channelMetadata = [],
     )
     {
