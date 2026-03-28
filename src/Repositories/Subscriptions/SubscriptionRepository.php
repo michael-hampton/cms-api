@@ -3,6 +3,7 @@
 namespace App\Repositories\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Model;
@@ -12,6 +13,83 @@ use App\Repositories\Repository;
 
 class SubscriptionRepository extends Repository
 {
+    /**
+     * Find all active print subscriptions eligible to receive a specific
+     * issue delivery.
+     *
+     * Eligibility rules (all must pass):
+     *   1. delivery_type = 'print'
+     *   2. status = 'active'
+     *   3. plan_id matches the IssueDelivery's subscription_plan_id
+     *   4. start_date is on or before the reference date (or null)
+     *   5. end_date is on or after the reference date (or null — open-ended)
+     *
+     * Address validation is intentionally deferred to CreatePrintFulfillmentAction.
+     * A missing address is a per-subscription failure, not a reason to exclude
+     * the subscriber from the result set — the action logs it and the pipeline
+     * continues for the remaining subscriptions.
+     *
+     * Idempotency (fulfilled exclusion) is also deferred to
+     * CreatePrintFulfillmentAction, which guards against duplicate
+     * PrintFulfillment records. Excluding at query level would make the
+     * query more complex and would prevent legitimate re-runs after a
+     * failed export.
+     *
+     * Reference date: the issue's on_sale_date when set, otherwise
+     * estimated_delivery_date. The caller resolves and passes this date
+     * so the repository stays free of IssueDelivery model knowledge.
+     *
+     * @param int $issueDeliveryId Used only for logging context — not filtered on.
+     * @param int $planId The subscription_plan_id from the IssueDelivery.
+     * @param \DateTime $referenceDate on_sale_date ?? estimated_delivery_date.
+     *
+     * @return Collection<Subscription>
+     */
+    public function findPrintSubscriptionsForIssueDelivery(
+        int       $issueDeliveryId,
+        int       $planId,
+        \DateTime $referenceDate,
+    ): Collection
+    {
+        return Subscription::where('delivery_type', SubscriptionType::PRINTED->value)
+            ->where('status', SubscriptionStatus::ACTIVE->value)
+            ->where('plan_id', $planId)
+            ->where(function ($query) use ($referenceDate) {
+                $query->whereNull('start_date')
+                    ->orWhere('start_date', '<=', $referenceDate->format('Y-m-d H:i:s'));
+            })
+            ->where(function ($query) use ($referenceDate) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $referenceDate->format('Y-m-d H:i:s'));
+            })
+            ->get();
+    }
+
+    /**
+     * Returns true when at least one active print subscription exists for
+     * the given plan_id, globally across all sites.
+     *
+     * Used by IssueDeliveryDispatchedListener as a fast existence check
+     * before dispatching TriggerPrintRunWorkflowJob. If no print subscriptions
+     * exist for the plan, the print pipeline is not triggered at all —
+     * no PrintRun is created, no jobs are wasted.
+     *
+     * Deliberately a global check (no site_id filter) because:
+     *   - IssueDelivery already scopes to a plan
+     *   - Plans are already site-scoped upstream
+     *   - Adding site_id here would require passing it through the event
+     *     chain for no extra safety benefit
+     *
+     * @param int $planId The subscription_plan_id from the IssueDelivery.
+     */
+    public function hasPrintSubscriptionsForPlan(int $planId): bool
+    {
+        return Subscription::where('delivery_type', SubscriptionType::PRINTED->value)
+            ->where('status', SubscriptionStatus::ACTIVE->value)
+            ->where('plan_id', $planId)
+            ->exists();
+    }
+
     protected function getModelClass(): string
     {
         return Subscription::class;

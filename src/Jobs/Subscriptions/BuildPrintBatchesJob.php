@@ -33,40 +33,38 @@ class BuildPrintBatchesJob extends BaseJob
     public int $backoff = 30;
 
     public function __construct(
-        private readonly int $printRunId,
+        private readonly PrintRunRepository      $printRunRepository,
+        private readonly IssueDeliveryRepository $issueDeliveryRepository,
+        private readonly BatchBuilderService     $batchBuilderService,
+        private readonly Logger                  $logger,
     )
     {
     }
 
-    public function handle(
-        PrintRunRepository      $printRunRepository,
-        IssueDeliveryRepository $issueDeliveryRepository,
-        BatchBuilderService     $batchBuilderService,
-        Logger                  $logger,
-    ): void
+    public function handle(int $printRunId): void
     {
-        $printRun = $printRunRepository->find($this->printRunId);
+        $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
-            $logger->error('BuildPrintBatchesJob: PrintRun not found', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->error('BuildPrintBatchesJob: PrintRun not found', [
+                'print_run_id' => $printRunId,
             ]);
             return;
         }
 
         if ($printRun->isCancelled() || $printRun->isComplete()) {
-            $logger->info('BuildPrintBatchesJob: PrintRun in terminal state, skipping', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->info('BuildPrintBatchesJob: PrintRun in terminal state, skipping', [
+                'print_run_id' => $printRunId,
                 'status' => $printRun->status,
             ]);
             return;
         }
 
-        $issueDelivery = $issueDeliveryRepository->find($printRun->issue_delivery_id);
+        $issueDelivery = $this->issueDeliveryRepository->find($printRun->issue_delivery_id);
 
         if (!$issueDelivery) {
-            $logger->error('BuildPrintBatchesJob: IssueDelivery not found', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->error('BuildPrintBatchesJob: IssueDelivery not found', [
+                'print_run_id' => $printRunId,
                 'issue_delivery_id' => $printRun->issue_delivery_id,
             ]);
             $printRun->markFailed();
@@ -75,17 +73,17 @@ class BuildPrintBatchesJob extends BaseJob
 
         $printRun->markBatching();
 
-        $logger->info('BuildPrintBatchesJob: building batches', [
-            'print_run_id' => $this->printRunId,
+        $this->logger->info('BuildPrintBatchesJob: building batches', [
+            'print_run_id' => $printRunId,
             'issue_delivery_id' => $issueDelivery->id,
         ]);
 
-        $batches = $batchBuilderService->buildBatches($issueDelivery);
+        $batches = $this->batchBuilderService->buildBatches($issueDelivery);
 
         $printRun->markBatched();
 
-        $logger->info('BuildPrintBatchesJob: batches built', [
-            'print_run_id' => $this->printRunId,
+        $this->logger->info('BuildPrintBatchesJob: batches built', [
+            'print_run_id' => $printRunId,
             'batch_count' => $batches->count(),
         ]);
 

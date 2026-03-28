@@ -10,7 +10,6 @@ use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\LabelRunRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
-use App\Services\Subscriptions\Printing\Label\LabelGenerationService;
 
 /**
  * Creates LabelRun records for every PrintFulfillment in a batch,
@@ -29,23 +28,24 @@ class GenerateLabelRunsJob extends BaseJob
     public string $queue = 'print';
     public int $tries = 3;
 
-    public function __construct()
+    public function __construct(
+        private readonly PrintBatchRepository       $batchRepository,
+        private readonly PrintFulfillmentRepository $fulfillmentRepository,
+        private readonly LabelRunRepository         $labelRunRepository,
+        private readonly Logger                     $logger,
+    )
     {
     }
 
     public function handle(
-        PrintBatchRepository       $batchRepository,
-        PrintFulfillmentRepository $fulfillmentRepository,
-        LabelRunRepository         $labelRunRepository,
-        Logger                     $logger,
-        ?LabelExportFormat         $type = null,
         int                        $batchId,
+        ?LabelExportFormat $type = null,
     ): void
     {
-        $batch = $batchRepository->find($batchId);
+        $batch = $this->batchRepository->find($batchId);
 
         if (!$batch) {
-            $logger->error('GenerateLabelRunsJob: batch not found', [
+            $this->logger->error('GenerateLabelRunsJob: batch not found', [
                 'batch_id' => $batchId,
             ]);
             return;
@@ -55,7 +55,7 @@ class GenerateLabelRunsJob extends BaseJob
             config('print.label_format', LabelExportFormat::Csv->value)
         );
 
-        $fulfillments = $fulfillmentRepository->findByBatch($batchId);
+        $fulfillments = $this->fulfillmentRepository->findByBatch($batchId);
 
         $dispatched = 0;
         $skipped = 0;
@@ -63,7 +63,7 @@ class GenerateLabelRunsJob extends BaseJob
         foreach ($fulfillments as $fulfillment) {
             // Idempotency: skip if a LabelRun already exists for this
             // fulfillment + batch combination.
-            if ($labelRunRepository->existsForIssuesDeliveredAndBatch(
+            if ($this->labelRunRepository->existsForIssuesDeliveredAndBatch(
                 $fulfillment->issues_delivered_id,
                 $batchId,
             )) {
@@ -71,19 +71,19 @@ class GenerateLabelRunsJob extends BaseJob
                 continue;
             }
 
-            $labelRun = $labelRunRepository->createForIssuesDelivered(
+            $labelRun = $this->labelRunRepository->createForIssuesDelivered(
                 issuesDeliveredId: $fulfillment->issues_delivered_id,
                 subscriptionId: $fulfillment->subscription_id,
                 format: $format,
                 printBatchId: $batchId,
             );
 
-            dispatch(GenerateLabelJob::for(), app(LabelRunRepository::class), app(LabelGenerationService::class), app(Logger::class), $labelRun->id);
+            dispatch(GenerateLabelJob::for(), $labelRun->id);
 
             $dispatched++;
         }
 
-        $logger->info('GenerateLabelRunsJob: label runs created', [
+        $this->logger->info('GenerateLabelRunsJob: label runs created', [
             'batch_id' => $batchId,
             'dispatched' => $dispatched,
             'skipped' => $skipped,

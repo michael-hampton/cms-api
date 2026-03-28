@@ -100,6 +100,16 @@ class PrintFulfillmentRepository extends Repository
             ->update(['status' => PrintFulfillmentStatus::EXPORTED->value]);
     }
 
+    public function findByIssuesDeliveredAndBatch(
+        int $issuesDeliveredId,
+        int $printBatchId,
+    ): ?PrintFulfillment
+    {
+        return PrintFulfillment::where('issues_delivered_id', $issuesDeliveredId)
+            ->where('batch_id', $printBatchId)
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return PrintFulfillment::class;

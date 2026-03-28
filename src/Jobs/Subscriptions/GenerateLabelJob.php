@@ -25,26 +25,27 @@ class GenerateLabelJob extends BaseJob
     public int $tries = 3;
     public int $backoff = 60;
 
-    public function __construct()
+    public function __construct(
+        private readonly LabelRunRepository     $labelRunRepository,
+        private readonly LabelGenerationService $labelGenerationService,
+        private readonly Logger                 $logger,
+    )
     {
     }
 
     public function handle(
-        LabelRunRepository     $labelRunRepository,
-        LabelGenerationService $labelGenerationService,
-        Logger                 $logger,
         int                    $labelRunId,
     ): void
     {
-        $labelRun = $labelRunRepository->find($labelRunId);
+        $labelRun = $this->labelRunRepository->find($labelRunId);
 
         if (!$labelRun) {
-            $logger->error('GenerateLabelJob: LabelRun not found', [
+            $this->logger->error('GenerateLabelJob: LabelRun not found', [
                 'label_run_id' => $labelRunId,
             ]);
             return;
         }
 
-        $labelGenerationService->generate($labelRun);
+        $this->labelGenerationService->generate($labelRun);
     }
 }

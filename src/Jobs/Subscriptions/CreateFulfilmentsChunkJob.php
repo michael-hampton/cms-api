@@ -42,47 +42,47 @@ class CreateFulfilmentsChunkJob extends BaseJob
     public int $backoff = 60;
 
     public function __construct(
-        private readonly int   $printRunId,
-        private readonly int   $issueDeliveryId,
-        private readonly array $subscriptionIds,
-        private readonly int   $chunkIndex,
+        private readonly PrintRunRepository           $printRunRepository,
+        private readonly IssueDeliveryRepository      $issueDeliveryRepository,
+        private readonly SubscriptionRepository       $subscriptionRepository,
+        private readonly CreatePrintFulfillmentAction $fulfillmentAction,
+        private readonly Logger                       $logger,
     )
     {
     }
 
     public function handle(
-        PrintRunRepository           $printRunRepository,
-        IssueDeliveryRepository      $issueDeliveryRepository,
-        SubscriptionRepository       $subscriptionRepository,
-        CreatePrintFulfillmentAction $fulfillmentAction,
-        Logger                       $logger,
+        int   $printRunId,
+        int   $issueDeliveryId,
+        array $subscriptionIds,
+        int   $chunkIndex,
     ): void
     {
-        $printRun = $printRunRepository->find($this->printRunId);
+        $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
-            $logger->error('CreateFulfilmentsChunkJob: PrintRun not found', [
-                'print_run_id' => $this->printRunId,
-                'chunk_index' => $this->chunkIndex,
+            $this->logger->error('CreateFulfilmentsChunkJob: PrintRun not found', [
+                'print_run_id' => $printRunId,
+                'chunk_index' => $chunkIndex,
             ]);
             return;
         }
 
         // Guard: if the PrintRun was cancelled while this job was queued, abort.
         if ($printRun->isCancelled()) {
-            $logger->info('CreateFulfilmentsChunkJob: PrintRun cancelled, skipping chunk', [
-                'print_run_id' => $this->printRunId,
-                'chunk_index' => $this->chunkIndex,
+            $this->logger->info('CreateFulfilmentsChunkJob: PrintRun cancelled, skipping chunk', [
+                'print_run_id' => $printRunId,
+                'chunk_index' => $chunkIndex,
             ]);
             return;
         }
 
-        $issueDelivery = $issueDeliveryRepository->find($this->issueDeliveryId);
+        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
 
         if (!$issueDelivery) {
-            $logger->error('CreateFulfilmentsChunkJob: IssueDelivery not found', [
-                'issue_delivery_id' => $this->issueDeliveryId,
-                'print_run_id' => $this->printRunId,
+            $this->logger->error('CreateFulfilmentsChunkJob: IssueDelivery not found', [
+                'issue_delivery_id' => $issueDeliveryId,
+                'print_run_id' => $printRunId,
             ]);
             return;
         }
@@ -91,38 +91,38 @@ class CreateFulfilmentsChunkJob extends BaseJob
         $skipped = 0;
         $failed = 0;
 
-        foreach ($this->subscriptionIds as $subscriptionId) {
-            $subscription = $subscriptionRepository->find($subscriptionId);
+        foreach ($subscriptionIds as $subscriptionId) {
+            $subscription = $this->subscriptionRepository->find($subscriptionId);
 
             if (!$subscription) {
-                $logger->warning('CreateFulfilmentsChunkJob: subscription not found', [
+                $this->logger->warning('CreateFulfilmentsChunkJob: subscription not found', [
                     'subscription_id' => $subscriptionId,
-                    'print_run_id' => $this->printRunId,
+                    'print_run_id' => $printRunId,
                 ]);
                 $failed++;
                 continue;
             }
 
             try {
-                $fulfillmentAction->execute($subscription, $issueDelivery);
+                $this->fulfillmentAction->execute($subscription, $issueDelivery);
                 $created++;
             } catch (\Throwable $e) {
                 // Non-critical per subscription — address missing, validation
                 // failure, etc. Log and continue so one bad record does not
                 // block the rest of the chunk.
                 $failed++;
-                $logger->error('CreateFulfilmentsChunkJob: fulfillment creation failed', [
+                $this->logger->error('CreateFulfilmentsChunkJob: fulfillment creation failed', [
                     'subscription_id' => $subscriptionId,
-                    'issue_delivery_id' => $this->issueDeliveryId,
-                    'print_run_id' => $this->printRunId,
+                    'issue_delivery_id' => $issueDeliveryId,
+                    'print_run_id' => $printRunId,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        $logger->info('CreateFulfilmentsChunkJob: chunk processed', [
-            'print_run_id' => $this->printRunId,
-            'chunk_index' => $this->chunkIndex,
+        $this->logger->info('CreateFulfilmentsChunkJob: chunk processed', [
+            'print_run_id' => $printRunId,
+            'chunk_index' => $chunkIndex,
             'created' => $created,
             'skipped' => $skipped,
             'failed' => $failed,
@@ -133,8 +133,8 @@ class CreateFulfilmentsChunkJob extends BaseJob
 
         // If this was the last chunk, fire the Phase 2 barrier signal.
         if ($printRun->allChunksComplete()) {
-            $logger->info('CreateFulfilmentsChunkJob: all chunks complete, firing AllFulfilmentsCreated', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->info('CreateFulfilmentsChunkJob: all chunks complete, firing AllFulfilmentsCreated', [
+                'print_run_id' => $printRunId,
                 'total_chunks' => $printRun->total_chunks,
                 'fulfilled_count' => $newCount,
             ]);

@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Support\Logger;
-use App\Jobs\Subscriptions\ExportPrintBatchJob;
-use App\Jobs\Subscriptions\GenerateLabelRunsJob;
 use App\Jobs\Subscriptions\ProcessPrintBatchJob;
 use App\Models\PrintBatch;
 use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 class ProcessPrintBatchJobTest extends FunctionalTestCase
 {
@@ -46,7 +43,7 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
         $this->batchRepository->shouldReceive('find')->with(10)->andReturn($batch);
 
 
-        $this->makeJob()->handle($this->batchRepository, $this->logger, 10);
+        $this->makeJob()->handle(10);
 
         $this->assertTrue(true);
     }
@@ -60,7 +57,7 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
         $this->batchRepository->shouldReceive('find')->andReturn(null);
 
 
-        $this->makeJob()->handle($this->batchRepository, $this->logger, 1);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
 
@@ -74,7 +71,7 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
         $this->batchRepository->shouldReceive('find')->andReturn($batch);
 
 
-        $this->makeJob()->handle($this->batchRepository, $this->logger, 1);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
 
@@ -86,7 +83,9 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
 
     private function makeJob(): ProcessPrintBatchJob
     {
-        return new ProcessPrintBatchJob();
+        return new ProcessPrintBatchJob(
+            $this->batchRepository, $this->logger
+        );
     }
 
     private function makeBatch(int $id, int $issueDeliveryId): MockInterface

@@ -27,8 +27,7 @@ class AllFulfilmentsCreatedListener
     {
         $printRun = $event->printRun;
 
-        dispatch(BuildPrintBatchesJob::for(), $printRun->id)
-            ->onQueue(config('print.queue', 'print'));
+        dispatch(BuildPrintBatchesJob::for(), $printRun->id);
 
         $this->logger->info('AllFulfilmentsCreatedListener: BuildPrintBatchesJob dispatched', [
             'print_run_id' => $printRun->id,

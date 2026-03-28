@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Listeners\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\TriggerPrintRunWorkflowJob;
@@ -46,8 +45,7 @@ class IssueDeliveryDispatchedListener
             return;
         }
 
-        dispatch(TriggerPrintRunWorkflowJob::for(), $issueDelivery->id)
-            ->onQueue(config('print.queue', 'print'));
+        dispatch(TriggerPrintRunWorkflowJob::for(), $issueDelivery->id);
 
         $this->logger->info('IssueDeliveryDispatchedListener: TriggerPrintRunWorkflowJob dispatched', [
             'issue_delivery_id' => $issueDelivery->id,

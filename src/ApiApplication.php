@@ -22,12 +22,19 @@ use App\Events\DatabaseEventSubscriber;
 use App\Events\Members\MemberAddressImported;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Events\Orders\OrderCreatedEvent;
+use App\Events\Products\AllProductFulfilmentsCreated;
+use App\Events\Products\ProductFulfilmentCreated;
+use App\Events\Products\ProductFulfilmentStalled;
 use App\Events\Products\ProductViewedEvent;
 use App\Events\Refunds\RefundCreated;
 use App\Events\Rewards\MemberRewardApproved;
 use App\Events\Stock\StockAllocated;
 use App\Events\Stock\StockLow;
 use App\Events\Stock\StockReleased;
+use App\Events\Subscriptions\AllFulfilmentsCreated;
+use App\Events\Subscriptions\IssueDeliveryDispatched;
+use App\Events\Subscriptions\LabelRunFailed;
+use App\Events\Subscriptions\LabelRunGenerated;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -70,6 +77,9 @@ use App\Listeners\Members\MemberPostcodeUpdatedListener;
 use App\Listeners\Members\SendAccountActivationEmailListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
+use App\Listeners\Products\AllProductFulfilmentsCreatedListener;
+use App\Listeners\Products\NotifyOpsOfStalledProductFulfilmentListener;
+use App\Listeners\Products\ProductFulfilmentCreatedListener;
 use App\Listeners\Products\TrackProductViewListener;
 use App\Listeners\Refunds\LogRefundHistory;
 use App\Listeners\Refunds\SendRefundNotification;
@@ -78,6 +88,10 @@ use App\Listeners\Rewards\NotifyMemberOnRewardApproval;
 use App\Listeners\Stock\StockAllocatedAnalyticsListener;
 use App\Listeners\Stock\StockConfirmedAnalyticsListener;
 use App\Listeners\Stock\StockLowAlertListener;
+use App\Listeners\Subscriptions\AllFulfilmentsCreatedListener;
+use App\Listeners\Subscriptions\IssueDeliveryDispatchedListener;
+use App\Listeners\Subscriptions\LabelRunFailedListener;
+use App\Listeners\Subscriptions\LabelRunGeneratedListener;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -428,8 +442,22 @@ class ApiApplication
 
         $eventDispatcher->listen(MemberAddressImported::class, [MemberPostcodeUpdated::class, 'handle']);
         $eventDispatcher->listen(MemberPostcodeUpdatedListener::class, [MemberPostcodeUpdated::class, 'handle']);
-        $eventDispatcher->listen(StockAllocated::class, [StockAllocatedAnalyticsListener::class, 'handle']);
+        $eventDispatcher->listen(StockAllocated::class, [StockAllocatedAnalyticsListener::
+        class, 'handle']);
         $eventDispatcher->listen(StockReleased::class, [StockConfirmedAnalyticsListener::class, 'handle']);
         $eventDispatcher->listen(StockLow::class, [StockLowAlertListener::class, 'handle']);
+
+        $eventDispatcher->listen(AllProductFulfilmentsCreated::class, [AllProductFulfilmentsCreatedListener::class, 'handle']);
+        $eventDispatcher->listen(ProductFulfilmentCreated::class, [ProductFulfilmentCreatedListener::class, 'handle']);
+        $eventDispatcher->listen(ProductFulfilmentStalled::class, [NotifyOpsOfStalledProductFulfilmentListener::class, 'handle']);
+
+
+        $eventDispatcher->listen(IssueDeliveryDispatched::class, [IssueDeliveryDispatchedListener::class, 'handle']);
+        $eventDispatcher->listen(AllFulfilmentsCreated::class, [AllFulfilmentsCreatedListener::class, 'handle']);
+        $eventDispatcher->listen(LabelRunFailed::class, [LabelRunFailedListener::class, 'handle']);
+        $eventDispatcher->listen(LabelRunGenerated::class, [LabelRunGeneratedListener::class, 'handle']);
+
+
+
     }
 }

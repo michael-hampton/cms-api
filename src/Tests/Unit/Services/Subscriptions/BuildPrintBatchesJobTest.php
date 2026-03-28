@@ -8,7 +8,6 @@ use App\Enums\Subscriptions\PrintRunStatus;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
-use App\Jobs\Subscriptions\ProcessPrintBatchJob;
 use App\Models\IssueDelivery;
 use App\Models\PrintBatch;
 use App\Models\PrintRun;
@@ -18,7 +17,6 @@ use App\Services\Subscriptions\Printing\BatchBuilderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
 class BuildPrintBatchesJobTest extends FunctionalTestCase
 {
@@ -68,10 +66,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
             ->andReturn(new Collection([$batch1, $batch2]));
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -97,10 +92,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         });
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertSame(['batching', 'batched'], $callOrder);
@@ -118,10 +110,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -136,10 +125,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -154,10 +140,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -176,10 +159,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -202,10 +182,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $printRun->shouldReceive('markBatched')->once();
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->logger,
+            1
         );
 
         $this->assertTrue(true);
@@ -217,7 +194,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
     private function makeJob(): BuildPrintBatchesJob
     {
-        return new BuildPrintBatchesJob(printRunId: 1);
+        return new BuildPrintBatchesJob($this->printRunRepository, $this->issueDeliveryRepository, $this->batchBuilderService, $this->logger);
     }
 
     private function makePrintRun(PrintRunStatus $status): MockInterface

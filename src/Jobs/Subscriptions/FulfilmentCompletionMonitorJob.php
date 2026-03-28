@@ -32,29 +32,29 @@ class FulfilmentCompletionMonitorJob extends BaseJob
     public int $tries = 1; // Only run once — it's a point-in-time check.
 
     public function __construct(
-        private readonly int $printRunId,
+        private readonly PrintRunRepository $printRunRepository,
+        private readonly Logger             $logger,
     )
     {
     }
 
     public function handle(
-        PrintRunRepository $printRunRepository,
-        Logger             $logger,
+        int $printRunId,
     ): void
     {
-        $printRun = $printRunRepository->find($this->printRunId);
+        $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
-            $logger->warning('FulfilmentCompletionMonitorJob: PrintRun not found', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->warning('FulfilmentCompletionMonitorJob: PrintRun not found', [
+                'print_run_id' => $printRunId,
             ]);
             return;
         }
 
         // If the PrintRun has moved past Fulfilling, Phase 1 completed normally.
         if (!$printRun->isFulfilling()) {
-            $logger->info('FulfilmentCompletionMonitorJob: PrintRun already past fulfilling phase', [
-                'print_run_id' => $this->printRunId,
+            $this->logger->info('FulfilmentCompletionMonitorJob: PrintRun already past fulfilling phase', [
+                'print_run_id' => $printRunId,
                 'status' => $printRun->status,
             ]);
             return;
@@ -65,8 +65,8 @@ class FulfilmentCompletionMonitorJob extends BaseJob
         $totalChunks = $printRun->total_chunks;
         $delayMinutes = (int)config('print.monitor_delay_minutes', 15);
 
-        $logger->error('FulfilmentCompletionMonitorJob: stall detected', [
-            'print_run_id' => $this->printRunId,
+        $this->logger->error('FulfilmentCompletionMonitorJob: stall detected', [
+            'print_run_id' => $printRunId,
             'completed_chunks' => $completedChunks,
             'total_chunks' => $totalChunks,
             'missing_chunks' => $totalChunks - $completedChunks,

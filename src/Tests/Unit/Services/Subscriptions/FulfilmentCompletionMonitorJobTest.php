@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\PrintRunStatus;
-use App\Events\Subscriptions\PrintFulfilmentStalled;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\FulfilmentCompletionMonitorJob;
 use App\Models\PrintRun;
@@ -42,7 +41,7 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
         $this->printRunRepository->shouldReceive('find')->with(1)->andReturn($printRun);
 
-        $this->makeJob()->handle($this->printRunRepository, $this->logger);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
 
@@ -58,7 +57,7 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
 
-        $this->makeJob()->handle($this->printRunRepository, $this->logger);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
 
@@ -68,7 +67,7 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
     {
         $this->printRunRepository->shouldReceive('find')->andReturn(null);
 
-        $this->makeJob()->handle($this->printRunRepository, $this->logger);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
     }
@@ -83,7 +82,7 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
 
-        $this->makeJob()->handle($this->printRunRepository, $this->logger);
+        $this->makeJob()->handle(1);
 
         $this->assertTrue(true);
     }
@@ -94,7 +93,10 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
     private function makeJob(): FulfilmentCompletionMonitorJob
     {
-        return new FulfilmentCompletionMonitorJob(printRunId: 1);
+        return new FulfilmentCompletionMonitorJob(
+            $this->printRunRepository,
+            $this->logger
+        );
     }
 
     private function makePrintRun(

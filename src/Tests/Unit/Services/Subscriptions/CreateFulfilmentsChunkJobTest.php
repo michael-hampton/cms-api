@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Actions\Subscriptions\Print\CreatePrintFulfillmentAction;
 use App\Enums\Subscriptions\PrintRunStatus;
-use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\CreateFulfilmentsChunkJob;
 use App\Models\IssueDelivery;
@@ -66,12 +65,11 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $printRun->shouldReceive('incrementFulfilledChunks')->once()->andReturn(1);
         $printRun->shouldReceive('allChunksComplete')->once()->andReturn(true);
 
-        $this->makeJob(subscriptionIds: [10])->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+        $this->makeJob()->handle(
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [10],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -91,12 +89,11 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $printRun->shouldReceive('incrementFulfilledChunks')->once()->andReturn(1);
         $printRun->shouldReceive('allChunksComplete')->once()->andReturn(false);
 
-        $this->makeJob(subscriptionIds: [10])->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+        $this->makeJob()->handle(
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [10],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -114,11 +111,10 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $this->fulfillmentAction->shouldNotReceive('execute');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -133,11 +129,10 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $this->fulfillmentAction->shouldNotReceive('execute');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -153,11 +148,10 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $this->fulfillmentAction->shouldNotReceive('execute');
 
         $this->makeJob()->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -192,12 +186,11 @@ class CreateFulfilmentsChunkJobTest extends TestCase
         $printRun->shouldReceive('incrementFulfilledChunks')->once()->andReturn(1);
         $printRun->shouldReceive('allChunksComplete')->once()->andReturn(true);
 
-        $this->makeJob(subscriptionIds: [10, 11])->handle(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->subscriptionRepository,
-            $this->fulfillmentAction,
-            $this->logger,
+        $this->makeJob()->handle(
+            printRunId: 1,
+            issueDeliveryId: 5,
+            subscriptionIds: [10, 11],
+            chunkIndex: 0,
         );
 
         $this->assertTrue(true);
@@ -207,13 +200,14 @@ class CreateFulfilmentsChunkJobTest extends TestCase
     // Helpers
     // =========================================================================
 
-    private function makeJob(array $subscriptionIds = []): CreateFulfilmentsChunkJob
+    private function makeJob(): CreateFulfilmentsChunkJob
     {
         return new CreateFulfilmentsChunkJob(
-            printRunId: 1,
-            issueDeliveryId: 5,
-            subscriptionIds: $subscriptionIds,
-            chunkIndex: 0,
+            $this->printRunRepository,
+            $this->issueDeliveryRepository,
+            $this->subscriptionRepository,
+            $this->fulfillmentAction,
+            $this->logger,
         );
     }
 

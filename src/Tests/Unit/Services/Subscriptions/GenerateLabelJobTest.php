@@ -47,9 +47,6 @@ class GenerateLabelJobTest extends TestCase
             ->with($labelRun);
 
         $this->makeJob()->handle(
-            $this->labelRunRepository,
-            $this->labelGenerationService,
-            $this->logger,
             1
         );
 
@@ -63,9 +60,6 @@ class GenerateLabelJobTest extends TestCase
         $this->labelGenerationService->shouldNotReceive('generate');
 
         $this->makeJob()->handle(
-            $this->labelRunRepository,
-            $this->labelGenerationService,
-            $this->logger,
             1
         );
 
@@ -86,9 +80,6 @@ class GenerateLabelJobTest extends TestCase
         $this->expectExceptionMessage('Transport failed');
 
         $this->makeJob()->handle(
-            $this->labelRunRepository,
-            $this->labelGenerationService,
-            $this->logger,
             1
         );
 
@@ -101,7 +92,11 @@ class GenerateLabelJobTest extends TestCase
 
     private function makeJob(): GenerateLabelJob
     {
-        return new GenerateLabelJob();
+        return new GenerateLabelJob(
+            $this->labelRunRepository,
+            $this->labelGenerationService,
+            $this->logger,
+        );
     }
 
     private function makeLabelRun(LabelRunStatus $status): MockInterface
