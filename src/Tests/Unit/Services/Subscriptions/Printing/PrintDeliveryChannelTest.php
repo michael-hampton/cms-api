@@ -62,7 +62,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(false);
 
         $this->fulfillmentRepository
-            ->shouldReceive('create')
+            ->shouldReceive('createFullfilment')
             ->once()
             ->andReturn($fulfillment);
 
@@ -117,7 +117,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(false);
 
         $this->fulfillmentRepository
-            ->shouldReceive('create')
+            ->shouldReceive('createFullfilment')
             ->once()
             ->andReturn($fulfillment);
 
@@ -157,7 +157,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(false);
 
         $this->fulfillmentRepository
-            ->shouldReceive('create')
+            ->shouldReceive('createFullfilment')
             ->once()
             ->andReturn($fulfillment);
 
@@ -182,7 +182,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andThrow(new \RuntimeException('no valid delivery address found'));
 
         $this->batchRepository->shouldNotReceive('createForIssueDelivery');
-        $this->fulfillmentRepository->shouldNotReceive('create');
+        $this->fulfillmentRepository->shouldNotReceive('createFullfilment');
         $this->databaseMock->shouldNotReceive('afterCommit');
 
         $this->expectException(\RuntimeException::class);
@@ -235,7 +235,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->once()
             ->andReturn(null);
 
-        $this->fulfillmentRepository->shouldNotReceive('create');
+        $this->fulfillmentRepository->shouldNotReceive('createFullfilment');
         $this->databaseMock->shouldNotReceive('afterCommit');
 
         $this->expectException(\RuntimeException::class);
@@ -274,7 +274,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(true);
 
         // Must not create another fulfilment or register another export job
-        $this->fulfillmentRepository->shouldNotReceive('create');
+        $this->fulfillmentRepository->shouldNotReceive('createFullfilment');
         $this->databaseMock->shouldNotReceive('afterCommit');
 
         $this->channel->send($subscription, $issueDelivery);
@@ -308,7 +308,7 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
             ->andReturn(false);
 
         $this->fulfillmentRepository
-            ->shouldReceive('create')
+            ->shouldReceive('createFullfilment')
             ->andThrow(new \RuntimeException('DB write failed'));
 
         $this->databaseMock->shouldNotReceive('afterCommit');

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Enums\Subscriptions\PrintRunStatus;
@@ -7,21 +9,26 @@ use App\Enums\Subscriptions\PrintRunStatus;
 /**
  * A PrintRun represents the complete print output decision for one IssueDelivery.
  *
- * Relationship chain:
- *   IssueDelivery → PrintRun(s) → PrintBatch(es) → PrintFulfillment(s)
+ * Phase progression:
+ *   pending → fulfilling → batching → batched → complete | failed | cancelled
  *
- * A single IssueDelivery may have multiple PrintRuns over its lifetime (e.g. a
- * re-run after cancellation). Only one PrintRun per IssueDelivery should be in
- * a non-cancelled state at any time — enforced by the workflow, not the DB.
+ * Phase 1 tracking (fulfilling):
+ *   total_chunks           — set when PrintRun enters Fulfilling. Known up front
+ *                            from the eligible subscription count / chunk size.
+ *   fulfilled_chunks_count — atomically incremented by each CreateFulfilmentsChunkJob
+ *                            via incrementFulfilledChunks(). When it reaches
+ *                            total_chunks, AllFulfilmentsCreated is fired.
  *
  * @property int $id
  * @property int $issue_delivery_id
- * @property int|null $workflow_run_id    The WorkflowRun that created this PrintRun.
- * @property string $status             PrintRunStatus value.
- * @property bool $is_regional        Whether territory grouping was applied.
- * @property int|null $territory_id       Set when the run is pinned to one territory.
+ * @property int|null $workflow_run_id
+ * @property string $status
+ * @property bool $is_regional
+ * @property int|null $territory_id
  * @property bool $driver_sync_enabled
- * @property string|null $driver_ref         External reference returned by syncToDriver.
+ * @property int $total_chunks
+ * @property int $fulfilled_chunks_count
+ * @property string|null $driver_ref
  * @property string|null $driver_synced_at
  * @property \DateTime $created_at
  * @property \DateTime $updated_at
@@ -37,6 +44,8 @@ class PrintRun extends Model
         'is_regional',
         'territory_id',
         'driver_sync_enabled',
+        'total_chunks',
+        'fulfilled_chunks_count',
         'driver_ref',
         'driver_synced_at',
     ];
@@ -44,6 +53,8 @@ class PrintRun extends Model
     protected $casts = [
         'is_regional' => 'boolean',
         'driver_sync_enabled' => 'boolean',
+        'total_chunks' => 'integer',
+        'fulfilled_chunks_count' => 'integer',
         'driver_synced_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -69,7 +80,68 @@ class PrintRun extends Model
     }
 
     // =========================================================================
-    // State transitions
+    // Phase 1 — fulfilment tracking
+    // =========================================================================
+
+    /**
+     * Transition to Fulfilling and record how many chunks will be dispatched.
+     * Called once by TriggerPrintRunWorkflowJob before any chunks are dispatched.
+     */
+    public function markFulfilling(int $totalChunks): void
+    {
+        $this->update([
+            'status' => PrintRunStatus::FULFILLING->value,
+            'total_chunks' => $totalChunks,
+        ]);
+
+        $this->total_chunks = $totalChunks;
+    }
+
+    /**
+     * Atomically increment the fulfilled chunk counter.
+     *
+     * Returns the new count so the caller can decide whether to fire
+     * AllFulfilmentsCreated without a separate SELECT.
+     *
+     * Uses a raw DB increment to avoid race conditions between concurrent
+     * chunk workers — never do $this->fulfilled_chunks_count++ here.
+     */
+    public function incrementFulfilledChunks(): int
+    {
+        static::where('id', $this->id)->increment('fulfilled_chunks_count');
+
+        // Reload only the counter column to avoid a full model reload.
+        $fresh = static::where('id', $this->id)
+            ->selectRaw('fulfilled_chunks_count')
+            ->first();
+
+        $this->fulfilled_chunks_count = (int)$fresh->fulfilled_chunks_count;
+
+        return $this->fulfilled_chunks_count;
+    }
+
+    public function allChunksComplete(): bool
+    {
+        return $this->total_chunks > 0
+            && $this->fulfilled_chunks_count >= $this->total_chunks;
+    }
+
+    // =========================================================================
+    // Phase 2 — batch building
+    // =========================================================================
+
+    public function markBatching(): void
+    {
+        $this->update(['status' => PrintRunStatus::BATCHING->value]);
+    }
+
+    public function markBatched(): void
+    {
+        $this->update(['status' => PrintRunStatus::BATCHED->value]);
+    }
+
+    // =========================================================================
+    // Terminal transitions
     // =========================================================================
 
     public function markComplete(): void
@@ -77,14 +149,14 @@ class PrintRun extends Model
         $this->update(['status' => PrintRunStatus::COMPLETE->value]);
     }
 
-    public function markCancelled(): void
-    {
-        $this->update(['status' => PrintRunStatus::CANCELLED->value]);
-    }
-
     public function markFailed(): void
     {
         $this->update(['status' => PrintRunStatus::FAILED->value]);
+    }
+
+    public function markCancelled(): void
+    {
+        $this->update(['status' => PrintRunStatus::CANCELLED->value]);
     }
 
     public function recordDriverSync(string $driverRef): void
@@ -99,6 +171,21 @@ class PrintRun extends Model
     // State queries
     // =========================================================================
 
+    public function isFulfilling(): bool
+    {
+        return $this->status === PrintRunStatus::FULFILLING->value;
+    }
+
+    public function isBatching(): bool
+    {
+        return $this->status === PrintRunStatus::BATCHING->value;
+    }
+
+    public function isBatched(): bool
+    {
+        return $this->status === PrintRunStatus::BATCHED->value;
+    }
+
     public function isComplete(): bool
     {
         return $this->status === PrintRunStatus::COMPLETE->value;
@@ -109,14 +196,14 @@ class PrintRun extends Model
         return $this->status === PrintRunStatus::CANCELLED->value;
     }
 
-    public function canCancel(): bool
-    {
-        return $this->isPending();
-    }
-
     public function isPending(): bool
     {
         return $this->status === PrintRunStatus::PENDING->value;
+    }
+
+    public function canCancel(): bool
+    {
+        return PrintRunStatus::from($this->status)->canCancel();
     }
 
     // =========================================================================
@@ -126,6 +213,11 @@ class PrintRun extends Model
     public function scopePending($query)
     {
         return $query->where('status', PrintRunStatus::PENDING->value);
+    }
+
+    public function scopeFulfilling($query)
+    {
+        return $query->where('status', PrintRunStatus::FULFILLING->value);
     }
 
     public function scopeForIssueDelivery($query, int $issueDeliveryId)

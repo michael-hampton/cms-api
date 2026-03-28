@@ -1,8 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Subscriptions\IssueDeliveryDispatchFailed;
+use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
@@ -11,6 +15,19 @@ use App\Repositories\Subscriptions\IssuesDeliveredRepository;
 use App\Services\Subscriptions\IssueDeliveryEligibilityService;
 use DomainException;
 
+/**
+ * Creates IssuesDelivered records for all eligible subscriptions and fires
+ * the appropriate pipeline event.
+ *
+ * Changes from the original:
+ *   - Digital subscriptions: DeliverIssueDeliveryJob dispatched (unchanged).
+ *   - Print subscriptions: NO job dispatched here. Instead, IssueDeliveryDispatched
+ *     is fired after all records are created. IssueDeliveryDispatchedListener
+ *     triggers the print pipeline independently.
+ *
+ * This separation means the delivery job has zero knowledge of printing.
+ * Print pipeline entry is entirely event-driven.
+ */
 class GenerateIssueDeliveriesJob extends BaseJob
 {
     public function __construct(
@@ -32,14 +49,9 @@ class GenerateIssueDeliveriesJob extends BaseJob
                 'issue_delivery_id' => $issueDelivery->id,
                 'status' => $issueDelivery->status,
             ]);
-
             return [];
         }
 
-        // Resolve eligible subscriptions BEFORE opening a transaction.
-        // A DomainException here signals a non-retryable configuration problem
-        // (e.g. no newsletter linked to the plan). We fail-fast, record the
-        // error, and emit an event so operators are alerted.
         try {
             $eligibleSubscriptions = $this->eligibilityService->getEligibleSubscriptions($issueDelivery);
         } catch (DomainException $e) {
@@ -54,13 +66,11 @@ class GenerateIssueDeliveriesJob extends BaseJob
             return [];
         }
 
-        // Collect job IDs to dispatch after the transaction commits.
-        // Dispatching inside a transaction risks the queue worker picking up
-        // the job before the DB write is visible.
-        $toDispatch = [];
+        // Digital jobs dispatched after commit; print handled via event.
+        $digitalToDispatch = [];
 
         $summary = $this->database->transaction(
-            function () use ($issueDelivery, $eligibleSubscriptions, &$toDispatch): array {
+            function () use ($issueDelivery, $eligibleSubscriptions, &$digitalToDispatch): array {
                 $created = 0;
                 $skipped = 0;
 
@@ -78,7 +88,15 @@ class GenerateIssueDeliveriesJob extends BaseJob
                         $issueDelivery->id
                     );
 
-                    $toDispatch[] = $issueDelivered->id;
+                    // Only queue digital delivery jobs here.
+                    // Print subscriptions are handled by the print pipeline
+                    // triggered via IssueDeliveryDispatched event below.
+                    $isPrint = $subscription->delivery_type === SubscriptionType::PRINTED->value;
+
+                    if (!$isPrint) {
+                        $digitalToDispatch[] = $issueDelivered->id;
+                    }
+
                     $created++;
                 }
 
@@ -89,15 +107,25 @@ class GenerateIssueDeliveriesJob extends BaseJob
                     'eligible_subscriptions' => $eligibleSubscriptions->count(),
                     'created' => $created,
                     'skipped' => $skipped,
-                    'dispatched' => $created,
+                    'dispatched' => count($digitalToDispatch),
                 ];
             }
         );
 
-        // Dispatch outside the transaction so workers see committed rows.
-        foreach ($toDispatch as $issueDeliveredId) {
+        // Dispatch digital delivery jobs outside the transaction.
+        foreach ($digitalToDispatch as $issueDeliveredId) {
             dispatch(DeliverIssueDeliveryJob::for(), $issueDeliveredId);
         }
+
+        // Fire the event that triggers the print pipeline.
+        // IssueDeliveryDispatchedListener will check whether any print
+        // subscriptions exist before dispatching TriggerPrintRunWorkflowJob.
+        event(new IssueDeliveryDispatched(
+            issueDelivery: $issueDelivery,
+            eligibleCount: $summary['eligible_subscriptions'],
+            createdCount: $summary['created'],
+            skippedCount: $summary['skipped'],
+        ));
 
         $this->logger->info('Issue deliveries generated', $summary);
 

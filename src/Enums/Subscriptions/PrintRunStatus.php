@@ -5,6 +5,9 @@ namespace App\Enums\Subscriptions;
 enum PrintRunStatus: string
 {
     case PENDING = 'pending';
+    case FULFILLING = 'fulfilling';
+    case BATCHED = 'batched';
+    case BATCHING = 'batching';
     case COMPLETE = 'complete';
     case CANCELLED = 'cancelled';
     case FAILED = 'failed';

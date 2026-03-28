@@ -22,7 +22,7 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
     {
         [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
 
-        $result = $this->repository->create(
+        $result = $this->repository->createFullfilment(
             batchId: $batch->id,
             issuesDeliveredId: $issuesDelivered->id,
             subscriptionId: $subscription->id,
@@ -83,7 +83,7 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
         [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
         $territory = $this->createTerritory();
 
-        $result = $this->repository->create(
+        $result = $this->repository->createFullfilment(
             batchId: $batch->id,
             issuesDeliveredId: $issuesDelivered->id,
             subscriptionId: $subscription->id,
@@ -107,7 +107,7 @@ class PrintFulfillmentRepositoryTest extends FunctionalTestCase
     {
         [$batch, $issuesDelivered, $subscription] = $this->makePrerequisites();
 
-        $result = $this->repository->create(
+        $result = $this->repository->createFullfilment(
             batchId: $batch->id,
             issuesDeliveredId: $issuesDelivered->id,
             subscriptionId: $subscription->id,

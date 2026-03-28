@@ -115,7 +115,7 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
             return;
         }
 
-        $this->fulfillmentRepository->create(
+        $this->fulfillmentRepository->createFullfilment(
             batchId: $batch->id,
             issuesDeliveredId: $issuesDelivered->id,
             subscriptionId: $subscription->id,

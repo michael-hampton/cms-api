@@ -6,8 +6,9 @@ use App\Enums\Subscriptions\PrintFulfillmentStatus;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PrintFulfillment;
+use App\Repositories\Repository;
 
-class PrintFulfillmentRepository
+class PrintFulfillmentRepository extends Repository
 {
     /**
      * Persist a print fulfilment record.
@@ -15,7 +16,7 @@ class PrintFulfillmentRepository
      * territory_id records which territory edition this subscriber receives.
      * A null territory_id means the subscriber receives the global/default edition.
      */
-    public function create(
+    public function createFullfilment(
         int     $batchId,
         int     $issuesDeliveredId,
         int     $subscriptionId,
@@ -97,5 +98,10 @@ class PrintFulfillmentRepository
     {
         PrintFulfillment::where('batch_id', $batchId)
             ->update(['status' => PrintFulfillmentStatus::EXPORTED->value]);
+    }
+
+    protected function getModelClass(): string
+    {
+        return PrintFulfillment::class;
     }
 }
