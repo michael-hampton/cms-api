@@ -111,6 +111,22 @@ class PrintFulfillmentRepository extends Repository
             ->first();
     }
 
+    public function findBySubscriptionDeliveryAndTerritory(
+        int  $subscriptionId,
+        int  $issuesDeliveredId,
+        ?int $territoryId,
+    ): ?PrintFulfillment
+    {
+        return PrintFulfillment::where('subscription_id', $subscriptionId)
+            ->where('issues_delivered_id', $issuesDeliveredId)
+            ->when(
+                is_null($territoryId),
+                fn($q) => $q->whereNull('territory_id'),
+                fn($q) => $q->where('territory_id', $territoryId),
+            )
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return PrintFulfillment::class;

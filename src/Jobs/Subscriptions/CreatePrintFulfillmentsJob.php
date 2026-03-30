@@ -128,7 +128,7 @@ class CreatePrintFulfillmentsJob extends BaseJob
             return;
         }
 
-        //$printRun->markFulfilling($totalChunks);
+        $printRun->markFulfilling($totalChunks);
 
         foreach ($chunks as $chunkIndex => $chunk) {
             dispatch(

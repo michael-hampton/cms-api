@@ -100,7 +100,7 @@ class GenerateIssueDeliveriesJob extends BaseJob
                     $created++;
                 }
 
-                //$issueDelivery->markDispatched();
+                $issueDelivery->markDispatched();
 
                 return [
                     'issue_delivery_id' => $issueDelivery->id,

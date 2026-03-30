@@ -80,21 +80,21 @@ class CreatePrintFulfillmentAction
             $context->territoryId(),
         );
 
-//        if ($existing) {
-//            $this->logger->info('CreatePrintFulfillmentAction: fulfillment already exists — skipping', [
-//                'subscription_id' => $subscription->id,
-//                'issue_delivery_id' => $issueDelivery->id,
-//                'issues_delivered_id' => $issuesDelivered->id,
-//                'territory_id' => $context->territoryId(),
-//            ]);
-//
-//            // Return the existing record so the caller (job) can reference it.
-//            return $this->fulfillmentRepository->findBySubscriptionDeliveryAndTerritory(
-//                $subscription->id,
-//                $issuesDelivered->id,
-//                $context->territoryId(),
-//            );
-//        }
+        if ($existing) {
+            $this->logger->info('CreatePrintFulfillmentAction: fulfillment already exists — skipping', [
+                'subscription_id' => $subscription->id,
+                'issue_delivery_id' => $issueDelivery->id,
+                'issues_delivered_id' => $issuesDelivered->id,
+                'territory_id' => $context->territoryId(),
+            ]);
+
+            // Return the existing record so the caller (job) can reference it.
+            return $this->fulfillmentRepository->findBySubscriptionDeliveryAndTerritory(
+                $subscription->id,
+                $issuesDelivered->id,
+                $context->territoryId(),
+            );
+        }
 
         $snapshot = $context->addressSnapshot;
         $resolved = $this->buildResolvedAddress($snapshot, $subscription);
