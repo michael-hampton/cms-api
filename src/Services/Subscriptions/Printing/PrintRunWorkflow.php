@@ -76,20 +76,20 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
         } catch (DomainException $e) {
             // WorkflowRun cannot be created yet — log and rethrow so the caller
             // (job, CLI) can record the failure at a higher level.
-//            $this->logger->error('PrintRunWorkflow: process config resolution failed', [
-//                'process_config_id' => $input->processConfigId,
-//                'error'             => $e->getMessage(),
-//            ]);
+            $this->logger->error('PrintRunWorkflow: process config resolution failed', [
+                'process_config_id' => $input->processConfigId,
+                'error' => $e->getMessage(),
+            ]);
             throw $e;
         }
 
         // ── Step 2: Create WorkflowRun ─────────────────────────────────────────
         $workflowRun = $this->workflowRunFactory->create($input);
 
-//        $this->logger->info('PrintRunWorkflow: started', [
-//            'workflow_run_id'   => $workflowRun->id,
-//            'process_config_id' => $input->processConfigId,
-//        ]);
+        $this->logger->info('PrintRunWorkflow: started', [
+            'workflow_run_id' => $workflowRun->id,
+            'process_config_id' => $input->processConfigId,
+        ]);
 
         try {
             // ── Step 3: Extract IssueDeliveries ───────────────────────────────
@@ -99,9 +99,9 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
             if ($issueDeliveries->isEmpty()) {
                 $workflowRun->markNoData(['reason' => 'No eligible issue deliveries found']);
 
-//                $this->logger->info('PrintRunWorkflow: no eligible issue deliveries', [
-//                    'workflow_run_id' => $workflowRun->id,
-//                ]);
+                $this->logger->info('PrintRunWorkflow: no eligible issue deliveries', [
+                    'workflow_run_id' => $workflowRun->id,
+                ]);
 
                 event(new PrintRunWorkflowNoData($workflowRun));
 
@@ -161,10 +161,10 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
 
             $workflowRun->markComplete($summary);
 
-//            $this->logger->info('PrintRunWorkflow: completed', array_merge(
-//                ['workflow_run_id' => $workflowRun->id],
-//                $summary
-//            ));
+            $this->logger->info('PrintRunWorkflow: completed', array_merge(
+                ['workflow_run_id' => $workflowRun->id],
+                $summary
+            ));
 
             // ── Step 10: Notify ────────────────────────────────────────────────
             event(new \App\Events\Subscriptions\PrintRunWorkflowCompleted($workflowRun));
@@ -174,10 +174,10 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
             // Unrecoverable failure — infrastructure or programming error.
             $workflowRun->markFailed($e->getMessage());
 
-//            $this->logger->error('PrintRunWorkflow: fatal failure', [
-//                'workflow_run_id' => $workflowRun->id,
-//                'error'           => $e->getMessage(),
-//            ]);
+            $this->logger->error('PrintRunWorkflow: fatal failure', [
+                'workflow_run_id' => $workflowRun->id,
+                'error' => $e->getMessage(),
+            ]);
 
             throw $e;
         }
@@ -215,10 +215,10 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
             $cancelled = $this->printRunRepository->cancelAllPendingForIssueDelivery($issueDelivery->id);
 
             if ($cancelled > 0) {
-//                $this->logger->info('PrintRunWorkflow: cancelled preceding pending print runs', [
-//                    'issue_delivery_id' => $issueDelivery->id,
-//                    'cancelled_count'   => $cancelled,
-//                ]);
+                $this->logger->info('PrintRunWorkflow: cancelled preceding pending print runs', [
+                    'issue_delivery_id' => $issueDelivery->id,
+                    'cancelled_count' => $cancelled,
+                ]);
             }
         }
     }
@@ -299,11 +299,11 @@ class PrintRunWorkflow implements PrintRunWorkflowInterface
                 $ref = $driver->sync($printRun);
                 $printRun->recordDriverSync($ref);
 
-//                $this->logger->info('PrintRunWorkflow: driver sync succeeded', [
-//                    'workflow_run_id' => $workflowRun->id,
-//                    'print_run_id'    => $printRun->id,
-//                    'driver_ref'      => $ref,
-//                ]);
+                $this->logger->info('PrintRunWorkflow: driver sync succeeded', [
+                    'workflow_run_id' => $workflowRun->id,
+                    'print_run_id' => $printRun->id,
+                    'driver_ref' => $ref,
+                ]);
             } catch (\RuntimeException $e) {
                 // Non-critical: the PrintRun data is already persisted.
                 // Sync can be retried manually or via a separate job.

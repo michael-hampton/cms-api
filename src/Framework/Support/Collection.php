@@ -2,6 +2,7 @@
 
 namespace App\Framework\Support;
 
+use App\Models\Model;
 use ArrayIterator;
 use Countable;
 use DateTimeInterface;
@@ -205,7 +206,7 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
             }
 
             if ($groupKey === null) {
-                continue;
+                $groupKey = 'null';
             }
 
             if (!isset($groups[$groupKey])) {
@@ -925,6 +926,17 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         }
 
         return $item;
+    }
+
+    public function every(callable $callback): bool
+    {
+        foreach ($this->items as $key => $item) {
+            if (!$callback($item, $key)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
 }

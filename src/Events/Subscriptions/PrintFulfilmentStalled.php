@@ -28,6 +28,7 @@ final class PrintFulfilmentStalled
         public readonly int      $completedChunks,
         public readonly int      $totalChunks,
         public readonly int      $monitorDelayMinutes,
+        public array $missingChunkIndexes = []
     )
     {
     }

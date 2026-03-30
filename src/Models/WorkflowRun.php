@@ -97,4 +97,21 @@ class WorkflowRun extends Model
     {
         return $this->status === WorkflowRunStatus::RUNNING->value;
     }
+
+    // WorkflowRun model
+    // WorkflowRun model — no advanceStage needed
+    public function recordStage(WorkflowRunStatus $status, array $summary): void
+    {
+        if (WorkflowRunStatus::from($this->status)->isFinal()) {
+            return; // never overwrite a terminal status
+        }
+
+        $this->update([
+            'status' => $status->value,
+            'summary' => array_merge($this->summary ?? [], $summary),
+            'completed_at' => $status->isFinal()
+                ? now_datetime()->format('Y-m-d H:i:s')
+                : null,
+        ]);
+    }
 }

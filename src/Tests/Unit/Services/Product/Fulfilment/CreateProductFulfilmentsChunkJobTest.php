@@ -55,6 +55,7 @@ class CreateProductFulfilmentsChunkJobTest extends TestCase
     {
         $run = Mockery::mock(ProductFulfilmentRun::class)->makePartial();
         $run->total_chunks = $totalChunks;
+        $run->id = 1;
 
         $run->shouldReceive('isCancelled')->andReturn(false);
         $run->shouldReceive('allChunksComplete')->andReturn($isLast);

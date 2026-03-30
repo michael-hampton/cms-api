@@ -2,10 +2,15 @@
 
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
+use App\Framework\Container;
 use App\Models\Payment;
 use App\Models\RegionSet;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanRegionSet;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -22,6 +27,16 @@ use PHPUnit\Framework\Attributes\DataProvider;
 class SubscriptionControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
+
+    public function setUp(): void
+    {
+        parent::setUp();
+
+        $container = Container::getInstance();
+
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
+    }
 
     // =========================================================================
     // GET /api/subscriptions
@@ -597,7 +612,7 @@ class SubscriptionControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $data['bundle']['id'])->get();
+        $regions = SubscriptionPlanRegionSet::where('subscription_plan_id', $data['data']['plan']['id'])->get();
         $this->assertCount(0, $regions);
     }
 

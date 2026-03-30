@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Listeners\Subscriptions;
 
+use App\DTO\Subscriptions\WorkflowStageResult;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
  * Listens for AllFulfilmentsCreated (Phase 1 complete) and dispatches
@@ -18,6 +21,7 @@ use App\Jobs\Subscriptions\BuildPrintBatchesJob;
 class AllFulfilmentsCreatedListener
 {
     public function __construct(
+        private readonly WorkflowRunRecorderFactory $recorderFactory,
         private readonly Logger $logger,
     )
     {
@@ -28,6 +32,13 @@ class AllFulfilmentsCreatedListener
         $printRun = $event->printRun;
 
         dispatch(BuildPrintBatchesJob::for(), $printRun->id);
+
+        $this->recorderFactory
+            ->forPrintRun($event->printRun, 'phase_1', WorkflowRunStatus::BATCHING)
+            ->record(WorkflowStageResult::succeeded([
+                'total_chunks' => $event->printRun->total_chunks,
+                'total_fulfilments' => $event->totalFulfilments,
+            ]));
 
         $this->logger->info('AllFulfilmentsCreatedListener: BuildPrintBatchesJob dispatched', [
             'print_run_id' => $printRun->id,

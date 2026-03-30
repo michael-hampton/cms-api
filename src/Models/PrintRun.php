@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\Subscriptions\PrintRunStatus;
+use App\Framework\Database\Database;
 
 /**
  * A PrintRun represents the complete print output decision for one IssueDelivery.
@@ -106,18 +107,37 @@ class PrintRun extends Model
      * Uses a raw DB increment to avoid race conditions between concurrent
      * chunk workers — never do $this->fulfilled_chunks_count++ here.
      */
-    public function incrementFulfilledChunks(): int
+    public function incrementFulfilledChunks(int $chunkIndex): int
     {
+        // Atomic increment of the counter — unchanged
         static::where('id', $this->id)->increment('fulfilled_chunks_count');
 
-        // Reload only the counter column to avoid a full model reload.
+        // Append the index to the JSON array atomically
+        static::where('id', $this->id)->update([
+            'fulfilled_chunk_indexes' => Database::raw(
+                "JSON_ARRAY_APPEND(fulfilled_chunk_indexes, '$', {$chunkIndex})"
+            ),
+        ]);
+
         $fresh = static::where('id', $this->id)
-            ->selectRaw('fulfilled_chunks_count')
+            ->selectRaw('fulfilled_chunks_count, fulfilled_chunk_indexes')
             ->first();
 
         $this->fulfilled_chunks_count = (int)$fresh->fulfilled_chunks_count;
 
+        if ($fresh->fulfilled_chunk_indexes) {
+            $this->fulfilled_chunk_indexes = json_decode($fresh->fulfilled_chunk_indexes, true);
+        }
+
         return $this->fulfilled_chunks_count;
+    }
+
+    public function getMissingChunkIndexes(): array
+    {
+        $completed = $this->fulfilled_chunk_indexes ?? [];
+        $all = range(0, $this->total_chunks - 1);
+
+        return array_values(array_diff($all, $completed));
     }
 
     public function allChunksComplete(): bool

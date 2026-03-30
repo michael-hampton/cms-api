@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Jobs\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionType;
-use App\Events\Subscriptions\IssueDeliveryDispatchFailed;
 use App\Events\Subscriptions\IssueDeliveryDispatched;
+use App\Events\Subscriptions\IssueDeliveryDispatchFailed;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
@@ -100,7 +100,7 @@ class GenerateIssueDeliveriesJob extends BaseJob
                     $created++;
                 }
 
-                $issueDelivery->markDispatched();
+                //$issueDelivery->markDispatched();
 
                 return [
                     'issue_delivery_id' => $issueDelivery->id,

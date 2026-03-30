@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Jobs\Subscriptions;
 
+use App\DTO\Subscriptions\WorkflowStageResult;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Events\Subscriptions\PrintFulfilmentStalled;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\PrintRunRepository;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
  * Safety net for Phase 1.
@@ -33,6 +36,7 @@ class FulfilmentCompletionMonitorJob extends BaseJob
 
     public function __construct(
         private readonly PrintRunRepository $printRunRepository,
+        private readonly WorkflowRunRecorderFactory $recorderFactory,
         private readonly Logger             $logger,
     )
     {
@@ -72,11 +76,23 @@ class FulfilmentCompletionMonitorJob extends BaseJob
             'missing_chunks' => $totalChunks - $completedChunks,
         ]);
 
+        $this->recorderFactory
+            ->forPrintRun($printRun, 'phase_1', WorkflowRunStatus::STALLED)
+            ->record(WorkflowStageResult::failed(
+                "Phase 1 stalled after {$delayMinutes} minutes.",
+                [
+                    'completed_chunks' => $completedChunks,
+                    'total_chunks' => $totalChunks,
+                    'missing_chunk_indexes' => $printRun->getMissingChunkIndexes(),
+                ]
+            ));
+
         event(new PrintFulfilmentStalled(
             printRun: $printRun,
             completedChunks: $completedChunks,
             totalChunks: $totalChunks,
             monitorDelayMinutes: $delayMinutes,
+            missingChunkIndexes: $printRun->getMissingChunkIndexes(), // new
         ));
     }
 }

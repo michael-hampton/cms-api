@@ -69,6 +69,8 @@ use App\Controllers\Subscription\ShopAccountController;
 use App\Controllers\Subscription\SubscriptionDealsController;
 use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
+use App\Framework\Middleware\AuthenticateCrmPortal;
+use App\Framework\Middleware\AuthenticateMerchantPortal;
 use App\Framework\Middleware\RequireMemberAuth;
 
 /*
@@ -97,32 +99,44 @@ $router->get('/pages/{id}/edit', WebPageController::class, 'edit');
 $router->put('/pages/{id}', WebPageController::class, 'update');
 $router->delete('/pages/{id}', WebPageController::class, 'destroy');
 
+// ── Portal auth routes ──────────────────────────────────────
+$router->get('/crm/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'showLoginForm'], null, []);
+$router->post('/crm/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
+$router->post('/crm/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
+
+$router->get('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'showLoginForm'], null, []);
+$router->post('/merchant/login', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
+$router->post('/merchant/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
+
 // crm
-$router->get('/crm/members', [CrmMemberController::class, 'index']);
-$router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
-$router->get('/crm/members/{id}/edit', [CrmMemberController::class, 'edit']);
-$router->post('/crm/members/{id}', [CrmMemberController::class, 'update']);
-$router->delete('/crm/members/{id}', [CrmMemberController::class, 'destroy']);
+$router->group(['middleware' => [AuthenticateCrmPortal::class]], function ($router) {
+    $router->get('/crm/members', [CrmMemberController::class, 'index']);
+    $router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
+    $router->get('/crm/members/{id}/edit', [CrmMemberController::class, 'edit']);
+    $router->post('/crm/members/{id}', [CrmMemberController::class, 'update']);
+    $router->delete('/crm/members/{id}', [CrmMemberController::class, 'destroy']);
 
 // ── Address sub-resources (CrmAddressController) ──────────────────────────
 
 // Create form
-$router->get('/crm/members/{memberId}/addresses/create', [CrmAddressController::class, 'create']);
+    $router->get('/crm/members/{memberId}/addresses/create', [CrmAddressController::class, 'create']);
 
 // Store new address
-$router->post('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'store']);
+    $router->post('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'store']);
 
 // Edit form
-$router->get('/crm/members/{memberId}/addresses/{id}/edit', [CrmAddressController::class, 'edit']);
+    $router->get('/crm/members/{memberId}/addresses/{id}/edit', [CrmAddressController::class, 'edit']);
 
 // Update existing address
-$router->post('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'update']);
+    $router->post('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'update']);
 
 // Delete address
-$router->delete('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'destroy']);
+    $router->delete('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'destroy']);
 
 // Set address as default
-$router->post('/crm/members/{memberId}/addresses/{id}/default', [CrmAddressController::class, 'setDefault']);
+    $router->post('/crm/members/{memberId}/addresses/{id}/default', [CrmAddressController::class, 'setDefault']);
+});
+
 
 $router->get('/{site}/offers', [OfferListController::class, 'index']);
 $router->get('/{site}/offers/{offerId}', [OfferListController::class, 'show']);
@@ -503,8 +517,12 @@ $router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductMod
 //    ->where('regionSlug', 'asia-pacific|europe|americas');
 
 // In your routes file — adjust to your router's API
-$router->get('/merchant-portal', [MerchantDashboardController::class, 'index']);
-$router->get('/merchant-portal/boost', [BoostController::class, 'boostPage']);
+
+$router->group(['middleware' => [AuthenticateMerchantPortal::class]], function ($router) {
+    $router->get('/merchant-portal', [MerchantDashboardController::class, 'index']);
+    $router->get('/merchant-portal/boost', [BoostController::class, 'boostPage']);
+});
+
 
 //legal
 $router->group(['prefix' => 'legal'], function ($router) {

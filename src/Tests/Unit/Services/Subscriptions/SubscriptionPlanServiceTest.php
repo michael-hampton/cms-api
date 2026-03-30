@@ -7,6 +7,7 @@ use App\DTO\Vouchers\VoucherValidationResult;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
@@ -14,6 +15,10 @@ use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Services\Subscriptions\SubscriptionEligibilityService;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 use App\Services\Subscriptions\SubscriptionPlanService;
@@ -46,6 +51,10 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
         $this->createPlanAction = Mockery::mock(CreatePlanAction::class);
         $this->pricingService = Mockery::mock(SubscriptionPlanPricingService::class);
         $this->databaseMock = Mockery::mock(Database::class);
+
+        $container = Container::getInstance();
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
 
         $this->service = new SubscriptionPlanService(
             $this->planRepository,

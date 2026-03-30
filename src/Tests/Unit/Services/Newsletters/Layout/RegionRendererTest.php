@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Newsletters\Layout;
 use App\DTO\Newsletters\Layout\RegionDTO;
 use App\Services\Newsletter\DTOs\BlockData\TextBlockData;
 use App\Services\Newsletter\DTOs\RenderedBlock;
+use App\Services\Newsletter\Layout\LayoutBlockVariableResolver;
 use App\Services\Newsletter\Layout\RegionRenderer;
 use App\Services\Newsletter\Layout\SlotRenderer;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
@@ -17,6 +18,7 @@ class RegionRendererTest extends TestCase
     private RegionRenderer $renderer;
     private $mockRegistry;
     private $blockDataFactory;
+    private LayoutBlockVariableResolver $layoutBlockVariableResolver;
 
     protected function setUp(): void
     {
@@ -24,7 +26,8 @@ class RegionRendererTest extends TestCase
 
         $this->mockRegistry = Mockery::mock(EmailBlockRendererRegistry::class);
         $this->blockDataFactory = Mockery::mock(BlockDataFactory::class);
-        $slotRenderer = new SlotRenderer($this->mockRegistry, $this->blockDataFactory);
+        $this->layoutBlockVariableResolver = Mockery::mock(LayoutBlockVariableResolver::class);
+        $slotRenderer = new SlotRenderer($this->mockRegistry, $this->blockDataFactory, $this->layoutBlockVariableResolver);
         $this->renderer = new RegionRenderer($slotRenderer);
     }
 

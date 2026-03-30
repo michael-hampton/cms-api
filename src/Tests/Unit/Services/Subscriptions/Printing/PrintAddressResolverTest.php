@@ -13,22 +13,25 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_uses_delivery_address_when_present(): void
     {
-        $subscription = $this->makeSubscription(
-            deliveryAddress: $this->validAddress(['first_name' => 'Jane', 'address_line_1' => '1 Delivery Rd']),
-            billingAddress: $this->validAddress(['first_name' => 'Jane', 'address_line_1' => '2 Billing Ave']),
-        );
+        $subscription = $this->makeSubscription([
+            $this->validAddress(['type' => 'shipping', 'address_line_1' => '1 Delivery Rd']),
+            $this->validAddress(['type' => 'billing', 'address_line_1' => '2 Billing Ave']),
+        ]);
 
         $result = $this->resolver->resolve($subscription);
 
         $this->assertSame('1 Delivery Rd', $result['address_line_1']);
     }
 
-    private function makeSubscription(mixed $deliveryAddress, mixed $billingAddress): Subscription
+    private function makeSubscription(array $addresses = []): Subscription
     {
+        $member = Mockery::mock();
+        $member->addresses = collect($addresses);
+
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 10;
-        $subscription->delivery_address = $deliveryAddress;
-        $subscription->billing_address = $billingAddress;
+        $subscription->member = $member;
+
         return $subscription;
     }
 
@@ -47,10 +50,9 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_falls_back_to_billing_address_when_delivery_absent(): void
     {
-        $subscription = $this->makeSubscription(
-            deliveryAddress: null,
-            billingAddress: $this->validAddress(['address_line_1' => '2 Billing Ave']),
-        );
+        $subscription = $this->makeSubscription([
+            $this->validAddress(['type' => 'billing', 'address_line_1' => '2 Billing Ave']),
+        ]);
 
         $result = $this->resolver->resolve($subscription);
 
@@ -59,23 +61,19 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_throws_when_no_address_available(): void
     {
-        $subscription = $this->makeSubscription(
-            deliveryAddress: null,
-            billingAddress: null,
-        );
+        $subscription = $this->makeSubscription([]);
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/no valid delivery address found/');
+        $this->expectExceptionMessage('Cannot fulfil print subscription #10: no valid delivery address found');
 
         $this->resolver->resolve($subscription);
     }
 
     public function test_throws_when_delivery_address_missing_required_fields(): void
     {
-        $subscription = $this->makeSubscription(
-            deliveryAddress: ['first_name' => 'Jane'], // missing address_line_1, city, etc.
-            billingAddress: null,
-        );
+        $subscription = $this->makeSubscription([
+            ['type' => 'shipping', 'first_name' => 'Jane'], // invalid
+        ]);
 
         $this->expectException(\RuntimeException::class);
 
@@ -84,8 +82,12 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_snapshots_address_in_result(): void
     {
-        $address = $this->validAddress(['address_line_1' => '99 Test St']);
-        $subscription = $this->makeSubscription(deliveryAddress: $address, billingAddress: null);
+        $address = $this->validAddress([
+            'type' => 'shipping',
+            'address_line_1' => '99 Test St'
+        ]);
+
+        $subscription = $this->makeSubscription([$address]);
 
         $result = $this->resolver->resolve($subscription);
 
@@ -95,8 +97,8 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_builds_full_name_from_first_and_last_name(): void
     {
-        $address = $this->validAddress(['first_name' => 'Jane', 'last_name' => 'Doe']);
-        $subscription = $this->makeSubscription(deliveryAddress: $address, billingAddress: null);
+        $address = $this->validAddress(['type' => 'shipping', 'first_name' => 'Jane', 'last_name' => 'Doe']);
+        $subscription = $this->makeSubscription([$address]);
 
         $result = $this->resolver->resolve($subscription);
 
@@ -105,8 +107,8 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     public function test_accepts_json_encoded_address(): void
     {
-        $address = json_encode($this->validAddress(['address_line_1' => '5 Json Lane']));
-        $subscription = $this->makeSubscription(deliveryAddress: $address, billingAddress: null);
+        $address = json_encode($this->validAddress(['type' => 'shipping', 'address_line_1' => '5 Json Lane']));
+        $subscription = $this->makeSubscription([$address]);
 
         $result = $this->resolver->resolve($subscription);
 

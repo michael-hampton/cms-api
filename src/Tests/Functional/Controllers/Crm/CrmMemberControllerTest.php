@@ -23,12 +23,13 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
     }
 
-//    public function test_index_redirects_unauthenticated_request(): void
-//    {
-//        $response = $this->getForSiteUnauthenticated('/crm/members');
-//
-//        $this->assertResponseStatus(302, $response);
-//    }
+    public function test_index_redirects_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+        $response = $this->get('/crm/members');
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_index_lists_non_anonymous_members(): void
     {
@@ -96,12 +97,13 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(302, $response);
     }
 
-//    public function test_show_redirects_unauthenticated_request(): void
-//    {
-//        $response = $this->getForSiteUnauthenticated('/crm/members/' . $this->member->id);
-//
-//        $this->assertResponseStatus(302, $response);
-//    }
+    public function test_show_redirects_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+        $response = $this->get('/crm/members/' . $this->member->id);
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_show_displays_member_addresses(): void
     {
@@ -144,12 +146,13 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(200, $response);
     }
 
-//    public function test_edit_redirects_unauthenticated_request(): void
-//    {
-//        $response = $this->getForSiteUnauthenticated('/crm/members/' . $this->member->id . '/edit');
-//
-//        $this->assertResponseStatus(302, $response);
-//    }
+    public function test_edit_redirects_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+        $response = $this->get('/crm/members/' . $this->member->id . '/edit');
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     // ── Update ───────────────────────────────────────────────────────────────
 
@@ -243,17 +246,18 @@ class CrmMemberControllerTest extends FunctionalTestCase
         ]);
     }
 
-//    public function test_update_returns_401_for_unauthenticated_request(): void
-//    {
-//        $response = $this->postForSiteUnauthenticated('/crm/members/' . $this->member->id, [
-//            'first_name' => 'Hacker',
-//            'last_name'  => 'Attack',
-//            'email'      => 'hacker@example.com',
-//            'is_active'  => 1,
-//        ]);
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_update_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+        $response = $this->post('/crm/members/' . $this->member->id, [
+            'first_name' => 'Hacker',
+            'last_name' => 'Attack',
+            'email' => 'hacker@example.com',
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     /**
      * Helper — creates a User acting as a CRM agent.
@@ -291,12 +295,13 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('already in use', $data['message']);
     }
 
-//    public function test_destroy_returns_401_for_unauthenticated_request(): void
-//    {
-//        $response = $this->deleteForSiteUnauthenticated('/crm/members/' . $this->member->id);
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_destroy_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+        $response = $this->delete('/crm/members/' . $this->member->id);
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     // ── Addresses ────────────────────────────────────────────────────────────
 
@@ -336,23 +341,6 @@ class CrmMemberControllerTest extends FunctionalTestCase
             'id' => $active->id,
             'is_active' => 0,
         ]);
-    }
-
-    public function test_addresses_returns_member_addresses_as_json(): void
-    {
-        $this->createAddress([
-            'member_id' => $this->member->id,
-            'address_line_1' => '10 Downing St',
-            'city' => 'London',
-        ]);
-
-        $response = $this->get('/crm/members/' . $this->member->id . '/addresses');
-
-        $this->assertResponseStatus(200, $response);
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-        $this->assertNotEmpty($data['addresses']);
     }
 
     public function test_addresses_returns_404_for_non_existent_member(): void

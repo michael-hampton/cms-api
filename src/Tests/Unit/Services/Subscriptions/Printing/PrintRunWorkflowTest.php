@@ -665,7 +665,7 @@ class PrintRunWorkflowTest extends FunctionalTestCase
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->batchBuilderService = Mockery::mock(BatchBuilderService::class);
         $this->driverRegistry = Mockery::mock(PrintDriverRegistry::class);
-        $this->logger = Mockery::mock(Logger::class);
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->driver = Mockery::mock(PrintRunDriverInterface::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->workflowRunFactory = Mockery::mock(WorkflowRunFactory::class);

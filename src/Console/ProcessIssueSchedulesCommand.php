@@ -30,7 +30,7 @@ class ProcessIssueSchedulesCommand extends Command
 
         foreach ($schedules as $schedule) {
             try {
-                dispatch(GenerateIssueDeliveriesJob::for(), $schedule);
+                dispatch(GenerateIssueDeliveriesJob::for(), $schedule->id);
 
                 $result->incrementSucceeded();
                 $result->addMessage("Dispatched delivery job for schedule #{$schedule->id}");

@@ -30,9 +30,9 @@ class CrmMemberController extends Controller
      */
     public function index(Request $request): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->redirect('/login');
-//        }
+        if (!Auth::check()) {
+            return $this->redirect('/login');
+        }
 
         $siteId = SiteContext::getId();
 
@@ -75,9 +75,9 @@ class CrmMemberController extends Controller
      */
     public function show(int $id): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->redirect('/login');
-//        }
+        if (!Auth::check()) {
+            return $this->redirect('/login');
+        }
 
         $member = $this->crmMemberRepository->findForSite($id, SiteContext::getId());
 
@@ -101,9 +101,9 @@ class CrmMemberController extends Controller
      */
     public function edit(int $id): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->redirect('/login');
-//        }
+        if (!Auth::check()) {
+            return $this->redirect('/login');
+        }
 
         $member = $this->crmMemberRepository->findForSite($id, SiteContext::getId());
 
@@ -125,9 +125,9 @@ class CrmMemberController extends Controller
      */
     public function update(int $id, UpdateMemberRequest $request): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->errorResponse('Unauthorized', 401);
-//        }
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
 
         try {
             $data = $request->validated();

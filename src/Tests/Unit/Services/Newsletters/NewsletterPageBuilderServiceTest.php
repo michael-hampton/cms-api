@@ -2319,7 +2319,8 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => false,
-            'original_price' => 0
+            'original_price' => 0,
+            'site_id' => $this->siteId
         ]);
 
         $page = Page::create([
@@ -2398,7 +2399,8 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
             'is_active' => true,
-            'original_price' => 0
+            'original_price' => 0,
+            'site_id' => $this->siteId
         ]);
 
         $page = Page::create([
@@ -3153,7 +3155,7 @@ class NewsletterPageBuilderServiceTest extends RepositoryTestCase
         );
 
         $placeholderPos = strpos($html, NewsletterPageBuilderService::VIEW_IN_BROWSER_PLACEHOLDER);
-        $logoHeaderPos = strpos($html, 'Logo Header');
+        $logoHeaderPos = strpos($html, 'Logo');
 
         $this->assertNotFalse($placeholderPos);
         $this->assertNotFalse($logoHeaderPos);

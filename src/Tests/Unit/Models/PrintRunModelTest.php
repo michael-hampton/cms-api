@@ -9,7 +9,7 @@ use App\Models\PrintRun;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
-class PrintRunTest extends TestCase
+class PrintRunModelTest extends TestCase
 {
     public function test_it_returns_true_when_fulfilled_chunks_equals_total_chunks(): void
     {

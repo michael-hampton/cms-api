@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Jobs\Subscriptions;
 
+use App\DTO\Subscriptions\WorkflowStageResult;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
-use App\Repositories\Subscriptions\PrintBatchRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Subscriptions\Printing\BatchBuilderService;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
  * Phase 2: Build PrintBatch records from the fulfillments created in Phase 1.
@@ -36,6 +38,7 @@ class BuildPrintBatchesJob extends BaseJob
         private readonly PrintRunRepository      $printRunRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
         private readonly BatchBuilderService     $batchBuilderService,
+        private readonly WorkflowRunRecorderFactory $recorderFactory,
         private readonly Logger                  $logger,
     )
     {
@@ -87,10 +90,16 @@ class BuildPrintBatchesJob extends BaseJob
             'batch_count' => $batches->count(),
         ]);
 
+        $this->recorderFactory
+            ->forPrintRun($printRun, 'phase_2', WorkflowRunStatus::EXPORTING)
+            ->record(WorkflowStageResult::succeeded([
+                'batch_count' => $batches->count(),
+            ]));
+
         // Dispatch Phase 3 — one ProcessPrintBatchJob per batch.
         // Export and label generation are parallel (both dispatched from that job).
         foreach ($batches as $batch) {
-            dispatch(ProcessPrintBatchJob::for(), app(PrintBatchRepository::class), app(Logger::class), $batch->id);
+            dispatch(ProcessPrintBatchJob::for(), $batch->id);
         }
     }
 }

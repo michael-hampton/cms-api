@@ -5,6 +5,7 @@ namespace App\Controllers\Crm;
 use App\Controllers\Controller;
 use App\Enums\Address\AddressType;
 use App\Events\Members\MemberPostcodeUpdated;
+use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\AddressRepository;
@@ -28,9 +29,9 @@ class CrmAddressController extends Controller
      */
     public function create(int $memberId): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->redirect('/login');
-//        }
+        if (!Auth::check()) {
+            return $this->redirect('/login');
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 
@@ -50,9 +51,9 @@ class CrmAddressController extends Controller
      */
     public function store(int $memberId, CrmCreateAddressRequest $request): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->errorResponse('Unauthorized', 401);
-//        }
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 
@@ -90,9 +91,9 @@ class CrmAddressController extends Controller
      */
     public function edit(int $memberId, int $id): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->redirect('/login');
-//        }
+        if (!Auth::check()) {
+            return $this->redirect('/login');
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 
@@ -120,9 +121,9 @@ class CrmAddressController extends Controller
      */
     public function update(int $memberId, int $id, CrmUpdateAddressRequest $request): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->errorResponse('Unauthorized', 401);
-//        }
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 
@@ -163,9 +164,9 @@ class CrmAddressController extends Controller
      */
     public function destroy(int $memberId, int $id): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->errorResponse('Unauthorized', 401);
-//        }
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 
@@ -193,9 +194,9 @@ class CrmAddressController extends Controller
      */
     public function setDefault(int $memberId, int $id): mixed
     {
-//        if (!Auth::check()) {
-//            return $this->errorResponse('Unauthorized', 401);
-//        }
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
 

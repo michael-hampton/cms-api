@@ -3,11 +3,15 @@
 namespace App\Tests\Unit\Actions\Subscriptions;
 
 use App\Actions\Subscriptions\AddPlanPriceAction;
+use App\Framework\Container;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Services\Subscriptions\PlanPricingDomainGuard;
 use App\Services\Subscriptions\Validators\PricingCurrencyValidator;
 use Mockery;
@@ -28,6 +32,10 @@ class AddPlanPriceActionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $container = Container::getInstance();
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
 
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->pricingRepository = Mockery::mock(SubscriptionPlanPricingRepository::class);

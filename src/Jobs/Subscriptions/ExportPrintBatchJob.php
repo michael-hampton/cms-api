@@ -2,11 +2,15 @@
 
 namespace App\Jobs\Subscriptions;
 
+use App\DTO\Subscriptions\WorkflowStageResult;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\PrintBatchRepository;
+use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Subscriptions\Printing\PrintBatchExportService;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
  * Dispatched by PrintDeliveryChannel after the fulfillment record is persisted
@@ -20,10 +24,12 @@ use App\Services\Subscriptions\Printing\PrintBatchExportService;
 class ExportPrintBatchJob extends BaseJob
 {
     public function __construct(
-        private readonly PrintBatchRepository    $batchRepository,
-        private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly PrintBatchExportService $exportService,
-        private readonly Logger                  $logger,
+        private readonly PrintBatchRepository       $batchRepository,
+        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
+        private readonly PrintBatchExportService    $exportService,
+        private readonly WorkflowRunRecorderFactory $recorderFactory,
+        private readonly PrintRunRepository         $printRunRepository,
+        private readonly Logger                     $logger,
     )
     {
     }
@@ -49,9 +55,43 @@ class ExportPrintBatchJob extends BaseJob
             return;
         }
 
-        // Export failures (transport errors) throw, causing the queue to retry
-        // this job. PrintBatchExportService marks the batch failed internally
-        // before re-throwing so the status reflects the failure in the DB.
-        $this->exportService->export($batch, $issueDelivery);
+        try {
+            $this->exportService->export($batch, $issueDelivery);
+        } catch (\Throwable $e) {
+            $printRun = $this->printRunRepository->findActiveForIssueDelivery($batch->issue_delivery_id);
+
+            if ($printRun) {
+                $this->recorderFactory
+                    ->forPrintRun($printRun, 'phase_3', WorkflowRunStatus::COMPLETE)
+                    ->record(WorkflowStageResult::failed(
+                        $e->getMessage(),
+                        ['batch_id' => $batchId],
+                    ));
+            }
+
+            throw $e;
+        }
+
+        $allBatches = $this->batchRepository->findByIssueDelivery($batch->issue_delivery_id);
+        $allExported = $allBatches->every(fn($b) => $b->isExported());
+
+        if (!$allExported) {
+            return;
+        }
+
+        $printRun = $this->printRunRepository->findActiveForIssueDelivery($batch->issue_delivery_id);
+
+        if (!$printRun) {
+            $this->logger->warning('ExportPrintBatchJob: all batches exported but no active PrintRun found', [
+                'issue_delivery_id' => $issueDeliveryId,
+            ]);
+            return;
+        }
+
+        $this->recorderFactory
+            ->forPrintRun($printRun, 'phase_3', WorkflowRunStatus::COMPLETE)
+            ->record(WorkflowStageResult::succeeded([
+                'batch_count' => $allBatches->count(),
+            ]));
     }
 }

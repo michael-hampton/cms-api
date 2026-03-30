@@ -70,6 +70,17 @@ class PrintRunRepository extends Repository
             ->update(['status' => PrintRunStatus::CANCELLED->value]);
     }
 
+    public function findActiveForIssueDelivery(int $issueDeliveryId): ?PrintRun
+    {
+        return PrintRun::where('issue_delivery_id', $issueDeliveryId)
+            ->whereNotIn('status', [
+                PrintRunStatus::CANCELLED->value,
+                PrintRunStatus::FAILED->value,
+            ])
+            ->latest()
+            ->first();
+    }
+
     protected function getModelClass(): string
     {
         return PrintRun::class;

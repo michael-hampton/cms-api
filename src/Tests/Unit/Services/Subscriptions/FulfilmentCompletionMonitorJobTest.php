@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\WorkflowStageResult;
 use App\Enums\Subscriptions\PrintRunStatus;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\FulfilmentCompletionMonitorJob;
 use App\Models\PrintRun;
 use App\Repositories\Subscriptions\PrintRunRepository;
+use App\Services\Workflow\WorkflowRunRecorder;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -17,12 +21,16 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 {
     private MockInterface $printRunRepository;
     private MockInterface $logger;
+    private WorkflowRunRecorderFactory|MockInterface $recorderFactory;
+
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->recorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class)
+            ->shouldIgnoreMissing();
     }
 
     protected function tearDown(): void
@@ -40,6 +48,19 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
         );
 
         $this->printRunRepository->shouldReceive('find')->with(1)->andReturn($printRun);
+
+        $recorder = $this->makeRecorder();
+        $recorder->shouldReceive('record')
+            ->once()
+            ->with(Mockery::on(fn($r) => $r instanceof WorkflowStageResult
+                && $r->status === \App\Enums\Workflow\WorkflowStageStatus::FAILED
+                && str_contains($r->error, '5')
+            ));
+
+        $this->recorderFactory
+            ->shouldReceive('forPrintRun')
+            ->with($printRun, 'phase_1', WorkflowRunStatus::STALLED)
+            ->andReturn($recorder);
 
         $this->makeJob()->handle(1);
 
@@ -95,6 +116,7 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
     {
         return new FulfilmentCompletionMonitorJob(
             $this->printRunRepository,
+            $this->recorderFactory,
             $this->logger
         );
     }
@@ -116,5 +138,10 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
             ->andReturn($status === PrintRunStatus::FULFILLING);
 
         return $printRun;
+    }
+
+    private function makeRecorder(): WorkflowRunRecorder|MockInterface
+    {
+        return Mockery::mock(WorkflowRunRecorder::class);
     }
 }

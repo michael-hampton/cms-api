@@ -43,12 +43,13 @@ class CrmAddressControllerTest extends FunctionalTestCase
         );
     }
 
-//    public function test_create_redirects_unauthenticated_agent(): void
-//    {
-//        $response = $this->getForSiteUnauthenticated('/crm/members/' . $this->member->id . '/addresses/create');
-//
-//        $this->assertResponseStatus(302, $response);
-//    }
+    public function test_create_redirects_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $response = $this->get('/crm/members/' . $this->member->id . '/addresses/create');
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_create_redirects_when_member_not_found(): void
     {
@@ -160,15 +161,16 @@ class CrmAddressControllerTest extends FunctionalTestCase
         }
     }
 
-//    public function test_store_returns_401_for_unauthenticated_agent(): void
-//    {
-//        $response = $this->postForSiteUnauthenticated(
-//            '/crm/members/' . $this->member->id . '/addresses',
-//            $this->validAddressPayload()
-//        );
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_store_returns_401_for_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $response = $this->post(
+            '/crm/members/' . $this->member->id . '/addresses',
+            $this->validAddressPayload()
+        );
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_store_returns_422_when_required_fields_missing(): void
     {
@@ -208,16 +210,17 @@ class CrmAddressControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
     }
 
-//    public function test_edit_redirects_unauthenticated_agent(): void
-//    {
-//        $address = $this->createAddress(['member_id' => $this->member->id]);
-//
-//        $response = $this->getForSiteUnauthenticated(
-//            '/crm/members/' . $this->member->id . '/addresses/' . $address->id . '/edit'
-//        );
-//
-//        $this->assertResponseStatus(302, $response);
-//    }
+    public function test_edit_redirects_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $address = $this->createAddress(['member_id' => $this->member->id]);
+
+        $response = $this->get(
+            '/crm/members/' . $this->member->id . '/addresses/' . $address->id . '/edit'
+        );
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_edit_returns_200_for_existing_address(): void
     {
@@ -306,17 +309,18 @@ class CrmAddressControllerTest extends FunctionalTestCase
         ]);
     }
 
-//    public function test_update_returns_401_for_unauthenticated_agent(): void
-//    {
-//        $address = $this->createAddress(['member_id' => $this->member->id]);
-//
-//        $response = $this->post(
-//            '/crm/members/' . $this->member->id . '/addresses/' . $address->id,
-//            $this->validAddressPayload()
-//        );
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_update_returns_401_for_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $address = $this->createAddress(['member_id' => $this->member->id]);
+
+        $response = $this->post(
+            '/crm/members/' . $this->member->id . '/addresses/' . $address->id,
+            $this->validAddressPayload()
+        );
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_update_returns_422_when_required_fields_missing(): void
     {
@@ -357,16 +361,17 @@ class CrmAddressControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
     }
 
-//    public function test_destroy_returns_401_for_unauthenticated_agent(): void
-//    {
-//        $address = $this->createAddress(['member_id' => $this->member->id]);
-//
-//        $response = $this->delete(
-//            '/crm/members/' . $this->member->id . '/addresses/' . $address->id
-//        );
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_destroy_returns_401_for_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $address = $this->createAddress(['member_id' => $this->member->id]);
+
+        $response = $this->delete(
+            '/crm/members/' . $this->member->id . '/addresses/' . $address->id
+        );
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_destroy_deletes_address_belonging_to_member(): void
     {
@@ -409,16 +414,17 @@ class CrmAddressControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
     }
 
-//    public function test_set_default_returns_401_for_unauthenticated_agent(): void
-//    {
-//        $address = $this->createAddress(['member_id' => $this->member->id]);
-//
-//        $response = $this->post(
-//            '/crm/members/' . $this->member->id . '/addresses/' . $address->id . '/default'
-//        );
-//
-//        $this->assertResponseStatus(401, $response);
-//    }
+    public function test_set_default_returns_401_for_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+        $address = $this->createAddress(['member_id' => $this->member->id]);
+
+        $response = $this->post(
+            '/crm/members/' . $this->member->id . '/addresses/' . $address->id . '/default'
+        );
+
+        $this->assertResponseStatus(302, $response);
+    }
 
     public function test_set_default_marks_address_as_default(): void
     {

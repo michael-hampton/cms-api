@@ -4,28 +4,8 @@ namespace App\Services\Subscriptions\Printing;
 
 use App\Models\Subscription;
 
-/**
- * Resolves the delivery address for a print subscription.
- *
- * Rule: use delivery_address if present, fall back to billing_address.
- * Throws if neither is available — a missing address is a hard failure for
- * physical fulfilment.
- */
 class PrintAddressResolver
 {
-    /**
-     * @return array{
-     *     full_name: string,
-     *     address_line_1: string,
-     *     address_line_2: string|null,
-     *     city: string,
-     *     postcode: string,
-     *     country: string,
-     *     snapshot: array
-     * }
-     *
-     * @throws \RuntimeException When no valid delivery address exists.
-     */
     public function resolve(Subscription $subscription): array
     {
         $address = $this->pickAddress($subscription);
@@ -38,8 +18,6 @@ class PrintAddressResolver
 
         $this->guardRequiredFields($address, $subscription->id);
 
-        $snapshot = $address;
-
         return [
             'full_name' => trim(($address['first_name'] ?? '') . ' ' . ($address['last_name'] ?? '')),
             'address_line_1' => $address['address_line_1'],
@@ -47,42 +25,49 @@ class PrintAddressResolver
             'city' => $address['city'],
             'postcode' => $address['postcode'],
             'country' => $address['country'],
-            'snapshot' => $snapshot,
+            'snapshot' => $address,
         ];
     }
 
     private function pickAddress(Subscription $subscription): ?array
     {
-        $delivery = $subscription->delivery_address;
-        if ($delivery !== null && $delivery !== '' && $delivery !== []) {
-            $address = is_array($delivery)
-                ? $delivery
-                : json_decode($delivery, true);
+        $addresses = $subscription->member?->addresses;
 
-            if ($this->isUsableAddress($address)) {
-                return $address;
-            }
+        // Normalize everything up front
+        $normalized = $addresses
+            ->map(fn($addr) => $this->normalize($addr))
+            ->filter(); // remove nulls
+
+        // Prefer delivery/shipping
+        $delivery = $normalized->first(function ($address) {
+            return ($address['type'] ?? null) === 'delivery'
+                || ($address['type'] ?? null) === 'shipping';
+        });
+
+        if ($this->isUsableAddress($delivery)) {
+            return $delivery;
         }
 
-        $billing = $subscription->billing_address;
-        if ($billing !== null && $billing !== '' && $billing !== []) {
-            $address = is_array($billing)
-                ? $billing
-                : json_decode($billing, true);
+        // Fallback to billing
+        $billing = $normalized->first(function ($address) {
+            return ($address['type'] ?? null) === 'billing';
+        });
 
-            if ($this->isUsableAddress($address)) {
-                return $address;
-            }
+        if ($this->isUsableAddress($billing)) {
+            return $billing;
         }
 
         return null;
     }
 
-    private function isUsableAddress(?array $address): bool
+    private function isUsableAddress(mixed $address): bool
     {
-        if (!is_array($address)) {
+        if (is_null($address)) {
             return false;
         }
+
+        // Handle Eloquent model or array
+        $address = $this->normalize($address);
 
         return isset($address['address_line_1']) && $address['address_line_1'] !== ''
             && isset($address['city']) && $address['city'] !== ''
@@ -90,12 +75,29 @@ class PrintAddressResolver
             && isset($address['country']) && $address['country'] !== '';
     }
 
+    private function normalize(mixed $address): ?array
+    {
+        if (is_array($address)) {
+            return $address;
+        }
+
+        // Eloquent model → array
+        if (is_object($address) && method_exists($address, 'toArray')) {
+            return $address->toArray();
+        }
+
+        // JSON string fallback (just in case legacy data exists)
+        if (is_string($address)) {
+            return json_decode($address, true);
+        }
+
+        return null;
+    }
+
     private function guardRequiredFields(array $address, int $subscriptionId): void
     {
-        $required = ['address_line_1', 'city', 'postcode', 'country'];
-
-        foreach ($required as $field) {
-            if (!isset($address[$field]) || $address[$field] === '') {
+        foreach (['address_line_1', 'city', 'postcode', 'country'] as $field) {
+            if (empty($address[$field])) {
                 throw new \RuntimeException(
                     "Print address for subscription #{$subscriptionId} is missing required field: {$field}"
                 );

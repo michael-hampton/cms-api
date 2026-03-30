@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\PrintRunStatus;
+use App\Enums\Workflow\WorkflowRunStatus;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
@@ -14,6 +15,8 @@ use App\Models\PrintRun;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
 use App\Services\Subscriptions\Printing\BatchBuilderService;
+use App\Services\Workflow\WorkflowRunRecorder;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -24,26 +27,7 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
     private MockInterface $issueDeliveryRepository;
     private MockInterface $batchBuilderService;
     private MockInterface $logger;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
-        $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
-        $this->batchBuilderService = Mockery::mock(BatchBuilderService::class);
-        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-
-    // =========================================================================
-    // Happy path
-    // =========================================================================
+    private WorkflowRunRecorderFactory $workflowRunRecorderFactory;
 
     public function test_it_builds_batches_and_dispatches_one_process_job_per_batch(): void
     {
@@ -51,6 +35,8 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $issueDelivery = $this->makeIssueDelivery();
         $batch1 = $this->makeBatch(id: 10);
         $batch2 = $this->makeBatch(id: 11);
+
+        $this->setWorkflowExpectations($printRun);
 
         $this->printRunRepository->shouldReceive('find')->with(1)->andReturn($printRun);
         $this->issueDeliveryRepository->shouldReceive('find')->with(5)->andReturn($issueDelivery);
@@ -73,10 +59,75 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
     }
 
+    private function makePrintRun(PrintRunStatus $status): MockInterface
+    {
+        $printRun = Mockery::mock(PrintRun::class)->makePartial();
+
+        $printRun->id = 1;
+        $printRun->issue_delivery_id = 5;
+        $printRun->status = $status->value;
+
+        $printRun->shouldReceive('isCancelled')
+            ->andReturn($status === PrintRunStatus::CANCELLED);
+
+        $printRun->shouldReceive('isComplete')
+            ->andReturn($status === PrintRunStatus::COMPLETE);
+
+        return $printRun;
+    }
+
+    // =========================================================================
+    // Happy path
+    // =========================================================================
+
+    private function makeIssueDelivery(): MockInterface
+    {
+        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
+        $delivery->id = 5;
+        return $delivery;
+    }
+
+    private function makeBatch(int $id): MockInterface
+    {
+        $batch = Mockery::mock(PrintBatch::class)->makePartial();
+        $batch->id = $id;
+        return $batch;
+    }
+
+    // =========================================================================
+    // Guard conditions
+    // =========================================================================
+
+    private function setWorkflowExpectations(PrintRun $printRun)
+    {
+        $recorder = Mockery::mock(WorkflowRunRecorder::class);
+        $recorder->shouldReceive('record')
+            ->once();
+
+        $this->workflowRunRecorderFactory->shouldReceive('forPrintRun')
+            ->with($printRun, 'phase_2', WorkflowRunStatus::EXPORTING)
+            ->once()
+            ->andReturn($recorder);
+
+    }
+
+    private function makeJob(): BuildPrintBatchesJob
+    {
+        return new BuildPrintBatchesJob(
+            $this->printRunRepository,
+            $this->issueDeliveryRepository,
+            $this->batchBuilderService,
+            $this->workflowRunRecorderFactory,
+            $this->logger
+        );
+    }
+
     public function test_it_transitions_print_run_through_batching_to_batched(): void
     {
         $printRun = $this->makePrintRun(PrintRunStatus::FULFILLING);
         $issueDelivery = $this->makeIssueDelivery();
+
+        $this->setWorkflowExpectations($printRun);
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
         $this->issueDeliveryRepository->shouldReceive('find')->andReturn($issueDelivery);
@@ -98,10 +149,6 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->assertSame(['batching', 'batched'], $callOrder);
     }
 
-    // =========================================================================
-    // Guard conditions
-    // =========================================================================
-
     public function test_it_returns_early_when_print_run_not_found(): void
     {
         $this->printRunRepository->shouldReceive('find')->andReturn(null);
@@ -115,6 +162,10 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
         $this->assertTrue(true);
     }
+
+    // =========================================================================
+    // Zero batches
+    // =========================================================================
 
     public function test_it_returns_early_when_print_run_is_cancelled(): void
     {
@@ -130,6 +181,10 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
         $this->assertTrue(true);
     }
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     public function test_it_returns_early_when_print_run_is_already_complete(): void
     {
@@ -165,14 +220,12 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->assertTrue(true);
     }
 
-    // =========================================================================
-    // Zero batches
-    // =========================================================================
-
     public function test_it_handles_zero_batches_without_dispatching_any_process_jobs(): void
     {
         $printRun = $this->makePrintRun(PrintRunStatus::FULFILLING);
         $issueDelivery = $this->makeIssueDelivery();
+
+        $this->setWorkflowExpectations($printRun);
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
         $this->issueDeliveryRepository->shouldReceive('find')->andReturn($issueDelivery);
@@ -188,43 +241,20 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->assertTrue(true);
     }
 
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    private function makeJob(): BuildPrintBatchesJob
+    protected function setUp(): void
     {
-        return new BuildPrintBatchesJob($this->printRunRepository, $this->issueDeliveryRepository, $this->batchBuilderService, $this->logger);
+        parent::setUp();
+
+        $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
+        $this->issueDeliveryRepository = Mockery::mock(IssueDeliveryRepository::class);
+        $this->batchBuilderService = Mockery::mock(BatchBuilderService::class);
+        $this->workflowRunRecorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class);
+        $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
     }
 
-    private function makePrintRun(PrintRunStatus $status): MockInterface
+    protected function tearDown(): void
     {
-        $printRun = Mockery::mock(PrintRun::class)->makePartial();
-
-        $printRun->id = 1;
-        $printRun->issue_delivery_id = 5;
-        $printRun->status = $status->value;
-
-        $printRun->shouldReceive('isCancelled')
-            ->andReturn($status === PrintRunStatus::CANCELLED);
-
-        $printRun->shouldReceive('isComplete')
-            ->andReturn($status === PrintRunStatus::COMPLETE);
-
-        return $printRun;
-    }
-
-    private function makeIssueDelivery(): MockInterface
-    {
-        $delivery = Mockery::mock(IssueDelivery::class)->makePartial();
-        $delivery->id = 5;
-        return $delivery;
-    }
-
-    private function makeBatch(int $id): MockInterface
-    {
-        $batch = Mockery::mock(PrintBatch::class)->makePartial();
-        $batch->id = $id;
-        return $batch;
+        Mockery::close();
+        parent::tearDown();
     }
 }

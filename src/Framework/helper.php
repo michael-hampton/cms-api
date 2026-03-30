@@ -627,6 +627,21 @@ if (!function_exists('event')) {
     }
 }
 
+if (!function_exists('storage_path')) {
+    /**
+     * Get the path to the storage folder.
+     *
+     * @param string $path
+     * @return string
+     */
+    function storage_path(string $path = ''): string
+    {
+        $base = dirname(__DIR__) . '/storage';
+
+        return $path ? $base . DIRECTORY_SEPARATOR . ltrim($path, '/\\') : $base;
+    }
+}
+
 
 if (!function_exists('tap')) {
     function tap(mixed $value, callable $callback): mixed

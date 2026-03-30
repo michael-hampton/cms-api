@@ -65,6 +65,7 @@ class PrintFulfillmentRepository extends Repository
      */
     public function findByIssueDeliveryGroupedByTerritory(int $issueDeliveryId): Collection
     {
+
         return PrintFulfillment::query()
             ->whereHas('issuesDelivered', function ($q) use ($issueDeliveryId) {
                 $q->where('issue_delivery_id', $issueDeliveryId);

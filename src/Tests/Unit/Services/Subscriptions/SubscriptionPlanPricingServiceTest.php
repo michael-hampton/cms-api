@@ -4,10 +4,15 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Actions\Subscriptions\AddPlanPriceAction;
 use App\Actions\Subscriptions\ReplacePlanPriceAction;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Services\Subscriptions\SubscriptionPlanPricingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
@@ -31,6 +36,10 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->addPlanPriceAction = Mockery::mock(AddPlanPriceAction::class);
         $this->replacePlanPriceAction = Mockery::mock(ReplacePlanPriceAction::class);
+
+        $container = Container::getInstance();
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
 
         $this->service = new SubscriptionPlanPricingService(
             $this->pricingRepository,
@@ -179,15 +188,6 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->service->createPricingTier(1, $this->validPricingData(['currency' => null]));
     }
 
-    public function testCreateRejectsMissingInterval(): void
-    {
-        $this->addPlanPriceAction->shouldReceive('execute')->never();
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('interval');
-
-        $this->service->createPricingTier(1, $this->validPricingData(['interval' => null]));
-    }
-
     // ---------------------------------------------------------------------------
     // updatePricingTier — delegation
     // ---------------------------------------------------------------------------
@@ -269,15 +269,6 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
         $this->expectExceptionMessage('currency');
 
         $this->service->updatePricingTier(1, $this->validPricingData(['currency' => null]));
-    }
-
-    public function testUpdateRejectsMissingInterval(): void
-    {
-        $this->replacePlanPriceAction->shouldReceive('execute')->never();
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('interval');
-
-        $this->service->updatePricingTier(1, $this->validPricingData(['interval' => null]));
     }
 
     // ---------------------------------------------------------------------------

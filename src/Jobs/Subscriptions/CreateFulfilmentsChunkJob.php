@@ -129,7 +129,7 @@ class CreateFulfilmentsChunkJob extends BaseJob
         ]);
 
         // Atomic increment — safe across concurrent chunk workers.
-        $newCount = $printRun->incrementFulfilledChunks();
+        $newCount = $printRun->incrementFulfilledChunks($chunkIndex); //todo check test
 
         // If this was the last chunk, fire the Phase 2 barrier signal.
         if ($printRun->allChunksComplete()) {

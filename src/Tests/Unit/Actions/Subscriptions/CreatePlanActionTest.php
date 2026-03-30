@@ -3,9 +3,13 @@
 namespace App\Tests\Unit\Actions\Subscriptions;
 
 use App\Actions\Subscriptions\CreatePlanAction;
+use App\Framework\Container;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +25,10 @@ class CreatePlanActionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $container = Container::getInstance();
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
 
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
         $this->stripeProductGateway = Mockery::mock(StripeProductGatewayInterface::class);

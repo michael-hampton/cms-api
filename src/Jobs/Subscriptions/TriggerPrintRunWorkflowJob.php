@@ -9,6 +9,7 @@ use App\Framework\Support\Logger;
 use App\Jobs\BaseJob;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\PrintRunRepository;
+use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
  * Phase 1 entry point for the print pipeline.
@@ -16,13 +17,14 @@ use App\Repositories\Subscriptions\PrintRunRepository;
  * Responsibilities (only these):
  *   1. Load the IssueDelivery — bail if missing.
  *   2. Cancel any existing pending PrintRuns for this delivery (idempotency).
- *   3. Create a new PrintRun in Pending status.
- *   4. Dispatch CreatePrintFulfillmentsJob to handle subscription querying,
+ *   3. Create a WorkflowRun audit record for this pipeline execution.
+ *   4. Create a new PrintRun in Pending status linked to the WorkflowRun.
+ *   5. Dispatch CreatePrintFulfillmentsJob to handle subscription querying,
  *      chunking, and chunk job dispatch.
  *
- * This job deliberately knows nothing about subscriptions, chunk sizes,
- * or monitor delays. That is CreatePrintFulfillmentsJob's responsibility.
- * Keeping this job thin means it is trivially testable and retryable.
+ * WorkflowRun updates are observability only — a failure to update
+ * WorkflowRun must never propagate to the pipeline. The recorder
+ * handles this guarantee internally.
  */
 class TriggerPrintRunWorkflowJob extends BaseJob
 {
@@ -30,16 +32,17 @@ class TriggerPrintRunWorkflowJob extends BaseJob
     public int $tries = 3;
 
     public function __construct(
-        private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly PrintRunRepository      $printRunRepository,
-        private readonly Logger                  $logger,
+        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
+        private readonly PrintRunRepository         $printRunRepository,
+        private readonly WorkflowRunRecorderFactory $recorderFactory,
+        private readonly Logger                     $logger,
+        private readonly WorkflowRunStarter         $workflowRunStarter, // 👈 add this
+
     )
     {
     }
 
-    public function handle(
-        int $issueDeliveryId,
-    ): void
+    public function handle(int $issueDeliveryId): void
     {
         $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
 
@@ -54,8 +57,16 @@ class TriggerPrintRunWorkflowJob extends BaseJob
         // one — prevents orphaned runs if this job is retried or re-triggered.
         $this->printRunRepository->cancelAllPendingForIssueDelivery($issueDelivery->id);
 
+        // Create the WorkflowRun before the PrintRun so workflow_run_id is
+        // available when the PrintRun is persisted.
+        $workflowRun = $this->workflowRunStarter->start(self::class, [
+            'issue_delivery_id' => $issueDeliveryId,
+            'triggered_by' => 'IssueDeliveryDispatchedListener',
+        ]);
+
         $printRun = $this->printRunRepository->create([
             'issue_delivery_id' => $issueDelivery->id,
+            'workflow_run_id' => $workflowRun->id,
             'status' => PrintRunStatus::PENDING->value,
             'is_regional' => false,
             'driver_sync_enabled' => false,
@@ -65,6 +76,7 @@ class TriggerPrintRunWorkflowJob extends BaseJob
 
         $this->logger->info('TriggerPrintRunWorkflowJob: PrintRun created', [
             'print_run_id' => $printRun->id,
+            'workflow_run_id' => $workflowRun->id,
             'issue_delivery_id' => $issueDelivery->id,
         ]);
 

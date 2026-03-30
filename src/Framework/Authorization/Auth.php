@@ -22,7 +22,7 @@ class Auth
             return false;
         }
 
-        $user = AuthenticatedUser::where('email', $email)->first();
+        $user = User::where('email', $email)->first();
 
         if ($user && password_verify($password, $user['password'])) {
             self::login($user);

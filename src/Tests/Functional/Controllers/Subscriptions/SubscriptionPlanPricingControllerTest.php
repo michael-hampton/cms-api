@@ -2,8 +2,13 @@
 
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
+use App\Framework\Container;
 use App\Models\Model;
 use App\Models\SubscriptionPlanPricing;
+use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -17,6 +22,11 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
     {
         parent::setUp();
         $this->plan = $this->createSubscriptionPlan(['stripe_product_id' => 'test']);
+
+        $container = Container::getInstance();
+
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
     }
 
     // =========================================================================

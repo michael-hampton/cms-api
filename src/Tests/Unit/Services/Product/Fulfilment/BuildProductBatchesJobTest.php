@@ -12,11 +12,11 @@ use App\Models\ProductFulfilmentRun;
 use App\Repositories\Product\ProductBatchRepository;
 use App\Repositories\Product\ProductFulfilmentRepository;
 use App\Repositories\Product\ProductFulfilmentRunRepository;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
-class BuildProductBatchesJobTest extends TestCase
+class BuildProductBatchesJobTest extends FunctionalTestCase
 {
     private ProductFulfilmentRunRepository&MockInterface $runRepository;
     private ProductFulfilmentRepository&MockInterface $fulfilmentRepository;
@@ -52,6 +52,7 @@ class BuildProductBatchesJobTest extends TestCase
         $run->shouldReceive('markBatched')->once();
 
         $this->handle(runId: 1);
+        $this->assertTrue(true);
     }
 
     private function makeRun(int $id): ProductFulfilmentRun&MockInterface

@@ -82,12 +82,12 @@ class AddPlanPriceAction
         ));
 
         // 5. Create Stripe Price — throws on failure; pricing row exists but stripe_price_id stays null.
-        $stripePriceId = $_ENV['APP_ENV'] !== 'testing' ? $this->stripePriceGateway->createRecurringPrice(
+        $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
             $plan->stripe_product_id,
             $pricingData['amount_cents'],
             $currency,
             $pricingData['interval'] ?? 'month',
-        ) : uniqid();
+        );
 
         // 6. Store the Stripe Price ID.
         $this->pricingRepository->update($pricing->id, ['stripe_price_id' => $stripePriceId]);

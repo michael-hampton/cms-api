@@ -41,7 +41,7 @@ class CreatePlanAction
 
         // 2. Create Stripe Product — throws on Stripe failure; plan persists
         //    without a product ID so the caller knows to retry.
-        $stripeProductId = $_ENV['APP_ENV'] === 'testing' ? uniqid() : $this->stripeProductGateway->createProduct($plan->name);
+        $stripeProductId = $this->stripeProductGateway->createProduct($plan->name);
 
         // 3. Store the Stripe product ID. If the DB update fails, compensate
         //    by deleting the Stripe product to avoid orphaned Stripe objects.

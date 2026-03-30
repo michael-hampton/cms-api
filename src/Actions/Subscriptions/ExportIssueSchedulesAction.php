@@ -70,11 +70,4 @@ class ExportIssueSchedulesAction
             $schedule->created_at->format('Y-m-d H:i:s'),
         ];
     }
-
-    private function resolveFilepath(): string
-    {
-        $filename = 'issue_schedules_' . date('Y-m-d_His') . '.csv';
-
-        return storage_path('exports/' . $filename);
-    }
 }

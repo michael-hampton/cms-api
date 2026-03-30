@@ -3,12 +3,16 @@
 namespace App\Tests\Unit\Actions\Subscriptions;
 
 use App\Actions\Subscriptions\ReplacePlanPriceAction;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\NullStripePriceGateway;
+use App\Services\Billing\Stripe\NullStripeProductGateway;
 use App\Services\Subscriptions\PlanPricingDomainGuard;
 use App\Services\Subscriptions\Validators\PricingCurrencyValidator;
 use Mockery;
@@ -469,6 +473,10 @@ class ReplacePlanPriceActionTest extends TestCase
         $this->database = Mockery::mock(Database::class);
         $this->currencyValidator = Mockery::mock(PricingCurrencyValidator::class);
         $this->domainGuard = Mockery::mock(PlanPricingDomainGuard::class);
+
+        $container = Container::getInstance();
+        $container->bind(StripePriceGatewayInterface::class, NullStripePriceGateway::class);
+        $container->bind(StripeProductGatewayInterface::class, NullStripeProductGateway::class);
 
         $this->action = new ReplacePlanPriceAction(
             $this->planRepository,

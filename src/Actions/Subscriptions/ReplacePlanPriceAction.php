@@ -87,19 +87,15 @@ class ReplacePlanPriceAction
             excludePricingId: $currentPricingId,
         );
 
-        if ($_ENV['APP_ENV'] !== 'testing') {
-            // 3. Create the new Stripe Price before the transaction.
-            //    Stripe failure → DB is untouched; old price stays active.
-            //    DB failure → orphaned Stripe price (acceptable; it is unused and immutable).
-            $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
-                $plan->stripe_product_id,
-                $newPricingData['amount_cents'],
-                $currency,
-                $newPricingData['interval'] ?? 'month',
-            );
-        } else {
-            $stripePriceId = uniqid();
-        }
+        // 3. Create the new Stripe Price before the transaction.
+        //    Stripe failure → DB is untouched; old price stays active.
+        //    DB failure → orphaned Stripe price (acceptable; it is unused and immutable).
+        $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
+            $plan->stripe_product_id,
+            $newPricingData['amount_cents'],
+            $currency,
+            $newPricingData['interval'] ?? 'month',
+        );
 
         // 4. Both DB writes in one transaction.
         return $this->database->transaction(function () use (

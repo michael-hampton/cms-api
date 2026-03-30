@@ -145,7 +145,7 @@ abstract class Model
 
     protected function isFillable(string $key): bool
     {
-        $keywords = ['count', 'total', 'avg', 'units_sold', 'day', 'revenue'];
+        $keywords = ['count', 'total', 'avg', 'units_sold', 'day', 'revenue', 'territory_id'];
 
         if (collect($keywords)->contains(fn($keyword) => str_contains($key, $keyword))) {
             return true;
