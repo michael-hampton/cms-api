@@ -454,4 +454,37 @@ class SubscriptionRepository extends Repository
             'status' => SubscriptionStatus::ACTIVE->value,
         ]);
     }
+
+    public function getSubscribersForPlan(
+        int     $planId,
+        int     $page = 1,
+        int     $perPage = 25,
+        ?string $status = null,
+    ): array
+    {
+        $offset = ($page - 1) * $perPage;
+
+        $base = Subscription::where('plan_id', $planId);
+
+        if ($status !== null) {
+            $base->where('status', $status);
+        }
+
+        $total = (clone $base)->count();
+
+        $items = (clone $base)
+            ->with(['member'])
+            ->orderBy('created_at', 'desc')
+            ->limit($perPage)
+            ->offset($offset)
+            ->get();
+
+        return [
+            'items' => $items,
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => max(1, (int)ceil($total / $perPage)),
+        ];
+    }
 }

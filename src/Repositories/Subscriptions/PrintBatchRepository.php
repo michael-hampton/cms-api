@@ -43,8 +43,11 @@ class PrintBatchRepository
         PrintExportFormat $format = PrintExportFormat::CSV,
     ): Model
     {
+
         $existing = PrintBatch::where('issue_delivery_id', $issueDeliveryId)
-            ->where('territory_id', $territoryId)
+            ->when(!empty($territoryId), function ($query) use ($territoryId) {
+                return $query->where('territory_id', $territoryId);
+            })
             ->whereIn('status', [
                 PrintBatchStatus::QUEUED->value,
                 PrintBatchStatus::BATCH_EXPORTING->value,

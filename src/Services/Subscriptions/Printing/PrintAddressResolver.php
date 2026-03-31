@@ -19,7 +19,7 @@ class PrintAddressResolver
         $this->guardRequiredFields($address, $subscription->id);
 
         return [
-            'full_name' => trim(($address['first_name'] ?? '') . ' ' . ($address['last_name'] ?? '')),
+            'full_name' => trim(($subscription->member?->first_name) . ' ' . ($subscription->member?->last_name)),
             'address_line_1' => $address['address_line_1'],
             'address_line_2' => $address['address_line_2'] ?? null,
             'city' => $address['city'],

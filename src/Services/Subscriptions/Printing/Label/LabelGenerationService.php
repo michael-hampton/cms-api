@@ -11,7 +11,6 @@ use App\Framework\Support\Logger;
 use App\Models\LabelRun;
 use App\Repositories\Subscriptions\LabelRunRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
-use App\Services\Subscriptions\Printing\Transport\LabelExportTransport;
 use App\Services\Subscriptions\Printing\Transport\LocalLabelExportTransport;
 
 /**
@@ -84,10 +83,12 @@ class LabelGenerationService
             issueTitle: $issueDelivery?->issue_title,
         );
 
+
         $format = LabelExportFormat::from($labelRun->format);
+
         $strategy = $this->formatRegistry->get($format);
 
-        $labelRun->markGenerating();
+        //$labelRun->markGenerating();
 
         $this->logger->info('LabelGenerationService: generating', [
             'label_run_id' => $labelRun->id,
@@ -97,6 +98,7 @@ class LabelGenerationService
 
         try {
             $contents = $strategy->generate($fulfillment, $context);
+
             $filename = $this->buildFilename($labelRun, $format);
 
             $this->transport->upload($filename, $contents);
@@ -144,21 +146,6 @@ class LabelGenerationService
     }
 
     /**
-     * Deterministic versioned filename.
-     * Format: label_{labelRunId}_v{attempt}_{YYYYMMDD_HHmmss}.{ext}
-     *
-     * Examples:
-     *   label_1234_v1_20260401_120000.pdf
-     *   label_1234_v2_20260401_120030.pdf  ← retry
-     */
-    private function buildFilename(LabelRun $labelRun, LabelExportFormat $format): string
-    {
-        $timestamp = (new \DateTimeImmutable())->format('Ymd_His');
-
-        return "label_{$labelRun->id}_v{$labelRun->attempt_count}_{$timestamp}.{$format->extension()}";
-    }
-
-    /**
      * Mark the LabelRun as failed, emit the event, then throw so the
      * queue worker retries the job at the correct backoff interval.
      *
@@ -176,5 +163,20 @@ class LabelGenerationService
         event(new LabelRunFailed($labelRun, $reason));
 
         throw $previous ?? new \RuntimeException($reason);
+    }
+
+    /**
+     * Deterministic versioned filename.
+     * Format: label_{labelRunId}_v{attempt}_{YYYYMMDD_HHmmss}.{ext}
+     *
+     * Examples:
+     *   label_1234_v1_20260401_120000.pdf
+     *   label_1234_v2_20260401_120030.pdf  ← retry
+     */
+    private function buildFilename(LabelRun $labelRun, LabelExportFormat $format): string
+    {
+        $timestamp = (new \DateTimeImmutable())->format('Ymd_His');
+
+        return "label_{$labelRun->id}_v{$labelRun->attempt_count}_{$timestamp}.{$format->extension()}";
     }
 }

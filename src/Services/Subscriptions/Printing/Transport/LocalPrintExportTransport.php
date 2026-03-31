@@ -1,13 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Subscriptions\Printing\Transport;
+
+use Psr\Log\LoggerInterface;
 
 class LocalPrintExportTransport implements PrintExportTransport
 {
     private const DEFAULT_EXPORT_DIR =
         __DIR__ . '/../../../../storage/exports/print';
+
     public function __construct(
         private readonly string $exportDirectory = self::DEFAULT_EXPORT_DIR,
+        private readonly ?LoggerInterface $logger = null,
     )
     {
     }
@@ -17,15 +23,24 @@ class LocalPrintExportTransport implements PrintExportTransport
         $fullPath = rtrim($this->exportDirectory, '/') . '/' . ltrim($path, '/');
         $directory = dirname($fullPath);
 
-        // suppress mkdir warnings, try to create the folder
-        @mkdir($directory, 0777, true);
+        if (!is_dir($directory) && !mkdir($directory, 0755, true) && !is_dir($directory)) {
+            $this->logger?->warning('Failed to create print export directory', [
+                'directory' => $directory,
+            ]);
+            return;
+        }
 
-        // attempt to write the file, suppress warnings
-        $result = @file_put_contents($fullPath, $contents);
+        $result = file_put_contents($fullPath, $contents);
 
         if ($result === false) {
-            // optional: log the failure instead of throwing
-            error_log("⚠️ Failed to write print export to: {$fullPath}");
+            $this->logger?->warning('Failed to write print export file', [
+                'path' => $fullPath,
+            ]);
         }
+    }
+
+    public function identifier(): string
+    {
+        return 'local:' . rtrim($this->exportDirectory, '/');
     }
 }

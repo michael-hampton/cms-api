@@ -80,23 +80,27 @@ class CreatePrintFulfillmentAction
             $context->territoryId(),
         );
 
-        if ($existing) {
-            $this->logger->info('CreatePrintFulfillmentAction: fulfillment already exists — skipping', [
-                'subscription_id' => $subscription->id,
-                'issue_delivery_id' => $issueDelivery->id,
-                'issues_delivered_id' => $issuesDelivered->id,
-                'territory_id' => $context->territoryId(),
-            ]);
+//        if ($existing) {
+//            $this->logger->info('CreatePrintFulfillmentAction: fulfillment already exists — skipping', [
+//                'subscription_id' => $subscription->id,
+//                'issue_delivery_id' => $issueDelivery->id,
+//                'issues_delivered_id' => $issuesDelivered->id,
+//                'territory_id' => $context->territoryId(),
+//            ]);
+//
+//            // Return the existing record so the caller (job) can reference it.
+//            return $this->fulfillmentRepository->findBySubscriptionDeliveryAndTerritory(
+//                $subscription->id,
+//                $issuesDelivered->id,
+//                $context->territoryId(),
+//            );
+//        }
 
-            // Return the existing record so the caller (job) can reference it.
-            return $this->fulfillmentRepository->findBySubscriptionDeliveryAndTerritory(
-                $subscription->id,
-                $issuesDelivered->id,
-                $context->territoryId(),
-            );
-        }
+        $snapshot = [
+            ...$context->addressSnapshot,
+            'full_name' => $context->fullName,
+        ];
 
-        $snapshot = $context->addressSnapshot;
         $resolved = $this->buildResolvedAddress($snapshot, $subscription);
 
         $batch = $this->batchRepository->findOrCreateForIssueDeliveryAndTerritory(
@@ -139,7 +143,7 @@ class CreatePrintFulfillmentAction
     {
         if (!empty($snapshot['address_line_1'])) {
             return [
-                'full_name' => trim(($snapshot['first_name'] ?? '') . ' ' . ($snapshot['last_name'] ?? '')),
+                'full_name' => $snapshot['full_name'],
                 'address_line_1' => $snapshot['address_line_1'],
                 'address_line_2' => $snapshot['address_line_2'] ?? null,
                 'city' => $snapshot['city'],

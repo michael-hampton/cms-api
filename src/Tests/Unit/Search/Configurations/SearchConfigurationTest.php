@@ -3,11 +3,11 @@
 namespace App\Tests\Unit\Search\Configurations;
 
 use App\Search\Configurations\AuthorSearchConfiguration;
-use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\MerchantSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
+use App\Search\Configurations\PrintFulfilmentSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
@@ -54,7 +54,7 @@ class SearchConfigurationTest extends TestCase
 
     public function testBrandSearchConfigurationHasCorrectSetup()
     {
-        $config = new BrandSearchConfiguration();
+        $config = new PrintFulfilmentSearchConfiguration();
         $config->configure();
 
         // Check sorts
@@ -322,7 +322,7 @@ class SearchConfigurationTest extends TestCase
             new AuthorSearchConfiguration(),
             new VariantSearchConfiguration(),
             new MerchantSearchConfiguration(),
-            new BrandSearchConfiguration(),
+            new PrintFulfilmentSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
             new PageSearchConfiguration(),
@@ -351,7 +351,7 @@ class SearchConfigurationTest extends TestCase
     {
         $configurations = [
             new VariantSearchConfiguration(),
-            new BrandSearchConfiguration(),
+            new PrintFulfilmentSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
             new PageSearchConfiguration(),
@@ -373,7 +373,7 @@ class SearchConfigurationTest extends TestCase
 
     public function testConfigurationsSortsAreProperlyTyped()
     {
-        $config = new BrandSearchConfiguration();
+        $config = new PrintFulfilmentSearchConfiguration();
         $config->configure();
 
         $sorts = $config->getSorts();

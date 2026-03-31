@@ -56,6 +56,7 @@ class RewardDefinitionResource extends JsonResource
             'auto_deactivate' => $this->getAttribute('auto_deactivate'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
+            'terms_and_conditions' => $this->getAttribute('terms_and_conditions') ?? null,
 
             // Computed attributes
             'is_scheduled' => $this->isScheduled(),

@@ -3,12 +3,12 @@
 namespace App\Tests\Unit\Search;
 
 use App\Search\Configurations\AuthorSearchConfiguration;
-use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
+use App\Search\Configurations\PrintFulfilmentSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
@@ -77,7 +77,7 @@ class SearchConfigurationFactoryTest extends TestCase
     public function testFactoryCreatesBrandConfiguration()
     {
         $config = SearchConfigurationFactory::create('brand');
-        $this->assertInstanceOf(BrandSearchConfiguration::class, $config);
+        $this->assertInstanceOf(PrintFulfilmentSearchConfiguration::class, $config);
     }
 
     public function testFactoryCreatesRegionSetConfiguration()

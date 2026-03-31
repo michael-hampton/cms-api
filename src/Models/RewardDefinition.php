@@ -17,7 +17,8 @@ class RewardDefinition extends Model
         'max_claims_per_member',
         'is_active',
         'sort_order',
-        'deleted_at'
+        'deleted_at',
+        'terms_and_conditions',
     ];
 
     protected $casts = [

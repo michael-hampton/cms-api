@@ -7,7 +7,7 @@ namespace App\Services\Subscriptions\Printing\Transport;
 class LocalLabelExportTransport implements LabelExportTransport
 {
     private const DEFAULT_EXPORT_DIR =
-        __DIR__ . '/../../../../../exports/labels';
+        __DIR__ . '/../../../../storage/exports/labels';
 
     public function __construct(
         private readonly string $exportDirectory = self::DEFAULT_EXPORT_DIR,

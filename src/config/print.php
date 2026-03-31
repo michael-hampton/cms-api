@@ -23,7 +23,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'local' => [
-        'export_dir' => env('PRINT_LOCAL_EXPORT_DIR', '/var/exports/print'),
+        'export_dir' => env('PRINT_LOCAL_EXPORT_DIR', __DIR__ . '/../storage/exports/print'),
     ],
 
     /*
@@ -85,12 +85,12 @@ return [
     |--------------------------------------------------------------------------
     */
     'return_address' => [
-        'name' => env('PRINT_RETURN_NAME', ''),
-        'line_1' => env('PRINT_RETURN_LINE_1', ''),
+        'name' => env('PRINT_RETURN_NAME', 'Test'),
+        'line_1' => env('PRINT_RETURN_LINE_1', 'test line 1'),
         'line_2' => env('PRINT_RETURN_LINE_2'),
-        'city' => env('PRINT_RETURN_CITY', ''),
-        'postcode' => env('PRINT_RETURN_POSTCODE', ''),
-        'country' => env('PRINT_RETURN_COUNTRY', ''),
+        'city' => env('PRINT_RETURN_CITY', 'test'),
+        'postcode' => env('PRINT_RETURN_POSTCODE', 'test'),
+        'country' => env('PRINT_RETURN_COUNTRY', 'United Kingdom'),
     ],
 
     /*

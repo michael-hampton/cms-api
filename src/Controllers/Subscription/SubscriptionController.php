@@ -225,20 +225,4 @@ class SubscriptionController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
-
-    private function parseRegionSetIds(array $data): ?array
-    {
-        if (!isset($data['region_set_ids'])) {
-            return null;
-        }
-
-        $ids = $data['region_set_ids'];
-
-        if (is_string($ids)) {
-            $decoded = json_decode($ids, true);
-            return is_array($decoded) ? array_map('intval', $decoded) : [];
-        }
-
-        return is_array($ids) ? array_map('intval', $ids) : [];
-    }
 }

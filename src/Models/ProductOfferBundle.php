@@ -30,7 +30,8 @@ class ProductOfferBundle extends Model
         'rejected_by',
         'created_by',
         'updated_by',
-        'site_id'
+        'site_id',
+        'terms_and_conditions',
     ];
 
     protected $casts = [

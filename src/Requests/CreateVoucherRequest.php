@@ -35,7 +35,8 @@ class CreateVoucherRequest extends FormRequest
             'per_user_limit' => 'integer|min:1',
             'starts_at' => 'date',
             'expires_at' => 'date',
-            'status' => 'in:active,inactive,expired'
+            'status' => 'in:active,inactive,expired',
+            'terms_and_conditions' => 'nullable|string',
         ];
     }
 

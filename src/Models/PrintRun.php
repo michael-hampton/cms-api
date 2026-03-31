@@ -187,6 +187,30 @@ class PrintRun extends Model
         ]);
     }
 
+    /**
+     * Reset a failed or cancelled run back to pending for re-dispatch.
+     *
+     * Clears chunk-tracking counters so the fulfilling phase can restart
+     * cleanly. workflow_run_id is intentionally left intact — the upstream
+     * workflow system is responsible for assigning a new run ID when it
+     * re-triggers the job.
+     */
+    public function markRetry(): void
+    {
+        $this->update([
+            'status' => PrintRunStatus::PENDING->value,
+            'total_chunks' => 0,
+            'fulfilled_chunks_count' => 0,
+            'fulfilled_chunk_indexes' => null,
+        ]);
+    }
+
+    public function canRetry(): bool
+    {
+        return PrintRunStatus::from($this->status)->canRetry();
+    }
+
+
     // =========================================================================
     // State queries
     // =========================================================================

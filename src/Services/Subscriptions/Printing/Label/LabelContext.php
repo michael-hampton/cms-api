@@ -15,7 +15,7 @@ final class LabelContext
 {
     public function __construct(
         public readonly int     $issueDeliveryId,
-        public readonly ?string $issueNumber,
+        public readonly ?int $issueNumber,
         public readonly ?string $issueTitle,
         public readonly string  $returnAddressLine1,
         public readonly ?string $returnAddressLine2,
@@ -27,7 +27,7 @@ final class LabelContext
     {
     }
 
-    public static function fromConfig(int $issueDeliveryId, ?string $issueNumber, ?string $issueTitle): self
+    public static function fromConfig(int $issueDeliveryId, ?int $issueNumber, ?string $issueTitle): self
     {
         return new self(
             issueDeliveryId: $issueDeliveryId,

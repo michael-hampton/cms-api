@@ -18,15 +18,15 @@ class SubscriptionResource extends JsonResource
             'plan_id' => $this->getAttribute('plan_id'),
             'plan_name' => $this->getAttribute('plan')?->name,
             'status' => $this->getAttribute('status'),
-            'start_date' => $this->getAttribute('start_date'),
-            'end_date' => $this->getAttribute('end_date'),
-            'next_billing_date' => $this->getAttribute('next_billing_date'),
-            'last_payment_date' => $this->getAttribute('last_payment_date'),
+            'start_date' => $this->getAttribute('start_date')?->format('Y-m-d'),
+            'end_date' => $this->getAttribute('end_date')?->format('Y-m-d'),
+            'next_billing_date' => $this->getAttribute('next_billing_date')?->format('Y-m-d'),
+            'last_payment_date' => $this->getAttribute('last_payment_date')?->format('Y-m-d'),
             'price' => $this->getAttribute('price'),
             'currency' => $this->getAttribute('currency'),
             'auto_renew' => $this->getAttribute('auto_renew'),
-            'created_at' => $this->getAttribute('created_at'),
-            'updated_at' => $this->getAttribute('updated_at'),
+            'created_at' => $this->getAttribute('created_at')?->format('Y-m-d'),
+            'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d'),
         ];
     }
 }

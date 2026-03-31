@@ -60,6 +60,7 @@ class ProductOfferBundleRepository extends Repository
             'name' => $data['name'] ?? null,
             'slug' => $data['slug'] ?? null,
             'description' => $data['description'] ?? null,
+            'terms_and_conditions' => $data['terms_and_conditions'] ?? null,
             'total_price' => $data['total_price'] ?? null,
             'bundle_price' => $data['bundle_price'] ?? null,
             'discount_percentage' => $data['discount_percentage'] ?? null,
@@ -116,7 +117,8 @@ class ProductOfferBundleRepository extends Repository
             'is_active' => $data['is_active'] ?? true,
             'status' => $data['status'] ?? 'pending',
             'created_by' => $data['created_by'] ?? null,
-            'site_id' => $data['site_id']
+            'site_id' => $data['site_id'],
+            'terms_and_conditions' => $data['terms_and_conditions'] ?? null,
         ];
 
         $bundle = ProductOfferBundle::create($bundleData);

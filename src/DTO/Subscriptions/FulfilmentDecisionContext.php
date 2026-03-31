@@ -20,6 +20,7 @@ class FulfilmentDecisionContext
     public function __construct(
         public readonly ?Territory $territory,
         public array $addressSnapshot,
+        public string $fullName,
         public readonly array      $channelMetadata = [],
     )
     {

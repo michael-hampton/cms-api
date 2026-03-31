@@ -17,6 +17,9 @@ class UpdateProductOfferRequest extends FormRequest
             'status' => 'in:pending,published,rejected',
             'voucher_id' => 'nullable|integer|exists:vouchers,id',
             'rejection_reason' => 'nullable|string|max:500',
+            'region_set_ids' => 'nullable|array',
+            'region_set_ids.*' => 'integer|exists:region_sets,id',
+            'terms_and_conditions' => 'nullable|string',
         ];
     }
 

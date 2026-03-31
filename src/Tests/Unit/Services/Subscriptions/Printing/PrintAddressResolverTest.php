@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Subscriptions\Printing;
 
+use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Subscriptions\Printing\PrintAddressResolver;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -25,7 +26,12 @@ class PrintAddressResolverTest extends FunctionalTestCase
 
     private function makeSubscription(array $addresses = []): Subscription
     {
-        $member = Mockery::mock();
+        $member = Mockery::mock(Member::class)->makePartial();
+
+        $address = is_string($addresses[0]) ? json_decode($addresses[0], true) : $addresses[0];
+
+        $member->first_name = $address['first_name'];
+        $member->last_name = $address['last_name'];
         $member->addresses = collect($addresses);
 
         $subscription = Mockery::mock(Subscription::class)->makePartial();

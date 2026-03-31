@@ -29,20 +29,20 @@ class PrintRunControllerTest extends FunctionalTestCase
         ];
     }
 
-    public function testListByIssueReturnsPrintRunsForIssue(): void
+    public static function retryableStatuses(): array
     {
-        $issueDelivery = $this->createIssueDelivery();
-        $printRun = $this->createPrintRun($issueDelivery);
+        return [
+            [PrintRunStatus::FAILED->value],
+            [PrintRunStatus::CANCELLED->value],
+        ];
+    }
 
-        $response = $this->getForSite("/api/issues/{$issueDelivery->id}/print-runs");
-
-        $this->assertEquals(200, $response->getStatusCode());
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertTrue($data['success']);
-        $this->assertCount(1, $data['data']);
-        $this->assertEquals($printRun->id, $data['data'][0]['id']);
-        $this->assertEquals($issueDelivery->id, $data['data'][0]['issue_delivery_id']);
+    public static function nonRetryableStatuses(): array
+    {
+        return [
+            [PrintRunStatus::PENDING->value],
+            [PrintRunStatus::COMPLETE->value],
+        ];
     }
 
     // =========================================================================
@@ -85,6 +85,22 @@ class PrintRunControllerTest extends FunctionalTestCase
             'is_regional' => false,
             'driver_sync_enabled' => false,
         ], $overrides));
+    }
+
+    public function testListByIssueReturnsPrintRunsForIssue(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery);
+
+        $response = $this->getForSite("/api/issues/{$issueDelivery->id}/print-runs");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['data']);
+        $this->assertEquals($printRun->id, $data['data'][0]['id']);
+        $this->assertEquals($issueDelivery->id, $data['data'][0]['issue_delivery_id']);
     }
 
     public function testListByIssueReturns404WhenIssueNotFound(): void
@@ -337,4 +353,255 @@ class PrintRunControllerTest extends FunctionalTestCase
 
         $this->assertEquals(422, $response->getStatusCode());
     }
+
+    // =========================================================================
+    // PUT /print-runs/{printRun}/retry
+    // =========================================================================
+
+    #[DataProvider('retryableStatuses')]
+    public function testRetrySucceedsWhenRetryable(string $status): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery, ['status' => $status]);
+
+        $response = $this->putForSite("/api/print-runs/{$printRun->id}/retry", []);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(PrintRunStatus::PENDING->value, $data['data']['status']);
+        $this->assertEquals(PrintRunStatus::PENDING->value, $printRun->fresh()->status);
+    }
+
+    public function testRetryResponseContainsExpectedMessage(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::FAILED->value]);
+
+        $response = $this->putForSite("/api/print-runs/{$printRun->id}/retry", []);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('message', $data);
+        $this->assertNotEmpty($data['message']);
+    }
+
+    public function testRetryResponseContainsUpdatedPrintRun(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::FAILED->value]);
+
+        $response = $this->putForSite("/api/print-runs/{$printRun->id}/retry", []);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('data', $data);
+        $this->assertEquals($printRun->id, $data['data']['id']);
+        $this->assertEquals(PrintRunStatus::PENDING->value, $data['data']['status']);
+    }
+
+    #[DataProvider('nonRetryableStatuses')]
+    public function testRetryRejects422WhenNotRetryable(string $status): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery, ['status' => $status]);
+
+        $response = $this->putForSite("/api/print-runs/{$printRun->id}/retry", []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        // Status must not have changed
+        $this->assertEquals($status, $printRun->fresh()->status);
+    }
+
+    public function testRetryReturns404WhenNotFound(): void
+    {
+        $response = $this->putForSite('/api/print-runs/99999/retry', []);
+
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    public function testRetryResetsChunkCountersOnModel(): void
+    {
+        // Verifies that markRetry() clears chunk-tracking fields, not just status.
+        // Adjust field names to match your actual PrintRun schema if they differ.
+        $issueDelivery = $this->createIssueDelivery();
+        $printRun = $this->createPrintRun($issueDelivery, [
+            'status' => PrintRunStatus::FAILED->value,
+            'total_chunks' => 10,
+            'chunks_complete' => 7,
+            'chunks_failed' => 3,
+        ]);
+
+        $this->putForSite("/api/print-runs/{$printRun->id}/retry", []);
+
+        $fresh = $printRun->fresh();
+        $this->assertEquals(0, $fresh->chunks_total);
+        $this->assertEquals(0, $fresh->chunks_complete);
+        $this->assertEquals(0, $fresh->chunks_failed);
+    }
+
+    // =========================================================================
+    // POST /print-runs/bulk-cancel
+    // =========================================================================
+
+    public function testBulkCancelSucceedsForAllPendingRuns(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $run1 = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::PENDING->value]);
+        $run2 = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::PENDING->value]);
+
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [$run1->id, $run2->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals(2, $data['summary']['cancelled']);
+        $this->assertEquals(0, $data['summary']['not_found']);
+        $this->assertEquals(0, $data['summary']['not_cancellable']);
+        $this->assertContains($run1->id, $data['cancelled']);
+        $this->assertContains($run2->id, $data['cancelled']);
+
+        $this->assertEquals(PrintRunStatus::CANCELLED->value, $run1->fresh()->status);
+        $this->assertEquals(PrintRunStatus::CANCELLED->value, $run2->fresh()->status);
+    }
+
+    public function testBulkCancelReportsNotFoundIds(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $run = $this->createPrintRun($issueDelivery);
+
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [$run->id, 99998, 99999],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(1, $data['summary']['cancelled']);
+        $this->assertEquals(2, $data['summary']['not_found']);
+        $this->assertContains(99998, $data['not_found']);
+        $this->assertContains(99999, $data['not_found']);
+    }
+
+    public function testBulkCancelReportsNotCancellableRuns(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $pending = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::PENDING->value]);
+        $complete = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::COMPLETE->value]);
+        $failed = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::FAILED->value]);
+
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [$pending->id, $complete->id, $failed->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(1, $data['summary']['cancelled']);
+        $this->assertEquals(0, $data['summary']['not_found']);
+        $this->assertEquals(2, $data['summary']['not_cancellable']);
+
+        $notCancellableIds = array_column($data['not_cancellable'], 'id');
+        $this->assertContains($complete->id, $notCancellableIds);
+        $this->assertContains($failed->id, $notCancellableIds);
+
+        // Non-cancellable runs must retain their original statuses
+        $this->assertEquals(PrintRunStatus::COMPLETE->value, $complete->fresh()->status);
+        $this->assertEquals(PrintRunStatus::FAILED->value, $failed->fresh()->status);
+    }
+
+    public function testBulkCancelNotCancellableEntryIncludesStatus(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $complete = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::COMPLETE->value]);
+
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [$complete->id],
+        ]);
+        $data = json_decode($response->getContent(), true);
+        $notCancellable = $data['not_cancellable'];
+
+        $this->assertCount(1, $notCancellable);
+        $this->assertArrayHasKey('id', $notCancellable[0]);
+        $this->assertArrayHasKey('status', $notCancellable[0]);
+        $this->assertEquals(PrintRunStatus::COMPLETE->value, $notCancellable[0]['status']);
+    }
+
+    public function testBulkCancelDeduplicatesIds(): void
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        $run = $this->createPrintRun($issueDelivery, ['status' => PrintRunStatus::PENDING->value]);
+
+        // Same ID submitted three times — must only be cancelled once
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [$run->id, $run->id, $run->id],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(1, $data['summary']['cancelled']);
+        $this->assertCount(1, $data['cancelled']);
+    }
+
+    public function testBulkCancelRejects422ForEmptyArray(): void
+    {
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [],
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkCancelRejects422WhenKeyMissing(): void
+    {
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', []);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkCancelRejects422WhenIdsExceedLimit(): void
+    {
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => range(1, 101),
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function testBulkCancelAcceptsExactlyOneHundredIds(): void
+    {
+        // 100 is the stated maximum — must be accepted even when none of the IDs exist
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => range(900000, 900099),
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(100, $data['summary']['not_found']);
+    }
+
+    public function testBulkCancelResponseStructureIsAlwaysPresent(): void
+    {
+        // Even an all-not-found request must return the full summary shape
+        $response = $this->postForSite('/api/print-runs/bulk-cancel', [
+            'print_run_ids' => [99997],
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('summary', $data);
+        $this->assertArrayHasKey('cancelled', $data['summary']);
+        $this->assertArrayHasKey('not_found', $data['summary']);
+        $this->assertArrayHasKey('not_cancellable', $data['summary']);
+        $this->assertIsArray($data['cancelled']);
+        $this->assertIsArray($data['not_found']);
+        $this->assertIsArray($data['not_cancellable']);
+    }
+
 }

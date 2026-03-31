@@ -41,7 +41,8 @@ class ProductOffer extends Model implements BoostableInterface
         'reward_definition_id',
         'original_price',
         'link',
-        'site_id'
+        'site_id',
+        'terms_and_conditions',
     ];
 
     protected $casts = [

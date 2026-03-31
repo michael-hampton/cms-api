@@ -19,7 +19,7 @@ class UpdateVoucherRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user() && $this->user()->can('create', 'Voucher');
+        return $this->user() && $this->user()->can('update', 'Voucher');
     }
 
     public function rules(): array
@@ -36,7 +36,8 @@ class UpdateVoucherRequest extends FormRequest
             'per_user_limit' => 'integer|min:1',
             'starts_at' => 'date',
             'expires_at' => 'date',
-            'status' => 'in:active,inactive,expired'
+            'status' => 'in:active,inactive,expired',
+            'terms_and_conditions' => 'nullable|string',
         ];
     }
 

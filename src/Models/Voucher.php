@@ -34,7 +34,8 @@ Voucher extends Model
         'stripe_coupon_id',
         'duration_in_months',
         'is_stackable',
-        'merchant_id'
+        'merchant_id',
+        'terms_and_conditions',
     ];
 
     protected $casts = [

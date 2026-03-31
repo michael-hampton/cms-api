@@ -55,4 +55,14 @@ class PrintFulfillment extends Model
     {
         return $this->hasOne(IssuesDelivered::class, 'id', 'issues_delivered_id', $relation);
     }
+
+    public function batch(bool $relation = false)
+    {
+        return $this->hasOne(PrintBatch::class, 'id', 'batch_id', $relation);
+    }
+
+    public function subscription(bool $relation = false)
+    {
+        return $this->hasOne(Subscription::class, 'id', 'subscription_id', $relation);
+    }
 }

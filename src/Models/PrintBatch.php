@@ -62,4 +62,9 @@ class PrintBatch extends Model
     {
         return $this->status === PrintBatchStatus::BATCH_EXPORTING->value;
     }
+
+    public function issueDelivery(bool $relation = false)
+    {
+        return $this->hasOne(IssueDelivery::class, 'id', 'issue_delivery_id', $relation);
+    }
 }

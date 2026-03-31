@@ -47,6 +47,7 @@ class FulfilmentDecisionService
         return new FulfilmentDecisionContext(
             territory: $territory,
             addressSnapshot: $resolvedAddress['snapshot'],
+            fullName: $resolvedAddress['full_name'],
             channelMetadata: [
                 'issue_delivery_id' => $issueDelivery->id,
                 'subscription_id' => $subscription->id,

@@ -35,6 +35,7 @@ class OfferResource extends JsonResource
             'sale_price' => $this->getAttribute('sale_price'),
             'product' => $this->getAttribute('product'),
             'region_set_ids' => $regionSets?->pluck('id')->toArray() ?? [],
+            'terms_and_conditions' => $this->getAttribute('terms_and_conditions') ?? null,
             'region_sets' => $regionSets?->map(fn($rs) => [
                     'id' => $rs['id'],
                     'name' => $rs['name'],

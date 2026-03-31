@@ -17,7 +17,8 @@ class CreateRewardRequest extends FormRequest
             'reward_config' => 'required|array',
             'max_claims_per_member' => 'integer|min_number:1',
             'is_active' => 'boolean',
-            'sort_order' => 'integer'
+            'sort_order' => 'integer',
+            'terms_and_conditions' => 'nullable|string',
         ];
     }
 }

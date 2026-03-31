@@ -22,6 +22,9 @@ class StoreProductOfferBundleRequest extends FormRequest
             'items.*.product_id' => ['integer', 'required_without:items.*.product_offer_id'],
             'items.*.product_offer_id' => ['integer', 'required_without:items.*.product_id'],
             'items.*.quantity' => ['integer', 'min_number:1'],
+            'region_set_ids' => ['nullable', 'array'],
+            'region_set_ids.*' => ['integer', 'exists:region_sets,id'],
+            'terms_and_conditions' => ['nullable', 'string'],
         ];
     }
 }

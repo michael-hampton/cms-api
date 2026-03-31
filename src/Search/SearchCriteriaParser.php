@@ -39,7 +39,9 @@ class SearchCriteriaParser
         'active',
         'name',
         'plan_type',
-        'billing_period'
+        'billing_period',
+        'batch_id',
+        'issue_id'
     ];
 
     public static function fromRequest($request, string $siteName): SearchCriteria

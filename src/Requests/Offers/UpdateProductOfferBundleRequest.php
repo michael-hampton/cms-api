@@ -22,6 +22,9 @@ class UpdateProductOfferBundleRequest extends FormRequest
             'items.*.product_id' => ['integer'],
             'items.*.product_offer_id' => ['integer'],
             'items.*.quantity' => ['integer', 'min_number:1'],
+            'region_set_ids' => ['nullable', 'array'],
+            'region_set_ids.*' => ['integer', 'exists:region_sets,id'],
+            'terms_and_conditions' => ['nullable', 'string'],
         ];
     }
 }

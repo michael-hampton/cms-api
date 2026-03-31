@@ -111,6 +111,9 @@ class CreatePrintFulfillmentActionTest extends TestCase
     {
         $context = Mockery::mock(FulfilmentDecisionContext::class)->makePartial();
         $context->addressSnapshot = $snapshot;
+        $context->fullName = trim($snapshot['first_name'] ?? '') . ' ' . trim($snapshot['last_name'] ?? '');
+
+
         $context->shouldReceive('territoryId')->andReturn($territoryId);
         return $context;
     }

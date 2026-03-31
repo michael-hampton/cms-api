@@ -24,4 +24,9 @@ enum PrintRunStatus: string
     {
         return $this === self::PENDING;
     }
+
+    public function canRetry()
+    {
+        return $this === self::FAILED || $this === self::CANCELLED;
+    }
 }

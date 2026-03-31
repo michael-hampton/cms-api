@@ -21,6 +21,7 @@ use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
 use App\Search\Configurations\PipelineSearchConfiguration;
+use App\Search\Configurations\PrintFulfilmentSearchConfiguration;
 use App\Search\Configurations\ProductOfferBundleSearchConfiguration;
 use App\Search\Configurations\ProductOfferSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
@@ -73,6 +74,7 @@ class SearchConfigurationFactory
         'subscription_plan_pricing' => SubscriptionPlanPricingSearchConfiguration::class,
         'payment' => SubscriptionPaymentSearchConfiguration::class,
         'newsletter_layout' => NewsletterLayoutSearchConfiguration::class,
+        'print-fulfilment' => PrintFulfilmentSearchConfiguration::class
     ];
 
     public static function create(string $type): SearchConfiguration

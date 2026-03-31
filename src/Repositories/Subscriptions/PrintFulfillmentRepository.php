@@ -7,9 +7,28 @@ use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\PrintFulfillment;
 use App\Repositories\Repository;
+use App\Search\PaginatedResult;
+use App\Search\SearchConfigurationFactory;
+use App\Search\SearchCriteria;
+use App\Search\SearchEngine;
 
 class PrintFulfillmentRepository extends Repository
 {
+    private readonly SearchEngine $searchEngine;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $config = SearchConfigurationFactory::create('print-fulfilment');
+        $this->searchEngine = new SearchEngine($config);
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        $query = PrintFulfillment::with(['subscription', 'issuesDelivered', 'batch', 'batch.issueDelivery']);
+        return $this->searchEngine->search($query, $criteria);
+    }
+
     /**
      * Persist a print fulfilment record.
      *
@@ -125,6 +144,15 @@ class PrintFulfillmentRepository extends Repository
                 fn($q) => $q->where('territory_id', $territoryId),
             )
             ->first();
+    }
+
+    public function listForBatch(int $batchId, array $filters): Collection
+    {
+        return PrintFulfillment::where('batch_id', $batchId)
+            ->when(!empty($filters['status']), function ($query) use ($filters) {
+                return $query->where('status', $filters['status']);
+            })
+            ->get();
     }
 
     protected function getModelClass(): string

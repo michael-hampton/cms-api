@@ -19,6 +19,8 @@ use App\Resources\PrintRunResource;
  *   GET  /print-runs                         — paginated list (status, issue_id, date)
  *   GET  /print-runs/{printRun}              — detail
  *   PUT  /print-runs/{printRun}/cancel       — cancel (only when pending)
+ *   PUT  /print-runs/{printRun}/retry        — retry (only when failed or cancelled)
+ *   POST /print-runs/bulk-cancel             — cancel up to 100 runs by ID
  *
  * This controller is deliberately thin: all business rules live in the
  * repository and the PrintRun model. No service is needed for these read
@@ -63,21 +65,6 @@ class PrintRunController extends Controller
     // GET /print-runs
     // =========================================================================
 
-    private function extractStatusFilter(Request $request): array
-    {
-        $status = $request->query('status');
-
-        if ($status && !PrintRunStatus::tryFrom($status)) {
-            return []; // silently ignore invalid status on list-by-issue
-        }
-
-        return $status ? ['status' => $status] : [];
-    }
-
-    // =========================================================================
-    // GET /print-runs/{printRun}
-    // =========================================================================
-
     /**
      * Paginated list of PrintRuns across all issues.
      *
@@ -104,7 +91,7 @@ class PrintRunController extends Controller
     }
 
     // =========================================================================
-    // PUT /print-runs/{printRun}/cancel
+    // GET /print-runs/{printRun}
     // =========================================================================
 
     public function show(int $printRunId): JsonResponse
@@ -117,12 +104,12 @@ class PrintRunController extends Controller
 
         return $this->resourceResponse([
             'success' => true,
-            'data' => PrintRunResource::make($printRun)->toArray()
+            'data' => PrintRunResource::make($printRun)->toArray(),
         ]);
     }
 
     // =========================================================================
-    // Private
+    // PUT /print-runs/{printRun}/cancel
     // =========================================================================
 
     /**
@@ -154,5 +141,119 @@ class PrintRunController extends Controller
             'message' => 'Print run cancelled',
             'data' => PrintRunResource::make($printRun->fresh())->toArray(),
         ]);
+    }
+
+    // =========================================================================
+    // PUT /print-runs/{printRun}/retry
+    // =========================================================================
+
+    /**
+     * Retry a failed or cancelled PrintRun.
+     *
+     * Resets status to pending and clears all chunk-tracking counters so the
+     * run can be dispatched cleanly from the beginning.
+     *
+     * Returns 422 when the PrintRun is not in a retryable state.
+     */
+    public function retry(int $printRunId): JsonResponse
+    {
+        $printRun = $this->printRunRepository->find($printRunId);
+
+        if (!$printRun) {
+            return $this->errorResponse('Print run not found', 404);
+        }
+
+        if (!$printRun->canRetry()) {
+            return $this->errorResponse(
+                "Print run cannot be retried in its current status: {$printRun->status}",
+                422
+            );
+        }
+
+        $printRun->markRetry();
+
+        return $this->resourceResponse([
+            'success' => true,
+            'message' => 'Print run reset to pending',
+            'data' => PrintRunResource::make($printRun->fresh())->toArray(),
+        ]);
+    }
+
+    // =========================================================================
+    // POST /print-runs/bulk-cancel
+    // =========================================================================
+
+    /**
+     * Cancel multiple PrintRuns by ID in a single request.
+     *
+     * Accepts a JSON body: { "print_run_ids": [1, 2, 3, ...] }
+     * Maximum 100 IDs per request.
+     *
+     * Processes valid, cancellable runs and reports on anything skipped:
+     *   - "not_found"      — IDs that don't exist in the database
+     *   - "not_cancellable" — runs that exist but are in a non-cancellable state
+     *
+     * Always returns 200 with a structured summary. The caller must inspect
+     * the summary to determine whether all requested runs were cancelled.
+     */
+    public function bulkCancel(Request $request): JsonResponse
+    {
+        $ids = $request->input('print_run_ids', []);
+
+        if (!is_array($ids) || empty($ids)) {
+            return $this->errorResponse('print_run_ids must be a non-empty array', 422);
+        }
+
+        if (count($ids) > 100) {
+            return $this->errorResponse('A maximum of 100 print run IDs may be submitted per request', 422);
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        $printRuns = $this->printRunRepository->findMany($ids);
+        $foundIds = $printRuns->pluck('id')->all();
+        $notFoundIds = array_values(array_diff($ids, $foundIds));
+
+        $cancelled = [];
+        $notCancellable = [];
+
+        foreach ($printRuns as $printRun) {
+            if ($printRun->canCancel()) {
+                $printRun->markCancelled();
+                $cancelled[] = $printRun->id;
+            } else {
+                $notCancellable[] = [
+                    'id' => $printRun->id,
+                    'status' => $printRun->status,
+                ];
+            }
+        }
+
+        return $this->resourceResponse([
+            'success' => true,
+            'summary' => [
+                'cancelled' => count($cancelled),
+                'not_found' => count($notFoundIds),
+                'not_cancellable' => count($notCancellable),
+            ],
+            'cancelled' => $cancelled,
+            'not_found' => $notFoundIds,
+            'not_cancellable' => $notCancellable,
+        ]);
+    }
+
+    // =========================================================================
+    // Private
+    // =========================================================================
+
+    private function extractStatusFilter(Request $request): array
+    {
+        $status = $request->query('status');
+
+        if ($status && !PrintRunStatus::tryFrom($status)) {
+            return []; // silently ignore invalid status on list-by-issue
+        }
+
+        return $status ? ['status' => $status] : [];
     }
 }

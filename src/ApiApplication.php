@@ -5,6 +5,7 @@ namespace App;
 use App\Console\SyncStripePlansCommand;
 use App\Console\SyncStripePricesCommand;
 use App\Contracts\ClockInterface;
+use App\Enums\Subscriptions\LabelExportFormat;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Alerts\OfferExpiryAlertDispatched;
 use App\Events\ArticleGifting\GiftClaimedEvent;
@@ -155,6 +156,9 @@ use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
 use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
 use App\Services\Subscriptions\Printing\Format\CsvPrintExportFormatStrategy;
 use App\Services\Subscriptions\Printing\Format\PrintExportFormatStrategy;
+use App\Services\Subscriptions\Printing\Label\CsvLabelExportFormatStrategy;
+use App\Services\Subscriptions\Printing\Label\LabelFormatStrategyRegistry;
+use App\Services\Subscriptions\Printing\Label\PdfLabelExportFormatStrategy;
 use App\Services\Subscriptions\Printing\Transport\LocalPrintExportTransport;
 use App\Services\Subscriptions\Printing\Transport\PrintExportTransport;
 use App\Services\SystemClock;
@@ -204,14 +208,27 @@ class ApiApplication
         // Bind the appropriate transport based on environment.
         // Local transport is used in development; SFTP in production.
         $this->container->bind(PrintExportTransport::class, function () {
-//            if (app()->environment('production')) {
-//                return SftpPrintExportTransport::fromConfig();
-//            }
-
             return new LocalPrintExportTransport(
-                config('print.local.export_dir', '/var/exports/print')
+                config('print.local.export_dir', __DIR__ . '/../storage/exports/print')
             );
         });
+
+        $this->container->singleton(LabelFormatStrategyRegistry::class, function ($app) {
+            $registry = new LabelFormatStrategyRegistry();
+
+            $registry->register(
+                LabelExportFormat::Pdf,
+                $this->container->make(PdfLabelExportFormatStrategy::class)
+            );
+
+            $registry->register(
+                LabelExportFormat::Csv,
+                $this->container->make(CsvLabelExportFormatStrategy::class)
+            );
+
+            return $registry;
+        });
+
 
         // Bind the channel map for DeliverIssueDeliveryJob.
         // Keys are SubscriptionType enum values.

@@ -64,10 +64,12 @@ use App\Controllers\Shopping\GiftPromotionController;
 use App\Controllers\Shopping\ProductListController;
 use App\Controllers\SiteController;
 use App\Controllers\Subscription\IssueDeliveryController;
+use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
+use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
@@ -302,11 +304,21 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/subscriptions/plans/{id}', [SubscriptionController::class, 'updatePlan']);
         $router->delete('/subscriptions/plans/{id}', [SubscriptionController::class, 'deletePlan']);
 
+        $router->get('/subscriptions/plans/{planId}/subscribers', [SubscriptionPlanSubscriberController::class, 'planSubscribers']);
+        $router->get('/subscriptions/{subscriptionId}', [SubscriptionPlanSubscriberController::class, 'show']);
+        $router->get('/subscriptions/{subscriptionId}/preferences', [SubscriptionPlanSubscriberController::class, 'preferences']);
+        $router->post('/print-runs/bulk-cancel', [PrintRunController::class, 'bulkCancel']);
+        $router->put('/print-runs/{printRunId}/retry', [PrintRunController::class, 'retry']);
+
         $router->get('/issues/{issueId}/print-runs', [PrintRunController::class, 'listByIssue']);
         $router->get('/print-runs', [PrintRunController::class, 'index']);
         $router->get('/print-runs/{printRunId}', [PrintRunController::class, 'show']);
         $router->put('/print-runs/{printRunId}/cancel', [PrintRunController::class, 'cancel']);
 
+        $router->get('/print-fulfillments', [PrintFulfillmentController::class, 'index']);
+        $router->get('/print-fulfillments/{fulfillmentId}', [PrintFulfillmentController::class, 'show']);
+        $router->get('/batches/{batchId}/print-fulfillments', [PrintFulfillmentController::class, 'listByBatch']);
+        $router->put('/print-fulfillments/{fulfillmentId}/tracking', [PrintFulfillmentController::class, 'updateTracking']);
 
 
         $router->post('/subscriptions/plans/bulk-toggle-active', [SubscriptionController::class, 'bulkToggleActive']);

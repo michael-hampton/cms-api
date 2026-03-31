@@ -60,6 +60,7 @@ class PrintBatchExportService
             ];
 
             $contents = $this->formatStrategy->generate($batch->id, $fulfillments, $issueSnapshot);
+
             $filename = $this->buildFilename($batch->id, $batch->export_attempt_count);
 
             $this->transport->upload($filename, $contents);
