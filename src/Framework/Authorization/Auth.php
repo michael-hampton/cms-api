@@ -4,7 +4,6 @@ namespace App\Framework\Authorization;
 
 use App\Framework\AuthenticatedUser;
 use App\Framework\Session\Session;
-use App\Framework\Support\Event;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
 
@@ -77,7 +76,7 @@ class Auth
         Session::regenerate();
 
         if ($user) {
-            Event::fire('user.logout', $user);
+            // Event::fire('user.logout', $user);
         }
     }
 

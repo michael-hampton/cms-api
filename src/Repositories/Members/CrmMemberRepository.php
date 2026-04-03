@@ -63,11 +63,6 @@ class CrmMemberRepository extends Repository
             ->first();
     }
 
-    public function updateCrmFields(int $memberId, array $data): ?Member
-    {
-        return $this->update($memberId, $data);
-    }
-
     public function getAgents(int $siteId): Collection
     {
         return \App\Models\User::where('site_id', $siteId)

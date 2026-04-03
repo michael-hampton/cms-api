@@ -33,10 +33,12 @@ class SearchEngine
 
         // Apply sorting
         $sortBy = $criteria->getSortBy() ?? $this->configuration->getDefaultSort();
+
         if ($sortBy) {
+
             $sort = $this->configuration->getSorts()[$sortBy] ?? null;
             if ($sort) {
-                $sortDirection = $criteria->getSortOrder();
+                $sortDirection = $criteria->getSortOrder() ?: $this->configuration->getDefaultSortDirection();
                 $queryBuilder = $sort->apply($queryBuilder, $sortDirection);
             }
         }

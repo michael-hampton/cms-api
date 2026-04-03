@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers;
 
 use App\ApiApplication;
+use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
@@ -172,6 +173,7 @@ abstract class FunctionalTestCase extends TestCase
     protected function unauthenticate(): self
     {
         $this->authenticatedUser = null;
+        Auth::$user = null;
         $this->authToken = null;
         return $this;
     }

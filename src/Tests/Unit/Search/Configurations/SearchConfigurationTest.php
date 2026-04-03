@@ -7,13 +7,13 @@ use App\Search\Configurations\CategorySearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\MerchantSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
-use App\Search\Configurations\PrintFulfilmentSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
 use App\Search\Configurations\VariantSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
+use App\Search\Configurations\WorkflowRunSearchConfiguration;
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
 use App\Search\Filters\DateRangeFilter;
@@ -54,7 +54,7 @@ class SearchConfigurationTest extends TestCase
 
     public function testBrandSearchConfigurationHasCorrectSetup()
     {
-        $config = new PrintFulfilmentSearchConfiguration();
+        $config = new WorkflowRunSearchConfiguration();
         $config->configure();
 
         // Check sorts
@@ -322,7 +322,7 @@ class SearchConfigurationTest extends TestCase
             new AuthorSearchConfiguration(),
             new VariantSearchConfiguration(),
             new MerchantSearchConfiguration(),
-            new PrintFulfilmentSearchConfiguration(),
+            new WorkflowRunSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
             new PageSearchConfiguration(),
@@ -351,7 +351,7 @@ class SearchConfigurationTest extends TestCase
     {
         $configurations = [
             new VariantSearchConfiguration(),
-            new PrintFulfilmentSearchConfiguration(),
+            new WorkflowRunSearchConfiguration(),
             new CategorySearchConfiguration(),
             new ImageSearchConfiguration(),
             new PageSearchConfiguration(),
@@ -373,7 +373,7 @@ class SearchConfigurationTest extends TestCase
 
     public function testConfigurationsSortsAreProperlyTyped()
     {
-        $config = new PrintFulfilmentSearchConfiguration();
+        $config = new WorkflowRunSearchConfiguration();
         $config->configure();
 
         $sorts = $config->getSorts();

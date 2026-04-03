@@ -4,6 +4,8 @@ namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\AddressRepository;
@@ -51,6 +53,25 @@ class CrmMemberController extends Controller
         );
 
         $agents = $this->crmMemberRepository->getAgents($siteId);
+
+        if ($request->wantsJson()) {
+            return $this->resourceResponse(
+                [
+                    'items' => $result['data']->map(function ($member) {
+                        return [
+                            ...$member->toArray(),
+                            'created_at' => $member->created_at?->format('Y-m-d H:i:s'),
+                        ];
+                    }),
+                    'pagination' => [
+                        'total' => $result['total'],
+                        'per_page' => $result['per_page'],
+                        'current_page' => $result['current_page'],
+                        'last_page' => $result['last_page'],
+                    ],
+                ]
+            );
+        }
 
         return $this->view('crm/members/index', [
             'members' => $result['data'],
@@ -120,10 +141,53 @@ class CrmMemberController extends Controller
     }
 
     /**
+     * POST /crm/members
+     * Create a new member record via the CRM.
+     *
+     * Intentionally thin: request validation is handled by UpdateMemberRequest
+     * (which covers the shared field contract). All business logic lives in
+     * CrmMemberService. The controller's only job is to map HTTP → service →
+     * HTTP response.
+     *
+     * Note: member creation in the CRM is scoped to the current site via
+     * SiteContext, so no site_id is accepted from the request payload.
+     */
+    public function store(UpdateMemberRequest $request): JsonResponse
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
+
+        try {
+            $data = $request->validated();
+            $created = $this->crmMemberService->createMember(SiteContext::getId(), $data);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'message' => 'Member created successfully.',
+                'member' => [
+                    'id' => $created->id,
+                    'first_name' => $created->first_name,
+                    'last_name' => $created->last_name,
+                    'email' => $created->email,
+                    'is_active' => $created->is_active,
+                ],
+            ], 201);
+        } catch (InvalidArgumentException $e) {
+            return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+        } catch (Exception $e) {
+            echo $e->getMessage();
+            return $this->resourceResponse(['success' => false, 'message' => 'Failed to create member.'], 500);
+        }
+    }
+
+    /**
      * POST /crm/members/{id}
      * Persist member updates.
      */
-    public function update(int $id, UpdateMemberRequest $request): mixed
+    public function update(int $id, UpdateMemberRequest $request): JsonResponse
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
@@ -146,6 +210,8 @@ class CrmMemberController extends Controller
             ]);
         } catch (InvalidArgumentException $e) {
             return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (Exception $e) {
             return $this->resourceResponse(['success' => false, 'message' => 'Failed to update member.'], 500);
         }

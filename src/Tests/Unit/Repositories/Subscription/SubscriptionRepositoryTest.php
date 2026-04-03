@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories\Subscription;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Subscription;
@@ -235,6 +236,180 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertNotNull($result);
         $this->assertEquals('Site 1 Plan', $result->plan_name);
+    }
+
+    public function test_find_print_subscriptions_for_issue_delivery_returns_matching(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $print = $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => SubscriptionType::PRINTED->value,
+        ]);
+
+        // Digital subscription for the same plan — must be excluded.
+        $this->subscription($this->createMember()->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => 'digital',
+        ]);
+
+        $referenceDate = new \DateTime();
+        $results = $this->repository->findPrintSubscriptionsForIssueDelivery(1, $plan->id, $referenceDate);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($print->id, $results->first()->id);
+    }
+
+    public function test_find_print_subscriptions_excludes_inactive(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => SubscriptionType::PRINTED->value,
+            'status' => 'cancelled',
+        ]);
+
+        $referenceDate = new \DateTime();
+        $results = $this->repository->findPrintSubscriptionsForIssueDelivery(1, $plan->id, $referenceDate);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_print_subscriptions_excludes_expired_by_end_date(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => SubscriptionType::PRINTED->value,
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $referenceDate = new \DateTime();
+        $results = $this->repository->findPrintSubscriptionsForIssueDelivery(1, $plan->id, $referenceDate);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_print_subscriptions_excludes_future_start_date(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => SubscriptionType::PRINTED->value,
+            'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
+        ]);
+
+        $referenceDate = new \DateTime();
+        $results = $this->repository->findPrintSubscriptionsForIssueDelivery(1, $plan->id, $referenceDate);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_has_print_subscriptions_for_plan_returns_true_when_exists(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => SubscriptionType::PRINTED->value,
+        ]);
+
+        $result = $this->repository->hasPrintSubscriptionsForPlan($plan->id);
+
+        $this->assertTrue($result);
+    }
+
+    public function test_has_print_subscriptions_for_plan_returns_false_when_none(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $result = $this->repository->hasPrintSubscriptionsForPlan($plan->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_has_print_subscriptions_for_plan_ignores_digital_subscriptions(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'delivery_type' => 'digital',
+        ]);
+
+        $result = $this->repository->hasPrintSubscriptionsForPlan($plan->id);
+
+        $this->assertFalse($result);
+    }
+
+    public function test_find_active_by_plan_and_date_returns_matching(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+        $active = $this->subscription($this->testMember->id, ['plan_id' => $plan->id]);
+
+        $results = $this->repository->findActiveByPlanAndDate($plan->id, new \DateTime());
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($active->id, $results->first()->id);
+    }
+
+    public function test_find_active_by_plan_and_date_excludes_cancelled(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'status' => 'cancelled',
+        ]);
+
+        $results = $this->repository->findActiveByPlanAndDate($plan->id, new \DateTime());
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_active_by_plan_and_date_excludes_past_end_date(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, [
+            'plan_id' => $plan->id,
+            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
+        ]);
+
+        $results = $this->repository->findActiveByPlanAndDate($plan->id, new \DateTime());
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_get_subscribers_for_plan_returns_paginated_results(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->subscription($this->createMember()->id, ['plan_id' => $plan->id]);
+        }
+
+        $result = $this->repository->getSubscribersForPlan($plan->id, 1, 3);
+
+        $this->assertEquals(5, $result['total']);
+        $this->assertCount(3, $result['items']);
+        $this->assertEquals(2, $result['last_page']);
+        $this->assertEquals(1, $result['current_page']);
+    }
+
+    public function test_get_subscribers_for_plan_filters_by_status(): void
+    {
+        $plan = $this->createSubscriptionPlan();
+
+        $this->subscription($this->testMember->id, ['plan_id' => $plan->id, 'status' => SubscriptionStatus::ACTIVE->value]);
+        $this->subscription($this->createMember()->id, ['plan_id' => $plan->id, 'status' => 'cancelled']);
+
+        $result = $this->repository->getSubscribersForPlan($plan->id, 1, 25, SubscriptionStatus::ACTIVE->value);
+
+        $this->assertEquals(1, $result['total']);
+        $this->assertEquals(SubscriptionStatus::ACTIVE->value, $result['items']->first()->status);
     }
 
     public function test_get_subscriptions_due_for_renewal(): void
@@ -869,5 +1044,21 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')
         ], $attributes));
+    }
+
+    /**
+     * Create a subscription with sensible defaults, accepting partial overrides.
+     */
+    private function subscription(int $memberId, array $overrides = []): Model
+    {
+        return Subscription::create(array_merge([
+            'member_id' => $memberId,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Test Plan',
+            'status' => SubscriptionStatus::ACTIVE->value,
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'USD',
+        ], $overrides));
     }
 }

@@ -28,6 +28,8 @@ use App\Controllers\Cms\TagController;
 use App\Controllers\Cms\TerritoryController;
 use App\Controllers\Cms\UserController;
 use App\Controllers\Cms\VideoController;
+use App\Controllers\Crm\CrmAddressController;
+use App\Controllers\Crm\CrmMemberController;
 use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
@@ -70,6 +72,7 @@ use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
+use App\Controllers\Subscription\WorkflowRunController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
 
@@ -101,6 +104,27 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
+
+        // crm
+        $router->get('/crm/members', [CrmMemberController::class, 'index']);
+        $router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
+        $router->post('/crm/members', [CrmMemberController::class, 'store']);
+        $router->put('/crm/members/{id}', [CrmMemberController::class, 'update']);
+        $router->delete('/crm/members/{id}', [CrmMemberController::class, 'destroy']);
+
+        $router->get('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'index']);
+
+        // Store new address
+        $router->post('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'store']);
+
+        // Update existing address
+        $router->put('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'update']);
+
+        // Delete address
+        $router->delete('/crm/members/{memberId}/addresses/{id}', [CrmAddressController::class, 'destroy']);
+
+        // Set address as default
+        $router->post('/crm/members/{memberId}/addresses/{id}/default', [CrmAddressController::class, 'setDefault']);
 
         // Briefs
         $router->get('/briefs', [BriefController::class, 'index']);
@@ -319,6 +343,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/print-fulfillments/{fulfillmentId}', [PrintFulfillmentController::class, 'show']);
         $router->get('/batches/{batchId}/print-fulfillments', [PrintFulfillmentController::class, 'listByBatch']);
         $router->put('/print-fulfillments/{fulfillmentId}/tracking', [PrintFulfillmentController::class, 'updateTracking']);
+
+        $router->get('/workflow-runs', [WorkflowRunController::class, 'index']);
+        $router->get('/workflow-runs/{runId}', [WorkflowRunController::class, 'show']);
 
 
         $router->post('/subscriptions/plans/bulk-toggle-active', [SubscriptionController::class, 'bulkToggleActive']);

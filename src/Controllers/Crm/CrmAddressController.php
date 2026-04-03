@@ -7,6 +7,7 @@ use App\Enums\Address\AddressType;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\CrmMemberRepository;
@@ -16,12 +17,48 @@ use Exception;
 
 class CrmAddressController extends Controller
 {
+    const DEFAULT_PER_PAGE = 10;
+
     public function __construct(
         private readonly AddressRepository   $addressRepository,
         private readonly CrmMemberRepository $crmMemberRepository,
     )
     {
         parent::__construct();
+    }
+
+    /**
+     * GET /crm/members/{memberId}/addresses
+     *
+     * Lists addresses for a member with pagination.
+     * Member must belong to the current site — guards against cross-site reads.
+     */
+    public function index(int $memberId, Request $request): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
+
+        $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
+
+        if (!$member) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Member not found.'], 404);
+        }
+
+        $page = max(1, (int)$request->get('page', 1));
+        $perPage = max(1, (int)$request->get('per_page', self::DEFAULT_PER_PAGE));
+
+        $result = $this->addressRepository->getPaginatedAddressesForMember($memberId, $page, $perPage);
+
+        return $this->resourceResponse([
+            'items' => $result['data']->toArray(),
+            'pagination' => [
+                'total' => $result['total'],
+                'per_page' => $result['per_page'],
+                'current_page' => $result['current_page'],
+                'last_page' => $result['last_page'],
+            ],
+        ]);
     }
 
     /**

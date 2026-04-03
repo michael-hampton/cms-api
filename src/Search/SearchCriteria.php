@@ -7,7 +7,7 @@ class SearchCriteria
     public function __construct(
         private array $filters = [],
         private ?string $sortBy = null,
-        private string $sortOrder = 'asc',
+        private ?string $sortOrder = null,
         private int $page = 1,
         private int $perPage = 20,
         private ?string $searchQuery = null

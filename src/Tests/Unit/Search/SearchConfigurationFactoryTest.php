@@ -8,13 +8,13 @@ use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
 use App\Search\Configurations\PageSearchConfiguration;
-use App\Search\Configurations\PrintFulfilmentSearchConfiguration;
 use App\Search\Configurations\ProductSearchConfiguration;
 use App\Search\Configurations\RegionSetSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
+use App\Search\Configurations\WorkflowRunSearchConfiguration;
 use App\Search\SearchConfigurationFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -77,7 +77,7 @@ class SearchConfigurationFactoryTest extends TestCase
     public function testFactoryCreatesBrandConfiguration()
     {
         $config = SearchConfigurationFactory::create('brand');
-        $this->assertInstanceOf(PrintFulfilmentSearchConfiguration::class, $config);
+        $this->assertInstanceOf(WorkflowRunSearchConfiguration::class, $config);
     }
 
     public function testFactoryCreatesRegionSetConfiguration()

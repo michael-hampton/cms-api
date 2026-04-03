@@ -303,6 +303,80 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(302, $response);
     }
 
+    // ── Store ────────────────────────────────────────────────────────────────
+
+    public function test_store_creates_new_member_and_returns_201(): void
+    {
+        $response = $this->postForSite('/api/crm/members', [
+            'first_name' => 'New',
+            'last_name' => 'Member',
+            'email' => 'new.member.' . uniqid() . '@example.com',
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('member', $data);
+        $this->assertEquals('New', $data['member']['first_name']);
+    }
+
+    public function test_store_persists_member_to_database(): void
+    {
+        $email = 'persist.' . uniqid() . '@example.com';
+
+        $this->postForSite('/api/crm/members', [
+            'first_name' => 'Persisted',
+            'last_name' => 'User',
+            'email' => $email,
+            'is_active' => 1,
+        ]);
+
+        $this->assertDatabaseHas('members', [
+            'email' => $email,
+            'is_active' => 1,
+        ]);
+    }
+
+    public function test_store_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite('/api/crm/members', [
+            'first_name' => 'Hacker',
+            'last_name' => 'Attack',
+            'email' => 'hacker@example.com',
+            'is_active' => 1,
+        ]);
+
+        // The controller returns a JSON 401, not a redirect, for POST endpoints.
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_store_returns_422_for_duplicate_email(): void
+    {
+        $this->post('/crm/members', [
+            'first_name' => 'First',
+            'last_name' => 'User',
+            'email' => $this->member->email,
+            'is_active' => 1,
+        ]);
+
+        $response = $this->postForSite('/api/crm/members', [
+            'first_name' => 'Second',
+            'last_name' => 'User',
+            'email' => $this->member->email,
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('already in use', $data['message']);
+    }
+
     // ── Addresses ────────────────────────────────────────────────────────────
 
     public function test_update_resets_email_verification_when_email_changes(): void

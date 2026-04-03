@@ -59,7 +59,7 @@ class CrmMemberService
                 $payload['email_verified_at'] = null;
             }
 
-            $updated = $this->crmMemberRepository->updateCrmFields($member->id, $payload);
+            $updated = $this->crmMemberRepository->update($member->id, $payload);
 
             $newStatus = MemberStatus::fromBool((bool)$updated->is_active);
 
@@ -82,7 +82,7 @@ class CrmMemberService
         });
     }
 
-    private function guardEmailUniqueness(?string $email, int $excludeMemberId): void
+    private function guardEmailUniqueness(?string $email, ?int $excludeMemberId = null): void
     {
         if ($email === null) {
             return;
@@ -93,5 +93,27 @@ class CrmMemberService
         if ($existing && $existing->id !== $excludeMemberId) {
             throw new InvalidArgumentException('Email address is already in use.');
         }
+    }
+
+    public function createMember(int $siteId, array $data)
+    {
+        $this->guardEmailUniqueness($data['email'] ?? null);
+
+        return $this->database->transaction(function () use ($data, $siteId) {
+
+            $allowedFields = [
+                'first_name',
+                'last_name',
+                'email',
+                'is_active',
+                'assigned_agent_id',
+                'crm_notes',
+            ];
+
+            $payload = array_intersect_key($data, array_flip($allowedFields));
+            $payload['site_id'] = $siteId;
+
+            return $this->crmMemberRepository->create($payload);
+        });
     }
 }

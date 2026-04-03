@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers\Crm;
 use App\Models\Address;
 use App\Models\Member;
 use App\Models\Model;
+use App\Models\Site;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -13,6 +14,99 @@ class CrmAddressControllerTest extends FunctionalTestCase
     use CreatesTestData;
 
     private Member $member;
+
+    // ── Index (GET) ───────────────────────────────────────────────────────────
+
+    public function test_index_returns_200_with_paginated_addresses(): void
+    {
+        $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => '1 Alpha Road']);
+        $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => '2 Beta Road']);
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/addresses');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertArrayHasKey('pagination', $data);
+        $this->assertCount(2, $data['items']);
+    }
+
+    public function test_index_returns_404_for_non_existent_member(): void
+    {
+        $response = $this->getForSite('/api/crm/members/999999/addresses');
+
+        $this->assertResponseStatus(404, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_index_returns_401_for_unauthenticated_agent(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/addresses');
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_index_returns_empty_items_when_member_has_no_addresses(): void
+    {
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/addresses');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(0, $data['items']);
+        $this->assertEquals(0, $data['pagination']['total']);
+    }
+
+    public function test_index_paginates_addresses(): void
+    {
+        for ($i = 1; $i <= 20; $i++) {
+            $this->createAddress([
+                'member_id' => $this->member->id,
+                'address_line_1' => "{$i} Pagination Street",
+            ]);
+        }
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/addresses?per_page=5&page=1');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(5, $data['items']);
+        $this->assertEquals(20, $data['pagination']['total']);
+        $this->assertEquals(4, $data['pagination']['last_page']);
+    }
+
+    public function test_index_only_returns_addresses_for_the_requested_member(): void
+    {
+        $otherMember = $this->createMember();
+        $this->createAddress(['member_id' => $this->member->id, 'address_line_1' => 'My Address']);
+        $this->createAddress(['member_id' => $otherMember->id, 'address_line_1' => 'Other Address']);
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/addresses');
+
+        $data = json_decode($response->getContent(), true);
+        $results = array_column($data['items'], 'address_line_1');
+
+        $this->assertContains('My Address', $results);
+        $this->assertNotContains('Other Address', $results);
+    }
+
+    public function test_index_does_not_return_addresses_for_member_on_different_site(): void
+    {
+        $otherSite = Site::create(['name' => uniqid(), 'slug' => uniqid()]);
+        $otherMember = $this->createMember(['site_id' => $otherSite->id]);
+
+        $response = $this->get('/crm/members/' . $otherMember->id . '/addresses');
+
+        // The member belongs to a different site, so findForSite returns null → 404.
+        $this->assertResponseStatus(404, $response);
+    }
 
     // ── Create (GET) ──────────────────────────────────────────────────────────
 

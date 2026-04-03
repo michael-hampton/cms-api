@@ -36,6 +36,7 @@ use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
 use App\Search\Configurations\VariantSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
+use App\Search\Configurations\WorkflowRunSearchConfiguration;
 
 class SearchConfigurationFactory
 {
@@ -74,7 +75,8 @@ class SearchConfigurationFactory
         'subscription_plan_pricing' => SubscriptionPlanPricingSearchConfiguration::class,
         'payment' => SubscriptionPaymentSearchConfiguration::class,
         'newsletter_layout' => NewsletterLayoutSearchConfiguration::class,
-        'print-fulfilment' => PrintFulfilmentSearchConfiguration::class
+        'print-fulfilment' => PrintFulfilmentSearchConfiguration::class,
+        'workflow-run' => WorkflowRunSearchConfiguration::class
     ];
 
     public static function create(string $type): SearchConfiguration

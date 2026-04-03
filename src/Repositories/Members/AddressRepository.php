@@ -18,6 +18,23 @@ class AddressRepository extends Repository
         return $this->create($data);
     }
 
+    public function getPaginatedAddressesForMember(int $memberId, int $page, int $perPage): array
+    {
+        $offset = ($page - 1) * $perPage;
+        $base = Address::where('member_id', $memberId);
+        $total = (clone $base)->count();
+        $data = (clone $base)->orderBy('is_default', 'desc')->orderBy('created_at', 'desc')
+            ->limit($perPage)->offset($offset)->get();
+
+        return [
+            'data' => $data,
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => max(1, (int)ceil($total / $perPage)),
+        ];
+    }
+
     protected function getModelClass(): string
     {
         return Address::class;

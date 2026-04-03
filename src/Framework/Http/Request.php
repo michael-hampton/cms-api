@@ -511,6 +511,6 @@ class Request implements RequestInterface
     {
         return $this->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
             $this->getHeader('Content-Type') === 'application/json' ||
-            $this->getHeader('Accept') === 'application/json';
+            str_contains($this->getHeader('Accept') ?? '', 'application/json');
     }
 }
