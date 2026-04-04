@@ -188,36 +188,28 @@ $planPrice = (float)$plan->price;
             <input type="hidden" name="subscription_plan_id" value="<?= (int)$plan->id ?>">
 
             <!-- Contact -->
-            <div class="form-section">
-                <h2 class="section-title">Contact Information</h2>
-                <div class="form-row">
-                    @include('checkout/components/form/form-group', ['name' => 'first_name', 'label' => 'First Name',
-                    'required' => true, 'value' => $member?->first_name ?? ''])
-                    @include('checkout/components/form/form-group', ['name' => 'last_name', 'label' => 'Last Name',
-                    'required' => true, 'value' => $member?->last_name ?? ''])
-                </div>
-                <div class="form-row">
-                    @include('checkout/components/form/form-group', ['name' => 'email', 'label' => 'Email', 'type' =>
-                    'email', 'required' => true, 'value' => $member?->email ?? ''])
-                    @include('checkout/components/form/form-group', ['name' => 'phone', 'label' => 'Phone', 'type' =>
-                    'tel'])
-                </div>
-            </div>
+            @include('checkout/components/form/form-section', ['title' => 'Contact Information'])
+            @include('checkout/components/form/form-row')
+            @include('checkout/components/form/form-group', ['name' => 'first_name', 'label' => 'First Name', 'required'
+            => true])
+            @include('checkout/components/form/form-group', ['name' => 'last_name', 'label' => 'Last Name', 'required'
+            => true])
+            @include('checkout/components/form/form-row', ['close' => true])
+            @include('checkout/components/form/form-section', ['close' => true])
 
             <?php if ($requiresShipping): ?>
-                <div class="form-section">
-                    <h2 class="section-title">Shipping Address</h2>
+                @include('checkout/components/form/form-section', ['title' => 'Shipping Address', 'close' => false])
                     @include('checkout/components/form/form-group', ['name' => 'address', 'label' => 'Address',
                     'required' => true, 'class' => 'full-width'])
                     @include('checkout/components/form/form-group', ['name' => 'address2', 'label' => 'Apartment, suite,
                     etc. (optional)', 'class' => 'full-width'])
-                    <div class="form-row">
+                @include('checkout/components/form/form-row')
                         @include('checkout/components/form/form-group', ['name' => 'city', 'label' => 'City', 'required'
                         => true])
                         @include('checkout/components/form/form-group', ['name' => 'state', 'label' => 'State /
                         Province'])
-                    </div>
-                    <div class="form-row">
+                @include('checkout/components/form/form-row', ['close' => true])
+                @include('checkout/components/form/form-row')
                         @include('checkout/components/form/form-group', ['name' => 'postal_code', 'label' => 'Postal
                         Code', 'required' => true])
                         @include('checkout/components/form/select', [
@@ -228,8 +220,8 @@ $planPrice = (float)$plan->price;
                         'selected' => $member?->country ?? '',
                         'onChange' => 'handleCountryChange(this.value)',
                         ])
-                    </div>
-                </div>
+                @include('checkout/components/form/form-row', ['close' => true])
+                @include('checkout/components/form/form-section', ['close' => true])
             <?php endif; ?>
 
             <?php if ($isPreRelease): ?>

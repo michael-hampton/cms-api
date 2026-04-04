@@ -377,14 +377,18 @@ $apiBase = '/api/' . $site;
                 ])
 
                 <!-- Order notes -->
-                <div class="form-section">
-                    <h2 class="section-title">Order Notes (Optional)</h2>
-                    <div class="form-group full-width">
-                        <label class="form-label">Special instructions for delivery</label>
-                        <textarea name="notes" class="form-textarea"
-                                  placeholder="Add any special instructions..."></textarea>
-                    </div>
-                </div>
+                @include('checkout/components/form/form-section', ['title' => 'Order Notes (Optional)', 'close' =>
+                false])
+                @include('checkout/components/form/form-group', [
+                'name' => 'notes',
+                'label' => 'Special instructions for delivery',
+                'required' => false,
+                'class' => 'full-width',
+                'type' => 'textarea',
+                'id' => 'notes',
+                'value' => ''
+                ])
+                @include('checkout/components/form/form-section', ['close' => true])
 
                 <?php if ($checkoutMode === 'steps'): ?>
                     @include('checkout/components/form/button', [

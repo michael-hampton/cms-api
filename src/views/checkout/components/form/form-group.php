@@ -1,17 +1,6 @@
 <?php
 /**
  * FormControl — label + input (or select/textarea) + validation message.
- *
- * @var string $name Input name attribute.
- * @var string|null $label Label text. If null, no label is rendered.
- * @var string|null $type Input type (text, email, tel, password, number). Defaults to 'text'.
- * @var string|null $value Pre-filled value.
- * @var bool $required Whether field is required.
- * @var string|null $placeholder Placeholder text.
- * @var string|null $id Input id. Defaults to "field-{$name}".
- * @var string|null $class Extra CSS classes on the input.
- * @var string|null $errorId Id for the error span. Defaults to "error-{$name}".
- * @var array|null $attrs Extra HTML attributes as key => value array.
  */
 $name = $name ?? '';
 $label = $label ?? null;
@@ -29,22 +18,33 @@ foreach ($attrs as $attrKey => $attrVal) {
     $attrStr .= ' ' . htmlspecialchars($attrKey) . '="' . htmlspecialchars($attrVal) . '"';
 }
 ?>
-<div class="form-group">
+<div class="form-group <?= ($type === 'textarea') ? 'full-width' : '' ?>">
     <?php if ($label): ?>
         <label class="form-label" for="<?= htmlspecialchars($inputId) ?>">
             <?= htmlspecialchars($label) ?>
             <?php if ($required): ?><span class="required">*</span><?php endif; ?>
         </label>
     <?php endif; ?>
-    <input
-            type="<?= htmlspecialchars($type) ?>"
-            name="<?= htmlspecialchars($name) ?>"
-            id="<?= htmlspecialchars($inputId) ?>"
-            class="form-input <?= htmlspecialchars($extraClass) ?>"
-            value="<?= htmlspecialchars($value) ?>"
-            placeholder="<?= htmlspecialchars($placeholder) ?>"
+
+    <?php if ($type === 'textarea'): ?>
+        <textarea
+                name="<?= htmlspecialchars($name) ?>"
+                id="<?= htmlspecialchars($inputId) ?>"
+                class="form-textarea <?= htmlspecialchars($extraClass) ?>"
+                placeholder="<?= htmlspecialchars($placeholder) ?>"
             <?= $required ? 'required' : '' ?>
-            <?= $attrStr ?>
-    >
+                <?= $attrStr ?>><?= htmlspecialchars($value) ?></textarea>
+    <?php else: ?>
+        <input
+                type="<?= htmlspecialchars($type) ?>"
+                name="<?= htmlspecialchars($name) ?>"
+                id="<?= htmlspecialchars($inputId) ?>"
+                class="form-input <?= htmlspecialchars($extraClass) ?>"
+                value="<?= htmlspecialchars($value) ?>"
+                placeholder="<?= htmlspecialchars($placeholder) ?>"
+                <?= $required ? 'required' : '' ?>
+                <?= $attrStr ?>
+        >
+    <?php endif; ?>
     <span class="form-error" id="<?= htmlspecialchars($errorId) ?>"></span>
 </div>
