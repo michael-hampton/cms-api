@@ -10,8 +10,6 @@
         setTimeout(() => toast.classList.remove('show'), 3000);
     };
 
-    alert('here')
-
     // ── Alert banner ──────────────────────────────────────────────────
     window.showAlert = function (message, type = 'success') {
         const container = document.getElementById('alert-container');
@@ -36,7 +34,8 @@
     // ── Apply voucher ─────────────────────────────────────────────────
     window.applyVoucher = async function () {
         const input = document.getElementById('voucher-input');
-        const code = input ? input.value.trim() : '';
+        if (!input) return;
+        const code = input.value.trim();
 
         if (!code) {
             showVoucherMessage('Please enter a voucher code', 'error');
@@ -68,14 +67,14 @@
             });
             const result = await res.json();
 
-            if (result.data.valid) {
+            if (result.data?.valid) {
                 window.appliedVoucher = {
                     code,
                     discount: result.data.discount,
                     voucher_id: result.data.voucher_id,
                 };
                 displayAppliedVoucher();
-                if (input) input.value = '';
+                input.value = '';
                 const msgEl = document.getElementById('voucher-message');
                 if (msgEl) msgEl.textContent = '';
                 showAlert('Voucher applied successfully!', 'success');
@@ -154,4 +153,178 @@
             discountAmt.textContent = '-' + fmt(discount);
         }
     };
+
+    /**
+     * Build a map of { merchantKey => { id, name, items[], subtotal } }
+     * from a flat array of cart items, deduplicating by product/plan.
+     */
+    function _groupAndDedup(items) {
+        // Step 1: deduplicate
+        const deduped = {};
+        for (const item of items) {
+            const key = item.subscription_plan_id
+                ? `plan:${item.subscription_plan_id}`
+                : `product:${item.product_id ?? 'x'}:${item.variant_id ?? ''}`;
+
+            if (!deduped[key]) {
+                deduped[key] = {...item};
+            } else {
+                deduped[key].quantity = (deduped[key].quantity || 1) + (item.quantity || 1);
+                deduped[key].subtotal = (deduped[key].subtotal || 0) + (item.subtotal || 0);
+            }
+        }
+
+        // Step 2: group by merchant
+        const groups = {};
+        for (const item of Object.values(deduped)) {
+            const merchantId = item.merchant_id ?? 0;
+            const merchantName = merchantId
+                ? (item.merchant_name || `Merchant ${merchantId}`)
+                : 'Direct';
+
+            if (!groups[merchantId]) {
+                groups[merchantId] = {id: merchantId, name: merchantName, items: [], subtotal: 0};
+            }
+            groups[merchantId].items.push(item);
+            groups[merchantId].subtotal += parseFloat(item.subtotal || 0);
+        }
+
+        return groups;
+    }
+
+    function _merchantInitials(name) {
+        return (name || '?')
+            .split(' ')
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(w => w[0].toUpperCase())
+            .join('') || '?';
+    }
+
+    function _escHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function _fmtPrice(n) {
+        return PLAN_CURRENCY + ' ' + parseFloat(n || 0).toFixed(2);
+    }
+
+    function _itemRowHtml(item) {
+        const isFreeGift = (item.options?.type === 'free_gift')
+            || (item.options?.is_gift === true)
+            || parseFloat(item.price || 0) === 0;
+
+        const name = _escHtml(item.product_name || item.name || 'Item');
+        const imgUrl = _escHtml(item.product_image || '');
+        const qty = parseInt(item.quantity || 1, 10);
+        const subtotal = parseFloat(item.subtotal || 0);
+        const priceStr = isFreeGift ? 'FREE' : _fmtPrice(subtotal);
+
+        const thumbHtml = imgUrl
+            ? `<img src="${imgUrl}" alt="${name}" class="cs-item-img">`
+            : `<div class="cs-item-img-placeholder" aria-hidden="true">
+             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+               <rect x="3" y="3" width="18" height="18" rx="2"/>
+               <circle cx="8.5" cy="8.5" r="1.5"/>
+               <polyline points="21 15 16 10 5 21"/>
+             </svg>
+           </div>`;
+
+        let variantHtml = '';
+        if (item.variant_id && item.variant_options) {
+            const parts = Object.entries(item.variant_options)
+                .map(([k, v]) => `${_escHtml(k.charAt(0).toUpperCase() + k.slice(1))}: <strong>${_escHtml(v)}</strong>`)
+                .join(' · ');
+            const sku = item.sku ? `<div class="cs-item-sku">SKU: ${_escHtml(item.sku)}</div>` : '';
+            variantHtml = `<div class="cs-item-variant">${parts}</div>${sku}`;
+        }
+
+        const trialHtml = item.trial_days
+            ? `<div style="display:inline-flex;align-items:center;gap:.35rem;background:#f0fdf4;border:1px solid #6ee7b7;border-radius:100px;padding:.2rem .75rem;font-size:.75rem;font-weight:600;color:#065f46;margin-top:.4rem;line-height:1.6;">
+             <span aria-hidden="true">🎁</span> ${parseInt(item.trial_days, 10)}-day free trial included
+           </div>`
+            : '';
+
+        const deliveryHtml = item.estimated_delivery
+            ? `<div class="cs-item-delivery">📦 ${_escHtml(item.estimated_delivery)}</div>`
+            : '';
+
+        return `
+    <div class="cs-item">
+      ${thumbHtml}
+      <div class="cs-item-details">
+        <div class="cs-item-name">${name}</div>
+        ${variantHtml}
+        <div class="cs-item-meta">Qty: ${qty}</div>
+        ${trialHtml}
+        ${deliveryHtml}
+      </div>
+      <div class="cs-item-price${isFreeGift ? ' cs-item-free' : ''}">${priceStr}</div>
+    </div>`;
+    }
+
+    /**
+     * Re-render the #order-items element with the current cart items.
+     * Call this after any cart mutation (add / update / remove / clear).
+     *
+     * @param {Array} items - flat array of cart item objects
+     */
+    window.renderOrderSummaryItems = function (items) {
+        const container = document.getElementById('order-items');
+        if (!container) return;
+
+        if (!items || items.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const groups = _groupAndDedup(items);
+        const groupKeys = Object.keys(groups);
+        const groupCount = groupKeys.length;
+
+        let html = '';
+
+        groupKeys.forEach((merchantId, idx) => {
+            const group = groups[merchantId];
+            const showHeader = groupCount > 1 || parseInt(merchantId, 10) !== 0;
+
+            html += `<div class="cs-merchant-group">`;
+            html += _merchantHeaderHtml(group, showHeader);
+
+            for (const item of group.items) {
+                html += _itemRowHtml(item);
+            }
+
+            html += `</div>`;
+
+            if (idx < groupCount - 1) {
+                html += `<div class="cs-group-divider"></div>`;
+            }
+        });
+
+        container.innerHTML = html;
+    }
+
+    window.updateCartCount = function (count) {
+        const el = document.getElementById('cart-count');
+        if (el) el.textContent = count;
+    }
+
+    function _merchantHeaderHtml(group, showHeader) {
+        if (!showHeader) return '';
+        const initials = _merchantInitials(group.name);
+        return `
+    <div class="cs-merchant-header">
+      <div class="cs-merchant-avatar" aria-hidden="true">${_escHtml(initials)}</div>
+      <div class="cs-merchant-meta">
+        <div class="cs-merchant-name">${_escHtml(group.name)}</div>
+        <span class="cs-merchant-pill">${group.items.length} item${group.items.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="cs-merchant-subtotal">${_fmtPrice(group.subtotal)}</div>
+    </div>`;
+    }
 })();

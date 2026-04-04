@@ -1,659 +1,700 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscribe - <?= htmlspecialchars($plan->name) ?></title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+@section('logic')
+<?php
+/**
+ * Subscription checkout page.
+ *
+ * Expected view data:
+ *   object      $plan             — SubscriptionPlan model
+ *   object      $member           — authenticated member
+ *   bool        $requiresShipping — whether a shipping address is needed
+ *   bool        $isSubscription   — always true for this view
+ *
+ * The page reuses the shared checkout layout, components, and JS patterns
+ * from checkout/index.php instead of duplicating them inline.
+ */
 
-        :root {
-            --primary-color: #667eea;
-            --primary-dark: #5a67d8;
-            --success-color: #10b981;
-            --danger-color: #ef4444;
-            --border-color: #e2e8f0;
-            --bg-light: #f8fafc;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
-        }
+use App\Framework\Support\SiteContext;
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: var(--text-primary);
-            background-color: var(--bg-light);
-        }
+$site = SiteContext::slug();
+$apiBase = '/api/' . $site;
+$displayCurrency = strtoupper($plan->currency ?? 'GBP');
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
+$isPreRelease = !empty($plan->release_date)
+        && $plan->release_date > now_datetime()
+        && !empty($plan->pre_release_enabled);
 
-        .site-header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+$trialDays = $plan->hasTrial() ? (int)$plan->trial_days : 0;
+$planPrice = (float)$plan->price;
+?>
+@endsection
 
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 0;
-        }
+@extends('checkout/layout/shop')
 
-        .logo a {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
+@section('title', 'Subscribe — ' . htmlspecialchars($plan->name))
 
-        .page-header {
-            background: linear-gradient(135deg, var(--primary-color) 0%, #764ba2 100%);
-            color: white;
-            padding: 3rem 0;
-            margin-bottom: 2rem;
-            text-align: center;
-        }
+@section('styles')
+<style>
+    .checkout-layout {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
 
-        .page-header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
+    .checkout-form {
+        background: white;
+        border-radius: 0.75rem;
+        padding: 2rem;
+        box-shadow: var(--shadow);
+    }
 
+    .form-section {
+        margin-bottom: 2rem;
+    }
+
+    .form-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--border-color);
+    }
+
+    .form-input, .form-select, .form-textarea {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        transition: border-color 0.2s;
+    }
+
+    .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    /* ── Plan summary card (right column header) ────────────────── */
+    .plan-hero {
+        background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
+        border-radius: 0.75rem 0.75rem 0 0;
+        padding: 1.5rem;
+        color: white;
+        text-align: center;
+    }
+
+    .plan-hero-name {
+        font-size: 1.375rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+    }
+
+    .plan-hero-price {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: .25rem;
+        margin-top: .5rem;
+    }
+
+    .plan-hero-currency {
+        font-size: 1.25rem;
+        font-weight: 700;
+        opacity: .85;
+    }
+
+    .plan-hero-amount {
+        font-size: 2.5rem;
+        font-weight: 900;
+    }
+
+    .plan-hero-period {
+        font-size: 1rem;
+        opacity: .8;
+    }
+
+    /* Pre-release notice */
+    .prerelease-notice {
+        background: #fef3c7;
+        border: 2px solid #f59e0b;
+        border-radius: 0.5rem;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .prerelease-notice h4 {
+        color: #92400e;
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .75rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+    .prerelease-notice p {
+        font-size: .875rem;
+        color: #78350f;
+        line-height: 1.6;
+    }
+
+    .summary-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        font-size: .875rem;
+    }
+
+    .summary-row.total {
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding-top: 1rem;
+        border-top: 2px solid var(--border-color);
+        margin-top: 1rem;
+    }
+
+    @media (max-width: 968px) {
         .checkout-layout {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 2rem;
-            margin-bottom: 3rem;
+            grid-template-columns: 1fr;
         }
 
-        .card {
-            background: white;
-            border-radius: 0.75rem;
-            padding: 2rem;
-            box-shadow: var(--shadow);
+        .form-row {
+            grid-template-columns: 1fr !important;
         }
+    }
+</style>
+@endsection
 
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--border-color);
-        }
+@section('page-header')
+@include('checkout/components/page-header', [
+'title'       => 'Subscribe',
+'breadcrumbs' => [
+['label' => 'Home', 'href'  => '/'],
+['label' => 'Shop', 'href'  => '/shop'],
+['label' => 'Subscribe'],
+],
+])
+@endsection
 
-        .form-group {
-            margin-bottom: 1rem;
-        }
+@section('content')
 
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
+<div id="alert-container"></div>
 
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            font-size: 1rem;
-        }
+<div class="checkout-layout">
 
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
+    <!-- ── Left: form ──────────────────────────────────────────── -->
+    <div class="checkout-form">
+        <form id="subscription-form">
+            <input type="hidden" name="subscription_plan_id" value="<?= (int)$plan->id ?>">
 
-        .payment-methods {
-            display: grid;
-            gap: 1rem;
-        }
-
-        .payment-method {
-            border: 2px solid var(--border-color);
-            border-radius: 0.5rem;
-            padding: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .payment-method:hover {
-            border-color: var(--primary-color);
-        }
-
-        .payment-method.selected {
-            border-color: var(--primary-color);
-            background: rgba(102, 126, 234, 0.05);
-        }
-
-        .plan-summary {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .plan-name {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .plan-price {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            margin-bottom: 0.5rem;
-        }
-
-        .plan-period {
-            color: var(--text-secondary);
-        }
-
-        .plan-features {
-            list-style: none;
-            padding: 0;
-            margin: 1rem 0;
-        }
-
-        .plan-features li {
-            padding: 0.5rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .plan-features li:before {
-            content: "✓";
-            color: var(--success-color);
-            font-weight: 700;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 1rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 1rem;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
-        }
-
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .alert {
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1rem;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #ef4444;
-        }
-
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        }
-
-        .loading-overlay.show {
-            display: flex;
-        }
-
-        .loading-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            text-align: center;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid var(--border-color);
-            border-top-color: var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        @media (max-width: 968px) {
-            .checkout-layout {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
-<header class="site-header">
-    <div class="container">
-        <div class="header-content">
-            <div class="logo">
-                <a href="/">YourStore</a>
+            <?php /* Contact details — member may already be filled in */ ?>
+            <div class="form-section">
+                <h2 class="section-title">Contact Information</h2>
+                <div class="form-row">
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'first_name',
+                    'label' => 'First Name',
+                    'required' => true,
+                    'value' => $member?->first_name ?? '',
+                    ])
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'last_name',
+                    'label' => 'Last Name',
+                    'required' => true,
+                    'value' => $member?->last_name ?? '',
+                    ])
+                </div>
+                <div class="form-row">
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'email',
+                    'label' => 'Email',
+                    'type' => 'email',
+                    'required' => true,
+                    'value' => $member?->email ?? '',
+                    ])
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'phone',
+                    'label' => 'Phone',
+                    'type' => 'tel',
+                    ])
+                </div>
             </div>
-        </div>
-    </div>
-</header>
 
-<div class="page-header">
-    <div class="container">
-        <h1>Complete Your Subscription</h1>
-        <p>Join thousands of satisfied subscribers</p>
-    </div>
-</div>
-
-<main>
-    <div class="container">
-        <div id="alert-container"></div>
-
-        <div class="checkout-layout">
-            <div class="card">
-                <form id="subscription-form">
-                    <input type="hidden" name="subscription_plan_id" value="<?= $plan->id ?>">
-
-                    <div class="section-title">Payment Method</div>
-                    <div class="payment-methods">
-                        <label class="payment-method selected" data-method="stripe">
-                            <input type="radio" name="payment_method" value="stripe" checked>
-                            <div>
-                                <div style="font-weight: 600;">Credit Card (Stripe)</div>
-                                <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                    Secure payment with Stripe
-                                </div>
-                            </div>
-                        </label>
-                        <label class="payment-method" data-method="paypal">
-                            <input type="radio" name="payment_method" value="paypal">
-                            <div>
-                                <div style="font-weight: 600;">PayPal</div>
-                                <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                    Pay with your PayPal account
-                                </div>
-                            </div>
-                        </label>
+            <?php if ($requiresShipping): ?>
+                <div class="form-section">
+                    <h2 class="section-title">Shipping Address</h2>
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'address',
+                    'label' => 'Address',
+                    'required' => true,
+                    'class' => 'full-width',
+                    ])
+                    @include('checkout/components/form/form-group', [
+                    'name' => 'address2',
+                    'label' => 'Apartment, suite, etc. (optional)',
+                    'class' => 'full-width',
+                    ])
+                    <div class="form-row">
+                        @include('checkout/components/form/form-group', [
+                        'name' => 'city',
+                        'label' => 'City',
+                        'required' => true,
+                        ])
+                        @include('checkout/components/form/form-group', [
+                        'name' => 'state',
+                        'label' => 'State / Province',
+                        ])
                     </div>
-
-                    <!-- ADD THIS BLOCK AFTER LINE 328 (before card details) -->
-
-                    <?php
-                    // Check if any item is pre-release
-                    $isPreRelease = $plan->release_date
-                            && $plan->release_date > now_datetime()
-                            && $plan->pre_release_enabled;
-                    ?>
-
-                    <?php if ($isPreRelease): ?>
-                        <div class="card"
-                             style="background: #fef3c7; border: 2px solid #f59e0b; margin-bottom: 1.5rem;">
-                            <h3 style="color: #92400e; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-                                <span>⚠️</span> Pre-Release Subscription
-                            </h3>
-                            <div style="color: #78350f; margin-bottom: 1rem;">
-                                <p style="margin-bottom: 0.5rem;">
-                                    <strong>Access begins:</strong> <?= $plan->release_date->format('F j, Y') ?>
-                                </p>
-                                <?php if ($plan->print_shipping_required): ?>
-                                    <p style="margin-bottom: 0.5rem;">
-                                        <strong>First print issue
-                                            ships:</strong> <?= $plan->release_date->format('F j, Y') ?>
-                                    </p>
-                                <?php endif; ?>
-                                <p style="margin-top: 1rem; font-size: 0.875rem;">
-                                    You will be charged today, but access to this subscription will begin on the date
-                                    above.
-                                </p>
-                            </div>
-                            <label style="display: flex; align-items: start; gap: 0.75rem; cursor: pointer; padding: 1rem; background: white; border-radius: 0.5rem;">
-                                <input
-                                        type="checkbox"
-                                        name="accept_pre_release"
-                                        id="accept-pre-release"
-                                        style="margin-top: 0.25rem; width: 18px; height: 18px; cursor: pointer;"
-                                        required
-                                >
-                                <span style="flex: 1; color: #1e293b;">
-            I understand this is a pre-release subscription and access will begin on
-            <strong><?= $plan->release_date->format('F j, Y') ?></strong>
-        </span>
-                            </label>
-                        </div>
-                    <?php endif; ?>
-
-                    <div id="card-details" style="margin-top: 2rem;">
-                        <div class="section-title">Card Details</div>
-                        <div id="card-element" style="padding: 1rem; border: 1px solid var(--border-color);
-         border-radius: 0.5rem; background: white;"></div>
-                        <div id="card-errors" style="color: var(--danger-color); margin-top: 0.5rem;
-         font-size: 0.875rem;"></div>
+                    <div class="form-row">
+                        @include('checkout/components/form/form-group', [
+                        'name' => 'postal_code',
+                        'label' => 'Postal Code',
+                        'required' => true,
+                        ])
+                        @include('checkout/components/form/select', [
+                        'name' => 'country',
+                        'id' => 'country-select',
+                        'label' => 'Country',
+                        'required' => true,
+                        'blank' => true,
+                        'blankLabel' => 'Select Country',
+                        'options' => [
+                        'US' => 'United States',
+                        'CA' => 'Canada',
+                        'GB' => 'United Kingdom',
+                        'AU' => 'Australia',
+                        'DE' => 'Germany',
+                        'FR' => 'France',
+                        ],
+                        'selected' => $member?->country ?? '',
+                        'onChange' => 'handleCountryChange(this.value)',
+                        ])
                     </div>
-                </form>
-            </div>
-            <div>
-                <div class="card">
-                    <div class="plan-summary">
-                        <div class="plan-name"><?= htmlspecialchars($plan->name) ?></div>
-                        <?php if ($plan->description): ?>
-                            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                                <?= htmlspecialchars($plan->description) ?>
-                            </p>
+                </div>
+            <?php endif; ?>
+
+            <?php /* Pre-release notice & acceptance */ ?>
+            <?php if ($isPreRelease): ?>
+                <div class="prerelease-notice">
+                    <h4>⚠️ Pre-Release Subscription</h4>
+                    <p>
+                        <strong>Access begins:</strong> <?= $plan->release_date->format('F j, Y') ?><br>
+                        <?php if (!empty($plan->print_shipping_required)): ?>
+                            <strong>First print issue ships:</strong> <?= $plan->release_date->format('F j, Y') ?><br>
                         <?php endif; ?>
-                        <div class="plan-price">
-                            <?= htmlspecialchars($plan->currency) ?>
-                            <?= number_format($plan->price, 2) ?>
-                        </div>
-                        <div class="plan-period">
-                            <?= htmlspecialchars($plan->getBillingPeriodLabel()) ?>
-                        </div>
+                        You will be charged today but access begins on the date above.
+                    </p>
+                    <div style="margin-top:1rem;">
+                        @include('checkout/components/form/checkbox-control', [
+                        'name' => 'accept_pre_release',
+                        'id' => 'accept-pre-release',
+                        'label' => 'I understand this is a pre-release subscription and access begins on <strong>' .
+                            $plan->release_date->format('F j, Y') . '</strong>.',
+                        'required' => true,
+                        ])
                     </div>
+                </div>
+            <?php endif; ?>
 
-                    <?php if ($plan->hasTrial()): ?>
-                        <div style="
-                            display: flex;
-                            align-items: flex-start;
-                            gap: .875rem;
-                            background: #f0fdf4;
-                            border: 1.5px solid #6ee7b7;
-                            border-radius: .625rem;
-                            padding: 1rem 1.25rem;
-                            margin-bottom: 1.25rem;
-                        " role="note" aria-label="Free trial information">
-                            <span style="font-size: 1.75rem; line-height: 1; flex-shrink: 0; margin-top: .1rem;"
-                                  aria-hidden="true">🎁</span>
-                            <div>
-                                <div style="font-weight: 700; font-size: 1rem; color: #065f46;">
-                                    <?= $plan->trial_days ?>-day free trial included
-                                </div>
-                                <div style="font-size: .875rem; color: #047857; margin-top: .25rem; line-height: 1.6;">
-                                    You won't be charged until
-                                    <strong><?= (new DateTimeImmutable())->modify("+{$plan->trial_days} days")->format('F j, Y') ?></strong>.
-                                    Cancel any time during the trial period at no cost.
-                                </div>
+            <?php /* Payment */ ?>
+            @include('checkout/components/saved-cards')
+
+            <div id="payment-request-button"></div>
+
+            @include('checkout/components/stripe-card-element', [
+            'sectionTitle' => 'Card Details',
+            'showBackButton' => false,
+            ])
+
+            <?php /* Auto-renewal consent */ ?>
+            @include('checkout/components/auto-renewal-consent', [
+            'showGlobal' => true,
+            'showUs' => false,
+            ])
+        </form>
+    </div>
+
+    <!-- ── Right: plan summary ─────────────────────────────────── -->
+    <div style="height:fit-content;position:sticky;top:100px;">
+
+        <!-- Plan hero -->
+        <div style="background:white;border-radius:.75rem;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1rem;">
+            <div class="plan-hero">
+                <div class="plan-hero-name"><?= htmlspecialchars($plan->name) ?></div>
+                <?php if (!empty($plan->description)): ?>
+                    <p style="font-size:.875rem;opacity:.8;margin-top:.25rem;"><?= htmlspecialchars($plan->description) ?></p>
+                <?php endif; ?>
+                <div class="plan-hero-price">
+                    <span class="plan-hero-currency"><?= htmlspecialchars($plan->currency) ?></span>
+                    <span class="plan-hero-amount"><?= number_format($planPrice, 2) ?></span>
+                    <span class="plan-hero-period">/<?= htmlspecialchars($plan->billing_period === 'month' ? 'mo' : 'yr') ?></span>
+                </div>
+            </div>
+
+            <div style="padding:1.5rem;">
+                <?php if ($trialDays > 0): ?>
+                    <div style="display:flex;align-items:flex-start;gap:.875rem;background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:.625rem;padding:1rem 1.25rem;margin-bottom:1.25rem;">
+                        <span style="font-size:1.75rem;line-height:1;flex-shrink:0;margin-top:.1rem;">🎁</span>
+                        <div>
+                            <div style="font-weight:700;font-size:1rem;color:#065f46;"><?= $trialDays ?>-day free trial
+                                included
+                            </div>
+                            <div style="font-size:.875rem;color:#047857;margin-top:.25rem;line-height:1.6;">
+                                First charge on
+                                <strong><?= (new DateTimeImmutable())->modify("+{$trialDays} days")->format('F j, Y') ?></strong>.
+                                Cancel any time.
                             </div>
                         </div>
-                    <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
-                    <?php if ($plan->features && count($plan->features) > 0): ?>
-                        <div class="section-title">What's Included</div>
-                        <ul class="plan-features">
+                <?php if (!empty($plan->features) && count($plan->features) > 0): ?>
+                    <div style="margin-bottom:1rem;">
+                        <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem;">
+                            What's included
+                        </div>
+                        <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:.5rem;">
                             <?php foreach ($plan->features as $feature): ?>
-                                <li><?= htmlspecialchars($feature) ?></li>
+                                <li style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981"
+                                         stroke-width="2.5" style="flex-shrink:0;">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    <?= htmlspecialchars($feature) ?>
+                                </li>
                             <?php endforeach; ?>
                         </ul>
-                    <?php endif; ?>
+                    </div>
+                <?php endif; ?>
 
-                    <button type="button" class="btn btn-primary" id="subscribe-btn">
-                        <?php if ($plan->hasTrial()): ?>
-                            Start <?= $plan->trial_days ?>-Day Free Trial
-                        <?php else: ?>
-                            Subscribe Now
-                        <?php endif; ?>
-                    </button>
+                <!-- Price breakdown -->
+                <div style="padding-top:1rem;border-top:1px solid var(--border-color);">
+                    <div class="summary-row">
+                        <span>Plan price</span>
+                        <span><?= htmlspecialchars($plan->currency) ?> <?= number_format($planPrice, 2) ?></span>
+                    </div>
+                    <?php if ($trialDays > 0): ?>
+                        <div class="summary-row" style="color:var(--success-color);">
+                            <span>Today's charge</span>
+                            <span>FREE</span>
+                        </div>
+                    <?php endif; ?>
+                    <div id="discount-row" style="display:none;color:var(--success-color);" class="summary-row">
+                        <span>Discount:</span>
+                        <span id="discount-amount"></span>
+                    </div>
+                    <div class="summary-row total">
+                        <span>Total today</span>
+                        <span id="total" data-total="<?= $trialDays > 0 ? '0' : $planPrice ?>">
+                            <?= $trialDays > 0 ? 'FREE' : htmlspecialchars($plan->currency) . ' ' . number_format($planPrice, 2) ?>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-</main>
 
-<div id="loading-overlay" class="loading-overlay">
-    <div class="loading-content">
-        <div class="spinner"></div>
-        <p>Processing your subscription...</p>
+        <!-- Voucher -->
+        @include('checkout/components/voucher-section', [
+        'currency' => $plan->currency ?? '$',
+        'applyOnClick' => 'applyVoucher()',
+        'removeOnClick' => 'removeVoucher()',
+        ])
+
+        <!-- Place order button -->
+        @include('checkout/components/form/button', [
+        'id' => 'subscribe-btn',
+        'label' => $trialDays > 0 ? "Start {$trialDays}-Day Free Trial" : 'Subscribe Now',
+        'variant' => 'primary',
+        'style' => 'margin-top:1rem;',
+        'type' => 'button'
+        ])
+
+        @include('checkout/components/security-badge')
     </div>
+
 </div>
 
-<script src="https://js.stripe.com/v3/"></script>
+@endsection
+
+@section('scripts')
+@include('checkout/components/loading-overlay', [
+'message' => 'Processing your subscription...',
+'id'      => 'loading-overlay',
+])
+
 <script>
-    const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
-    const API_BASE = '/api/' + SITE;
-    const STRIPE_PUBLIC_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
+    const API_BASE = <?= json_encode($apiBase) ?>;
+    const PLAN_CURRENCY = <?= json_encode($plan->currency ?? '$') ?>;
+    const TAX_RATE = 0;
+    const INITIAL_SUBTOTAL = <?= json_encode($planPrice) ?>;
+    const INITIAL_SHIPPING = 0;
+    const STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
+    const SITE = <?= json_encode($site) ?>;
+    const REQUIRES_SHIPPING = <?= json_encode($requiresShipping) ?>;
+    const HAS_TRIAL = <?= json_encode($trialDays > 0) ?>;
 
-    let stripe = null;
-    let cardElement = null;
-    let selectedPaymentMethod = 'stripe';
+    window.appliedVoucher = null;
+</script>
 
-    // Initialize Stripe
-    if (STRIPE_PUBLIC_KEY) {
-        stripe = Stripe(STRIPE_PUBLIC_KEY);
-        const elements = stripe.elements();
+@js('cart-utils.js')
+
+<script src="https://js.stripe.com/v3/"></script>
+
+<script>
+    let stripe = null, elements = null, cardElement = null;
+    let selectedCardId = null;
+    let clientSecret = null;
+    let subscriptionId = null;
+    let orderId = null;
+
+    // ── Country / US consent ─────────────────────────────────────────────
+    function handleCountryChange(countryCode) {
+        const usBlock = document.getElementById('us-renewal-consent-block');
+        if (!usBlock) return;
+        if (countryCode === 'US') {
+            usBlock.style.display = 'block';
+            usBlock.classList.remove('consent-error');
+        } else {
+            usBlock.style.display = 'none';
+            const cb = document.getElementById('us-renewal-consent');
+            if (cb) cb.checked = false;
+        }
+    }
+
+    // ── Stripe init ───────────────────────────────────────────────────────
+    async function initStripe() {
+        if (!STRIPE_KEY) return;
+        stripe = Stripe(STRIPE_KEY);
+        elements = stripe.elements();
 
         cardElement = elements.create('card', {
             hidePostalCode: true,
-            style: {
-                base: {
-                    fontSize: '16px',
-                    color: '#1e293b',
-                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                    '::placeholder': {
-                        color: '#94a3b8'
-                    }
-                },
-                invalid: {
-                    color: '#ef4444',
-                    iconColor: '#ef4444'
-                }
-            }
+            style: {base: {fontSize: '16px', color: '#1e293b', '::placeholder': {color: '#64748b'}}},
         });
 
-        cardElement.mount('#card-element');
-
-        // Handle real-time validation errors
-        cardElement.on('change', function (event) {
-            const displayError = document.getElementById('card-errors');
-            if (event.error) {
-                displayError.textContent = event.error.message;
-            } else {
-                displayError.textContent = '';
-            }
-        });
+        const cardContainer = document.getElementById('card-element');
+        if (cardContainer) {
+            cardElement.mount('#card-element');
+            cardElement.on('change', e => {
+                document.getElementById('card-errors').textContent = e.error ? e.error.message : '';
+            });
+        }
     }
 
-    // Payment method selection
-    document.querySelectorAll('.payment-method').forEach(method => {
-        method.addEventListener('click', function () {
-            document.querySelectorAll('.payment-method').forEach(m => m.classList.remove('selected'));
-            this.classList.add('selected');
-            this.querySelector('input[type="radio"]').checked = true;
-
-            selectedPaymentMethod = this.dataset.method;
-            const cardDetails = document.getElementById('card-details');
-
-            if (selectedPaymentMethod === 'stripe') {
-                cardDetails.style.display = 'block';
-            } else {
-                cardDetails.style.display = 'none';
+    // ── Saved cards ───────────────────────────────────────────────────────
+    async function loadSavedCards() {
+        try {
+            const res = await fetch(`${API_BASE}/member/payment-methods`);
+            const data = await res.json();
+            if (data.success && data.data?.payment_methods?.length) {
+                displaySavedCards(data.data.payment_methods);
             }
-        });
-    });
+        } catch (e) { /* non-critical */
+        }
+    }
 
-    // Subscribe button
-    document.getElementById('subscribe-btn').addEventListener('click', async function () {
+    function displaySavedCards(cards) {
+        const list = document.getElementById('saved-cards-list');
+        const section = document.getElementById('saved-cards-section');
+        const newCard = document.getElementById('new-card-section');
+        if (!list || !section) return;
+
+        list.innerHTML = cards.map(card => `
+        <label class="saved-card" for="card-${card.id}">
+          <input type="radio" name="saved_card" value="${card.id}" id="card-${card.id}"
+                 onchange="selectSavedCard('${card.id}')">
+          <div class="card-details">
+            <div class="card-brand">${card.card.brand}</div>
+            <div class="card-number">•••• •••• •••• ${card.card.last4}</div>
+            <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
+          </div>
+        </label>`).join('');
+
+        section.style.display = 'block';
+        if (newCard) newCard.style.display = 'none';
+    }
+
+    function selectSavedCard(id) {
+        selectedCardId = id;
+        document.querySelectorAll('.saved-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById(`card-${id}`)?.closest('.saved-card')?.classList.add('selected');
+    }
+
+    function showNewCardForm() {
+        selectedCardId = null;
+        const section = document.getElementById('saved-cards-section');
+        const newCard = document.getElementById('new-card-section');
+        const back = document.getElementById('back-to-saved-cards-btn');
+        if (section) section.style.display = 'none';
+        if (newCard) newCard.style.display = 'block';
+        if (back) back.style.display = 'block';
+        document.querySelectorAll('[name="saved_card"]').forEach(r => r.checked = false);
+    }
+
+    function showSavedCards() {
+        selectedCardId = null;
+        const section = document.getElementById('saved-cards-section');
+        const newCard = document.getElementById('new-card-section');
+        const back = document.getElementById('back-to-saved-cards-btn');
+        if (section) section.style.display = 'block';
+        if (newCard) newCard.style.display = 'none';
+        if (back) back.style.display = 'none';
+        document.querySelectorAll('[name="saved_card"]').forEach(r => r.checked = false);
+    }
+
+    // ── Place order ───────────────────────────────────────────────────────
+    function setProcessing(on) {
+        const btn = document.getElementById('subscribe-btn');
+        const overlay = document.getElementById('loading-overlay');
+        btn.disabled = on;
+        if (on) {
+            btn.classList.add('processing');
+            btn.textContent = 'Processing…';
+            overlay.classList.add('show');
+        } else {
+            btn.classList.remove('processing');
+            btn.textContent = <?= json_encode($trialDays > 0 ? "Start {$trialDays}-Day Free Trial" : 'Subscribe Now') ?>;
+            overlay.classList.remove('show');
+        }
+    }
+
+    document.getElementById('subscribe-btn').addEventListener('click', async () => {
         const form = document.getElementById('subscription-form');
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData);
+        const data = Object.fromEntries(new FormData(form));
 
-        // Show loading
-        document.getElementById('loading-overlay').classList.add('show');
-        this.disabled = true;
+        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
+        document.getElementById('alert-container').innerHTML = '';
+        document.getElementById('card-errors').textContent = '';
 
-        try {
-            if (selectedPaymentMethod === 'stripe') {
-                await processStripeSubscription(data);
-            } else if (selectedPaymentMethod === 'paypal') {
-                await processPayPalSubscription(data);
+        // Pre-release
+        const acceptEl = document.getElementById('accept-pre-release');
+        if (acceptEl && !acceptEl.checked) {
+            showAlert('You must accept the pre-release terms to continue.', 'error');
+            return;
+        }
+
+        // Global renewal consent
+        const globalCb = document.getElementById('global-renewal-consent');
+        const globalBlock = document.getElementById('global-renewal-consent-block');
+        if (globalCb && !globalCb.checked) {
+            globalBlock?.classList.add('consent-error');
+            showAlert('Please confirm the subscription terms.', 'error');
+            globalBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
+            return;
+        }
+        globalBlock?.classList.remove('consent-error');
+        data.global_renewal_consent = '1';
+
+        // US consent
+        const usBlock = document.getElementById('us-renewal-consent-block');
+        if (usBlock && usBlock?.style.display !== 'none') {
+            const usCb = document.getElementById('us-renewal-consent');
+            if (usCb && !usCb.checked) {
+                usBlock.classList.add('consent-error');
+                showAlert('Please confirm the auto-renewal terms.', 'error');
+                usBlock.scrollIntoView({behavior: 'smooth', block: 'center'});
+                return;
             }
-        } catch (error) {
-            console.error('Subscription error:', error);
-            showAlert('An error occurred. Please try again.', 'error');
-            document.getElementById('loading-overlay').classList.remove('show');
-            this.disabled = false;
+            usBlock.classList.remove('consent-error');
+            data.us_renewal_consent = '1';
+        }
+
+        if (window.appliedVoucher) {
+            data.voucher_code = window.appliedVoucher.code;
+            data.voucher_id = window.appliedVoucher.voucher_id;
+            data.discount_amount = window.appliedVoucher.discount;
+        }
+
+        data.isOneTimeSubscription = true;
+
+        setProcessing(true);
+        try {
+            await processSubscription(data);
+        } finally {
+            setProcessing(false);
         }
     });
 
-    async function processStripeSubscription(data) {
-        try {
-            // Step 1: Create Payment Method
-            const {paymentMethod, error: pmError} = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-            });
+    async function processSubscription(data) {
+        const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        const result = await res.json();
 
-            if (pmError) {
-                showAlert(pmError.message, 'error');
-                document.getElementById('loading-overlay').classList.remove('show');
-                document.getElementById('subscribe-btn').disabled = false;
-                return;
-            }
+        if (!result.success) {
+            showAlert(result.message || 'Checkout failed.', 'error');
+            return;
+        }
 
-            // ADD THIS: Check pre-release acceptance
-            const acceptPreRelease = document.getElementById('accept-pre-release');
-            if (acceptPreRelease && !acceptPreRelease.checked) {
-                showAlert('You must accept the pre-release terms to continue', 'error');
-                document.getElementById('loading-overlay').classList.remove('show');
-                document.getElementById('subscribe-btn').disabled = false;
-                return;
-            }
+        const contexts = result.data?.stripe_contexts;
+        clientSecret = contexts
+            ? contexts[Object.keys(contexts)[0]].client_secret
+            : (result.data?.client_secret ?? null);
 
-            // Step 2: Send to backend to create subscription
-            const response = await fetch(`${API_BASE}/checkout/process`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    subscription_plan_id: data.subscription_plan_id,
-                    payment_method: 'stripe',
-                    payment_method_id: paymentMethod.id
-                })
-            });
+        subscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
+        orderId = result.data?.order_id ?? null;
 
-            const result = await response.json();
-
-            if (!result.success) {
-                showAlert(result.message || 'Failed to create subscription', 'error');
-                document.getElementById('loading-overlay').classList.remove('show');
-                document.getElementById('subscribe-btn').disabled = false;
-                return;
-            }
-
-            // Step 3: Handle 3D Secure if required
-            if (result.requires_action && result.payment_intent_client_secret) {
-                const {error: confirmError} = await stripe.confirmCardPayment(
-                    result.payment_intent_client_secret
-                );
-
-                if (confirmError) {
-                    showAlert(confirmError.message, 'error');
-                    document.getElementById('loading-overlay').classList.remove('show');
-                    document.getElementById('subscribe-btn').disabled = false;
-                    return;
-                }
-
-                // Confirm with backend that payment succeeded
-                await fetch(`${API_BASE}/checkout/confirm-payment`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
+        const paymentResult = selectedCardId
+            ? await stripe.confirmCardPayment(clientSecret, {payment_method: selectedCardId})
+            : await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                        name: `${data.first_name} ${data.last_name}`,
+                        email: data.email,
+                        phone: data.phone ?? undefined,
                     },
-                    body: JSON.stringify({
-                        subscription_id: result.subscription_id
-                    })
-                });
-            }
-
-            // Success - redirect to subscriptions page
-            window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions?success=1';
-
-        } catch (error) {
-            console.error('Stripe error:', error);
-            throw error;
-        }
-    }
-
-    async function processPayPalSubscription(data) {
-        try {
-            const response = await fetch(`${API_BASE}/checkout/process`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                setup_future_usage: 'off_session',
             });
 
-            const result = await response.json();
+        const {error, paymentIntent} = paymentResult;
 
-            if (result.success && result.redirect_url) {
-                window.location.href = result.redirect_url;
-            } else {
-                showAlert(result.message || 'Failed to process subscription', 'error');
-                document.getElementById('loading-overlay').classList.remove('show');
-                document.getElementById('subscribe-btn').disabled = false;
-            }
-        } catch (error) {
-            console.error('PayPal error:', error);
-            throw error;
+        if (error) {
+            document.getElementById('card-errors').textContent = error.message;
+            showAlert(error.message, 'error');
+            return;
+        }
+
+        if (paymentIntent.status === 'succeeded') {
+            await confirmPayment(paymentIntent.id);
         }
     }
 
-    function showAlert(message, type = 'success') {
-        const alertHtml = `
-            <div class="alert alert-${type}">
-                ${message}
-            </div>
-        `;
-        document.getElementById('alert-container').innerHTML = alertHtml;
-        window.scrollTo({top: 0, behavior: 'smooth'});
+    async function confirmPayment(intentId) {
+        const body = {payment_intent_id: intentId, order_id: orderId};
+        Array.isArray(subscriptionId)
+            ? (body.subscription_ids = subscriptionId)
+            : (body.subscription_id = subscriptionId);
 
-        setTimeout(() => {
-            document.getElementById('alert-container').innerHTML = '';
-        }, 5000);
+        const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            const ids = Array.isArray(subscriptionId) ? subscriptionId : [subscriptionId];
+            window.location.href = `/subscription-confirmation?ids=${ids.join(',')}`;
+        } else {
+            showAlert(result.message || 'Payment confirmation failed.', 'error');
+        }
     }
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    initStripe();
+    loadSavedCards();
+
+    <?php if (($member?->country ?? '') === 'US'): ?>
+    handleCountryChange('US');
+    <?php endif; ?>
 </script>
+@endsection

@@ -24,6 +24,7 @@ use App\Services\Billing\TaxCalculatorService;
 use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
+use App\Services\Shopping\CartMigrationService;
 use App\Services\Shopping\CartPersistenceService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\CheckoutService;
@@ -51,6 +52,7 @@ class CartController extends Controller
         private readonly OTPRepository                      $OTPRepository,
         private readonly CheckoutIdentityService            $identityService,
         private readonly CartPersistenceService             $cartPersistence,
+        private readonly CartMigrationService   $cartMigration,
         private GiftResolutionService           $giftResolutionService,
         private readonly SubscriptionRepository $subscriptionRepository,
     )
@@ -66,7 +68,6 @@ class CartController extends Controller
         $subtotal = collect($items)->sum('subtotal');
 
         $startOptions = $this->calculateStartOptions($items);
-
         $deliveryMethod = DeliveryMethodConfig::default();
 
         $items = array_map(function ($item) use ($deliveryMethod) {
@@ -81,8 +82,6 @@ class CartController extends Controller
                 new DateTimeImmutable()
             );
 
-            // Expose trial_days so the view can render the trial pill without
-            // making its own repository call.
             $trialDays = ($product instanceof SubscriptionPlan && $product->hasTrial())
                 ? $product->trial_days
                 : null;
@@ -94,7 +93,7 @@ class CartController extends Controller
         }, $items);
 
         $shipping = $this->cartService->requiresShipping()
-            ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
+            ? $this->shippingService->calculateShipping($subtotal, Session::get('shipping_address', []))
             : 0.00;
 
         $tax = $this->calculateTax($subtotal, $shipping);
@@ -114,7 +113,7 @@ class CartController extends Controller
         return $this->view('cart/index', $cartData);
     }
 
-    private function calculateStartOptions(array $items)
+    private function calculateStartOptions(array $items): array
     {
         $subscriptionItems = array_filter($items, fn($item) => !empty($item['options']['subscription_plan_id']));
 
@@ -127,7 +126,7 @@ class CartController extends Controller
         ];
 
         $planIds = array_unique(array_column(array_column($subscriptionItems, 'options'), 'subscription_plan_id'));
-        $plans = SubscriptionPlan::whereIn('id', $planIds)->get()->toArray();
+        $plans = SubscriptionPlan::whereIn('id', $planIds)->get()->keyBy('id')->toArray();
 
         return array_reduce($subscriptionItems, function ($carry, $item) use ($plans, $allowedStartDates) {
             $planId = $item['options']['subscription_plan_id'];
@@ -153,7 +152,7 @@ class CartController extends Controller
         }, []);
     }
 
-    private function calculateTax(float $subtotal, float $shipping)
+    private function calculateTax(float $subtotal, float $shipping): object
     {
         return $this->taxCalculatorService->calculateOrderTax(
             (int)round($subtotal * 100),
@@ -171,7 +170,7 @@ class CartController extends Controller
         $subtotal = collect($items)->sum('subtotal');
 
         $shipping = $this->cartService->requiresShipping()
-            ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
+            ? $this->shippingService->calculateShipping($subtotal, Session::get('shipping_address', []))
             : 0.00;
 
         $tax = $this->calculateTax($subtotal, $shipping);
@@ -205,10 +204,7 @@ class CartController extends Controller
             }
 
             if ($planId) {
-                if ($isRenewal) {
-                    return $this->subscriptionCheckout($planId, true);
-                }
-                return $this->subscriptionCheckout($planId);
+                return $this->subscriptionCheckout($planId, $isRenewal);
             }
         }
 
@@ -240,7 +236,7 @@ class CartController extends Controller
         $subtotal = collect($items)->sum('subtotal');
 
         $shipping = $this->cartService->requiresShipping()
-            ? $this->shippingService->calculateShipping($subtotal, $_SESSION['shipping_address'] ?? [])
+            ? $this->shippingService->calculateShipping($subtotal, Session::get('shipping_address', []))
             : 0.00;
 
         $tax = $this->calculateTax($subtotal, $shipping);
@@ -257,7 +253,7 @@ class CartController extends Controller
             'tax_rate' => $tax->rate,
             'hasPreOrders' => $this->detectPreOrders($items),
             'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
-            'checkoutMode' => 'steps'
+            'checkoutMode' => 'steps',
         ];
 
         return $this->view('checkout/index', $cartData);
@@ -269,16 +265,16 @@ class CartController extends Controller
             return $this->redirect('/member/login?redirect=/checkout?plan_id=' . $planId);
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $plan = $this->subscriptionPlanRepository->find($planId);
 
         if (!$plan || !$plan->is_active) {
-            $_SESSION['flash_error'] = 'Subscription plan not found or unavailable.';
+            Session::put('flash_error', 'Subscription plan not found or unavailable.');
             return $this->redirect('/');
         }
 
         if (!$isRenewal && $this->subscriptionRepository->hasActiveSubscriptionToPlan($member->id, $planId)) {
-            $_SESSION['flash_error'] = 'You already have an active subscription to this plan.';
+            Session::put('flash_error', 'You already have an active subscription to this plan.');
             return $this->redirect('/' . SiteContext::slug() . '/member/subscriptions');
         }
 
@@ -288,10 +284,9 @@ class CartController extends Controller
         if ($isRenewal && !$hasPlan) {
             $this->cartService->addSubscriptionToCart(
                 $planId,
-                in_array(
-                    SubscriptionType::DIGITAL->value,
-                    $plan->getDeliveryOptions()
-                ) ? SubscriptionType::DIGITAL->value : SubscriptionType::PRINTED->value
+                in_array(SubscriptionType::DIGITAL->value, $plan->getDeliveryOptions())
+                    ? SubscriptionType::DIGITAL->value
+                    : SubscriptionType::PRINTED->value
             );
         }
 
@@ -356,11 +351,17 @@ class CartController extends Controller
 
         if (!$member && !empty($data['email'])) {
             $email = $data['email'];
+            $sessionId = $this->cartService->getSessionId();
 
             try {
                 $result = $this->identityService->createAnonymous($email, $siteId, $data);
                 $member = \App\Models\Member::find($result->userId);
                 MemberAuth::login($member);
+
+                // Migrate any session-keyed cart items to the newly created member
+                // so that downstream services can find them by member id.
+                $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
+
             } catch (\RuntimeException $e) {
                 return $this->errorResponse($e->getMessage(), 400);
             }
@@ -370,7 +371,8 @@ class CartController extends Controller
             return $this->errorResponse('Authentication required', 401);
         }
 
-        $items = $this->cartService->getItems(); //todo need to do something here because if im not logged in i add items to the cart (it will add it with session id not member id), then when i get to the step smove it will log me in. Once the cart service has a member it will lookup the cart items by member id but the cart items still do not have a member id and only the session id this also happens in the checkout service so its not possible to just move the logic here
+        $items = $this->cartService->getItems();
+
         if (!$items) {
             return $this->errorResponse('No items in cart', 400);
         }
@@ -381,9 +383,7 @@ class CartController extends Controller
         if (!empty($subscriptionItems)) {
             $result = $this->processSubscription($request);
 
-            Session::forget('applied_voucher_code');
-            Session::forget('checkout_token');
-            Session::forget('pending_otp_email');
+            $this->clearCheckoutSession();
             $statusCode = $result['success'] ? 200 : 400;
             return $this->resourceResponse($result, $statusCode);
         }
@@ -395,22 +395,22 @@ class CartController extends Controller
         if (!empty($data['multi_merchant']) && $data['multi_merchant'] === true) {
             $result = $this->checkoutService->processMultiMerchantCheckout($data, $siteId);
             $statusCode = $result['success'] ? 200 : 400;
-
-            Session::forget('applied_voucher_code');
-            Session::forget('checkout_token');
-            Session::forget('pending_otp_email');
-
+            $this->clearCheckoutSession();
             return $this->resourceResponse($result, $statusCode);
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
         $statusCode = $result['success'] ? 200 : 400;
+        $this->clearCheckoutSession();
 
+        return $this->resourceResponse($result, $statusCode);
+    }
+
+    private function clearCheckoutSession(): void
+    {
         Session::forget('applied_voucher_code');
         Session::forget('checkout_token');
         Session::forget('pending_otp_email');
-
-        return $this->resourceResponse($result, $statusCode);
     }
 
     private function processSubscription(Request $request): array
@@ -494,27 +494,18 @@ class CartController extends Controller
             return $this->redirect('/');
         }
 
-        $order = !empty($checkoutId)
-            ? $this->orderRepository->getOrdersByCheckoutId($checkoutId)?->first()
-            : $this->orderService->getOrderByNumber($orderNumber);
+        $orders = $checkoutId
+            ? $this->orderRepository->getOrdersByCheckoutId($checkoutId)
+            : collect([$this->orderService->getOrderByNumber($orderNumber)]);
 
-        if (!$order) {
+        $orders = $orders->filter();
+
+        if ($orders->isEmpty()) {
             return $this->redirect('/');
         }
 
         return $this->view('checkout/order-confirmation', [
-            'order' => $order,
-            'orderNumber' => $order->order_number,
-            'total' => $order->total,
-            'subtotal' => $order->subtotal,
-            'tax' => $order->tax,
-            'shipping' => $order->shipping,
-            'items' => $order->items,
-            'customerEmail' => $order->user->email ?? 'N/A',
-            'shippingAddress' => $order->shipping_address,
-            'paymentMethod' => $order->payment_method,
-            'status' => $order->status,
-            'createdAt' => $order->created_at,
+            'orders' => $orders,
         ]);
     }
 
@@ -705,6 +696,10 @@ class CartController extends Controller
 
             MemberAuth::login($member);
 
+            // Migrate session cart items to the authenticated member before
+            // restoring the OTP snapshot — order matters here.
+            $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
+
             $cartRestored = $this->cartPersistence->restoreCartAfterAuth($email, $siteId);
 
             Session::forget('pending_otp_email');
@@ -730,7 +725,6 @@ class CartController extends Controller
     {
         $email = $request->input('email');
         $sessionId = Session::getId();
-        $siteId = SiteContext::getId();
 
         if ($email) {
             $this->OTPRepository->cancelOTP($sessionId, $email);

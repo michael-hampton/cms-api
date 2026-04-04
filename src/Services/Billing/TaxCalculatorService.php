@@ -106,8 +106,8 @@ class TaxCalculatorService
             return new TaxData(
                 rate: 0,
                 ratePercentage: 0,
-                jurisdiction: $taxRate['jurisdiction'],
-                includesShipping: $taxRate['includes_shipping'] ?? false,
+                jurisdiction: null,
+                includesShipping: false,
                 taxCents: 0,
                 exempt: true
             );

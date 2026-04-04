@@ -143,8 +143,8 @@
 
         /* Content Grid */
         .confirmation-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
+            display: flex;
+            flex-direction: column;
             gap: 2rem;
             margin-bottom: 3rem;
         }
@@ -513,7 +513,6 @@
         }
 
 
-
         /* Loading Animation */
         .fade-in {
             animation: fadeIn 0.5s ease-out;
@@ -609,8 +608,6 @@
         }
     </style>
 </head>
-<body>
-<!-- Header -->
 <header class="site-header">
     <div class="container">
         <div class="header-content">
@@ -627,8 +624,8 @@
     </div>
 </header>
 
-<!-- Main Content -->
 <main class="container">
+
     <!-- Success Banner -->
     <div class="success-banner fade-in">
         <div class="success-icon">
@@ -636,10 +633,16 @@
                 <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
         </div>
+
         <h1>Order Confirmed!</h1>
         <p>Thank you for your purchase. Your order has been received.</p>
+
         <div class="order-number">
-            Order #<?= htmlspecialchars($orderNumber) ?>
+            <?php if ($orders->count() === 1): ?>
+                Order #<?= htmlspecialchars($orders->first()->order_number) ?>
+            <?php else: ?>
+                <?= $orders->count() ?> Orders Placed
+            <?php endif; ?>
         </div>
     </div>
 
@@ -651,167 +654,224 @@
         </svg>
         <div class="email-notice-content">
             <h3>Confirmation Email Sent</h3>
-            <p>We've sent a confirmation email to <strong><?= htmlspecialchars($customerEmail) ?></strong> with your order details and tracking information.</p>
+            <p>
+                We've sent a confirmation email to
+                <strong><?= htmlspecialchars($orders->first()->user->email ?? 'N/A') ?></strong>
+                with your order details and tracking information.
+            </p>
         </div>
     </div>
 
     <!-- Content Grid -->
     <div class="confirmation-content">
-        <!-- Left Column -->
-        <div>
+
+        <?php foreach ($orders
+
+        as $order): ?>
+
+        <div class="card fade-in" style="margin-bottom: 2rem;">
+
+            <!-- Order Header -->
+            <div class="card-header">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <path d="M16 10a4 4 0 0 1-8 0"></path>
+                </svg>
+                <h2>Order #<?= htmlspecialchars($order->order_number) ?></h2>
+            </div>
+
             <!-- Order Items -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <path d="M16 10a4 4 0 0 1-8 0"></path>
-                    </svg>
-                    <h2>Order Items</h2>
-                </div>
+            <?php foreach ($order->items as $item): ?>
+                <div class="order-item">
+                    <img src="<?= htmlspecialchars($item->product?->image ?? '/images/placeholder.jpg') ?>"
+                         alt="<?= htmlspecialchars($item->product_name) ?>"
+                         class="item-image">
 
-                <?php foreach ($items as $item): ?>
-                    <div class="order-item">
-                        <img src="<?= htmlspecialchars($item->product?->image ?? '/images/placeholder.jpg') ?>"
-                             alt="<?= htmlspecialchars($item->product_name) ?>"
-                             class="item-image">
-                        <div class="item-details">
-                            <div class="item-name"><?= htmlspecialchars($item->product_name) ?></div>
-                            <?php if ($item->product_sku): ?>
-                                <div class="item-meta">SKU: <?= htmlspecialchars($item->product_sku) ?></div>
-                            <?php endif; ?>
-                            <div class="item-quantity">Quantity: <?= $item->quantity ?> × $<?= number_format($item->unit_price, 2) ?></div>
-                        </div>
-                        <div class="item-price">
-                            $<?= number_format($item->total, 2) ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+                    <div class="item-details">
+                        <div class="item-name"><?= htmlspecialchars($item->product_name) ?></div>
 
-            <!-- Shipping & Payment Info -->
-            <div class="card fade-in" style="margin-top: 2rem;">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="16" x2="12" y2="12"></line>
-                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                    <h2>Order Information</h2>
-                </div>
-
-                <div class="info-section">
-                    <div class="info-label">Shipping Address</div>
-                    <div class="info-value">
-                        <?php if (is_array($shippingAddress)): ?>
-                            <span class="address-line"><?= htmlspecialchars($shippingAddress['address']) ?></span>
-                            <?php if (!empty($shippingAddress['address2'])): ?>
-                                <span class="address-line"><?= htmlspecialchars($shippingAddress['address2']) ?></span>
-                            <?php endif; ?>
-                            <span class="address-line"><?= htmlspecialchars($shippingAddress['city']) ?><?= !empty($shippingAddress['state']) ? ', ' . htmlspecialchars($shippingAddress['state']) : '' ?> <?= htmlspecialchars($shippingAddress['postal_code']) ?></span>
-                            <span class="address-line"><?= htmlspecialchars($shippingAddress['country']) ?></span>
+                        <?php if ($item->product_sku): ?>
+                            <div class="item-meta">
+                                SKU: <?= htmlspecialchars($item->product_sku) ?>
+                            </div>
                         <?php endif; ?>
+
+                        <div class="item-quantity">
+                            Quantity: <?= $item->quantity ?> × $<?= number_format($item->unit_price, 2) ?>
+                        </div>
+                    </div>
+
+                    <div class="item-price">
+                        $<?= number_format($item->total, 2) ?>
                     </div>
                 </div>
+            <?php endforeach; ?>
 
-                <div class="info-section">
-                    <div class="info-label">Payment Method</div>
-                    <div class="info-value">
-                        <?php
-                        $paymentLabels = [
-                            'card' => 'Credit / Debit Card',
-                            'paypal' => 'PayPal',
-                            'bank' => 'Bank Transfer'
-                        ];
-                        echo htmlspecialchars($paymentLabels[$paymentMethod] ?? ucfirst($paymentMethod));
-                        ?>
+            <!-- Bottom Grid -->
+            <div style="display: flex; flex-direction: column; gap: 2rem; margin-top: 2rem;">
+                <!-- Shipping & Payment Info -->
+                <div>
+                    <div class="card" style="box-shadow:none;">
+                        <div class="card-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <h2>Order Information</h2>
+                        </div>
+
+                        <?php $shippingAddress = $order->shippingAddress; ?>
+
+                        <div class="info-section">
+                            <div class="info-label">Shipping Address</div>
+                            <div class="info-value">
+
+                                <?php if ($shippingAddress): ?>
+
+                                    <span class="address-line">
+                                            <?= htmlspecialchars($shippingAddress->address_line_1) ?>
+                                        </span>
+
+                                    <?php if (!empty($shippingAddress->address_line_2)): ?>
+                                        <span class="address-line">
+                                                <?= htmlspecialchars($shippingAddress->address_line_2) ?>
+                                            </span>
+                                    <?php endif; ?>
+
+                                    <span class="address-line">
+                                            <?= htmlspecialchars($shippingAddress->city) ?>
+                                            <?= $shippingAddress->state ? ', ' . htmlspecialchars($shippingAddress->state) : '' ?>
+                                            <?= htmlspecialchars($shippingAddress->postcode) ?>
+                                        </span>
+
+                                    <span class="address-line">
+                                            <?= htmlspecialchars($shippingAddress->country) ?>
+                                        </span>
+
+                                <?php else: ?>
+                                    <span class="address-line">No shipping address found</span>
+                                <?php endif; ?>
+
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div class="info-section">
-                    <div class="info-label">Order Status</div>
-                    <div class="info-value">
-                            <span class="status-badge <?= htmlspecialchars($status) ?>">
-                                <?= htmlspecialchars(ucfirst($status)) ?>
-                            </span>
+                    <div class="info-section">
+                        <div class="info-label">Payment Method</div>
+                        <div class="info-value">
+                            <?php
+                            $paymentLabels = [
+                                    'card' => 'Credit / Debit Card',
+                                    'paypal' => 'PayPal',
+                                    'bank' => 'Bank Transfer'
+                            ];
+
+                            $method = $order->payment_method ?? null;
+
+                            echo htmlspecialchars(
+                                    $paymentLabels[$method] ?? ($method ? ucfirst($method) : 'N/A')
+                            );
+                            ?>
+                        </div>
                     </div>
-                </div>
 
-                <div class="info-section">
-                    <div class="info-label">Order Date</div>
-                    <div class="info-value">
-                        <?= $createdAt->format('F j, Y \a\t g:i A') ?>
+                    <div class="info-section">
+                        <div class="info-label">Order Status</div>
+                        <div class="info-value">
+                                    <span class="status-badge <?= htmlspecialchars($order->status) ?>">
+                                        <?= htmlspecialchars(ucfirst($order->status)) ?>
+                                    </span>
+                        </div>
+                    </div>
+
+                    <div class="info-section">
+                        <div class="info-label">Order Date</div>
+                        <div class="info-value">
+                            <?= $order->created_at->format('F j, Y \a\t g:i A') ?>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Right Column -->
-        <div>
             <!-- Order Summary -->
-            <div class="card fade-in">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <line x1="12" y1="1" x2="12" y2="23"></line>
-                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                    </svg>
-                    <h2>Order Summary</h2>
-                </div>
+            <div>
+                <div class="card" style="box-shadow:none;">
+                    <div class="card-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        <h2>Order Summary</h2>
+                    </div>
 
-                <div class="summary-row subtotal">
-                    <span>Subtotal:</span>
-                    <span>$<?= number_format($subtotal, 2) ?></span>
-                </div>
-                <div class="summary-row subtotal">
-                    <span>Shipping:</span>
-                    <span><?= $shipping > 0 ? '$' . number_format($shipping, 2) : 'Free' ?></span>
-                </div>
-                <div class="summary-row subtotal">
-                    <span>Tax:</span>
-                    <span>$<?= number_format($tax, 2) ?></span>
-                </div>
-                <div class="summary-row total">
-                    <span>Total:</span>
-                    <span>$<?= number_format($total, 2) ?></span>
-                </div>
+                    <div class="summary-row subtotal">
+                        <span>Subtotal:</span>
+                        <span>$<?= number_format($order->subtotal, 2) ?></span>
+                    </div>
 
-                <div class="action-buttons">
-                    <a href="/" class="btn btn-primary">Continue Shopping</a>
-                    <button onclick="window.print()" class="btn btn-outline">Print Receipt</button>
-                    <a href="/account/orders" class="btn btn-secondary">View All Orders</a>
+                    <div class="summary-row subtotal">
+                        <span>Shipping:</span>
+                        <span><?= $order->shipping > 0 ? '$' . number_format($order->shipping, 2) : 'Free' ?></span>
+                    </div>
+
+                    <div class="summary-row subtotal">
+                        <span>Tax:</span>
+                        <span>$<?= number_format($order->tax, 2) ?></span>
+                    </div>
+
+                    <div class="summary-row total">
+                        <span>Total:</span>
+                        <span>$<?= number_format($order->total, 2) ?></span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Help Section -->
-            <div class="card fade-in" style="margin-top: 2rem;">
-                <div class="card-header">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    <h2>Need Help?</h2>
-                </div>
-                <div class="info-value" style="line-height: 1.8;">
-                    <p style="margin-bottom: 1rem;">If you have any questions about your order, please don't hesitate to contact us.</p>
-                    <a href="/contact" class="btn btn-outline" style="width: 100%;">Contact Support</a>
-                </div>
-            </div>
         </div>
+
+    </div>
+
+    <?php endforeach; ?>
+
+    <!-- Actions -->
+    <div class="card fade-in">
+        <div class="action-buttons">
+            <a href="/" class="btn btn-primary">Continue Shopping</a>
+            <button onclick="window.print()" class="btn btn-outline">Print Receipt</button>
+            <a href="/account/orders" class="btn btn-secondary">View All Orders</a>
+        </div>
+    </div>
+
+    <!-- Help Section -->
+    <div class="card fade-in" style="margin-top: 2rem;">
+        <div class="card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <h2>Need Help?</h2>
+        </div>
+        <div class="info-value" style="line-height: 1.8;">
+            <p style="margin-bottom: 1rem;">
+                If you have any questions about your order, please don't hesitate to contact us.
+            </p>
+            <a href="/contact" class="btn btn-outline" style="width: 100%;">Contact Support</a>
+        </div>
+    </div>
+
     </div>
 </main>
 
 <script>
-    // Add fade-in animation on load
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const elements = document.querySelectorAll('.fade-in');
         elements.forEach((el, index) => {
             el.style.animationDelay = `${index * 0.1}s`;
         });
     });
 
-    // Track order view
-    console.log('Order viewed:', '<?= htmlspecialchars($orderNumber) ?>');
+    console.log('Orders viewed:', <?= json_encode($orders->pluck('order_number')) ?>);
 </script>
-</body>
 </html>

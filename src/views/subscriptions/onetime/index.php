@@ -909,6 +909,7 @@ $selectedTags = !empty($filters['tags'])
     const SORT_SELECT = document.getElementById('sort-select');
     const PLANS_WRAP = document.getElementById('plans-wrap');
     let cartData = {items: [], total: 0, count: 0};
+    const SITE = 'press-stack'
     const API_BASE = '/api/press-stack';
     CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
