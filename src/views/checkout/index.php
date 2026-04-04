@@ -458,19 +458,6 @@ $apiBase = '/api/' . $site;
     let subscriptionId = null, orderId = null;
     let isOneTimeSubscription = false;
 
-    // ── Country / US consent ─────────────────────────────────────────────
-    function handleCountryChange(countryCode) {
-        const usBlock = document.getElementById('us-renewal-consent-block');
-        if (!usBlock) return;
-        if (countryCode === 'US') {
-            usBlock.style.display = 'block';
-            usBlock.classList.remove('consent-error');
-        } else {
-            usBlock.style.display = 'none';
-            const cb = document.getElementById('us-renewal-consent');
-            if (cb) cb.checked = false;
-        }
-    }
 
     function checkCartForSubscription() {
         isOneTimeSubscription = new URLSearchParams(window.location.search).get('type') === 'subscription';
@@ -533,7 +520,6 @@ $apiBase = '/api/' . $site;
     }
 
     function advanceToPayment() {
-        alert('here5')
         if (isMixedCart) {
             showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
             return;
@@ -606,74 +592,6 @@ $apiBase = '/api/' . $site;
         const taxRate = <?= $tax_rate ?? 0 ?>;
         const taxable = <?= (float)($subtotal ?? 0) ?> - discount + <?= (float)($shipping ?? 0) ?>;
         return Math.round((taxable + taxable * taxRate) * 100);
-    }
-
-    // ── Login status / saved addresses ───────────────────────────────────
-    async function checkLoginStatus() {
-        try {
-            const res = await fetch('/member/me');
-            if (res.ok) {
-                const data = await res.json();
-                if (data.member) {
-                    window.isLoggedIn = true;
-                    window.currentMember = data.member;
-                    if (requiresShipping) loadSavedAddresses();
-                    loadSavedCards();
-                }
-            }
-        } catch (e) { /* guest */
-        }
-    }
-
-    async function loadSavedAddresses() {
-        try {
-            const res = await fetch(`/${SITE}/member/${window.currentMember.id}/addresses?type=shipping`);
-            const data = await res.json();
-            if (data.items?.length) displaySavedAddresses(data.items);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    function displaySavedAddresses(addresses) {
-        const container = document.getElementById('saved-addresses-list');
-        const section = document.getElementById('saved-addresses-section');
-        if (!container || !section) return;
-        container.innerHTML = addresses.map(addr => `
-        <label class="saved-address-card" for="addr-${addr.id}">
-            <input type="radio" name="saved_address" value="${addr.id}" id="addr-${addr.id}"
-                   onchange="selectAddress(${addr.id})">
-            <div class="address-details">
-                <strong>${addr.label || 'Address'}</strong>
-                <p>${addr.formatted}</p>
-            </div>
-            ${addr.is_default ? '<span class="badge" style="position:static;background:var(--primary-color);">Default</span>' : ''}
-        </label>`).join('');
-        section.style.display = 'block';
-        const shippingForm = document.getElementById('shipping-address-form');
-        if (shippingForm) shippingForm.style.display = 'none';
-    }
-
-    function selectAddress(id) {
-        selectedAddressId = id;
-        const form = document.getElementById('shipping-address-form');
-        if (form) form.style.display = 'none';
-    }
-    function showNewAddressForm() {
-        selectedAddressId = null;
-        document.getElementById('saved-addresses-section').style.display = 'none';
-        document.getElementById('shipping-address-form').style.display = 'block';
-        const btn = document.getElementById('back-to-saved-btn');
-        if (btn) btn.style.display = 'block';
-        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
-    }
-    function showSavedAddresses() {
-        selectedAddressId = null;
-        document.getElementById('saved-addresses-section').style.display = 'block';
-        document.getElementById('shipping-address-form').style.display = 'none';
-        const btn = document.getElementById('back-to-saved-btn');
-        if (btn) btn.style.display = 'none';
-        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
     }
 
     // ── Processing state ──────────────────────────────────────────────────

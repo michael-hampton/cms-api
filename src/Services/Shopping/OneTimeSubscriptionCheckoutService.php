@@ -185,7 +185,7 @@ class OneTimeSubscriptionCheckoutService
 
                 $status = !$startDate || $startDate > $today
                     ? SubscriptionStatus::PENDING
-                    : SubscriptionStatus::SCHEDULED;
+                    : SubscriptionStatus::SCHEDULED; //todo what about trials?
 
                 $subscription->update(['status' => $status->value]);
             }

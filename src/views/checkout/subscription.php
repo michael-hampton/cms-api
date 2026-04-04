@@ -37,6 +37,7 @@ $planPrice = (float)$plan->price;
         gap: 2rem;
         margin-bottom: 3rem;
     }
+
     .checkout-form {
         background: white;
         border-radius: .75rem;
@@ -75,7 +76,7 @@ $planPrice = (float)$plan->price;
         box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
     }
 
-    /* ── Plan hero ────────────────────────────────────────────────── */
+    /* ── Plan hero ─────────────────────────────────────────────── */
     .plan-hero {
         background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
         border-radius: .75rem .75rem 0 0;
@@ -114,7 +115,7 @@ $planPrice = (float)$plan->price;
         opacity: .8;
     }
 
-    /* ── Pre-release ──────────────────────────────────────────────── */
+    /* ── Pre-release notice ────────────────────────────────────── */
     .prerelease-notice {
         background: #fef3c7;
         border: 2px solid #f59e0b;
@@ -170,8 +171,8 @@ $planPrice = (float)$plan->price;
 @include('checkout/components/page-header', [
 'title'       => 'Subscribe',
 'breadcrumbs' => [
-['label' => 'Home', 'href'  => '/'],
-['label' => 'Shop', 'href'  => '/shop'],
+['label' => 'Home', 'href' => '/'],
+['label' => 'Shop', 'href' => '/shop'],
 ['label' => 'Subscribe'],
 ],
 ])
@@ -182,47 +183,17 @@ $planPrice = (float)$plan->price;
 
 <div class="checkout-layout">
 
-    <!-- ── Left: form ──────────────────────────────────────────────── -->
+    <!-- ── Left: form ──────────────────────────────────────────── -->
     <div class="checkout-form">
         <form id="subscription-form">
             <input type="hidden" name="subscription_plan_id" value="<?= (int)$plan->id ?>">
 
-            <!-- Contact -->
-            @include('checkout/components/form/form-section', ['title' => 'Contact Information'])
-            @include('checkout/components/form/form-row')
-            @include('checkout/components/form/form-group', ['name' => 'first_name', 'label' => 'First Name', 'required'
-            => true])
-            @include('checkout/components/form/form-group', ['name' => 'last_name', 'label' => 'Last Name', 'required'
-            => true])
-            @include('checkout/components/form/form-row', ['close' => true])
-            @include('checkout/components/form/form-section', ['close' => true])
-
-            <?php if ($requiresShipping): ?>
-                @include('checkout/components/form/form-section', ['title' => 'Shipping Address', 'close' => false])
-                    @include('checkout/components/form/form-group', ['name' => 'address', 'label' => 'Address',
-                    'required' => true, 'class' => 'full-width'])
-                    @include('checkout/components/form/form-group', ['name' => 'address2', 'label' => 'Apartment, suite,
-                    etc. (optional)', 'class' => 'full-width'])
-                @include('checkout/components/form/form-row')
-                        @include('checkout/components/form/form-group', ['name' => 'city', 'label' => 'City', 'required'
-                        => true])
-                        @include('checkout/components/form/form-group', ['name' => 'state', 'label' => 'State /
-                        Province'])
-                @include('checkout/components/form/form-row', ['close' => true])
-                @include('checkout/components/form/form-row')
-                        @include('checkout/components/form/form-group', ['name' => 'postal_code', 'label' => 'Postal
-                        Code', 'required' => true])
-                        @include('checkout/components/form/select', [
-                        'name' => 'country', 'id' => 'country-select', 'label' => 'Country',
-                        'required' => true, 'blank' => true, 'blankLabel' => 'Select Country',
-                        'options' => ['US' => 'United States', 'CA' => 'Canada', 'GB' => 'United Kingdom', 'AU' =>
-                        'Australia', 'DE' => 'Germany', 'FR' => 'France'],
-                        'selected' => $member?->country ?? '',
-                        'onChange' => 'handleCountryChange(this.value)',
-                        ])
-                @include('checkout/components/form/form-row', ['close' => true])
-                @include('checkout/components/form/form-section', ['close' => true])
-            <?php endif; ?>
+            <!-- Contact + Shipping via shared billing-form component -->
+            @include('checkout/components/form/billing-form', [
+            'member' => $member ?? null,
+            'requiresShipping' => $requiresShipping ?? false,
+            'checkoutMode' => 'single-page',
+            ])
 
             <?php if ($isPreRelease): ?>
                 <div class="prerelease-notice">
@@ -234,7 +205,7 @@ $planPrice = (float)$plan->price;
                         <?php endif; ?>
                         You will be charged today but access begins on the date above.
                     </p>
-                    <div style="margin-top:1rem;">
+                    <div style="margin-top: 1rem;">
                         @include('checkout/components/form/checkbox-control', [
                         'name' => 'accept_pre_release',
                         'id' => 'accept-pre-release',
@@ -251,7 +222,7 @@ $planPrice = (float)$plan->price;
 
             <div id="payment-request-button"></div>
 
-            <!-- New card form (shown by default if no saved cards) -->
+            <!-- New card form (shown by default when no saved cards) -->
             @include('checkout/components/stripe-card-element', [
             'sectionTitle' => 'Card Details',
             'showBackButton' => true,
@@ -264,14 +235,16 @@ $planPrice = (float)$plan->price;
         </form>
     </div>
 
-    <!-- ── Right: plan summary ─────────────────────────────────────── -->
-    <div style="height:fit-content;position:sticky;top:100px;">
+    <!-- ── Right: plan summary ─────────────────────────────────── -->
+    <div style="height: fit-content; position: sticky; top: 100px;">
 
-        <div style="background:white;border-radius:.75rem;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1rem;">
+        <div style="background: white; border-radius: .75rem; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 1rem;">
             <div class="plan-hero">
                 <div class="plan-hero-name"><?= htmlspecialchars($plan->name) ?></div>
                 <?php if (!empty($plan->description)): ?>
-                    <p style="font-size:.875rem;opacity:.8;margin-top:.25rem;"><?= htmlspecialchars($plan->description) ?></p>
+                    <p style="font-size: .875rem; opacity: .8; margin-top: .25rem;">
+                        <?= htmlspecialchars($plan->description) ?>
+                    </p>
                 <?php endif; ?>
                 <div class="plan-hero-price">
                     <span class="plan-hero-currency"><?= htmlspecialchars($plan->currency) ?></span>
@@ -280,15 +253,15 @@ $planPrice = (float)$plan->price;
                 </div>
             </div>
 
-            <div style="padding:1.5rem;">
+            <div style="padding: 1.5rem;">
                 <?php if ($trialDays > 0): ?>
-                    <div style="display:flex;align-items:flex-start;gap:.875rem;background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:.625rem;padding:1rem 1.25rem;margin-bottom:1.25rem;">
-                        <span style="font-size:1.75rem;line-height:1;flex-shrink:0;margin-top:.1rem;">🎁</span>
+                    <div style="display: flex; align-items: flex-start; gap: .875rem; background: #f0fdf4; border: 1.5px solid #6ee7b7; border-radius: .625rem; padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
+                        <span style="font-size: 1.75rem; line-height: 1; flex-shrink: 0; margin-top: .1rem;">🎁</span>
                         <div>
-                            <div style="font-weight:700;font-size:1rem;color:#065f46;"><?= $trialDays ?>-day free trial
-                                included
+                            <div style="font-weight: 700; font-size: 1rem; color: #065f46;">
+                                <?= $trialDays ?>-day free trial included
                             </div>
-                            <div style="font-size:.875rem;color:#047857;margin-top:.25rem;line-height:1.6;">
+                            <div style="font-size: .875rem; color: #047857; margin-top: .25rem; line-height: 1.6;">
                                 First charge on
                                 <strong><?= (new DateTimeImmutable())->modify("+{$trialDays} days")->format('F j, Y') ?></strong>.
                                 Cancel any time.
@@ -298,15 +271,15 @@ $planPrice = (float)$plan->price;
                 <?php endif; ?>
 
                 <?php if (!empty($plan->features) && count($plan->features) > 0): ?>
-                    <div style="margin-bottom:1rem;">
-                        <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem;">
+                    <div style="margin-bottom: 1rem;">
+                        <div style="font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary); margin-bottom: .75rem;">
                             What's included
                         </div>
-                        <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:.5rem;">
+                        <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: .5rem;">
                             <?php foreach ($plan->features as $feature): ?>
-                                <li style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;">
+                                <li style="display: flex; align-items: center; gap: .5rem; font-size: .875rem;">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981"
-                                         stroke-width="2.5" style="flex-shrink:0;">
+                                         stroke-width="2.5" style="flex-shrink: 0;">
                                         <polyline points="20 6 9 17 4 12"/>
                                     </svg>
                                     <?= htmlspecialchars($feature) ?>
@@ -316,23 +289,27 @@ $planPrice = (float)$plan->price;
                     </div>
                 <?php endif; ?>
 
-                <div style="padding-top:1rem;border-top:1px solid var(--border-color);">
+                <div style="padding-top: 1rem; border-top: 1px solid var(--border-color);">
                     <div class="summary-row">
                         <span>Plan price</span>
                         <span><?= htmlspecialchars($plan->currency) ?> <?= number_format($planPrice, 2) ?></span>
                     </div>
                     <?php if ($trialDays > 0): ?>
-                        <div class="summary-row" style="color:var(--success-color);">
-                            <span>Today's charge</span><span>FREE</span>
+                        <div class="summary-row" style="color: var(--success-color);">
+                            <span>Today's charge</span>
+                            <span>FREE</span>
                         </div>
                     <?php endif; ?>
-                    <div id="discount-row" style="display:none;color:var(--success-color);" class="summary-row">
-                        <span>Discount:</span><span id="discount-amount"></span>
+                    <div id="discount-row" style="display: none; color: var(--success-color);" class="summary-row">
+                        <span>Discount:</span>
+                        <span id="discount-amount"></span>
                     </div>
                     <div class="summary-row total">
                         <span>Total today</span>
                         <span id="total" data-total="<?= $trialDays > 0 ? '0' : $planPrice ?>">
-                            <?= $trialDays > 0 ? 'FREE' : htmlspecialchars($plan->currency) . ' ' . number_format($planPrice, 2) ?>
+                            <?= $trialDays > 0
+                                    ? 'FREE'
+                                    : htmlspecialchars($plan->currency) . ' ' . number_format($planPrice, 2) ?>
                         </span>
                     </div>
                 </div>
@@ -349,7 +326,7 @@ $planPrice = (float)$plan->price;
         'id' => 'subscribe-btn',
         'label' => $trialDays > 0 ? "Start {$trialDays}-Day Free Trial" : 'Subscribe Now',
         'variant' => 'primary',
-        'style' => 'margin-top:1rem;',
+        'style' => 'margin-top: 1rem;',
         'type' => 'button',
         ])
 
@@ -366,7 +343,7 @@ $planPrice = (float)$plan->price;
 ])
 
 <script>
-    // ── Global constants required by shared JS files ──────────────────────
+    // ── Constants required by shared JS files ────────────────────────────
     const API_BASE = <?= json_encode($apiBase) ?>;
     const PLAN_CURRENCY = <?= json_encode($plan->currency ?? '$') ?>;
     const TAX_RATE = 0;
@@ -375,8 +352,8 @@ $planPrice = (float)$plan->price;
     const STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
     const SITE = <?= json_encode($site) ?>;
 
-    // isLoggedIn / currentMember — needed by saved-cards.js
-    window.isLoggedIn = true;   // subscription page requires auth
+    // saved-cards.js reads these globals
+    window.isLoggedIn = true; // subscription page requires auth
     window.currentMember = <?= json_encode(['id' => $member->id, 'email' => $member->email]) ?>;
     window.appliedVoucher = null;
 </script>
@@ -393,20 +370,7 @@ $planPrice = (float)$plan->price;
     let clientSecret = null;
     let subscriptionId = null;
     let orderId = null;
-
-    // ── Country / US consent ─────────────────────────────────────────────
-    function handleCountryChange(countryCode) {
-        const usBlock = document.getElementById('us-renewal-consent-block');
-        if (!usBlock) return;
-        if (countryCode === 'US') {
-            usBlock.style.display = 'block';
-            usBlock.classList.remove('consent-error');
-        } else {
-            usBlock.style.display = 'none';
-            const cb = document.getElementById('us-renewal-consent');
-            if (cb) cb.checked = false;
-        }
-    }
+    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
 
     // ── Stripe init ───────────────────────────────────────────────────────
     async function initStripe() {
@@ -416,14 +380,21 @@ $planPrice = (float)$plan->price;
 
         cardElement = elements.create('card', {
             hidePostalCode: true,
-            style: {base: {fontSize: '16px', color: '#1e293b', '::placeholder': {color: '#64748b'}}},
+            style: {
+                base: {
+                    fontSize: '16px',
+                    color: '#1e293b',
+                    '::placeholder': {color: '#64748b'},
+                },
+            },
         });
 
         const cardContainer = document.getElementById('card-element');
         if (cardContainer) {
             cardElement.mount('#card-element');
             cardElement.on('change', e => {
-                document.getElementById('card-errors').textContent = e.error ? e.error.message : '';
+                const err = document.getElementById('card-errors');
+                if (err) err.textContent = e.error ? e.error.message : '';
             });
         }
     }
@@ -444,20 +415,51 @@ $planPrice = (float)$plan->price;
         }
     }
 
+    // ── Validate required fields ──────────────────────────────────────────
+    function validateFields() {
+        document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
+        const data = Object.fromEntries(new FormData(document.getElementById('subscription-form')));
+        const required = ['first_name', 'last_name', 'email'];
+
+        if (requiresShipping === true && !selectedAddressId) {
+            required.push('address', 'city', 'postal_code', 'country');
+        }
+
+        console.log('required', required, data)
+
+        let hasErrors = false;
+        for (const field of required) {
+            if (!data[field]?.trim()) {
+                const el = document.getElementById(`error-${field}`);
+                if (el) el.textContent = 'This field is required';
+                hasErrors = true;
+            }
+        }
+        return !hasErrors;
+    }
+
     // ── Place order ───────────────────────────────────────────────────────
     document.getElementById('subscribe-btn').addEventListener('click', async () => {
         const data = Object.fromEntries(new FormData(document.getElementById('subscription-form')));
 
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
-        document.getElementById('card-errors').textContent = '';
+        const cardErrors = document.getElementById('card-errors');
+        if (cardErrors) cardErrors.textContent = '';
 
+        if (!validateFields()) {
+            showAlert('Please fill in all required fields.', 'error');
+            return;
+        }
+
+        // Pre-release consent
         const acceptEl = document.getElementById('accept-pre-release');
         if (acceptEl && !acceptEl.checked) {
             showAlert('You must accept the pre-release terms to continue.', 'error');
             return;
         }
 
+        // Global renewal consent
         const globalCb = document.getElementById('global-renewal-consent');
         const globalBlock = document.getElementById('global-renewal-consent-block');
         if (globalCb && !globalCb.checked) {
@@ -469,8 +471,9 @@ $planPrice = (float)$plan->price;
         globalBlock?.classList.remove('consent-error');
         data.global_renewal_consent = '1';
 
+        // US renewal consent
         const usBlock = document.getElementById('us-renewal-consent-block');
-        if (usBlock?.style.display !== 'none') {
+        if (usBlock && usBlock?.style.display !== 'none') {
             const usCb = document.getElementById('us-renewal-consent');
             if (usCb && !usCb.checked) {
                 usBlock.classList.add('consent-error');
@@ -487,6 +490,7 @@ $planPrice = (float)$plan->price;
             data.voucher_id = window.appliedVoucher.voucher_id;
             data.discount_amount = window.appliedVoucher.discount;
         }
+
         data.isOneTimeSubscription = true;
 
         setProcessing(true);
@@ -497,7 +501,7 @@ $planPrice = (float)$plan->price;
         }
     });
 
-    // ── Checkout flow ─────────────────────────────────────────────────────
+    // ── Checkout flow — mirrors checkout/index.php handleStripeCheckout ───
     async function processSubscription(data) {
         const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
             method: 'POST',
@@ -512,39 +516,53 @@ $planPrice = (float)$plan->price;
         }
 
         const contexts = result.data?.stripe_contexts;
-        clientSecret = contexts ? contexts[Object.keys(contexts)[0]].client_secret : (result.data?.client_secret ?? null);
+        clientSecret = contexts
+            ? contexts[Object.keys(contexts)[0]].client_secret
+            : (result.data?.client_secret ?? null);
+
         subscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
         orderId = result.data?.order_id ?? null;
 
         const paymentResult = window.selectedCardId
-            ? await stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
+            ? await stripe.confirmCardPayment(clientSecret, {
+                payment_method: window.selectedCardId,
+            })
             : await stripe.confirmCardPayment(clientSecret, {
                 payment_method: {
                     card: cardElement,
                     billing_details: {
                         name: `${data.first_name} ${data.last_name}`,
                         email: data.email,
-                        phone: data.phone ?? undefined
+                        phone: data.phone ?? undefined,
                     },
                 },
                 setup_future_usage: 'off_session',
             });
 
         const {error, paymentIntent} = paymentResult;
+
         if (error) {
-            document.getElementById('card-errors').textContent = error.message;
+            const cardErrors = document.getElementById('card-errors');
+            if (cardErrors) cardErrors.textContent = error.message;
             showAlert(error.message, 'error');
             return;
         }
-        if (paymentIntent.status === 'succeeded') await confirmPayment(paymentIntent.id);
+
+        if (paymentIntent.status === 'succeeded') {
+            await confirmPayment(paymentIntent.id);
+        }
     }
 
     async function confirmPayment(intentId) {
         const body = {payment_intent_id: intentId, order_id: orderId};
-        Array.isArray(subscriptionId) ? (body.subscription_ids = subscriptionId) : (body.subscription_id = subscriptionId);
+        Array.isArray(subscriptionId)
+            ? (body.subscription_ids = subscriptionId)
+            : (body.subscription_id = subscriptionId);
 
         const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
         });
         const result = await res.json();
 
@@ -558,7 +576,7 @@ $planPrice = (float)$plan->price;
 
     // ── Init ──────────────────────────────────────────────────────────────
     initStripe();
-    loadSavedCards();      // from saved-cards.js
+    checkLoginStatus();
 
     <?php if (($member?->country ?? '') === 'US'): ?>
     handleCountryChange('US');

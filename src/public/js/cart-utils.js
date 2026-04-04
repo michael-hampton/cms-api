@@ -432,4 +432,85 @@
     function formatCurrency(amount) {
         return PLAN_CURRENCY + parseFloat(amount).toFixed(2);
     }
+
+    // ── Login status / saved addresses ───────────────────────────────────
+    window.checkLoginStatus = async function () {
+        try {
+            const res = await fetch('/member/me');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.member) {
+                    window.isLoggedIn = true;
+                    window.currentMember = data.member;
+                    if (requiresShipping) await loadSavedAddresses();
+                    await loadSavedCards();
+                }
+            }
+        } catch (e) { /* guest */
+        }
+    }
+
+    window.handleCountryChange = function (countryCode) {
+        const usBlock = document.getElementById('us-renewal-consent-block');
+        if (!usBlock) return;
+        if (countryCode === 'US') {
+            usBlock.style.display = 'block';
+            usBlock.classList.remove('consent-error');
+        } else {
+            usBlock.style.display = 'none';
+            const cb = document.getElementById('us-renewal-consent');
+            if (cb) cb.checked = false;
+        }
+    }
+
+    async function loadSavedAddresses() {
+        try {
+            const res = await fetch(`/${SITE}/member/${window.currentMember.id}/addresses?type=shipping`);
+            const data = await res.json();
+            if (data.items?.length) displaySavedAddresses(data.items);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function displaySavedAddresses(addresses) {
+        const container = document.getElementById('saved-addresses-list');
+        const section = document.getElementById('saved-addresses-section');
+        if (!container || !section) return;
+        container.innerHTML = addresses.map(addr => `
+        <label class="saved-address-card" for="addr-${addr.id}">
+            <input type="radio" name="saved_address" value="${addr.id}" id="addr-${addr.id}"
+                   onchange="selectAddress(${addr.id})">
+            <div class="address-details">
+                <strong>${addr.label || 'Address'}</strong>
+                <p>${addr.formatted}</p>
+            </div>
+            ${addr.is_default ? '<span class="badge" style="position:static;background:var(--primary-color);">Default</span>' : ''}
+        </label>`).join('');
+        section.style.display = 'block';
+        const shippingForm = document.getElementById('shipping-address-form');
+        if (shippingForm) shippingForm.style.display = 'none';
+    }
+
+    selectAddress = function (id) {
+        selectedAddressId = id;
+        const form = document.getElementById('shipping-address-form');
+        if (form) form.style.display = 'none';
+    }
+    window.showNewAddressForm = function () {
+        selectedAddressId = null;
+        document.getElementById('saved-addresses-section').style.display = 'none';
+        document.getElementById('shipping-address-form').style.display = 'block';
+        const btn = document.getElementById('back-to-saved-btn');
+        if (btn) btn.style.display = 'block';
+        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
+    }
+    window.showSavedAddresses = function () {
+        selectedAddressId = null;
+        document.getElementById('saved-addresses-section').style.display = 'block';
+        document.getElementById('shipping-address-form').style.display = 'none';
+        const btn = document.getElementById('back-to-saved-btn');
+        if (btn) btn.style.display = 'none';
+        document.querySelectorAll('[name="saved_address"]').forEach(r => r.checked = false);
+    }
 })();
