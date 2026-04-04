@@ -331,8 +331,9 @@ class CartService
 
         // Validate delivery type
         $deliveryType = $data['delivery_type'] ?? $deliveryType;
+        $deliveryOptions = $subscriptionPlan->getDeliveryOptions();
 
-        if (!in_array($deliveryType, $subscriptionPlan->getDeliveryOptions())) { //todo
+        if (!empty($deliveryOptions) && !in_array($deliveryType, $deliveryOptions)) { //todo
             return ['success' => false, 'message' => 'Invalid delivery type'];
         }
 
@@ -377,15 +378,15 @@ class CartService
         }
 
         // Regular subscription - needs product
-        $product = $subscriptionPlan->product;
-        if (!$product || !$product->is_active) {
-            return ['success' => false, 'message' => 'Associated product not found or inactive'];
-        }
+//        $product = $subscriptionPlan->product;
+//        if (!$product || !$product->is_active) {
+//            return ['success' => false, 'message' => 'Associated product not found or inactive'];
+//        }
 
         $cartItemData = $this->itemFactory->fromSubscription(
             $sessionId,
             $userId,
-            $product,
+            $subscriptionPlan,
             1,
             $price,
             $subscriptionPlanId,

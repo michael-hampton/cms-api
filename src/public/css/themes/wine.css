@@ -1793,7 +1793,7 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 2rem;
 }
 
-.form-row {
+/*.form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
@@ -1825,7 +1825,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .form-input::placeholder {
     color: var(--gray);
-}
+}*/
 
 .cta-button {
     background: var(--burgundy);
@@ -3010,7 +3010,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Form inputs with softer backgrounds */
-.form-input,
+/*.form-input,
 .form-textarea,
 .form-select,
 .comment-form .form-control {
@@ -3023,7 +3023,7 @@ h1, h2, h3, h4, h5, h6 {
 .form-select:focus,
 .comment-form .form-control:focus {
     background: rgba(255, 255, 255, 0.06);
-}
+}*/
 
 /* ==========================================
    FOOTER STYLE VARIATIONS

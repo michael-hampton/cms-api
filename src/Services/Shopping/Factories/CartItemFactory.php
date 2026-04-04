@@ -121,7 +121,7 @@ class CartItemFactory
     public function fromSubscription(
         string  $sessionId,
         ?int    $userId,
-        Product $product,
+        SubscriptionPlan $product,
         int     $quantity,
         float   $price,
         int     $subscriptionPlanId,

@@ -85,7 +85,9 @@ $apiBase = '/api/' . $site;
             </div>
 
             <div class="sub-plans">
-                <?php foreach ($plans as $plan): ?>
+                <?php foreach ($plans as $plan):
+                    $deliveryType = $plan->digital_download_url ? 'digital' : 'print';
+                    ?>
                     <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?>"
                          data-plan-id="<?= (int)$plan->id ?>"
                          data-plan-slug="<?= htmlspecialchars($plan->slug) ?>"
@@ -93,7 +95,8 @@ $apiBase = '/api/' . $site;
                          data-plan-price="<?= (float)$plan->price ?>"
                          data-plan-currency="<?= htmlspecialchars($plan->currency) ?>"
                          data-plan-period="<?= htmlspecialchars($plan->billing_period) ?>"
-                         data-plan-trial="<?= (int)($plan->trial_days ?? 0) ?>">
+                         data-plan-trial="<?= (int)($plan->trial_days ?? 0) ?>"
+                         data-plan-delivery-type="<?= htmlspecialchars($deliveryType) ?>">
 
                         <?php if ($plan->is_featured): ?>
                             <div class="sub-plan-badge">⭐ Most Popular</div>
@@ -164,46 +167,54 @@ $apiBase = '/api/' . $site;
             <form id="sub-register-form" class="sub-form" novalidate>
                 @csrf
                 <div class="sub-form-row">
-                    <div class="sub-form-group">
-                        <label class="sub-label" for="sub-reg-first-name">First Name *</label>
-                        <input type="text" id="sub-reg-first-name" name="first_name"
-                               class="sub-input" required autocomplete="given-name">
-                    </div>
-                    <div class="sub-form-group">
-                        <label class="sub-label" for="sub-reg-last-name">Last Name *</label>
-                        <input type="text" id="sub-reg-last-name" name="last_name"
-                               class="sub-input" required autocomplete="family-name">
-                    </div>
+                    <?= $this->partial('checkout/components/form/form-group', [
+                            'name' => 'first_name',
+                            'id' => 'sub-reg-first-name',
+                            'label' => 'First Name',
+                            'type' => 'text',
+                            'required' => true,
+                            'attrs' => ['autocomplete' => 'given-name'],
+                    ]) ?>
+                    <?= $this->partial('checkout/components/form/form-group', [
+                            'name' => 'last_name',
+                            'id' => 'sub-reg-last-name',
+                            'label' => 'Last Name',
+                            'type' => 'text',
+                            'required' => true,
+                            'attrs' => ['autocomplete' => 'family-name'],
+                    ]) ?>
                 </div>
-                <div class="sub-form-group">
-                    <label class="sub-label" for="sub-reg-email">Email *</label>
-                    <input type="email" id="sub-reg-email" name="email"
-                           class="sub-input" required autocomplete="email">
-                </div>
-                <div class="sub-form-group">
-                    <label class="sub-label" for="sub-reg-password">Password *</label>
-                    <input type="password" id="sub-reg-password" name="password"
-                           class="sub-input" required minlength="8" autocomplete="new-password">
-                    <span class="sub-hint">Minimum 8 characters</span>
-                </div>
-                <div class="sub-form-group">
-                    <label class="sub-label" for="sub-reg-confirm">Confirm Password *</label>
-                    <input type="password" id="sub-reg-confirm" name="password_confirmation"
-                           class="sub-input" required autocomplete="new-password">
-                </div>
-                <div class="sub-form-group">
-                    <label style="display: flex; align-items: flex-start; gap: .625rem; cursor: pointer;
-                                  font-size: .875rem; color: var(--sub-text);">
-                        <input type="checkbox" name="terms"
-                               style="margin-top: .2rem; width: 16px; height: 16px; flex-shrink: 0;" required>
-                        <span>
-                            I agree to the
-                            <a href="/terms" target="_blank" style="color: var(--sub-primary);">Terms</a>
-                            and
-                            <a href="/privacy" target="_blank" style="color: var(--sub-primary);">Privacy Policy</a>
-                        </span>
-                    </label>
-                </div>
+                <?= $this->partial('checkout/components/form/form-group', [
+                        'name' => 'email',
+                        'id' => 'sub-reg-email',
+                        'label' => 'Email',
+                        'type' => 'email',
+                        'required' => true,
+                        'attrs' => ['autocomplete' => 'email'],
+                ]) ?>
+                <?= $this->partial('checkout/components/form/form-group', [
+                        'name' => 'password',
+                        'id' => 'sub-reg-password',
+                        'label' => 'Password',
+                        'type' => 'password',
+                        'required' => true,
+                        'attrs' => ['autocomplete' => 'new-password', 'minlength' => '8'],
+                ]) ?>
+                <p class="sub-hint" style="margin-top: -.5rem; margin-bottom: .75rem;">Minimum 8 characters</p>
+                <?= $this->partial('checkout/components/form/form-group', [
+                        'name' => 'password_confirmation',
+                        'id' => 'sub-reg-confirm',
+                        'label' => 'Confirm Password',
+                        'type' => 'password',
+                        'required' => true,
+                        'attrs' => ['autocomplete' => 'new-password'],
+                ]) ?>
+                <?= $this->partial('checkout/components/form/checkbox-control', [
+                        'name' => 'terms',
+                        'id' => 'sub-reg-terms',
+                        'required' => true,
+                        'label' => 'I agree to the <a href="/terms" target="_blank" style="color:var(--sub-primary);">Terms</a> and <a href="/privacy" target="_blank" style="color:var(--sub-primary);">Privacy Policy</a>',
+                ]) ?>
                 <div class="sub-error" id="sub-register-error" role="alert"></div>
                 <?= $this->partial('checkout/components/form/button', [
                         'label' => 'Create Account & Continue',
@@ -214,16 +225,22 @@ $apiBase = '/api/' . $site;
 
             <!-- Login -->
             <form id="sub-login-form" class="sub-form" style="display: none;" novalidate>
-                <div class="sub-form-group">
-                    <label class="sub-label" for="sub-login-email">Email *</label>
-                    <input type="email" id="sub-login-email" name="email"
-                           class="sub-input" required autocomplete="email">
-                </div>
-                <div class="sub-form-group">
-                    <label class="sub-label" for="sub-login-password">Password *</label>
-                    <input type="password" id="sub-login-password" name="password"
-                           class="sub-input" required autocomplete="current-password">
-                </div>
+                <?= $this->partial('checkout/components/form/form-group', [
+                        'name' => 'email',
+                        'id' => 'sub-login-email',
+                        'label' => 'Email',
+                        'type' => 'email',
+                        'required' => true,
+                        'attrs' => ['autocomplete' => 'email'],
+                ]) ?>
+                <?= $this->partial('checkout/components/form/form-group', [
+                        'name' => 'password',
+                        'id' => 'sub-login-password',
+                        'label' => 'Password',
+                        'type' => 'password',
+                        'required' => true,
+                        'attrs' => ['autocomplete' => 'current-password'],
+                ]) ?>
                 <div class="sub-error" id="sub-login-error" role="alert"></div>
                 <?= $this->partial('checkout/components/form/button', [
                         'label' => 'Sign In & Continue',
@@ -253,114 +270,134 @@ $apiBase = '/api/' . $site;
                 <p class="sub-subtitle">Secure checkout powered by Stripe</p>
             </div>
 
-            <!-- Plan summary (populated dynamically by subUpdatePaymentSummary) -->
-            <div class="sub-payment-summary">
-                <div class="sub-summary-row">
-                    <span>Plan</span>
-                    <strong id="sub-summary-plan-name">—</strong>
-                </div>
-                <div class="sub-summary-row">
-                    <span>Billing</span>
-                    <strong id="sub-summary-billing">—</strong>
-                </div>
-                <div class="sub-summary-row" id="sub-discount-summary-row"
-                     style="display: none; color: var(--success-color);">
-                    <span>Discount</span>
-                    <strong id="sub-summary-discount">—</strong>
-                </div>
-                <div class="sub-summary-divider"></div>
-                <div class="sub-summary-row sub-summary-total">
-                    <span>Total today</span>
-                    <strong id="sub-summary-total">—</strong>
-                </div>
-            </div>
+            <div class="sub-step3-layout">
 
-            <!--
-                Payment method selector.
-                Uses the shared .payment-method / .payment-methods CSS from the
-                layout, and payment-method-selector.js for click handling.
-                window.onPaymentMethodChange (defined below) toggles sections.
-            -->
-            @include('checkout/components/payment-method-selector')
+                <!-- LEFT: payment inputs -->
+                <div class="sub-step3-main">
 
-            <!-- Card payment section -->
-            <div id="sub-card-payment-section">
+                    <!--
+                        Payment method selector.
+                        Uses the shared .payment-method / .payment-methods CSS from the
+                        layout, and payment-method-selector.js for click handling.
+                        window.onPaymentMethodChange (defined below) toggles sections.
+                    -->
+                    @include('checkout/components/payment-method-selector')
 
-                <!--
-                    Saved payment methods.
-                    Targets #saved-cards-section / #saved-cards-list / #new-card-section
-                    and #back-to-saved-cards-btn — the same IDs saved-cards.js expects.
-                    loadSavedCards() is called when step 3 becomes visible.
-                -->
-                <?= $this->partial('checkout/components/saved-cards', [
-                        'useDifferentCardOnClick' => 'showNewCardForm()',
-                ]) ?>
+                    <!-- Card payment section -->
+                    <div id="sub-card-payment-section">
 
-                <!--
-                    Stripe card element.
-                    Mounts into #card-element; errors written to #card-errors.
-                    Back button #back-to-saved-cards-btn toggled by showNewCardForm().
-                -->
-                <?= $this->partial('checkout/components/stripe-card-element', [
-                        'showBackButton' => true,
-                        'backBtnOnClick' => 'showSavedCards()',
-                ]) ?>
+                        <!--
+                            Saved payment methods.
+                            Targets #saved-cards-section / #saved-cards-list / #new-card-section
+                            and #back-to-saved-cards-btn — the same IDs saved-cards.js expects.
+                            loadSavedCards() is called when step 3 becomes visible.
+                        -->
+                        <?= $this->partial('checkout/components/saved-cards', [
+                                'useDifferentCardOnClick' => 'showNewCardForm()',
+                        ]) ?>
 
-            </div>
+                        <!--
+                            Stripe card element.
+                            Mounts into #card-element; errors written to #card-errors.
+                            Back button #back-to-saved-cards-btn toggled by showNewCardForm().
+                        -->
+                        <?= $this->partial('checkout/components/stripe-card-element', [
+                                'showBackButton' => true,
+                                'backBtnOnClick' => 'showSavedCards()',
+                        ]) ?>
 
-            <!-- PayPal section (shown when PayPal method is selected) -->
-            <div id="sub-paypal-payment-section" data-payment-section="paypal" style="display: none;">
-                <p style="font-size: .875rem; color: var(--text-secondary); text-align: center; padding: 1.25rem 0;">
-                    You will be redirected to PayPal to complete your payment.
-                </p>
-            </div>
+                    </div>
 
-            <!--
-                Voucher section.
-                applyVoucher() and removeVoucher() from cart-utils.js handle the
-                full flow: API call → DOM update → total recalculation.
-                They read window.appliedVoucher, PLAN_CURRENCY, and INITIAL_SUBTOTAL
-                which are kept in sync when a plan is selected.
-            -->
-            <?= $this->partial('checkout/components/voucher-section', [
-                    'currency' => '', // JS sets PLAN_CURRENCY at runtime via subReadPlanData
-                    'applyOnClick' => 'applyVoucher()',
-                    'removeOnClick' => 'removeVoucher()',
-            ]) ?>
+                    <!-- PayPal section (shown when PayPal method is selected) -->
+                    <div id="sub-paypal-payment-section" data-payment-section="paypal" style="display: none;">
+                        <p style="font-size: .875rem; color: var(--text-secondary); text-align: center; padding: 1.25rem 0;">
+                            You will be redirected to PayPal to complete your payment.
+                        </p>
+                    </div>
 
-            <!--
-                Auto-renewal consent.
-                Uses a scoped checkbox ID to avoid collision if the full checkout
-                page is simultaneously present in the DOM.
-            -->
-            <?= $this->partial('checkout/components/auto-renewal-consent', [
-                    'showGlobal' => true,
-                    'showUs' => false,
-                    'globalConsentId' => 'sub-global-renewal-consent',
-            ]) ?>
+                    <!--
+                        Voucher section.
+                        applyVoucher() and removeVoucher() from cart-utils.js handle the
+                        full flow: API call → DOM update → total recalculation.
+                        They read window.appliedVoucher, PLAN_CURRENCY, and INITIAL_SUBTOTAL
+                        which are kept in sync when a plan is selected.
+                    -->
+                    <?= $this->partial('checkout/components/voucher-section', [
+                            'currency' => '', // JS sets PLAN_CURRENCY at runtime via subReadPlanData
+                            'applyOnClick' => 'applyVoucher()',
+                            'removeOnClick' => 'removeVoucher()',
+                    ]) ?>
 
-            <!-- Submit (shared button component) -->
-            <?= $this->partial('checkout/components/form/button', [
-                    'id' => 'sub-pay-btn',
-                    'label' => 'Complete Subscription',
-                    'variant' => 'primary',
-                    'type' => 'button',
-                    'style' => 'margin-top: 1.5rem;',
-                    'onclick' => 'subProcessPayment()',
-            ]) ?>
+                    <!--
+                        Auto-renewal consent.
+                        Uses a scoped checkbox ID to avoid collision if the full checkout
+                        page is simultaneously present in the DOM.
+                    -->
+                    <?= $this->partial('checkout/components/auto-renewal-consent', [
+                            'showGlobal' => true,
+                            'showUs' => false,
+                            'globalConsentId' => 'sub-global-renewal-consent',
+                    ]) ?>
 
-            <!-- Security badge (shared component) -->
-            <?= $this->partial('checkout/components/security-badge', [
-                    'label' => 'Secured by Stripe · 256-bit SSL encryption',
-            ]) ?>
+                </div><!-- /.sub-step3-main -->
 
-            <?= $this->partial('checkout/components/form/button', [
-                    'label' => '← Back',
-                    'variant' => 'secondary',
-                    'type' => 'button',
-                    'style' => 'margin-top: .75rem;',
-                    'onclick' => 'subGoToStep(' . ($isLoggedIn ? 1 : 2) . ')',
-            ]) ?>
+                <!-- RIGHT: order summary sidebar -->
+                <aside class="sub-step3-aside">
+                    <div class="sub-aside-card">
+                        <h3 class="sub-aside-heading">Order Summary</h3>
+
+                        <!-- Plan summary (populated dynamically by subUpdatePaymentSummary) -->
+                        <div class="sub-aside-plan-name" id="sub-summary-plan-name">—</div>
+
+                        <div class="sub-summary-row">
+                            <span>Billing</span>
+                            <strong id="sub-summary-billing">—</strong>
+                        </div>
+                        <div class="sub-summary-row" id="sub-discount-summary-row"
+                             style="display: none; color: var(--success-color, #10b981);">
+                            <span>Discount</span>
+                            <strong id="sub-summary-discount">—</strong>
+                        </div>
+                        <div class="sub-summary-divider"></div>
+                        <div class="sub-summary-row sub-summary-total">
+                            <span>Total today</span>
+                            <strong id="sub-summary-total">—</strong>
+                        </div>
+
+                        <div class="sub-aside-guarantee">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                 stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            30-day money-back guarantee
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <?= $this->partial('checkout/components/form/button', [
+                            'id' => 'sub-pay-btn',
+                            'label' => 'Complete Subscription',
+                            'variant' => 'primary',
+                            'type' => 'button',
+                            'style' => 'width: 100%; margin-top: 1rem;',
+                            'onclick' => 'subProcessPayment()',
+                    ]) ?>
+
+                    <!-- Security badge (shared component) -->
+                    <?= $this->partial('checkout/components/security-badge', [
+                            'label' => 'Secured by Stripe · 256-bit SSL',
+                    ]) ?>
+
+                    <?= $this->partial('checkout/components/form/button', [
+                            'label' => '← Back',
+                            'variant' => 'secondary',
+                            'type' => 'button',
+                            'style' => 'width: 100%; margin-top: .5rem;',
+                            'onclick' => 'subGoToStep(' . ($isLoggedIn ? 1 : 2) . ')',
+                    ]) ?>
+                </aside><!-- /.sub-step3-aside -->
+
+            </div><!-- /.sub-step3-layout -->
         </div>
 
         <!-- ══ Step 4: Success ════════════════════════════════════════ -->
@@ -792,32 +829,73 @@ $apiBase = '/api/' . $site;
         display: block;
     }
 
-    /* ── Payment summary ────────────────────────────────────────── */
-    .sub-payment-summary {
-        background: var(--sub-bg-alt);
-        border: 1px solid var(--sub-border);
-        border-radius: 10px;
-        padding: 1rem 1.25rem;
-        margin-bottom: 1.25rem;
+    /* ── Step 3 two-column layout ───────────────────────────────── */
+    .sub-step3-layout {
+        display: grid;
+        grid-template-columns: 1fr 280px;
+        gap: 2rem;
+        align-items: start;
     }
 
+    .sub-step3-aside {
+        position: sticky;
+        top: 1rem;
+    }
+
+    .sub-aside-card {
+        background: var(--sub-bg-alt);
+        border: 1px solid var(--sub-border);
+        border-radius: 14px;
+        padding: 1.25rem;
+    }
+
+    .sub-aside-heading {
+        font-size: .8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--sub-muted);
+        margin-bottom: .875rem;
+    }
+
+    .sub-aside-plan-name {
+        font-size: 1rem;
+        font-weight: 700;
+        color: var(--sub-text);
+        margin-bottom: .75rem;
+        padding-bottom: .75rem;
+        border-bottom: 1px solid var(--sub-border);
+    }
+
+    .sub-aside-guarantee {
+        display: flex;
+        align-items: center;
+        gap: .375rem;
+        font-size: .75rem;
+        color: var(--sub-muted);
+        margin-top: .875rem;
+        padding-top: .875rem;
+        border-top: 1px solid var(--sub-border);
+    }
+
+    /* ── Payment summary rows (shared between sidebar and inline) ── */
     .sub-summary-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: .375rem 0;
-        font-size: .9rem;
+        padding: .3rem 0;
+        font-size: .875rem;
         color: var(--sub-text);
     }
 
     .sub-summary-divider {
         height: 1px;
         background: var(--sub-border);
-        margin: .25rem 0;
+        margin: .375rem 0;
     }
 
     .sub-summary-total {
-        font-size: 1rem;
+        font-size: .9375rem;
         font-weight: 700;
         color: var(--sub-primary);
     }
@@ -958,8 +1036,14 @@ $apiBase = '/api/' . $site;
         }
 
         .sub-plans,
-        #sub-payment-method-selector.payment-methods {
+        #sub-payment-method-selector.payment-methods,
+        .sub-step3-layout {
             grid-template-columns: 1fr;
+        }
+
+        .sub-step3-aside {
+            position: static;
+            order: -1; /* show summary above payment form on mobile */
         }
 
         .sub-form-row {
@@ -1046,13 +1130,9 @@ $apiBase = '/api/' . $site;
          * can measure the element's dimensions correctly.
          */
         function subMountCard() {
-            alert('mike100')
             if (subCardMounted || !subCardElement) return;
             const el = document.getElementById('card-element');
             if (!el) return;
-
-            alert('here66')
-
             subCardElement.mount('#card-element');
             subCardElement.on('change', function (e) {
                 const err = document.getElementById('card-errors');
@@ -1114,7 +1194,6 @@ $apiBase = '/api/' . $site;
             if (activeProg) activeProg.classList.add('active');
 
             if (step === 3) {
-                alert('here9')
                 setTimeout(subMountCard, 50);
                 subUpdatePaymentSummary();
                 // saved-cards.js loadSavedCards() reads window.isLoggedIn / window.currentMember
@@ -1134,6 +1213,7 @@ $apiBase = '/api/' . $site;
                 currency: planEl.dataset.planCurrency,
                 period: planEl.dataset.planPeriod,
                 trial: parseInt(planEl.dataset.planTrial, 10) || 0,
+                deliveryType: planEl.dataset.planDeliveryType, // 'digital' | 'printed'
             };
             // Keep globals in sync so cart-utils voucher helpers work correctly
             window.PLAN_CURRENCY = subSelectedPlan.currency;
@@ -1175,13 +1255,29 @@ $apiBase = '/api/' . $site;
          * payment-method-selector.js calls window.onPaymentMethodChange(method)
          * whenever the user picks a different payment method. We implement
          * that hook here to toggle the card / PayPal sections.
+         *
+         * When switching back to "card", we must re-show the saved cards section
+         * (if cards were already loaded) rather than always defaulting to the new
+         * card form. saved-cards.js displaySavedCards() handles the show/hide
+         * logic — if window.savedCards is populated it reveals the list and hides
+         * #new-card-section; otherwise we fall through to the card form.
          */
         window.onPaymentMethodChange = function (method) {
             var cardSection = document.getElementById('sub-card-payment-section');
             var paypalSection = document.getElementById('sub-paypal-payment-section');
             if (cardSection) cardSection.style.display = method === 'card' ? 'block' : 'none';
             if (paypalSection) paypalSection.style.display = method === 'paypal' ? 'block' : 'none';
-            if (method === 'card') subMountCard();
+
+            if (method === 'card') {
+                // Re-display saved cards if we already fetched them; otherwise mount
+                // the Stripe card element so the user can enter a new card.
+                if (window.savedCards && window.savedCards.length > 0
+                    && typeof window.displaySavedCards === 'function') {
+                    window.displaySavedCards();
+                } else {
+                    subMountCard();
+                }
+            }
         };
 
         /* ── Auth: register ─────────────────────────────────────────── */
@@ -1285,8 +1381,12 @@ $apiBase = '/api/' . $site;
             }
             consentBlock?.classList.remove('consent-error');
 
+            if (!subSelectedPlan) {
+                subShowCardError('No plan selected. Please go back and choose a plan.');
+                return;
+            }
+
             var data = {
-                subscription_plan_id: subSelectedPlan?.id,
                 isOneTimeSubscription: true,
                 global_renewal_consent: '1',
             };
@@ -1301,6 +1401,30 @@ $apiBase = '/api/' . $site;
 
             subSetLoading(true);
             try {
+                // 0. Add the selected plan to the cart so the checkout service
+                //    can read it via CartService::getItems(). The modal bypasses
+                //    the normal add-to-cart flow, so we do it here, right before
+                //    the checkout call.
+                //
+                //    We capture the returned cart item ID so we can issue a
+                //    DELETE /api/{site}/cart/{id} rollback if the checkout or
+                //    Stripe step fails, leaving the cart clean for a retry.
+                var cartRes = await fetch(window.API_BASE + '/cart/subscription', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        plan_id: subSelectedPlan.id,
+                        delivery_type: subSelectedPlan.deliveryType,
+                    }),
+                });
+                var cartResult = await cartRes.json();
+                if (!cartResult.success) {
+                    subShowCardError(cartResult.message || 'Could not add plan to cart. Please try again.');
+                    return;
+                }
+                // Cart item ID for rollback — adapt the key if your response shape differs.
+                var cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
+
                 // 1. Create checkout intent
                 var res = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
                     method: 'POST',
@@ -1310,6 +1434,14 @@ $apiBase = '/api/' . $site;
                 var result = await res.json();
 
                 if (!result.success) {
+                    // Roll back the cart item we just added so we don't leave
+                    // a stale item behind on failure.
+                    if (cartItemId) {
+                        await fetch(window.API_BASE + '/cart/' + cartItemId, {
+                            method: 'DELETE',
+                        }).catch(() => {
+                        });
+                    }
                     subShowCardError(result.message || 'Checkout failed. Please try again.');
                     return;
                 }
@@ -1344,6 +1476,15 @@ $apiBase = '/api/' . $site;
                 var paymentIntent = paymentResult.paymentIntent;
 
                 if (error) {
+                    // Stripe declined the card — the checkout service already
+                    // rolled back the subscriptions and order in handlePaymentFailure(),
+                    // but the cart item was added by us and must be cleaned up here.
+                    if (cartItemId) {
+                        await fetch(window.API_BASE + '/cart/' + cartItemId, {
+                            method: 'DELETE',
+                        }).catch(() => {
+                        });
+                    }
                     subShowCardError(error.message);
                     return;
                 }
