@@ -188,51 +188,45 @@ class SimpleTemplateEngine implements ViewEngineInterface
     private function compileIncludes(string $template, array $data = []): string
     {
         return preg_replace_callback(
-        // Match: @include('file', [optional variables])
-            '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[.*?\]))?\s*\)/s',
+        // The regex now uses a recursive subpattern (?R) or a balanced bracket matcher
+            '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[(?:[^[\]]|(?2))*\]))?\s*\)/s',
             function ($matches) use ($data) {
                 $view = $matches[1];
-
                 $file = $this->findTemplate($view);
 
                 if (!$file) {
-                    return "<!-- include not found: {$view} -->";
+                    return "";
                 }
 
                 $contents = file_get_contents($file);
 
                 if (!empty($matches[2])) {
-                    // With parameters: Pre-compile EVERYTHING including nested directives
                     $arrayExpression = $matches[2];
 
-                    // Fully compile the template (all directives)
+                    // ... keep your existing compilation and base64 logic ...
                     $compiled = $this->compileJsonDirective($contents);
                     $compiled = $this->compilePrintStatements($compiled);
                     $compiled = $this->compileConditionals($compiled);
                     $compiled = $this->compileLoops($compiled);
-                    $compiled = $this->compileIncludes($compiled, $data); // Recursively compile nested includes
+                    $compiled = $this->compileIncludes($compiled, $data);
                     $compiled = $this->compileAssets($compiled);
                     $compiled = str_replace('@csrf', '<?php echo csrf_field(); ?>', $compiled);
                     $compiled = preg_replace('/@method\([\'"](.+?)[\'"]\)/', '<?php echo method_field(\'$1\'); ?>', $compiled);
                     $compiled = $this->compileSections($compiled);
                     $compiled = $this->compileExtends($compiled, $data);
 
-                    // Use base64 encoding to safely embed the compiled template
                     $encodedCompiled = base64_encode($compiled);
 
                     return "<?php 
-                    \$__extraVars = {$arrayExpression};
-                    \$__includeData = array_merge(get_defined_vars(), \$__extraVars);
-                    unset(\$__includeData['__extraVars'], \$__includeData['__includeData']);
-                    extract(\$__includeData, EXTR_OVERWRITE);
-                    eval('?>' . base64_decode('{$encodedCompiled}'));
-                ?>";
+                \$__extraVars = {$arrayExpression};
+                \$__includeData = array_merge(get_defined_vars(), \$__extraVars);
+                unset(\$__includeData['__extraVars'], \$__includeData['__includeData']);
+                extract(\$__includeData, EXTR_OVERWRITE);
+                eval('?>' . base64_decode('{$encodedCompiled}'));
+            ?>";
                 }
 
-                // No extra variables - compile inline as before
-                $compiled = $this->compileTemplate($contents, $data);
-                return $compiled;
-
+                return $this->compileTemplate($contents, $data);
             },
             $template
         );

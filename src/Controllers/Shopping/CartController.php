@@ -370,7 +370,7 @@ class CartController extends Controller
             return $this->errorResponse('Authentication required', 401);
         }
 
-        $items = $this->cartService->getItems();
+        $items = $this->cartService->getItems(); //todo need to do something here because if im not logged in i add items to the cart (it will add it with session id not member id), then when i get to the step smove it will log me in. Once the cart service has a member it will lookup the cart items by member id but the cart items still do not have a member id and only the session id this also happens in the checkout service so its not possible to just move the logic here
         if (!$items) {
             return $this->errorResponse('No items in cart', 400);
         }

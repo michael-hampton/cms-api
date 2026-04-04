@@ -133,13 +133,13 @@ $groupIndex = 0;
     ?>
 
     <div class="cs-merchant-group">
-        @include('components/merchant-group-header', [
+        @include('checkout/components/merchant-group-header', [
         'name' => $merchantData['name'],
-        'initials' => CartViewHelpers::merchantInitials($merchantData['name']),
-        'itemCount' => count($merchantData['items']),
-        'subtotal' => $merchantData['subtotal'],
-        'currency' => $currency,
         'show' => $groupCount > 1 || $merchantId !== 0,
+        'currency' => $currency,
+        'subtotal' => $merchantData['subtotal'],
+        'itemCount' => count($merchantData['items']),
+        'initials' => CartViewHelpers::merchantInitials($merchantData['name']),
         ])
 
         <?php foreach ($merchantData['items'] as $item):

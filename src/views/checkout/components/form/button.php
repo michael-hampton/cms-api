@@ -15,7 +15,7 @@ $label = $label ?? '';
 $variant = $variant ?? 'primary';
 $btnId = $id ?? null;
 $type = $type ?? 'button';
-$onClick = $onClick ?? '';
+$onClick = $onclick ?? '';
 $disabled = $disabled ?? false;
 $style = $style ?? '';
 $class = $class ?? '';
@@ -24,7 +24,7 @@ $class = $class ?? '';
         type="<?= htmlspecialchars($type) ?>"
         class="btn btn-<?= htmlspecialchars($variant) ?> <?= htmlspecialchars($class) ?>"
         <?= $btnId ? 'id="' . htmlspecialchars($btnId) . '"' : '' ?>
-        <?= $onClick ? 'onclick="' . htmlspecialchars($onClick) . '"' : '' ?>
+        <?= $onClick ? 'onclick="' . $onClick . '"' : '' ?>
         <?= $disabled ? 'disabled' : '' ?>
         <?= $style ? 'style="' . htmlspecialchars($style) . '"' : '' ?>
 >

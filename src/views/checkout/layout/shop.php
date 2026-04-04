@@ -1,3 +1,5 @@
+@yield('logic')
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -370,23 +372,24 @@
                 font-size: 1.5rem;
             }
         }
-
-        <?= $additionalStyles ?? '' ?>
     </style>
+
+    @yield('styles')
+
     <?php if (!empty($headAssets)): ?>
         <?= $headAssets ?>
     <?php endif; ?>
 </head>
 <body>
 
-@include('components/layout/site-header', [
+@include('checkout/layout/site-header', [
 'activeNav' => $activeNav ?? '',
 'cartCount' => $count ?? 0,
 'wishlistCount'=> $wishlistCount ?? 0,
 ])
 
 <?php if (!empty($pageTitle) && !empty($breadcrumbs)): ?>
-    @include('components/layout/page-header', [
+    @include('checkout/layout/page-header', [
     'title'       => $pageTitle,
     'breadcrumbs' => $breadcrumbs,
     ])
@@ -402,26 +405,5 @@
 
 @yield('scripts')
 
-<script>
-    function showToast(message, type = 'success') {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = `toast ${type} show`;
-        setTimeout(() => toast.classList.remove('show'), 3000);
-    }
-
-    function formatCurrency(amount, symbol = '$') {
-        return symbol + parseFloat(amount).toFixed(2);
-    }
-
-    function showAlert(message, type = 'success') {
-        const html = `<div class="alert alert-${type}">${message}</div>`;
-        document.getElementById('alert-container').innerHTML = html;
-        window.scrollTo({top: 0, behavior: 'smooth'});
-        setTimeout(() => {
-            document.getElementById('alert-container').innerHTML = '';
-        }, 5000);
-    }
-</script>
 </body>
 </html>
