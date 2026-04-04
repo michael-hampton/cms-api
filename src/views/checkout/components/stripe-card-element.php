@@ -2,30 +2,33 @@
 /**
  * Stripe card element component.
  *
- * @var string|null $backBtnId Id for the "back to saved cards" button. Null hides it.
- * @var string|null $backBtnOnClick JS onclick for the back button.
+ * @var string|null $sectionId DOM id for the wrapper div. Defaults to 'new-card-section'.
+ * @var string|null $sectionTitle Heading text. Defaults to 'Card Details'.
+ * @var string|null $backBtnOnClick JS onclick for the back button. Defaults to 'showSavedCards()'.
+ * @var bool $showBackButton Whether to render the "Back to Saved Cards" button at all.
+ *                                   Defaults to true — the button is hidden via CSS until JS reveals it.
  */
-$backBtnId = $backBtnId ?? null;
+$sectionId = $sectionId ?? 'new-card-section';
+$sectionTitle = $sectionTitle ?? 'Card Details';
 $backBtnOnClick = $backBtnOnClick ?? 'showSavedCards()';
+$showBackButton = $showBackButton ?? true;
 ?>
 <style>
     #card-errors:not(:empty) {
-        margin-top: 0.5rem;
-        padding: 0.75rem 1rem;
+        margin-top: .5rem;
+        padding: .75rem 1rem;
         background: #fee2e2;
         border: 1px solid #ef4444;
-        border-radius: 0.375rem;
+        border-radius: .375rem;
         color: #991b1b;
-        font-size: 0.875rem;
+        font-size: .875rem;
     }
-
     .section-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         margin-bottom: 1rem;
     }
-
     .section-header .section-title {
         margin-bottom: 0;
         padding-bottom: 0;
@@ -33,15 +36,15 @@ $backBtnOnClick = $backBtnOnClick ?? 'showSavedCards()';
     }
 </style>
 
-<div class="form-section" id="<?= htmlspecialchars($sectionId ?? 'new-card-section') ?>">
+<div class="form-section" id="<?= htmlspecialchars($sectionId) ?>">
     <div class="section-header">
-        <h2 class="section-title"><?= htmlspecialchars($sectionTitle ?? 'Card Details') ?></h2>
-        <?php if ($backBtnId): ?>
+        <h2 class="section-title"><?= htmlspecialchars($sectionTitle) ?></h2>
+        <?php if ($showBackButton): ?>
             <button type="button"
-                    id="<?= htmlspecialchars($backBtnId) ?>"
+                    id="back-to-saved-cards-btn"
                     onclick="<?= htmlspecialchars($backBtnOnClick) ?>"
                     class="btn btn-secondary"
-                    style="display: none; width: auto; padding: 0.5rem 1rem;">
+                    style="display: none; width: auto; padding: .5rem 1rem;">
                 ← Back to Saved Cards
             </button>
         <?php endif; ?>
@@ -51,7 +54,7 @@ $backBtnOnClick = $backBtnOnClick ?? 'showSavedCards()';
             Card Information <span class="required">*</span>
         </label>
         <div id="card-element"
-             style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.5rem;">
+             style="padding: .75rem; border: 1px solid var(--border-color); border-radius: .5rem;">
         </div>
         <div id="card-errors" class="form-error" role="alert" aria-live="polite"></div>
     </div>

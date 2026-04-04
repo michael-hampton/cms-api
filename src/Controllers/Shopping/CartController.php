@@ -230,6 +230,7 @@ class CartController extends Controller
             return array_merge($item, [
                 'estimated_delivery' => $estimate->formattedRange(),
                 'trial_days' => $trialDays,
+                'product_name' => $product->name
             ]);
         }, $items);
 

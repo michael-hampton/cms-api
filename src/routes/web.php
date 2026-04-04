@@ -209,6 +209,7 @@ $router->get('/sites', ContentController::class, 'sites');
 $router->get('/member/register', [MemberAuthController::class, 'showRegisterForm']);
 $router->get('/{siteName}/member/register', [MemberAuthController::class, 'showRegisterForm']);
 $router->get('/{siteName}/member/login', [MemberAuthController::class, 'showLoginForm']);
+$router->get('/member/login', [MemberAuthController::class, 'showLoginForm']);
 $router->post('/member/logout', [MemberAuthController::class, 'logout']);
 
 $router->get('/api/{siteName}/pages/search', [PageController::class, 'searchPages']);

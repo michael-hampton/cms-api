@@ -1,3 +1,30 @@
+<?php
+/**
+ * PressStack account layout.
+ *
+ * Requires authentication — redirects to the member login page if the visitor
+ * is not logged in.  Uses the same MemberAuth guard as the rest of the app.
+ */
+
+use App\Framework\Authorization\MemberAuth;
+use App\Framework\Support\SiteContext;
+
+// Guard — must be the very first thing before any HTML output.
+if (!MemberAuth::check()) {
+    $site = SiteContext::slug();
+    $currentPath = $_SERVER['REQUEST_URI'] ?? ('/' . $site . '/account');
+    $loginUrl = '/' . $site . '/member/login?redirect=' . urlencode($currentPath);
+    header('Location: ' . $loginUrl, true, 302);
+    exit;
+}
+
+// Ensure $member is always available in the layout and child views.
+// Controllers should pass it, but fall back to the auth guard as a safety net.
+if (!isset($member)) {
+    $member = MemberAuth::getMember();
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

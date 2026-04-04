@@ -4,13 +4,10 @@
  * Subscription checkout page.
  *
  * Expected view data:
- *   object      $plan             — SubscriptionPlan model
- *   object      $member           — authenticated member
- *   bool        $requiresShipping — whether a shipping address is needed
- *   bool        $isSubscription   — always true for this view
- *
- * The page reuses the shared checkout layout, components, and JS patterns
- * from checkout/index.php instead of duplicating them inline.
+ *   object $plan             — SubscriptionPlan model
+ *   object $member           — authenticated member
+ *   bool   $requiresShipping — whether a shipping address is needed
+ *   bool   $isSubscription   — always true for this view
  */
 
 use App\Framework\Support\SiteContext;
@@ -40,10 +37,9 @@ $planPrice = (float)$plan->price;
         gap: 2rem;
         margin-bottom: 3rem;
     }
-
     .checkout-form {
         background: white;
-        border-radius: 0.75rem;
+        border-radius: .75rem;
         padding: 2rem;
         box-shadow: var(--shadow);
     }
@@ -60,29 +56,29 @@ $planPrice = (float)$plan->price;
         font-size: 1.25rem;
         font-weight: 600;
         margin-bottom: 1rem;
-        padding-bottom: 0.75rem;
+        padding-bottom: .75rem;
         border-bottom: 2px solid var(--border-color);
     }
 
-    .form-input, .form-select, .form-textarea {
+    .form-input, .form-select {
         width: 100%;
-        padding: 0.75rem;
+        padding: .75rem;
         border: 1px solid var(--border-color);
-        border-radius: 0.5rem;
+        border-radius: .5rem;
         font-size: 1rem;
-        transition: border-color 0.2s;
+        transition: border-color .2s;
     }
 
     .form-input:focus, .form-select:focus {
         outline: none;
         border-color: var(--primary-color);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, .1);
     }
 
-    /* ── Plan summary card (right column header) ────────────────── */
+    /* ── Plan hero ────────────────────────────────────────────────── */
     .plan-hero {
         background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #3b82f6 100%);
-        border-radius: 0.75rem 0.75rem 0 0;
+        border-radius: .75rem .75rem 0 0;
         padding: 1.5rem;
         color: white;
         text-align: center;
@@ -118,11 +114,11 @@ $planPrice = (float)$plan->price;
         opacity: .8;
     }
 
-    /* Pre-release notice */
+    /* ── Pre-release ──────────────────────────────────────────────── */
     .prerelease-notice {
         background: #fef3c7;
         border: 2px solid #f59e0b;
-        border-radius: 0.5rem;
+        border-radius: .5rem;
         padding: 1.25rem;
         margin-bottom: 1.5rem;
     }
@@ -182,95 +178,53 @@ $planPrice = (float)$plan->price;
 @endsection
 
 @section('content')
-
 <div id="alert-container"></div>
 
 <div class="checkout-layout">
 
-    <!-- ── Left: form ──────────────────────────────────────────── -->
+    <!-- ── Left: form ──────────────────────────────────────────────── -->
     <div class="checkout-form">
         <form id="subscription-form">
             <input type="hidden" name="subscription_plan_id" value="<?= (int)$plan->id ?>">
 
-            <?php /* Contact details — member may already be filled in */ ?>
+            <!-- Contact -->
             <div class="form-section">
                 <h2 class="section-title">Contact Information</h2>
                 <div class="form-row">
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'first_name',
-                    'label' => 'First Name',
-                    'required' => true,
-                    'value' => $member?->first_name ?? '',
-                    ])
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'last_name',
-                    'label' => 'Last Name',
-                    'required' => true,
-                    'value' => $member?->last_name ?? '',
-                    ])
+                    @include('checkout/components/form/form-group', ['name' => 'first_name', 'label' => 'First Name',
+                    'required' => true, 'value' => $member?->first_name ?? ''])
+                    @include('checkout/components/form/form-group', ['name' => 'last_name', 'label' => 'Last Name',
+                    'required' => true, 'value' => $member?->last_name ?? ''])
                 </div>
                 <div class="form-row">
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'email',
-                    'label' => 'Email',
-                    'type' => 'email',
-                    'required' => true,
-                    'value' => $member?->email ?? '',
-                    ])
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'phone',
-                    'label' => 'Phone',
-                    'type' => 'tel',
-                    ])
+                    @include('checkout/components/form/form-group', ['name' => 'email', 'label' => 'Email', 'type' =>
+                    'email', 'required' => true, 'value' => $member?->email ?? ''])
+                    @include('checkout/components/form/form-group', ['name' => 'phone', 'label' => 'Phone', 'type' =>
+                    'tel'])
                 </div>
             </div>
 
             <?php if ($requiresShipping): ?>
                 <div class="form-section">
                     <h2 class="section-title">Shipping Address</h2>
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'address',
-                    'label' => 'Address',
-                    'required' => true,
-                    'class' => 'full-width',
-                    ])
-                    @include('checkout/components/form/form-group', [
-                    'name' => 'address2',
-                    'label' => 'Apartment, suite, etc. (optional)',
-                    'class' => 'full-width',
-                    ])
+                    @include('checkout/components/form/form-group', ['name' => 'address', 'label' => 'Address',
+                    'required' => true, 'class' => 'full-width'])
+                    @include('checkout/components/form/form-group', ['name' => 'address2', 'label' => 'Apartment, suite,
+                    etc. (optional)', 'class' => 'full-width'])
                     <div class="form-row">
-                        @include('checkout/components/form/form-group', [
-                        'name' => 'city',
-                        'label' => 'City',
-                        'required' => true,
-                        ])
-                        @include('checkout/components/form/form-group', [
-                        'name' => 'state',
-                        'label' => 'State / Province',
-                        ])
+                        @include('checkout/components/form/form-group', ['name' => 'city', 'label' => 'City', 'required'
+                        => true])
+                        @include('checkout/components/form/form-group', ['name' => 'state', 'label' => 'State /
+                        Province'])
                     </div>
                     <div class="form-row">
-                        @include('checkout/components/form/form-group', [
-                        'name' => 'postal_code',
-                        'label' => 'Postal Code',
-                        'required' => true,
-                        ])
+                        @include('checkout/components/form/form-group', ['name' => 'postal_code', 'label' => 'Postal
+                        Code', 'required' => true])
                         @include('checkout/components/form/select', [
-                        'name' => 'country',
-                        'id' => 'country-select',
-                        'label' => 'Country',
-                        'required' => true,
-                        'blank' => true,
-                        'blankLabel' => 'Select Country',
-                        'options' => [
-                        'US' => 'United States',
-                        'CA' => 'Canada',
-                        'GB' => 'United Kingdom',
-                        'AU' => 'Australia',
-                        'DE' => 'Germany',
-                        'FR' => 'France',
-                        ],
+                        'name' => 'country', 'id' => 'country-select', 'label' => 'Country',
+                        'required' => true, 'blank' => true, 'blankLabel' => 'Select Country',
+                        'options' => ['US' => 'United States', 'CA' => 'Canada', 'GB' => 'United Kingdom', 'AU' =>
+                        'Australia', 'DE' => 'Germany', 'FR' => 'France'],
                         'selected' => $member?->country ?? '',
                         'onChange' => 'handleCountryChange(this.value)',
                         ])
@@ -278,7 +232,6 @@ $planPrice = (float)$plan->price;
                 </div>
             <?php endif; ?>
 
-            <?php /* Pre-release notice & acceptance */ ?>
             <?php if ($isPreRelease): ?>
                 <div class="prerelease-notice">
                     <h4>⚠️ Pre-Release Subscription</h4>
@@ -293,25 +246,25 @@ $planPrice = (float)$plan->price;
                         @include('checkout/components/form/checkbox-control', [
                         'name' => 'accept_pre_release',
                         'id' => 'accept-pre-release',
-                        'label' => 'I understand this is a pre-release subscription and access begins on <strong>' .
-                            $plan->release_date->format('F j, Y') . '</strong>.',
                         'required' => true,
+                        'label' => 'I understand this is a pre-release subscription and access begins on <strong>'
+                            . $plan->release_date->format('F j, Y') . '</strong>.',
                         ])
                     </div>
                 </div>
             <?php endif; ?>
 
-            <?php /* Payment */ ?>
+            <!-- Saved cards (populated by saved-cards.js) -->
             @include('checkout/components/saved-cards')
 
             <div id="payment-request-button"></div>
 
+            <!-- New card form (shown by default if no saved cards) -->
             @include('checkout/components/stripe-card-element', [
             'sectionTitle' => 'Card Details',
-            'showBackButton' => false,
+            'showBackButton' => true,
             ])
 
-            <?php /* Auto-renewal consent */ ?>
             @include('checkout/components/auto-renewal-consent', [
             'showGlobal' => true,
             'showUs' => false,
@@ -319,10 +272,9 @@ $planPrice = (float)$plan->price;
         </form>
     </div>
 
-    <!-- ── Right: plan summary ─────────────────────────────────── -->
+    <!-- ── Right: plan summary ─────────────────────────────────────── -->
     <div style="height:fit-content;position:sticky;top:100px;">
 
-        <!-- Plan hero -->
         <div style="background:white;border-radius:.75rem;box-shadow:var(--shadow);overflow:hidden;margin-bottom:1rem;">
             <div class="plan-hero">
                 <div class="plan-hero-name"><?= htmlspecialchars($plan->name) ?></div>
@@ -372,7 +324,6 @@ $planPrice = (float)$plan->price;
                     </div>
                 <?php endif; ?>
 
-                <!-- Price breakdown -->
                 <div style="padding-top:1rem;border-top:1px solid var(--border-color);">
                     <div class="summary-row">
                         <span>Plan price</span>
@@ -380,13 +331,11 @@ $planPrice = (float)$plan->price;
                     </div>
                     <?php if ($trialDays > 0): ?>
                         <div class="summary-row" style="color:var(--success-color);">
-                            <span>Today's charge</span>
-                            <span>FREE</span>
+                            <span>Today's charge</span><span>FREE</span>
                         </div>
                     <?php endif; ?>
                     <div id="discount-row" style="display:none;color:var(--success-color);" class="summary-row">
-                        <span>Discount:</span>
-                        <span id="discount-amount"></span>
+                        <span>Discount:</span><span id="discount-amount"></span>
                     </div>
                     <div class="summary-row total">
                         <span>Total today</span>
@@ -398,27 +347,24 @@ $planPrice = (float)$plan->price;
             </div>
         </div>
 
-        <!-- Voucher -->
         @include('checkout/components/voucher-section', [
         'currency' => $plan->currency ?? '$',
         'applyOnClick' => 'applyVoucher()',
         'removeOnClick' => 'removeVoucher()',
         ])
 
-        <!-- Place order button -->
         @include('checkout/components/form/button', [
         'id' => 'subscribe-btn',
         'label' => $trialDays > 0 ? "Start {$trialDays}-Day Free Trial" : 'Subscribe Now',
         'variant' => 'primary',
         'style' => 'margin-top:1rem;',
-        'type' => 'button'
+        'type' => 'button',
         ])
 
         @include('checkout/components/security-badge')
     </div>
 
 </div>
-
 @endsection
 
 @section('scripts')
@@ -428,6 +374,7 @@ $planPrice = (float)$plan->price;
 ])
 
 <script>
+    // ── Global constants required by shared JS files ──────────────────────
     const API_BASE = <?= json_encode($apiBase) ?>;
     const PLAN_CURRENCY = <?= json_encode($plan->currency ?? '$') ?>;
     const TAX_RATE = 0;
@@ -435,19 +382,22 @@ $planPrice = (float)$plan->price;
     const INITIAL_SHIPPING = 0;
     const STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
     const SITE = <?= json_encode($site) ?>;
-    const REQUIRES_SHIPPING = <?= json_encode($requiresShipping) ?>;
-    const HAS_TRIAL = <?= json_encode($trialDays > 0) ?>;
 
+    // isLoggedIn / currentMember — needed by saved-cards.js
+    window.isLoggedIn = true;   // subscription page requires auth
+    window.currentMember = <?= json_encode(['id' => $member->id, 'email' => $member->email]) ?>;
     window.appliedVoucher = null;
 </script>
 
 @js('cart-utils.js')
+@js('saved-cards.js')
 
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
-    let stripe = null, elements = null, cardElement = null;
-    let selectedCardId = null;
+    let stripe = null;
+    let elements = null;
+    let cardElement = null;
     let clientSecret = null;
     let subscriptionId = null;
     let orderId = null;
@@ -486,68 +436,7 @@ $planPrice = (float)$plan->price;
         }
     }
 
-    // ── Saved cards ───────────────────────────────────────────────────────
-    async function loadSavedCards() {
-        try {
-            const res = await fetch(`${API_BASE}/member/payment-methods`);
-            const data = await res.json();
-            if (data.success && data.data?.payment_methods?.length) {
-                displaySavedCards(data.data.payment_methods);
-            }
-        } catch (e) { /* non-critical */
-        }
-    }
-
-    function displaySavedCards(cards) {
-        const list = document.getElementById('saved-cards-list');
-        const section = document.getElementById('saved-cards-section');
-        const newCard = document.getElementById('new-card-section');
-        if (!list || !section) return;
-
-        list.innerHTML = cards.map(card => `
-        <label class="saved-card" for="card-${card.id}">
-          <input type="radio" name="saved_card" value="${card.id}" id="card-${card.id}"
-                 onchange="selectSavedCard('${card.id}')">
-          <div class="card-details">
-            <div class="card-brand">${card.card.brand}</div>
-            <div class="card-number">•••• •••• •••• ${card.card.last4}</div>
-            <div class="card-expiry">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
-          </div>
-        </label>`).join('');
-
-        section.style.display = 'block';
-        if (newCard) newCard.style.display = 'none';
-    }
-
-    function selectSavedCard(id) {
-        selectedCardId = id;
-        document.querySelectorAll('.saved-card').forEach(c => c.classList.remove('selected'));
-        document.getElementById(`card-${id}`)?.closest('.saved-card')?.classList.add('selected');
-    }
-
-    function showNewCardForm() {
-        selectedCardId = null;
-        const section = document.getElementById('saved-cards-section');
-        const newCard = document.getElementById('new-card-section');
-        const back = document.getElementById('back-to-saved-cards-btn');
-        if (section) section.style.display = 'none';
-        if (newCard) newCard.style.display = 'block';
-        if (back) back.style.display = 'block';
-        document.querySelectorAll('[name="saved_card"]').forEach(r => r.checked = false);
-    }
-
-    function showSavedCards() {
-        selectedCardId = null;
-        const section = document.getElementById('saved-cards-section');
-        const newCard = document.getElementById('new-card-section');
-        const back = document.getElementById('back-to-saved-cards-btn');
-        if (section) section.style.display = 'block';
-        if (newCard) newCard.style.display = 'none';
-        if (back) back.style.display = 'none';
-        document.querySelectorAll('[name="saved_card"]').forEach(r => r.checked = false);
-    }
-
-    // ── Place order ───────────────────────────────────────────────────────
+    // ── Processing state ──────────────────────────────────────────────────
     function setProcessing(on) {
         const btn = document.getElementById('subscribe-btn');
         const overlay = document.getElementById('loading-overlay');
@@ -563,22 +452,20 @@ $planPrice = (float)$plan->price;
         }
     }
 
+    // ── Place order ───────────────────────────────────────────────────────
     document.getElementById('subscribe-btn').addEventListener('click', async () => {
-        const form = document.getElementById('subscription-form');
-        const data = Object.fromEntries(new FormData(form));
+        const data = Object.fromEntries(new FormData(document.getElementById('subscription-form')));
 
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         document.getElementById('alert-container').innerHTML = '';
         document.getElementById('card-errors').textContent = '';
 
-        // Pre-release
         const acceptEl = document.getElementById('accept-pre-release');
         if (acceptEl && !acceptEl.checked) {
             showAlert('You must accept the pre-release terms to continue.', 'error');
             return;
         }
 
-        // Global renewal consent
         const globalCb = document.getElementById('global-renewal-consent');
         const globalBlock = document.getElementById('global-renewal-consent-block');
         if (globalCb && !globalCb.checked) {
@@ -590,9 +477,8 @@ $planPrice = (float)$plan->price;
         globalBlock?.classList.remove('consent-error');
         data.global_renewal_consent = '1';
 
-        // US consent
         const usBlock = document.getElementById('us-renewal-consent-block');
-        if (usBlock && usBlock?.style.display !== 'none') {
+        if (usBlock?.style.display !== 'none') {
             const usCb = document.getElementById('us-renewal-consent');
             if (usCb && !usCb.checked) {
                 usBlock.classList.add('consent-error');
@@ -609,7 +495,6 @@ $planPrice = (float)$plan->price;
             data.voucher_id = window.appliedVoucher.voucher_id;
             data.discount_amount = window.appliedVoucher.discount;
         }
-
         data.isOneTimeSubscription = true;
 
         setProcessing(true);
@@ -620,6 +505,7 @@ $planPrice = (float)$plan->price;
         }
     });
 
+    // ── Checkout flow ─────────────────────────────────────────────────────
     async function processSubscription(data) {
         const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
             method: 'POST',
@@ -634,50 +520,39 @@ $planPrice = (float)$plan->price;
         }
 
         const contexts = result.data?.stripe_contexts;
-        clientSecret = contexts
-            ? contexts[Object.keys(contexts)[0]].client_secret
-            : (result.data?.client_secret ?? null);
-
+        clientSecret = contexts ? contexts[Object.keys(contexts)[0]].client_secret : (result.data?.client_secret ?? null);
         subscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
         orderId = result.data?.order_id ?? null;
 
-        const paymentResult = selectedCardId
-            ? await stripe.confirmCardPayment(clientSecret, {payment_method: selectedCardId})
+        const paymentResult = window.selectedCardId
+            ? await stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
             : await stripe.confirmCardPayment(clientSecret, {
                 payment_method: {
                     card: cardElement,
                     billing_details: {
                         name: `${data.first_name} ${data.last_name}`,
                         email: data.email,
-                        phone: data.phone ?? undefined,
+                        phone: data.phone ?? undefined
                     },
                 },
                 setup_future_usage: 'off_session',
             });
 
         const {error, paymentIntent} = paymentResult;
-
         if (error) {
             document.getElementById('card-errors').textContent = error.message;
             showAlert(error.message, 'error');
             return;
         }
-
-        if (paymentIntent.status === 'succeeded') {
-            await confirmPayment(paymentIntent.id);
-        }
+        if (paymentIntent.status === 'succeeded') await confirmPayment(paymentIntent.id);
     }
 
     async function confirmPayment(intentId) {
         const body = {payment_intent_id: intentId, order_id: orderId};
-        Array.isArray(subscriptionId)
-            ? (body.subscription_ids = subscriptionId)
-            : (body.subscription_id = subscriptionId);
+        Array.isArray(subscriptionId) ? (body.subscription_ids = subscriptionId) : (body.subscription_id = subscriptionId);
 
         const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(body),
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
         });
         const result = await res.json();
 
@@ -691,7 +566,7 @@ $planPrice = (float)$plan->price;
 
     // ── Init ──────────────────────────────────────────────────────────────
     initStripe();
-    loadSavedCards();
+    loadSavedCards();      // from saved-cards.js
 
     <?php if (($member?->country ?? '') === 'US'): ?>
     handleCountryChange('US');

@@ -3,9 +3,7 @@
  * Order summary items — merchant-grouped item rows.
  *
  * Deduplicates items that share the same product_id + variant_id (or
- * subscription_plan_id) by summing their quantities and subtotals.  This
- * prevents the same product appearing twice in the sidebar when the cart
- * contains offer or bundle rows for the same SKU.
+ * subscription_plan_id) by summing their quantities and subtotals.
  *
  * @var array $items Flat array of cart items.
  * @var string $currency Currency symbol (e.g. '£', '$'). Defaults to '£'.
@@ -19,11 +17,6 @@ $showMerchantHeader = $showMerchantHeader ?? true;
 $items = $items ?? [];
 
 // ── Deduplicate items ────────────────────────────────────────────────────────
-// Two rows are considered the same logical line when they share:
-//   - subscription_plan_id (for subscription rows), or
-//   - product_id + variant_id (for product rows)
-// When duplicates are found the first row's metadata is preserved and
-// quantities/subtotals are summed.
 $deduplicated = [];
 foreach ($items as $item) {
     if (!empty($item['subscription_plan_id'])) {
@@ -47,7 +40,6 @@ $groupIndex = 0;
 
 <?php foreach ($groups as $merchantId => $merchantData):
     $groupIndex++;
-
     $initials = CartViewHelpers::merchantInitials($merchantData['name']);
     $itemCount = count($merchantData['items']);
     ?>
@@ -65,8 +57,34 @@ $groupIndex = 0;
 
         <?php foreach ($merchantData['items'] as $item):
             $isFreeGift = CartViewHelpers::isFreeGift($item);
-            $productName = $item['product_name'] ?? ($item['name'] ?? 'Item');
-            $productImg = $item['product_image'] ?? null;
+
+            // ── Resolve display name ─────────────────────────────────────
+            // For subscriptions the canonical name lives in options.plan_name.
+            // Fall back to product_name then name then 'Item'.
+            $isSubscription = !empty($item['subscription_plan_id']);
+            $opts = $item['options'] ?? [];
+
+            if ($isSubscription && !empty($opts['plan_name'])) {
+                $productName = $opts['plan_name'];
+            } elseif (!empty($item['product_name'])) {
+                $productName = $item['product_name'];
+            } elseif (!empty($item['name'])) {
+                $productName = $item['name'];
+            } else {
+                $productName = 'Item';
+            }
+
+            // ── Resolve thumbnail ────────────────────────────────────────
+            // Subscription may store plan image in options.plan_image or
+            // directly on the plan object attached to the item.
+            if ($isSubscription) {
+                $productImg = $opts['plan_image']
+                        ?? $item['plan_image']
+                        ?? $item['product_image']
+                        ?? null;
+            } else {
+                $productImg = $item['product_image'] ?? null;
+            }
             ?>
 
             <div class="cs-item">
@@ -75,10 +93,19 @@ $groupIndex = 0;
                     <img src="<?= htmlspecialchars($productImg) ?>"
                          alt="<?= htmlspecialchars($productName) ?>"
                          class="cs-item-img">
+                <?php elseif ($isSubscription): ?>
+                    <!-- Subscription placeholder icon -->
+                    <div class="cs-item-img-placeholder" aria-hidden="true"
+                         style="background: linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+                        </svg>
+                    </div>
                 <?php else: ?>
                     <div class="cs-item-img-placeholder" aria-hidden="true">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                             stroke="currentColor" stroke-width="1.5">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="2"/>
                             <circle cx="8.5" cy="8.5" r="1.5"/>
                             <polyline points="21 15 16 10 5 21"/>
@@ -90,7 +117,16 @@ $groupIndex = 0;
                 <div class="cs-item-details">
                     <div class="cs-item-name"><?= htmlspecialchars($productName) ?></div>
 
-                    <?php if (!empty($item['variant_id']) && !empty($item['variant_options'])): ?>
+                    <?php if ($isSubscription && !empty($opts['delivery_type'])): ?>
+                        <div class="cs-item-meta" style="font-size:.7rem; color:var(--text-secondary);">
+                            <?= htmlspecialchars(ucfirst($opts['delivery_type'])) ?> delivery
+                            <?php if (!empty($opts['billing_period'])): ?>
+                                &bull; <?= htmlspecialchars($opts['billing_period']) ?>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!$isSubscription && !empty($item['variant_id']) && !empty($item['variant_options'])): ?>
                         <div class="cs-item-variant">
                             <?php
                             $parts = [];
@@ -118,9 +154,8 @@ $groupIndex = 0;
                         <div class="cs-item-delivery">📦 <?= htmlspecialchars($item['estimated_delivery']) ?></div>
                     <?php endif; ?>
 
-                    <?php if (!empty($item['options']['subscription_plan_id'])): ?>
-                        <input type="hidden" name="plan_id"
-                               value="<?= (int)$item['options']['subscription_plan_id'] ?>">
+                    <?php if ($isSubscription && !empty($item['subscription_plan_id'])): ?>
+                        <input type="hidden" name="plan_id" value="<?= (int)$item['subscription_plan_id'] ?>">
                     <?php endif; ?>
                 </div>
 

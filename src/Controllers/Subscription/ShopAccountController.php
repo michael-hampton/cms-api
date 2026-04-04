@@ -64,6 +64,10 @@ class ShopAccountController extends Controller
 
     public function subscriptions(Request $request): mixed
     {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
@@ -106,6 +110,10 @@ class ShopAccountController extends Controller
 
     public function orders(Request $request): mixed
     {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
         $member = MemberAuth::getMember();
         $page = max(1, (int)$request->input('page', 1));
         $perPage = 10;
@@ -135,6 +143,10 @@ class ShopAccountController extends Controller
 
     public function orderDetail(int $id, Request $request): mixed
     {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
         $member = MemberAuth::getMember();
         $order = $this->orderManager->findById($id);
 
@@ -155,6 +167,10 @@ class ShopAccountController extends Controller
 
     public function billing(Request $request): mixed
     {
+        if (!MemberAuth::check()) {
+            return $this->redirect('/member/login');
+        }
+
         $member = MemberAuth::getMember();
 
         return $this->view('subscriptions/account/billing', [
