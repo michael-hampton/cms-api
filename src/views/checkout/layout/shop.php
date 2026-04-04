@@ -344,19 +344,6 @@
             border-bottom: 2px solid var(--border-color);
         }
 
-        /* Security Badge */
-        .security-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 1rem;
-            background: var(--bg-light);
-            border-radius: 0.5rem;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
         .loading-content {
             background: white;
             padding: 2rem;

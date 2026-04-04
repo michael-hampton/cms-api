@@ -50,10 +50,11 @@ $useDifferentCardOnClick = $useDifferentCardOnClick ?? 'showNewCardForm()';
 <div class="form-section" id="<?= htmlspecialchars($sectionId) ?>" style="display: none;">
     <h2 class="section-title">Saved Payment Methods</h2>
     <div id="saved-cards-list"></div>
-    <button type="button"
-            onclick="<?= htmlspecialchars($useDifferentCardOnClick) ?>"
-            class="btn btn-secondary"
-            style="width: auto; padding: .5rem 1rem; margin-top: .5rem;">
-        Use Different Card
-    </button>
+    <?= $this->partial('checkout/components/form/button', [
+            'label' => 'Use Different Card',
+            'variant' => 'secondary',
+            'type' => 'button',
+            'onclick' => $useDifferentCardOnClick,
+            'style' => 'width: auto; padding: .5rem 1rem; margin-top: .5rem;',
+    ]) ?>
 </div>

@@ -187,6 +187,8 @@ class SimpleTemplateEngine implements ViewEngineInterface
 
     private function compileIncludes(string $template, array $data = []): string
     {
+        $pattern = '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[(?:[^[\]]|(?2))*\]))?\s*\)/s';
+
         return preg_replace_callback(
         // The regex now uses a recursive subpattern (?R) or a balanced bracket matcher
             '/@include\s*\(\s*[\'"](.*?)[\'"]\s*(?:,\s*(\[(?:[^[\]]|(?2))*\]))?\s*\)/s',

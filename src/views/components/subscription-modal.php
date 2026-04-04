@@ -1,6 +1,16 @@
 <?php
 // views/components/subscription-modal.php
 /**
+ * Subscription modal.
+ *
+ * Uses shared checkout components wherever possible:
+ *   - checkout/components/voucher-section        (voucher input + applied display)
+ *   - checkout/components/stripe-card-element    (Stripe card mount point)
+ *   - checkout/components/saved-cards            (saved payment methods list)
+ *   - checkout/components/auto-renewal-consent   (auto-renewal checkbox block)
+ *   - checkout/components/security-badge         (SSL badge)
+ *   - checkout/components/form/button            (all CTAs)
+ *
  * @var array $subscriptionModalData
  */
 if (!isset($subscriptionModalData) || (!$subscriptionModalData['show_modal'] && ($subscriptionModalData['is_direct'] ?? false) || false !== true)) {
@@ -10,8 +20,6 @@ if (!isset($subscriptionModalData) || (!$subscriptionModalData['show_modal'] && 
 $plans = $subscriptionModalData['plans'];
 $member = $subscriptionModalData['member'];
 $isLoggedIn = !empty($member);
-
-
 ?>
 
 <div id="subscriptionModal" class="sub-modal hide">
@@ -46,7 +54,7 @@ $isLoggedIn = !empty($member);
             </div>
         </div>
 
-        <!-- Step 1: Choose Plan -->
+        <!-- ══ Step 1: Choose Plan ══════════════════════════════════════ -->
         <div class="sub-step" id="step-1" style="display: block;">
             <div class="sub-header">
                 <h2 class="sub-title">Choose Your Plan</h2>
@@ -55,8 +63,10 @@ $isLoggedIn = !empty($member);
 
             <div class="sub-plans">
                 <?php foreach ($plans as $plan): ?>
-                    <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?>" data-plan-id="<?= $plan->id ?>"
+                    <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?>"
+                         data-plan-id="<?= $plan->id ?>"
                          data-plan-slug="<?= htmlspecialchars($plan->slug) ?>">
+
                         <?php if ($plan->is_featured): ?>
                             <div class="sub-plan-badge">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -104,16 +114,20 @@ $isLoggedIn = !empty($member);
                             </ul>
                         <?php endif; ?>
 
-                        <button class="sub-plan-btn"
-                                onclick="selectPlan('<?= htmlspecialchars($plan->slug) ?>', <?= $plan->id ?>)">
-                            Select Plan
-                        </button>
+                        <!-- Uses shared button component -->
+                        @include('checkout/components/form/button', [
+                        'label' => 'Select Plan',
+                        'variant' => 'primary',
+                        'type' => 'button',
+                        'class' => 'sub-plan-btn',
+                        'onclick' => "selectPlan('" . htmlspecialchars($plan->slug) . "', " . $plan->id . ")",
+                        ])
                     </div>
                 <?php endforeach; ?>
             </div>
         </div>
 
-        <!-- Step 2: Account (Register/Login) -->
+        <!-- ══ Step 2: Account (Register / Login) ═══════════════════════ -->
         <div class="sub-step" id="step-2" style="display: none;">
             <div class="sub-header">
                 <h2 class="sub-title">Create Your Account</h2>
@@ -138,36 +152,33 @@ $isLoggedIn = !empty($member);
                         <input type="text" name="last_name" class="sub-input" required>
                     </div>
                 </div>
-
                 <div class="sub-form-group">
                     <label class="sub-label">Email</label>
                     <input type="email" name="email" class="sub-input" required>
                 </div>
-
                 <div class="sub-form-group">
                     <label class="sub-label">Password</label>
                     <input type="password" name="password" class="sub-input" required minlength="8">
                     <span class="sub-hint">Minimum 8 characters</span>
                 </div>
-
                 <div class="sub-form-group">
                     <label class="sub-label">Confirm Password</label>
                     <input type="password" name="password_confirmation" class="sub-input" required>
                 </div>
-
                 <div class="sub-form-group">
                     <label class="sub-checkbox">
                         <input type="checkbox" name="terms" required>
-                        <span>I agree to the <a href="/terms" target="_blank">Terms</a> and <a href="/privacy"
-                                                                                               target="_blank">Privacy Policy</a></span>
+                        <span>I agree to the <a href="/terms" target="_blank">Terms</a> and
+                              <a href="/privacy" target="_blank">Privacy Policy</a></span>
                     </label>
                 </div>
-
                 <div class="sub-error" id="register-error"></div>
-
-                <button type="submit" class="sub-btn-primary">
-                    Create Account & Continue
-                </button>
+                @include('checkout/components/form/button', [
+                'label' => 'Create Account & Continue',
+                'variant' => 'primary',
+                'type' => 'submit',
+                'class' => 'sub-btn-primary',
+                ])
             </form>
 
             <!-- Login Form -->
@@ -177,38 +188,39 @@ $isLoggedIn = !empty($member);
                     <label class="sub-label">Email</label>
                     <input type="email" name="email" class="sub-input" required>
                 </div>
-
                 <div class="sub-form-group">
                     <label class="sub-label">Password</label>
                     <input type="password" name="password" class="sub-input" required>
                 </div>
-
                 <div class="sub-error" id="login-error"></div>
-
-                <button type="submit" class="sub-btn-primary">
-                    Sign In & Continue
-                </button>
-
+                @include('checkout/components/form/button', [
+                'label' => 'Sign In & Continue',
+                'variant' => 'primary',
+                'type' => 'submit',
+                'class' => 'sub-btn-primary',
+                ])
                 <div class="sub-form-footer">
                     <a href="/member/forgot-password" target="_blank">Forgot password?</a>
                 </div>
             </form>
 
-            <button class="sub-btn-back" onclick="goToStep(1)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-                Back to Plans
-            </button>
+            @include('checkout/components/form/button', [
+            'label' => '← Back to Plans',
+            'variant' => 'secondary',
+            'type' => 'button',
+            'class' => 'sub-btn-back',
+            'onclick' => 'goToStep(1)',
+            ])
         </div>
 
-        <!-- Step 3: Payment -->
+        <!-- ══ Step 3: Payment ══════════════════════════════════════════ -->
         <div class="sub-step" id="step-3" style="display: none;">
             <div class="sub-header">
                 <h2 class="sub-title">Payment Details</h2>
                 <p class="sub-subtitle">Secure checkout with Stripe</p>
             </div>
 
+            <!-- Plan summary -->
             <div class="sub-payment-summary">
                 <div class="sub-summary-row">
                     <span>Plan</span>
@@ -225,93 +237,79 @@ $isLoggedIn = !empty($member);
                 </div>
             </div>
 
-            <div class="sub-voucher-section">
-                <div class="sub-form-group">
-                    <label class="sub-label">
-                        Have a voucher code?
-                        <span class="sub-hint">Optional - Enter your discount code</span>
-                    </label>
-                    <div class="sub-voucher-input-group">
-                        <input
-                                type="text"
-                                id="voucher-code"
-                                class="sub-input"
-                                placeholder="Enter voucher code"
-                                style="margin-bottom: 0;"
-                        >
-                        <button
-                                type="button"
-                                id="apply-voucher-btn"
-                                class="sub-btn-voucher"
-                                onclick="applyVoucher()"
-                        >
-                            Apply
-                        </button>
-                    </div>
-                    <div id="voucher-message" class="sub-voucher-message"></div>
-                </div>
+            <!-- ── Shared: Saved payment methods ─────────────────────── -->
+            <!--
+                saved-cards.php renders the section hidden; saved-cards.js
+                populates and reveals it when the member has saved cards.
+                We override the section styling inside .sub-modal-container
+                via the scoped CSS block below.
+            -->
+            @include('checkout/components/saved-cards', [
+            'sectionId' => 'sub-saved-cards-section',
+            'useDifferentCardOnClick' => 'subShowNewCardForm()',
+            ])
 
-                <div id="voucher-applied" class="sub-voucher-applied" style="display: none;">
-                    <div class="sub-voucher-success">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2">
-                            <polyline points="20 6 9 17 4 12"/>
-                        </svg>
-                        <div class="sub-voucher-details">
-                            <strong id="voucher-discount-text">-</strong>
-                            <span id="voucher-code-text">-</span>
-                        </div>
-                    </div>
-                    <button type="button" class="sub-voucher-remove" onclick="removeVoucher()">
-                        ✕
-                    </button>
-                </div>
-            </div>
+            <!-- ── Shared: Stripe card element ───────────────────────── -->
+            <!--
+                stripe-card-element.php renders #card-element + #card-errors.
+                The modal mounts Stripe into this element on step-3 open.
+                We pass showBackButton=false because the modal has its own
+                back button below.
+            -->
+            @include('checkout/components/stripe-card-element', [
+            'sectionId' => 'sub-new-card-section',
+            'sectionTitle' => 'Card Information',
+            'showBackButton' => false,
+            ])
 
-            <form id="payment-form" class="sub-form">
-                <div class="sub-form-group">
-                    <label class="sub-label">Card Information</label>
-                    <div id="card-element" class="sub-card-element"></div>
-                    <div id="card-errors" class="sub-error"></div>
-                </div>
+            <!-- ── Shared: Voucher section ────────────────────────────── -->
+            <!--
+                voucher-section.php renders #voucher-input, #voucher-message,
+                #applied-voucher, #discount-row.
+                The modal's applyVoucher() / removeVoucher() functions call the
+                same API endpoints as the checkout page; the component's default
+                onclick handlers (applyVoucher / removeVoucher) match.
+                We override colours via scoped CSS below.
+            -->
+            @include('checkout/components/voucher-section', [
+            'currency' => '', // JS fills in the correct symbol at runtime
+            'applyOnClick' => 'subApplyVoucher()',
+            'removeOnClick' => 'subRemoveVoucher()',
+            ])
 
-                <button type="submit" class="sub-btn-primary" id="submit-payment">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                        <line x1="1" y1="10" x2="23" y2="10"/>
-                    </svg>
-                    Complete Subscription
-                </button>
+            <!-- ── Shared: Auto-renewal consent ─────────────────────── -->
+            @include('checkout/components/auto-renewal-consent', [
+            'showGlobal' => true,
+            'showUs' => false,
+            'globalConsentId'=> 'sub-global-renewal-consent',
+            ])
 
-                <div class="sub-form-group" style="margin-top: 16px;">
-                    <label class="sub-checkbox">
-                        <input type="checkbox" id="auto-renew-consent" name="auto_renew" checked>
-                        <span>
-                            I agree to automatic renewal. Your subscription will renew automatically at the end of each billing period.
-                            You can cancel at any time. By checking this box you consent to recurring charges per our
-                            <a href="/terms" target="_blank">Terms</a>.
-                        </span>
-                    </label>
-                </div>
+            <!-- Payment submit -->
+            <form id="payment-form" class="sub-form" style="margin-top: 1.5rem;">
+                @include('checkout/components/form/button', [
+                'id' => 'submit-payment',
+                'label' => 'Complete Subscription',
+                'variant' => 'primary',
+                'type' => 'submit',
+                'class' => 'sub-btn-primary',
+                ])
             </form>
 
-            <div class="sub-security">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                Secured by Stripe • 256-bit SSL encryption
-            </div>
+            <!-- ── Shared: Security badge ─────────────────────────────── -->
+            @include('checkout/components/security-badge', [
+            'label' => 'Secured by Stripe • 256-bit SSL encryption',
+            ])
 
-            <button class="sub-btn-back" onclick="goToStep(<?= $isLoggedIn ? 1 : 2 ?>)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 12H5M12 19l-7-7 7-7"/>
-                </svg>
-                Back
-            </button>
+            @include('checkout/components/form/button', [
+            'label' => '← Back',
+            'variant' => 'secondary',
+            'type' => 'button',
+            'class' => 'sub-btn-back',
+            'onclick' => 'goToStep(' . ($isLoggedIn ? 1 : 2) . ')',
+            ])
         </div>
 
-        <!-- Step 4: Success -->
+        <!-- ══ Step 4: Success ══════════════════════════════════════════ -->
         <div class="sub-step" id="step-4" style="display: none;">
             <div class="sub-success">
                 <div class="sub-success-icon">
@@ -323,10 +321,14 @@ $isLoggedIn = !empty($member);
                 <h2 class="sub-success-title">Welcome Aboard! 🎉</h2>
                 <p class="sub-success-text">Your subscription is now active. Get ready to unlock premium content!</p>
 
-                <button class="sub-btn-primary"
-                        onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/member/dashboard'">
-                    Go to Dashboard
-                </button>
+                @include('checkout/components/form/button', [
+                'label' => 'Go to Dashboard',
+                'variant' => 'primary',
+                'type' => 'button',
+                'class' => 'sub-btn-primary',
+                'onclick' => "window.location.href='/" . \App\Framework\Support\SiteContext::slug() .
+                "/member/dashboard'",
+                ])
             </div>
         </div>
 
@@ -339,6 +341,7 @@ $isLoggedIn = !empty($member);
 </div>
 
 <style>
+    /* ── Modal root variables ─────────────────────────────────────────── */
     :root {
         --sub-primary: #6366f1;
         --sub-primary-dark: #4f46e5;
@@ -351,12 +354,13 @@ $isLoggedIn = !empty($member);
         --sub-bg-alt: #f8fafc;
     }
 
+    /* ── Modal shell ──────────────────────────────────────────────────── */
     .sub-modal {
         display: none;
         position: fixed;
         inset: 0;
         z-index: 99999;
-        animation: subFadeIn 0.3s ease-out;
+        animation: subFadeIn .3s ease-out;
     }
 
     .sub-modal.show {
@@ -375,7 +379,7 @@ $isLoggedIn = !empty($member);
     @keyframes subSlideUp {
         from {
             opacity: 0;
-            transform: translateY(30px) scale(0.95);
+            transform: translateY(30px) scale(.95);
         }
         to {
             opacity: 1;
@@ -386,10 +390,9 @@ $isLoggedIn = !empty($member);
     .sub-modal-overlay {
         position: absolute;
         inset: 0;
-        background: rgba(15, 23, 42, 0.7);
+        background: rgba(15, 23, 42, .7);
         backdrop-filter: blur(8px);
     }
-
     .sub-modal-container {
         position: relative;
         width: 100%;
@@ -400,8 +403,8 @@ $isLoggedIn = !empty($member);
         border-radius: 24px;
         padding: 48px;
         overflow-y: auto;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        animation: subSlideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, .25);
+        animation: subSlideUp .5s cubic-bezier(.34, 1.56, .64, 1);
     }
 
     .sub-modal-close {
@@ -418,7 +421,7 @@ $isLoggedIn = !empty($member);
         border-radius: 50%;
         color: var(--sub-text-light);
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all .2s;
         z-index: 10;
     }
 
@@ -428,13 +431,12 @@ $isLoggedIn = !empty($member);
         transform: rotate(90deg);
     }
 
-    /* Progress Indicator */
+    /* ── Progress ─────────────────────────────────────────────────────── */
     .sub-progress {
         display: flex;
         align-items: center;
         justify-content: center;
         margin-bottom: 48px;
-        gap: 0;
     }
 
     .sub-progress-step {
@@ -443,7 +445,6 @@ $isLoggedIn = !empty($member);
         align-items: center;
         gap: 8px;
     }
-
     .sub-progress-circle {
         width: 48px;
         height: 48px;
@@ -456,14 +457,14 @@ $isLoggedIn = !empty($member);
         color: var(--sub-text-light);
         font-weight: 700;
         font-size: 18px;
-        transition: all 0.3s;
+        transition: all .3s;
     }
 
     .sub-progress-step.active .sub-progress-circle {
         background: var(--sub-primary);
         border-color: var(--sub-primary);
         color: white;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        box-shadow: 0 4px 12px rgba(99, 102, 241, .4);
     }
 
     .sub-progress-step.completed .sub-progress-circle {
@@ -477,7 +478,7 @@ $isLoggedIn = !empty($member);
         font-weight: 600;
         color: var(--sub-text-light);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: .5px;
     }
 
     .sub-progress-step.active .sub-progress-label {
@@ -489,14 +490,9 @@ $isLoggedIn = !empty($member);
         height: 2px;
         background: var(--sub-border);
         margin: 0 4px 24px 4px;
-        transition: all 0.3s;
     }
 
-    .sub-progress-step.active ~ .sub-progress-line {
-        background: var(--sub-border);
-    }
-
-    /* Header */
+    /* ── Header ───────────────────────────────────────────────────────── */
     .sub-header {
         text-align: center;
         margin-bottom: 40px;
@@ -507,7 +503,7 @@ $isLoggedIn = !empty($member);
         font-weight: 800;
         color: var(--sub-text);
         margin-bottom: 8px;
-        letter-spacing: -0.5px;
+        letter-spacing: -.5px;
     }
 
     .sub-subtitle {
@@ -515,40 +511,38 @@ $isLoggedIn = !empty($member);
         color: var(--sub-text-light);
     }
 
-    /* Plans Grid */
+    /* ── Plans ────────────────────────────────────────────────────────── */
     .sub-plans {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 24px;
     }
-
     .sub-plan {
         position: relative;
         background: var(--sub-bg);
         border: 2px solid var(--sub-border);
         border-radius: 16px;
         padding: 32px 24px;
-        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        transition: all .3s cubic-bezier(.34, 1.56, .64, 1);
         cursor: pointer;
     }
 
     .sub-plan:hover {
         border-color: var(--sub-primary);
         transform: translateY(-4px);
-        box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
+        box-shadow: 0 12px 24px rgba(99, 102, 241, .15);
     }
 
     .sub-plan.featured {
         border-color: var(--sub-primary);
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+        background: linear-gradient(135deg, rgba(99, 102, 241, .05), rgba(139, 92, 246, .05));
         transform: scale(1.05);
     }
 
     .sub-plan.featured:hover {
         transform: translateY(-4px) scale(1.05);
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.2);
+        box-shadow: 0 20px 40px rgba(99, 102, 241, .2);
     }
-
     .sub-plan-badge {
         position: absolute;
         top: -12px;
@@ -564,8 +558,8 @@ $isLoggedIn = !empty($member);
         font-size: 12px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        letter-spacing: .5px;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, .4);
     }
 
     .sub-plan-header {
@@ -613,7 +607,6 @@ $isLoggedIn = !empty($member);
         color: var(--sub-text-light);
         font-weight: 600;
     }
-
     .sub-plan-trial {
         display: flex;
         align-items: center;
@@ -649,31 +642,29 @@ $isLoggedIn = !empty($member);
         flex-shrink: 0;
     }
 
-    .sub-plan-btn {
-        width: 100%;
+    /* Override shared btn styles within the modal */
+    .sub-modal-container .sub-plan-btn,
+    .sub-modal-container .btn.sub-plan-btn {
+        background: var(--sub-primary) !important;
         padding: 14px 24px;
-        background: var(--sub-primary);
-        color: white;
-        border: none;
         border-radius: 10px;
         font-size: 15px;
         font-weight: 700;
-        cursor: pointer;
-        transition: all 0.3s;
+        margin-bottom: 0;
     }
 
-    .sub-plan-btn:hover {
-        background: var(--sub-primary-dark);
+    .sub-modal-container .sub-plan-btn:hover {
+        background: var(--sub-primary-dark) !important;
         transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 8px 16px rgba(99, 102, 241, .3);
     }
 
     .sub-plan.featured .sub-plan-btn {
-        background: linear-gradient(135deg, var(--sub-primary), #8b5cf6);
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        background: linear-gradient(135deg, var(--sub-primary), #8b5cf6) !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, .4);
     }
 
-    /* Auth Toggle */
+    /* ── Auth toggle ──────────────────────────────────────────────────── */
     .sub-auth-toggle {
         display: flex;
         background: var(--sub-bg-alt);
@@ -692,16 +683,16 @@ $isLoggedIn = !empty($member);
         font-weight: 600;
         color: var(--sub-text-light);
         cursor: pointer;
-        transition: all 0.3s;
+        transition: all .3s;
     }
 
     .sub-auth-tab.active {
         background: white;
         color: var(--sub-primary);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, .05);
     }
 
-    /* Forms */
+    /* ── Forms ────────────────────────────────────────────────────────── */
     .sub-form {
         max-width: 500px;
         margin: 0 auto;
@@ -732,13 +723,13 @@ $isLoggedIn = !empty($member);
         border-radius: 10px;
         font-size: 15px;
         color: var(--sub-text);
-        transition: all 0.3s;
+        transition: all .3s;
     }
 
     .sub-input:focus {
         outline: none;
         border-color: var(--sub-primary);
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, .1);
     }
 
     .sub-hint {
@@ -770,10 +761,6 @@ $isLoggedIn = !empty($member);
         font-weight: 600;
     }
 
-    .sub-checkbox a:hover {
-        text-decoration: underline;
-    }
-
     .sub-error {
         padding: 12px 16px;
         background: #fee2e2;
@@ -788,32 +775,23 @@ $isLoggedIn = !empty($member);
         display: block;
     }
 
-    .sub-btn-primary {
-        width: 100%;
-        padding: 16px 24px;
-        background: linear-gradient(135deg, var(--sub-primary), var(--sub-primary-dark));
-        color: white;
-        border: none;
+    /* Override shared btn styles for primary actions inside modal */
+    .sub-modal-container .sub-btn-primary,
+    .sub-modal-container .btn.sub-btn-primary {
+        background: linear-gradient(135deg, var(--sub-primary), var(--sub-primary-dark)) !important;
         border-radius: 12px;
         font-size: 16px;
         font-weight: 700;
-        cursor: pointer;
-        transition: all 0.3s;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 10px;
+        margin-bottom: 0;
     }
 
-    .sub-btn-primary:hover:not(:disabled) {
+    .sub-modal-container .sub-btn-primary:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 12px 24px rgba(99, 102, 241, 0.3);
-    }
-
-    .sub-btn-primary:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none !important;
+        box-shadow: 0 12px 24px rgba(99, 102, 241, .3);
     }
 
     .sub-form-footer {
@@ -828,35 +806,28 @@ $isLoggedIn = !empty($member);
         font-weight: 600;
     }
 
-    .sub-form-footer a:hover {
-        text-decoration: underline;
-    }
-
-    .sub-btn-back {
+    .sub-modal-container .sub-btn-back,
+    .sub-modal-container .btn.sub-btn-back {
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
-        width: 100%;
-        padding: 12px 24px;
-        background: transparent;
-        border: 2px solid var(--sub-border);
+        background: transparent !important;
+        border: 2px solid var(--sub-border) !important;
         border-radius: 10px;
         font-size: 15px;
         font-weight: 600;
-        color: var(--sub-text-light);
-        cursor: pointer;
+        color: var(--sub-text-light) !important;
         margin-top: 16px;
-        transition: all 0.3s;
     }
 
-    .sub-btn-back:hover {
-        border-color: var(--sub-primary);
-        color: var(--sub-primary);
-        background: rgba(99, 102, 241, 0.05);
+    .sub-modal-container .sub-btn-back:hover {
+        border-color: var(--sub-primary) !important;
+        color: var(--sub-primary) !important;
+        background: rgba(99, 102, 241, .05) !important;
     }
 
-    /* Payment Summary */
+    /* ── Payment summary box ──────────────────────────────────────────── */
     .sub-payment-summary {
         background: var(--sub-bg-alt);
         border-radius: 12px;
@@ -888,41 +859,56 @@ $isLoggedIn = !empty($member);
         color: var(--sub-primary);
     }
 
-    .sub-card-element {
+    /* ── Stripe card element (scoped to modal) ────────────────────────── */
+    /* stripe-card-element.php uses #card-element which we re-style here */
+    .sub-modal-container #card-element {
         padding: 14px 16px;
         border: 2px solid var(--sub-border);
         border-radius: 10px;
         background: white;
-        transition: all 0.3s;
+        transition: all .3s;
     }
 
-    .sub-card-element:focus-within {
+    .sub-modal-container #card-element:focus-within {
         border-color: var(--sub-primary);
-        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, .1);
     }
 
-    .sub-security {
-        display: flex;
-        align-items: center;
+    /* ── Voucher (scoped overrides) ───────────────────────────────────── */
+    /* voucher-section.php uses its own IDs; we just make sure the section
+       flows correctly inside the modal layout */
+    .sub-modal-container .voucher-section {
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* ── Auto-renewal consent (scoped) ───────────────────────────────── */
+    .sub-modal-container .auto-renewal-consent {
+        max-width: 500px;
+        margin: 1rem auto;
+    }
+
+    /* ── Saved cards (scoped) ─────────────────────────────────────────── */
+    .sub-modal-container #sub-saved-cards-section {
+        max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* ── Security badge (scoped) ─────────────────────────────────────── */
+    .sub-modal-container .security-badge {
         justify-content: center;
-        gap: 8px;
-        font-size: 13px;
-        color: var(--sub-text-light);
         margin-top: 24px;
     }
 
-    .sub-security svg {
-        color: var(--sub-success);
-    }
-
-    /* Success */
+    /* ── Success state ────────────────────────────────────────────────── */
     .sub-success {
         text-align: center;
         padding: 48px 24px;
         max-width: 500px;
         margin: 0 auto;
     }
-
     .sub-success-icon {
         width: 96px;
         height: 96px;
@@ -932,7 +918,7 @@ $isLoggedIn = !empty($member);
         align-items: center;
         justify-content: center;
         margin: 0 auto 24px;
-        animation: successPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: successPop .6s cubic-bezier(.34, 1.56, .64, 1);
     }
 
     @keyframes successPop {
@@ -967,12 +953,12 @@ $isLoggedIn = !empty($member);
         line-height: 1.6;
     }
 
-    /* Loading */
+    /* ── Loading overlay ─────────────────────────────────────────────── */
     .sub-loading {
         display: none;
         position: absolute;
         inset: 0;
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, .95);
         backdrop-filter: blur(4px);
         border-radius: 24px;
         align-items: center;
@@ -992,9 +978,10 @@ $isLoggedIn = !empty($member);
         border: 4px solid var(--sub-border);
         border-top-color: var(--sub-primary);
         border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+        animation: subSpin .8s linear infinite;
     }
-    @keyframes spin {
+
+    @keyframes subSpin {
         to {
             transform: rotate(360deg);
         }
@@ -1006,7 +993,7 @@ $isLoggedIn = !empty($member);
         color: var(--sub-text);
     }
 
-    /* Responsive */
+    /* ── Responsive ──────────────────────────────────────────────────── */
     @media (max-width: 768px) {
         .sub-modal-container {
             margin: 0;
@@ -1031,10 +1018,6 @@ $isLoggedIn = !empty($member);
             grid-template-columns: 1fr;
         }
 
-        .sub-progress {
-            gap: 0;
-        }
-
         .sub-progress-label {
             display: none;
         }
@@ -1045,118 +1028,11 @@ $isLoggedIn = !empty($member);
         }
     }
 
-    .sub-voucher-section {
-        margin-bottom: 24px;
-    }
-
-    .sub-voucher-input-group {
-        display: flex;
-        gap: 12px;
-    }
-
-    .sub-voucher-input-group .sub-input {
-        flex: 1;
-    }
-
-    .sub-btn-voucher {
-        padding: 12px 24px;
-        background: white;
-        border: 2px solid var(--sub-primary);
-        color: var(--sub-primary);
-        border-radius: 10px;
-        font-size: 15px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s;
-        white-space: nowrap;
-    }
-
-    .sub-btn-voucher:hover {
-        background: var(--sub-primary);
-        color: white;
-    }
-
-    .sub-btn-voucher:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .sub-voucher-message {
-        margin-top: 8px;
-        font-size: 14px;
-        padding: 10px 14px;
-        border-radius: 8px;
-        display: none;
-    }
-
-    .sub-voucher-message.success {
-        display: block;
-        background: #d4edda;
-        color: #155724;
-    }
-
-    .sub-voucher-message.error {
-        display: block;
-        background: #f8d7da;
-        color: #721c24;
-    }
-
-    .sub-voucher-applied {
-        margin-top: 16px;
-        padding: 16px;
-        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-        border-radius: 10px;
-        border: 2px solid #28a745;
-    }
-
-    .sub-voucher-success {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .sub-voucher-success svg {
-        color: #28a745;
-        flex-shrink: 0;
-    }
-
-    .sub-voucher-details {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .sub-voucher-details strong {
-        font-size: 16px;
-        color: #155724;
-    }
-
-    .sub-voucher-details span {
-        font-size: 13px;
-        color: #28a745;
-        font-weight: 600;
-    }
-
-    .sub-voucher-remove {
-        background: transparent;
-        border: none;
-        color: #28a745;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 4px 8px;
-        border-radius: 4px;
-        transition: all 0.2s;
-    }
-
-    .sub-voucher-remove:hover {
-        background: rgba(40, 167, 69, 0.1);
-    }
-
-    /* Single Plan Layout Improvements */
+    /* ── Single-plan centering ───────────────────────────────────────── */
     .sub-plans:has(.sub-plan:only-child) {
         display: flex;
         justify-content: center;
+        padding: 2rem 0;
     }
 
     .sub-plans:has(.sub-plan:only-child) .sub-plan {
@@ -1168,19 +1044,9 @@ $isLoggedIn = !empty($member);
         transform: scale(1) !important;
     }
 
-    .sub-plan:only-child .sub-plan-badge {
-        background: linear-gradient(135deg, #10b981, #059669);
-    }
-
     .sub-plan:only-child:hover {
         transform: scale(1.02) !important;
     }
-
-    /* Center single plan content */
-    .sub-plans:has(.sub-plan:only-child) {
-        padding: 2rem 0;
-    }
-
     .sub-plan:only-child .sub-plan-header,
     .sub-plan:only-child .sub-plan-price,
     .sub-plan:only-child .sub-plan-features {
@@ -1201,26 +1067,31 @@ $isLoggedIn = !empty($member);
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
+    /* ── Constants ──────────────────────────────────────────────────── */
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
-    const API_BASE = '/api/' + SITE;
-    const STRIPE_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? '' ?>';
+    const API_BASE_MODAL = '/api/' + SITE;          // avoid collision with checkout-page API_BASE
+    const STRIPE_KEY_MODAL = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? '' ?>';
     const IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
     const MODAL_STORAGE_KEY = 'subscription_modal_last_shown_' + SITE;
     const MODAL_COOLDOWN_HOURS = 24;
-    forceVerification = false
+    let forceVerification = false;
 
-    let stripe = null;
-    let cardElement = null;
+    /* ── State ──────────────────────────────────────────────────────── */
+    let subStripe = null;
+    let subCardElement = null;
+    let subElements = null;
     let selectedPlanId = null;
     let selectedPlanSlug = null;
     let selectedPlanData = null;
-    let currentMember = null;
+    let subAppliedVoucher = null;
+    let subCurrentMember = null;
 
-    // Initialize Stripe
-    if (STRIPE_KEY) {
-        stripe = Stripe(STRIPE_KEY);
-        const elements = stripe.elements();
-        cardElement = elements.create('card', {
+    /* ── Stripe init ────────────────────────────────────────────────── */
+    if (STRIPE_KEY_MODAL) {
+        alert('yes')
+        subStripe = Stripe(STRIPE_KEY_MODAL);
+        subElements = subStripe.elements();
+        subCardElement = subElements.create('card', {
             hidePostalCode: true,
             style: {
                 base: {
@@ -1229,49 +1100,109 @@ $isLoggedIn = !empty($member);
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                     '::placeholder': {color: '#94a3b8'}
                 },
-                invalid: {
-                    color: '#ef4444',
-                    iconColor: '#ef4444'
-                }
-            }
+                invalid: {color: '#ef4444', iconColor: '#ef4444'},
+            },
         });
     }
 
-    // Show modal
+    /* ── Saved cards (uses the page-level saved-cards.js functions) ─── */
+    /*
+     * saved-cards.js exposes loadSavedCards(), displaySavedCards(),
+     * selectSavedCard(), showNewCardForm(), showSavedCards().
+     * Those functions reference #saved-cards-section and #saved-cards-list.
+     * Because we used a custom sectionId ('sub-saved-cards-section') we need
+     * thin wrappers that re-target the modal-specific IDs.
+     */
+    function subLoadSavedCards() {
+        if (!IS_LOGGED_IN || !subCurrentMember) return;
+        fetch(`${API_BASE_MODAL}/member/payment-methods`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success && data.data?.payment_methods?.length) {
+                    subDisplaySavedCards(data.data.payment_methods);
+                }
+            })
+            .catch(console.error);
+    }
+
+    function subDisplaySavedCards(cards) {
+        const list = document.getElementById('saved-cards-list');   // inside #sub-saved-cards-section
+        const section = document.getElementById('sub-saved-cards-section');
+        if (!list || !section) return;
+
+        list.innerHTML = cards.map(card => `
+            <label class="radio-option-card" for="sub-card-${card.id}" style="display:flex;align-items:center;gap:1rem;border:2px solid var(--border-color,#e2e8f0);border-radius:.5rem;padding:1rem;margin-bottom:1rem;cursor:pointer;transition:border-color .2s;">
+                <input type="radio" name="sub_saved_card" id="sub-card-${card.id}" value="${card.id}"
+                       onchange="subSelectSavedCard('${card.id}')" class="radio-option-input" style="width:20px;height:20px;">
+                <div>
+                    <div style="font-weight:600;text-transform:capitalize;">${card.card.brand}</div>
+                    <div style="color:var(--text-secondary,#64748b);font-size:.875rem;">•••• ${card.card.last4}</div>
+                    <div style="color:var(--text-secondary,#64748b);font-size:.875rem;">Expires ${card.card.exp_month}/${card.card.exp_year}</div>
+                </div>
+            </label>`).join('');
+
+        section.style.display = 'block';
+        const newCardSection = document.getElementById('sub-new-card-section');
+        if (newCardSection) newCardSection.style.display = 'none';
+    }
+
+    let subSelectedCardId = null;
+
+    function subSelectSavedCard(id) {
+        subSelectedCardId = id;
+        document.querySelectorAll('[name="sub_saved_card"]').forEach(r => {
+            r.closest('.radio-option-card')?.classList.toggle('selected', r.value === id);
+        });
+    }
+
+    function subShowNewCardForm() {
+        subSelectedCardId = null;
+        const sec = document.getElementById('sub-saved-cards-section');
+        const frm = document.getElementById('sub-new-card-section');
+        if (sec) sec.style.display = 'none';
+        if (frm) frm.style.display = 'block';
+    }
+
+    /* ── Modal open / close ─────────────────────────────────────────── */
     function showSubscriptionModal(planSlug = null, planId = null, isManual = false) {
         const modal = document.getElementById('subscriptionModal');
-        if (modal) {
-            modal.classList.add('show');
-            document.body.style.overflow = 'hidden';
+        if (!modal) return;
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
 
-            // Mount Stripe card element when step 3 becomes visible
-            setTimeout(() => {
-                if (cardElement && document.getElementById('card-element')) {
-                    cardElement.mount('#card-element');
-                }
-            }, 100);
-
-            if (planSlug && planId) {
-                selectPlan(planSlug, planId);
-            } else {
-                // Show step 1 (plan selection)
-                goToStep(1);
-            }
-
-            // Only track if not a manual open
-            if (!isManual) {
-                trackModalShown();
-
-                // Mark as shown on server (for logged-in users)
-                fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+        // Mount card element when the DOM element is accessible
+        setTimeout(() => {
+            const el = document.getElementById('card-element');
+            if (subCardElement && el && !el.hasChildNodes()) {
+                subCardElement.mount('#card-element');
+                subCardElement.on('change', e => {
+                    const err = document.getElementById('card-errors');
+                    if (err) err.textContent = e.error ? e.error.message : '';
                 });
             }
+        }, 100);
+
+        if (planSlug && planId) {
+            selectPlan(planSlug, planId);
+        } else {
+            goToStep(1);
+        }
+
+        if (!isManual) {
+            trackModalShown();
+            fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+        }
+
+        // Load saved cards if logged in
+        if (IS_LOGGED_IN) {
+            subCurrentMember = {id: <?= $member ? (int)$member->id : 'null' ?>};
+            subLoadSavedCards();
         }
     }
 
-    // Close modal
     function closeSubscriptionModal() {
         const modal = document.getElementById('subscriptionModal');
         if (modal) {
@@ -1280,150 +1211,119 @@ $isLoggedIn = !empty($member);
         }
     }
 
-    // Navigate to step
+    /* ── Step navigation ────────────────────────────────────────────── */
     function goToStep(step) {
-        // Hide all steps
         for (let i = 1; i <= 4; i++) {
-            const stepEl = document.getElementById('step-' + i);
-            if (stepEl) stepEl.style.display = 'none';
-
-            const progressStep = document.querySelector(`.sub-progress-step[data-step="${i}"]`);
-            if (progressStep) {
-                progressStep.classList.remove('active');
-                if (i < step) progressStep.classList.add('completed');
-                else progressStep.classList.remove('completed');
+            const el = document.getElementById('step-' + i);
+            const prog = document.querySelector(`.sub-progress-step[data-step="${i}"]`);
+            if (el) el.style.display = 'none';
+            if (prog) {
+                prog.classList.remove('active');
+                i < step ? prog.classList.add('completed') : prog.classList.remove('completed');
             }
         }
-
-        // Show target step
-        const targetStep = document.getElementById('step-' + step);
-        if (targetStep) {
-            targetStep.style.display = 'block';
-
-            const progressStep = document.querySelector(`.sub-progress-step[data-step="${step}"]`);
-            if (progressStep) progressStep.classList.add('active');
-        }
+        const target = document.getElementById('step-' + step);
+        const prog = document.querySelector(`.sub-progress-step[data-step="${step}"]`);
+        if (target) target.style.display = 'block';
+        if (prog) prog.classList.add('active');
     }
 
-    // Select plan
+    /* ── Plan selection ─────────────────────────────────────────────── */
     function selectPlan(slug, id) {
         selectedPlanSlug = slug;
         selectedPlanId = id;
 
-        // Get plan data
         const planEl = document.querySelector(`[data-plan-slug="${slug}"]`);
         if (planEl) {
             selectedPlanData = {
-                name: planEl.querySelector('.sub-plan-name').textContent,
-                price: planEl.querySelector('.sub-price-amount').textContent,
-                currency: planEl.querySelector('.sub-price-currency').textContent,
-                period: planEl.querySelector('.sub-price-period').textContent
+                name: planEl.querySelector('.sub-plan-name')?.textContent ?? '',
+                price: planEl.querySelector('.sub-price-amount')?.textContent ?? '',
+                currency: planEl.querySelector('.sub-price-currency')?.textContent ?? '',
+                period: planEl.querySelector('.sub-price-period')?.textContent ?? '',
             };
         }
 
-        if (IS_LOGGED_IN) {
-            goToStep(3);
-            updatePaymentSummary();
-        } else {
-            goToStep(2);
-        }
+        IS_LOGGED_IN ? (goToStep(3), updatePaymentSummary()) : goToStep(2);
     }
 
-    // Update payment summary
     function updatePaymentSummary() {
-        if (selectedPlanData) {
-            document.getElementById('summary-plan-name').textContent = selectedPlanData.name;
-            document.getElementById('summary-billing').textContent = 'Billed ' + selectedPlanData.period.replace('/', '');
-            document.getElementById('summary-total').textContent =
-                selectedPlanData.currency + selectedPlanData.price + selectedPlanData.period;
-        }
+        if (!selectedPlanData) return;
+        const set = (id, v) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = v;
+        };
+        set('summary-plan-name', selectedPlanData.name);
+        set('summary-billing', 'Billed ' + selectedPlanData.period.replace('/', ''));
+        set('summary-total', selectedPlanData.currency + selectedPlanData.price + selectedPlanData.period);
     }
 
-    // Auth tab switching
+    /* ── Auth tab switching ─────────────────────────────────────────── */
     document.querySelectorAll('.sub-auth-tab').forEach(tab => {
         tab.addEventListener('click', function () {
-            const targetTab = this.dataset.tab;
-
+            const target = this.dataset.tab;
             document.querySelectorAll('.sub-auth-tab').forEach(t => t.classList.remove('active'));
             this.classList.add('active');
-
-            document.getElementById('register-form').style.display = targetTab === 'register' ? 'block' : 'none';
-            document.getElementById('login-form').style.display = targetTab === 'login' ? 'block' : 'none';
+            document.getElementById('register-form').style.display = target === 'register' ? 'block' : 'none';
+            document.getElementById('login-form').style.display = target === 'login' ? 'block' : 'none';
         });
     });
 
-    // Register form
+    /* ── Register ───────────────────────────────────────────────────── */
     document.getElementById('register-form').addEventListener('submit', async function (e) {
         e.preventDefault();
+        const data = Object.fromEntries(new FormData(this));
 
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-
-        // Client-side validation
         if (data.password !== data.password_confirmation) {
             document.getElementById('register-error').textContent = 'Passwords do not match';
             return;
         }
-
         if (data.password.length < 8) {
             document.getElementById('register-error').textContent = 'Password must be at least 8 characters';
             return;
         }
-
         if (!data.terms) {
             document.getElementById('register-error').textContent = 'You must agree to the terms';
             return;
         }
 
         showLoading();
-
         try {
-            const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/register', {
+            const res = await fetch('/' + SITE + '/member/register', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
-
-            const result = await response.json();
+            const result = await res.json();
 
             if (result.success) {
-                currentMember = result.member;
-
-                // Check if email verification is required
+                subCurrentMember = result.member;
+                hideLoading();
                 if (forceVerification && result.requires_verification) {
-                    hideLoading();
                     showVerificationNotice(data.email);
                 } else {
-                    hideLoading();
                     goToStep(3);
                     updatePaymentSummary();
+                    subLoadSavedCards();
                 }
             } else {
                 hideLoading();
-
-                // Check if email already exists
                 if (result.error === 'email_exists' || result.message?.toLowerCase().includes('already registered')) {
                     const errorDiv = document.getElementById('register-error');
-
-                    let message = 'This email is already registered. ';
-
+                    let msg = 'This email is already registered. ';
                     if (result.is_verified === false) {
-                        message += '<strong>Your account exists but email is not verified.</strong> Please check your email for the verification link, or ';
-                        message += '<a href="/' + SITE + '/member/resend-verification" style="color: var(--sub-primary); text-decoration: underline;">click here to resend</a>.';
+                        msg += '<strong>Your account exists but email is not verified.</strong> Please check your email, or '
+                            + '<a href="/' + SITE + '/member/resend-verification" style="color:var(--sub-primary);text-decoration:underline;">click here to resend</a>.';
                     } else {
-                        message += '<strong>Please log in instead.</strong>';
+                        msg += '<strong>Please log in instead.</strong>';
                     }
-
-                    errorDiv.innerHTML = `<div>${message}</div>`;
-
-                    // Switch to login tab after a moment
+                    errorDiv.innerHTML = `<div>${msg}</div>`;
                     if (result.is_verified !== false) {
                         setTimeout(() => {
                             document.querySelector('[data-tab="login"]').click();
-                            const emailInput = document.querySelector('#login-form input[name="email"]');
-                            if (emailInput) {
-                                emailInput.value = data.email;
-                                emailInput.focus();
+                            const em = document.querySelector('#login-form input[name="email"]');
+                            if (em) {
+                                em.value = data.email;
+                                em.focus();
                             }
                         }, 2000);
                     }
@@ -1431,89 +1331,91 @@ $isLoggedIn = !empty($member);
                     document.getElementById('register-error').textContent = result.message || 'Registration failed';
                 }
             }
-        } catch (error) {
+        } catch (err) {
             hideLoading();
             document.getElementById('register-error').textContent = 'An error occurred. Please try again.';
         }
     });
 
-    // Login form
+    /* ── Login ──────────────────────────────────────────────────────── */
     document.getElementById('login-form').addEventListener('submit', async function (e) {
         e.preventDefault();
-
-        const formData = new FormData(this);
-        const data = Object.fromEntries(formData);
-
+        const data = Object.fromEntries(new FormData(this));
         showLoading();
-
         try {
-            const response = await fetch('/<?= \App\Framework\Support\SiteContext::slug()?>/member/login', {
+            const res = await fetch('/' + SITE + '/member/login', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             });
-
-            const result = await response.json();
-
+            const result = await res.json();
             if (result.success) {
-                currentMember = result.member;
+                subCurrentMember = result.member;
                 hideLoading();
                 goToStep(3);
                 updatePaymentSummary();
+                subLoadSavedCards();
             } else {
                 hideLoading();
                 document.getElementById('login-error').textContent = result.message || 'Login failed';
             }
-        } catch (error) {
+        } catch (err) {
             hideLoading();
             document.getElementById('login-error').textContent = 'An error occurred. Please try again.';
         }
     });
 
-    // Payment form
+    /* ── Payment ────────────────────────────────────────────────────── */
     document.getElementById('payment-form').addEventListener('submit', async function (e) {
         e.preventDefault();
-
-        if (!stripe || !cardElement) {
+        if (!subStripe || !subCardElement) {
             alert('Payment processing is not available');
             return;
         }
 
+        // Validate auto-renewal consent
+        const consentCb = document.getElementById('sub-global-renewal-consent');
+        if (consentCb && !consentCb.checked) {
+            const block = document.getElementById('global-renewal-consent-block');
+            block?.classList.add('consent-error');
+            alert('Please agree to the subscription terms to continue.');
+            return;
+        }
+
         showLoading();
-
         try {
-            // Create payment method
-            const {paymentMethod, error: pmError} = await stripe.createPaymentMethod({
-                type: 'card',
-                card: cardElement,
-            });
+            let paymentMethodId;
 
-            if (pmError) {
-                hideLoading();
-                document.getElementById('card-errors').textContent = pmError.message;
-                return;
+            if (subSelectedCardId) {
+                paymentMethodId = subSelectedCardId;
+            } else {
+                const {paymentMethod, error: pmError} = await subStripe.createPaymentMethod({
+                    type: 'card',
+                    card: subCardElement
+                });
+                if (pmError) {
+                    hideLoading();
+                    document.getElementById('card-errors').textContent = pmError.message;
+                    return;
+                }
+                paymentMethodId = paymentMethod.id;
             }
 
-            // Process subscription
-            const requestBody = {
+            const body = {
                 subscription_plan_id: selectedPlanId,
                 payment_method: 'stripe',
-                payment_method_id: paymentMethod.id,
-                auto_renew_consent: document.getElementById('auto-renew-consent').checked,
+                payment_method_id: paymentMethodId,
+                auto_renew_consent: consentCb ? consentCb.checked : true,
             };
 
-            // Include voucher code if applied
-            if (appliedVoucher) {
-                requestBody.voucher_code = appliedVoucher.voucher.code;
-            }
+            if (subAppliedVoucher) body.voucher_code = subAppliedVoucher.voucher?.code ?? subAppliedVoucher.code;
 
-            const response = await fetch(API_BASE + '/checkout/process', {
+            const res = await fetch(API_BASE_MODAL + '/checkout/process', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(body)
             });
-
-            const result = await response.json();
+            const result = await res.json();
 
             if (!result.success) {
                 hideLoading();
@@ -1521,12 +1423,8 @@ $isLoggedIn = !empty($member);
                 return;
             }
 
-            // Handle 3D Secure if needed
             if (result.requires_action && result.payment_intent_client_secret) {
-                const {error: confirmError} = await stripe.confirmCardPayment(
-                    result.payment_intent_client_secret
-                );
-
+                const {error: confirmError} = await subStripe.confirmCardPayment(result.payment_intent_client_secret);
                 if (confirmError) {
                     hideLoading();
                     document.getElementById('card-errors').textContent = confirmError.message;
@@ -1537,119 +1435,103 @@ $isLoggedIn = !empty($member);
             hideLoading();
             goToStep(4);
 
-        } catch (error) {
+        } catch (err) {
             hideLoading();
             document.getElementById('card-errors').textContent = 'An error occurred. Please try again.';
         }
     });
 
-    let appliedVoucher = null;
-
-    async function applyVoucher() {
-        const input = document.getElementById('voucher-code');
-        const button = document.getElementById('apply-voucher-btn');
-        const message = document.getElementById('voucher-message');
-        const code = input.value.trim();
+    /* ── Voucher (scoped — uses modal-specific state) ───────────────── */
+    async function subApplyVoucher() {
+        const input = document.getElementById('voucher-input');
+        const msgEl = document.getElementById('voucher-message');
+        const code = input?.value.trim();
 
         if (!code) {
-            showVoucherMessage('Please enter a voucher code', 'error');
+            subShowVoucherMsg('Please enter a voucher code', 'error');
             return;
         }
-
         if (!selectedPlanSlug) {
-            showVoucherMessage('Please select a plan first', 'error');
+            subShowVoucherMsg('Please select a plan first', 'error');
             return;
         }
 
-        button.disabled = true;
-        button.textContent = 'Validating...';
-        message.className = 'sub-voucher-message';
-        message.textContent = '';
+        const applyBtn = document.getElementById('apply-voucher-btn') ?? document.querySelector('[onclick="subApplyVoucher()"]');
+        if (applyBtn) {
+            applyBtn.disabled = true;
+            applyBtn.textContent = 'Validating...';
+        }
 
         try {
-            const response = await fetch(`/api/${SITE}/subscription-plans/${selectedPlanSlug}/validate-voucher`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({voucher_code: code})
+            const res = await fetch(`/api/${SITE}/subscription-plans/${selectedPlanSlug}/validate-voucher`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({voucher_code: code}),
             });
-
-            const result = await response.json();
+            const result = await res.json();
 
             if (result.success) {
-                appliedVoucher = result.data;
-                showVoucherApplied();
-                updatePaymentSummaryWithDiscount();
-                showVoucherMessage('Voucher applied successfully!', 'success');
-
-                // Hide input and button
-                document.querySelector('.sub-voucher-input-group').style.display = 'none';
+                subAppliedVoucher = result.data;
+                subShowVoucherApplied();
+                subUpdateSummaryWithDiscount();
+                subShowVoucherMsg('Voucher applied successfully!', 'success');
+                const group = document.querySelector('.sub-modal-container .voucher-section div[style*="flex"]');
+                if (group) group.style.display = 'none';
             } else {
-                showVoucherMessage(result.message, 'error');
+                subShowVoucherMsg(result.message || 'Invalid code', 'error');
             }
-        } catch (error) {
-            showVoucherMessage('Failed to validate voucher', 'error');
+        } catch (err) {
+            subShowVoucherMsg('Failed to validate voucher', 'error');
         } finally {
-            button.disabled = false;
-            button.textContent = 'Apply';
+            if (applyBtn) {
+                applyBtn.disabled = false;
+                applyBtn.textContent = 'Apply';
+            }
         }
     }
 
-    function removeVoucher() {
-        appliedVoucher = null;
-        document.getElementById('voucher-applied').style.display = 'none';
-        document.querySelector('.sub-voucher-input-group').style.display = 'flex';
-        document.getElementById('voucher-code').value = '';
-        document.getElementById('voucher-message').className = 'sub-voucher-message';
+    function subRemoveVoucher() {
+        subAppliedVoucher = null;
+        const applied = document.getElementById('applied-voucher');
+        const row = document.getElementById('discount-row');
+        if (applied) applied.style.display = 'none';
+        if (row) row.style.display = 'none';
+        if (document.getElementById('voucher-input')) document.getElementById('voucher-input').value = '';
+        const group = document.querySelector('.sub-modal-container .voucher-section div[style*="display: none"]');
+        if (group) group.style.display = 'flex';
         updatePaymentSummary();
     }
 
-    function showVoucherApplied() {
-        if (!appliedVoucher) return;
-
-        const container = document.getElementById('voucher-applied');
-        const discountText = document.getElementById('voucher-discount-text');
-        const codeText = document.getElementById('voucher-code-text');
-
-        discountText.textContent = `-${appliedVoucher.voucher.currency || '$'}${appliedVoucher.discount.toFixed(2)} discount`;
-        codeText.textContent = `Code: ${appliedVoucher.voucher.code}`;
-
-        container.style.display = 'flex';
+    function subShowVoucherApplied() {
+        if (!subAppliedVoucher) return;
+        const codeEl = document.getElementById('voucher-code-display');
+        const discountEl = document.getElementById('voucher-discount-display');
+        const appliedEl = document.getElementById('applied-voucher');
+        if (codeEl) codeEl.textContent = subAppliedVoucher.voucher?.code ?? '';
+        if (discountEl) discountEl.textContent = (subAppliedVoucher.voucher?.currency ?? '$') + (subAppliedVoucher.discount ?? 0).toFixed(2);
+        if (appliedEl) appliedEl.style.display = 'block';
     }
 
-    function showVoucherMessage(message, type) {
-        const messageEl = document.getElementById('voucher-message');
-        messageEl.textContent = message;
-        messageEl.className = `sub-voucher-message ${type}`;
+    function subShowVoucherMsg(message, type) {
+        const el = document.getElementById('voucher-message');
+        if (!el) return;
+        el.textContent = message;
+        el.className = `sub-voucher-message ${type}`;
     }
 
-    function updatePaymentSummaryWithDiscount() {
-        if (selectedPlanData && appliedVoucher) {
-            const originalPrice = parseFloat(selectedPlanData.price.replace(/,/g, ''));
-            const finalPrice = appliedVoucher.final_price;
-
-            document.getElementById('summary-plan-name').textContent = selectedPlanData.name;
-            document.getElementById('summary-billing').innerHTML = `
-            <div>
-                <div>Billed ${selectedPlanData.period.replace('/', '')}</div>
-                <div style="font-size: 13px; color: #28a745; margin-top: 4px;">
-                    Voucher: -${selectedPlanData.currency}${appliedVoucher.discount.toFixed(2)}
-                </div>
-            </div>
-        `;
-            document.getElementById('summary-total').innerHTML = `
-            <div>
-                <div style="text-decoration: line-through; font-size: 14px; color: #999; font-weight: 400;">
-                    ${selectedPlanData.currency}${selectedPlanData.price}${selectedPlanData.period}
-                </div>
-                <div style="color: #28a745;">
-                    ${selectedPlanData.currency}${finalPrice.toFixed(2)}${selectedPlanData.period}
-                </div>
-            </div>
-        `;
-        }
+    function subUpdateSummaryWithDiscount() {
+        if (!selectedPlanData || !subAppliedVoucher) return;
+        const finalPrice = subAppliedVoucher.final_price ?? 0;
+        const discount = subAppliedVoucher.discount ?? 0;
+        document.getElementById('summary-plan-name').textContent = selectedPlanData.name;
+        document.getElementById('summary-billing').innerHTML = `
+            <div>Billed ${selectedPlanData.period.replace('/', '')}</div>
+            <div style="font-size:13px;color:#28a745;margin-top:4px;">Voucher: -${selectedPlanData.currency}${discount.toFixed(2)}</div>`;
+        document.getElementById('summary-total').innerHTML = `
+            <div style="text-decoration:line-through;font-size:14px;color:#999;font-weight:400;">${selectedPlanData.currency}${selectedPlanData.price}${selectedPlanData.period}</div>
+            <div style="color:#28a745;">${selectedPlanData.currency}${finalPrice.toFixed(2)}${selectedPlanData.period}</div>`;
     }
 
-    // Loading helpers
+    /* ── Loading helpers ────────────────────────────────────────────── */
     function showLoading() {
         document.getElementById('sub-loading').classList.add('show');
     }
@@ -1658,99 +1540,59 @@ $isLoggedIn = !empty($member);
         document.getElementById('sub-loading').classList.remove('show');
     }
 
-    // Show verification notice
+    /* ── Verification notice ────────────────────────────────────────── */
     function showVerificationNotice(email) {
         const errorDiv = document.getElementById('register-error');
-        errorDiv.style.background = '#dbeafe';
-        errorDiv.style.color = '#1e40af';
-        errorDiv.style.borderLeft = '4px solid #3b82f6';
+        errorDiv.style.cssText = 'background:#dbeafe;color:#1e40af;border-left:4px solid #3b82f6;';
         errorDiv.innerHTML = `
-        <div style="display: flex; align-items: start; gap: 0.75rem;">
-            <span style="font-size: 1.25rem;">📧</span>
+        <div style="display:flex;align-items:start;gap:.75rem;">
+            <span style="font-size:1.25rem;">📧</span>
             <div>
                 <strong>Verification Email Sent!</strong>
-                <p style="margin-top: 0.25rem; font-size: 0.875rem;">
-                    We've sent a verification link to <strong>${email}</strong>.
-                    Please check your inbox and click the link to verify your account before proceeding with payment.
-                </p>
-                <button onclick="resendVerificationEmail('${email}')"
-                        style="margin-top: 0.75rem; padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; font-weight: 600;">
-                    Resend Verification Email
-                </button>
+                <p style="margin-top:.25rem;font-size:.875rem;">We've sent a link to <strong>${email}</strong>. Please verify before continuing.</p>
+                <button onclick="resendVerificationEmail('${email}')" style="margin-top:.75rem;padding:.5rem 1rem;background:#3b82f6;color:white;border:none;border-radius:.375rem;cursor:pointer;font-size:.875rem;font-weight:600;">Resend Email</button>
             </div>
-        </div>
-    `;
+        </div>`;
     }
 
     async function resendVerificationEmail(email) {
         try {
-            const response = await fetch('/' + SITE + '/member/resend-verification', {
+            const res = await fetch('/' + SITE + '/member/resend-verification', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({email})
             });
-
-            const result = await response.json();
-
-            if (result.success) {
-                alert('Verification email resent! Please check your inbox.');
-            } else {
-                alert(result.message || 'Failed to resend email. Please try again.');
-            }
-        } catch (error) {
+            const result = await res.json();
+            alert(result.success ? 'Verification email resent! Please check your inbox.' : (result.message || 'Failed to resend email.'));
+        } catch (err) {
             alert('An error occurred. Please try again.');
         }
     }
 
-    // Check if we should show modal for non-logged-in visitors
+    /* ── Cooldown helpers ───────────────────────────────────────────── */
     function shouldShowModalForVisitor() {
-        const lastShown = localStorage.getItem(MODAL_STORAGE_KEY);
-
-        if (!lastShown) {
-            return true;
-        }
-
-        const lastShownTime = parseInt(lastShown, 10);
-        const hoursSince = (Date.now() - lastShownTime) / (1000 * 60 * 60);
-
-        return hoursSince >= MODAL_COOLDOWN_HOURS;
+        const last = localStorage.getItem(MODAL_STORAGE_KEY);
+        return !last || ((Date.now() - parseInt(last, 10)) / 3600000) >= MODAL_COOLDOWN_HOURS;
     }
 
     function trackModalShown() {
-        if (!IS_LOGGED_IN) {
-            localStorage.setItem(MODAL_STORAGE_KEY, Date.now().toString());
-        }
+        if (!IS_LOGGED_IN) localStorage.setItem(MODAL_STORAGE_KEY, Date.now().toString());
     }
 
-    // Close on overlay click
+    /* ── Event listeners ────────────────────────────────────────────── */
     document.querySelector('.sub-modal-overlay')?.addEventListener('click', closeSubscriptionModal);
-
-    // Close on ESC
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeSubscriptionModal();
     });
 
-    // Show modal after delay
+    /* ── Auto-show after delay ──────────────────────────────────────── */
     <?php if ($subscriptionModalData['show_modal'] ?? false): ?>
     setTimeout(() => {
-        // For logged-in users, server already checked - just show
-        if (IS_LOGGED_IN) {
-            showSubscriptionModal(null, null, false);
-        }
-        // For visitors, check localStorage first
-        else if (shouldShowModalForVisitor()) {
-            showSubscriptionModal(null, null, false);
-        }
+        if (IS_LOGGED_IN || shouldShowModalForVisitor()) showSubscriptionModal(null, null, false);
     }, 3000);
     <?php endif; ?>
 
-    // Manual trigger (from button clicks) - always show, don't track
-    window.showSubscriptionModalWithPlan = function (planSlug, planId) {
-        showSubscriptionModal(planSlug, planId, true);
-    };
-
-    // Also add a manual trigger without plan
-    window.openSubscriptionModal = function () {
-        showSubscriptionModal(null, null, true);
-    };
+    /* ── Public API ─────────────────────────────────────────────────── */
+    window.showSubscriptionModalWithPlan = (slug, id) => showSubscriptionModal(slug, id, true);
+    window.openSubscriptionModal = () => showSubscriptionModal(null, null, true);
 </script>

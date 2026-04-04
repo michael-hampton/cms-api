@@ -23,7 +23,8 @@ $methods = $methods ?? [
         gap: 1rem;
     }
 
-    .payment-method {
+    /* radio-option-card overrides scoped to payment method selector */
+    .payment-methods .radio-option-card {
         border: 2px solid var(--border-color);
         border-radius: .5rem;
         padding: 1rem;
@@ -34,26 +35,34 @@ $methods = $methods ?? [
         gap: 1rem;
     }
 
-    .payment-method:hover {
+    .payment-methods .radio-option-card:hover {
         border-color: var(--primary-color);
     }
-    .payment-method.selected {
+
+    .payment-methods .radio-option-card:has(.radio-option-input:checked) {
         border-color: var(--primary-color);
         background: rgba(37, 99, 235, .05);
     }
 
-    .payment-radio {
+    /* Fallback for browsers without :has() — JS adds .selected */
+    .payment-methods .radio-option-card.selected {
+        border-color: var(--primary-color);
+        background: rgba(37, 99, 235, .05);
+    }
+
+    .radio-option-input {
         width: 20px;
         height: 20px;
         cursor: pointer;
+        flex-shrink: 0;
     }
 
-    .payment-info .payment-name {
+    .radio-option-title {
         font-weight: 600;
         margin-bottom: .25rem;
     }
 
-    .payment-info .payment-description {
+    .radio-option-description {
         font-size: .875rem;
         color: var(--text-secondary);
     }
@@ -62,46 +71,36 @@ $methods = $methods ?? [
 <div class="form-section">
     <h2 class="section-title">Payment Method</h2>
     <div class="payment-methods" id="payment-method-selector">
-        <?php foreach ($methods as $method): ?>
-            <label class="payment-method <?= $method['value'] === $selected ? 'selected' : '' ?>"
-                   data-method="<?= htmlspecialchars($method['value']) ?>">
-                <input type="radio"
-                       name="payment_method"
-                       value="<?= htmlspecialchars($method['value']) ?>"
-                       class="payment-radio"
-                        <?= $method['value'] === $selected ? 'checked' : '' ?>>
-                <div class="payment-info">
-                    <div class="payment-name"><?= htmlspecialchars($method['name']) ?></div>
-                    <?php if (!empty($method['description'])): ?>
-                        <div class="payment-description"><?= htmlspecialchars($method['description']) ?></div>
-                    <?php endif; ?>
-                </div>
-            </label>
-        <?php endforeach; ?>
+        <?php foreach ($methods as $method):
+            $isSelected = ($method['value'] === $selected);
+
+            // Call the engine's internal method directly using $this
+            echo $this->partial('checkout/components/form/radio-option', [
+                    'name' => 'payment_method',
+                    'value' => $method['value'],
+                    'id' => 'payment-method-' . $method['value'],
+                    'checked' => $isSelected,
+                    'cardClass' => 'payment-method' . ($isSelected ? ' selected' : ''),
+                    'dataAttr' => 'data-method="' . htmlspecialchars($method['value']) . '"',
+                    'content' => '<div class="radio-option-title">' . htmlspecialchars($method['name']) . '</div>'
+                            . '<div class="radio-option-description">' . htmlspecialchars($method['description'] ?? '') . '</div>'
+            ]);
+        endforeach; ?>
     </div>
 </div>
 
 <script>
     (function () {
-        /**
-         * Show only the payment section that matches `method`.
-         * Sections are identified by data-payment-section="card|paypal|bank".
-         * Falls back gracefully when a section element doesn't exist.
-         */
         function showPaymentSection(method) {
-            // Card-specific sections
             const savedCardsSection = document.getElementById('saved-cards-section');
             const newCardSection = document.getElementById('new-card-section');
-            const cardErrors = document.getElementById('card-errors');
 
-            // Generic additional sections
             document.querySelectorAll('[data-payment-section]').forEach(function (el) {
                 el.style.display = el.dataset.paymentSection === method ? 'block' : 'none';
             });
 
             if (method === 'card') {
-                // Reveal saved cards if available, otherwise the new-card form
-                if (savedCardsSection && savedCardsSection.querySelector('.saved-card')) {
+                if (savedCardsSection && savedCardsSection.querySelector('.radio-option-card')) {
                     savedCardsSection.style.display = 'block';
                     if (newCardSection) newCardSection.style.display = 'none';
                 } else {
@@ -109,16 +108,12 @@ $methods = $methods ?? [
                     if (newCardSection) newCardSection.style.display = 'block';
                 }
             } else {
-                // Non-card: hide both card sections
                 if (savedCardsSection) savedCardsSection.style.display = 'none';
                 if (newCardSection) newCardSection.style.display = 'none';
             }
 
-            // Expose currently selected method globally so the checkout submit handler
-            // can read it without querying the DOM
             window.selectedPaymentMethod = method;
 
-            // Hook for page-level custom handling (optional)
             if (typeof window.onPaymentMethodChange === 'function') {
                 window.onPaymentMethodChange(method);
             }
@@ -128,8 +123,8 @@ $methods = $methods ?? [
             const selector = document.getElementById('payment-method-selector');
             if (!selector) return;
 
-            selector.querySelectorAll('.payment-method').forEach(function (el) {
-                el.addEventListener('click', function () {
+            selector.querySelectorAll('.payment-method').forEach(function (card) {
+                card.addEventListener('click', function () {
                     selector.querySelectorAll('.payment-method').forEach(function (m) {
                         m.classList.remove('selected');
                     });
@@ -140,7 +135,6 @@ $methods = $methods ?? [
                 });
             });
 
-            // Trigger once on load so the initial selected state is correct
             const initial = selector.querySelector('.payment-method.selected');
             if (initial) showPaymentSection(initial.dataset.method);
         }

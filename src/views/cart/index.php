@@ -598,7 +598,7 @@ $apiBase = '/api/' . $site;
 
             if (!cartData.items?.length) {
                 loading.style.display = 'none';
-                empty.style.display = 'block';       // ← full-width, outside the grid
+                empty.style.display = 'block';
                 cartEl.style.display = 'none';
                 updateCartCount(0);
                 return;
@@ -625,52 +625,10 @@ $apiBase = '/api/' . $site;
             return;
         }
 
-        const fmt = (n) => '$' + parseFloat(n).toFixed(2);
+        // ── Main items column — uses shared helper that groups by merchant ──
+        renderCartItemsList(cartData.items);
 
-        document.getElementById('cart-items-list').innerHTML = cartData.items.map(item => {
-            const isFreeGift = (item.options?.type === 'free_gift')
-                || (item.options?.is_gift === true)
-                || parseFloat(item.price || 0) === 0;
-
-            let variantHtml = '';
-            if (item.variant_id && item.variant_options) {
-                const badges = Object.entries(item.variant_options)
-                    .map(([k, v]) => `<span style="display:inline-block;background:var(--bg-light);color:var(--text-secondary);padding:.25rem .75rem;border-radius:1rem;font-size:.875rem;margin-right:.5rem;border:1px solid var(--border-color);">${k.charAt(0).toUpperCase() + k.slice(1)}: <strong>${v}</strong></span>`)
-                    .join('');
-                const sku = item.sku ? `<div style="font-size:.75rem;color:var(--text-secondary);margin-top:.25rem;">SKU: ${item.sku}</div>` : '';
-                variantHtml = `<div style="margin-top:.5rem;">${badges}</div>${sku}`;
-            }
-
-            const priceHtml = isFreeGift ? `<span style="color:#10b981;font-weight:700;font-size:1rem;">FREE</span>` : `<span class="sale-price">${fmt(item.price)}</span>`;
-            const subtotalHtml = isFreeGift ? `<span style="color:#10b981;font-weight:700;">FREE</span>` : fmt(item.subtotal);
-            const deliveryHtml = item.estimated_delivery ? `<span style="font-size:.75rem;color:var(--success-color);margin-top:.25rem;">📦 Delivery: ${item.estimated_delivery}</span>` : '';
-
-            return `
-            <div class="cart-item" data-item-id="${item.id}">
-                <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="item-image">
-                <div class="item-details">
-                    <a href="/shop/details/${item.product_slug}" class="item-name">${item.product_name}</a>
-                    ${variantHtml}
-                    <div class="item-price">${priceHtml}</div>
-                    <div class="quantity-controls">
-                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity - 1})" aria-label="Decrease">-</button>
-                        <input type="number" class="qty-input" value="${item.quantity}" min="1"
-                               onchange="updateQuantity(${item.id}, this.value)" aria-label="Quantity">
-                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity + 1})" aria-label="Increase">+</button>
-                    </div>
-                    ${deliveryHtml}
-                </div>
-                <div class="item-actions">
-                    <div class="item-subtotal">${subtotalHtml}</div>
-                    <button class="remove-btn" onclick="removeItem(${item.id})" aria-label="Remove">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>`;
-        }).join('');
-
+        // ── Sidebar summary ────────────────────────────────────────────────
         renderOrderSummaryItems(cartData.items);
 
         document.getElementById('items-count').textContent = cartData.items.length;
@@ -683,10 +641,13 @@ $apiBase = '/api/' . $site;
         quantity = Math.max(1, parseInt(quantity, 10));
         try {
             const res = await fetch(`${API_BASE}/cart/${itemId}`, {
-                method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({quantity}),
+                method: 'PUT', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({quantity}),
             });
             const data = await res.json();
-            data.success ? (await loadCart(), showToast('Cart updated')) : showToast(data.message || 'Failed to update quantity', 'error');
+            data.success
+                ? (await loadCart(), showToast('Cart updated'))
+                : showToast(data.message || 'Failed to update quantity', 'error');
         } catch (err) {
             console.error(err);
             showToast('Failed to update quantity', 'error');
@@ -698,7 +659,9 @@ $apiBase = '/api/' . $site;
         try {
             const res = await fetch(`${API_BASE}/cart/${itemId}`, {method: 'DELETE'});
             const data = await res.json();
-            data.success ? (await loadCart(), showToast('Item removed from cart')) : showToast(data.message || 'Failed to remove item', 'error');
+            data.success
+                ? (await loadCart(), showToast('Item removed from cart'))
+                : showToast(data.message || 'Failed to remove item', 'error');
         } catch (err) {
             console.error(err);
             showToast('Failed to remove item', 'error');
@@ -710,7 +673,9 @@ $apiBase = '/api/' . $site;
         try {
             const res = await fetch(`${API_BASE}/cart/clear`, {method: 'DELETE'});
             const data = await res.json();
-            data.success ? (await loadCart(), showToast('Cart cleared')) : showToast(data.message || 'Failed to clear cart', 'error');
+            data.success
+                ? (await loadCart(), showToast('Cart cleared'))
+                : showToast(data.message || 'Failed to clear cart', 'error');
         } catch (err) {
             console.error(err);
             showToast('Failed to clear cart', 'error');
@@ -719,7 +684,8 @@ $apiBase = '/api/' . $site;
 
     function proceedToCheckout() {
         if (window.appliedVoucher) sessionStorage.setItem('appliedVoucher', JSON.stringify(window.appliedVoucher));
-        if (Object.keys(subscriptionStartDates).length) sessionStorage.setItem('subscriptionStartDates', JSON.stringify(subscriptionStartDates));
+        if (Object.keys(subscriptionStartDates).length)
+            sessionStorage.setItem('subscriptionStartDates', JSON.stringify(subscriptionStartDates));
         window.location.href = isOneTimeSubscription ? '/checkout?type=subscription' : '/checkout';
     }
 

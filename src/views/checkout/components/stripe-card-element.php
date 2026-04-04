@@ -40,13 +40,14 @@ $showBackButton = $showBackButton ?? true;
     <div class="section-header">
         <h2 class="section-title"><?= htmlspecialchars($sectionTitle) ?></h2>
         <?php if ($showBackButton): ?>
-            <button type="button"
-                    id="back-to-saved-cards-btn"
-                    onclick="<?= htmlspecialchars($backBtnOnClick) ?>"
-                    class="btn btn-secondary"
-                    style="display: none; width: auto; padding: .5rem 1rem;">
-                ← Back to Saved Cards
-            </button>
+            <?= $this->partial('checkout/components/form/button', [
+                    'label' => '← Back to Saved Cards',
+                    'id' => 'back-to-saved-cards-btn',
+                    'variant' => 'secondary',
+                    'type' => 'button',
+                    'onclick' => $backBtnOnClick,
+                    'style' => 'display: none; width: auto; padding: .5rem 1rem;',
+            ]) ?>
         <?php endif; ?>
     </div>
     <div class="form-group full-width">

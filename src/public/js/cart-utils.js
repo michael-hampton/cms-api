@@ -327,4 +327,109 @@
       <div class="cs-merchant-subtotal">${_fmtPrice(group.subtotal)}</div>
     </div>`;
     }
+
+    /**
+     * Re-renders the cart items list, preserving merchant group headers.
+     * Called after any CRUD operation (updateQuantity / removeItem / clearCart).
+     */
+    window.renderCartItemsList = function (items) {
+        const container = document.getElementById('cart-items-list');
+        if (!container) return;
+
+        const groups = groupItemsByMerchant(items);
+
+        container.innerHTML = Object.entries(groups).map(([merchantId, group]) => {
+            const itemsHtml = group.items.map(item => {
+                const isFree = (item.options?.type === 'free_gift')
+                    || (item.options?.is_gift === true)
+                    || parseFloat(item.price || 0) === 0;
+
+                let variantHtml = '';
+                if (item.variant_id && item.variant_options) {
+                    const badges = Object.entries(item.variant_options)
+                        .map(([k, v]) =>
+                            `<span style="display:inline-block;background:var(--bg-light);color:var(--text-secondary);padding:.25rem .75rem;border-radius:1rem;font-size:.875rem;margin-right:.5rem;border:1px solid var(--border-color);">
+                            ${k.charAt(0).toUpperCase() + k.slice(1)}: <strong>${v}</strong>
+                        </span>`)
+                        .join('');
+                    const sku = item.sku ? `<div style="font-size:.75rem;color:var(--text-secondary);margin-top:.25rem;">SKU: ${item.sku}</div>` : '';
+                    variantHtml = `<div style="margin-top:.5rem;">${badges}</div>${sku}`;
+                }
+
+                const priceHtml = isFree ? `<span style="color:#10b981;font-weight:700;font-size:1rem;">FREE</span>`
+                    : `<span class="sale-price">${formatCurrency(item.price)}</span>`;
+                const subtotalHtml = isFree ? `<span style="color:#10b981;font-weight:700;">FREE</span>`
+                    : formatCurrency(item.subtotal);
+                const deliveryHtml = item.estimated_delivery
+                    ? `<span style="font-size:.75rem;color:var(--success-color);margin-top:.25rem;">📦 Delivery: ${item.estimated_delivery}</span>`
+                    : '';
+
+                return `
+            <div class="cart-item" data-item-id="${item.id}">
+                <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="item-image">
+                <div class="item-details">
+                    <a href="/shop/details/${item.product_slug}" class="item-name">${item.product_name}</a>
+                    ${variantHtml}
+                    <div class="item-price">${priceHtml}</div>
+                    <div class="quantity-controls">
+                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity - 1})" aria-label="Decrease">-</button>
+                        <input type="number" class="qty-input" value="${item.quantity}" min="1"
+                               onchange="updateQuantity(${item.id}, this.value)" aria-label="Quantity">
+                        <button class="qty-btn" onclick="updateQuantity(${item.id}, ${item.quantity + 1})" aria-label="Increase">+</button>
+                    </div>
+                    ${deliveryHtml}
+                </div>
+                <div class="item-actions">
+                    <div class="item-subtotal">${subtotalHtml}</div>
+                    <button class="remove-btn" onclick="removeItem(${item.id})" aria-label="Remove">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>`;
+            }).join('');
+
+            return `
+        <div class="merchant-group">
+            <div class="merchant-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         style="display:inline-block;vertical-align:middle;margin-right:.5rem;" aria-hidden="true">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    ${group.name}
+                </h3>
+                <p>${group.items.length} item(s)</p>
+            </div>
+            ${itemsHtml}
+        </div>`;
+        }).join('');
+    }
+
+    /* ── Cart item list (main column) — merchant-grouped ─────────────────── */
+    /**
+     * Groups a flat items array by merchant_id, preserving the merchant_name.
+     * Returns { merchantId: { name, items: [] }, … }
+     */
+    function groupItemsByMerchant(items) {
+        const groups = {};
+        for (const item of items) {
+            const mid = item.merchant_id ?? item.options?.merchant_id ?? 0;
+            const name = (mid && item.merchant_name) ? item.merchant_name
+                : mid ? 'Merchant ' + mid
+                    : 'Direct';
+
+            if (!groups[mid]) {
+                groups[mid] = {name, items: []};
+            }
+            groups[mid].items.push(item);
+        }
+        return groups;
+    }
+
+    function formatCurrency(amount) {
+        return PLAN_CURRENCY + parseFloat(amount).toFixed(2);
+    }
 })();
