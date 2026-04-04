@@ -422,6 +422,7 @@ $apiBase = '/api/' . $site;
     'backUrl' => '/cart',
     ])
 </div>
+
 @endsection
 
 @section('scripts')
@@ -440,6 +441,31 @@ $apiBase = '/api/' . $site;
 
 @include('checkout/components/scripts/payment-method-selector.js.php')
 @js('checkout-auth.js')
+
+<script>
+    /*
+     * Restore the correct card UI when the user switches back to "card" after
+     * having selected another payment method (e.g. PayPal → Card).
+     *
+     * payment-method-selector.js calls window.onPaymentMethodChange(method)
+     * on every selection. Without this hook, #saved-cards-section stays hidden
+     * because showPaymentSection() hides it, and only the Stripe element reappears.
+     *
+     * Fix: if cards were already fetched, re-run displaySavedCards() which shows
+     * #saved-cards-section and hides #new-card-section. Otherwise do nothing —
+     * saved-cards.js loadSavedCards() will handle first-load visibility.
+     */
+    window.onPaymentMethodChange = function (method) {
+        if (method !== 'card') return;
+
+        if (window.savedCards && window.savedCards.length > 0
+            && typeof window.displaySavedCards === 'function') {
+            window.displaySavedCards();
+        }
+        // If no saved cards exist, #new-card-section is already visible from
+        // the initial load — nothing to restore.
+    };
+</script>
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>

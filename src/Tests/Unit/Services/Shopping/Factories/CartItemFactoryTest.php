@@ -153,7 +153,7 @@ class CartItemFactoryTest extends FunctionalTestCase
 
     public function testFromSubscriptionReturnsCartItemData(): void
     {
-        $product = new Product([
+        $product = new SubscriptionPlan([
             'id' => 1,
             'site_id' => 10
         ]);

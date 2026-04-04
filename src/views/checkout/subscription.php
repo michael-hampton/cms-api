@@ -361,6 +361,28 @@ $planPrice = (float)$plan->price;
 @js('cart-utils.js')
 @js('saved-cards.js')
 
+<script>
+    /*
+     * Restore the correct card UI when the user switches back to "card" after
+     * having selected another payment method (e.g. PayPal → Card).
+     *
+     * payment-method-selector.js calls window.onPaymentMethodChange(method)
+     * on every selection. Without this hook, #saved-cards-section stays hidden
+     * and only the Stripe element reappears.
+     *
+     * Fix: if cards were already fetched, re-run displaySavedCards() to restore
+     * the saved-cards list and hide #new-card-section.
+     */
+    window.onPaymentMethodChange = function (method) {
+        if (method !== 'card') return;
+
+        if (window.savedCards && window.savedCards.length > 0
+            && typeof window.displaySavedCards === 'function') {
+            window.displaySavedCards();
+        }
+    };
+</script>
+
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
@@ -389,13 +411,19 @@ $planPrice = (float)$plan->price;
             },
         });
 
-        const cardContainer = document.getElementById('card-element');
-        if (cardContainer) {
-            cardElement.mount('#card-element');
-            cardElement.on('change', e => {
-                const err = document.getElementById('card-errors');
-                if (err) err.textContent = e.error ? e.error.message : '';
-            });
+        // Only mount immediately if #new-card-section is visible (i.e. no
+        // saved cards have been loaded yet). If saved-cards.js later calls
+        // showNewCardForm(), the element will already be mounted because
+        // cardElement.mount() is idempotent once called.
+        cardElement.on('change', e => {
+            const err = document.getElementById('card-errors');
+            if (err) err.textContent = e.error ? e.error.message : '';
+        });
+
+        const newCardSection = document.getElementById('new-card-section');
+        if (!newCardSection || newCardSection.style.display !== 'none') {
+            const cardContainer = document.getElementById('card-element');
+            if (cardContainer) cardElement.mount('#card-element');
         }
     }
 
@@ -425,7 +453,6 @@ $planPrice = (float)$plan->price;
             required.push('address', 'city', 'postal_code', 'country');
         }
 
-        console.log('required', required, data)
 
         let hasErrors = false;
         for (const field of required) {

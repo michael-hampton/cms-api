@@ -5,11 +5,9 @@
 
     window.loadSavedCards = async function () {
         if (!window.isLoggedIn || !window.currentMember) return;
-        alert('mike8')
         try {
             const res = await fetch(`${API_BASE}/member/payment-methods`);
             const data = await res.json();
-            console.log('data')
             if (data.success && data.data.payment_methods?.length > 0) {
                 window.savedCards = data.data.payment_methods;
                 displaySavedCards();
