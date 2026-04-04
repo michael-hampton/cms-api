@@ -20,15 +20,10 @@
     };
 
     window.displaySavedCards = function () {
-        alert('here67')
         const container = document.getElementById('saved-cards-list');
         const section = document.getElementById('saved-cards-section');
 
-        alert(container + ' ' + section)
-
         if (!container || !section) return;
-
-        alert('here10')
 
         container.innerHTML = window.savedCards.map(function (card) {
             const selected = card.id === window.selectedCardId ? ' selected' : '';
