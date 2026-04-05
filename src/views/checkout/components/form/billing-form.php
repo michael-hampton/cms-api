@@ -89,7 +89,6 @@ $countryOptions = [
 
     <!-- Saved addresses — revealed by JS when member has saved addresses -->
     @include('checkout/components/form/form-section', [
-    'close' => false,
     'title' => 'Saved Addresses',
     'id' => 'saved-addresses-section',
     'style' => 'display: none;'

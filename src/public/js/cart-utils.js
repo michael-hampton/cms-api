@@ -474,6 +474,7 @@
     }
 
     function displaySavedAddresses(addresses) {
+        console.log('addresses', addresses)
         const container = document.getElementById('saved-addresses-list');
         const section = document.getElementById('saved-addresses-section');
         if (!container || !section) return;

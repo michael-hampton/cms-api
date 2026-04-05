@@ -67,6 +67,7 @@ class MemberAddressController extends Controller
     {
         $member = Member::find($memberId);
         $addresses = $this->addressRepository->getAddressesForMember($memberId);
+
         return $this->resourceResponse(['items' => $addresses]);
     }
 

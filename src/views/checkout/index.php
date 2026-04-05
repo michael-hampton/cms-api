@@ -377,8 +377,7 @@ $apiBase = '/api/' . $site;
                 ])
 
                 <!-- Order notes -->
-                @include('checkout/components/form/form-section', ['title' => 'Order Notes (Optional)', 'close' =>
-                false])
+                @include('checkout/components/form/form-section', ['title' => 'Order Notes (Optional)'])
                 @include('checkout/components/form/form-group', [
                 'name' => 'notes',
                 'label' => 'Special instructions for delivery',
@@ -671,7 +670,7 @@ $apiBase = '/api/' . $site;
 
         // US consent
         const usConsentBlock = document.getElementById('us-renewal-consent-block');
-        if (usConsentBlock?.style.display !== 'none' && isOneTimeSubscription) {
+        if (usConsentBlock && usConsentBlock?.style.display !== 'none' && isOneTimeSubscription) {
             const usConsentCb = document.getElementById('us-renewal-consent');
             if (!usConsentCb?.checked) {
                 usConsentBlock.classList.add('consent-error');

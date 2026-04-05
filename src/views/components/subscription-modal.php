@@ -2,32 +2,28 @@
 /**
  * Subscription modal.
  *
+ * Steps:
+ *   1 — Choose Plan
+ *   2 — Account  (skipped when already logged in)
+ *   3a — Delivery Address  (print plans only; skipped for digital)
+ *   3b — Payment
+ *   4  — Complete
+ *
+ * Progress indicator shows 4 circles: Plan → Account → Address → Payment → Complete
+ * For digital plans "Address" is shown greyed/skipped visually but not rendered.
+ *
  * Uses shared checkout components:
- *   - checkout/components/saved-cards            (#saved-cards-section / #saved-cards-list)
- *   - checkout/components/stripe-card-element    (#card-element / #card-errors)
- *   - checkout/components/voucher-section        (#voucher-input / #applied-voucher / #discount-row)
- *   - checkout/components/auto-renewal-consent   (#global-renewal-consent-block)
+ *   - checkout/components/form/billing-form  (step 3 — address)
+ *   - checkout/components/saved-cards
+ *   - checkout/components/stripe-card-element
+ *   - checkout/components/voucher-section
+ *   - checkout/components/auto-renewal-consent
  *   - checkout/components/security-badge
  *   - checkout/components/form/button
  *
  * JS dependencies (loaded by the parent layout before this partial):
- *   - cart-utils.js   (showAlert, showVoucherMessage, applyVoucher, removeVoucher,
- *                       displayAppliedVoucher, updateTotals)
- *   - saved-cards.js  (loadSavedCards, displaySavedCards, selectSavedCard,
- *                       showNewCardForm, showSavedCards)
- *   - payment-method-selector.js  (initialises .payment-method click handlers)
- *
- * Payment flow mirrors checkout/index.php:
- *   POST /api/{site}/subscriptions/onetime/checkout
- *   → stripe.confirmCardPayment(clientSecret)
- *   → POST /api/{site}/subscriptions/onetime/confirm-payment
- *   → step 4 (success)
- *
- * Globals set here for shared JS files:
- *   window.API_BASE, window.PLAN_CURRENCY, window.INITIAL_SUBTOTAL,
- *   window.INITIAL_SHIPPING, window.TAX_RATE,
- *   window.isLoggedIn, window.currentMember,
- *   window.selectedCardId, window.appliedVoucher
+ *   - cart-utils.js
+ *   - saved-cards.js
  *
  * @var array $subscriptionModalData {
  *   bool         show_modal
@@ -51,7 +47,7 @@ $apiBase = '/api/' . $site;
 
     <div class="sub-modal-container">
 
-        <!-- Close button (shared component) -->
+        <!-- Close button -->
         <?= $this->partial('checkout/components/form/button', [
                 'id' => 'sub-modal-close-btn',
                 'label' => '✕',
@@ -61,10 +57,20 @@ $apiBase = '/api/' . $site;
                 'onclick' => 'closeSubscriptionModal()',
         ]) ?>
 
-        <!-- Progress indicator -->
+        <!-- ── Progress indicator ──────────────────────────────────────
+             Steps: 1 Plan | 2 Account | 3 Address | 4 Payment | 5 Complete
+             "Account" circle is hidden for logged-in users via JS class.
+             "Address"  circle is marked .sub-prog-skipped for digital plans.
+        ─────────────────────────────────────────────────────────────── -->
         <div class="sub-progress" role="list">
             <?php
-            $steps = [1 => 'Choose Plan', 2 => 'Account', 3 => 'Payment', 4 => 'Complete'];
+            $steps = [
+                    1 => 'Plan',
+                    2 => 'Account',
+                    3 => 'Address',
+                    4 => 'Payment',
+                    5 => 'Done',
+            ];
             foreach ($steps as $n => $label): ?>
                 <div class="sub-progress-step" id="sub-prog-<?= $n ?>"
                      data-step="<?= $n ?>" role="listitem">
@@ -77,7 +83,7 @@ $apiBase = '/api/' . $site;
             <?php endforeach; ?>
         </div>
 
-        <!-- ══ Step 1: Choose Plan ═══════════════════════════════════ -->
+        <!-- ══ Step 1: Choose Plan ════════════════════════════════════ -->
         <div class="sub-step" id="sub-step-1">
             <div class="sub-header">
                 <h2 class="sub-title">Choose Your Plan</h2>
@@ -147,7 +153,7 @@ $apiBase = '/api/' . $site;
             </div>
         </div>
 
-        <!-- ══ Step 2: Account (skipped when already logged in) ══════ -->
+        <!-- ══ Step 2: Account (skipped when already logged in) ═══════ -->
         <div class="sub-step" id="sub-step-2" style="display: none;">
             <div class="sub-header">
                 <h2 class="sub-title">Your Account</h2>
@@ -200,7 +206,7 @@ $apiBase = '/api/' . $site;
                         'required' => true,
                         'attrs' => ['autocomplete' => 'new-password', 'minlength' => '8'],
                 ]) ?>
-                <p class="sub-hint" style="margin-top: -.5rem; margin-bottom: .75rem;">Minimum 8 characters</p>
+                <p class="sub-hint" style="margin-top:-.5rem;margin-bottom:.75rem;">Minimum 8 characters</p>
                 <?= $this->partial('checkout/components/form/form-group', [
                         'name' => 'password_confirmation',
                         'id' => 'sub-reg-confirm',
@@ -224,7 +230,7 @@ $apiBase = '/api/' . $site;
             </form>
 
             <!-- Login -->
-            <form id="sub-login-form" class="sub-form" style="display: none;" novalidate>
+            <form id="sub-login-form" class="sub-form" style="display:none;" novalidate>
                 <?= $this->partial('checkout/components/form/form-group', [
                         'name' => 'email',
                         'id' => 'sub-login-email',
@@ -247,8 +253,8 @@ $apiBase = '/api/' . $site;
                         'variant' => 'primary',
                         'type' => 'submit',
                 ]) ?>
-                <div style="text-align: center; margin-top: .75rem; font-size: .875rem;">
-                    <a href="/member/forgot-password" target="_blank" style="color: var(--sub-primary);">
+                <div style="text-align:center;margin-top:.75rem;font-size:.875rem;">
+                    <a href="/member/forgot-password" target="_blank" style="color:var(--sub-primary);">
                         Forgot password?
                     </a>
                 </div>
@@ -258,103 +264,113 @@ $apiBase = '/api/' . $site;
                     'label' => '← Back to Plans',
                     'variant' => 'secondary',
                     'type' => 'button',
-                    'style' => 'margin-top: 1rem;',
+                    'style' => 'margin-top:1rem;',
                     'onclick' => 'subGoToStep(1)',
             ]) ?>
         </div>
 
-        <!-- ══ Step 3: Payment ════════════════════════════════════════ -->
-        <div class="sub-step" id="sub-step-3" style="display: none;">
+        <!-- ══ Step 3: Delivery Address (print plans only) ════════════
+             Hidden for digital plans — subGoToStep() skips it entirely.
+             The <form> id is sub-address-form so JS can serialise it
+             separately from the account forms above.
+        ════════════════════════════════════════════════════════════════ -->
+        <div class="sub-step" id="sub-step-3" style="display:none;">
+            <div class="sub-header">
+                <h2 class="sub-title">Delivery Address</h2>
+                <p class="sub-subtitle">Where should we send your subscription?</p>
+            </div>
+
+            <form id="sub-address-form" novalidate>
+                <?= $this->partial('checkout/components/form/billing-form', [
+                        'member' => $member,
+                        'requiresShipping' => true,
+                        'checkoutMode' => 'single-page',
+                ]) ?>
+            </form>
+
+            <!-- US auto-renewal consent is shown here because country is known
+                 only after the address step. JS calls handleSubCountryChange()
+                 via the select's onchange handler in the address form partial. -->
+            <?= $this->partial('checkout/components/auto-renewal-consent', [
+                    'showGlobal' => false,
+                    'showUs' => true,
+                    'usConsentId' => 'sub-us-renewal-consent',
+            ]) ?>
+
+            <div style="display:flex;gap:.75rem;margin-top:1.5rem;">
+                <?= $this->partial('checkout/components/form/button', [
+                        'label' => '← Back',
+                        'variant' => 'secondary',
+                        'type' => 'button',
+                        'onclick' => 'subGoBack()',
+                ]) ?>
+                <?= $this->partial('checkout/components/form/button', [
+                        'id' => 'sub-address-next-btn',
+                        'label' => 'Continue to Payment →',
+                        'variant' => 'primary',
+                        'type' => 'button',
+                        'onclick' => 'subAdvanceFromAddress()',
+                ]) ?>
+            </div>
+        </div>
+
+        <!-- ══ Step 4: Payment ════════════════════════════════════════ -->
+        <div class="sub-step" id="sub-step-4" style="display:none;">
             <div class="sub-header">
                 <h2 class="sub-title">Payment Details</h2>
                 <p class="sub-subtitle">Secure checkout powered by Stripe</p>
             </div>
 
-            <div class="sub-step3-layout">
+            <div class="sub-step4-layout">
 
                 <!-- LEFT: payment inputs -->
-                <div class="sub-step3-main">
+                <div class="sub-step4-main">
 
-                    <!--
-                        Payment method selector.
-                        Uses the shared .payment-method / .payment-methods CSS from the
-                        layout, and payment-method-selector.js for click handling.
-                        window.onPaymentMethodChange (defined below) toggles sections.
-                    -->
                     @include('checkout/components/payment-method-selector')
 
-                    <!-- Card payment section -->
                     <div id="sub-card-payment-section">
-
-                        <!--
-                            Saved payment methods.
-                            Targets #saved-cards-section / #saved-cards-list / #new-card-section
-                            and #back-to-saved-cards-btn — the same IDs saved-cards.js expects.
-                            loadSavedCards() is called when step 3 becomes visible.
-                        -->
                         <?= $this->partial('checkout/components/saved-cards', [
                                 'useDifferentCardOnClick' => 'showNewCardForm()',
                         ]) ?>
 
-                        <!--
-                            Stripe card element.
-                            Mounts into #card-element; errors written to #card-errors.
-                            Back button #back-to-saved-cards-btn toggled by showNewCardForm().
-                        -->
                         <?= $this->partial('checkout/components/stripe-card-element', [
                                 'showBackButton' => true,
                                 'backBtnOnClick' => 'showSavedCards()',
                         ]) ?>
-
                     </div>
 
-                    <!-- PayPal section (shown when PayPal method is selected) -->
-                    <div id="sub-paypal-payment-section" data-payment-section="paypal" style="display: none;">
-                        <p style="font-size: .875rem; color: var(--text-secondary); text-align: center; padding: 1.25rem 0;">
+                    <div id="sub-paypal-payment-section" data-payment-section="paypal" style="display:none;">
+                        <p style="font-size:.875rem;color:var(--text-secondary);text-align:center;padding:1.25rem 0;">
                             You will be redirected to PayPal to complete your payment.
                         </p>
                     </div>
 
-                    <!--
-                        Voucher section.
-                        applyVoucher() and removeVoucher() from cart-utils.js handle the
-                        full flow: API call → DOM update → total recalculation.
-                        They read window.appliedVoucher, PLAN_CURRENCY, and INITIAL_SUBTOTAL
-                        which are kept in sync when a plan is selected.
-                    -->
                     <?= $this->partial('checkout/components/voucher-section', [
-                            'currency' => '', // JS sets PLAN_CURRENCY at runtime via subReadPlanData
+                            'currency' => '',
                             'applyOnClick' => 'applyVoucher()',
                             'removeOnClick' => 'removeVoucher()',
                     ]) ?>
 
-                    <!--
-                        Auto-renewal consent.
-                        Uses a scoped checkbox ID to avoid collision if the full checkout
-                        page is simultaneously present in the DOM.
-                    -->
+                    <!-- Global auto-renewal consent (all plans) -->
                     <?= $this->partial('checkout/components/auto-renewal-consent', [
                             'showGlobal' => true,
                             'showUs' => false,
                             'globalConsentId' => 'sub-global-renewal-consent',
                     ]) ?>
 
-                </div><!-- /.sub-step3-main -->
+                </div>
 
                 <!-- RIGHT: order summary sidebar -->
                 <aside class="sub-step3-aside">
                     <div class="sub-aside-card">
                         <h3 class="sub-aside-heading">Order Summary</h3>
-
-                        <!-- Plan summary (populated dynamically by subUpdatePaymentSummary) -->
                         <div class="sub-aside-plan-name" id="sub-summary-plan-name">—</div>
-
                         <div class="sub-summary-row">
                             <span>Billing</span>
                             <strong id="sub-summary-billing">—</strong>
                         </div>
                         <div class="sub-summary-row" id="sub-discount-summary-row"
-                             style="display: none; color: var(--success-color, #10b981);">
+                             style="display:none;color:var(--success-color,#10b981);">
                             <span>Discount</span>
                             <strong id="sub-summary-discount">—</strong>
                         </div>
@@ -363,7 +379,6 @@ $apiBase = '/api/' . $site;
                             <span>Total today</span>
                             <strong id="sub-summary-total">—</strong>
                         </div>
-
                         <div class="sub-aside-guarantee">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                                  stroke="currentColor" stroke-width="2.5" aria-hidden="true">
@@ -373,17 +388,15 @@ $apiBase = '/api/' . $site;
                         </div>
                     </div>
 
-                    <!-- Submit -->
                     <?= $this->partial('checkout/components/form/button', [
                             'id' => 'sub-pay-btn',
                             'label' => 'Complete Subscription',
                             'variant' => 'primary',
                             'type' => 'button',
-                            'style' => 'width: 100%; margin-top: 1rem;',
+                            'style' => 'width:100%;margin-top:1rem;',
                             'onclick' => 'subProcessPayment()',
                     ]) ?>
 
-                    <!-- Security badge (shared component) -->
                     <?= $this->partial('checkout/components/security-badge', [
                             'label' => 'Secured by Stripe · 256-bit SSL',
                     ]) ?>
@@ -392,16 +405,15 @@ $apiBase = '/api/' . $site;
                             'label' => '← Back',
                             'variant' => 'secondary',
                             'type' => 'button',
-                            'style' => 'width: 100%; margin-top: .5rem;',
-                            'onclick' => 'subGoToStep(' . ($isLoggedIn ? 1 : 2) . ')',
+                            'style' => 'width:100%;margin-top:.5rem;',
+                            'onclick' => 'subGoBack()',
                     ]) ?>
-                </aside><!-- /.sub-step3-aside -->
-
-            </div><!-- /.sub-step3-layout -->
+                </aside>
+            </div>
         </div>
 
-        <!-- ══ Step 4: Success ════════════════════════════════════════ -->
-        <div class="sub-step" id="sub-step-4" style="display: none;">
+        <!-- ══ Step 5: Success ════════════════════════════════════════ -->
+        <div class="sub-step" id="sub-step-5" style="display:none;">
             <div class="sub-success">
                 <div class="sub-success-icon" aria-hidden="true">
                     <svg width="56" height="56" viewBox="0 0 24 24" fill="none"
@@ -415,13 +427,13 @@ $apiBase = '/api/' . $site;
                         'label' => 'Go to Dashboard',
                         'variant' => 'primary',
                         'type' => 'button',
-                        'style' => 'margin-top: 1.5rem;',
+                        'style' => 'margin-top:1.5rem;',
                         'onclick' => "window.location.href='/" . htmlspecialchars($site) . "/member/dashboard'",
                 ]) ?>
             </div>
         </div>
 
-        <!-- Loading overlay (scoped inside modal container) -->
+        <!-- Loading overlay -->
         <div class="sub-loading" id="sub-loading" aria-live="polite">
             <div class="sub-spinner"></div>
             <p>Processing...</p>
@@ -457,10 +469,10 @@ $apiBase = '/api/' . $site;
 
     @keyframes subFadeIn {
         from {
-            opacity: 0;
+            opacity: 0
         }
         to {
-            opacity: 1;
+            opacity: 1
         }
     }
 
@@ -474,7 +486,7 @@ $apiBase = '/api/' . $site;
     .sub-modal-container {
         position: relative;
         width: 100%;
-        max-width: 860px;
+        max-width: 1200px;
         max-height: 92vh;
         margin: 4vh auto;
         background: var(--sub-bg);
@@ -484,19 +496,18 @@ $apiBase = '/api/' . $site;
         box-shadow: 0 25px 60px rgba(0, 0, 0, .22);
         animation: subSlideUp .35s cubic-bezier(.34, 1.56, .64, 1);
     }
-
     @keyframes subSlideUp {
         from {
             opacity: 0;
-            transform: translateY(20px) scale(.97);
+            transform: translateY(20px) scale(.97)
         }
         to {
             opacity: 1;
-            transform: translateY(0) scale(1);
+            transform: translateY(0) scale(1)
         }
     }
 
-    /* ── Close button ───────────────────────────────────────────── */
+    /* ── Close ──────────────────────────────────────────────────── */
     .sub-modal-container .sub-modal-close.btn {
         position: absolute;
         top: 1.125rem;
@@ -514,7 +525,6 @@ $apiBase = '/api/' . $site;
         z-index: 10;
         transition: transform .2s, background .2s;
     }
-
     .sub-modal-container .sub-modal-close.btn:hover {
         background: var(--sub-border) !important;
         transform: rotate(90deg);
@@ -527,14 +537,12 @@ $apiBase = '/api/' . $site;
         justify-content: center;
         margin-bottom: 2rem;
     }
-
     .sub-progress-step {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: .375rem;
     }
-
     .sub-progress-circle {
         width: 40px;
         height: 40px;
@@ -563,6 +571,15 @@ $apiBase = '/api/' . $site;
         color: white;
     }
 
+    /* Skipped steps (address step for digital plans) */
+    .sub-progress-step.skipped .sub-progress-circle {
+        opacity: .35;
+    }
+
+    .sub-progress-step.skipped .sub-progress-label {
+        opacity: .35;
+    }
+
     .sub-progress-label {
         font-size: .7rem;
         font-weight: 600;
@@ -587,7 +604,7 @@ $apiBase = '/api/' . $site;
         flex-shrink: 0;
     }
 
-    /* ── Step header ────────────────────────────────────────────── */
+    /* ── Step header ─────────────────────────────────────────────── */
     .sub-header {
         text-align: center;
         margin-bottom: 1.75rem;
@@ -609,10 +626,9 @@ $apiBase = '/api/' . $site;
     /* ── Plans grid ─────────────────────────────────────────────── */
     .sub-plans {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
         gap: 1.25rem;
     }
-
     .sub-plan {
         position: relative;
         background: var(--sub-bg);
@@ -726,7 +742,6 @@ $apiBase = '/api/' . $site;
         flex-shrink: 0;
     }
 
-    /* Override shared .btn inside plan cards */
     .sub-modal-container .sub-plan-btn.btn {
         background: var(--sub-primary) !important;
         border: none !important;
@@ -739,7 +754,7 @@ $apiBase = '/api/' . $site;
         box-shadow: 0 6px 16px rgba(99, 102, 241, .28);
     }
 
-    /* ── Auth toggle ────────────────────────────────────────────── */
+    /* ── Auth toggle ─────────────────────────────────────────────── */
     .sub-auth-toggle {
         display: flex;
         background: var(--sub-bg-alt);
@@ -768,7 +783,7 @@ $apiBase = '/api/' . $site;
         box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
     }
 
-    /* ── Auth forms ─────────────────────────────────────────────── */
+    /* ── Auth forms ──────────────────────────────────────────────── */
     .sub-form {
         max-width: 420px;
         margin: 0 auto;
@@ -776,36 +791,8 @@ $apiBase = '/api/' . $site;
 
     .sub-form-row {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns:1fr 1fr;
         gap: .875rem;
-    }
-
-    .sub-form-group {
-        margin-bottom: 1rem;
-    }
-
-    .sub-label {
-        display: block;
-        font-size: .875rem;
-        font-weight: 600;
-        color: var(--sub-text);
-        margin-bottom: .3125rem;
-    }
-
-    .sub-input {
-        width: 100%;
-        padding: .625rem .875rem;
-        border: 2px solid var(--sub-border);
-        border-radius: 8px;
-        font-size: .9375rem;
-        color: var(--sub-text);
-        transition: border-color .2s, box-shadow .2s;
-    }
-
-    .sub-input:focus {
-        outline: none;
-        border-color: var(--sub-primary);
-        box-shadow: 0 0 0 3px rgba(99, 102, 241, .1);
     }
 
     .sub-hint {
@@ -829,10 +816,50 @@ $apiBase = '/api/' . $site;
         display: block;
     }
 
-    /* ── Step 3 two-column layout ───────────────────────────────── */
-    .sub-step3-layout {
+    /* ── Address step ─────────────────────────────────────────────
+       The form inside #sub-step-3 uses the standard .form-row /
+       .form-group / .form-input classes already in the layout CSS.
+       We just need spacing and a max-width constraint.
+    ──────────────────────────────────────────────────────────────── */
+    #sub-step-3 .form-section {
+        margin-bottom: 1.5rem;
+    }
+
+    #sub-step-3 .form-row {
         display: grid;
-        grid-template-columns: 1fr 280px;
+        grid-template-columns:1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    #sub-step-3 .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: .25rem;
+    }
+
+    #sub-step-3 .form-group.full-width {
+        grid-column: 1/-1;
+    }
+
+    #sub-step-3 .section-title {
+        font-size: 1rem;
+        font-weight: 700;
+        margin-bottom: .875rem;
+        padding-bottom: .625rem;
+        border-bottom: 2px solid var(--sub-border);
+    }
+
+    /* US consent block sits just below the address form — hide until JS reveals */
+    #sub-step-3 .auto-renewal-consent {
+        display: none;
+        margin-top: 1rem;
+    }
+
+    /* ── Step 4 two-column layout ────────────────────────────────── */
+    .sub-step4-layout {
+        display: grid;
+        grid-template-columns:1fr 280px;
         gap: 2rem;
         align-items: start;
     }
@@ -842,6 +869,7 @@ $apiBase = '/api/' . $site;
         top: 1rem;
     }
 
+    /* reuse existing aside class */
     .sub-aside-card {
         background: var(--sub-bg-alt);
         border: 1px solid var(--sub-border);
@@ -878,7 +906,6 @@ $apiBase = '/api/' . $site;
         border-top: 1px solid var(--sub-border);
     }
 
-    /* ── Payment summary rows (shared between sidebar and inline) ── */
     .sub-summary-row {
         display: flex;
         justify-content: space-between;
@@ -900,93 +927,7 @@ $apiBase = '/api/' . $site;
         color: var(--sub-primary);
     }
 
-    /* ── Payment method selector ────────────────────────────────── */
-    .sub-method-section {
-        margin-bottom: 1.25rem;
-    }
-
-    .sub-section-label {
-        font-size: .8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .05em;
-        color: var(--sub-muted);
-        margin-bottom: .5rem;
-    }
-
-    /* The shared .payment-methods grid, scoped to the modal selector */
-    #sub-payment-method-selector.payment-methods {
-        grid-template-columns: 1fr 1fr;
-        gap: .75rem;
-    }
-
-    #sub-payment-method-selector .payment-method {
-        padding: .75rem 1rem;
-    }
-
-    /* ── Shared component max-width constraint ──────────────────── */
-    .sub-modal-container #saved-cards-section,
-    .sub-modal-container #new-card-section,
-    .sub-modal-container .voucher-section,
-    .sub-modal-container .auto-renewal-consent {
-        max-width: 520px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-
-    .sub-modal-container .security-badge {
-        justify-content: center;
-        margin-top: 1rem;
-    }
-
-    /* ── Success ────────────────────────────────────────────────── */
-    .sub-success {
-        text-align: center;
-        padding: 2.5rem 1.5rem;
-        max-width: 420px;
-        margin: 0 auto;
-    }
-
-    .sub-success-icon {
-        width: 84px;
-        height: 84px;
-        background: linear-gradient(135deg, var(--success-color, #10b981), #059669);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 1.375rem;
-        animation: subSuccessPop .45s cubic-bezier(.34, 1.56, .64, 1);
-    }
-
-    @keyframes subSuccessPop {
-        0% {
-            transform: scale(0);
-            opacity: 0;
-        }
-        60% {
-            transform: scale(1.1);
-        }
-        100% {
-            transform: scale(1);
-            opacity: 1;
-        }
-    }
-
-    .sub-success-title {
-        font-size: 1.625rem;
-        font-weight: 800;
-        color: var(--sub-text);
-        margin-bottom: .625rem;
-    }
-
-    .sub-success-text {
-        font-size: .9375rem;
-        color: var(--sub-muted);
-        line-height: 1.6;
-    }
-
-    /* ── Loading overlay ────────────────────────────────────────── */
+    /* ── Loading overlay ─────────────────────────────────────────── */
     .sub-loading {
         display: none;
         position: absolute;
@@ -1016,7 +957,7 @@ $apiBase = '/api/' . $site;
 
     @keyframes subSpin {
         to {
-            transform: rotate(360deg);
+            transform: rotate(360deg)
         }
     }
 
@@ -1026,7 +967,54 @@ $apiBase = '/api/' . $site;
         color: var(--sub-text);
     }
 
-    /* ── Responsive ─────────────────────────────────────────────── */
+    /* ── Success ─────────────────────────────────────────────────── */
+    .sub-success {
+        text-align: center;
+        padding: 2.5rem 1.5rem;
+        max-width: 420px;
+        margin: 0 auto;
+    }
+
+    .sub-success-icon {
+        width: 84px;
+        height: 84px;
+        background: linear-gradient(135deg, var(--success-color, #10b981), #059669);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.375rem;
+        animation: subSuccessPop .45s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    @keyframes subSuccessPop {
+        0% {
+            transform: scale(0);
+            opacity: 0
+        }
+        60% {
+            transform: scale(1.1)
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1
+        }
+    }
+
+    .sub-success-title {
+        font-size: 1.625rem;
+        font-weight: 800;
+        color: var(--sub-text);
+        margin-bottom: .625rem;
+    }
+
+    .sub-success-text {
+        font-size: .9375rem;
+        color: var(--sub-muted);
+        line-height: 1.6;
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────── */
     @media (max-width: 640px) {
         .sub-modal-container {
             margin: 0;
@@ -1035,19 +1023,17 @@ $apiBase = '/api/' . $site;
             padding: 1.375rem 1.125rem;
         }
 
-        .sub-plans,
-        #sub-payment-method-selector.payment-methods,
-        .sub-step3-layout {
-            grid-template-columns: 1fr;
+        .sub-plans, .sub-step4-layout {
+            grid-template-columns:1fr;
         }
 
         .sub-step3-aside {
             position: static;
-            order: -1; /* show summary above payment form on mobile */
+            order: -1;
         }
 
-        .sub-form-row {
-            grid-template-columns: 1fr;
+        .sub-form-row, #sub-step-3 .form-row {
+            grid-template-columns:1fr;
         }
 
         .sub-progress-label {
@@ -1066,7 +1052,6 @@ $apiBase = '/api/' . $site;
 
 <script src="https://js.stripe.com/v3/"></script>
 
-
 @js('saved-cards.js')
 @js('cart-utils.js')
 
@@ -1083,11 +1068,9 @@ $apiBase = '/api/' . $site;
 
         /*
          * Globals required by cart-utils.js and saved-cards.js.
-         * Both files are loaded by the parent layout via @js() — they execute
-         * after this inline script, so these assignments are in time.
          */
         window.API_BASE = <?= json_encode($apiBase) ?>;
-        window.PLAN_CURRENCY = '';   // set per-plan in subReadPlanData
+        window.PLAN_CURRENCY = '';
         window.INITIAL_SUBTOTAL = 0;
         window.INITIAL_SHIPPING = 0;
         window.TAX_RATE = 0;
@@ -1102,6 +1085,8 @@ $apiBase = '/api/' . $site;
                 : 'null' ?>;
         window.appliedVoucher = null;
         window.selectedCardId = null;
+        window.requiresShipping = true;
+
 
         /* ── Stripe ─────────────────────────────────────────────────── */
         let subStripe = null;
@@ -1114,8 +1099,7 @@ $apiBase = '/api/' . $site;
                 hidePostalCode: true,
                 style: {
                     base: {
-                        fontSize: '15px',
-                        color: '#0f172a',
+                        fontSize: '15px', color: '#0f172a',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                         '::placeholder': {color: '#94a3b8'},
                     },
@@ -1124,17 +1108,12 @@ $apiBase = '/api/' . $site;
             });
         }
 
-        /*
-         * Mount into #card-element rendered by stripe-card-element.php.
-         * Called with a 50 ms delay after step 3 becomes visible so Stripe
-         * can measure the element's dimensions correctly.
-         */
         function subMountCard() {
             if (subCardMounted || !subCardElement) return;
             const el = document.getElementById('card-element');
             if (!el) return;
             subCardElement.mount('#card-element');
-            subCardElement.on('change', function (e) {
+            subCardElement.on('change', e => {
                 const err = document.getElementById('card-errors');
                 if (err) err.textContent = e.error ? e.error.message : '';
             });
@@ -1147,18 +1126,56 @@ $apiBase = '/api/' . $site;
         let subSubscriptionId = null;
         let subOrderId = null;
 
-        /* ── Modal open / close ─────────────────────────────────────── */
+        /*
+         * Step routing map.
+         *
+         * For DIGITAL plans the address step (3) is skipped.
+         * subNextStep(current) / subPrevStep(current) resolve the correct
+         * step number respecting whether the user is logged-in and whether
+         * the plan requires an address.
+         */
+        const STEP_COUNT = 5; // 1 Plan | 2 Account | 3 Address | 4 Payment | 5 Done
+
+        function subNeedsAccount() {
+            return !window.isLoggedIn;
+        }
+
+        function subNeedsAddress() {
+            return subSelectedPlan && subSelectedPlan.deliveryType === 'print';
+        }
+
+        /**
+         * Returns the next logical step number from `current`, skipping
+         * steps that don't apply to the current plan / auth state.
+         */
+        function subNextStep(current) {
+            let next = current + 1;
+            if (next === 2 && !subNeedsAccount()) next++;  // skip Account
+            if (next === 3 && !subNeedsAddress()) next++;  // skip Address
+            return Math.min(next, STEP_COUNT);
+        }
+
+        function subPrevStep(current) {
+            let prev = current - 1;
+            if (prev === 3 && !subNeedsAddress()) prev--;  // skip Address
+            if (prev === 2 && !subNeedsAccount()) prev--;  // skip Account
+            return Math.max(prev, 1);
+        }
+
+        /* ── Open / close ───────────────────────────────────────────── */
         function showSubscriptionModal(planSlug, planId, isManual) {
             const modal = document.getElementById('subscriptionModal');
             if (!modal) return;
             modal.classList.add('show');
             document.body.style.overflow = 'hidden';
 
+            checkLoginStatus();
+
             if (planSlug && planId) {
-                const planEl = document.querySelector('.sub-plan[data-plan-slug="' + planSlug + '"]');
+                const planEl = document.querySelector(`.sub-plan[data-plan-slug="${planSlug}"]`);
                 if (planEl) {
                     subReadPlanData(planEl);
-                    subGoToStep(SUB_IS_LOGGED_IN ? 3 : 2);
+                    subGoToStep(subNextStep(1)); // skip Plan step when plan pre-selected
                 } else {
                     subGoToStep(1);
                 }
@@ -1178,28 +1195,111 @@ $apiBase = '/api/' . $site;
 
         /* ── Step navigation ────────────────────────────────────────── */
         function subGoToStep(step) {
-            for (var i = 1; i <= 4; i++) {
-                var el = document.getElementById('sub-step-' + i);
-                var prog = document.getElementById('sub-prog-' + i);
+            for (let i = 1; i <= STEP_COUNT; i++) {
+                const el = document.getElementById(`sub-step-${i}`);
+                const prog = document.getElementById(`sub-prog-${i}`);
                 if (el) el.style.display = 'none';
                 if (prog) {
-                    prog.classList.remove('active', 'completed');
-                    if (i < step) prog.classList.add('completed');
+                    prog.classList.remove('active', 'completed', 'skipped');
+                    if (i < step) {
+                        // Mark skipped steps (address for digital plans)
+                        if (i === 3 && !subNeedsAddress()) {
+                            prog.classList.add('skipped');
+                        } else if (i === 2 && !subNeedsAccount()) {
+                            prog.classList.add('skipped');
+                        } else {
+                            prog.classList.add('completed');
+                        }
+                    }
                 }
             }
 
-            var active = document.getElementById('sub-step-' + step);
-            var activeProg = document.getElementById('sub-prog-' + step);
+            const active = document.getElementById(`sub-step-${step}`);
+            const prog = document.getElementById(`sub-prog-${step}`);
             if (active) active.style.display = 'block';
-            if (activeProg) activeProg.classList.add('active');
+            if (prog) prog.classList.add('active');
 
-            if (step === 3) {
+            if (step === 4) {
                 setTimeout(subMountCard, 50);
                 subUpdatePaymentSummary();
-                // saved-cards.js loadSavedCards() reads window.isLoggedIn / window.currentMember
                 if (window.isLoggedIn && typeof window.loadSavedCards === 'function') {
                     window.loadSavedCards();
                 }
+            }
+        }
+
+        /** Advance to the next logical step. */
+        function subAdvance() {
+            const current = subCurrentStep();
+            subGoToStep(subNextStep(current));
+        }
+
+        /** Go back to the previous logical step. */
+        function subGoBack() {
+            const current = subCurrentStep();
+            subGoToStep(subPrevStep(current));
+        }
+
+        /** Returns the currently visible step number. */
+        function subCurrentStep() {
+            for (let i = 1; i <= STEP_COUNT; i++) {
+                const el = document.getElementById(`sub-step-${i}`);
+                if (el && el.style.display !== 'none') return i;
+            }
+            return 1;
+        }
+
+        /* ── Address step validation & advance ──────────────────────── */
+        function subAdvanceFromAddress() {
+            const form = document.getElementById('sub-address-form');
+            const errors = form.querySelectorAll('.form-error');
+            errors.forEach(e => (e.textContent = ''));
+
+            const required = selectedAddressId
+                ? ['first_name', 'last_name', 'email']
+                : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
+
+            const data = Object.fromEntries(new FormData(form));
+            let hasErrors = false;
+
+            console.log(required, data)
+
+            for (const field of required) {
+                if (!data[field]?.trim()) {
+                    const el = form.querySelector(`#error-${field}`);
+                    if (el) el.textContent = 'This field is required';
+                    hasErrors = true;
+                }
+            }
+
+            if (hasErrors) return;
+
+            // US consent check — only required if US is selected
+            const country = data.country;
+            const usBlock = document.getElementById('us-renewal-consent-block');
+            const usCb = document.getElementById('sub-us-renewal-consent');
+            if (country === 'US' && usCb && !usCb.checked) {
+                if (usBlock) usBlock.classList.add('consent-error');
+                return;
+            }
+            if (usBlock) usBlock.classList.remove('consent-error');
+
+            subGoToStep(subNextStep(3));
+        }
+
+        /* ── Country change — show/hide US consent in address step ──── */
+        function handleSubCountryChange(code) {
+            const usBlock = document.getElementById('us-renewal-consent-block');
+            if (!usBlock) return;
+            // The auto-renewal-consent partial hides the US block by default;
+            // we override display here only for the address step's instance.
+            if (code === 'US') {
+                usBlock.style.display = 'block';
+                usBlock.classList.remove('consent-error');
+            } else {
+                usBlock.style.display = 'none';
+                const cb = document.getElementById('sub-us-renewal-consent');
+                if (cb) cb.checked = false;
             }
         }
 
@@ -1213,26 +1313,25 @@ $apiBase = '/api/' . $site;
                 currency: planEl.dataset.planCurrency,
                 period: planEl.dataset.planPeriod,
                 trial: parseInt(planEl.dataset.planTrial, 10) || 0,
-                deliveryType: planEl.dataset.planDeliveryType, // 'digital' | 'printed'
+                deliveryType: planEl.dataset.planDeliveryType,
             };
-            // Keep globals in sync so cart-utils voucher helpers work correctly
             window.PLAN_CURRENCY = subSelectedPlan.currency;
             window.INITIAL_SUBTOTAL = subSelectedPlan.price;
         }
 
-        function selectPlan(slug, id) {
-
+        function selectPlan(slug) {
             const planEl = document.querySelector(`[data-plan-slug="${slug}"]`);
+            if (!planEl) return;
             subReadPlanData(planEl);
-            subGoToStep(SUB_IS_LOGGED_IN ? 3 : 2);
+            subGoToStep(subNextStep(1));
         }
 
         function subUpdatePaymentSummary() {
             if (!subSelectedPlan) return;
-            var p = subSelectedPlan;
-            var periodLabel = p.period === 'month' ? 'monthly' : 'yearly';
-            var discount = window.appliedVoucher ? parseFloat(window.appliedVoucher.discount) : 0;
-            var discRow = document.getElementById('sub-discount-summary-row');
+            const p = subSelectedPlan;
+            const periodLabel = p.period === 'month' ? 'monthly' : 'yearly';
+            const discount = window.appliedVoucher ? parseFloat(window.appliedVoucher.discount) : 0;
+            const discRow = document.getElementById('sub-discount-summary-row');
 
             document.getElementById('sub-summary-plan-name').textContent = p.name;
             document.getElementById('sub-summary-billing').textContent = 'Billed ' + periodLabel;
@@ -1245,32 +1344,20 @@ $apiBase = '/api/' . $site;
                 discRow.style.display = 'none';
             }
 
-            var total = p.trial > 0 ? 0 : Math.max(0, p.price - discount);
+            const total = p.trial > 0 ? 0 : Math.max(0, p.price - discount);
             document.getElementById('sub-summary-total').textContent = p.trial > 0
                 ? 'FREE (then ' + p.currency + p.price.toFixed(2) + '/' + (p.period === 'month' ? 'mo' : 'yr') + ')'
                 : p.currency + total.toFixed(2);
         }
 
-        /*
-         * payment-method-selector.js calls window.onPaymentMethodChange(method)
-         * whenever the user picks a different payment method. We implement
-         * that hook here to toggle the card / PayPal sections.
-         *
-         * When switching back to "card", we must re-show the saved cards section
-         * (if cards were already loaded) rather than always defaulting to the new
-         * card form. saved-cards.js displaySavedCards() handles the show/hide
-         * logic — if window.savedCards is populated it reveals the list and hides
-         * #new-card-section; otherwise we fall through to the card form.
-         */
+        /* ── Payment method change hook ─────────────────────────────── */
         window.onPaymentMethodChange = function (method) {
-            var cardSection = document.getElementById('sub-card-payment-section');
-            var paypalSection = document.getElementById('sub-paypal-payment-section');
+            const cardSection = document.getElementById('sub-card-payment-section');
+            const paypalSection = document.getElementById('sub-paypal-payment-section');
             if (cardSection) cardSection.style.display = method === 'card' ? 'block' : 'none';
             if (paypalSection) paypalSection.style.display = method === 'paypal' ? 'block' : 'none';
 
             if (method === 'card') {
-                // Re-display saved cards if we already fetched them; otherwise mount
-                // the Stripe card element so the user can enter a new card.
                 if (window.savedCards && window.savedCards.length > 0
                     && typeof window.displaySavedCards === 'function') {
                     window.displaySavedCards();
@@ -1283,8 +1370,8 @@ $apiBase = '/api/' . $site;
         /* ── Auth: register ─────────────────────────────────────────── */
         document.getElementById('sub-register-form')?.addEventListener('submit', async function (e) {
             e.preventDefault();
-            var data = Object.fromEntries(new FormData(this));
-            var errEl = document.getElementById('sub-register-error');
+            const data = Object.fromEntries(new FormData(this));
+            const errEl = document.getElementById('sub-register-error');
             errEl.textContent = '';
 
             if (data.password !== data.password_confirmation) {
@@ -1302,16 +1389,14 @@ $apiBase = '/api/' . $site;
 
             subSetLoading(true);
             try {
-                var res = await fetch('/' + SITE + '/member/register', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data),
+                const res = await fetch('/' + SITE + '/member/register', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
                 });
-                var result = await res.json();
+                const result = await res.json();
                 if (result.success) {
                     window.currentMember = result.member;
                     window.isLoggedIn = true;
-                    subGoToStep(3);
+                    subGoToStep(subNextStep(2));
                 } else {
                     errEl.textContent = result.message || 'Registration failed.';
                 }
@@ -1325,22 +1410,20 @@ $apiBase = '/api/' . $site;
         /* ── Auth: login ────────────────────────────────────────────── */
         document.getElementById('sub-login-form')?.addEventListener('submit', async function (e) {
             e.preventDefault();
-            var data = Object.fromEntries(new FormData(this));
-            var errEl = document.getElementById('sub-login-error');
+            const data = Object.fromEntries(new FormData(this));
+            const errEl = document.getElementById('sub-login-error');
             errEl.textContent = '';
 
             subSetLoading(true);
             try {
-                var res = await fetch('/' + SITE + '/member/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data),
+                const res = await fetch('/' + SITE + '/member/login', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
                 });
-                var result = await res.json();
+                const result = await res.json();
                 if (result.success) {
                     window.currentMember = result.member;
                     window.isLoggedIn = true;
-                    subGoToStep(3);
+                    subGoToStep(subNextStep(2));
                 } else {
                     errEl.textContent = result.message || 'Login failed.';
                 }
@@ -1352,46 +1435,50 @@ $apiBase = '/api/' . $site;
         });
 
         /* ── Auth tab toggle ────────────────────────────────────────── */
-        document.querySelectorAll('.sub-auth-tab').forEach(function (tab) {
+        document.querySelectorAll('.sub-auth-tab').forEach(tab => {
             tab.addEventListener('click', function () {
-                document.querySelectorAll('.sub-auth-tab').forEach(function (t) {
+                document.querySelectorAll('.sub-auth-tab').forEach(t => {
                     t.classList.remove('active');
                     t.setAttribute('aria-selected', 'false');
                 });
                 this.classList.add('active');
                 this.setAttribute('aria-selected', 'true');
-                var target = this.dataset.tab;
-                document.getElementById('sub-register-form').style.display =
-                    target === 'register' ? 'block' : 'none';
-                document.getElementById('sub-login-form').style.display =
-                    target === 'login' ? 'block' : 'none';
+                const target = this.dataset.tab;
+                document.getElementById('sub-register-form').style.display = target === 'register' ? 'block' : 'none';
+                document.getElementById('sub-login-form').style.display = target === 'login' ? 'block' : 'none';
             });
         });
 
-        /* ── Process payment — mirrors checkout/index.php ───────────── */
+        /* ── Process payment ────────────────────────────────────────── */
         async function subProcessPayment() {
-            var consentCb = document.getElementById('sub-global-renewal-consent');
-            var consentBlock = document.getElementById('global-renewal-consent-block');
+            const globalCb = document.getElementById('sub-global-renewal-consent');
+            const globalBlock = document.getElementById('global-renewal-consent-block');
 
-            if (consentCb && !consentCb.checked) {
-                consentBlock?.classList.add('consent-error');
+            if (globalCb && !globalCb.checked) {
+                globalBlock?.classList.add('consent-error');
                 subShowCardError('Please confirm the subscription terms to continue.');
-                consentBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
+                globalBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
                 return;
             }
-            consentBlock?.classList.remove('consent-error');
+            globalBlock?.classList.remove('consent-error');
 
             if (!subSelectedPlan) {
                 subShowCardError('No plan selected. Please go back and choose a plan.');
                 return;
             }
 
-            var data = {
-                isOneTimeSubscription: true,
-                global_renewal_consent: '1',
-            };
+            // Build the payload — merge address fields when it's a print plan
+            const data = {isOneTimeSubscription: true, global_renewal_consent: '1'};
 
             if (window.currentMember) data.member_id = window.currentMember.id;
+
+            if (subNeedsAddress()) {
+                const addressForm = document.getElementById('sub-address-form');
+                if (addressForm) {
+                    const addressData = Object.fromEntries(new FormData(addressForm));
+                    Object.assign(data, addressData);
+                }
+            }
 
             if (window.appliedVoucher) {
                 data.voucher_code = window.appliedVoucher.code;
@@ -1401,15 +1488,8 @@ $apiBase = '/api/' . $site;
 
             subSetLoading(true);
             try {
-                // 0. Add the selected plan to the cart so the checkout service
-                //    can read it via CartService::getItems(). The modal bypasses
-                //    the normal add-to-cart flow, so we do it here, right before
-                //    the checkout call.
-                //
-                //    We capture the returned cart item ID so we can issue a
-                //    DELETE /api/{site}/cart/{id} rollback if the checkout or
-                //    Stripe step fails, leaving the cart clean for a retry.
-                var cartRes = await fetch(window.API_BASE + '/cart/subscription', {
+                // 1. Add plan to cart
+                const cartRes = await fetch(window.API_BASE + '/cart/subscription', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -1417,81 +1497,59 @@ $apiBase = '/api/' . $site;
                         delivery_type: subSelectedPlan.deliveryType,
                     }),
                 });
-                var cartResult = await cartRes.json();
+                const cartResult = await cartRes.json();
                 if (!cartResult.success) {
                     subShowCardError(cartResult.message || 'Could not add plan to cart. Please try again.');
                     return;
                 }
-                // Cart item ID for rollback — adapt the key if your response shape differs.
-                var cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
+                const cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
 
-                // 1. Create checkout intent
-                var res = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
+                // 2. Create checkout intent
+                const res = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data),
                 });
-                var result = await res.json();
+                const result = await res.json();
 
                 if (!result.success) {
-                    // Roll back the cart item we just added so we don't leave
-                    // a stale item behind on failure.
-                    if (cartItemId) {
-                        await fetch(window.API_BASE + '/cart/' + cartItemId, {
-                            method: 'DELETE',
-                        }).catch(() => {
-                        });
-                    }
+                    if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
+                    });
                     subShowCardError(result.message || 'Checkout failed. Please try again.');
                     return;
                 }
 
-                var contexts = result.data?.stripe_contexts;
+                const contexts = result.data?.stripe_contexts;
                 subClientSecret = contexts
                     ? contexts[Object.keys(contexts)[0]].client_secret
                     : (result.data?.client_secret ?? null);
                 subSubscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
                 subOrderId = result.data?.order_id ?? null;
 
-                // 2. Confirm via Stripe
-                var member = window.currentMember;
-                var paymentResult = window.selectedCardId
-                    ? await subStripe.confirmCardPayment(subClientSecret, {
-                        payment_method: window.selectedCardId,
-                    })
+                // 3. Confirm via Stripe
+                const member = window.currentMember;
+                const paymentResult = window.selectedCardId
+                    ? await subStripe.confirmCardPayment(subClientSecret, {payment_method: window.selectedCardId})
                     : await subStripe.confirmCardPayment(subClientSecret, {
                         payment_method: {
                             card: subCardElement,
                             billing_details: {
-                                name: member
-                                    ? (member.first_name + ' ' + member.last_name).trim()
-                                    : '',
+                                name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
                                 email: member?.email ?? '',
                             },
                         },
                         setup_future_usage: 'off_session',
                     });
 
-                var error = paymentResult.error;
-                var paymentIntent = paymentResult.paymentIntent;
-
-                if (error) {
-                    // Stripe declined the card — the checkout service already
-                    // rolled back the subscriptions and order in handlePaymentFailure(),
-                    // but the cart item was added by us and must be cleaned up here.
-                    if (cartItemId) {
-                        await fetch(window.API_BASE + '/cart/' + cartItemId, {
-                            method: 'DELETE',
-                        }).catch(() => {
-                        });
-                    }
-                    subShowCardError(error.message);
+                if (paymentResult.error) {
+                    if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
+                    });
+                    subShowCardError(paymentResult.error.message);
                     return;
                 }
 
-                // 3. Server-side confirmation
-                if (paymentIntent.status === 'succeeded') {
-                    await subConfirmPayment(paymentIntent.id);
+                if (paymentResult.paymentIntent.status === 'succeeded') {
+                    await subConfirmPayment(paymentResult.paymentIntent.id);
                 }
 
             } catch (err) {
@@ -1503,20 +1561,18 @@ $apiBase = '/api/' . $site;
         }
 
         async function subConfirmPayment(intentId) {
-            var body = {payment_intent_id: intentId, order_id: subOrderId};
+            const body = {payment_intent_id: intentId, order_id: subOrderId};
             Array.isArray(subSubscriptionId)
                 ? (body.subscription_ids = subSubscriptionId)
                 : (body.subscription_id = subSubscriptionId);
 
-            var res = await fetch(window.API_BASE + '/subscriptions/onetime/confirm-payment', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(body),
+            const res = await fetch(window.API_BASE + '/subscriptions/onetime/confirm-payment', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
             });
-            var result = await res.json();
+            const result = await res.json();
 
             if (result.success) {
-                subGoToStep(4);
+                subGoToStep(5);
             } else {
                 subShowCardError(result.message || 'Payment confirmation failed.');
             }
@@ -1524,20 +1580,20 @@ $apiBase = '/api/' . $site;
 
         /* ── Helpers ────────────────────────────────────────────────── */
         function subSetLoading(on) {
-            var overlay = document.getElementById('sub-loading');
-            var btn = document.getElementById('sub-pay-btn');
+            const overlay = document.getElementById('sub-loading');
+            const btn = document.getElementById('sub-pay-btn');
             if (overlay) overlay.classList.toggle('show', on);
             if (btn) btn.disabled = on;
         }
 
         function subShowCardError(msg) {
-            var el = document.getElementById('card-errors');
+            const el = document.getElementById('card-errors');
             if (el) el.textContent = msg;
         }
 
         /* ── Cooldown tracking ──────────────────────────────────────── */
         function subShouldShow() {
-            var last = localStorage.getItem(MODAL_STORAGE_KEY);
+            const last = localStorage.getItem(MODAL_STORAGE_KEY);
             return !last || (Date.now() - parseInt(last, 10)) >= MODAL_COOLDOWN_MS;
         }
 
@@ -1547,14 +1603,13 @@ $apiBase = '/api/' . $site;
 
         /* ── Event listeners ────────────────────────────────────────── */
         document.querySelector('.sub-modal-overlay')?.addEventListener('click', closeSubscriptionModal);
-
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', e => {
             if (e.key === 'Escape') closeSubscriptionModal();
         });
 
         /* ── Auto-show ──────────────────────────────────────────────── */
         <?php if ($subscriptionModalData['show_modal'] ?? false): ?>
-        setTimeout(function () {
+        setTimeout(() => {
             if (SUB_IS_LOGGED_IN || subShouldShow()) showSubscriptionModal(null, null, false);
         }, 3000);
         <?php endif; ?>
@@ -1563,14 +1618,13 @@ $apiBase = '/api/' . $site;
         window.showSubscriptionModal = showSubscriptionModal;
         window.closeSubscriptionModal = closeSubscriptionModal;
         window.subGoToStep = subGoToStep;
+        window.subGoBack = subGoBack;
         window.selectPlan = selectPlan;
         window.subProcessPayment = subProcessPayment;
-        window.showSubscriptionModalWithPlan = function (slug, id) {
-            showSubscriptionModal(slug, id, true);
-        };
-        window.openSubscriptionModal = function () {
-            showSubscriptionModal(null, null, true);
-        };
+        window.subAdvanceFromAddress = subAdvanceFromAddress;
+        window.handleSubCountryChange = handleSubCountryChange;
+        window.showSubscriptionModalWithPlan = (slug, id) => showSubscriptionModal(slug, id, true);
+        window.openSubscriptionModal = () => showSubscriptionModal(null, null, true);
 
     })();
 </script>

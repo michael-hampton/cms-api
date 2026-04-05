@@ -336,7 +336,7 @@ $router->post('/{site}/member/addresses/{id}', [MemberAddressController::class, 
 $router->post('/{site}/member/addresses/{id}/delete', [MemberAddressController::class, 'destroy']);
 $router->post('/{site}/member/addresses/{id}/set-default', [MemberAddressController::class, 'setDefault']);
 
-$router->get('/member/me', MemberController::class, 'me');
+$router->get('/member/me', [MemberController::class, 'me']);
 
 $router->post('/{site}/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
 

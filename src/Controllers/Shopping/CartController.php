@@ -21,6 +21,7 @@ use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\Payments\SavedPaymentMethodService;
 use App\Services\Billing\TaxCalculatorService;
+use App\Services\Currency\CurrencyResolver;
 use App\Services\Shipping\FulfilmentResolver;
 use App\Services\Shipping\InternalBusinessDayEstimator;
 use App\Services\Shipping\ShippingService;
@@ -55,6 +56,7 @@ class CartController extends Controller
         private readonly CartMigrationService   $cartMigration,
         private GiftResolutionService           $giftResolutionService,
         private readonly SubscriptionRepository $subscriptionRepository,
+        private readonly CurrencyResolver $currencyResolver,
     )
     {
         parent::__construct();
@@ -242,6 +244,9 @@ class CartController extends Controller
 
         $tax = $this->calculateTax($subtotal, $shipping);
 
+        $currencyCode = $this->currencyResolver->resolveUpperCase();
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         $cartData = [
             'items' => $items,
             'total' => $this->cartService->getTotal(),
@@ -255,6 +260,8 @@ class CartController extends Controller
             'hasPreOrders' => $this->detectPreOrders($items),
             'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
             'checkoutMode' => 'steps',
+            'currency' => $currencyCode,
+            'currencySymbol' => $currencySymbol
         ];
 
         return $this->view('checkout/index', $cartData);
