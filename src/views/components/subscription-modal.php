@@ -316,8 +316,8 @@ $apiBase = '/api/' . $site;
 
         <!-- ══ Step 4: Payment ════════════════════════════════════════ -->
         <div class="sub-step" id="sub-step-4" style="display:none;">
-            <div class="sub-header">
-                <h2 class="sub-title">Payment Details</h2>
+            <div class="sub-header sub-header--payment">
+                <h2 class="sub-title sub-title--payment">Payment Details</h2>
                 <p class="sub-subtitle">Secure checkout powered by Stripe</p>
             </div>
 
@@ -1014,7 +1014,102 @@ $apiBase = '/api/' . $site;
         line-height: 1.6;
     }
 
-    /* ── Responsive ──────────────────────────────────────────────── */
+    /* ── Step 4 payment header overrides ────────────────────────── */
+    .sub-header--payment {
+        text-align: left;
+        margin-bottom: 1.25rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--sub-border);
+    }
+
+    .sub-title--payment {
+        font-size: 1.125rem;
+        font-weight: 700;
+        letter-spacing: -.01em;
+    }
+
+    .sub-header--payment .sub-subtitle {
+        font-size: .8125rem;
+        margin-top: .2rem;
+    }
+
+    /* ── Payment method selector spacing & separation ────────────── */
+    #sub-step-4 .payment-method-selector,
+    #sub-step-4 [class*="payment-method"] {
+        margin-bottom: 1.25rem;
+    }
+
+    /* Give each payment option card a visible border + breathing room */
+    #sub-step-4 .payment-option,
+    #sub-step-4 [class*="payment-option"],
+    #sub-step-4 label[class*="method"] {
+        border: 1.5px solid var(--sub-border);
+        border-radius: 10px;
+        padding: .875rem 1rem;
+        margin-bottom: .625rem;
+        transition: border-color .2s, background .2s;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+    }
+
+    #sub-step-4 .payment-option:last-child,
+    #sub-step-4 [class*="payment-option"]:last-child {
+        margin-bottom: 0;
+    }
+
+    #sub-step-4 .payment-option.selected,
+    #sub-step-4 .payment-option:has(input:checked) {
+        border-color: var(--sub-primary);
+        background: rgba(99, 102, 241, .04);
+    }
+
+    /* Section label above saved cards */
+    #sub-card-payment-section {
+        margin-top: 1.25rem;
+    }
+
+    /* Separator between payment method selector and card section */
+    #sub-card-payment-section::before {
+        content: 'Card Details';
+        display: block;
+        font-size: .7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--sub-muted);
+        margin-bottom: .75rem;
+        padding-bottom: .5rem;
+        border-bottom: 1px solid var(--sub-border);
+    }
+
+    /* Saved card items — add card to each option */
+    #sub-step-4 .saved-card,
+    #sub-step-4 [class*="saved-card"] {
+        border: 1.5px solid var(--sub-border);
+        border-radius: 10px;
+        padding: .75rem 1rem;
+        margin-bottom: .5rem;
+        transition: border-color .2s;
+        cursor: pointer;
+    }
+
+    #sub-step-4 .saved-card.selected,
+    #sub-step-4 [class*="saved-card"].selected,
+    #sub-step-4 .saved-card:has(input:checked) {
+        border-color: var(--sub-primary);
+        background: rgba(99, 102, 241, .04);
+    }
+
+    /* PayPal section spacing */
+    #sub-paypal-payment-section {
+        margin-top: 1rem;
+        padding: 1.5rem;
+        border: 1.5px dashed var(--sub-border);
+        border-radius: 10px;
+    }
+
     @media (max-width: 640px) {
         .sub-modal-container {
             margin: 0;

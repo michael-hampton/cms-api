@@ -347,6 +347,8 @@ body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     transition: all 0.3s;
     position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .product-card:hover {
@@ -388,6 +390,9 @@ body {
 
 .product-content {
     padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
 .product-name {
@@ -434,6 +439,8 @@ body {
 .product-actions {
     display: flex;
     gap: 0.5rem;
+    margin-top: auto !important;
+    padding-top: 0.75rem;
 }
 
 .btn-add-to-cart {
@@ -1141,10 +1148,10 @@ body {
     position: relative;
     perspective: 1000px;
     transform-style: preserve-3d;
-    min-height: 400px;
     width: auto !important;
     margin: 0 !important;
-    height: 620px !important;
+    height: 100vh !important;
+    max-height: 720px !important;
 }
 
 .product-card:has(.top-review-section.show) {
@@ -2141,4 +2148,3 @@ input[type="radio"].filter-checkbox {
     color: white;
     border-color: #3b82f6;
 }
-
