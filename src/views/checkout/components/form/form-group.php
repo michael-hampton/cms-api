@@ -27,24 +27,9 @@ foreach ($attrs as $attrKey => $attrVal) {
     <?php endif; ?>
 
     <?php if ($type === 'textarea'): ?>
-        <textarea
-                name="<?= htmlspecialchars($name) ?>"
-                id="<?= htmlspecialchars($inputId) ?>"
-                class="form-textarea <?= htmlspecialchars($extraClass) ?>"
-                placeholder="<?= htmlspecialchars($placeholder) ?>"
-            <?= $required ? 'required' : '' ?>
-                <?= $attrStr ?>><?= htmlspecialchars($value) ?></textarea>
+        @include('checkout/components/form/textarea', ['name' => $name, 'value' => $value, 'required' => $required, 'placeholder' => $placeholder, 'inputId' => $inputId, 'class' => $extraClass, 'attrs' => $attrs])
     <?php else: ?>
-        <input
-                type="<?= htmlspecialchars($type) ?>"
-                name="<?= htmlspecialchars($name) ?>"
-                id="<?= htmlspecialchars($inputId) ?>"
-                class="form-input <?= htmlspecialchars($extraClass) ?>"
-                value="<?= htmlspecialchars($value) ?>"
-                placeholder="<?= htmlspecialchars($placeholder) ?>"
-                <?= $required ? 'required' : '' ?>
-                <?= $attrStr ?>
-        >
+        @include('checkout/components/form/input', ['name' => $name, 'value' => $value, 'type' => $type, 'required' => $required, 'placeholder' => $placeholder, 'inputId' => $inputId, 'class' => $extraClass, 'attrs' => $attrs])
     <?php endif; ?>
     <span class="form-error" id="<?= htmlspecialchars($errorId) ?>"></span>
 </div>

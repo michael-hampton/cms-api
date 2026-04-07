@@ -2,15 +2,20 @@
 
 namespace App\Tests\Unit\Models;
 
-use App\Models\OrderHistory;
-use App\Models\Order;
 use App\Models\Member;
+use App\Models\Order;
+use App\Models\OrderHistory;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class OrderHistoryModelTest extends FunctionalTestCase
 {
     use CreatesTestData;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+    }
 
     public function testOrderHistoryHasCorrectTable()
     {

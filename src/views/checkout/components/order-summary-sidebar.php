@@ -96,13 +96,35 @@ $hasAppliedVoucher = !empty($appliedVoucher['code']);
         'label'   => 'Proceed to Checkout',
         'variant' => 'primary',
         'onclick' => 'proceedToCheckout()',
+        'icon' => '
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <!-- Cart -->
+            <path d="M3 5h2l2.5 10h10l2-7H7.5"></path>
+            <circle cx="10" cy="19" r="1"></circle>
+            <circle cx="17" cy="19" r="1"></circle>
+
+            <!-- Checkmark -->
+            <path d="M16 7l2 2 4-4"></path>
+        </svg>'
         ])
     <?php else: ?>
         @include('checkout/components/form/button', [
         'id'      => $submitBtnId,
         'label'   => $submitBtnLabel,
         'variant' => 'primary',
-        'onclick' => ''
+        'onclick' => '',
+        'icon' => '
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <!-- Cart -->
+            <path d="M3 5h2l2.5 10h10l2-7H7.5"></path>
+            <circle cx="10" cy="19" r="1"></circle>
+            <circle cx="17" cy="19" r="1"></circle>
+
+            <!-- Checkmark -->
+            <path d="M16 7l2 2 4-4"></path>
+        </svg>'
         ])
     <?php endif; ?>
 
@@ -110,6 +132,14 @@ $hasAppliedVoucher = !empty($appliedVoucher['code']);
     'label' => 'Continue Shopping',
     'variant' => 'secondary',
     'onclick' => "window.location.href='/cart'",
+    'icon' => '
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 5h2l2.5 10h10l2-7H7.5"></path>
+        <circle cx="10" cy="19" r="1"></circle>
+        <circle cx="17" cy="19" r="1"></circle>
+    </svg>
+    '
     ])
 
     @include('checkout/components/security-badge')

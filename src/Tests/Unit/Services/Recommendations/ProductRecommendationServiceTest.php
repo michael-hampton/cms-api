@@ -4,15 +4,12 @@ namespace App\Tests\Unit\Services\Recommendations;
 
 use App\Framework\Support\Collection;
 use App\Models\Member;
-use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
-use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Product\ProductRepository;
-use App\Repositories\Product\ProductViewRepository;
 use App\Resources\ProductRecommendationResource;
 use App\Services\Recommendations\ProductRecommendationService;
 use App\Services\Recommendations\RecommendationEngine;
+use App\Services\Recommendations\Signals\PopularProductProvider;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 
@@ -22,6 +19,7 @@ class ProductRecommendationServiceTest extends FunctionalTestCase
     private $productRepository;
     private $engine;
     private $resource;
+    private $popularProductProvider;
 
     protected function setUp(): void
     {
@@ -30,10 +28,12 @@ class ProductRecommendationServiceTest extends FunctionalTestCase
         $this->productRepository = Mockery::mock(ProductRepository::class);
         $this->engine = Mockery::mock(RecommendationEngine::class);
         $this->resource = Mockery::mock(ProductRecommendationResource::class);
+        $this->popularProductProvider = Mockery::mock(PopularProductProvider::class);
 
         $this->service = new ProductRecommendationService(
             $this->productRepository,
             $this->engine,
+            $this->popularProductProvider,
             $this->resource
         );
     }

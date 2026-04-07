@@ -5,7 +5,6 @@ namespace App\Tests\Unit\Services\Adverts;
 use App\Models\Block;
 use App\Models\Newsletter;
 use App\Models\Page;
-use App\Models\ProductOffer;
 use App\Services\Newsletter\NewsletterPageBuilderService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -25,15 +24,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
     public function testRendersOfferBlockInNewsletter(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'original_price' => 99.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => true,
-            'description' => 'Limited time offer',
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $page = Page::create([
             'title' => 'Test Page',
@@ -70,14 +61,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
     public function testSuppressesInactiveOffer(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => false,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['is_active' => false]);
 
         $page = Page::create([
             'title' => 'Test Page',
@@ -198,14 +182,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         $product = $this->createProduct();
         $member = $this->createMember();
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $page = Page::create([
             'title' => 'Test Page',
@@ -447,14 +424,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
     public function testDynamicallyInjectsOffersIntoNewsletter(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $page = Page::create([
             'title' => 'Test Page',
@@ -549,14 +519,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
 
         // Dynamic offer
         $product = $this->createProduct();
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'is_active' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'original_price' => 100.00,
-        ]);
+        $this->createProductOffer($product->id);
 
         $newsletter = Newsletter::create([
             'title' => 'Test Newsletter',
@@ -599,14 +562,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
 
         // Create dynamic promotions
         $product = $this->createProduct();
-        ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'original_price' => 99.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'is_active' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-        ]);
+        $this->createProductOffer($product->id);
 
         $this->createMemberReward([
             'member_id' => $member->id,
@@ -666,14 +622,7 @@ class NewsletterWithOffersAndRewardsTest extends FunctionalTestCase
         // Create 3 dynamic promotions
         for ($i = 0; $i < 3; $i++) {
             $product = $this->createProduct();
-            ProductOffer::create([
-                'product_id' => $product->id,
-                'sale_price' => 79.99,
-                'original_price' => 99.99,
-                'start_date' => date('Y-m-d H:i:s'),
-                'is_active' => true,
-                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            ]);
+            $this->createProductOffer($product->id);
         }
 
         $newsletter = Newsletter::create([

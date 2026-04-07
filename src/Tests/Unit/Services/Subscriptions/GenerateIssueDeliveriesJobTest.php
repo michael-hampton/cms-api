@@ -316,6 +316,7 @@ class GenerateIssueDeliveriesJobTest extends FunctionalTestCase
         $delivery->id = 1;
         $delivery->site_id = 1;
         $delivery->status = $status->value;
+        $delivery->subscription_plan_id = 1;
 
         $delivery->shouldReceive('isActive')
             ->andReturn($status === IssueDeliveryStatus::ACTIVE);

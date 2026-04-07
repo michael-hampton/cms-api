@@ -60,6 +60,7 @@ class ProductFulfilmentDecisionServiceTest extends TestCase
         $snapshot = [
             'first_name' => 'Test',
             'last_name' => 'User',
+            'full_name' => 'Test User',
             'address_line_1' => '1 Test Street',
             'city' => 'London',
             'postcode' => $postcode,

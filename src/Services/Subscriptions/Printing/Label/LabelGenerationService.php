@@ -88,7 +88,7 @@ class LabelGenerationService
 
         $strategy = $this->formatRegistry->get($format);
 
-        //$labelRun->markGenerating();
+        $labelRun->markGenerating();
 
         $this->logger->info('LabelGenerationService: generating', [
             'label_run_id' => $labelRun->id,

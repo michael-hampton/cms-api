@@ -287,7 +287,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
 
     public function test_availability_message_includes_formatted_date_for_pre_release(): void
     {
-        $releaseDate = new \DateTime('2026-04-01');
+        $releaseDate = now_datetime()->addMonths(1);
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
@@ -297,7 +297,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
         $message = $policy->getAvailabilityMessage();
-        $this->assertStringContainsString('Apr 1, 2026', $message);
+        $this->assertStringContainsString($releaseDate->format('M j, Y'), $message);
     }
 
     // ========================================

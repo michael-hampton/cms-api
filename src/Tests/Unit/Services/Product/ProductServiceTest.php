@@ -275,8 +275,8 @@ class ProductServiceTest extends FunctionalTestCase
 
         $this->repository->expects('find')->with(1)->andReturn($product);
         $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
-        $this->repository->expects('getImages')->with(1)->andReturn([]);
-        $this->repository->expects('getVariants')->with(1)->andReturn([]);
+        $this->repository->expects('getImages')->with(1)->andReturn(collect([]));
+        $this->repository->expects('getVariants')->with(1)->andReturn(collect());
         $this->repository->expects('deletePriceHistory')->with(1)->once();
         $this->repository->expects('delete')->with(1)->andReturn(false);
 

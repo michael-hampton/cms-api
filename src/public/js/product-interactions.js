@@ -11,9 +11,13 @@
             }
         });
 
+        console.log('test', document.querySelectorAll('.btn-wishlist'))
+
         // Wishlist toggle
         document.querySelectorAll('.btn-wishlist').forEach(btn => {
+            console.log('a')
             if (!btn.hasListener) {
+                console.log('b')
                 btn.addEventListener('click', handleToggleWishlist);
                 btn.hasListener = true;
             }
@@ -129,6 +133,7 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', attachProductListeners);
     } else {
+        alert(document.readyState)
         attachProductListeners();
     }
 

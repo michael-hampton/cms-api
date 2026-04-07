@@ -19,11 +19,14 @@ class DealTrackingService
     public function trackRender(Product $product, NewsletterRenderContext $context): void
     {
         try {
+
             $advertContext = $context->toAdvertContext();
 
             $this->trackingRecorder->recordDealRender(
                 $product->id,
                 $advertContext,
+                '',
+                '',
                 $context->siteId
             );
         } catch (\Exception $e) {

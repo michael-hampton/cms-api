@@ -15,14 +15,7 @@ class PromotionInjectorTest extends FunctionalTestCase
     public function testInjectsEligibleOffers(): void
     {
         $product = $this->createProduct();
-        $offer = \App\Models\ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'is_active' => true,
-            'original_price' => 100
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $blocks = $this->injector->getBlocksForSurface(
             'newsletter_issue',
@@ -88,14 +81,7 @@ class PromotionInjectorTest extends FunctionalTestCase
         // Create 10 offers
         for ($i = 0; $i < 10; $i++) {
             $product = $this->createProduct();
-            \App\Models\ProductOffer::create([
-                'product_id' => $product->id,
-                'sale_price' => 79.99,
-                'start_date' => date('Y-m-d H:i:s'),
-                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-                'is_active' => true,
-                'original_price' => 100
-            ]);
+            $this->createProductOffer($product->id);
         }
 
         // Newsletter: max 3 offers
@@ -161,14 +147,7 @@ class PromotionInjectorTest extends FunctionalTestCase
         // Create multiple of each type
         for ($i = 0; $i < 3; $i++) {
             $product = $this->createProduct();
-            \App\Models\ProductOffer::create([
-                'product_id' => $product->id,
-                'sale_price' => 79.99 - $i,
-                'original_price' => 99.99,
-                'start_date' => date('Y-m-d H:i:s'),
-                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-                'is_active' => true,
-            ]);
+            $this->createProductOffer($product->id);
 
             $this->createMemberReward([
                 'member_id' => $member->id,
@@ -219,14 +198,7 @@ class PromotionInjectorTest extends FunctionalTestCase
     {
         // Inactive offer
         $product = $this->createProduct();
-        \App\Models\ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'is_active' => false,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'original_price' => 100
-        ]);
+        $this->createProductOffer($product->id, ['is_active' => false]);
 
         // Claimed reward
         $member = $this->createMember();
@@ -260,14 +232,7 @@ class PromotionInjectorTest extends FunctionalTestCase
         // Create 3 of each type
         for ($i = 0; $i < 3; $i++) {
             $product = $this->createProduct();
-            \App\Models\ProductOffer::create([
-                'product_id' => $product->id,
-                'sale_price' => 79.99 - $i, // Different priorities
-                'original_price' => 99.99,
-                'start_date' => date('Y-m-d H:i:s'),
-                'is_active' => true,
-                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            ]);
+            $this->createProductOffer($product->id);
 
             $this->createMemberReward([
                 'member_id' => $member->id,
@@ -319,14 +284,7 @@ class PromotionInjectorTest extends FunctionalTestCase
         // 5 offers, 2 rewards, 1 deal
         for ($i = 0; $i < 5; $i++) {
             $product = $this->createProduct();
-            \App\Models\ProductOffer::create([
-                'product_id' => $product->id,
-                'sale_price' => 79.99,
-                'original_price' => 99.99,
-                'start_date' => date('Y-m-d H:i:s'),
-                'is_active' => true,
-                'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            ]);
+            $this->createProductOffer($product->id);
         }
 
         for ($i = 0; $i < 2; $i++) {
@@ -370,24 +328,12 @@ class PromotionInjectorTest extends FunctionalTestCase
     {
         // Create offers with different deal values
         $product1 = $this->createProduct();
-        $highValueOffer = \App\Models\ProductOffer::create([
-            'product_id' => $product1->id,
-            'sale_price' => 50.00,
-            'original_price' => 100.00, // $50 discount
-            'start_date' => date('Y-m-d H:i:s'),
-            'is_active' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-        ]);
+        $highValueOffer = $this->createProductOffer($product1->id, ['sale_price' => 50.00,
+            'original_price' => 100.00]);
 
         $product2 = $this->createProduct();
-        $lowValueOffer = \App\Models\ProductOffer::create([
-            'product_id' => $product2->id,
-            'sale_price' => 90.00,
-            'original_price' => 100.00, // $10 discount
-            'start_date' => date('Y-m-d H:i:s'),
-            'is_active' => true,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-        ]);
+        $lowValueOffer = $this->createProductOffer($product2->id, ['sale_price' => 90.00,
+            'original_price' => 100.00]);
 
         $blocks = $this->injector->getBlocksForSurface(
             'newsletter_issue',

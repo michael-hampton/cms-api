@@ -26,14 +26,14 @@ class IssueDeliveryEligibilityService
             return new Collection([]);
         }
 
-        return $this->subscriptionRepository->findActiveByPlanAndDate(
+        $candidates = $this->subscriptionRepository->findActiveByPlanAndDate(
             $issueDelivery->subscription_plan_id,
             $scheduledDate
         );
 
-//        return $candidates->filter(
-//            fn(Subscription $subscription) => $this->hasActiveWindowForDate($subscription, $scheduledDate)
-//        );
+        return $candidates->filter(
+            fn(Subscription $subscription) => $this->hasActiveWindowForDate($subscription, $scheduledDate)
+        );
     }
 
     public function isSubscriptionEligible(Subscription $subscription, IssueDelivery $issueDelivery): bool

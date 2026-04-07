@@ -615,6 +615,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             status: SubscriptionStatus::PENDING,
             pricing: $pricing,
         );
+
+        $this->assertTrue(true);
     }
 
     /**

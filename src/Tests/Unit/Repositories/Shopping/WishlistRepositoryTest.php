@@ -281,6 +281,124 @@ class WishlistRepositoryTest extends RepositoryTestCase
         $this->assertCount(0, $offers);
     }
 
+    public function test_get_product_ids_by_session_when_user_is_null(): void
+    {
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product1->id,
+            'site_id' => $this->siteId
+        ]);
+
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $product2->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $result = $this->repository->getProductIdsBySessionOrUser(null, $this->sessionId);
+
+        $this->assertCount(2, $result);
+        $this->assertEqualsCanonicalizing(
+            [$product1->id, $product2->id],
+            $result
+        );
+    }
+
+    public function test_get_product_ids_by_user_when_user_is_present(): void
+    {
+        $user = $this->createMember();
+
+        $product1 = $this->createProduct();
+        $product2 = $this->createProduct();
+
+        // Belongs to user
+        Wishlist::create([
+            'session_id' => 'different-session',
+            'user_id' => $user->id,
+            'product_id' => $product1->id,
+            'site_id' => $this->siteId
+        ]);
+
+        Wishlist::create([
+            'session_id' => 'another-session',
+            'user_id' => $user->id,
+            'product_id' => $product2->id,
+            'site_id' => $this->siteId
+        ]);
+
+        // Should be ignored (session match but wrong user)
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $this->createProduct()->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $result = $this->repository->getProductIdsBySessionOrUser($user->id, $this->sessionId);
+
+        $this->assertCount(2, $result);
+        $this->assertEqualsCanonicalizing(
+            [$product1->id, $product2->id],
+            $result
+        );
+    }
+
+    public function test_get_product_ids_returns_empty_array_when_no_matches(): void
+    {
+        $result = $this->repository->getProductIdsBySessionOrUser(null, $this->sessionId);
+
+        $this->assertIsArray($result);
+        $this->assertEmpty($result);
+    }
+
+    public function test_get_product_ids_are_cast_to_integers(): void
+    {
+        $product = $this->createProduct();
+
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => (string)$product->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $result = $this->repository->getProductIdsBySessionOrUser(null, $this->sessionId);
+
+        $this->assertIsInt($result[0]);
+    }
+
+    public function test_user_id_takes_priority_over_session(): void
+    {
+        $user = $this->createMember();
+
+        $productUser = $this->createProduct();
+        $productSession = $this->createProduct();
+
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => $user->id,
+            'product_id' => $productUser->id,
+            'site_id' => $this->siteId
+        ]);
+
+        Wishlist::create([
+            'session_id' => $this->sessionId,
+            'user_id' => null,
+            'product_id' => $productSession->id,
+            'site_id' => $this->siteId
+        ]);
+
+        $result = $this->repository->getProductIdsBySessionOrUser($user->id, $this->sessionId);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals([$productUser->id], $result);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

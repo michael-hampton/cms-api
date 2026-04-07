@@ -15,7 +15,7 @@ use App\Services\Adverts\Boost\AutoBoostService;
 use App\Services\Adverts\Boost\BoostService;
 use App\Services\Adverts\Boost\BoostSuggestionService;
 use App\Services\Adverts\Boost\BudgetAllocator;
-use App\Services\FrozenClock;
+use App\Services\SystemClock;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -232,7 +232,7 @@ class AutoBoostServiceTest extends FunctionalTestCase
         $this->offerRepository = Mockery::mock(ProductOfferRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
 
-        $clock = new FrozenClock(new \DateTimeImmutable('2026-01-04 00:00:00'));
+        $clock = new SystemClock();
 
         $this->service = new AutoBoostService(
             $this->suggestionService,

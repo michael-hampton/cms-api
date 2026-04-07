@@ -41,7 +41,7 @@ class BriefScheduleProcessorTest extends TestCase
         $this->duplicateBrief
             ->shouldReceive('handle')
             ->once()
-            ->with($schedule->source_brief_id, $schedule->source_brief_id, null, true);
+            ->with($schedule->source_brief_id, $schedule->source_brief_id, null, null);
 
         $this->scheduleRepository
             ->shouldReceive('update')

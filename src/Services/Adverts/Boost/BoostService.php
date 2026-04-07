@@ -3,6 +3,7 @@
 namespace App\Services\Adverts\Boost;
 
 use App\Contracts\Boost\BoostableInterface;
+use App\Contracts\ClockInterface;
 use App\Enums\Boost\BoostStatus;
 use App\Events\Boost\BoostActivatedEvent;
 use App\Events\Boost\BoostCancelledEvent;
@@ -14,7 +15,6 @@ use App\Exceptions\Boost\BoostTransitionException;
 use App\Framework\Database\Database;
 use App\Models\Boost;
 use App\Repositories\Adverts\Boost\BoostRepository;
-use App\Services\SystemClock;
 
 class BoostService
 {
@@ -23,7 +23,7 @@ class BoostService
         private readonly BoostEligibilityService $eligibilityService,
         private readonly BoostPricingService     $pricingService,
         private readonly Database                $database,
-        private readonly SystemClock $clock,
+        private readonly ClockInterface $clock,
     )
     {
     }

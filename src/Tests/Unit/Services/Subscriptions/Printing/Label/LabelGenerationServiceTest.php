@@ -6,8 +6,6 @@ namespace App\Tests\Unit\Services\Subscriptions\Printing\Label;
 
 use App\Enums\Subscriptions\LabelExportFormat;
 use App\Enums\Subscriptions\LabelRunStatus;
-use App\Events\Subscriptions\LabelRunFailed;
-use App\Events\Subscriptions\LabelRunGenerated;
 use App\Framework\Support\Logger;
 use App\Models\IssueDelivery;
 use App\Models\IssuesDelivered;
@@ -15,12 +13,10 @@ use App\Models\LabelRun;
 use App\Models\PrintFulfillment;
 use App\Repositories\Subscriptions\LabelRunRepository;
 use App\Repositories\Subscriptions\PrintFulfillmentRepository;
-use App\Services\Subscriptions\Printing\Label\CsvLabelExportFormatStrategy;
-use App\Services\Subscriptions\Printing\Label\LabelContext;
 use App\Services\Subscriptions\Printing\Label\LabelExportFormatStrategy;
 use App\Services\Subscriptions\Printing\Label\LabelFormatStrategyRegistry;
 use App\Services\Subscriptions\Printing\Label\LabelGenerationService;
-use App\Services\Subscriptions\Printing\Transport\LabelExportTransport;
+use App\Services\Subscriptions\Printing\Transport\LocalLabelExportTransport;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -41,7 +37,7 @@ class LabelGenerationServiceTest extends TestCase
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->labelRunRepository = Mockery::mock(LabelRunRepository::class);
         $this->formatRegistry = Mockery::mock(LabelFormatStrategyRegistry::class);
-        $this->transport = Mockery::mock(LabelExportTransport::class);
+        $this->transport = Mockery::mock(LocalLabelExportTransport::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
         $this->service = new LabelGenerationService(
@@ -318,7 +314,7 @@ class LabelGenerationServiceTest extends TestCase
 
         // Stub relationship chain for issuesDelivered → issueDelivery
         $issueDelivery = Mockery::mock(IssueDelivery::class)->makePartial();
-        $issueDelivery->issue_number = '42';
+        $issueDelivery->issue_number = 42;
         $issueDelivery->issue_title = 'Test Issue';
 
         $issuesDelivered = Mockery::mock(IssuesDelivered::class)->makePartial();

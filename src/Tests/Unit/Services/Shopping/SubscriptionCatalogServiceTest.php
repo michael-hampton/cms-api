@@ -297,6 +297,10 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
 
         // Mock the Query Builder (fluent interface)
         $this->queryMock = Mockery::mock('Illuminate\Database\Eloquent\Builder');
+        $this->queryMock->shouldReceive('visibleToMember')
+            ->byDefault()
+            ->with(Mockery::any())
+            ->andReturnSelf();
 
         $this->service = new SubscriptionCatalogService($this->repository);
     }

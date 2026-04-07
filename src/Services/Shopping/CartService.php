@@ -379,9 +379,9 @@ class CartService
 
         // Regular subscription - needs product
 //        $product = $subscriptionPlan->product;
-//        if (!$product || !$product->is_active) {
-//            return ['success' => false, 'message' => 'Associated product not found or inactive'];
-//        }
+        if (!$subscriptionPlan || !$subscriptionPlan->is_active) {
+            return ['success' => false, 'message' => 'Associated product not found or inactive'];
+        }
 
         $cartItemData = $this->itemFactory->fromSubscription(
             $sessionId,

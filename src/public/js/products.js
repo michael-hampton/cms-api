@@ -29,6 +29,7 @@
         allDiscoveredFilters: new Map(),
         cartCount: 0,
         wishlistCount: 0,
+        wishlistProductIds: new Set(),
         debounceTimer: null
     };
 
@@ -60,6 +61,74 @@
         attachEventListeners();
         attachTabListeners();
         updateCounts();
+        initSearchReset();
+    }
+
+    /**
+     * Injects a clear (×) button inside the search input wrapper and wires it up.
+     * Works for any search input on the page with id="search-input".
+     * The wrapper must be position:relative (add that CSS if needed).
+     */
+    function initSearchReset() {
+        const input = elements.searchInput;
+        if (!input) return;
+
+        // Inject the reset button — positioned absolutely inside the input wrapper
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.id = 'search-reset-btn';
+        resetBtn.setAttribute('aria-label', 'Clear search');
+        resetBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>`;
+        resetBtn.style.cssText = `
+        display: none;
+        position: absolute;
+        right: 2.75rem;   /* sits left of the search button */
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text-secondary, #64748b);
+        padding: 0.25rem;
+        line-height: 0;
+        border-radius: 50%;
+        transition: color 0.15s;
+    `;
+        resetBtn.addEventListener('mouseenter', () => resetBtn.style.color = 'var(--text-primary, #1e293b)');
+        resetBtn.addEventListener('mouseleave', () => resetBtn.style.color = 'var(--text-secondary, #64748b)');
+
+        // Insert into the input's parent (the wrapper must be position:relative)
+        const wrapper = input.parentElement;
+        if (wrapper) {
+            wrapper.style.position = 'relative';
+            wrapper.appendChild(resetBtn);
+        }
+
+        // Show/hide the reset button based on input value
+        const syncVisibility = () => {
+            resetBtn.style.display = input.value.trim() ? 'block' : 'none';
+        };
+        input.addEventListener('input', syncVisibility);
+
+        // Wire the clear action
+        resetBtn.addEventListener('click', () => {
+            input.value = '';
+            state.filters.search = '';
+            syncVisibility();
+            state.currentPage = 1;
+            updateURL();
+            loadProducts();
+            input.focus();
+        });
+
+        // Also show on load if the URL pre-populated the search field
+        syncVisibility();
     }
 
     // -------------------------------------------------------------------------
@@ -837,7 +906,7 @@
                             <button class="btn-add-to-cart" data-product-id="${product.id}">
                                 Add to Cart
                             </button>
-                            <button class="btn-wishlist" data-product-id="${product.id}">
+                            <button class="btn-wishlist${state.wishlistProductIds.has(product.id) ? ' active' : ''}" data-product-id="${product.id}">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                                 </svg>
@@ -898,9 +967,9 @@
         });
 
         // Wishlist buttons
-        /*document.querySelectorAll('.btn-wishlist').forEach(btn => {
+        document.querySelectorAll('.btn-wishlist').forEach(btn => {
             btn.addEventListener('click', handleToggleWishlist);
-        });*/
+        });
     }
 
     // Attach flip card event listeners
@@ -1019,6 +1088,14 @@
                 showToast(data.message, 'success');
                 state.wishlistCount = data.count;
                 updateWishlistCount();
+
+                // Keep the Set in sync so re-renders stay correct
+                const id = parseInt(productId, 10);
+                if (isInWishlist) {
+                    state.wishlistProductIds.delete(id);
+                } else {
+                    state.wishlistProductIds.add(id);
+                }
             } else {
                 showToast(data.message, 'error');
             }
@@ -1105,6 +1182,13 @@
             const wishlistData = await wishlistResponse.json();
             state.wishlistCount = wishlistData.count || 0;
             updateWishlistCount();
+
+            // Populate the Set so renderProducts() can stamp active on buttons.
+            // Requires the wishlist endpoint to include `product_ids: int[]` in its
+            // JSON response alongside `count`. Add that to WishlistController@index.
+            if (Array.isArray(wishlistData.product_ids)) {
+                state.wishlistProductIds = new Set(wishlistData.product_ids);
+            }
         } catch (error) {
             console.error('Error updating counts:', error);
         }

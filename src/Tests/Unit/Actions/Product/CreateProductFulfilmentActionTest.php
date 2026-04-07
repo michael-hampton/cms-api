@@ -90,6 +90,7 @@ class CreateProductFulfilmentActionTest extends TestCase
         return new FulfilmentDecisionContext(
             territory: $territory,
             addressSnapshot: $snapshot,
+            fullName: trim(($snapshot['first_name'] ?? '') . ' ' . ($snapshot['last_name'] ?? '')),
             channelMetadata: [],
         );
     }

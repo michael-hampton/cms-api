@@ -44,6 +44,13 @@ class Author extends Model
         'is_active' => 'boolean'
     ];
 
+    protected $appends = [
+        'url',
+        'total_published_articles',
+        'total_published_reviews',
+        'years_of_experience',
+    ];
+
     public function pages($relation = false)
     {
         return $this->belongsToMany(Page::class, 'page_authors', 'author_id', 'id', $relation);

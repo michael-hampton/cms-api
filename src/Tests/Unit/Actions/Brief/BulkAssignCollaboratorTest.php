@@ -4,7 +4,8 @@ namespace App\Tests\Unit\Actions\Brief;
 
 use App\Actions\Brief\BulkAssignCollaborator;
 use App\Actions\Brief\LogBriefActivity;
-use App\Models\BriefCollaborator;
+use App\Models\Brief;
+use App\Models\Collaborator;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -30,9 +31,11 @@ class BulkAssignCollaboratorTest extends TestCase
                 ->shouldReceive('create')
                 ->once()
                 ->with(Mockery::on(function ($data) use ($briefId) {
-                    return $data['brief_id'] === $briefId &&
+                    return $data['collaboratable_id'] === $briefId &&
                         $data['user_id'] === 10 &&
-                        $data['role'] === 'editor';
+                        $data['role'] === 'editor' &&
+                        $data['collaboratable_type'] === Brief::class &&
+                        $data['site_id'] === 1;
                 }));
 
             $this->activityService
@@ -41,14 +44,14 @@ class BulkAssignCollaboratorTest extends TestCase
                 ->with($briefId, 10, 'collaborator_added', 'Assigned as editor');
         }
 
-        $count = $this->service->handle($briefIds, 10, 'editor');
+        $count = $this->service->handle($briefIds, 10, 'editor', 1);
 
         $this->assertEquals(3, $count);
     }
 
     public function test_bulk_assign_updates_existing_collaborators(): void
     {
-        $existing = Mockery::mock(BriefCollaborator::class)->makePartial();
+        $existing = Mockery::mock(Collaborator::class)->makePartial();
         $existing->id = 99;
 
         $this->collaboratorRepository
@@ -66,7 +69,7 @@ class BulkAssignCollaboratorTest extends TestCase
             ->shouldReceive('handle')
             ->once();
 
-        $count = $this->service->handle([1], 10, 'reviewer');
+        $count = $this->service->handle([1], 10, 'reviewer', 1);
 
         $this->assertEquals(1, $count);
     }
@@ -82,5 +85,11 @@ class BulkAssignCollaboratorTest extends TestCase
             $this->collaboratorRepository,
             $this->activityService
         );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
     }
 }

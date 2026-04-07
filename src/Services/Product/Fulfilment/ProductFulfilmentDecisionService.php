@@ -46,6 +46,7 @@ class ProductFulfilmentDecisionService
                 'order_id' => $order->id,
                 'order_line_id' => $orderLine->id,
             ],
+            fullName: $resolvedAddress['full_name']
         );
     }
 }

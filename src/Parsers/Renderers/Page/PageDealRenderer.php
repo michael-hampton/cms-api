@@ -19,7 +19,7 @@ class PageDealRenderer
     {
     }
 
-    public function render(int $productId, RenderContext $context, string $ip = '', string $userAgent = ''): string
+    public function render(int $productId, RenderContext $context, string $ip = '', string $userAgent = '', ?int $siteId = null): string
     {
         try {
             $product = $this->productRepository->findWithRelations($productId, ['brand', 'images']);
@@ -39,6 +39,7 @@ class PageDealRenderer
                 context: $context,
                 ip: $ip,
                 userAgent: $userAgent,
+                siteId: $siteId
             );
 
             return $this->renderHtml($product, $context);

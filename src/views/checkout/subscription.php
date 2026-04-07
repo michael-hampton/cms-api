@@ -328,6 +328,14 @@ $planPrice = (float)$plan->price;
         'variant' => 'primary',
         'style' => 'margin-top: 1rem;',
         'type' => 'button',
+        'icon' => '
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M2 9h20"></path>
+            <rect x="5" y="12" width="3" height="2" rx="0.5"></rect>
+            <path d="M10 13h7"></path>
+        </svg>
         ])
 
         @include('checkout/components/security-badge')

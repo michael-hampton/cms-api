@@ -950,7 +950,7 @@ class BriefServiceTest extends TestCase
         $this->logBriefActivity
             ->shouldReceive('handle')
             ->once()
-            ->with($brief->id, 5, 'created_from_template', 'Created from template: My Preset');
+            ->with($brief->id, 5, 'created_from_preset', 'Created from preset: My Preset');
 
         $this->service->createFromTemplate(1, ['owner_id' => 5, 'site_id' => 1]);
         $this->assertTrue(true);

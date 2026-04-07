@@ -51,14 +51,6 @@ class OfferVisibilityResolver
         // Check eligibility rules
         $member = $context->memberId ? \App\Models\Member::find($context->memberId) : null;
 
-        if ($context->memberId && !$member) {
-            error_log("OfferVisibilityResolver: Member not found for ID: " . $context->memberId);
-        }
-
-        if ($member) {
-            error_log("OfferVisibilityResolver: Member found: ID=" . $member->id . ", isPaid=" . ($member->isPaid() ? 'yes' : 'no'));
-        }
-
         $eligibilityRules = $offer->eligibility_rules ?? [];
         if (!empty($eligibilityRules)) {
             $rules = $this->ruleFactory->createFromArray($eligibilityRules);

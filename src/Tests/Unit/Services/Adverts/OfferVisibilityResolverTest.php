@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Services\Adverts;
 
 use App\Enums\Adverts\SuppressionReason;
-use App\Models\ProductOffer;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Offers\ProductOfferRepository;
@@ -24,14 +23,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     public function testResolvesActiveOffer(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'original_price' => 99.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-        ]);
+        $offer = $this->createProductOffer($product->id);
 
         $context = RenderContext::forNewsletter(1, null);
         $decision = $this->resolver->resolve($offer, $context);
@@ -43,14 +35,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     public function testHidesInactiveOffer(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => false,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['is_active' => false]);
 
         $context = RenderContext::forNewsletter(1, null);
         $decision = $this->resolver->resolve($offer, $context);
@@ -62,14 +47,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     public function testHidesExpiredOffer(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['end_date' => date('Y-m-d H:i:s', strtotime('-1 day'))]);
 
         $context = RenderContext::forNewsletter(1, null);
         $decision = $this->resolver->resolve($offer, $context);
@@ -81,14 +59,8 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     public function testHidesOfferNotYetStarted(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['start_date' => date('Y-m-d H:i:s', strtotime('+1 day'))]);
+
 
         $context = RenderContext::forNewsletter(1, null);
         $decision = $this->resolver->resolve($offer, $context);
@@ -100,15 +72,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     public function testRespectsRequirePaidEligibility(): void
     {
         $product = $this->createProduct();
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'eligibility_rules' => ['require_paid' => true],
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['eligibility_rules' => ['require_paid' => true]]);
 
         // Free member
         $freeMember = $this->createMember(['plan' => 'free']);
@@ -146,15 +110,7 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
             'plan_name' => 'Premium Plan'
         ]);
 
-        $offer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'eligibility_rules' => ['require_paid' => true],
-            'original_price' => 100.00,
-        ]);
+        $offer = $this->createProductOffer($product->id, ['eligibility_rules' => ['require_paid' => true]]);
 
         $context = RenderContext::forNewsletter(1, $paidMember->fresh());
         $decision = $this->resolver->resolve($offer, $context);
@@ -166,23 +122,9 @@ class OfferVisibilityResolverTest extends FunctionalTestCase
     {
         $product = $this->createProduct();
 
-        $activeOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 79.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => true,
-            'original_price' => 100.00,
-        ]);
+        $activeOffer = $this->createProductOffer($product->id);
+        $inactiveOffer = $this->createProductOffer($product->id, ['is_active' => false]);
 
-        $inactiveOffer = ProductOffer::create([
-            'product_id' => $product->id,
-            'sale_price' => 69.99,
-            'start_date' => date('Y-m-d H:i:s'),
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
-            'is_active' => false,
-            'original_price' => 100.00,
-        ]);
 
         $context = RenderContext::forNewsletter(1, null);
         $decisions = $this->resolver->resolveMultiple(

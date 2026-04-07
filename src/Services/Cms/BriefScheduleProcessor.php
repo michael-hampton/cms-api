@@ -37,7 +37,7 @@ class BriefScheduleProcessor
             $schedule->source_brief_id,
             $schedule->source_brief_id, // owner = source brief's owner; service resolves via getWithRelations
             null,
-            true
+            null
         );
 
         $newCount = $schedule->occurrences_count + 1;

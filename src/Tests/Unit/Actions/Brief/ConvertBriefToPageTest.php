@@ -141,6 +141,7 @@ class ConvertBriefToPageTest extends FunctionalTestCase
 
         $image = Mockery::mock(Image::class)->makePartial();
         $image->id = 50;
+        $image->url = '/path/to/image.jpg';
         $image->file_path = '/path/to/image.jpg';
 
         $attachment = Mockery::mock(BriefAttachment::class)->makePartial();

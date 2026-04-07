@@ -33,7 +33,7 @@ class SearchCriteria
         return $this->sortBy;
     }
 
-    public function getSortOrder(): string
+    public function getSortOrder(): ?string
     {
         return $this->sortOrder;
     }

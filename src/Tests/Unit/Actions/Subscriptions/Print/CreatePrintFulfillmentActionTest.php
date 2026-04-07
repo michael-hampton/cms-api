@@ -171,8 +171,8 @@ class CreatePrintFulfillmentActionTest extends TestCase
             ->with($subscription->id, $issuesDelivered->id, 7)
             ->andReturn($existing);
 
-        // create must never be called
-        $this->fulfillmentRepository->shouldNotReceive('create');
+        $this->batchRepository->shouldNotReceive('findOrCreateForIssueDeliveryAndTerritory');
+        $this->fulfillmentRepository->shouldNotReceive('createFullfilment');
 
         $result = $this->action->execute($subscription, $issueDelivery);
 

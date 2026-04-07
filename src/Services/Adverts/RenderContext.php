@@ -14,7 +14,8 @@ class RenderContext
         public readonly string    $channel, // 'newsletter' | 'web'
         public readonly string    $surfaceType, // newsletter_issue or page
         public readonly int       $surfaceId, // newsletter_issue_id or page_id
-        public readonly \DateTime $timestamp
+        public readonly \DateTime $timestamp,
+        public readonly ?int      $siteId = null
     )
     {
     }

@@ -939,6 +939,7 @@ class CartServiceTest extends FunctionalTestCase
         $product->is_active = false;
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->site_id = $this->siteId;
         $plan->shouldReceive('isOneTime')->andReturn(false);
         $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(29.99);
@@ -960,20 +961,15 @@ class CartServiceTest extends FunctionalTestCase
 
     public function testAddSubscriptionToCartForRegularSubscriptionSuccess(): void
     {
-        $product = Mockery::mock(Product::class)->makePartial();
-        $product->id = 1;
-        $product->is_active = true;
-        $product->name = 'Magazine';
-        $product->slug = 'magazine';
-        $product->site_id = $this->siteId;
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
         $plan->shouldReceive('isOneTime')->andReturn(false);
         $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(29.99);
-        $plan->product = $product;
         $plan->pricingTiers = collect([]);
+        $plan->is_active = true;
+        $plan->site_id = $this->siteId;
 
         $this->subscriptionPlanRepository->shouldReceive('find')
             ->with(1, ['pricingTiers'])

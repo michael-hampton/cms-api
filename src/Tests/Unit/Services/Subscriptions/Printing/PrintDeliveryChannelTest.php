@@ -91,10 +91,13 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
         $territory = Mockery::mock(Territory::class)->makePartial();
         $territory->id = 7;
 
+        $addressSnapshot = $this->makeResolvedAddress()['snapshot'];
+
         $context = new FulfilmentDecisionContext(
             territory: $territory,
-            addressSnapshot: $this->makeResolvedAddress()['snapshot'],
-            channelMetadata: ['subscription_id' => $subscription->id],
+            addressSnapshot: $addressSnapshot,
+            fullName: $addressSnapshot['first_name'] . ' ' . $addressSnapshot['last_name'],
+            channelMetadata: ['subscription_id' => $subscription->id]
         );
 
         // Address resolver must NOT be called when a context with a complete snapshot is provided
@@ -134,9 +137,12 @@ class PrintDeliveryChannelTest extends FunctionalTestCase
     {
         [$subscription, $issueDelivery, $batch, $fulfillment, $issuesDelivered] = $this->makeValidScenario();
 
+        $addressSnapshot = $this->makeResolvedAddress()['snapshot'];
+
         $context = new FulfilmentDecisionContext(
             territory: null,
             addressSnapshot: $this->makeResolvedAddress()['snapshot'],
+            fullName: $addressSnapshot['first_name'] . ' ' . $addressSnapshot['last_name']
         );
 
         $this->addressResolver->shouldNotReceive('resolve');

@@ -2,6 +2,7 @@
 
 namespace App\Services\Adverts\Boost;
 
+use App\Contracts\ClockInterface;
 use App\DTO\Boost\BoostSuggestionDTO;
 use App\Enums\Boost\AutoBoostGoal;
 use App\Enums\Boost\BoostContext;
@@ -9,7 +10,6 @@ use App\Enums\Boost\SuggestionType;
 use App\Framework\Support\Config;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\BoostSuggestionRepository;
-use App\Services\SystemClock;
 
 class BoostSuggestionService
 {
@@ -20,7 +20,7 @@ class BoostSuggestionService
         private readonly BoostRepository           $boostRepository,
         private readonly BoostPricingService       $pricingService,
         private readonly OpportunityScorer         $scorer,
-        private readonly SystemClock $clock,
+        private readonly ClockInterface $clock,
     )
     {
         $this->cfg = config('boost.suggestions');

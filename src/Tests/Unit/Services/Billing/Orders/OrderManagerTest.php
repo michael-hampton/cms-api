@@ -526,7 +526,7 @@ class OrderManagerTest extends FunctionalTestCase
 
         $this->orderRepository
             ->expects('getByUserPaginated')
-            ->with(3, 2, 10)
+            ->with(3, 2, 10, [])
             ->andReturn($expected);
 
         $result = $this->service->getByUserPaginated(3, 2, 10);
@@ -538,7 +538,7 @@ class OrderManagerTest extends FunctionalTestCase
     {
         $this->orderRepository
             ->expects('getByUserPaginated')
-            ->with(3, 1, 10)
+            ->with(3, 1, 10, [])
             ->andReturn([]);
 
         $result = $this->service->getByUserPaginated(3);

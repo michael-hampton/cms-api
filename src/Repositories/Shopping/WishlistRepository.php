@@ -23,7 +23,7 @@ class WishlistRepository extends Repository
             $query->where('session_id', $sessionId);
         }
 
-        return $query->with(['product'])->get(); // Changed to array
+        return $query->with(['product'])->get();
     }
 
     public function existsByProduct(int $productId, ?int $userId, string $sessionId): bool
@@ -65,6 +65,30 @@ class WishlistRepository extends Repository
         }
 
         return $query->count();
+    }
+
+    /**
+     * Returns the product_ids in the wishlist for the given identity.
+     *
+     * Used by the wishlist index endpoint so the frontend can stamp `.active`
+     * on product card wishlist buttons without a per-card API call.
+     *
+     * @return int[]
+     */
+    public function getProductIdsBySessionOrUser(?int $userId, string $sessionId): array
+    {
+        $query = $this->model->query()->select('product_id');
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('session_id', $sessionId);
+        }
+
+        return $query->get()
+            ->pluck('product_id')
+            ->map(fn($id) => (int)$id)
+            ->toArray();
     }
 
     public function getBundles(int $bundleId, ?int $userId = null, ?string $sessionId = null): Collection
