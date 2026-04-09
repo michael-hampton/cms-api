@@ -34,8 +34,6 @@ class IssueDeliveryDispatchedListener
     {
         $issueDelivery = $event->issueDelivery;
 
-        dd($issueDelivery);
-
         $hasPrintSubscriptions = $this->subscriptionRepository->hasPrintSubscriptionsForPlan(
             $issueDelivery->subscription_plan_id,
         );

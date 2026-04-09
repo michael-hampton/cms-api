@@ -59,7 +59,6 @@ class DeliverIssueDeliveryJob extends BaseJob
                 $issueDelivery = $issuesDelivered->issueDelivery(true)->first();
 
                 if (!$subscription || !$issueDelivery) {
-                    die('no');
                     throw new \RuntimeException(
                         'Missing subscription or issue delivery for IssuesDelivered #' . $issuesDelivered->id
                     );

@@ -136,8 +136,6 @@ class QueueWorker
 
         $job = $this->deserialise($record['payload'], $jobId);
 
-        dd($job);
-
         if ($job === null) {
             $this->driver->fail(
                 $jobId,
