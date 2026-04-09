@@ -21,27 +21,26 @@ use App\Services\Product\Fulfilment\ProductBatchExportService;
  */
 class ExportProductBatchJob extends BaseJob
 {
-    public string $queue = 'products';
+    public ?string $queue = 'products';
     public int $tries = 3;
     public int $backoff = 60;
+    private ProductBatchRepository $batchRepository;
+    private ProductBatchExportService $exportService;
+    private Logger $logger;
 
     public function __construct(
-        private readonly ProductBatchRepository    $batchRepository,
-        private readonly ProductBatchExportService $exportService,
-        private readonly Logger                    $logger,
+        private readonly int $batchId,
     )
     {
     }
 
-    public function handle(
-        int $batchId,
-    ): void
+    public function handle(): void
     {
-        $batch = $this->batchRepository->find($batchId);
+        $batch = $this->batchRepository->find($this->batchId);
 
         if (!$batch) {
             $this->logger->error('ExportProductBatchJob: batch not found', [
-                'batch_id' => $batchId,
+                'batch_id' => $this->batchId,
             ]);
             return;
         }

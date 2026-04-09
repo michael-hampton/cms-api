@@ -57,6 +57,7 @@ use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Queue\DatabaseQueueDriver;
+use App\Framework\Queue\NullQueueDriver;
 use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Routing\RouteLoader;
 use App\Framework\Storage\StoragePathResolver;
@@ -103,6 +104,8 @@ use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
+use App\Services\Members\AddressLookupService;
+use App\Services\Members\AddressLookupServiceInterface;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
 use App\Services\Members\Comments\SimpleSpamDetector;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
@@ -200,8 +203,14 @@ class ApiApplication
         $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
-        $this->container->bind(QueueDriverInterface::class, DatabaseQueueDriver::class);
+        $this->container->bind(
+            QueueDriverInterface::class,
+            ($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing'
+                ? NullQueueDriver::class
+                : DatabaseQueueDriver::class
+        );
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
+        $this->container->bind(AddressLookupServiceInterface::class, AddressLookupService::class);
 
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 

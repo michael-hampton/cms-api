@@ -2,8 +2,11 @@
 
 namespace App\Tests\Functional\Controllers\Front;
 
+use App\Framework\Container;
 use App\Models\Address;
 use App\Models\Member;
+use App\Services\Members\AddressLookupServiceInterface;
+use App\Services\Members\FakeAddressLookupService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -13,14 +16,6 @@ class AddressControllerTest extends FunctionalTestCase
 
     private Member $testMember;
     private Member $otherMember;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->testMember = $this->createMember();
-        $this->otherMember = $this->createMember();
-    }
 
     public function testIndexReturnsAddressesList()
     {
@@ -188,7 +183,6 @@ class AddressControllerTest extends FunctionalTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
-
     public function testSetDefaultUpdatesDefaultFlag()
     {
         $address1 = $this->createAddress(['member_id' => $this->testMember->id]);
@@ -222,7 +216,7 @@ class AddressControllerTest extends FunctionalTestCase
 
     public function testSetDefaultFailsForWrongMember()
     {
-        $address = $this->createAddress([ 'member_id' => $this->testMember->id]);
+        $address = $this->createAddress(['member_id' => $this->testMember->id]);
 
         // Try to set default using other member's ID
         $response = $this->postForSite("/api/addresses/{$address->id}/set-default", [
@@ -358,4 +352,120 @@ class AddressControllerTest extends FunctionalTestCase
         $this->assertFalse($address2Fresh->is_default);
     }
 
+    public function testLookupReturnsAddressesForValidPostcode(): void
+    {
+        $spy = new FakeAddressLookupService();
+        $spy->results = [
+            [
+                'address' => '10 Downing Street',
+                'city' => 'London',
+                'county' => 'Greater London',
+                'postal_code' => 'SW1A 1AA',
+                'country' => 'GB',
+            ],
+        ];
+
+        Container::getInstance()->bind(AddressLookupServiceInterface::class, function () use ($spy) {
+            return $spy;
+        });
+
+        $response = $this->getForSite('/api/address-lookup?postcode=SW1A1AA');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['addresses']);
+        $this->assertEquals('10 Downing Street', $data['addresses'][0]['address']);
+    }
+
+    public function testLookupReturnsMultipleAddresses(): void
+    {
+        $spy = new FakeAddressLookupService();
+        $spy->results = [
+            ['address' => '1 Example St', 'city' => 'London', 'county' => '', 'postal_code' => 'EC1A 1BB', 'country' => 'GB'],
+            ['address' => '2 Example St', 'city' => 'London', 'county' => '', 'postal_code' => 'EC1A 1BB', 'country' => 'GB'],
+            ['address' => '3 Example St', 'city' => 'London', 'county' => '', 'postal_code' => 'EC1A 1BB', 'country' => 'GB'],
+        ];
+
+        Container::getInstance()->bind(AddressLookupServiceInterface::class, function () use ($spy) {
+            return $spy;
+        });
+
+        $response = $this->getForSite('/api/address-lookup?postcode=EC1A1BB');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(3, $data['addresses']);
+    }
+
+    public function testLookupReturns422WhenPostcodeIsMissing(): void
+    {
+        $response = $this->getForSite('/api/address-lookup');
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertEquals('Postcode is required', $data['message']);
+    }
+
+    public function testLookupReturns422WhenNoAddressesFound(): void
+    {
+        $spy = new FakeAddressLookupService();
+        $spy->results = [];
+
+        Container::getInstance()->bind(AddressLookupServiceInterface::class, function () use ($spy) {
+            return $spy;
+        });
+
+        $response = $this->getForSite('/api/address-lookup?postcode=ZZ99ZZ');
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('No addresses found', $data['message']);
+    }
+
+    public function testLookupReturns500WhenServiceThrows(): void
+    {
+        $spy = new FakeAddressLookupService();
+        $spy->shouldThrow = true;
+
+        Container::getInstance()->bind(AddressLookupServiceInterface::class, function () use ($spy) {
+            return $spy;
+        });
+
+        $response = $this->getForSite('/api/address-lookup?postcode=SW1A1AA');
+
+        $this->assertEquals(500, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function testLookupStripsWhitespaceFromPostcode(): void
+    {
+        $spy = new FakeAddressLookupService();
+        $spy->results = [
+            ['address' => '10 Downing Street', 'city' => 'London', 'county' => '', 'postal_code' => 'SW1A 1AA', 'country' => 'GB'],
+        ];
+
+        Container::getInstance()->bind(AddressLookupServiceInterface::class, function () use ($spy) {
+            return $spy;
+        });
+
+        $response = $this->getForSite('/api/address-lookup?postcode=SW1A+1AA');
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $container = Container::getInstance();
+
+        $this->testMember = $this->createMember();
+        $this->otherMember = $this->createMember();
+        $container->bind(AddressLookupServiceInterface::class, FakeAddressLookupService::class);
+
+    }
 }

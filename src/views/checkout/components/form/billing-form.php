@@ -3,7 +3,7 @@
  * Billing form — Contact Information + Shipping Address sections.
  *
  * Handles both the saved-addresses flow (logged-in users) and
- * the manual address form (guests / "use different address").
+ * the address-lookup / manual address form (guests / "use different address").
  *
  * @var object|null $member Authenticated member object (nullable for guests).
  * @var bool $requiresShipping Whether the order needs a shipping address.
@@ -12,15 +12,6 @@
 $member = $member ?? null;
 $requiresShipping = $requiresShipping ?? true;
 $checkoutMode = $checkoutMode ?? 'single-page';
-
-$countryOptions = [
-        'US' => 'United States',
-        'CA' => 'Canada',
-        'GB' => 'United Kingdom',
-        'AU' => 'Australia',
-        'DE' => 'Germany',
-        'FR' => 'France',
-];
 ?>
     <style>
         .saved-address-card {
@@ -58,40 +49,41 @@ $countryOptions = [
     @include('checkout/components/form/form-section', ['title' => 'Contact Information'])
     @include('checkout/components/form/form-row')
     @include('checkout/components/form/form-group', [
-    'name' => 'first_name',
-    'label' => 'First Name',
+    'name'     => 'first_name',
+    'label'    => 'First Name',
     'required' => true,
-    'value' => $member?->first_name ?? '',
+    'value'    => $member?->first_name ?? '',
     ])
     @include('checkout/components/form/form-group', [
-    'name' => 'last_name',
-    'label' => 'Last Name',
+    'name'     => 'last_name',
+    'label'    => 'Last Name',
     'required' => true,
-    'value' => $member?->last_name ?? '',
+    'value'    => $member?->last_name ?? '',
     ])
     @include('checkout/components/form/form-row', ['close' => true])
     @include('checkout/components/form/form-row')
     @include('checkout/components/form/form-group', [
-    'name' => 'email',
-    'label' => 'Email',
-    'type' => 'email',
+    'name'     => 'email',
+    'label'    => 'Email',
+    'type'     => 'email',
     'required' => true,
-    'value' => $member?->email ?? '',
+    'value'    => $member?->email ?? '',
     ])
     @include('checkout/components/form/form-group', [
     'name' => 'phone',
     'label' => 'Phone',
-    'type' => 'tel',
+    'type'  => 'tel',
     ])
     @include('checkout/components/form/form-row', ['close' => true])
     @include('checkout/components/form/form-section', ['close' => true])
+
 <?php if ($requiresShipping): ?>
 
-    <!-- Saved addresses — revealed by JS when member has saved addresses -->
+    <!-- ── Saved addresses — revealed by JS when member has saved addresses ── -->
     @include('checkout/components/form/form-section', [
     'title' => 'Saved Addresses',
-    'id' => 'saved-addresses-section',
-    'style' => 'display: none;'
+    'id'    => 'saved-addresses-section',
+    'style' => 'display: none;',
     ])
     <div id="saved-addresses-list"></div>
 
@@ -105,70 +97,29 @@ $countryOptions = [
     @include('checkout/components/form/form-section', ['close' => true])
 
     <?php
-    $button = $this->partial('checkout/components/form/button', [
+    $backBtn = $this->partial('checkout/components/form/button', [
             'label' => ' ← Back to Saved Addresses',
             'variant' => 'secondary',
             'type' => 'button',
             'onclick' => 'showSavedAddresses()',
             'style' => 'display: none; width: auto; padding: 0.5rem 1rem;',
-            'id' => 'back-to-saved-btn'
-    ])
+            'id' => 'back-to-saved-btn',
+    ]);
     ?>
 
-    <!-- Manual address form -->
+    <!-- ── Shipping Address ──────────────────────────────────────────────── -->
     @include('checkout/components/form/form-section', [
-    'title' => 'Shipping Address',
-    'id' => 'shipping-address-form',
-    'close' => false,
-    'headerContent' =>  $button
+    'title'         => 'Shipping Address',
+    'id'            => 'shipping-address-form',
+    'close'         => false,
+    'headerContent' => $backBtn,
     ])
 
-
-    @include('checkout/components/form/form-group', [
-    'name' => 'address',
-    'label' => 'Address',
-    'required' => true,
-    'class' => 'full-width',
+    @include('checkout/components/form/address-lookup', [
+    'member'           => $member,
+    'requiresShipping' => $requiresShipping,
     ])
-    @include('checkout/components/form/form-group', [
-    'name' => 'address2',
-    'label' => 'Apartment, suite, etc. (optional)',
-    'class' => 'full-width',
-    ])
-
-    @include('checkout/components/form/form-row')
-    @include('checkout/components/form/form-group', [
-    'name' => 'city',
-    'label' => 'City',
-    'required' => true,
-    ])
-    @include('checkout/components/form/form-group', [
-    'name' => 'state',
-    'label' => 'State / Province',
-    ])
-    @include('checkout/components/form/form-row', ['close' => true])
-
-
-    @include('checkout/components/form/form-row')
-    @include('checkout/components/form/form-group', [
-    'name' => 'postal_code',
-    'label' => 'Postal Code',
-    'required' => true,
-    ])
-    @include('checkout/components/form/select', [
-    'name' => 'country',
-    'id' => 'country-select',
-    'label' => 'Country',
-    'required' => true,
-    'blank' => true,
-    'blankLabel' => 'Select Country',
-    'options' => $countryOptions,
-    'selected' => $member?->country ?? '',
-    'onChange' => 'handleCountryChange(this.value)',
-    ])
-    @include('checkout/components/form/form-row', ['close' => true])
 
     @include('checkout/components/form/form-section', ['close' => true])
-
 
 <?php endif; ?>

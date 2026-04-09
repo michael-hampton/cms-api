@@ -6,17 +6,22 @@ use App\Framework\Support\Logger;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Services\Adverts\Boost\BoostService;
 
-class ExpireBoostsJob
+class ExpireBoostsJob extends BaseJob
 {
+    private BoostRepository $boostRepository;
+    private BoostService $boostService;
+
     public function __construct(
-        private readonly BoostRepository $boostRepository,
-        private readonly BoostService    $boostService,
+        private readonly ?int $nowUnix = null,
     )
     {
     }
 
-    public function handle(\DateTimeImmutable $now): void
+    public function handle(): void
     {
+        $now = $this->nowUnix !== null
+            ? (new \DateTimeImmutable('@' . $this->nowUnix))->setTimezone(new \DateTimeZone('UTC'))
+            : new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $expiredBoosts = $this->boostRepository->getExpiredBoosts($now);
 
         foreach ($expiredBoosts as $boost) {

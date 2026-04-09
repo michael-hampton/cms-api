@@ -762,4 +762,14 @@ class Subscription extends Model
 
         return $this->first_shipment_at <= now();
     }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class, 'subscription_id', 'id');
+    }
+
+    public function lastPayment()
+    {
+        return $this->payments()->last();
+    }
 }

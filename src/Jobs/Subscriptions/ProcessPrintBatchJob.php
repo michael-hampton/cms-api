@@ -23,43 +23,42 @@ use App\Repositories\Subscriptions\PrintBatchRepository;
  */
 class ProcessPrintBatchJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
+    private PrintBatchRepository $batchRepository;
+    private Logger $logger;
 
     public function __construct(
-        private readonly PrintBatchRepository $batchRepository,
-        private readonly Logger               $logger,
+        private readonly int $batchId,
     )
     {
     }
 
-    public function handle(
-        int                  $batchId,
-    ): void
+    public function handle(): void
     {
-        $batch = $this->batchRepository->find($batchId);
+        $batch = $this->batchRepository->find($this->batchId);
 
         if (!$batch) {
             $this->logger->error('ProcessPrintBatchJob: batch not found', [
-                'batch_id' => $batchId,
+                'batch_id' => $this->batchId,
             ]);
             return;
         }
 
         if ($batch->isExported()) {
             $this->logger->info('ProcessPrintBatchJob: batch already exported, skipping', [
-                'batch_id' => $batchId,
+                'batch_id' => $this->batchId,
             ]);
             return;
         }
 
         $this->logger->info('ProcessPrintBatchJob: dispatching export and label jobs', [
-            'batch_id' => $batchId,
+            'batch_id' => $this->batchId,
         ]);
 
         // Parallel — both dispatched simultaneously, neither waits for the other.
-        dispatch(ExportPrintBatchJob::for(), $batchId, $batch->issue_delivery_id);
+        dispatch(ExportPrintBatchJob::for($this->batchId, (int)$batch->issue_delivery_id))->onQueue('print');
 
-        dispatch(GenerateLabelRunsJob::for(), $batchId);
+        dispatch(GenerateLabelRunsJob::for($this->batchId))->onQueue('print');
     }
 }

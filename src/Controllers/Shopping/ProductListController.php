@@ -4,7 +4,9 @@ namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\Enums\Boost\BoostContext;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Session\Session;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\Product;
@@ -16,6 +18,8 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
 use App\Repositories\ReviewRepository;
+use App\Repositories\Shopping\CartRepository;
+use App\Repositories\Shopping\WishlistRepository;
 use App\Search\SearchCriteria;
 use App\Services\Adverts\Boost\BoostEventService;
 use App\Services\Adverts\Boost\BoostRankingService;
@@ -40,6 +44,8 @@ class ProductListController extends Controller
         private readonly BoostRepository                     $boostRepository,
         private readonly CurrencyResolver                    $currencyResolver,
         private readonly FilterInputSanitiser                $inputSanitiser,
+        private readonly WishlistRepository $wishlistRepository,
+        private readonly CartRepository     $cartRepository,
     )
     {
         parent::__construct();
@@ -48,6 +54,8 @@ class ProductListController extends Controller
     public function index(Request $request)
     {
         $siteId = SiteContext::getId();
+        $userId = MemberAuth::id() ?? null;
+        $sessionId = Session::get('cart_session_id');
 
         $categories = $this->categoryRepository->getAllWithProductCounts($siteId);
         $brands = $this->brandRepository->getAllWithProductCounts($siteId);
@@ -58,6 +66,18 @@ class ProductListController extends Controller
         $currencyCode = $this->currencyResolver->resolveUpperCase();
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
 
+        // Resolve cart and wishlist state once on the server so the page
+        // doesn't need extra API calls just to seed the initial badge counts
+        // and button active-states.  The view renders these into INITIAL_DATA
+        // which products.js picks up via seedInitialState().
+        $wishlistProductIds = $this->wishlistRepository
+            ->getProductIdsBySessionOrUser($userId, $sessionId);
+
+        $cartProductIds = $this->cartRepository
+            ->findBySessionOrUser($userId, $sessionId)
+            ->pluck('product_id')
+            ->all();
+
         return $this->view('products.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
@@ -66,6 +86,11 @@ class ProductListController extends Controller
             'specificationGroups' => $specificationGroups->toArray(),
             'currencyCode' => $currencyCode,
             'currencySymbol' => $currencySymbol,
+            // Passed to the view for INITIAL_DATA injection
+            'wishlistCount' => count($wishlistProductIds),
+            'wishlistProductIds' => $wishlistProductIds,
+            'cartCount' => $this->cartRepository->getCountBySessionOrUser($userId, $sessionId),
+            'cartProductIds' => $cartProductIds,
         ]);
     }
 

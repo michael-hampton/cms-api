@@ -30,6 +30,7 @@
         cartCount: 0,
         wishlistCount: 0,
         wishlistProductIds: new Set(),
+        cartProductIds: new Set(),
         debounceTimer: null
     };
 
@@ -60,8 +61,46 @@
         loadFromURL();
         attachEventListeners();
         attachTabListeners();
-        updateCounts();
+        seedInitialState();
         initSearchReset();
+    }
+
+    /**
+     * Seed cart/wishlist state from data the PHP view has already rendered
+     * into window.INITIAL_DATA.  This avoids two extra API calls on every
+     * page load while keeping the runtime state correct for re-renders.
+     *
+     * The view must output:
+     *   <script>
+     *     window.INITIAL_DATA = {
+     *       cartCount:          <?= $cartCount ?>,
+     *       cartProductIds:     <?= json_encode($cartProductIds) ?>,
+     *       wishlistCount:      <?= $wishlistCount ?>,
+     *       wishlistProductIds: <?= json_encode($wishlistProductIds) ?>,
+     *     };
+     *   </script>
+     *
+     * Both *Count values are integers.
+     * Both *ProductIds values are arrays of integer product IDs.
+     */
+    function seedInitialState() {
+        const d = window.INITIAL_DATA;
+        if (!d) return;
+
+        if (typeof d.cartCount === 'number') {
+            state.cartCount = d.cartCount;
+            updateCartCount();
+        }
+        if (Array.isArray(d.cartProductIds)) {
+            state.cartProductIds = new Set(d.cartProductIds.map(Number));
+        }
+        if (typeof d.wishlistCount === 'number') {
+            state.wishlistCount = d.wishlistCount;
+            updateWishlistCount();
+        }
+        if (Array.isArray(d.wishlistProductIds)) {
+            state.wishlistProductIds = new Set(d.wishlistProductIds.map(Number));
+        }
     }
 
     /**
@@ -903,7 +942,7 @@
                                 <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
                             </svg>
                         </button>
-                            <button class="btn-add-to-cart" data-product-id="${product.id}">
+                            <button class="btn-add-to-cart${state.cartProductIds.has(Number(product.id)) ? ' active' : ''}" data-product-id="${product.id}">
                                 Add to Cart
                             </button>
                             <button class="btn-wishlist${state.wishlistProductIds.has(product.id) ? ' active' : ''}" data-product-id="${product.id}">

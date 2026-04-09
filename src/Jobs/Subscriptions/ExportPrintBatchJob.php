@@ -23,34 +23,37 @@ use App\Services\Workflow\WorkflowRunRecorderFactory;
  */
 class ExportPrintBatchJob extends BaseJob
 {
+    private PrintBatchRepository $batchRepository;
+    private IssueDeliveryRepository $issueDeliveryRepository;
+    private PrintBatchExportService $exportService;
+    private WorkflowRunRecorderFactory $recorderFactory;
+    private PrintRunRepository $printRunRepository;
+    private Logger $logger;
+
     public function __construct(
-        private readonly PrintBatchRepository       $batchRepository,
-        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
-        private readonly PrintBatchExportService    $exportService,
-        private readonly WorkflowRunRecorderFactory $recorderFactory,
-        private readonly PrintRunRepository         $printRunRepository,
-        private readonly Logger                     $logger,
+        private readonly int $batchId,
+        private readonly int $issueDeliveryId,
     )
     {
     }
 
-    public function handle(int $batchId, int $issueDeliveryId): void
+    public function handle(): void
     {
-        $batch = $this->batchRepository->find($batchId);
+        $batch = $this->batchRepository->find($this->batchId);
 
         if (!$batch) {
             $this->logger->error('ExportPrintBatchJob: batch not found', [
-                'batch_id' => $batchId,
+                'batch_id' => $this->batchId,
             ]);
             return;
         }
 
-        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
+        $issueDelivery = $this->issueDeliveryRepository->find($this->issueDeliveryId);
 
         if (!$issueDelivery) {
             $this->logger->error('ExportPrintBatchJob: issue delivery not found', [
-                'batch_id' => $batchId,
-                'issue_delivery_id' => $issueDeliveryId,
+                'batch_id' => $this->batchId,
+                'issue_delivery_id' => $this->issueDeliveryId,
             ]);
             return;
         }
@@ -65,7 +68,7 @@ class ExportPrintBatchJob extends BaseJob
                     ->forPrintRun($printRun, 'phase_3', WorkflowRunStatus::COMPLETE)
                     ->record(WorkflowStageResult::failed(
                         $e->getMessage(),
-                        ['batch_id' => $batchId],
+                        ['batch_id' => $this->batchId],
                     ));
             }
 
@@ -83,7 +86,7 @@ class ExportPrintBatchJob extends BaseJob
 
         if (!$printRun) {
             $this->logger->warning('ExportPrintBatchJob: all batches exported but no active PrintRun found', [
-                'issue_delivery_id' => $issueDeliveryId,
+                'issue_delivery_id' => $this->issueDeliveryId,
             ]);
             return;
         }

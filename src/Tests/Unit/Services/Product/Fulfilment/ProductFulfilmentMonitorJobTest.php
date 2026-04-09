@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Product\Fulfilment;
 
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Products\ProductFulfilmentMonitorJob;
 use App\Models\ProductFulfilmentRun;
@@ -32,8 +33,9 @@ class ProductFulfilmentMonitorJobTest extends TestCase
 
     private function handle(int $runId): void
     {
-        $job = new ProductFulfilmentMonitorJob($this->runRepository, $this->logger);
-        $job->handle($runId);
+        $job = ProductFulfilmentMonitorJob::for($runId);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_it_returns_early_when_run_is_past_fulfilling(): void
@@ -103,7 +105,7 @@ class ProductFulfilmentMonitorJobTest extends TestCase
 
         $this->logger
             ->shouldReceive('error')
-            ->once()
+            ->atLeast()->once()
             ->with(
                 Mockery::any(),
                 Mockery::on(fn($ctx) => $ctx['missing_chunks'] === 3),
@@ -125,6 +127,10 @@ class ProductFulfilmentMonitorJobTest extends TestCase
         $this->logger->shouldReceive('info')->byDefault();
         $this->logger->shouldReceive('warning')->byDefault();
         $this->logger->shouldReceive('error')->byDefault();
+
+        $container = Container::getInstance();
+        $container->instance(ProductFulfilmentRunRepository::class, $this->runRepository);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\ProcessPrintBatchJob;
 use App\Models\PrintBatch;
@@ -23,6 +24,10 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
 
         $this->batchRepository = Mockery::mock(PrintBatchRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $container = Container::getInstance();
+        $container->instance(PrintBatchRepository::class, $this->batchRepository);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void
@@ -43,7 +48,9 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
         $this->batchRepository->shouldReceive('find')->with(10)->andReturn($batch);
 
 
-        $this->makeJob()->handle(10);
+        $job = ProcessPrintBatchJob::for(10);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -56,8 +63,9 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
     {
         $this->batchRepository->shouldReceive('find')->andReturn(null);
 
-
-        $this->makeJob()->handle(1);
+        $job = ProcessPrintBatchJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -71,7 +79,9 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
         $this->batchRepository->shouldReceive('find')->andReturn($batch);
 
 
-        $this->makeJob()->handle(1);
+        $job = ProcessPrintBatchJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -80,13 +90,6 @@ class ProcessPrintBatchJobTest extends FunctionalTestCase
     // =========================================================================
     // Helpers
     // =========================================================================
-
-    private function makeJob(): ProcessPrintBatchJob
-    {
-        return new ProcessPrintBatchJob(
-            $this->batchRepository, $this->logger
-        );
-    }
 
     private function makeBatch(int $id, int $issueDeliveryId): MockInterface
     {

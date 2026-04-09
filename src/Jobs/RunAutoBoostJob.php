@@ -5,10 +5,11 @@ namespace App\Jobs;
 use App\Framework\Support\Logger;
 use App\Services\Adverts\Boost\AutoBoostService;
 
-class RunAutoBoostJob
+class RunAutoBoostJob extends BaseJob
 {
+    private AutoBoostService $autoBoostService;
+
     public function __construct(
-        private readonly AutoBoostService $autoBoostService,
     )
     {
     }

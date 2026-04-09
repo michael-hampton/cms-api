@@ -452,6 +452,13 @@ body {
     background: #1d4ed8;
 }
 
+.btn-add-to-cart:hover,
+.btn-add-to-cart.active {
+    background: #fef2f2;
+    color: #ef4444;
+    border-color: #fecaca;
+}
+
 .btn-wishlist {
     padding: 0.625rem;
     background: #fff;

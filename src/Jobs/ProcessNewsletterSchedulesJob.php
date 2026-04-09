@@ -27,7 +27,7 @@ use App\Services\Newsletter\NewsletterSendScheduleRunner;
  * The job accepts an optional $siteId to scope the run to a single site,
  * which is useful for multi-tenant setups or manual site-scoped triggers.
  */
-class ProcessNewsletterSchedulesJob implements ShouldQueue, ShouldBeUnique
+class ProcessNewsletterSchedulesJob extends BaseJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -39,26 +39,26 @@ class ProcessNewsletterSchedulesJob implements ShouldQueue, ShouldBeUnique
      */
     public int $tries = 1;
 
+    private NewsletterSendScheduleRunner $runner;
+    private Logger $logger;
+
     public function __construct(
         private readonly ?int $siteId = null,
     )
     {
     }
 
-    public function handle(
-        NewsletterSendScheduleRunner $runner,
-        Logger                       $logger,
-    ): void
+    public function handle(): void
     {
         $context = $this->siteId !== null
             ? ['site_id' => $this->siteId]
             : ['site_id' => 'all'];
 
-        $logger->info('ProcessNewsletterSchedulesJob started', $context);
+        $this->logger->info('ProcessNewsletterSchedulesJob started', $context);
 
-        $result = $runner->run($this->siteId);
+        $result = $this->runner->run($this->siteId);
 
-        $logger->info('ProcessNewsletterSchedulesJob completed', array_merge($context, $result));
+        $this->logger->info('ProcessNewsletterSchedulesJob completed', array_merge($context, $result));
     }
 
     /**

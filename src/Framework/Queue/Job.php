@@ -1,10 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Framework\Queue;
 
 use App\Framework\Support\Logger;
 use Exception;
 
+/**
+ * Framework base for all queueable jobs.
+ *
+ * Provides fluent queue configuration and backoff resolution.
+ * Application jobs should extend BaseJob, not this class directly.
+ */
 abstract class Job implements JobInterface
 {
     public int $tries = 3;
@@ -15,7 +23,9 @@ abstract class Job implements JobInterface
 
     protected ?QueuedJob $queuedJob = null;
 
-    // ---------- Fluent setters ----------
+    // -------------------------------------------------------------------------
+    // Fluent setters
+    // -------------------------------------------------------------------------
 
     public function onQueue(string $queue): static
     {
@@ -29,13 +39,67 @@ abstract class Job implements JobInterface
         return $this;
     }
 
-    public function delay(int $seconds): static
+    /**
+     * @param \DateTimeInterface|int $delay Seconds from now, or an absolute DateTime.
+     */
+    public function delay(\DateTimeInterface|int $delay): static
     {
-        $this->delay = $seconds;
+        $this->delay = $delay instanceof \DateTimeInterface
+            ? max(0, $delay->getTimestamp() - time())
+            : max(0, $delay);
+
         return $this;
     }
 
-    // ---------- Internal worker binding ----------
+    public function tries(int $tries): static
+    {
+        $this->tries = $tries;
+        return $this;
+    }
+
+    public function timeout(int $seconds): static
+    {
+        $this->timeout = $seconds;
+        return $this;
+    }
+
+    // -------------------------------------------------------------------------
+    // Backoff
+    // -------------------------------------------------------------------------
+
+    /**
+     * Override to customise retry delays in seconds.
+     *
+     *   public function backoff(): array { return [30, 60, 120]; }
+     *   public function backoff(): int   { return 60; }
+     *
+     * Default (empty array) → exponential: 60s, 120s, 240s …
+     *
+     * @return int[]|int
+     */
+    public function backoff(): array|int
+    {
+        return [];
+    }
+
+    final public function backoffForAttempt(int $attempt): int
+    {
+        $backoff = $this->backoff();
+
+        if (is_int($backoff)) {
+            return $backoff;
+        }
+
+        if (empty($backoff)) {
+            return (int)(pow(2, $attempt - 1) * 60);
+        }
+
+        return (int)$backoff[min($attempt - 1, count($backoff) - 1)];
+    }
+
+    // -------------------------------------------------------------------------
+    // Worker binding
+    // -------------------------------------------------------------------------
 
     public function setQueuedJob(QueuedJob $job): void
     {
@@ -56,7 +120,7 @@ abstract class Job implements JobInterface
     {
         Logger::error('Job failed', [
             'job' => static::class,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

@@ -470,6 +470,13 @@ body {
     transition: all 0.3s;
 }
 
+.btn-add-to-cart:hover,
+.btn-add-to-cart.active {
+    background: #fef2f2;
+    color: #ef4444;
+    border-color: #fecaca;
+}
+
 .btn-wishlist:hover,
 .btn-wishlist.active {
     background: #fef2f2;

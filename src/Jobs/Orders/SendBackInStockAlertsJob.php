@@ -10,24 +10,26 @@ use App\Repositories\Product\ProductStockAlertRepository;
 
 class SendBackInStockAlertsJob extends BaseJob
 {
+    private ProductRepository $productRepository;
+    private ProductStockAlertRepository $alertRepository;
+    private MailManager $mailManager;
+    private Logger $logger;
+
     public function __construct(
-        private readonly ProductRepository           $productRepository,
-        private readonly ProductStockAlertRepository $alertRepository,
-        private readonly MailManager                 $mailManager,
-        private readonly Logger                      $logger
+        private readonly int $productId,
     )
     {
     }
 
-    public function handle(int $productId): void
+    public function handle(): void
     {
-        $product = $this->productRepository->find($productId);
+        $product = $this->productRepository->find($this->productId);
 
         if (!$product || $product->stock_quantity <= 0) {
             return;
         }
 
-        $alerts = $this->alertRepository->getPendingAlerts($productId);
+        $alerts = $this->alertRepository->getPendingAlerts($this->productId);
 
         foreach ($alerts as $alert) {
             try {

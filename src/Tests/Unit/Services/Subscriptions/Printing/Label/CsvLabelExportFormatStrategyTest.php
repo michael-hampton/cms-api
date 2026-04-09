@@ -72,7 +72,7 @@ class CsvLabelExportFormatStrategyTest extends TestCase
     // =========================================================================
 
     private function makeContext(
-        ?string $issueNumber = '1',
+        ?int $issueNumber = 1,
         ?string $issueTitle = 'Test Issue',
         string  $returnName = 'Publisher',
         string  $returnAddressLine1 = '1 Return Street',
@@ -136,7 +136,7 @@ class CsvLabelExportFormatStrategyTest extends TestCase
     public function test_it_writes_issue_and_return_address_data_to_data_row(): void
     {
         $context = $this->makeContext(
-            issueNumber: '99',
+            issueNumber: 99,
             issueTitle: 'Winter Edition',
             returnName: 'Publisher Ltd',
             returnAddressLine1: '1 Publisher Way',

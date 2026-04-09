@@ -1504,7 +1504,9 @@ class SubscriptionModelTest extends FunctionalTestCase
             'name' => 'Test Bundle',
             'slug' => 'test-bundle',
             'newsletter_slugs' => ['news1', 'news2'],
-            'is_active' => true
+            'is_active' => true,
+            'bundle_price' => 20,
+            'total_price' => 20
         ]);
 
         $subscription = new Subscription(['bundle_id' => $bundle->id]);
@@ -1520,7 +1522,9 @@ class SubscriptionModelTest extends FunctionalTestCase
             'name' => 'Inactive Bundle',
             'slug' => 'inactive',
             'newsletter_slugs' => ['news1'],
-            'is_active' => false
+            'is_active' => false,
+            'bundle_price' => 20,
+            'total_price' => 20
         ]);
 
         $subscription = new Subscription(['bundle_id' => $bundle->id]);

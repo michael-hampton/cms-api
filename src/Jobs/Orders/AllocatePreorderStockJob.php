@@ -8,16 +8,18 @@ use App\Services\Billing\Preorder\Actions\AllocatePreorderStockAction;
 
 class AllocatePreorderStockJob extends BaseJob
 {
+    private ProductRepository $productRepository;
+    private AllocatePreorderStockAction $allocateAction;
+
     public function __construct(
-        private readonly ProductRepository           $productRepository,
-        private readonly AllocatePreorderStockAction $allocateAction
+        private readonly int $productId,
     )
     {
     }
 
-    public function handle(int $productId): void
+    public function handle(): void
     {
-        $product = $this->productRepository->find($productId);
+        $product = $this->productRepository->find($this->productId);
 
         if (!$product) {
             return;

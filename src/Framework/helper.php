@@ -7,6 +7,9 @@ use App\Framework\Date;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Http\Request;
 use App\Framework\Http\Router;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\Job;
+use App\Framework\Queue\PendingDispatch;
 use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
 use App\Framework\Support\Collection;
@@ -61,15 +64,24 @@ if (!function_exists('request')) {
 }
 
 if (!function_exists('dispatch')) {
-    function dispatch(object $job, ...$args): void
+    /**
+     * Dispatch a job to the queue.
+     *
+     * Returns a PendingDispatch that allows fluent configuration of the
+     * queue, connection, delay, tries, and timeout before the job is pushed.
+     * The job is pushed to the driver when the PendingDispatch is destructed.
+     *
+     * @param Job $job A Job instance. Use a named constructor (::for(), ::make())
+     *                    to keep call-sites clean.
+     * @return PendingDispatch
+     */
+    function dispatch(Job $job): PendingDispatch
     {
-        if (!method_exists($job, 'handle')) {
-            throw new InvalidArgumentException('Dispatched job must have a handle() method.');
-        }
+        /** @var Dispatcher $dispatcher */
+        $dispatcher = Container::getInstance()->resolve(Dispatcher::class);
 
-        $job->handle(...$args);
+        return $dispatcher->dispatch($job);
     }
-
 }
 
 if (!function_exists('message')) {

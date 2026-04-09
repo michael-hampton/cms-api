@@ -338,6 +338,30 @@
 <script>
     SITE = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug(), ENT_QUOTES) ?>';
     CURRENCY_SYMBOL = '<?= htmlspecialchars($currencySymbol, ENT_QUOTES) ?>';
+    window.INITIAL_DATA = {
+        cartCount: {
+    {
+        $cartCount
+    }
+    },
+    cartProductIds:     {
+        !!json_encode($cartProductIds)
+        !!
+    }
+    ,
+    wishlistCount:      {
+        {
+            $wishlistCount
+        }
+    }
+    ,
+    wishlistProductIds: {
+        !!json_encode($wishlistProductIds)
+        !!
+    }
+    ,
+    }
+    ;
 </script>
 
 @js('productModal.js')

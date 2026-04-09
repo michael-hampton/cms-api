@@ -98,6 +98,8 @@ $router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']
 $router->post('/api/{site}/internal/workflow/run', [\App\Controllers\WorkflowController::class, 'run']);
 $router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowController::class, 'logs']);
 $router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
+$router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
+
 
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
 
@@ -971,4 +973,5 @@ $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportContro
 $router->get('/api/{siteName}/recommendations/products', [RecommendationController::class, 'products']);
 
 $router->get('/api/{site}/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
+$router->get('/api/{site}/address-lookup', [AddressController::class, 'lookup']);
 

@@ -6,6 +6,6 @@ use Exception;
 
 interface JobInterface
 {
-    public function handle(): void;
+    public function handle();
     public function failed(Exception $exception): void;
 }

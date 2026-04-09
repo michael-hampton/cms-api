@@ -13,10 +13,6 @@ use App\Framework\Support\Logger;
  * This is the single canonical queue implementation. It is used by Dispatcher
  * for pushing jobs and by QueueWorker for processing them.
  *
- * The old DatabaseQueue class (which implemented the empty QueueInterface and
- * duplicated this logic) should be deleted. DatabaseQueueDriver is the
- * replacement — it is complete and wired correctly.
- *
  * Schema (see migration CreateJobsTable):
  *   jobs(id, queue, payload, attempts, reserved_at, available_at, created_at)
  *   failed_jobs(id, queue, payload, exception, failed_at)
@@ -75,7 +71,7 @@ class DatabaseQueueDriver implements QueueDriverInterface
     /**
      * Atomically claim the next available job and return it.
      *
-     * Returns null when the queue is empty.
+     * Returns null when the queue is empty or no job could be reserved.
      * Abandoned jobs (reserved_at expired) are released before fetching.
      */
     public function pop(string $queue = 'default'): ?QueuedJob
@@ -133,18 +129,24 @@ class DatabaseQueueDriver implements QueueDriverInterface
     }
 
     /**
-     * Release a job back to the queue after a transient failure,
-     * incrementing the attempt counter and applying exponential backoff.
+     * Release a job back to the queue after a transient failure.
+     *
+     * The delay in seconds is computed by the worker via Job::backoffForAttempt()
+     * and passed in directly. The driver records the incremented attempt count
+     * and sets available_at accordingly.
+     *
+     * @param int $jobId Database ID of the job record.
+     * @param int $attempts New attempt count (current attempt + 1).
+     * @param int $delaySecs Seconds to wait before the job becomes available again.
      */
-    public function release(int $jobId, int $attempts): void
+    public function release(int $jobId, int $attempts, int $delaySecs): void
     {
-        $delay = (int)(2 ** $attempts) * 60; // 2m, 4m, 8m, …
-        $availableAt = time() + $delay;
+        $availableAt = time() + $delaySecs;
 
         $this->db->query(
             "UPDATE jobs
-             SET attempts    = ?,
-                 reserved_at = NULL,
+             SET attempts     = ?,
+                 reserved_at  = NULL,
                  available_at = ?
              WHERE id = ?",
             [$attempts, $availableAt, $jobId]
@@ -153,7 +155,7 @@ class DatabaseQueueDriver implements QueueDriverInterface
         $this->logger->info('Job released for retry', [
             'job_id' => $jobId,
             'attempts' => $attempts,
-            'retry_in_s' => $delay,
+            'retry_in_s' => $delaySecs,
         ]);
     }
 
@@ -210,10 +212,7 @@ class DatabaseQueueDriver implements QueueDriverInterface
      */
     public function retryFailed(int $failedJobId): void
     {
-        $result = $this->db->query(
-            "SELECT * FROM failed_jobs WHERE id = ?",
-            [$failedJobId]
-        );
+        $result = $this->db->query("SELECT * FROM failed_jobs WHERE id = ?", [$failedJobId]);
         $failedJob = $result->fetch(\PDO::FETCH_ASSOC);
 
         if (!$failedJob) {
@@ -230,7 +229,6 @@ class DatabaseQueueDriver implements QueueDriverInterface
             return;
         }
 
-        // Reset attempts so it gets a clean retry budget.
         $job->delay = 0;
         $this->push($job);
 
@@ -245,7 +243,7 @@ class DatabaseQueueDriver implements QueueDriverInterface
 
     /**
      * Release jobs that were reserved but never acknowledged within the
-     * reservation timeout. This handles worker crashes and timeouts.
+     * reservation timeout. Handles worker crashes and timeouts.
      */
     private function releaseAbandoned(string $queue): void
     {

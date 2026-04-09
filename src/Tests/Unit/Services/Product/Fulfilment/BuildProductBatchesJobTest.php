@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Product\Fulfilment;
 
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Products\BuildProductBatchesJob;
 use App\Models\ProductBatch;
@@ -80,15 +81,9 @@ class BuildProductBatchesJobTest extends FunctionalTestCase
 
     private function handle(int $runId): void
     {
-        $job = new BuildProductBatchesJob(
-            $this->runRepository,
-            $this->fulfilmentRepository,
-            $this->batchRepository,
-            $this->logger,
-        );
-        $job->handle(
-            $runId
-        );
+        $job = BuildProductBatchesJob::for($runId);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_it_transitions_run_through_batching_then_batched(): void
@@ -147,93 +142,13 @@ class BuildProductBatchesJobTest extends FunctionalTestCase
 
         $this->logger->shouldReceive('info')->byDefault();
         $this->logger->shouldReceive('error')->byDefault();
+
+        $container = Container::getInstance();
+        $container->instance(ProductFulfilmentRunRepository::class, $this->runRepository);
+        $container->instance(ProductFulfilmentRepository::class, $this->fulfilmentRepository);
+        $container->instance(ProductBatchRepository::class, $this->batchRepository);
+        $container->instance(Logger::class, $this->logger);
     }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-namespace Tests\Unit\Jobs\Products;
-
-use App\Framework\Support\Logger;
-use App\Jobs\Products\ExportProductBatchJob;
-use App\Models\ProductBatch;
-use App\Repositories\Products\ProductBatchRepository;
-use App\Services\Products\Fulfilment\ProductBatchExportService;
-use Mockery;
-use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
-
-class ExportProductBatchJobTest extends TestCase
-{
-    private ProductBatchRepository&MockInterface $batchRepository;
-    private ProductBatchExportService&MockInterface $exportService;
-    private Logger&MockInterface $logger;
-
-    /** @test */
-    public function it_delegates_to_export_service(): void
-    {
-        $batch = Mockery::mock(ProductBatch::class);
-
-        $this->batchRepository->shouldReceive('find')->with(5)->andReturn($batch);
-        $this->exportService->shouldReceive('export')->once()->with($batch);
-
-        $this->handle(batchId: 5);
-    }
-
-    private function handle(int $batchId): void
-    {
-        $job = new ExportProductBatchJob($batchId);
-        $job->handle($this->batchRepository, $this->exportService, $this->logger);
-    }
-
-    /** @test */
-    public function it_returns_early_when_batch_not_found(): void
-    {
-        $this->batchRepository->shouldReceive('find')->with(99)->andReturn(null);
-        $this->exportService->shouldNotReceive('export');
-
-        $this->logger->shouldReceive('error')->once()->with(
-            Mockery::pattern('/batch not found/'),
-            Mockery::any(),
-        );
-
-        $this->handle(batchId: 99);
-    }
-
-    /** @test */
-    public function it_propagates_exceptions_from_export_service(): void
-    {
-        $batch = Mockery::mock(ProductBatch::class);
-        $this->batchRepository->shouldReceive('find')->andReturn($batch);
-        $this->exportService
-            ->shouldReceive('export')
-            ->andThrow(new \RuntimeException('transport failed'));
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('transport failed');
-
-        $this->handle(batchId: 5);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->batchRepository = Mockery::mock(ProductBatchRepository::class);
-        $this->exportService = Mockery::mock(ProductBatchExportService::class);
-        $this->logger = Mockery::mock(Logger::class);
-
-        $this->logger->shouldReceive('error')->byDefault();
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     protected function tearDown(): void
     {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\LabelRunStatus;
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\GenerateLabelJob;
 use App\Models\LabelRun;
@@ -27,6 +28,11 @@ class GenerateLabelJobTest extends TestCase
         $this->labelRunRepository = Mockery::mock(LabelRunRepository::class);
         $this->labelGenerationService = Mockery::mock(LabelGenerationService::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $container = Container::getInstance();
+        $container->instance(LabelRunRepository::class, $this->labelRunRepository);
+        $container->instance(LabelGenerationService::class, $this->labelGenerationService);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void
@@ -46,9 +52,9 @@ class GenerateLabelJobTest extends TestCase
             ->once()
             ->with($labelRun);
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = GenerateLabelJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -59,9 +65,9 @@ class GenerateLabelJobTest extends TestCase
 
         $this->labelGenerationService->shouldNotReceive('generate');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = GenerateLabelJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -79,9 +85,9 @@ class GenerateLabelJobTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Transport failed');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = GenerateLabelJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -89,15 +95,6 @@ class GenerateLabelJobTest extends TestCase
     // =========================================================================
     // Helpers
     // =========================================================================
-
-    private function makeJob(): GenerateLabelJob
-    {
-        return new GenerateLabelJob(
-            $this->labelRunRepository,
-            $this->labelGenerationService,
-            $this->logger,
-        );
-    }
 
     private function makeLabelRun(LabelRunStatus $status): MockInterface
     {

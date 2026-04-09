@@ -22,6 +22,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $this->assertTrue($offer->isCurrentlyActive());
@@ -37,6 +39,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => false,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $this->assertFalse($offer->isCurrentlyActive());
@@ -52,6 +56,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $this->assertFalse($offer->isCurrentlyActive());
@@ -67,6 +73,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 100
         ]);
 
         $offer = $offer->fresh(['product']);
@@ -85,6 +93,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         // Expired offer
@@ -94,6 +104,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $activeOffers = ProductOffer::active()->get();
@@ -112,6 +124,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         ProductOffer::create([
@@ -120,6 +134,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $offers = ProductOffer::forProduct($product1->id)->get();
@@ -139,6 +155,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         ProductOffer::create([
@@ -148,6 +166,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $published = ProductOffer::published()->get();
@@ -167,6 +187,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         ProductOffer::create([
@@ -176,6 +198,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $pending = ProductOffer::pending()->get();
@@ -195,6 +219,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'rejected',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         ProductOffer::create([
@@ -204,6 +230,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $rejected = ProductOffer::rejected()->get();
@@ -224,6 +252,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $offer = $offer->fresh(['voucher']);
@@ -246,12 +276,14 @@ class ProductOfferModelTest extends FunctionalTestCase
             'status' => 'published',
             'published_by' => $user->id,
             'published_at' => now(),
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $offer = $offer->fresh(['publisher']);
 
         $this->assertNotNull($offer->publisher);
-        $this->assertEquals($user->id, $offer->publisher->id);
+        $this->assertEquals($user->id, $offer->publisher['id']);
     }
 
     public function testRejectorRelationship(): void
@@ -269,12 +301,14 @@ class ProductOfferModelTest extends FunctionalTestCase
             'rejected_by' => $user->id,
             'rejected_at' => now(),
             'rejection_reason' => 'Test reason',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $offer = $offer->fresh(['rejector']);
 
         $this->assertNotNull($offer->rejector);
-        $this->assertEquals($user->id, $offer->rejector->id);
+        $this->assertEquals($user->id, $offer->rejector['id']);
     }
 
     public function testCanBePublished(): void
@@ -288,6 +322,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $publishedOffer = ProductOffer::create([
@@ -297,6 +333,8 @@ class ProductOfferModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId,
+            'original_price' => 80
         ]);
 
         $this->assertTrue($pendingOffer->canBePublished());

@@ -34,6 +34,8 @@ class IssueDeliveryDispatchedListener
     {
         $issueDelivery = $event->issueDelivery;
 
+        dd($issueDelivery);
+
         $hasPrintSubscriptions = $this->subscriptionRepository->hasPrintSubscriptionsForPlan(
             $issueDelivery->subscription_plan_id,
         );
@@ -45,7 +47,7 @@ class IssueDeliveryDispatchedListener
             return;
         }
 
-        dispatch(TriggerPrintRunWorkflowJob::for(), $issueDelivery->id);
+        dispatch(TriggerPrintRunWorkflowJob::for((int)$issueDelivery->id))->onQueue('print');
 
         $this->logger->info('IssueDeliveryDispatchedListener: TriggerPrintRunWorkflowJob dispatched', [
             'issue_delivery_id' => $issueDelivery->id,

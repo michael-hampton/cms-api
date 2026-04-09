@@ -60,6 +60,7 @@ $countries = [
 ];
 
 $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_code']);
+
 ?>
 
 <style>
@@ -214,7 +215,6 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
 
 <div class="address-lookup" id="address-lookup">
 
-    {{-- ── Postcode search row ────────────────────────────── --}}
     <div class="address-lookup__search-row">
         @include('checkout/components/form/input', [
         'name' => 'postcode_search',
@@ -245,82 +245,59 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         </button>
     </div>
 
-    {{-- ── Results dropdown ───────────────────────────────── --}}
     <div id="address-results"
          class="address-lookup__results"
          role="listbox"
          aria-label="Address suggestions"></div>
 
-    {{-- ── Manual entry fields ────────────────────────────── --}}
     <div id="address-manual-entry"
          class="address-lookup__manual"
          style="<?= $hasExistingAddress ? '' : 'display:none;' ?>">
 
-        @include('checkout/components/form/input', [
+
+        @include('checkout/components/form/form-group', [
         'name' => 'address',
-        'id' => 'address',
-        'label' => 'Address line 1',
-        'type' => 'text',
-        'value' => $prefill['address'],
-        'required' => $required,
-        'placeholder' => 'Street address',
-        'attrs' => ['autocomplete' => 'address-line1'],
+        'label' => 'Address',
+        'required' => true,
+        'class' => 'full-width',
+        ])
+        @include('checkout/components/form/form-group', [
+        'name' => 'address2',
+        'label' => 'Apartment, suite, etc. (optional)',
+        'class' => 'full-width',
         ])
 
-        @include('checkout/components/form/input', [
+        @include('checkout/components/form/form-row')
+        @include('checkout/components/form/form-group', [
         'name' => 'city',
-        'id' => 'city',
         'label' => 'City',
-        'type' => 'text',
-        'value' => $prefill['city'],
-        'required' => $required,
-        'placeholder' => 'City / Town',
-        'attrs' => ['autocomplete' => 'address-level2'],
+        'required' => true,
         ])
+        @include('checkout/components/form/form-group', [
+        'name' => 'state',
+        'label' => 'State / Province',
+        ])
+        @include('checkout/components/form/form-row', ['close' => true])
 
-        <div class="form-row">
-            @include('checkout/components/form/input', [
-            'name' => 'county',
-            'id' => 'county',
-            'label' => 'County / State',
-            'type' => 'text',
-            'value' => $prefill['county'],
-            'placeholder' => 'County',
-            'attrs' => ['autocomplete' => 'address-level1'],
-            ])
 
-            @include('checkout/components/form/input', [
-            'name' => 'postal_code',
-            'id' => 'postal_code',
-            'label' => 'Postcode / ZIP',
-            'type' => 'text',
-            'value' => $prefill['postal_code'],
-            'required' => $required,
-            'placeholder' => 'Postcode',
-            'attrs' => ['autocomplete' => 'postal-code'],
-            ])
-        </div>
-
-        {{-- Country — uses the same select + handleCountryChange() as billing-form --}}
-        <div class="form-group">
-            <label class="form-label" for="country">
-                Country
-                <?php if ($required): ?><span class="required">*</span><?php endif; ?>
-            </label>
-            <select name="country"
-                    id="country"
-                    class="form-select"
-                    onchange="handleCountryChange(this.value)"
-                    <?= $required ? 'required' : '' ?>>
-                <?php foreach ($countries as $code => $name): ?>
-                    <option value="<?= htmlspecialchars($code) ?>"
-                            <?= $prefill['country'] === $code ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($name) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <span class="form-error" id="error-country"></span>
-        </div>
+        @include('checkout/components/form/form-row')
+        @include('checkout/components/form/form-group', [
+        'name' => 'postal_code',
+        'label' => 'Postal Code',
+        'required' => true,
+        ])
+        @include('checkout/components/form/select', [
+        'name' => 'country',
+        'id' => 'country-select',
+        'label' => 'Country',
+        'required' => true,
+        'blank' => true,
+        'blankLabel' => 'Select Country',
+        'options' => $countries,
+        'selected' => $member?->country ?? '',
+        'onChange' => 'handleCountryChange(this.value)',
+        ])
+        @include('checkout/components/form/form-row', ['close' => true])
 
     </div>
 
@@ -388,7 +365,7 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         /* ── Populate form fields from a selected address ─────────── */
         function populate(addr) {
             Object.entries(fieldMap).forEach(([key, inputId]) => {
-                const el = document.getElementById(inputId);
+                const el = inputId === 'country' ? document.getElementById('country-select') : document.getElementById('field-' + inputId);
                 if (el && addr[key] !== undefined) el.value = addr[key];
             });
 

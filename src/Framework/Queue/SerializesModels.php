@@ -20,13 +20,13 @@ trait SerializesModels
         return array_keys(get_object_vars($this));
     }
 
-    public function __wakeup()
-    {
-        foreach (get_object_vars($this) as $property => $value) {
-            if (is_array($value) && isset($value['__model_class'])) {
-                $class = $value['__model_class'];
-                $this->{$property} = $class::find($value['id']);
-            }
-        }
-    }
+//    public function __wakeup()
+//    {
+//        foreach (get_object_vars($this) as $property => $value) {
+//            if (is_array($value) && isset($value['__model_class'])) {
+//                $class = $value['__model_class'];
+//                $this->{$property} = $class::find($value['id']);
+//            }
+//        }
+//    }
 }

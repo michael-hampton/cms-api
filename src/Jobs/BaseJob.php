@@ -3,57 +3,72 @@
 namespace App\Jobs;
 
 use App\Framework\Container;
+use App\Framework\Queue\Job;
 
-abstract class BaseJob
+abstract class BaseJob extends Job
 {
-    public static function for(): static
+    public static function for(...$arguments): static
     {
-        return static::resolve(static::class);
+        return new static(...$arguments);
     }
 
-    private static function resolve(string $class)
+    /**
+     * Re-inject services after the worker deserialises this job.
+     *
+     * Reflects the constructor, skips built-in types (the primitives that
+     * were serialised), and resolves every class/interface type from the
+     * container.  This is identical to what the container does when it builds
+     * the job fresh — so the job's handle() sees the same dependencies it
+     * would in a brand-new process.
+     */
+    public function __wakeup(): void
     {
         $container = Container::getInstance();
-        return $container->resolve(static::class);
-//        $container = Container::getInstance();
-//        // If container has binding or can resolve it, use it
-//        if ($container->has($class)) {
-//            return $container->make($class);
-//        }
-//
-//        // Otherwise fallback to reflection (for unbound concretes)
-//        $reflection = new \ReflectionClass($class);
-//
-//        if (!$reflection->isInstantiable()) {
-//            throw new \RuntimeException("Class {$class} is not instantiable");
-//        }
-//
-//        $constructor = $reflection->getConstructor();
-//
-//        if (!$constructor) {
-//            return new $class();
-//        }
-//
-//        $dependencies = [];
-//
-//        foreach ($constructor->getParameters() as $param) {
-//            $type = $param->getType();
-//
-//            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
-//                if ($param->isDefaultValueAvailable()) {
-//                    $dependencies[] = $param->getDefaultValue();
-//                    continue;
-//                }
-//
-//                throw new \RuntimeException(
-//                    "Cannot resolve parameter '{$param->getName()}' in {$class}"
-//                );
-//            }
-//
-//            $dependencies[] = self::resolve($type->getName());
-//        }
-//
-//        return $reflection->newInstanceArgs($dependencies);
+
+        try {
+            $reflection = new \ReflectionObject($this);
+        } catch (\ReflectionException) {
+            return;
+        }
+
+        foreach ($reflection->getProperties() as $property) {
+            $type = $property->getType();
+
+            // Skip scalars, arrays, and untyped params — they were serialised.
+            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
+                continue;
+            }
+
+            // Services are rehydrated post-construction; readonly props cannot be assigned here.
+            if ($property->isReadOnly()) {
+                continue;
+            }
+
+            $typeName = $type->getName();
+
+            // Skip if the container can't resolve it (interface not bound, etc.)
+            if (!$container->bound($typeName)) {
+                continue;
+            }
+
+            try {
+                $property->setAccessible(true);
+
+                if ($property->isInitialized($this)) {
+                    $currentValue = $property->getValue($this);
+                    if ($currentValue !== null) {
+                        continue;
+                    }
+                }
+
+                $property->setValue($this, $container->resolve($typeName));
+            } catch (\Throwable) {
+                // Non-fatal: if a service can't be re-injected the job will
+                // fail naturally in handle() with a clear property error
+                // rather than a cryptic wakeup exception.
+                // no-op
+            }
+        }
     }
 
 }

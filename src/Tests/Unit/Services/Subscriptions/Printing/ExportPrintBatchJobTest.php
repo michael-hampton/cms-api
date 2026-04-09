@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Subscriptions\Printing;
 use App\DTO\Subscriptions\WorkflowStageResult;
 use App\Enums\Subscriptions\PrintBatchStatus;
 use App\Enums\Workflow\WorkflowRunStatus;
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\ExportPrintBatchJob;
 use App\Models\IssueDelivery;
@@ -28,7 +29,6 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
     private WorkflowRunRecorderFactory|MockInterface $recorderFactory;
     private PrintRunRepository|MockInterface $printRunRepository;
     private Logger|MockInterface $logger;
-    private ExportPrintBatchJob $job;
 
     public function test_calls_export_service_with_batch_and_issue_delivery(): void
     {
@@ -71,7 +71,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
             ->with($printRun, 'phase_3', WorkflowRunStatus::COMPLETE)
             ->andReturn($recorder);
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -108,7 +110,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
             ->with($printRun, 'phase_3', WorkflowRunStatus::COMPLETE)
             ->andReturn($recorder);
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -131,7 +135,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
         $this->recorderFactory->shouldNotReceive('forPrintRun');
         $this->printRunRepository->shouldNotReceive('findActiveForIssueDelivery');
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -155,7 +161,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
             ->once()
             ->with('ExportPrintBatchJob: batch not found', Mockery::hasKey('batch_id'));
 
-        $this->job->handle(99, 1);
+        $job = ExportPrintBatchJob::for(99, 1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -186,7 +194,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
             ->once()
             ->with('ExportPrintBatchJob: issue delivery not found', Mockery::hasKey('issue_delivery_id'));
 
-        $this->job->handle(1, 999);
+        $job = ExportPrintBatchJob::for(1, 999);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -229,7 +239,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('SFTP timed out');
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_records_failure_and_rethrows_when_export_service_throws(): void
@@ -266,7 +278,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('SFTP timed out');
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_rethrows_when_export_fails_and_no_active_print_run(): void
@@ -290,7 +304,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_logs_warning_when_all_exported_but_no_active_print_run(): void
@@ -322,7 +338,9 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
                 Mockery::hasKey('issue_delivery_id'),
             );
 
-        $this->job->handle(42, 7);
+        $job = ExportPrintBatchJob::for(42, 7);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -342,14 +360,13 @@ class ExportPrintBatchJobTest extends FunctionalTestCase
         $this->printRunRepository = Mockery::mock(PrintRunRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
 
-        $this->job = new ExportPrintBatchJob(
-            batchRepository: $this->batchRepository,
-            issueDeliveryRepository: $this->issueDeliveryRepository,
-            exportService: $this->exportService,
-            recorderFactory: $this->recorderFactory,
-            printRunRepository: $this->printRunRepository,
-            logger: $this->logger,
-        );
+        $container = Container::getInstance();
+        $container->instance(PrintBatchRepository::class, $this->batchRepository);
+        $container->instance(IssueDeliveryRepository::class, $this->issueDeliveryRepository);
+        $container->instance(PrintBatchExportService::class, $this->exportService);
+        $container->instance(WorkflowRunRecorderFactory::class, $this->recorderFactory);
+        $container->instance(PrintRunRepository::class, $this->printRunRepository);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void

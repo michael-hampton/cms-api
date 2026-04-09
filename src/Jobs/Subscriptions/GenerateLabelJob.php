@@ -21,27 +21,26 @@ use App\Services\Subscriptions\Printing\Label\LabelGenerationService;
  */
 class GenerateLabelJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
     public int $backoff = 60;
+    private LabelRunRepository $labelRunRepository;
+    private LabelGenerationService $labelGenerationService;
+    private Logger $logger;
 
     public function __construct(
-        private readonly LabelRunRepository     $labelRunRepository,
-        private readonly LabelGenerationService $labelGenerationService,
-        private readonly Logger                 $logger,
+        private readonly int $labelRunId,
     )
     {
     }
 
-    public function handle(
-        int                    $labelRunId,
-    ): void
+    public function handle(): void
     {
-        $labelRun = $this->labelRunRepository->find($labelRunId);
+        $labelRun = $this->labelRunRepository->find($this->labelRunId);
 
         if (!$labelRun) {
             $this->logger->error('GenerateLabelJob: LabelRun not found', [
-                'label_run_id' => $labelRunId,
+                'label_run_id' => $this->labelRunId,
             ]);
             return;
         }

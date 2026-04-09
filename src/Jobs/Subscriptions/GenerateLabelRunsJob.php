@@ -25,37 +25,36 @@ use App\Repositories\Subscriptions\PrintFulfillmentRepository;
  */
 class GenerateLabelRunsJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
+    private PrintBatchRepository $batchRepository;
+    private PrintFulfillmentRepository $fulfillmentRepository;
+    private LabelRunRepository $labelRunRepository;
+    private Logger $logger;
 
     public function __construct(
-        private readonly PrintBatchRepository       $batchRepository,
-        private readonly PrintFulfillmentRepository $fulfillmentRepository,
-        private readonly LabelRunRepository         $labelRunRepository,
-        private readonly Logger                     $logger,
+        private readonly int                $batchId,
+        private readonly ?LabelExportFormat $type = null,
     )
     {
     }
 
-    public function handle(
-        int                        $batchId,
-        ?LabelExportFormat $type = null,
-    ): void
+    public function handle(): void
     {
-        $batch = $this->batchRepository->find($batchId);
+        $batch = $this->batchRepository->find($this->batchId);
 
         if (!$batch) {
             $this->logger->error('GenerateLabelRunsJob: batch not found', [
-                'batch_id' => $batchId,
+                'batch_id' => $this->batchId,
             ]);
             return;
         }
 
-        $format = $type ?? LabelExportFormat::from(
+        $format = $this->type ?? LabelExportFormat::from(
             config('print.label_format', LabelExportFormat::Csv->value)
         );
 
-        $fulfillments = $this->fulfillmentRepository->findByBatch($batchId);
+        $fulfillments = $this->fulfillmentRepository->findByBatch($this->batchId);
 
         $dispatched = 0;
         $skipped = 0;
@@ -65,7 +64,7 @@ class GenerateLabelRunsJob extends BaseJob
             // fulfillment + batch combination.
             if ($this->labelRunRepository->existsForIssuesDeliveredAndBatch(
                 $fulfillment->issues_delivered_id,
-                $batchId,
+                $this->batchId,
             )) {
                 $skipped++;
                 continue;
@@ -75,16 +74,16 @@ class GenerateLabelRunsJob extends BaseJob
                 issuesDeliveredId: $fulfillment->issues_delivered_id,
                 subscriptionId: $fulfillment->subscription_id,
                 format: $format,
-                printBatchId: $batchId,
+                printBatchId: $this->batchId,
             );
 
-            dispatch(GenerateLabelJob::for(), $labelRun->id);
+            dispatch(GenerateLabelJob::for((int)$labelRun->id));
 
             $dispatched++;
         }
 
         $this->logger->info('GenerateLabelRunsJob: label runs created', [
-            'batch_id' => $batchId,
+            'batch_id' => $this->batchId,
             'dispatched' => $dispatched,
             'skipped' => $skipped,
         ]);

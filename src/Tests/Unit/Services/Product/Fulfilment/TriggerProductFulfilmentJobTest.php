@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Product\Fulfilment;
 
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Products\TriggerProductFulfilmentJob;
 use App\Models\Order;
@@ -48,16 +49,9 @@ class TriggerProductFulfilmentJobTest extends FunctionalTestCase
             // For full coverage, wrap in a framework test that calls Config::set().
         }
 
-        $job = new TriggerProductFulfilmentJob(
-            $this->orderRepository,
-            $this->orderLineRepository,
-            $this->runRepository,
-            $this->logger,
-        );
-
-        $job->handle(
-            $orderId
-        );
+        $job = TriggerProductFulfilmentJob::for($orderId);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_it_returns_early_when_order_has_no_fulfilable_lines(): void
@@ -210,6 +204,12 @@ class TriggerProductFulfilmentJobTest extends FunctionalTestCase
 
         $this->logger->shouldReceive('info')->byDefault();
         $this->logger->shouldReceive('error')->byDefault();
+
+        $container = Container::getInstance();
+        $container->instance(OrderRepository::class, $this->orderRepository);
+        $container->instance(OrderItemRepository::class, $this->orderLineRepository);
+        $container->instance(ProductFulfilmentRunRepository::class, $this->runRepository);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void

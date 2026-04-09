@@ -26,6 +26,7 @@ use App\Models\GiftPromotion;
 use App\Models\GiftPromotionTrigger;
 use App\Models\Image;
 use App\Models\IssueDelivery;
+use App\Models\IssuesDelivered;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
@@ -57,6 +58,7 @@ use App\Models\PageSocial;
 use App\Models\PageTag;
 use App\Models\PageTerritory;
 use App\Models\PageView;
+use App\Models\PrintBatch;
 use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductMerchant;
@@ -1008,5 +1010,18 @@ trait CreatesTestData
             'status' => 'pending',
             'site_id' => $this->siteId
         ], $attributes));
+    }
+
+    protected function createIssueDelivered(Subscription $subscription, array $overrides = [])
+    {
+
+        $issueDelivery = $this->createIssueDelivery();
+        return IssuesDelivered::create(array_merge(['subscription_id' => $subscription->id, 'issue_delivery_id' => $issueDelivery->id], $overrides));
+    }
+
+    protected function createPrintBatch(array $overrides = [])
+    {
+        $issueDelivery = $this->createIssueDelivery();
+        return PrintBatch::create(array_merge(['issue_delivery_id' => $issueDelivery->id], $overrides));
     }
 }

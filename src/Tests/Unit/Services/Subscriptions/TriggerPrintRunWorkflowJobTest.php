@@ -64,7 +64,8 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
             ))
             ->andReturn($printRun);
 
-        $this->job->handle(5);
+        $this->job = $this->makeJob(5);
+        $this->job->handle();
 
         $this->assertTrue(true);
     }
@@ -150,7 +151,8 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
                 return $printRun;
             });
 
-        $this->job->handle(5);
+        $this->job = $this->makeJob(5);
+        $this->job->handle();
 
         $this->assertTrue($cancelCalled, 'cancelAllPendingForIssueDelivery was not called');
         $this->assertTrue($createCalled, 'create was not called');
@@ -179,7 +181,8 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
                 ),
             );
 
-        $this->job->handle(5);
+        $this->job = $this->makeJob(5);
+        $this->job->handle();
         $this->assertTrue(true);
     }
 
@@ -205,7 +208,8 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
                 Mockery::hasKey('issue_delivery_id'),
             );
 
-        $this->job->handle(99);
+        $this->job = $this->makeJob(99);
+        $this->job->handle();
 
         $this->assertTrue(true);
     }
@@ -219,7 +223,8 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
         // WorkflowRun::start is a static call — if IssueDelivery is missing
         // we bail before reaching it, so create is never called.
         // This is verified by asserting create is never called on the repository.
-        $this->job->handle(99);
+        $this->job = $this->makeJob(99);
+        $this->job->handle();
 
         $this->assertTrue(true);
     }
@@ -235,18 +240,33 @@ class TriggerPrintRunWorkflowJobTest extends FunctionalTestCase
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->workflowRunStarter = Mockery::mock(WorkflowRunStarter::class);
 
-        $this->job = new TriggerPrintRunWorkflowJob(
-            issueDeliveryRepository: $this->issueDeliveryRepository,
-            printRunRepository: $this->printRunRepository,
-            recorderFactory: $this->recorderFactory,
-            logger: $this->logger,
-            workflowRunStarter: $this->workflowRunStarter,
-        );
+        $this->job = $this->makeJob(0);
     }
 
     protected function tearDown(): void
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+    private function makeJob(int $issueDeliveryId): TriggerPrintRunWorkflowJob
+    {
+        $job = TriggerPrintRunWorkflowJob::for($issueDeliveryId);
+
+        $this->injectService($job, 'issueDeliveryRepository', $this->issueDeliveryRepository);
+        $this->injectService($job, 'printRunRepository', $this->printRunRepository);
+        $this->injectService($job, 'recorderFactory', $this->recorderFactory);
+        $this->injectService($job, 'logger', $this->logger);
+        $this->injectService($job, 'workflowRunStarter', $this->workflowRunStarter);
+
+        return $job;
+    }
+
+    private function injectService(object $job, string $property, object $service): void
+    {
+        $reflection = new \ReflectionObject($job);
+        $prop = $reflection->getProperty($property);
+        $prop->setAccessible(true);
+        $prop->setValue($job, $service);
     }
 }

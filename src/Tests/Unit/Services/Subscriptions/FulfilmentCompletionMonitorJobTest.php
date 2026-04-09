@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\WorkflowStageResult;
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Workflow\WorkflowRunStatus;
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\FulfilmentCompletionMonitorJob;
 use App\Models\PrintRun;
@@ -31,6 +32,11 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
         $this->recorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class)
             ->shouldIgnoreMissing();
+
+        $container = Container::getInstance();
+        $container->instance(PrintRunRepository::class, $this->printRunRepository);
+        $container->instance(WorkflowRunRecorderFactory::class, $this->recorderFactory);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void
@@ -62,7 +68,9 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
             ->with($printRun, 'phase_1', WorkflowRunStatus::STALLED)
             ->andReturn($recorder);
 
-        $this->makeJob()->handle(1);
+        $job = FulfilmentCompletionMonitorJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -78,7 +86,9 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
 
-        $this->makeJob()->handle(1);
+        $job = FulfilmentCompletionMonitorJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -88,7 +98,9 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
     {
         $this->printRunRepository->shouldReceive('find')->andReturn(null);
 
-        $this->makeJob()->handle(1);
+        $job = FulfilmentCompletionMonitorJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -103,7 +115,9 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
 
         $this->printRunRepository->shouldReceive('find')->andReturn($printRun);
 
-        $this->makeJob()->handle(1);
+        $job = FulfilmentCompletionMonitorJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -111,15 +125,6 @@ class FulfilmentCompletionMonitorJobTest extends TestCase
     // =========================================================================
     // Helpers
     // =========================================================================
-
-    private function makeJob(): FulfilmentCompletionMonitorJob
-    {
-        return new FulfilmentCompletionMonitorJob(
-            $this->printRunRepository,
-            $this->recorderFactory,
-            $this->logger
-        );
-    }
 
     private function makePrintRun(
         PrintRunStatus $status,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Product\Fulfilment;
 
 use App\Actions\Product\CreateProductFulfilmentAction;
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Products\CreateProductFulfilmentsChunkJob;
 use App\Models\Order;
@@ -31,14 +32,11 @@ class CreateProductFulfilmentsChunkJobTest extends TestCase
         $order = $this->makeOrder(10);
 
         $this->runRepository->shouldReceive('find')->with(1)->andReturn($run);
+        $this->orderRepository->shouldReceive('find')->with(10)->andReturn($order);
 
         $this->orderLineRepository
             ->shouldReceive('find')
             ->andReturnUsing(function ($id) use ($order) {
-                if ($id === 10) {
-                    return $order;
-                }
-
                 return $this->makeOrderLine($id);
             });
 
@@ -80,17 +78,9 @@ class CreateProductFulfilmentsChunkJobTest extends TestCase
 
     private function handle(int $runId, int $orderId, array $orderLineIds, int $chunkIndex = 0): void
     {
-        $job = new CreateProductFulfilmentsChunkJob(
-            $this->runRepository,
-            $this->orderRepository,
-            $this->orderLineRepository,
-            $this->fulfilmentAction,
-            $this->logger,
-        );
-
-        $job->handle(
-            $runId, $orderId, $orderLineIds, $chunkIndex
-        );
+        $job = CreateProductFulfilmentsChunkJob::for($runId, $orderId, $orderLineIds, $chunkIndex);
+        $job->__wakeup();
+        $job->handle();
     }
 
     public function test_it_continues_processing_after_a_per_line_failure(): void
@@ -252,6 +242,13 @@ class CreateProductFulfilmentsChunkJobTest extends TestCase
         $this->logger->shouldReceive('info')->byDefault();
         $this->logger->shouldReceive('error')->byDefault();
         $this->logger->shouldReceive('warning')->byDefault();
+
+        $container = Container::getInstance();
+        $container->instance(ProductFulfilmentRunRepository::class, $this->runRepository);
+        $container->instance(OrderRepository::class, $this->orderRepository);
+        $container->instance(OrderItemRepository::class, $this->orderLineRepository);
+        $container->instance(CreateProductFulfilmentAction::class, $this->fulfilmentAction);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void

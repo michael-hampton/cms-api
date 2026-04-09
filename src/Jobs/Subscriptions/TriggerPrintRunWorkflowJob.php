@@ -28,27 +28,27 @@ use App\Services\Workflow\WorkflowRunRecorderFactory;
  */
 class TriggerPrintRunWorkflowJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
+    private IssueDeliveryRepository $issueDeliveryRepository;
+    private PrintRunRepository $printRunRepository;
+    private WorkflowRunRecorderFactory $recorderFactory;
+    private Logger $logger;
+    private WorkflowRunStarter $workflowRunStarter;
 
     public function __construct(
-        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
-        private readonly PrintRunRepository         $printRunRepository,
-        private readonly WorkflowRunRecorderFactory $recorderFactory,
-        private readonly Logger                     $logger,
-        private readonly WorkflowRunStarter         $workflowRunStarter, // 👈 add this
-
+        private readonly int $issueDeliveryId,
     )
     {
     }
 
-    public function handle(int $issueDeliveryId): void
+    public function handle(): void
     {
-        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
+        $issueDelivery = $this->issueDeliveryRepository->find($this->issueDeliveryId);
 
         if (!$issueDelivery) {
             $this->logger->error('TriggerPrintRunWorkflowJob: IssueDelivery not found', [
-                'issue_delivery_id' => $issueDeliveryId,
+                'issue_delivery_id' => $this->issueDeliveryId,
             ]);
             return;
         }
@@ -60,7 +60,7 @@ class TriggerPrintRunWorkflowJob extends BaseJob
         // Create the WorkflowRun before the PrintRun so workflow_run_id is
         // available when the PrintRun is persisted.
         $workflowRun = $this->workflowRunStarter->start(self::class, [
-            'issue_delivery_id' => $issueDeliveryId,
+            'issue_delivery_id' => $this->issueDeliveryId,
             'triggered_by' => 'IssueDeliveryDispatchedListener',
         ]);
 
@@ -80,6 +80,6 @@ class TriggerPrintRunWorkflowJob extends BaseJob
             'issue_delivery_id' => $issueDelivery->id,
         ]);
 
-        dispatch(CreatePrintFulfillmentsJob::for(), $printRun->id, $issueDelivery->id);
+        dispatch(CreatePrintFulfillmentsJob::for($printRun->id, $issueDelivery->id))->onQueue('print');
     }
 }

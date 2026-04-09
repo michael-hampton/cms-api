@@ -25,7 +25,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 2,
             'label' => 'Annual',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -36,7 +37,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'Six Months',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -47,7 +49,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => false,
             'sort_order' => 3,
             'label' => 'Monthly',
-            'period_description' => 'billed monthly'
+            'period_description' => 'billed monthly',
+            'site_id' => $this->siteId
         ]);
 
         $pricings = $this->repository->getForPlan($plan->id);
@@ -68,7 +71,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_default' => true,
             'is_active' => true,
             'label' => 'Default',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -79,7 +83,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_default' => false,
             'is_active' => true,
             'label' => 'Not Default',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->getDefaultForPlan($plan->id);
@@ -100,7 +105,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_default' => true,
             'is_active' => true,
             'label' => 'Pricing 1',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         $pricing2 = SubscriptionPlanPricing::create([
@@ -111,7 +117,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_default' => false,
             'is_active' => true,
             'label' => 'Pricing 2',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->setAsDefault($pricing2->id);
@@ -131,7 +138,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'price' => 50.00,
             'is_active' => true,
             'label' => 'Toggle',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         $this->repository->toggleActive($pricing->id);
@@ -151,7 +159,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'label' => 'P1',
             'duration_months' => 1,
             'issue_count' => 1,
-            'period_description' => 'desc'
+            'period_description' => 'desc',
+            'site_id' => $this->siteId
         ]);
         $p2 = SubscriptionPlanPricing::create([
             'plan_id' => $plan->id,
@@ -160,7 +169,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'label' => 'P2',
             'duration_months' => 2,
             'issue_count' => 2,
-            'period_description' => 'desc'
+            'period_description' => 'desc',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->updateSortOrders([
@@ -186,7 +196,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'Annual Plan 1',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -197,7 +208,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'Annual Plan 2',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->searchPricingTiersPaginated([
@@ -220,7 +232,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'Active',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -231,7 +244,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => false,
             'sort_order' => 2,
             'label' => 'Inactive',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->searchPricingTiersPaginated([
@@ -255,7 +269,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'Premium Annual',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -266,7 +281,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 2,
             'label' => 'Standard Six Months',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->searchPricingTiersPaginated([
@@ -291,7 +307,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
                 'is_active' => true,
                 'sort_order' => $i,
                 'label' => "Plan {$i}",
-                'period_description' => "description {$i}"
+                'period_description' => "description {$i}",
+                'site_id' => $this->siteId
             ]);
         }
 
@@ -328,7 +345,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 3,
             'label' => 'Third',
-            'period_description' => 'billed yearly'
+            'period_description' => 'billed yearly',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -339,7 +357,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 1,
             'label' => 'First',
-            'period_description' => 'billed every 6 months'
+            'period_description' => 'billed every 6 months',
+            'site_id' => $this->siteId
         ]);
 
         SubscriptionPlanPricing::create([
@@ -350,7 +369,8 @@ class SubscriptionPlanPricingRepositoryTest extends RepositoryTestCase
             'is_active' => true,
             'sort_order' => 2,
             'label' => 'Second',
-            'period_description' => 'billed monthly'
+            'period_description' => 'billed monthly',
+            'site_id' => $this->siteId
         ]);
 
         $result = $this->repository->searchPricingTiersPaginated([

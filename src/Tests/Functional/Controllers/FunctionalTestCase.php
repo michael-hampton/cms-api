@@ -31,6 +31,10 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function setUp(): void
     {
+        // Ensure each test starts with a clean container so mocks/bindings from
+        // previous tests cannot leak across the suite.
+        \App\Framework\Container::getInstance()->flush();
+
         $this->cleanupServerGlobals();
 
         $_ENV['APP_ENV'] = 'testing';

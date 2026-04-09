@@ -136,7 +136,7 @@ class PrintDeliveryChannel implements DeliveryChannelInterface
         // This guarantees the queue worker always sees committed fulfilment rows.
         $this->database->afterCommit(
             static function () use ($batchId, $issueDeliveryId): void {
-                dispatch(\App\Jobs\Subscriptions\ExportPrintBatchJob::for(), $batchId, $issueDeliveryId);
+                dispatch(\App\Jobs\Subscriptions\ExportPrintBatchJob::for((int)$batchId, (int)$issueDeliveryId));
             }
         );
 

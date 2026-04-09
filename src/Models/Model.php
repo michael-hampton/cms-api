@@ -1379,7 +1379,7 @@ abstract class Model
     {
         // Allow access to internal properties for testing/debugging
         if (in_array($key, ['attributes', 'exists', 'original'], true)) {
-            return $this->$key;
+            return $this->castAttribute($key, $this->getAttribute($key));
         }
 
         // Check for eager loaded relation first for performance

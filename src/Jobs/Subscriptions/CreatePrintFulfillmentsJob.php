@@ -36,44 +36,47 @@ use App\Services\Workflow\WorkflowRunRecorderFactory;
  */
 class CreatePrintFulfillmentsJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
     public int $backoff = 30;
 
+    private PrintRunRepository $printRunRepository;
+    private IssueDeliveryRepository $issueDeliveryRepository;
+    private SubscriptionRepository $subscriptionRepository;
+    private WorkflowRunRecorderFactory $recorderFactory;
+    private Logger $logger;
+
     public function __construct(
-        private readonly PrintRunRepository         $printRunRepository,
-        private readonly IssueDeliveryRepository    $issueDeliveryRepository,
-        private readonly SubscriptionRepository     $subscriptionRepository,
-        private readonly WorkflowRunRecorderFactory $recorderFactory,
-        private readonly Logger                     $logger,
+        private readonly int $printRunId,
+        private readonly int $issueDeliveryId,
     )
     {
     }
 
-    public function handle(int $printRunId, int $issueDeliveryId): void
+    public function handle(): void
     {
-        $printRun = $this->printRunRepository->find($printRunId);
+        $printRun = $this->printRunRepository->find($this->printRunId);
 
         if (!$printRun) {
             $this->logger->error('CreatePrintFulfillmentsJob: PrintRun not found', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
             ]);
             return;
         }
 
         if ($printRun->isCancelled()) {
             $this->logger->info('CreatePrintFulfillmentsJob: PrintRun cancelled, aborting', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
             ]);
             return;
         }
 
-        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
+        $issueDelivery = $this->issueDeliveryRepository->find($this->issueDeliveryId);
 
         if (!$issueDelivery) {
             $this->logger->error('CreatePrintFulfillmentsJob: IssueDelivery not found', [
-                'print_run_id' => $printRunId,
-                'issue_delivery_id' => $issueDeliveryId,
+                'print_run_id' => $this->printRunId,
+                'issue_delivery_id' => $this->issueDeliveryId,
             ]);
 
             $printRun->markFailed();
@@ -81,8 +84,8 @@ class CreatePrintFulfillmentsJob extends BaseJob
             $this->recorderFactory
                 ->forPrintRun($printRun, 'phase_1', WorkflowRunStatus::BATCHING)
                 ->record(WorkflowStageResult::failed(
-                    'IssueDelivery not found: ' . $issueDeliveryId,
-                    ['print_run_id' => $printRunId],
+                    'IssueDelivery not found: ' . $this->issueDeliveryId,
+                    ['print_run_id' => $this->printRunId],
                 ));
 
             return;
@@ -121,8 +124,8 @@ class CreatePrintFulfillmentsJob extends BaseJob
                 ]));
 
             $this->logger->info('CreatePrintFulfillmentsJob: no print subscriptions, skipping to Phase 2', [
-                'print_run_id' => $printRunId,
-                'issue_delivery_id' => $issueDeliveryId,
+                'print_run_id' => $this->printRunId,
+                'issue_delivery_id' => $this->issueDeliveryId,
             ]);
 
             return;
@@ -131,22 +134,21 @@ class CreatePrintFulfillmentsJob extends BaseJob
         $printRun->markFulfilling($totalChunks);
 
         foreach ($chunks as $chunkIndex => $chunk) {
-            dispatch(
-                CreateFulfilmentsChunkJob::for(),
-                $printRunId,
-                $issueDeliveryId,
+            dispatch(CreateFulfilmentsChunkJob::for(
+                $this->printRunId,
+                $this->issueDeliveryId,
                 $chunk->pluck('id')->toArray(),
                 $chunkIndex,
-            );
+            ))->onQueue('print');
         }
 
         $delayMinutes = (int)config('print.monitor_delay_minutes', 15);
 
-        dispatch(FulfilmentCompletionMonitorJob::for(), $printRunId);
+        dispatch(FulfilmentCompletionMonitorJob::for($this->printRunId))->onQueue('print');
 
         $this->logger->info('CreatePrintFulfillmentsJob: chunk jobs dispatched', [
-            'print_run_id' => $printRunId,
-            'issue_delivery_id' => $issueDeliveryId,
+            'print_run_id' => $this->printRunId,
+            'issue_delivery_id' => $this->issueDeliveryId,
             'subscription_count' => $printSubscriptions->count(),
             'total_chunks' => $totalChunks,
             'monitor_delay' => $delayMinutes,

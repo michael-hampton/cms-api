@@ -31,26 +31,25 @@ use App\Services\Workflow\WorkflowRunRecorderFactory;
  */
 class FulfilmentCompletionMonitorJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 1; // Only run once — it's a point-in-time check.
+    private PrintRunRepository $printRunRepository;
+    private WorkflowRunRecorderFactory $recorderFactory;
+    private Logger $logger;
 
     public function __construct(
-        private readonly PrintRunRepository $printRunRepository,
-        private readonly WorkflowRunRecorderFactory $recorderFactory,
-        private readonly Logger             $logger,
+        private readonly int $printRunId,
     )
     {
     }
 
-    public function handle(
-        int $printRunId,
-    ): void
+    public function handle(): void
     {
-        $printRun = $this->printRunRepository->find($printRunId);
+        $printRun = $this->printRunRepository->find($this->printRunId);
 
         if (!$printRun) {
             $this->logger->warning('FulfilmentCompletionMonitorJob: PrintRun not found', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
             ]);
             return;
         }
@@ -58,7 +57,7 @@ class FulfilmentCompletionMonitorJob extends BaseJob
         // If the PrintRun has moved past Fulfilling, Phase 1 completed normally.
         if (!$printRun->isFulfilling()) {
             $this->logger->info('FulfilmentCompletionMonitorJob: PrintRun already past fulfilling phase', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
                 'status' => $printRun->status,
             ]);
             return;
@@ -70,7 +69,7 @@ class FulfilmentCompletionMonitorJob extends BaseJob
         $delayMinutes = (int)config('print.monitor_delay_minutes', 15);
 
         $this->logger->error('FulfilmentCompletionMonitorJob: stall detected', [
-            'print_run_id' => $printRunId,
+            'print_run_id' => $this->printRunId,
             'completed_chunks' => $completedChunks,
             'total_chunks' => $totalChunks,
             'missing_chunks' => $totalChunks - $completedChunks,

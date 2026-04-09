@@ -145,6 +145,7 @@ class ProductVariantModelTest extends FunctionalTestCase
         ]);
 
         $this->assertIsArray($variant->attributes);
+
         $this->assertEquals('red', $variant->attributes['color']);
         $this->assertEquals('large', $variant->attributes['size']);
     }

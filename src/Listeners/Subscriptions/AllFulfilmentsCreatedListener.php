@@ -31,7 +31,7 @@ class AllFulfilmentsCreatedListener
     {
         $printRun = $event->printRun;
 
-        dispatch(BuildPrintBatchesJob::for(), $printRun->id);
+        dispatch(BuildPrintBatchesJob::for((int)$printRun->id));
 
         $this->recorderFactory
             ->forPrintRun($event->printRun, 'phase_1', WorkflowRunStatus::BATCHING)

@@ -11,6 +11,11 @@ use App\Services\Subscriptions\DeliveryService;
 
 class DeliverIssueDeliveryJob extends BaseJob
 {
+    private IssuesDeliveredRepository $issuesDeliveredRepository;
+    private DeliveryService $deliveryService;
+    private Database $database;
+    private Logger $logger;
+
     /**
      * @param array<string, DeliveryChannelInterface> $channelMap
      *   Keyed by SubscriptionType value, e.g.
@@ -20,21 +25,18 @@ class DeliverIssueDeliveryJob extends BaseJob
      *   provider registered (e.g. in test environments).
      */
     public function __construct(
-        private readonly IssuesDeliveredRepository $issuesDeliveredRepository,
-        private readonly DeliveryService           $deliveryService,
-        private readonly Database $database,
-        private readonly Logger   $logger,
-        private readonly array    $channelMap = [],
+        private readonly int   $issuesDeliveredId,
+        private readonly array $channelMap = [],
     )
     {
     }
 
-    public function handle(int $issuesDeliveredId): void
+    public function handle(): void
     {
-        $issuesDelivered = $this->issuesDeliveredRepository->find($issuesDeliveredId);
+        $issuesDelivered = $this->issuesDeliveredRepository->find($this->issuesDeliveredId);
 
         if (!$issuesDelivered) {
-            $this->logger->error('IssuesDelivered not found', ['id' => $issuesDeliveredId]);
+            $this->logger->error('IssuesDelivered not found', ['id' => $this->issuesDeliveredId]);
             return;
         }
 
@@ -57,6 +59,7 @@ class DeliverIssueDeliveryJob extends BaseJob
                 $issueDelivery = $issuesDelivered->issueDelivery(true)->first();
 
                 if (!$subscription || !$issueDelivery) {
+                    die('no');
                     throw new \RuntimeException(
                         'Missing subscription or issue delivery for IssuesDelivered #' . $issuesDelivered->id
                     );

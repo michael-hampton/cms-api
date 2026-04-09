@@ -2,6 +2,8 @@
 
 namespace App\Framework\Queue;
 
+use DateTimeInterface;
+
 trait Queueable
 {
     public ?string $connection = null;
@@ -22,9 +24,11 @@ trait Queueable
         return $this;
     }
 
-    public function delay(int $seconds): static
+    public function delay(DateTimeInterface|int $delay): static
     {
-        $this->delay = $seconds;
+        $this->delay = $delay instanceof \DateTimeInterface
+            ? max(0, $delay->getTimestamp() - time())
+            : max(0, $delay);
         return $this;
     }
 }

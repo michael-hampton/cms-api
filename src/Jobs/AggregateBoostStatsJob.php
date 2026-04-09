@@ -8,13 +8,13 @@ use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Services\Adverts\Boost\BoostLimitEnforcer;
 use App\Services\Adverts\Boost\BoostStatAggregator;
 
-class AggregateBoostStatsJob
+class AggregateBoostStatsJob extends BaseJob
 {
-    public function __construct(
-        private readonly BoostRepository     $boostRepository,
-        private readonly BoostStatAggregator $aggregator,
-        private readonly BoostLimitEnforcer  $enforcer,
-    )
+    private BoostRepository $boostRepository;
+    private BoostStatAggregator $aggregator;
+    private BoostLimitEnforcer $enforcer;
+
+    public function __construct()
     {
     }
 

@@ -66,7 +66,7 @@ class RewardAuditLogModelTest extends FunctionalTestCase
         $log = $log->fresh(['user']);
 
         $this->assertNotNull($log->user);
-        $this->assertEquals($user->id, $log->user->id);
+        $this->assertEquals($user->id, $log->user['id']);
     }
 
     public function testGetChangedFields(): void

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Enums\Workflow\WorkflowRunStatus;
+use App\Framework\Container;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
@@ -51,9 +52,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
             ->with($issueDelivery)
             ->andReturn(new Collection([$batch1, $batch2]));
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -111,17 +112,6 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
     }
 
-    private function makeJob(): BuildPrintBatchesJob
-    {
-        return new BuildPrintBatchesJob(
-            $this->printRunRepository,
-            $this->issueDeliveryRepository,
-            $this->batchBuilderService,
-            $this->workflowRunRecorderFactory,
-            $this->logger
-        );
-    }
-
     public function test_it_transitions_print_run_through_batching_to_batched(): void
     {
         $printRun = $this->makePrintRun(PrintRunStatus::FULFILLING);
@@ -142,9 +132,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
             $callOrder[] = 'batched';
         });
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertSame(['batching', 'batched'], $callOrder);
     }
@@ -156,9 +146,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->issueDeliveryRepository->shouldNotReceive('find');
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -175,9 +165,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->issueDeliveryRepository->shouldNotReceive('find');
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -194,9 +184,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->issueDeliveryRepository->shouldNotReceive('find');
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -213,9 +203,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
 
         $this->batchBuilderService->shouldNotReceive('buildBatches');
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -234,9 +224,9 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $printRun->shouldReceive('markBatching')->once();
         $printRun->shouldReceive('markBatched')->once();
 
-        $this->makeJob()->handle(
-            1
-        );
+        $job = BuildPrintBatchesJob::for(1);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -250,6 +240,13 @@ class BuildPrintBatchesJobTest extends FunctionalTestCase
         $this->batchBuilderService = Mockery::mock(BatchBuilderService::class);
         $this->workflowRunRecorderFactory = Mockery::mock(WorkflowRunRecorderFactory::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $container = Container::getInstance();
+        $container->instance(PrintRunRepository::class, $this->printRunRepository);
+        $container->instance(IssueDeliveryRepository::class, $this->issueDeliveryRepository);
+        $container->instance(BatchBuilderService::class, $this->batchBuilderService);
+        $container->instance(WorkflowRunRecorderFactory::class, $this->workflowRunRecorderFactory);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void

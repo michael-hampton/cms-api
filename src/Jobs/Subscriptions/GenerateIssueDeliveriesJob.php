@@ -30,19 +30,21 @@ use DomainException;
  */
 class GenerateIssueDeliveriesJob extends BaseJob
 {
+    private IssuesDeliveredRepository $issuesDeliveredRepository;
+    private IssueDeliveryRepository $issueDeliveryRepository;
+    private IssueDeliveryEligibilityService $eligibilityService;
+    private Database $database;
+    private Logger $logger;
+
     public function __construct(
-        private readonly IssuesDeliveredRepository       $issuesDeliveredRepository,
-        private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly IssueDeliveryEligibilityService $eligibilityService,
-        private readonly Database                $database,
-        private readonly Logger                  $logger,
+        private readonly int $issueDeliveryId,
     )
     {
     }
 
-    public function handle(int $issueDeliveryId): array
+    public function handle(): array
     {
-        $issueDelivery = $this->issueDeliveryRepository->find($issueDeliveryId);
+        $issueDelivery = $this->issueDeliveryRepository->find($this->issueDeliveryId);
 
         if (!$issueDelivery->isActive()) {
             $this->logger->info('IssueDelivery skipped — not active', [
@@ -54,6 +56,7 @@ class GenerateIssueDeliveriesJob extends BaseJob
 
         try {
             $eligibleSubscriptions = $this->eligibilityService->getEligibleSubscriptions($issueDelivery);
+
         } catch (DomainException $e) {
             $this->logger->error('IssueDelivery eligibility resolution failed', [
                 'issue_delivery_id' => $issueDelivery->id,
@@ -114,7 +117,7 @@ class GenerateIssueDeliveriesJob extends BaseJob
 
         // Dispatch digital delivery jobs outside the transaction.
         foreach ($digitalToDispatch as $issueDeliveredId) {
-            dispatch(DeliverIssueDeliveryJob::for(), $issueDeliveredId);
+            dispatch(DeliverIssueDeliveryJob::for((int)$issueDeliveredId));
         }
 
         // Fire the event that triggers the print pipeline.

@@ -15,15 +15,11 @@ class DispatchStockAllocationJobs
             return;
         }
 
-        $job = AllocatePreorderStockJob::for();
-
-        // Dispatch allocation job
-        dispatch($job, $event->product->id);
+        dispatch(AllocatePreorderStockJob::for((int)$event->product->id));
 
         // Dispatch alert job if stock went from 0 to >0
         if ($event->oldStock === 0 && $event->newStock > 0) {
-            $job2 = SendBackInStockAlertsJob::for();
-            dispatch($job2, $event->product->id);
+            dispatch(SendBackInStockAlertsJob::for((int)$event->product->id));
         }
     }
 }

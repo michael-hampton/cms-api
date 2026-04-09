@@ -5,6 +5,7 @@ namespace App\Controllers\Offers;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Repositories\Cms\BrandRepository;
@@ -12,6 +13,8 @@ use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
+use App\Repositories\Shopping\CartRepository;
+use App\Repositories\Shopping\WishlistRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Offers\DealAlertService;
@@ -36,6 +39,8 @@ class DealsController extends Controller
         private readonly ProductOfferBundleService           $bundleService,
         private readonly CurrencyResolver                    $currencyResolver,
         private readonly FilterInputSanitiser                $inputSanitiser,
+        private readonly WishlistRepository $wishlistRepository,
+        private readonly CartRepository     $cartRepository,
     ) {
         parent::__construct();
     }
@@ -43,6 +48,8 @@ class DealsController extends Controller
     public function index(Request $request)
     {
         $siteId = SiteContext::getId();
+        $userId = MemberAuth::id() ?? null;
+        $sessionId = Session::get('cart_session_id');
         $member = MemberAuth::getMember();
 
         $categories = $this->categoryRepository->getAllWithProductCounts($siteId);
@@ -63,6 +70,14 @@ class DealsController extends Controller
         $currencyCode = $this->currencyResolver->resolveUpperCase();
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
 
+        $wishlistProductIds = $this->wishlistRepository
+            ->getProductIdsBySessionOrUser($userId, $sessionId);
+
+        $cartProductIds = $this->cartRepository
+            ->findBySessionOrUser($userId, $sessionId)
+            ->pluck('product_id')
+            ->all();
+
         return $this->view('deals.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
@@ -75,6 +90,10 @@ class DealsController extends Controller
             'bundles' => $bundles,
             'currencyCode' => $currencyCode,
             'currencySymbol' => $currencySymbol,
+            'wishlistCount' => count($wishlistProductIds),
+            'wishlistProductIds' => $wishlistProductIds,
+            'cartCount' => $this->cartRepository->getCountBySessionOrUser($userId, $sessionId),
+            'cartProductIds' => $cartProductIds,
         ]);
     }
 

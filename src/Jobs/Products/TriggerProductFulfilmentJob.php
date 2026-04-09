@@ -33,34 +33,35 @@ use App\Repositories\Product\ProductFulfilmentRunRepository;
  */
 class TriggerProductFulfilmentJob extends BaseJob
 {
-    public string $queue = 'products';
+    public ?string $queue = 'products';
     public int $tries = 3;
+    private OrderRepository $orderRepository;
+    private OrderItemRepository $orderLineRepository;
+    private ProductFulfilmentRunRepository $runRepository;
+    private Logger $logger;
 
     public function __construct(
-        private readonly OrderRepository                $orderRepository,
-        private readonly OrderItemRepository            $orderLineRepository,
-        private readonly ProductFulfilmentRunRepository $runRepository,
-        private readonly Logger                         $logger,
+        private readonly int $orderId,
     )
     {
     }
 
-    public function handle(int $orderId): void
+    public function handle(): void
     {
-        $order = $this->orderRepository->find($orderId);
+        $order = $this->orderRepository->find($this->orderId);
 
         if (!$order) {
             $this->logger->error('TriggerProductFulfilmentJob: Order not found', [
-                'order_id' => $orderId,
+                'order_id' => $this->orderId,
             ]);
             return;
         }
 
-        $orderLines = $this->orderLineRepository->findFulfilableByOrder($orderId);
+        $orderLines = $this->orderLineRepository->findFulfilableByOrder($this->orderId);
 
         if ($orderLines->isEmpty()) {
             $this->logger->info('TriggerProductFulfilmentJob: no fulfilable order lines', [
-                'order_id' => $orderId,
+                'order_id' => $this->orderId,
             ]);
             return;
         }
@@ -77,7 +78,7 @@ class TriggerProductFulfilmentJob extends BaseJob
 
         $this->logger->info('TriggerProductFulfilmentJob: ProductFulfilmentRun created', [
             'run_id' => $run->id,
-            'order_id' => $orderId,
+            'order_id' => $this->orderId,
             'total_chunks' => $totalChunks,
             'line_count' => $orderLines->count(),
         ]);
@@ -91,17 +92,17 @@ class TriggerProductFulfilmentJob extends BaseJob
         $run->markFulfilling($totalChunks);
 
         foreach ($chunks as $chunkIndex => $chunk) {
-            dispatch(CreateProductFulfilmentsChunkJob::for(),
+            dispatch(CreateProductFulfilmentsChunkJob::for(
                 $run->id,
-                $orderId,
+                $this->orderId,
                 $chunk->pluck('id')->toArray(),
                 $chunkIndex,
-            );
+            ));
         }
 
         $delayMinutes = (int)config('products.fulfilment.monitor_delay_minutes', 15);
 
-        dispatch(ProductFulfilmentMonitorJob::for(), $run->id);
+        dispatch(ProductFulfilmentMonitorJob::for((int)$run->id));
 
         $this->logger->info('TriggerProductFulfilmentJob: chunk jobs dispatched', [
             'run_id' => $run->id,

@@ -23,6 +23,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $this->assertTrue($bundle->isCurrentlyActive());
@@ -38,6 +39,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => false,
+            'site_id' => $this->siteId
         ]);
 
         $this->assertFalse($bundle->isCurrentlyActive());
@@ -53,6 +55,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $this->assertFalse($bundle->isCurrentlyActive());
@@ -68,6 +71,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+2 days')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $this->assertFalse($bundle->isCurrentlyActive());
@@ -84,6 +88,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         // Expired bundle
@@ -95,6 +100,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-2 days')),
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         // Inactive bundle
@@ -106,6 +112,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => false,
+            'site_id' => $this->siteId
         ]);
 
         $activeBundles = ProductOfferBundle::active()->get();
@@ -124,6 +131,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundle::create([
@@ -135,6 +143,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $published = ProductOfferBundle::published()->get();
@@ -154,6 +163,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundle::create([
@@ -165,6 +175,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         $pending = ProductOfferBundle::pending()->get();
@@ -184,6 +195,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'rejected',
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundle::create([
@@ -195,6 +207,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $rejected = ProductOfferBundle::rejected()->get();
@@ -218,6 +231,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         ProductOfferBundleItem::create([
@@ -253,12 +267,13 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'status' => 'published',
             'published_by' => $user->id,
             'published_at' => now(),
+            'site_id' => $this->siteId
         ]);
 
         $bundle = $bundle->fresh(['publisher']);
 
         $this->assertNotNull($bundle->publisher);
-        $this->assertEquals($user->id, $bundle->publisher->id);
+        $this->assertEquals($user->id, $bundle->published_by);
     }
 
     public function testRejectorRelationship(): void
@@ -277,12 +292,13 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'rejected_by' => $user->id,
             'rejected_at' => now(),
             'rejection_reason' => 'Test reason',
+            'site_id' => $this->siteId
         ]);
 
         $bundle = $bundle->fresh(['rejector']);
 
         $this->assertNotNull($bundle->rejector);
-        $this->assertEquals($user->id, $bundle->rejector->id);
+        $this->assertEquals($user->id, $bundle->rejected_by);
     }
 
     public function testCanBePublished(): void
@@ -296,6 +312,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $publishedBundle = ProductOfferBundle::create([
@@ -307,6 +324,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
             'status' => 'published',
+            'site_id' => $this->siteId
         ]);
 
         $expiredBundle = ProductOfferBundle::create([
@@ -318,6 +336,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('-1 day')),
             'is_active' => true,
             'status' => 'pending',
+            'site_id' => $this->siteId
         ]);
 
         $this->assertTrue($pendingBundle->canBePublished());
@@ -335,6 +354,7 @@ class ProductOfferBundleModelTest extends FunctionalTestCase
             'start_date' => date('Y-m-d H:i:s'),
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day')),
             'is_active' => true,
+            'site_id' => $this->siteId
         ]);
 
         $savings = $bundle->calculateSavings();

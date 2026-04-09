@@ -29,7 +29,7 @@ class AllProductFulfilmentsCreatedListener
     {
         $run = $event->fulfilmentRun;
 
-        dispatch(BuildProductBatchesJob::for(), $run->id);
+        dispatch(BuildProductBatchesJob::for((int)$run->id));
 
         $this->logger->info('AllProductFulfilmentsCreatedListener: BuildProductBatchesJob dispatched', [
             'run_id' => $run->id,

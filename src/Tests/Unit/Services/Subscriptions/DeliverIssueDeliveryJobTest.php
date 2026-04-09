@@ -3,8 +3,12 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\IssueDeliveredStatus;
+use App\Enums\Subscriptions\SubscriptionType;
+use App\Framework\Container;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Models\IssuesDelivered;
+use App\Services\Subscriptions\DeliveryChannels\EmailDeliveryChannel;
+use App\Services\Subscriptions\DeliveryChannels\PrintDeliveryChannel;
 use App\Services\Subscriptions\DeliveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -30,8 +34,15 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $deliveryService->shouldReceive('send')->once();
         app()->instance(DeliveryService::class, $deliveryService);
 
-        $job = app(DeliverIssueDeliveryJob::class);
-        $job->handle($issuesDelivered->id);
+        $job = DeliverIssueDeliveryJob::for(
+            $issuesDelivered->id,
+            [
+                SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
+                SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
+            ]
+        );
+        $job->__wakeup();
+        $job->handle();
 
         $issuesDelivered->refresh();
 
@@ -53,12 +64,19 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $deliveryService = Mockery::mock(DeliveryService::class);
         $deliveryService->shouldReceive('registerChannel')->byDefault();
         $deliveryService->shouldReceive('send')->andThrow(new \Exception('Delivery failed'));
-        app()->instance(DeliveryService::class, $deliveryService);
+        Container::getInstance()->instance(DeliveryService::class, $deliveryService);
 
-        $job = app(DeliverIssueDeliveryJob::class);
+        $job = DeliverIssueDeliveryJob::for(
+            $issuesDelivered->id,
+            [
+                SubscriptionType::DIGITAL->value => app()->make(EmailDeliveryChannel::class),
+                SubscriptionType::PRINTED->value => app()->make(PrintDeliveryChannel::class),
+            ]
+        );
+        $job->__wakeup();
 
         try {
-            $job->handle($issuesDelivered->id);
+            $job->handle();
         } catch (\Exception) {
             // Expected — job re-throws after marking failure.
         }
@@ -85,10 +103,11 @@ class DeliverIssueDeliveryJobTest extends FunctionalTestCase
         $deliveryService = Mockery::mock(DeliveryService::class);
         $deliveryService->shouldReceive('registerChannel');
         $deliveryService->shouldNotReceive('send');
-        app()->instance(DeliveryService::class, $deliveryService);
+        Container::getInstance()->instance(DeliveryService::class, $deliveryService);
 
-        $job = app(DeliverIssueDeliveryJob::class);
-        $job->handle($issuesDelivered->id);
+        $job = DeliverIssueDeliveryJob::for($issuesDelivered->id);
+        $job->__wakeup();
+        $job->handle();
 
         $issuesDelivered = IssuesDelivered::find($issuesDelivered->id);
         $this->assertEquals(IssueDeliveredStatus::DELIVERED->value, $issuesDelivered->status);

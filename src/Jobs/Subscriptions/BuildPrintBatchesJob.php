@@ -30,34 +30,36 @@ use App\Services\Workflow\WorkflowRunRecorderFactory;
  */
 class BuildPrintBatchesJob extends BaseJob
 {
-    public string $queue = 'print';
+    public ?string $queue = 'print';
     public int $tries = 3;
     public int $backoff = 30;
 
+    private PrintRunRepository $printRunRepository;
+    private IssueDeliveryRepository $issueDeliveryRepository;
+    private BatchBuilderService $batchBuilderService;
+    private WorkflowRunRecorderFactory $recorderFactory;
+    private Logger $logger;
+
     public function __construct(
-        private readonly PrintRunRepository      $printRunRepository,
-        private readonly IssueDeliveryRepository $issueDeliveryRepository,
-        private readonly BatchBuilderService     $batchBuilderService,
-        private readonly WorkflowRunRecorderFactory $recorderFactory,
-        private readonly Logger                  $logger,
+        private readonly int $printRunId,
     )
     {
     }
 
-    public function handle(int $printRunId): void
+    public function handle(): void
     {
-        $printRun = $this->printRunRepository->find($printRunId);
+        $printRun = $this->printRunRepository->find($this->printRunId);
 
         if (!$printRun) {
             $this->logger->error('BuildPrintBatchesJob: PrintRun not found', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
             ]);
             return;
         }
 
         if ($printRun->isCancelled() || $printRun->isComplete()) {
             $this->logger->info('BuildPrintBatchesJob: PrintRun in terminal state, skipping', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
                 'status' => $printRun->status,
             ]);
             return;
@@ -67,7 +69,7 @@ class BuildPrintBatchesJob extends BaseJob
 
         if (!$issueDelivery) {
             $this->logger->error('BuildPrintBatchesJob: IssueDelivery not found', [
-                'print_run_id' => $printRunId,
+                'print_run_id' => $this->printRunId,
                 'issue_delivery_id' => $printRun->issue_delivery_id,
             ]);
             $printRun->markFailed();
@@ -77,7 +79,7 @@ class BuildPrintBatchesJob extends BaseJob
         $printRun->markBatching();
 
         $this->logger->info('BuildPrintBatchesJob: building batches', [
-            'print_run_id' => $printRunId,
+            'print_run_id' => $this->printRunId,
             'issue_delivery_id' => $issueDelivery->id,
         ]);
 
@@ -86,7 +88,7 @@ class BuildPrintBatchesJob extends BaseJob
         $printRun->markBatched();
 
         $this->logger->info('BuildPrintBatchesJob: batches built', [
-            'print_run_id' => $printRunId,
+            'print_run_id' => $this->printRunId,
             'batch_count' => $batches->count(),
         ]);
 
@@ -99,7 +101,7 @@ class BuildPrintBatchesJob extends BaseJob
         // Dispatch Phase 3 — one ProcessPrintBatchJob per batch.
         // Export and label generation are parallel (both dispatched from that job).
         foreach ($batches as $batch) {
-            dispatch(ProcessPrintBatchJob::for(), $batch->id);
+            dispatch(ProcessPrintBatchJob::for($batch->id));
         }
     }
 }

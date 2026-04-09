@@ -24,32 +24,31 @@ use App\Repositories\Product\ProductFulfilmentRunRepository;
  */
 class ProductFulfilmentMonitorJob extends BaseJob
 {
-    public string $queue = 'products';
+    public ?string $queue = 'products';
     public int $tries = 1;
+    private ProductFulfilmentRunRepository $runRepository;
+    private Logger $logger;
 
     public function __construct(
-        private readonly ProductFulfilmentRunRepository $runRepository,
-        private readonly Logger                         $logger,
+        private readonly int $runId,
     )
     {
     }
 
-    public function handle(
-        int $runId,
-    ): void
+    public function handle(): void
     {
-        $run = $this->runRepository->find($runId);
+        $run = $this->runRepository->find($this->runId);
 
         if (!$run) {
             $this->logger->warning('ProductFulfilmentMonitorJob: run not found', [
-                'run_id' => $runId,
+                'run_id' => $this->runId,
             ]);
             return;
         }
 
         if (!$run->isFulfilling()) {
             $this->logger->info('ProductFulfilmentMonitorJob: run past fulfilling phase', [
-                'run_id' => $runId,
+                'run_id' => $this->runId,
                 'status' => $run->status,
             ]);
             return;
@@ -60,7 +59,7 @@ class ProductFulfilmentMonitorJob extends BaseJob
         $delayMinutes = (int)config('products.fulfilment.monitor_delay_minutes', 15);
 
         $this->logger->error('ProductFulfilmentMonitorJob: stall detected', [
-            'run_id' => $runId,
+            'run_id' => $this->runId,
             'completed_chunks' => $completedChunks,
             'total_chunks' => $totalChunks,
             'missing_chunks' => $totalChunks - $completedChunks,

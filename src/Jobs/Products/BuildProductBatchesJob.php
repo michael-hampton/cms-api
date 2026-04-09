@@ -20,35 +20,35 @@ use App\Repositories\Product\ProductFulfilmentRunRepository;
  */
 class BuildProductBatchesJob extends BaseJob
 {
-    public string $queue = 'products';
+    public ?string $queue = 'products';
     public int $tries = 3;
     public int $backoff = 30;
 
+    private ProductFulfilmentRunRepository $runRepository;
+    private ProductFulfilmentRepository $fulfilmentRepository;
+    private ProductBatchRepository $batchRepository;
+    private Logger $logger;
+
     public function __construct(
-        private readonly ProductFulfilmentRunRepository $runRepository,
-        private readonly ProductFulfilmentRepository    $fulfilmentRepository,
-        private readonly ProductBatchRepository         $batchRepository,
-        private readonly Logger                         $logger,
+        private readonly int $runId,
     )
     {
     }
 
-    public function handle(
-        $runId,
-    ): void
+    public function handle(): void
     {
-        $run = $this->runRepository->find($runId);
+        $run = $this->runRepository->find($this->runId);
 
         if (!$run) {
             $this->logger->error('BuildProductBatchesJob: run not found', [
-                'run_id' => $runId,
+                'run_id' => $this->runId,
             ]);
             return;
         }
 
         if ($run->isComplete() || $run->isCancelled()) {
             $this->logger->info('BuildProductBatchesJob: run in terminal state, skipping', [
-                'run_id' => $runId,
+                'run_id' => $this->runId,
                 'status' => $run->status,
             ]);
             return;
@@ -58,7 +58,7 @@ class BuildProductBatchesJob extends BaseJob
 
         // Group fulfilments by territory — one batch per territory.
         // null territory_id = global/default batch.
-        $grouped = $this->fulfilmentRepository->findByRunGroupedByTerritory($runId);
+        $grouped = $this->fulfilmentRepository->findByRunGroupedByTerritory($this->runId);
 
         $batches = [];
         foreach ($grouped as $territoryId => $fulfilments) {
@@ -67,7 +67,7 @@ class BuildProductBatchesJob extends BaseJob
                 : (int)$territoryId;
 
             $batches[] = $this->batchRepository->findOrCreateForRunAndTerritory(
-                $runId,
+                $this->runId,
                 $normalisedTerritoryId,
             );
         }
@@ -75,12 +75,12 @@ class BuildProductBatchesJob extends BaseJob
         $run->markBatched();
 
         $this->logger->info('BuildProductBatchesJob: batches built', [
-            'run_id' => $runId,
+            'run_id' => $this->runId,
             'batch_count' => count($batches),
         ]);
 
         foreach ($batches as $batch) {
-            dispatch(ExportProductBatchJob::for(), $batch->id);
+            dispatch(ExportProductBatchJob::for((int)$batch->id));
         }
     }
 }

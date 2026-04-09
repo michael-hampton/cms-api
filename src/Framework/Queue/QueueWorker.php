@@ -16,14 +16,16 @@ use App\Framework\Support\Logger;
  *     Loops indefinitely, sleeping between empty polls.
  *     Suitable for a supervised process (systemd, supervisord).
  *
- *   Cron-tick (bounded):
+ *   Cron-tick / HTTP-triggered (bounded):
  *     $worker->runBatch('default', limit: 50);
- *     Processes up to $limit jobs then exits.
- *     Suitable for a cron entry every minute.
+ *     Processes up to $limit jobs then returns.
+ *     Suitable for a cron entry or a short-lived HTTP handler.
  *
- * The worker never catches \Throwable inside handle() silently —
- * all failures are logged and the job is either released for retry
- * or moved to failed_jobs, matching the contract in DatabaseQueueDriver.
+ * Backoff strategy is delegated to Job::backoffForAttempt(), so individual
+ * jobs can customise their retry intervals without touching the worker.
+ * DatabaseQueueDriver::release() accepts an explicit delay in seconds, so we
+ * compute it here using the job's own backoff policy and pass the resolved
+ * value to the driver.
  */
 class QueueWorker
 {
@@ -43,14 +45,9 @@ class QueueWorker
     /**
      * Long-running daemon loop.
      *
-     * Registers SIGTERM/SIGINT handlers so the process exits cleanly after the
-     * current job finishes rather than being killed mid-handle().
-     *
      * @param string $queue Queue name to poll.
      * @param int $sleep Seconds to sleep when the queue is empty.
      * @param int $maxJobs Stop after processing this many jobs (0 = unlimited).
-     *                          Useful to periodically restart the worker process
-     *                          to avoid memory leaks.
      */
     public function listen(string $queue = 'default', int $sleep = 3, int $maxJobs = 0): void
     {
@@ -82,7 +79,6 @@ class QueueWorker
                 break;
             }
 
-            // Allow signal handlers to fire between jobs.
             if (function_exists('pcntl_signal_dispatch')) {
                 pcntl_signal_dispatch();
             }
@@ -91,24 +87,46 @@ class QueueWorker
         $this->logger->info('QueueWorker: stopped', ['processed' => $processed]);
     }
 
-    private function registerSignalHandlers(): void
+    /**
+     * Cron-tick / HTTP-trigger mode: process up to $limit jobs then return.
+     *
+     * Returns the number of jobs processed.
+     */
+    public function runBatch(string $queue = 'default', int $limit = 50): int
     {
-        if (!function_exists('pcntl_signal')) {
-            return;
+        $processed = 0;
+
+        while ($processed < $limit) {
+            $job = $this->driver->pop($queue);
+
+            if (!$job) {
+                break;
+            }
+
+            $this->process($job);
+
+            $processed++;
         }
 
-        pcntl_async_signals(true);
+        $this->logger->info('QueueWorker: batch complete', [
+            'queue' => $queue,
+            'processed' => $processed,
+        ]);
 
-        pcntl_signal(SIGTERM, function (): void {
-            $this->logger->info('QueueWorker: SIGTERM received, stopping after current job');
-            $this->shouldStop = true;
-        });
-
-        pcntl_signal(SIGINT, function (): void {
-            $this->logger->info('QueueWorker: SIGINT received, stopping after current job');
-            $this->shouldStop = true;
-        });
+        return $processed;
     }
+
+    /**
+     * Allow external code to request a graceful stop (e.g. from a console command).
+     */
+    public function stop(): void
+    {
+        $this->shouldStop = true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Core processing
+    // -------------------------------------------------------------------------
 
     private function process(QueuedJob $queuedJob): void
     {
@@ -118,9 +136,14 @@ class QueueWorker
 
         $job = $this->deserialise($record['payload'], $jobId);
 
+        dd($job);
+
         if ($job === null) {
-            // Payload is corrupt — move straight to failed so it doesn't loop.
-            $this->driver->fail($jobId, $record, new \RuntimeException('Failed to deserialise job payload'));
+            $this->driver->fail(
+                $jobId,
+                $record,
+                new \RuntimeException('Failed to deserialise job payload'),
+            );
             return;
         }
 
@@ -151,17 +174,23 @@ class QueueWorker
             ]);
 
             if ($attempts < $job->tries) {
-                $this->driver->release($jobId, $attempts);
+                // Resolve the delay via the job's own backoff policy, then pass
+                // the computed seconds to the driver. This keeps the retry delay
+                // logic in Job and avoids leaking it into the worker or driver.
+                $delaySecs = $job->backoffForAttempt($attempts);
+                $this->driver->release($jobId, $attempts, $delaySecs);
+
+                $this->logger->info('QueueWorker: job released for retry', [
+                    'job_id' => $jobId,
+                    'attempt' => $attempts,
+                    'retry_in_s' => $delaySecs,
+                ]);
             } else {
                 $job->failed($e);
                 $this->driver->fail($jobId, $record, $e);
             }
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Core processing
-    // -------------------------------------------------------------------------
 
     private function deserialise(string $payload, int $jobId): ?Job
     {
@@ -181,42 +210,25 @@ class QueueWorker
     }
 
     // -------------------------------------------------------------------------
-    // Helpers
+    // Signal handling
     // -------------------------------------------------------------------------
 
-    /**
-     * Cron-tick mode: process up to $limit jobs then return.
-     *
-     * Returns the number of jobs successfully processed.
-     */
-    public function runBatch(string $queue = 'default', int $limit = 50): int
+    private function registerSignalHandlers(): void
     {
-        $processed = 0;
-
-        while ($processed < $limit) {
-            $job = $this->driver->pop($queue);
-
-            if (!$job) {
-                break; // Queue empty.
-            }
-
-            $this->process($job);
-            $processed++;
+        if (!function_exists('pcntl_signal')) {
+            return;
         }
 
-        $this->logger->info('QueueWorker: batch complete', [
-            'queue' => $queue,
-            'processed' => $processed,
-        ]);
+        pcntl_async_signals(true);
 
-        return $processed;
-    }
+        pcntl_signal(SIGTERM, function (): void {
+            $this->logger->info('QueueWorker: SIGTERM received, stopping after current job');
+            $this->shouldStop = true;
+        });
 
-    /**
-     * Allow external code to request a graceful stop (e.g. from a console command).
-     */
-    public function stop(): void
-    {
-        $this->shouldStop = true;
+        pcntl_signal(SIGINT, function (): void {
+            $this->logger->info('QueueWorker: SIGINT received, stopping after current job');
+            $this->shouldStop = true;
+        });
     }
 }

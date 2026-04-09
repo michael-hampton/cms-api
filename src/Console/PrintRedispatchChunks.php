@@ -29,7 +29,13 @@ class PrintRedispatchChunks extends Command
     public function handle(): int
     {
         $result = $this->createResult('print:redispatch-chunks');
-        $printRun = $this->printRunRepository->find($this->argument('printRunId'));
+        $batchId = (int)$this->argument('batchId');
+        $printRun = $this->printRunRepository->find($batchId);
+
+        if (!$printRun) {
+            $this->error("Print run #{$batchId} not found.");
+            return self::FAILURE;
+        }
         $missing = $printRun->getMissingChunkIndexes();
 
         if (empty($missing)) {
@@ -50,25 +56,25 @@ class PrintRedispatchChunks extends Command
             $chunks = $subscriptions->chunk(config('print.chunk_size', 200));
 
             foreach ($missing as $chunkIndex) {
-                $chunk = $chunks[$chunkIndex] ?? null;
+
+                $chunk = $chunks->get($chunkIndex) ?? null;
 
                 if (!$chunk) {
                     $this->warn("Chunk index {$chunkIndex} not found in current subscription set.");
                     continue;
                 }
 
-                dispatch(CreateFulfilmentsChunkJob::for(),
-                    $printRun->id,
-                    $issueDelivery->id,
+                dispatch(CreateFulfilmentsChunkJob::for(
+                    (int)$printRun->id,
+                    (int)$issueDelivery->id,
                     $chunk->pluck('id')->toArray(),
-                    $chunkIndex,
-                );
+                    (int)$chunkIndex,
+                ))->dispatchNow();
 
                 $this->info("Re-dispatched chunk {$chunkIndex}.");
+                $result->incrementSucceeded();
+                $result->addMessage("Re-dispatched chunk {$chunkIndex}.");
             }
-
-            $result->incrementSucceeded();
-            $result->addMessage("Re-dispatched chunk {$chunkIndex}.");
         } catch (\Throwable $e) {
             $this->reportFailure(
                 result: $result,

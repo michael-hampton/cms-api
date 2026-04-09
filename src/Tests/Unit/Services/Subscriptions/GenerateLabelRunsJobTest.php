@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\LabelExportFormat;
+use App\Framework\Container;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\GenerateLabelRunsJob;
 use App\Models\LabelRun;
@@ -32,6 +33,12 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
         $this->fulfillmentRepository = Mockery::mock(PrintFulfillmentRepository::class);
         $this->labelRunRepository = Mockery::mock(LabelRunRepository::class);
         $this->logger = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+
+        $container = Container::getInstance();
+        $container->instance(PrintBatchRepository::class, $this->batchRepository);
+        $container->instance(PrintFulfillmentRepository::class, $this->fulfillmentRepository);
+        $container->instance(LabelRunRepository::class, $this->labelRunRepository);
+        $container->instance(Logger::class, $this->logger);
     }
 
     protected function tearDown(): void
@@ -77,9 +84,9 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
             ->once()
             ->andReturn($labelRun2);
 
-        $this->makeJob()->handle(
-            10
-        );
+        $job = GenerateLabelRunsJob::for(10);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
 
@@ -108,9 +115,9 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
             ->once()
             ->andReturn($this->makeLabelRun(id: 200));
 
-        $this->makeJob()->handle(
-            10
-        );
+        $job = GenerateLabelRunsJob::for(10);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -125,9 +132,9 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
         $this->fulfillmentRepository->shouldNotReceive('findByBatch');
         $this->labelRunRepository->shouldNotReceive('createForIssuesDelivered');
 
-        $this->makeJob()->handle(
-            10
-        );
+        $job = GenerateLabelRunsJob::for(10);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -142,9 +149,9 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
 
         $this->labelRunRepository->shouldNotReceive('createForIssuesDelivered');
 
-        $this->makeJob()->handle(
-            10
-        );
+        $job = GenerateLabelRunsJob::for(10);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -174,10 +181,9 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
             })
             ->andReturn($this->makeLabelRun(id: 200));
 
-        $this->makeJob()->handle(
-            10,
-            LabelExportFormat::Pdf,
-        );
+        $job = GenerateLabelRunsJob::for(10, LabelExportFormat::Pdf);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertSame(LabelExportFormat::Pdf, $capturedFormat);
     }
@@ -185,16 +191,6 @@ class GenerateLabelRunsJobTest extends FunctionalTestCase
     // =========================================================================
     // Helpers
     // =========================================================================
-
-    private function makeJob(): GenerateLabelRunsJob
-    {
-        return new GenerateLabelRunsJob(
-            $this->batchRepository,
-            $this->fulfillmentRepository,
-            $this->labelRunRepository,
-            $this->logger,
-        );
-    }
 
     private function makeBatch(int $id): MockInterface
     {

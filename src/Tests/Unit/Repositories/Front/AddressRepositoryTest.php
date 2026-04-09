@@ -187,4 +187,160 @@ class AddressRepositoryTest extends RepositoryTestCase
         // Assert
         $this->assertFalse($address->is_default);
     }
+
+    public function test_get_paginated_addresses_returns_correct_structure(): void
+    {
+        // Arrange
+        $this->createAddress(['member_id' => $this->testMember->id, 'is_default' => true]);
+        $this->createAddress(['member_id' => $this->testMember->id, 'is_default' => false]);
+        $this->createAddress(['member_id' => $this->testMember->id, 'is_default' => false]);
+
+        // Act
+        $result = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 10);
+
+        // Assert
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('total', $result);
+        $this->assertArrayHasKey('per_page', $result);
+        $this->assertArrayHasKey('current_page', $result);
+        $this->assertArrayHasKey('last_page', $result);
+    }
+
+    public function test_get_paginated_addresses_returns_correct_total(): void
+    {
+        // Arrange
+        $this->createAddress(['member_id' => $this->testMember->id]);
+        $this->createAddress(['member_id' => $this->testMember->id]);
+        $this->createAddress(['member_id' => $this->testMember->id]);
+
+        // Act
+        $result = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 10);
+
+        // Assert
+        $this->assertEquals(3, $result['total']);
+        $this->assertCount(3, $result['data']);
+    }
+
+    public function test_get_paginated_addresses_paginates_correctly(): void
+    {
+        // Arrange — create 3 addresses, paginate 2 per page
+        $this->createAddress(['member_id' => $this->testMember->id]);
+        $this->createAddress(['member_id' => $this->testMember->id]);
+        $this->createAddress(['member_id' => $this->testMember->id]);
+
+        // Act
+        $page1 = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 2);
+        $page2 = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 2, 2);
+
+        // Assert
+        $this->assertCount(2, $page1['data']);
+        $this->assertCount(1, $page2['data']);
+        $this->assertEquals(2, $page1['last_page']);
+        $this->assertEquals(1, $page1['current_page']);
+        $this->assertEquals(2, $page2['current_page']);
+        $this->assertEquals(2, $page1['per_page']);
+    }
+
+    public function test_get_paginated_addresses_returns_default_first(): void
+    {
+        // Arrange
+        $nonDefault = $this->createAddress(['member_id' => $this->testMember->id, 'is_default' => false]);
+        $default = $this->createAddress(['member_id' => $this->testMember->id, 'is_default' => true]);
+
+        // Act
+        $result = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 10);
+
+        // Assert — default address should be first in the result set
+        $this->assertEquals($default->id, $result['data']->first()->id);
+    }
+
+    public function test_get_paginated_addresses_excludes_other_members(): void
+    {
+        // Arrange
+        $otherMember = $this->createMember();
+        $this->createAddress(['member_id' => $otherMember->id]);
+        $this->createAddress(['member_id' => $this->testMember->id]);
+
+        // Act
+        $result = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 10);
+
+        // Assert
+        $this->assertEquals(1, $result['total']);
+    }
+
+    public function test_get_paginated_addresses_last_page_is_at_least_one_when_empty(): void
+    {
+        // Act — no addresses exist for the member
+        $result = $this->repository->getPaginatedAddressesForMember($this->testMember->id, 1, 10);
+
+        // Assert
+        $this->assertEquals(0, $result['total']);
+        $this->assertEquals(1, $result['last_page']);
+    }
+
+    public function test_create_guest_address_sets_site_id(): void
+    {
+        // Act
+        $address = $this->repository->createGuestAddress([
+            'type' => 'shipping',
+            'address_line_1' => '10 Downing St',
+            'city' => 'London',
+            'postcode' => 'SW1A 2AA',
+            'country' => 'GB',
+        ], $this->siteId);
+
+        // Assert
+        $this->assertEquals($this->siteId, $address->site_id);
+    }
+
+    public function test_create_guest_address_sets_member_id_to_null(): void
+    {
+        // Act
+        $address = $this->repository->createGuestAddress([
+            'type' => 'shipping',
+            'address_line_1' => '10 Downing St',
+            'city' => 'London',
+            'postcode' => 'SW1A 2AA',
+            'country' => 'GB',
+        ], $this->siteId);
+
+        // Assert
+        $this->assertNull($address->member_id);
+    }
+
+    public function test_create_guest_address_sets_is_guest_flag(): void
+    {
+        // Act
+        $address = $this->repository->createGuestAddress([
+            'type' => 'billing',
+            'address_line_1' => '221B Baker St',
+            'city' => 'London',
+            'postcode' => 'NW1 6XE',
+            'country' => 'GB',
+        ], $this->siteId);
+
+        // Assert
+        $this->assertTrue((bool)$address->is_guest);
+    }
+
+    public function test_create_guest_address_persists_provided_fields(): void
+    {
+        // Arrange
+        $data = [
+            'type' => 'shipping',
+            'address_line_1' => '1 Infinite Loop',
+            'city' => 'Cupertino',
+            'postcode' => '95014',
+            'country' => 'US',
+        ];
+
+        // Act
+        $address = $this->repository->createGuestAddress($data, $this->siteId);
+
+        // Assert
+        $this->assertEquals('1 Infinite Loop', $address->address_line_1);
+        $this->assertEquals('Cupertino', $address->city);
+        $this->assertEquals('95014', $address->postcode);
+        $this->assertEquals('US', $address->country);
+    }
 }

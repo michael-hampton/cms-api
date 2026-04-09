@@ -1,13 +1,14 @@
 <?php
 
+use App\Contracts\ClockInterface;
 use App\Framework\Container;
 use App\Framework\Database\Database;
-use App\Framework\Events\EventDispatcher;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\ModelRegistry;
 use App\Framework\ServiceProvider\ServiceProviderManager;
 use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
+use App\Services\SystemClock;
 
 function bootstrapApplication(array $databaseConfig, ?Database $database = null): Container
 {
@@ -15,6 +16,11 @@ function bootstrapApplication(array $databaseConfig, ?Database $database = null)
     Logger::setLogPath('storage/logs');
 
     $container = Container::getInstance();
+
+    // Baseline bindings that must exist in every runtime (HTTP, CLI, tests).
+    // ApiApplication also binds these, but WorkflowController and console
+    // entry points may execute before those bindings are applied.
+    $container->bind(ClockInterface::class, SystemClock::class);
 
     //$container->singleton(EventDispatcher::class, new EventDispatcher());
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Console\Commands\Subscriptions;
+namespace App\Console;
 
 use App\Framework\Console\Command;
 use App\Framework\Console\ReportsCommandResult;
@@ -36,7 +36,7 @@ class RetryFailedDeliveriesCommand extends Command
 
         foreach ($failed as $delivery) {
             try {
-                dispatch(new DeliverIssueDeliveryJob($delivery->id));
+                dispatch(DeliverIssueDeliveryJob::for((int)$delivery->id))->dispatchNow();
 
                 $result->incrementSucceeded();
                 $result->addMessage("Dispatched retry job for delivery #{$delivery->id}");

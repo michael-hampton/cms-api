@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Adverts\Boost;
 
 use App\Enums\Boost\BoostStatus;
+use App\Framework\Container;
 use App\Framework\Support\Collection;
 use App\Jobs\ExpireBoostsJob;
 use App\Models\Boost;
@@ -16,6 +17,7 @@ class ExpireBoostsJobTest extends FunctionalTestCase
     public function test_expires_boosts_past_end_date(): void
     {
         $now = new \DateTimeImmutable('2026-01-10');
+        $nowUnix = $now->getTimestamp();
         $boost = new Boost(['id' => 1, 'status' => BoostStatus::Active->value]);
         $boost->id = 1;
 
@@ -23,15 +25,20 @@ class ExpireBoostsJobTest extends FunctionalTestCase
         $service = Mockery::mock(BoostService::class);
 
         $repository->shouldReceive('getExpiredBoosts')
-            ->with($now)
+            ->with(Mockery::on(fn(\DateTimeImmutable $dt) => $dt->getTimestamp() === $nowUnix))
             ->andReturn(new Collection([$boost]));
 
         $service->shouldReceive('expireBoost')
             ->once()
             ->with(1, $now);
 
-        $job = new ExpireBoostsJob($repository, $service);
-        $job->handle($now);
+        $container = Container::getInstance();
+        $container->instance(BoostRepository::class, $repository);
+        $container->instance(BoostService::class, $service);
+
+        $job = ExpireBoostsJob::for($nowUnix);
+        $job->__wakeup();
+        $job->handle();
 
         $this->assertTrue(true);
     }
@@ -39,6 +46,7 @@ class ExpireBoostsJobTest extends FunctionalTestCase
     public function test_is_idempotent_on_double_run(): void
     {
         $now = new \DateTimeImmutable('2026-01-10');
+        $nowUnix = $now->getTimestamp();
 
         $repository = Mockery::mock(BoostRepository::class);
         $service = Mockery::mock(BoostService::class);
@@ -47,9 +55,17 @@ class ExpireBoostsJobTest extends FunctionalTestCase
         $repository->shouldReceive('getExpiredBoosts')->andReturn(new Collection([]));
         $service->shouldNotReceive('expireBoost');
 
-        $job = new ExpireBoostsJob($repository, $service);
-        $job->handle($now);
-        $job->handle($now); // idempotent
+        $container = Container::getInstance();
+        $container->instance(BoostRepository::class, $repository);
+        $container->instance(BoostService::class, $service);
+
+        $job = ExpireBoostsJob::for($nowUnix);
+        $job->__wakeup();
+        $job->handle();
+
+        $job2 = ExpireBoostsJob::for($nowUnix);
+        $job2->__wakeup();
+        $job2->handle(); // idempotent
 
         $this->assertTrue(true);
     }
@@ -57,6 +73,7 @@ class ExpireBoostsJobTest extends FunctionalTestCase
     public function test_continues_when_single_boost_expiry_fails(): void
     {
         $now = new \DateTimeImmutable('2026-01-10');
+        $nowUnix = $now->getTimestamp();
         $boost1 = new Boost(['id' => 1]);
         $boost1->id = 1;
         $boost2 = new Boost(['id' => 2]);
@@ -75,8 +92,13 @@ class ExpireBoostsJobTest extends FunctionalTestCase
         $service->shouldReceive('expireBoost')
             ->with(2, $now);
 
-        $job = new ExpireBoostsJob($repository, $service);
-        $job->handle($now); // Should not throw
+        $container = Container::getInstance();
+        $container->instance(BoostRepository::class, $repository);
+        $container->instance(BoostService::class, $service);
+
+        $job = ExpireBoostsJob::for($nowUnix);
+        $job->__wakeup();
+        $job->handle(); // Should not throw
         $this->assertTrue(true);
     }
 

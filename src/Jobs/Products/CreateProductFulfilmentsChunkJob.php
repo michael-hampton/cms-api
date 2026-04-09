@@ -32,51 +32,51 @@ use App\Repositories\Product\ProductFulfilmentRunRepository;
  */
 class CreateProductFulfilmentsChunkJob extends BaseJob
 {
-    public string $queue = 'products';
+    public ?string $queue = 'products';
     public int $tries = 3;
     public int $backoff = 60;
 
+    private ProductFulfilmentRunRepository $runRepository;
+    private OrderRepository $orderRepository;
+    private OrderItemRepository $orderLineRepository;
+    private CreateProductFulfilmentAction $fulfilmentAction;
+    private Logger $logger;
+
     public function __construct(
-        private readonly ProductFulfilmentRunRepository $runRepository,
-        private readonly OrderRepository                $orderRepository,
-        private readonly OrderItemRepository            $orderLineRepository,
-        private readonly CreateProductFulfilmentAction  $fulfilmentAction,
-        private readonly Logger                         $logger,
+        private readonly int   $runId,
+        private readonly int   $orderId,
+        private readonly array $orderLineIds,
+        private readonly int   $chunkIndex,
     )
     {
     }
 
-    public function handle(
-        int   $runId,
-        int   $orderId,
-        array $orderLineIds,
-        int   $chunkIndex,
-    ): void
+    public function handle(): void
     {
-        $run = $this->runRepository->find($runId);
+        $run = $this->runRepository->find($this->runId);
 
         if (!$run) {
             $this->logger->error('CreateProductFulfilmentsChunkJob: run not found', [
-                'run_id' => $runId,
-                'chunk_index' => $chunkIndex,
+                'run_id' => $this->runId,
+                'chunk_index' => $this->chunkIndex,
             ]);
             return;
         }
 
         if ($run->isCancelled()) {
             $this->logger->info('CreateProductFulfilmentsChunkJob: run cancelled, skipping chunk', [
-                'run_id' => $runId,
-                'chunk_index' => $chunkIndex,
+                'run_id' => $this->runId,
+                'chunk_index' => $this->chunkIndex,
             ]);
             return;
         }
 
-        $order = $this->orderLineRepository->find($orderId);
+        $order = $this->orderRepository->find($this->orderId);
 
         if (!$order) {
             $this->logger->error('CreateProductFulfilmentsChunkJob: order not found', [
-                'order_id' => $orderId,
-                'run_id' => $runId,
+                'order_id' => $this->orderId,
+                'run_id' => $this->runId,
             ]);
             return;
         }
@@ -84,20 +84,20 @@ class CreateProductFulfilmentsChunkJob extends BaseJob
         $created = 0;
         $failed = 0;
 
-        foreach ($orderLineIds as $orderLineId) {
+        foreach ($this->orderLineIds as $orderLineId) {
             $orderLine = $this->orderLineRepository->find($orderLineId);
 
             if (!$orderLine) {
                 $this->logger->warning('CreateProductFulfilmentsChunkJob: order line not found', [
                     'order_line_id' => $orderLineId,
-                    'run_id' => $runId,
+                    'run_id' => $this->runId,
                 ]);
                 $failed++;
                 continue;
             }
 
             try {
-                $this->fulfilmentAction->execute($order, $orderLine, $runId);
+                $this->fulfilmentAction->execute($order, $orderLine, $this->runId);
                 $created++;
             } catch (\Throwable $e) {
                 // Non-critical per line — address missing, validation failure, etc.
@@ -105,16 +105,16 @@ class CreateProductFulfilmentsChunkJob extends BaseJob
                 $failed++;
                 $this->logger->error('CreateProductFulfilmentsChunkJob: fulfilment creation failed', [
                     'order_line_id' => $orderLineId,
-                    'order_id' => $orderId,
-                    'run_id' => $runId,
+                    'order_id' => $this->orderId,
+                    'run_id' => $this->runId,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
 
         $this->logger->info('CreateProductFulfilmentsChunkJob: chunk processed', [
-            'run_id' => $runId,
-            'chunk_index' => $chunkIndex,
+            'run_id' => $this->runId,
+            'chunk_index' => $this->chunkIndex,
             'created' => $created,
             'failed' => $failed,
         ]);
@@ -123,7 +123,7 @@ class CreateProductFulfilmentsChunkJob extends BaseJob
 
         if ($run->allChunksComplete()) {
             $this->logger->info('CreateProductFulfilmentsChunkJob: all chunks complete', [
-                'run_id' => $runId,
+                'run_id' => $this->runId,
                 'total_chunks' => $run->total_chunks,
             ]);
 

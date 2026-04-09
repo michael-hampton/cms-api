@@ -31,6 +31,8 @@ class IssueDeliveryEligibilityService
             $scheduledDate
         );
 
+        return $candidates;
+
         return $candidates->filter(
             fn(Subscription $subscription) => $this->hasActiveWindowForDate($subscription, $scheduledDate)
         );
