@@ -479,6 +479,8 @@ class PageService
             'forms.listing.useAsHero' => 'listing_use_as_hero',
             'forms.meta.content_type' => 'page_type',
             'requires_approval' => 'requires_approval',
+            'contributor_id' => 'contributor_id',
+            'is_public_contribution' => 'is_public_contribution'
         ];
 
         foreach ($fieldMappings as $path => $field) {

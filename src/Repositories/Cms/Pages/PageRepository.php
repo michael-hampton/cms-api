@@ -967,4 +967,40 @@ class PageRepository extends Repository
             'relationships'
         ])->where('page_id', $pageId)->first();
     }
+
+    /**
+     * Returns all pages owned by a specific contributor, ordered newest first.
+     * Admins call PageRepository::search(); contributors call this.
+     */
+    public function getContributorPages(int $contributorId, int $siteId): \App\Framework\Support\Collection
+    {
+        return \App\Models\Page::where('contributor_id', $contributorId)
+            ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Returns pages that are published, public contributions, and free.
+     * Used for the public contributor listing endpoint.
+     */
+    public function getPublishedContributorPages(int $siteId): \App\Framework\Support\Collection
+    {
+        return \App\Models\Page::where('site_id', $siteId)
+            ->where('status', \App\Enums\Pages\PageStatus::PUBLISHED->value)
+            ->where('is_public_contribution', true)
+            ->orderBy('published_at', 'desc')
+            ->get();
+    }
+
+    /**
+     * Confirms a given page belongs to the specified contributor.
+     * Used by the policy layer — never used to make business decisions directly.
+     */
+    public function isOwnedByContributor(int $pageId, int $contributorId): bool
+    {
+        return \App\Models\Page::where('id', $pageId)
+            ->where('contributor_id', $contributorId)
+            ->exists();
+    }
 }

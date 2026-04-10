@@ -55,7 +55,11 @@ class Page extends Model
         'zones',
         'scheduled_at',
         'owner_id',
-        'brief_id'
+        'brief_id',
+        'is_paid',
+        'price',
+        'contributor_id',
+        'is_public_contribution'
     ];
 
     protected $alwaysInclude = [
@@ -91,6 +95,8 @@ class Page extends Model
         'requires_approval' => 'boolean',
         'approved_at' => 'datetime',
         'zones' => 'json',
+        'is_paid' => 'boolean',
+        'is_public_contribution' => 'boolean'
     ];
 
     public function blocks(bool $relation = false)

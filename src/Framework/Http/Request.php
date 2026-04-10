@@ -18,6 +18,7 @@ class Request implements RequestInterface
     public AuthenticatedUser|User|null $user = null;
     private $headers;
     private string $path;
+    private string $rawBody;
     /**
      * @var \App\Framework\Support\Collection|bool|\DateTime|float|int|mixed|string|null
      */
@@ -26,6 +27,7 @@ class Request implements RequestInterface
     public function __construct(array $data = [], array $files = [], array $routeParams = [])
     {
         $this->routeParams = $routeParams;
+        $this->rawBody = file_get_contents('php://input');
         $this->headers = [];
 
         if (function_exists('getallheaders')) {
@@ -512,5 +514,10 @@ class Request implements RequestInterface
         return $this->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
             $this->getHeader('Content-Type') === 'application/json' ||
             str_contains($this->getHeader('Accept') ?? '', 'application/json');
+    }
+
+    public function getContent(): string
+    {
+        return $this->rawBody;
     }
 }

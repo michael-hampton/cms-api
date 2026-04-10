@@ -11,7 +11,8 @@ class User extends Model
         'role',
         'is_active',
         'site_id',
-        'avatar'
+        'avatar',
+        'is_contributor'
     ];
 
     protected $hidden = [
@@ -23,6 +24,7 @@ class User extends Model
         'email_verified_at' => 'datetime',
         'is_active' => 'boolean',
         'password' => 'hashed',
+        'is_contributor' => 'boolean'
     ];
 
     public $table = 'users';

@@ -48,6 +48,11 @@ use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferStatisticsDetailController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
+use App\Controllers\OpenCollab\ArticlePaymentController;
+use App\Controllers\OpenCollab\ContributorDashboardController;
+use App\Controllers\OpenCollab\ContributorPageController;
+use App\Controllers\OpenCollab\InvitationController;
+use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\Product\MerchantContactController;
 use App\Controllers\Product\MerchantController;
 use App\Controllers\Product\MerchantImportController;
@@ -100,12 +105,60 @@ $router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowCon
 $router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
 
+$router->post(
+    '/api/{site}/open-collab/pages/{pageId}/purchase',
+    [ArticlePaymentController::class, 'initiate']
+);
+
+// Guest: accept an invitation and register
+$router->post(
+    '/api/{site}/open-collab/invitations/{token}/accept',
+    [InvitationController::class, 'accept']
+);
+
+// Stripe webhook — must NOT be behind auth middleware
+$router->post(
+    '/api/{site}/open-collab/stripe/webhook',
+    [StripeWebhookController::class, 'handle']
+);
+
 
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
 
     // Pages API
     $router->group(['prefix' => '{siteName}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
+
+        $router->post(
+            '/open-collab/invitations',
+            [InvitationController::class, 'store']
+        );
+
+        $router->get(
+            '/open-collab/dashboard',
+            [ContributorDashboardController::class, 'show']
+        );
+
+        // Contributor pages (articles)
+        $router->get(
+            '/open-collab/pages',
+            [ContributorPageController::class, 'index']
+        );
+
+        $router->post(
+            '/open-collab/pages',
+            [ContributorPageController::class, 'store']
+        );
+
+        $router->put(
+            '/open-collab/pages/{id}',
+            [ContributorPageController::class, 'update']
+        );
+
+        $router->delete(
+            '/open-collab/pages/{id}',
+            [ContributorPageController::class, 'destroy']
+        );
 
         // crm
         $router->get('/crm/members', [CrmMemberController::class, 'index']);
