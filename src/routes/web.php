@@ -57,6 +57,10 @@ use App\Controllers\Offers\BundleListController;
 use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferListController;
 use App\Controllers\Offers\ProductOfferController;
+use App\Controllers\OpenCollab\ArticlePageController;
+use App\Controllers\OpenCollab\DashboardPageController;
+use App\Controllers\OpenCollab\InvitationPageController;
+use App\Controllers\OpenCollab\OnboardingPageController;
 use App\Controllers\Product\MerchantDashboardController;
 use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
@@ -550,4 +554,15 @@ $router->get('/go/{type}/{id}', [AdvertTrackingController::class, 'handle'])
     ->middleware([
         // 'throttle:60,1',  // Uncomment and tune — prevents click flooding
     ]);
+
+$router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show'])->name('onboarding');
+$router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index'])->name('dashboard');
+$router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
+$router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);
+$router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
+$router->get('/{site}/open-collab/admin/invitations', [InvitationPageController::class, 'index'])->name('admin.invitations');
+// Guest-accessible Web route
+$router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageController::class, 'showAcceptForm'])
+    ->name('invitations.accept');
+$router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings'])->name('contributor.earnings');
 

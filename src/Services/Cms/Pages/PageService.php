@@ -480,7 +480,9 @@ class PageService
             'forms.meta.content_type' => 'page_type',
             'requires_approval' => 'requires_approval',
             'contributor_id' => 'contributor_id',
-            'is_public_contribution' => 'is_public_contribution'
+            'is_public_contribution' => 'is_public_contribution',
+            'is_paid' => 'is_paid',
+            'price' => 'price'
         ];
 
         foreach ($fieldMappings as $path => $field) {

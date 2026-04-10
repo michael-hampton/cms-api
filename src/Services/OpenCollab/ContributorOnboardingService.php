@@ -59,22 +59,22 @@ class ContributorOnboardingService
 
         $profile = $this->profileRepository->findByUserId($userId);
 
-        if (!$profile || empty($profile->bio)) {
+        if (!$profile || !$profile->bio) {
             $pending[] = 'profile';
         }
 
-        if ($site->require_payment_setup && !$this->profileRepository->isPaymentSetup($userId)) {
+        if (($site->require_payment_setup ?? true) && !$this->profileRepository->isPaymentSetup($userId)) {
             $pending[] = 'payment';
         }
 
-        if ($site->require_contracts) {
+        if (($site->require_contracts ?? true)) {
             $contract = $this->contractRepository->latestForSite($site->id);
             if ($contract && !$this->contractRepository->hasSigned($userId, $contract->id)) {
                 $pending[] = 'contract';
             }
         }
 
-        if ($site->require_guidelines_ack) {
+        if (($site->require_guidelines_ack ?? true)) {
             $latestVersion = (int)($site->guidelines_version ?? 1);
             $acknowledgedVer = $this->guidelinesRepository->latestAcknowledgedVersion($userId, $site->id);
             if ($acknowledgedVer < $latestVersion) {

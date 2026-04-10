@@ -48,10 +48,12 @@ use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferStatisticsDetailController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
+use App\Controllers\OpenCollab\ActivityFeedController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\InvitationController;
+use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\Product\MerchantContactController;
 use App\Controllers\Product\MerchantController;
@@ -1027,4 +1029,45 @@ $router->get('/api/{siteName}/recommendations/products', [RecommendationControll
 
 $router->get('/api/{site}/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
 $router->get('/api/{site}/address-lookup', [AddressController::class, 'lookup']);
+
+$router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router) {
+
+    // Epic 2: Onboarding API (Targets OnboardingController)
+    $router->group(['prefix' => 'onboarding'], function () use ($router) {
+        $router->get('/status', [OnboardingController::class, 'status']);
+        $router->post('/profile', [OnboardingController::class, 'storeProfile']);
+        $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
+        $router->post('/contract', [OnboardingController::class, 'signContract']);
+        $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);
+    });
+
+    // Epic 3: Article Management (Targets ContributorPageController)
+    //$router->apiResource('pages', ContributorPageController::class);
+
+    // Epic 4: Payments (Targets ArticlePaymentController)
+    $router->post('/pages/{id}/purchase', [ArticlePaymentController::class, 'initiate']);
+
+    // Activity Feed (Targets ActivityFeedController)
+    $router->get('/activity', [ActivityFeedController::class, 'index']);
+    $router->get('/activity/site', [ActivityFeedController::class, 'siteWide']); // Admin only
+
+    // Invitations (Targets InvitationController)
+    $router->post('/invitations', [InvitationController::class, 'store']);
+
+    // POST /api/{site}/open-collab/pages 
+    // Triggers: ContributorPageController@store
+    $router->post('/pages', [ContributorPageController::class, 'store']);
+
+    // PUT /api/{site}/open-collab/pages/{id}
+    // Triggers: ContributorPageController@update
+    $router->put('/pages/{id}', [ContributorPageController::class, 'update']);
+
+    // DELETE /api/{site}/open-collab/pages/{id}
+    // Triggers: ContributorPageController@destroy
+    $router->delete('/pages/{id}', [ContributorPageController::class, 'destroy']);
+
+    $router->post('/invitations', [\App\Controllers\OpenCollab\InvitationController::class, 'store']);
+
+    $router->post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
+});
 
