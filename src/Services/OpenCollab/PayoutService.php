@@ -1,0 +1,192 @@
+<?php
+
+namespace App\Services\OpenCollab;
+
+use App\Enums\OpenCollab\PayoutStatus;
+use App\Events\OpenCollab\PayoutProcessedEvent;
+use App\Events\OpenCollab\PayoutRequestedEvent;
+use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
+use App\Repositories\OpenCollab\ArticlePaymentRepository;
+use App\Repositories\OpenCollab\EarningsLedgerRepository;
+use App\Repositories\OpenCollab\PayoutRepository;
+
+/**
+ * Manual/batch payout management. No Stripe Connect involved.
+ *
+ * Balance calculation:
+ *   available balance = total earnings from ledger
+ *                     − total paid payouts
+ *                     − total in-flight payouts (pending + approved)
+ *
+ * This ensures a contributor cannot request more than they have available,
+ * and prevents double-requesting while a payout is in flight.
+ *
+ * Lifecycle: request → (admin approves) → (admin marks paid)
+ */
+class PayoutService
+{
+    // Minimum balance required before a payout can be requested (pence).
+    private const MINIMUM_PAYOUT_PENCE = 5000; // £50.00
+
+    public function __construct(
+        private readonly PayoutRepository         $payoutRepository,
+        private readonly EarningsLedgerRepository $ledgerRepository,
+        private readonly ArticlePaymentRepository $paymentRepository,
+        private readonly EventDispatcher          $eventDispatcher,
+        private readonly Database                 $database,
+    )
+    {
+    }
+
+    /**
+     * Contributor requests a payout for their full available balance.
+     *
+     * @throws \InvalidArgumentException if balance is below the minimum
+     * @throws \RuntimeException if there is already a payout in flight
+     */
+    public function requestPayout(int $userId, int $siteId, string $method): \App\Models\Payout
+    {
+        $available = $this->availableBalance($userId);
+
+        if ($available < self::MINIMUM_PAYOUT_PENCE) {
+            throw new \InvalidArgumentException(
+                "Minimum payout is £" . number_format(self::MINIMUM_PAYOUT_PENCE / 100, 2) .
+                ". Current available balance: £" . number_format($available / 100, 2) . "."
+            );
+        }
+
+        $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
+        if ($inFlight > 0) {
+            throw new \RuntimeException(
+                "A payout of £" . number_format($inFlight / 100, 2) . " is already in progress."
+            );
+        }
+
+        $payout = $this->database->transaction(function () use ($userId, $siteId, $method, $available): \App\Models\Payout {
+            return $this->payoutRepository->create([
+                'user_id' => $userId,
+                'site_id' => $siteId,
+                'amount' => $available,
+                'currency' => 'GBP',
+                'status' => PayoutStatus::Pending->value,
+                'method' => $method,
+            ]);
+        });
+
+        $this->eventDispatcher->dispatch(new PayoutRequestedEvent($payout, $userId));
+
+        return $payout;
+    }
+
+    /**
+     * Available balance in pence for a contributor.
+     * = ledger balance − already paid − in-flight
+     */
+    public function availableBalance(int $userId): int
+    {
+        $ledgerBalance = $this->ledgerRepository->balanceForContributor($userId);
+        $paid = $this->payoutRepository->totalPaidForContributor($userId);
+        $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
+
+        return max(0, $ledgerBalance - $paid - $inFlight);
+    }
+
+    /**
+     * Admin approves a pending payout.
+     *
+     * @throws \InvalidArgumentException if payout is not pending
+     */
+    public function approve(int $payoutId, int $adminId): \App\Models\Payout
+    {
+        $payout = $this->payoutRepository->find($payoutId);
+
+        if (!$payout) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
+        }
+
+        if (!$payout->isPending()) {
+            throw new \InvalidArgumentException(
+                "Payout [{$payoutId}] cannot be approved from status [{$payout->status}]."
+            );
+        }
+
+        return $this->database->transaction(function () use ($payout, $adminId): \App\Models\Payout {
+            $this->payoutRepository->update($payout->id, [
+                'status' => PayoutStatus::Approved->value,
+                'approved_by' => $adminId,
+                'approved_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return $this->payoutRepository->find($payout->id);
+        });
+    }
+
+    /**
+     * Admin marks an approved payout as paid.
+     * Records the payment reference for the audit trail.
+     *
+     * @throws \InvalidArgumentException if payout is not approved
+     */
+    public function markPaid(int $payoutId, int $adminId, ?string $reference = null, ?string $notes = null): \App\Models\Payout
+    {
+        $payout = $this->payoutRepository->find($payoutId);
+
+        if (!$payout) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
+        }
+
+        if (!$payout->isApproved()) {
+            throw new \InvalidArgumentException(
+                "Payout [{$payoutId}] cannot be marked as paid from status [{$payout->status}]."
+            );
+        }
+
+        $payout = $this->database->transaction(function () use ($payout, $adminId, $reference, $notes): \App\Models\Payout {
+            $this->payoutRepository->update($payout->id, [
+                'status' => PayoutStatus::Paid->value,
+                'paid_by' => $adminId,
+                'processed_at' => date('Y-m-d H:i:s'),
+                'reference' => $reference,
+                'notes' => $notes,
+            ]);
+
+            return $this->payoutRepository->find($payout->id);
+        });
+
+        $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId));
+
+        return $payout;
+    }
+
+    /**
+     * Admin rejects a pending payout (e.g. missing bank details).
+     *
+     * @throws \InvalidArgumentException if payout is not pending
+     */
+    public function reject(int $payoutId, int $adminId, string $reason): \App\Models\Payout
+    {
+        $payout = $this->payoutRepository->find($payoutId);
+
+        if (!$payout) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
+        }
+
+        if (!$payout->isPending()) {
+            throw new \InvalidArgumentException(
+                "Payout [{$payoutId}] cannot be rejected from status [{$payout->status}]."
+            );
+        }
+
+        return $this->database->transaction(function () use ($payout, $adminId, $reason): \App\Models\Payout {
+            $this->payoutRepository->update($payout->id, [
+                'status' => PayoutStatus::Rejected->value,
+                'rejected_by' => $adminId,
+                'rejected_at' => date('Y-m-d H:i:s'),
+                'rejection_reason' => $reason,
+            ]);
+
+            return $this->payoutRepository->find($payout->id);
+        });
+    }
+}

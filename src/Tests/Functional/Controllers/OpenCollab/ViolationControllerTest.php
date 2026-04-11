@@ -1,0 +1,134 @@
+<?php
+
+namespace App\Tests\Functional\Controllers\OpenCollab;
+
+use App\Enums\OpenCollab\ViolationAction;
+use App\Models\ContributorViolation;
+use App\Models\Site;
+use App\Models\User;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+
+class ViolationControllerTest extends FunctionalTestCase
+{
+    use CreatesTestData;
+
+    private User $contributor;
+
+    public function test_index_lists_violations_for_contributor_on_current_site(): void
+    {
+        $siteViolation = ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'spam',
+            'severity' => 'low',
+            'reason' => 'Repeated low-quality spam content.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $otherSite = Site::create(['name' => 'Other Site', 'slug' => 'other-site-violations', 'is_default' => false]);
+        ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $otherSite->id,
+            'type' => 'policy',
+            'severity' => 'medium',
+            'reason' => 'Different site violation reason.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $response = $this->getForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations");
+        $data = json_decode($response->getContent(), true);
+        $items = array_values(array_filter($data, static fn($key) => is_int($key), ARRAY_FILTER_USE_KEY));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $items);
+        $this->assertEquals($siteViolation->id, $items[0]['id']);
+    }
+
+    public function test_store_records_violation_and_deactivates_user_when_threshold_triggers_ban(): void
+    {
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
+            'type' => 'plagiarism',
+            'severity' => 'high',
+            'reason' => 'Plagiarised article copied from another publication.',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $this->assertDatabaseHas('oc_contributor_violations', [
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'action_taken' => ViolationAction::Ban->value,
+        ]);
+        $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 0]);
+    }
+
+    public function test_store_returns_422_for_invalid_payload(): void
+    {
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
+            'type' => 'spam',
+            'severity' => 'low',
+            'reason' => 'short',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_store_returns_validation_errors_for_invalid_enum_values(): void
+    {
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
+            'type' => 'fake',
+            'severity' => 'severe',
+            'reason' => 'This reason is long enough to pass length validation.',
+            'action_taken' => 'delete',
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertEquals('Validation failed', $data['error']);
+        $this->assertArrayHasKey('type', $data['errors']);
+        $this->assertArrayHasKey('severity', $data['errors']);
+        $this->assertArrayHasKey('action_taken', $data['errors']);
+    }
+
+    public function test_resolve_marks_violation_resolved_and_reactivates_user(): void
+    {
+        $violation = ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'policy',
+            'severity' => 'medium',
+            'reason' => 'Serious policy breach requiring suspension.',
+            'action_taken' => ViolationAction::Suspension->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $this->contributor->update(['is_active' => false]);
+
+        $response = $this->postForSite("/api/open-collab/admin/violations/{$violation->id}/resolve", [
+            'notes' => 'Issue investigated and cleared.',
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseHas('oc_contributor_violations', [
+            'id' => $violation->id,
+            'resolved_by' => $this->authenticatedUser->id,
+            'resolution_notes' => 'Issue investigated and cleared.',
+        ]);
+        $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 1]);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->contributor = $this->createUser([
+            'email' => 'violations@example.com',
+            'role' => 'contributor',
+            'is_contributor' => true,
+            'is_active' => true,
+        ]);
+    }
+}

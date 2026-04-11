@@ -49,12 +49,16 @@ use App\Controllers\Offers\OfferStatisticsDetailController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ActivityFeedController;
+use App\Controllers\OpenCollab\AdminContributorController;
+use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\OnboardingController;
+use App\Controllers\OpenCollab\PayoutController;
 use App\Controllers\OpenCollab\StripeWebhookController;
+use App\Controllers\OpenCollab\ViolationController;
 use App\Controllers\Product\MerchantContactController;
 use App\Controllers\Product\MerchantController;
 use App\Controllers\Product\MerchantImportController;
@@ -160,6 +164,121 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete(
             '/open-collab/pages/{id}',
             [ContributorPageController::class, 'destroy']
+        );
+
+        $router->get(
+            '/open-collab/admin/contributors',
+            [AdminContributorController::class, 'index']
+        );
+
+        $router->get(
+            '/open-collab/admin/contributors/{id}',
+            [AdminContributorController::class, 'show']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{id}/deactivate',
+            [AdminContributorController::class, 'deactivate']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{id}/reactivate',
+            [AdminContributorController::class, 'reactivate']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{id}/close',
+            [AdminContributorController::class, 'close']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{id}/grant-access',
+            [AdminContributorController::class, 'grantAccess']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{id}/revoke-access',
+            [AdminContributorController::class, 'revokeAccess']
+        );
+
+        $router->get(
+            '/open-collab/admin/invitations',
+            [AdminContributorController::class, 'invitations']
+        );
+
+        $router->post(
+            '/open-collab/admin/invitations/{id}/resend',
+            [AdminContributorController::class, 'resendInvitation']
+        );
+
+        $router->delete(
+            '/open-collab/admin/invitations/{id}',
+            [AdminContributorController::class, 'revokeInvitation']
+        );
+
+        $router->get(
+            '/open-collab/admin/articles/pending',
+            [ArticleApprovalController::class, 'pending']
+        );
+
+        $router->post(
+            '/open-collab/admin/articles/{id}/approve',
+            [ArticleApprovalController::class, 'approve']
+        );
+
+        $router->post(
+            '/open-collab/admin/articles/{id}/reject',
+            [ArticleApprovalController::class, 'reject']
+        );
+
+        $router->post(
+            '/open-collab/pages/{id}/submit',
+            [ArticleApprovalController::class, 'submit']
+        );
+
+        $router->post(
+            '/open-collab/pages/{id}/resubmit',
+            [ArticleApprovalController::class, 'resubmit']
+        );
+
+        $router->get(
+            '/open-collab/payouts/balance',
+            [PayoutController::class, 'balance']
+        );
+
+        $router->post(
+            '/open-collab/payouts',
+            [PayoutController::class, 'request']
+        );
+
+        $router->post(
+            '/open-collab/admin/payouts/{id}/approve',
+            [PayoutController::class, 'approve']
+        );
+
+        $router->post(
+            '/open-collab/admin/payouts/{id}/paid',
+            [PayoutController::class, 'markPaid']
+        );
+
+        $router->post(
+            '/open-collab/admin/payouts/{id}/reject',
+            [PayoutController::class, 'reject']
+        );
+
+        $router->get(
+            '/open-collab/admin/contributors/{userId}/violations',
+            [ViolationController::class, 'index']
+        );
+
+        $router->post(
+            '/open-collab/admin/contributors/{userId}/violations',
+            [ViolationController::class, 'store']
+        );
+
+        $router->post(
+            '/open-collab/admin/violations/{id}/resolve',
+            [ViolationController::class, 'resolve']
         );
 
         // crm
@@ -1045,7 +1164,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     //$router->apiResource('pages', ContributorPageController::class);
 
     // Epic 4: Payments (Targets ArticlePaymentController)
-    $router->post('/pages/{id}/purchase', [ArticlePaymentController::class, 'initiate']);
+    $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
 
     // Activity Feed (Targets ActivityFeedController)
     $router->get('/activity', [ActivityFeedController::class, 'index']);
@@ -1070,4 +1189,3 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     $router->post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 });
-
