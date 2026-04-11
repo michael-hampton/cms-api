@@ -25,7 +25,7 @@ class ArticleCommentRepositoryTest extends RepositoryTestCase
         ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user2->id, 'content' => 'Reply', 'parent_id' => $parent->id]);
 
         // Act
-        $comments = $this->repository->forArticle(1);
+        $comments = $this->repository->forArticle($this->page->id);
 
         // Assert
         $this->assertCount(1, $comments);
@@ -37,9 +37,23 @@ class ArticleCommentRepositoryTest extends RepositoryTestCase
         $parent = ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user->id, 'content' => 'Parent', 'parent_id' => null]);
         ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user2->id, 'content' => 'Reply', 'parent_id' => $parent->id]);
 
-        $comments = $this->repository->forArticle(1);
+        $comments = $this->repository->forArticle($this->page->id);
 
         $this->assertCount(1, $comments->first()->replies);
+    }
+
+    public function test_for_article_eager_loads_user_relationship(): void
+    {
+        ArticleComment::create([
+            'article_id' => $this->page->id,
+            'user_id' => $this->user->id,
+            'content' => 'Parent',
+            'parent_id' => null,
+        ]);
+
+        $comments = $this->repository->forArticle($this->page->id);
+
+        $this->assertRelationLoaded($comments->first(), 'user');
     }
 
     public function test_for_article_does_not_return_comments_for_other_articles(): void
@@ -53,12 +67,13 @@ class ArticleCommentRepositoryTest extends RepositoryTestCase
 
     public function test_for_article_orders_by_created_at_asc(): void
     {
-        ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user->id, 'content' => 'Second', 'parent_id' => null, 'created_at' => '2024-06-01']);
-        ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user->id, 'content' => 'First', 'parent_id' => null, 'created_at' => '2024-01-01']);
+        $older = ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user->id, 'content' => 'Older', 'parent_id' => null]);
+        $newer = ArticleComment::create(['article_id' => $this->page->id, 'user_id' => $this->user->id, 'content' => 'Newer', 'parent_id' => null]);
 
-        $comments = $this->repository->forArticle(1);
+        $comments = $this->repository->forArticle($this->page->id);
 
-        $this->assertEquals('First', $comments->first()->content);
+        $this->assertEquals($newer->id, $comments->first()->id);
+        $this->assertEquals($older->id, $comments->last()->id);
     }
 
     public function test_add_comment_creates_top_level_comment(): void
@@ -92,8 +107,11 @@ class ArticleCommentRepositoryTest extends RepositoryTestCase
     {
         parent::setUp();
         $this->repository = new ArticleCommentRepository();
-        $this->page = $this->createPage();
         $this->user = $this->createUser();
         $this->user2 = $this->createUser();
+        $this->page = $this->createPage([
+            'created_by' => $this->user->id,
+            'updated_by' => $this->user->id,
+        ]);
     }
 }

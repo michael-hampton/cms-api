@@ -14,7 +14,7 @@ class ArticleCommentRepository extends Repository
     {
         return ArticleComment::where('article_id', $articleId)
             ->whereNull('parent_id')
-            ->with(['replies'])
+            ->with(['replies', 'user'])
             ->orderBy('id', 'desc')
             ->get();
     }

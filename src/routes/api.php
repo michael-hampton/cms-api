@@ -51,6 +51,8 @@ use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ActivityFeedController;
 use App\Controllers\OpenCollab\AdminContributorController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
+use App\Controllers\OpenCollab\ArticleCommentController;
+use App\Controllers\OpenCollab\ArticleHistoryController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
@@ -1165,6 +1167,14 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     //$router->apiResource('pages', ContributorPageController::class);
 
     // Epic 4: Payments (Targets ArticlePaymentController)
+    $router->post('/pages/{pageId}/comments', [ArticleCommentController::class, 'store']);
+    $router->get('/pages/{pageId}/comments', [ArticleCommentController::class, 'index']);
+    $router->post('/pages/{pageId}/comments/{id}/reply', [ArticleCommentController::class, 'reply']);
+    $router->delete('/comments/{id}', [ArticleCommentController::class, 'destroy']);
+
+    $router->get('/pages/{pageId}/history', [ArticleHistoryController::class, 'index']);
+    $router->post('/pages/{pageId}/history/{historyId}/restore', [ArticleHistoryController::class, 'restore']);
+
     $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
 
     $router->post('/auth/login', [ContributorAuthController::class, 'login']);

@@ -4,8 +4,8 @@ namespace App\Models;
 
 class PageHistory extends Model
 {
+    public $timestamps = false;
     protected $table = 'page_history';
-
     protected $fillable = [
         'page_id',
         'user_id',
@@ -18,14 +18,11 @@ class PageHistory extends Model
         'user_agent',
         'created_at'
     ];
-
     protected $casts = [
         'changes' => 'array',
         'snapshot' => 'array',
         'created_at' => 'date'
     ];
-
-    public $timestamps = false;
 
     public function page($relation = false)
     {
@@ -67,6 +64,10 @@ class PageHistory extends Model
 
     public function getUserName(): string
     {
+        if (is_array($this->user)) {
+            return $this->user['name'];
+        }
+
         if ($this->user) {
             return $this->user->name;
         }

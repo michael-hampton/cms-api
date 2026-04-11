@@ -117,6 +117,8 @@ abstract class FunctionalTestCase extends TestCase
      */
     protected function actingAs(?User $user = null): self
     {
+        Auth::$user = null;
+
         if ($user === null) {
 
             // Create or get a test user

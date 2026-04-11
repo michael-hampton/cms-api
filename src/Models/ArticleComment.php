@@ -40,4 +40,9 @@ class ArticleComment extends Model
     {
         return $this->parent_id !== null;
     }
+
+    public function user(): ?Model
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
+    }
 }
