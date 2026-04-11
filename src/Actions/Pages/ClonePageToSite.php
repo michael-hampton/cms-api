@@ -108,8 +108,31 @@ class ClonePageToSite
 
             $this->historyService->logPageClonedToSite($sourcePage->id, $newPage->id, $targetSiteId);
 
+            $clonedPage = $this->pageRepository->getCompletePageData($newPage->id);
+
+            if ($clonedPage && empty($clonedPage->authors) && !empty($clonedPage->pageAuthors)) {
+                $authors = $clonedPage->pageAuthors
+                    ->map(function ($pageAuthor) {
+                        $author = $pageAuthor->author;
+
+                        if (!$author) {
+                            return null;
+                        }
+
+                        $data = is_array($author) ? $author : $author->toArray();
+                        $data['role'] = $pageAuthor->role;
+                        $data['sort_order'] = $pageAuthor->sort_order;
+
+                        return $data;
+                    })
+                    ->filter()
+                    ->values();
+
+                $clonedPage->setRelation('authors', $authors);
+            }
+
             return [
-                'page' => $this->pageRepository->getCompletePageData($newPage->id),
+                'page' => $clonedPage,
                 'results' => $relationResults,
                 'original_page_id' => $sourcePage->id,
                 'original_site_id' => $sourcePage->site_id,

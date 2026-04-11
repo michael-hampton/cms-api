@@ -7,7 +7,6 @@ trait TracksCreator
     protected static function bootTracksCreator(): void
     {
         static::creating(function ($model) {
-
             if (!$model->created_by && auth()->check()) {
                 $model->created_by = auth()->id();
             }

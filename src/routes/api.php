@@ -401,7 +401,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->get('/members', MemberController::class, 'search');
 
-        $router->get('/pages', PageController::class, 'index');
+        $router->get('/pages', [PageController::class, 'index']);
         $router->post('/pages', PageController::class, 'store', [AuthenticateWithToken::class]);
         $router->post('/pages/bulk-update', PageController::class, 'bulkUpdate', [AuthenticateWithToken::class]);
         $router->get('/pages/block-types', PageController::class, 'getAvailableBlockTypes', [AuthenticateWithToken::class]);

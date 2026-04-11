@@ -523,7 +523,15 @@ class PageRepository extends Repository
             // Create if doesn't exist
             if (!$targetAuthor) {
                 $authorData = $sourceAuthor->toArray();
-                unset($authorData['id'], $authorData['created_at'], $authorData['updated_at']);
+                unset(
+                    $authorData['id'],
+                    $authorData['created_at'],
+                    $authorData['updated_at'],
+                    $authorData['url'],
+                    $authorData['total_published_articles'],
+                    $authorData['total_published_reviews'],
+                    $authorData['years_of_experience']
+                );
                 $authorData['site_id'] = $targetSiteId;
 
                 $targetAuthor = Author::create($authorData);
@@ -535,7 +543,6 @@ class PageRepository extends Repository
                 'author_id' => $targetAuthor->id,
                 'role' => $pageAuthor->role,
                 'sort_order' => $pageAuthor->sort_order,
-                'site_id' => $targetSiteId
             ]);
         }
     }

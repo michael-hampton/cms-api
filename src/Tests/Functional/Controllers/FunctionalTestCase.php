@@ -138,6 +138,7 @@ abstract class FunctionalTestCase extends TestCase
         }
 
         $this->authenticatedUser = $user;
+        Auth::login($user->toArray());
 
         // Generate a test token (you may need to adjust based on your token generation logic)
         $this->authToken = $this->generateTestToken($user);
