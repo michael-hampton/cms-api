@@ -31,11 +31,9 @@ class AdminContractController extends Controller
      */
     public function index(): JsonResponse
     {
-        $contracts = \App\Models\Contract::where('site_id', SiteContext::getId())
-            ->orderByDesc('version')
-            ->get();
+        $contracts = $this->contractRepository->getContractsForSite(SiteContext::getId());
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $contracts->map(fn($c) => $this->formatContract($c))->toArray()
         );
     }

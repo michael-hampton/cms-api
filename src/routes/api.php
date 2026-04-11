@@ -286,6 +286,32 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ViolationController::class, 'resolve']
         );
 
+        $router->post(
+            '/api/{site}/open-collab/contributor-requests',
+            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'store']
+        );
+
+// ── Invitation self-service resend (public — no auth) ────────────────
+        $router->post(
+            '/api/{site}/open-collab/invitations/resend',
+            [\App\Controllers\OpenCollab\ResendInvitationController::class, 'resend']
+        );
+
+// ── Admin: contributor request queue ─────────────────────────────────
+// (add inside the authenticated admin group)
+        $router->get(
+            '/open-collab/admin/contributor-requests',
+            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'index']
+        );
+        $router->post(
+            '/open-collab/admin/contributor-requests/{id}/approve',
+            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'approve']
+        );
+        $router->post(
+            '/open-collab/admin/contributor-requests/{id}/reject',
+            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'reject']
+        );
+
         // crm
         $router->get('/crm/members', [CrmMemberController::class, 'index']);
         $router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
@@ -1214,4 +1240,14 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->post('/invitations', [\App\Controllers\OpenCollab\InvitationController::class, 'store']);
 
     $router->post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
+
+    $router->post(
+        '/contributor-requests',
+        [\App\Controllers\OpenCollab\ContributorRequestController::class, 'store']
+    );
+
+    $router->post(
+        '/invitations/resend',
+        [\App\Controllers\OpenCollab\ResendInvitationController::class, 'resend']
+    );
 });

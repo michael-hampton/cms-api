@@ -90,6 +90,11 @@ class Auth
         return !self::check();
     }
 
+    public static function getUser()
+    {
+        return User::where('id', Session::get('user_id'))->first();
+    }
+
     public static function user(): ?AuthenticatedUser
     {
         if (self::$user !== null) {

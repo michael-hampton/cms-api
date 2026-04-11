@@ -38,7 +38,7 @@ class AdminGuidelinesController extends Controller
     {
         $guidelines = $this->guidelinesContentRepository->allForSite(SiteContext::getId());
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $guidelines->map(fn($g) => $this->formatGuideline($g))->toArray()
         );
     }

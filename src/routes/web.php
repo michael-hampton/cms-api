@@ -570,4 +570,23 @@ $router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageCo
 $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings'])->name('contributor.earnings');
 $router->get('/{site}/open-collab/login', [\App\Controllers\OpenCollab\ContributorLoginPageController::class, 'login'])->name('contributor.login');
 $router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
+$router->get('/{site}/open-collab/admin/articles/pending',
+    [\App\Controllers\OpenCollab\Admin\AdminArticlePageController::class, 'pending'])
+    ->name('admin.articles.pending');
+
+$router->get('/{site}/open-collab/admin/contracts',
+    [\App\Controllers\OpenCollab\Admin\AdminContractPageController::class, 'index'])
+    ->name('admin.contracts');
+
+$router->get('/{site}/open-collab/admin/guidelines',
+    [\App\Controllers\OpenCollab\Admin\AdminGuidelinesPageController::class, 'index'])
+    ->name('admin.guidelines');
+
+$router->get('/{site}/open-collab/request-access',
+    [\App\Controllers\OpenCollab\ContributorRequestPageController::class, 'show'])
+    ->name('contributor.request-access');
+
+$router->get('/{site}/open-collab/resend-invitation',
+    [\App\Controllers\OpenCollab\ResendInvitationPageController::class, 'show'])
+    ->name('contributor.resend-invitation');
 

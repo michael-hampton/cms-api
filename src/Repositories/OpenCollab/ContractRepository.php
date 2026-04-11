@@ -2,6 +2,7 @@
 
 namespace App\Repositories\OpenCollab;
 
+use App\Framework\Support\Collection;
 use App\Models\Contract;
 use App\Models\UserContractSignature;
 use App\Repositories\Repository;
@@ -14,6 +15,13 @@ class ContractRepository extends Repository
         return Contract::where('site_id', $siteId)
             ->orderByDesc('version')
             ->first();
+    }
+
+    public function getContractsForSite(int $siteId): ?Collection
+    {
+        return \App\Models\Contract::where('site_id', $siteId)
+            ->orderByDesc('version')
+            ->get();
     }
 
     public function hasSigned(int $userId, int $contractId): bool
