@@ -567,4 +567,5 @@ $router->get('/{site}/open-collab/admin/invitations', [InvitationPageController:
 $router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageController::class, 'showAcceptForm'])
     ->name('invitations.accept');
 $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings'])->name('contributor.earnings');
+$router->get('/{site}/open-collab/login', [\App\Controllers\OpenCollab\ContributorLoginPageController::class, 'login'])->name('contributor.login');
 

@@ -52,6 +52,7 @@ use App\Controllers\OpenCollab\ActivityFeedController;
 use App\Controllers\OpenCollab\AdminContributorController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
+use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\InvitationController;
@@ -1165,6 +1166,9 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     // Epic 4: Payments (Targets ArticlePaymentController)
     $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
+
+    $router->post('/auth/login', [ContributorAuthController::class, 'login']);
+    $router->post('/auth/logout', [ContributorAuthController::class, 'logout']);
 
     // Activity Feed (Targets ActivityFeedController)
     $router->get('/activity', [ActivityFeedController::class, 'index']);

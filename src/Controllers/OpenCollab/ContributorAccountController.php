@@ -3,27 +3,25 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
-use App\Enums\OpenCollab\ActivityEventType;
 use App\Framework\Authorization\Auth;
-use App\Framework\Database\Database;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Models\User;
-use App\Repositories\Cms\UserRepositoryInterface;
-use App\Repositories\OpenCollab\ActivityRepository;
+use App\Requests\OpenCollab\CloseContributorAccountRequest;
+use App\Services\OpenCollab\ContributorTerminationService;
 
 /**
- * Handles contributor account lifecycle operations.
+ * Handles contributor self-service account closure.
  *
- * Account closure is a REQUEST, not an immediate delete.
- * Reasons:
- *   - Contributor agreements may require content retention.
- *   - Outstanding earnings must be resolved.
- *   - GDPR right-to-erasure is a separate process with its own timeline.
+ * Account closure is immediate — it calls ContributorTerminationService which:
+ *   1. Deactivates the account (is_active = false)
+ *   2. Revokes site access
+ *   3. Cancels in-flight payouts
+ *   4. Archives unpublished pages
+ *   5. Fires ContributorAccountClosedEvent (notifies admin, etc.)
  *
- * The request is logged in the activity feed and the user's is_active flag
- * is set to false. Permanent deletion is a manual admin action.
+ * This is intentionally irreversible through the normal UI.
  *
  * Routes:
  *   POST /api/{site}/open-collab/contributor/close-account
@@ -31,10 +29,8 @@ use App\Repositories\OpenCollab\ActivityRepository;
 class ContributorAccountController extends Controller
 {
     public function __construct(
-        private readonly UserRepositoryInterface $userRepository,
-        private readonly ActivityRepository      $activityRepository,
-        private readonly Database                $database,
-        private readonly Logger                  $logger,
+        private readonly ContributorTerminationService $terminationService,
+        private readonly Logger                        $logger,
     )
     {
         parent::__construct();
@@ -43,12 +39,11 @@ class ContributorAccountController extends Controller
     /**
      * POST /api/{site}/open-collab/contributor/close-account
      *
-     * Records an account closure request. Does NOT immediately delete the user.
-     * Sets is_active = false to block login and schedules review by admins.
-     *
-     * Audit trail: the reason and notes are logged to the activity feed.
+     * Immediately closes the authenticated contributor's account.
+     * Uses ContributorTerminationService so all side-effects are handled
+     * consistently regardless of whether closure is self-service or admin-initiated.
      */
-    public function requestClosure(): JsonResponse
+    public function requestClosure(CloseContributorAccountRequest $request): JsonResponse
     {
         $userId = Auth::id();
 
@@ -56,52 +51,34 @@ class ContributorAccountController extends Controller
             return $this->errorResponse('Unauthenticated.', 401);
         }
 
-        $reason = $_POST['reason'] ?? (json_decode(file_get_contents('php://input'), true)['reason'] ?? '');
-        $notes = $_POST['notes'] ?? (json_decode(file_get_contents('php://input'), true)['notes'] ?? '');
-
-        if (empty($reason)) {
-            return $this->errorResponse('A reason is required.', 422);
-        }
-
         try {
-            $this->database->transaction(function () use ($userId, $reason, $notes): void {
-                // Deactivate the account
-                $user = User::find($userId);
-                if ($user) {
-                    $user->update(['is_active' => false]);
-                }
+            $data = $request->validated();
 
-                // Write audit record into the activity feed
-                $this->activityRepository->record(
-                    siteId: SiteContext::getId(),
-                    userId: $userId,
-                    type: ActivityEventType::InvitationAccepted, // reuse closest type or add AccountClosureRequested
-                    payload: [
-                        'event' => 'account_closure_requested',
-                        'reason' => $reason,
-                        'notes' => $notes,
-                        'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
-                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
-                        'timestamp' => date('Y-m-d H:i:s'),
-                    ],
-                );
-            });
+            $this->terminationService->close(
+                userId: $userId,
+                siteId: SiteContext::getId(),
+                adminId: $userId, // self-initiated: the actor is the contributor themselves
+                reason: $data['reason'],
+            );
 
-            $this->logger->info('Contributor account closure requested.', [
+            return $this->successResponse(
+                'Your account has been closed. Thank you for contributing.'
+            );
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\RuntimeException $e) {
+            $this->logger->error('Contributor self-service account closure failed.', [
                 'user_id' => $userId,
                 'site_id' => SiteContext::getId(),
-                'reason' => $reason,
-            ]);
-
-            return $this->successResponse('Account closure request received. Our team will be in touch within 2 business days.');
-
-        } catch (\Exception $e) {
-            $this->logger->error('Account closure request failed.', [
-                'user_id' => $userId,
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->errorResponse('Could not process your request. Please try again.', 500);
+            return $this->errorResponse(
+                'Could not process your request. Please try again or contact support.',
+                500
+            );
         }
     }
 }
