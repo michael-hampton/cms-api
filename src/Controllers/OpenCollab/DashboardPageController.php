@@ -14,16 +14,20 @@ class DashboardPageController extends Controller
     public function __construct(
         private readonly PageRepository     $pageRepository,
         private readonly EarningsService    $earningsService,
-        private readonly ActivityRepository $activityRepository
+        private readonly ActivityRepository $activityRepository,
     )
     {
         parent::__construct();
     }
 
+    /**
+     * GET /contributor/dashboard
+     */
     public function index()
     {
+        $this->requireAuth();
+
         $userId = Auth::id();
-        $userId = 1; //todo needs login
         $siteId = SiteContext::getId();
 
         return $this->view('open-collab.dashboard.show', [
@@ -33,28 +37,37 @@ class DashboardPageController extends Controller
                 'breakdown' => $this->earningsService->earningsBreakdownForContributor($userId),
             ],
             'activity' => $this->activityRepository->forContributor($userId, 10),
+            'currentUser' => Auth::user(),
         ]);
     }
 
+    /**
+     * GET /contributor/earnings
+     */
     public function earnings()
     {
+        $this->requireAuth();
+
         $userId = Auth::id();
-
-        // Using the service you already have
         $total = $this->earningsService->totalEarningsForContributor($userId);
-        $breakdown = $this->earningsService->earningsBreakdownForContributor($userId);
-
-        // Mocking pending for now, or fetch from a PayoutService if you have one
-        $pending = $total;
 
         return $this->view('open-collab.dashboard.earnings', [
             'earnings' => [
                 'total' => $total,
-                'breakdown' => $breakdown,
-                'pending' => $pending
+                'breakdown' => $this->earningsService->earningsBreakdownForContributor($userId),
+                'pending' => $total, // TODO: replace with a dedicated PayoutService balance
             ],
-            //'payment_details' => $this->profileRepository->getPaymentDetails($userId), // todo
-            'site' => SiteContext::slug()
+            'paymentDetails' => null, // TODO: inject ContributorProfileRepository if needed
+            'currentUser' => Auth::user(),
+            'site' => SiteContext::slug(),
         ]);
+    }
+
+    private function requireAuth(): void
+    {
+        if (!Auth::check()) {
+            header('Location: /login?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
+            exit;
+        }
     }
 }

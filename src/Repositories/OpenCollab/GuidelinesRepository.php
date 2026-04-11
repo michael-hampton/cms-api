@@ -26,6 +26,14 @@ class GuidelinesRepository extends Repository
             ->max('version');
     }
 
+    public function getForUser(int $userId, int $siteId): UserGuidelinesAcknowledgement
+    {
+        return UserGuidelinesAcknowledgement::where('user_id', $userId)
+            ->where('site_id', $siteId)
+            ->orderByDesc('version')
+            ->first();
+    }
+
     public function record(int $userId, int $siteId, int $version): UserGuidelinesAcknowledgement
     {
         $ack = new UserGuidelinesAcknowledgement();

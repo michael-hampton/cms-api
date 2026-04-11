@@ -108,7 +108,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->invitationRepository
             ->shouldReceive('markAsUsed')
-            ->with(5)
+            ->with(5, 10)
             ->once();
 
         $user = $this->service->accept('valid-token', 'Jane Doe', 'secret123');

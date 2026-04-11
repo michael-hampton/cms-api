@@ -2,6 +2,7 @@
 
 namespace App\Repositories\OpenCollab;
 
+use App\Enums\OpenCollab\InvitationStatus;
 use App\Models\Invitation;
 use App\Repositories\Repository;
 
@@ -10,9 +11,6 @@ class InvitationRepository extends Repository
     /**
      * Returns true if a live (pending, non-expired, non-revoked) invitation
      * exists for the given email on the given site.
-     *
-     * Previous implementation ignored $siteId and returned a model instance,
-     * making the truthy check wrong for expired/used records.
      */
     public function hasPendingInviteForEmail(string $email, int $siteId): bool
     {
@@ -30,10 +28,20 @@ class InvitationRepository extends Repository
         return Invitation::where('token', $token)->first();
     }
 
-    public function markAsUsed(int $id): void
+    /**
+     * Marks the invitation as used.
+     *
+     * @param int $id Invitation ID
+     * @param int $acceptedBy User ID of whoever accepted:
+     *                         - new contributor (self-service)
+     *                         - admin user ID (on-behalf acceptance)
+     */
+    public function markAsUsed(int $id, int $acceptedBy): void
     {
         Invitation::where('id', $id)->update([
             'used_at' => date('Y-m-d H:i:s'),
+            'accepted_by' => $acceptedBy,
+            'accepted_at' => date('Y-m-d H:i:s'),
         ]);
     }
 
@@ -46,14 +54,32 @@ class InvitationRepository extends Repository
     }
 
     /**
+     * How many invitations for this site are currently expired (but not revoked/used).
+     * Used by cron jobs for monitoring — no status column to update since
+     * status is derived from expires_at at read time.
+     */
+    public function countExpired(int $siteId): int
+    {
+        return (int)Invitation::where('site_id', $siteId)
+            ->whereNull('used_at')
+            ->whereNull('revoked_at')
+            ->where('expires_at', '<', date('Y-m-d H:i:s'))
+            ->count();
+    }
+
+    /**
      * Returns all invitations for a site, ordered newest first.
-     * Used by the admin invitation list.
      */
     public function getAllForSite(int $siteId): \App\Framework\Support\Collection
     {
         return Invitation::where('site_id', $siteId)
             ->orderBy('id', 'desc')
             ->get();
+    }
+
+    public function resolveStatus(Invitation $invitation): InvitationStatus
+    {
+        return $invitation->resolveStatus();
     }
 
     protected function getModelClass(): string

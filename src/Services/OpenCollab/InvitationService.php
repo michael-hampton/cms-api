@@ -16,9 +16,11 @@ use App\Repositories\OpenCollab\InvitationRepository;
  * Responsibilities:
  *   - Creating invitations (admin action)
  *   - Revoking invitations (admin action)
- *   - Accepting invitations (registers a contributor user)
+ *   - Accepting invitations (self-service: guest registers themselves)
+ *   - Admin accepting on behalf (admin creates the user for an invitee)
  *
- * Two writes in accept() → wrapped in a transaction.
+ * Both acceptance paths record accepted_by so there is always a clear
+ * audit trail of who consumed a given invitation token.
  */
 class InvitationService
 {
@@ -31,34 +33,34 @@ class InvitationService
     }
 
     /**
-     * Admin revokes an outstanding invitation.
+     * Admin creates an invitation for an email address.
      *
-     * @throws \InvalidArgumentException if the invitation does not exist or is already used
+     * @throws \InvalidArgumentException if a live invitation already exists
      */
-    public function revoke(int $invitationId, int $revokedBy): void
+    public function create(string $email, int $invitedBy, int $siteId, int $ttlHours = 72): Model
     {
-        $invitation = $this->invitationRepository->find($invitationId);
-
-        if (!$invitation) {
-            throw new \InvalidArgumentException("Invitation not found.");
+        if ($this->invitationRepository->hasPendingInviteForEmail($email, $siteId)) {
+            throw new \InvalidArgumentException(
+                "A pending invitation already exists for {$email}."
+            );
         }
 
-        $status = $this->invitationRepository->resolveStatus($invitation);
-
-        if ($status === InvitationStatus::Used) {
-            throw new \InvalidArgumentException("Cannot revoke an invitation that has already been used.");
-        }
-
-        $this->invitationRepository->revoke($invitationId, $revokedBy);
+        return $this->invitationRepository->create([
+            'site_id' => $siteId,
+            'email' => $email,
+            'token' => $this->generateToken(),
+            'invited_by' => $invitedBy,
+            'status' => InvitationStatus::Pending->value,
+            'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
+        ]);
     }
 
     /**
-     * Guest accepts an invitation and becomes a contributor user.
+     * Guest accepts their own invitation and registers.
      *
-     * Wraps two writes (create user + mark invite used) in a transaction.
-     * Returns the newly created User so the controller can immediately issue a token.
+     * accepted_by = the newly created user (self-acceptance).
      *
-     * @throws InvalidInvitationException with specific reason (Expired, Revoked, Used)
+     * @throws InvalidInvitationException
      */
     public function accept(string $token, string $name, string $password): User
     {
@@ -84,33 +86,81 @@ class InvitationService
                 'is_contributor' => true,
             ]);
 
-            $this->invitationRepository->markAsUsed($invitation->id);
+            // Record who accepted and when
+            $this->invitationRepository->markAsUsed(
+                id: $invitation->id,
+                acceptedBy: $user->id,
+            );
 
             return $user;
         });
     }
 
     /**
-     * Admin creates an invitation for a given email address.
+     * Admin accepts an invitation on behalf of the invitee.
      *
-     * @throws \InvalidArgumentException if a live invitation already exists for this email
+     * Used when an admin wants to provision an account without requiring
+     * the invitee to go through the self-service flow.
+     *
+     * accepted_by = the admin user ID (not the new contributor).
+     *
+     * @throws InvalidInvitationException
+     * @throws \InvalidArgumentException  if adminId is not provided
      */
-    public function create(string $email, int $invitedBy, int $siteId, int $ttlHours = 72): Model
+    public function acceptOnBehalf(string $token, string $name, string $temporaryPassword, int $adminId): User
     {
-        if ($this->invitationRepository->hasPendingInviteForEmail($email, $siteId)) {
-            throw new \InvalidArgumentException(
-                "A pending invitation already exists for {$email}."
-            );
+        $invitation = $this->invitationRepository->findByToken($token);
+
+        if (!$invitation) {
+            throw new InvalidInvitationException(InvitationStatus::Expired);
         }
 
-        return $this->invitationRepository->create([
-            'site_id' => $siteId,
-            'email' => $email,
-            'token' => $this->generateToken(),
-            'invited_by' => $invitedBy,
-            'status' => InvitationStatus::Pending->value,
-            'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
-        ]);
+        $status = $invitation->resolveStatus();
+
+        if ($status !== InvitationStatus::Pending) {
+            throw new InvalidInvitationException($status);
+        }
+
+        return $this->database->transaction(function () use ($invitation, $name, $temporaryPassword, $adminId): User {
+            $user = $this->userRepository->create([
+                'site_id' => $invitation->site_id,
+                'name' => $name,
+                'email' => $invitation->email,
+                'password' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+                'role' => 'contributor',
+                'is_contributor' => true,
+            ]);
+
+            // accepted_by = admin who created the account on behalf
+            $this->invitationRepository->markAsUsed(
+                id: $invitation->id,
+                acceptedBy: $adminId,
+            );
+
+            return $user;
+        });
+    }
+
+    /**
+     * Admin revokes an outstanding invitation.
+     *
+     * @throws \InvalidArgumentException if already used
+     */
+    public function revoke(int $invitationId, int $revokedBy): void
+    {
+        $invitation = $this->invitationRepository->find($invitationId);
+
+        if (!$invitation) {
+            throw new \InvalidArgumentException('Invitation not found.');
+        }
+
+        $status = $invitation->resolveStatus();
+
+        if ($status === InvitationStatus::Used) {
+            throw new \InvalidArgumentException('Cannot revoke an invitation that has already been used.');
+        }
+
+        $this->invitationRepository->revoke($invitationId, $revokedBy);
     }
 
     private function generateToken(): string

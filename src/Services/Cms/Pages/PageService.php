@@ -463,6 +463,7 @@ class PageService
         $fieldMappings = [
             'forms.main.title' => 'title',
             'forms.main.subtitle' => 'subtitle',
+            'forms.main.content' => 'content',
             'forms.main.owner' => 'owner_id',
             'hero_type' => 'hero_type',
             'brief_id' => 'brief_id',

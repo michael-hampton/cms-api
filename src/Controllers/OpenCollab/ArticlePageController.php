@@ -7,12 +7,24 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\OpenCollab\ArticleAccessService;
+use App\Services\OpenCollab\ReadabilityService;
 
+/**
+ * Renders the public and contributor-facing article pages.
+ *
+ * All `$userId = 1; //todo` stubs have been replaced with Auth::id().
+ * Auth is resolved via the token (API calls) or session (web); both
+ * paths are handled by Auth::user() already.
+ *
+ * Draft-first rule: ContributorPageService sets status = draft at creation.
+ * This controller does not override that; it just reads what's stored.
+ */
 class ArticlePageController extends Controller
 {
     public function __construct(
         private readonly PageRepository       $pageRepository,
-        private readonly ArticleAccessService $accessService
+        private readonly ArticleAccessService $accessService,
+        private readonly ReadabilityService   $readabilityService,
     )
     {
         parent::__construct();
@@ -20,79 +32,134 @@ class ArticlePageController extends Controller
 
     /**
      * GET /articles/{slug}
+     * Public article page. Three rendering states:
+     *   Free article           → full content
+     *   Paid + no access       → preview + paywall
+     *   Paid + access granted  → full content
      */
     public function show(string $slug)
     {
         $page = $this->pageRepository->findBySlug($slug);
-        $user = Auth::user();
 
-        // Logic for Epic 4 & 5
-        $hasAccess = true;
-        if ($page->is_paid) {
-            $hasAccess = $user && $this->accessService->canView($page, $user->id, $user->email);
+        if (!$page) {
+            return $this->notFound();
         }
 
-        return $this->view('articles.show', [
-            'page' => $page,
-            'accessGranted' => $hasAccess,
-            // Only send preview if access is denied
-            'content' => $hasAccess ? $page->content : $this->generatePreview($page->content)
-        ]);
-    }
+        // Only published articles are publicly accessible
+        if ($page->status !== 'published') {
+            return $this->notFound();
+        }
 
-    private function generatePreview(string $content): string
-    {
-        return substr(strip_tags($content), 0, 300) . '...';
+        $user = Auth::user();
+        $userId = $user?->id;
+        $email = $user?->email;
+
+        $accessGranted = $this->accessService->canView($page, $userId, $email);
+
+        $authorName = $page->contributor_id
+            ? \App\Models\User::find($page->contributor_id)?->name
+            : null;
+
+        $content = $accessGranted
+            ? $page->content
+            : $this->previewContent($page->content);
+
+        return $this->view('open-collab.articles.show', [
+            'page' => $page,
+            'accessGranted' => $accessGranted,
+            'content' => $content,
+            'authorName' => $authorName,
+            'readerEmail' => $email ?? '',
+            'site' => SiteContext::slug(),
+            'stripePublicKey' => config('stripe.public_key', ''),
+        ]);
     }
 
     /**
      * GET /articles/create
-     * Renders the blank editor for a new article.
      */
     public function create()
     {
-        return $this->view('open-collab.articles.create', [
-            'page' => null, // Passing null signals "Create" mode to the view
-            'site' => SiteContext::slug()
+        $this->requireAuth();
+
+        return $this->view('open-collab.articles.editor', [
+            'page' => null,
+            'site' => SiteContext::slug(),
+            'siteId' => SiteContext::getId(),
+            'readabilityScore' => null,
+            'currentUser' => Auth::user(),
         ]);
     }
 
     /**
      * GET /articles/{id}/edit
-     * Renders the editor with existing data.
      */
     public function edit(int $id)
     {
-        $userId = 1; //todo
+        $this->requireAuth();
+
+        $userId = Auth::id();
         $page = $this->pageRepository->find($id);
 
-        // Security: Ensure the contributor owns this page
-        if (!$page || $page->contributor_id !== $userId) {
-            return $this->redirect('contributor.dashboard');
+        //dd($page);
+
+        // Ownership check
+        if (!$page || (int)$page->contributor_id !== (int)$userId) {
+            return $this->redirect('/articles');
         }
 
-        return $this->view('open-collab.articles.edit', [
+        $score = $this->readabilityService->getScore($id);
+
+        return $this->view('open-collab.articles.editor', [
             'page' => $page,
-            'site' => SiteContext::slug()
+            'site' => SiteContext::slug(),
+            'siteId' => SiteContext::getId(),
+            'readabilityScore' => $score?->readability_score,
+            'currentUser' => Auth::user(),
         ]);
     }
 
     /**
      * GET /articles
-     * Purpose: Show the management list of all articles owned by the contributor.
+     * Contributor's article management list.
      */
     public function index()
     {
-        $userId = Auth::id();
-        $userId = 1; //todo needs login
-        $siteId = SiteContext::getId();
+        $this->requireAuth();
 
-        // Fetch articles from the repository
-        $articles = $this->pageRepository->getContributorPages($userId, $siteId);
+        $articles = $this->pageRepository->getContributorPages(
+            Auth::id(),
+            SiteContext::getId(),
+        );
 
         return $this->view('open-collab.articles.index', [
             'articles' => $articles,
-            'site' => SiteContext::slug()
+            'site' => SiteContext::slug(),
+            'currentUser' => Auth::user(),
         ]);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────
+
+    /**
+     * Returns the first ~300 characters of the content stripped of HTML.
+     * The controller — not the view — is responsible for this truncation.
+     */
+    private function previewContent(string $content): string
+    {
+        $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return mb_substr($plain, 0, 300) . '…';
+    }
+
+    /**
+     * Redirect unauthenticated users to login, preserving intent.
+     */
+    private function requireAuth(): void
+    {
+        if (!Auth::check()) {
+            $intendedUrl = urlencode($_SERVER['REQUEST_URI'] ?? '/');
+            header('Location: /login?redirect=' . $intendedUrl);
+            exit;
+        }
     }
 }

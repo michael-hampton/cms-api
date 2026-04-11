@@ -3,7 +3,6 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
-use App\Framework\AuthenticatedUser;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
@@ -14,7 +13,7 @@ class OnboardingPageController extends Controller
 {
     public function __construct(
         private readonly ContributorOnboardingService $onboardingService,
-        private ContractRepository                    $contractRepository
+        private readonly ContractRepository $contractRepository,
     )
     {
         parent::__construct();
@@ -22,29 +21,51 @@ class OnboardingPageController extends Controller
 
     /**
      * GET /onboarding
-     * The single entry point for the onboarding flow.
      */
     public function show()
     {
-        Auth::$user = new AuthenticatedUser(1, 'Michael Hampton', 'michaelhamptondesign@yahoo.com'); //todo login needs plugging in
+        $this->requireAuth();
+
         $userId = Auth::id();
         $site = Site::find(SiteContext::getId());
+
+        if (!$site) {
+            return $this->serverError('Site configuration missing.');
+        }
 
         $pending = $this->onboardingService->pendingSteps($userId, $site);
 
         if (empty($pending)) {
-            return $this->redirect('contributor.dashboard');
+            header('Location: /contributor/dashboard');
+            exit;
         }
 
-        // The current step is always the first one in the pending list
         $currentStep = $pending[0];
 
         return $this->view('open-collab.onboarding.index', [
             'currentStep' => $currentStep,
             'pendingSteps' => $pending,
             'site' => SiteContext::slug(),
-            // Pass specific data needed for steps (e.g. the contract text)
-            'contract' => $currentStep === 'contract' ? $this->contractRepository->latestForSite(SiteContext::getId()) : null,
+            'contract' => $currentStep === 'contract'
+                ? $this->contractRepository->latestForSite($site->id)
+                : null,
+            'siteGuidelinesVersion' => (int)($site->guidelines_version ?? 1),
+            'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
+            'currentUser' => Auth::user(),
         ]);
+    }
+
+    private function requireAuth(): void
+    {
+        if (!Auth::check()) {
+            header('Location: /login?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
+            exit;
+        }
+    }
+
+    private function serverError(string $msg)
+    {
+        http_response_code(500);
+        return $this->view('errors.500', ['message' => $msg]);
     }
 }

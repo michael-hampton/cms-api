@@ -58,6 +58,7 @@ use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferListController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ArticlePageController;
+use App\Controllers\OpenCollab\ContributorAccountPageController;
 use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
 use App\Controllers\OpenCollab\OnboardingPageController;
@@ -556,6 +557,7 @@ $router->get('/go/{type}/{id}', [AdvertTrackingController::class, 'handle'])
     ]);
 
 $router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show'])->name('onboarding');
+$router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index'])->name('settings');
 $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index'])->name('dashboard');
 $router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
 $router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);

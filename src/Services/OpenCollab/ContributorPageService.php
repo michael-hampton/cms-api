@@ -73,6 +73,7 @@ class ContributorPageService
 
         $wasPublished = $page->status === PageStatus::PUBLISHED->value;
         $requestData = $this->injectContributorDefaults($requestData, $contributorId);
+        $requestData['id'] = $pageId;
 
         $updated = $this->pageService->updatePageWithAllData($pageId, $requestData, $siteId, $page);
 

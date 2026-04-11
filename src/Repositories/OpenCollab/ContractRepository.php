@@ -23,6 +23,13 @@ class ContractRepository extends Repository
             ->exists();
     }
 
+    public function getForUser(int $userId, int $contractId): UserContractSignature
+    {
+        return UserContractSignature::where('user_id', $userId)
+            ->where('contract_id', $contractId)
+            ->first();
+    }
+
     public function recordSignature(int $userId, int $contractId, string $ipAddress): UserContractSignature
     {
         $signature = new UserContractSignature();

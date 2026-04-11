@@ -83,7 +83,7 @@ class InvitationRepositoryTest extends RepositoryTestCase
     {
         $inv = $this->makeInvitation();
 
-        $this->repository->markAsUsed($inv->id);
+        $this->repository->markAsUsed($inv->id, $this->user->id);
 
         $this->assertDatabaseHas('oc_invitations', [
             'id' => $inv->id,
