@@ -7,6 +7,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Repositories\OpenCollab\PayoutRepository;
 use App\Requests\OpenCollab\MarkPayoutPaidRequest;
 use App\Requests\OpenCollab\RequestPayoutRequest;
 use App\Services\OpenCollab\PayoutService;
@@ -24,13 +25,28 @@ use App\Services\OpenCollab\PayoutService;
 class PayoutController extends Controller
 {
     public function __construct(
-        private readonly PayoutService $payoutService,
+        private readonly PayoutService    $payoutService,
+        private readonly PayoutRepository $payoutRepository,
     )
     {
         parent::__construct();
     }
 
     // ── Contributor endpoints ─────────────────────────────────────────────────
+
+    /**
+     * GET /api/{site}/open-collab/payouts
+     * Returns the authenticated contributor's payout history, newest first.
+     */
+    public function index(): JsonResponse
+    {
+        $userId = Auth::id();
+        $payouts = $this->payoutRepository->forContributor($userId);
+
+        return $this->resourceResponse(
+            $payouts->map(fn($p) => $this->formatPayout($p))->toArray()
+        );
+    }
 
     /**
      * GET /api/{site}/open-collab/payouts/balance
@@ -75,10 +91,34 @@ class PayoutController extends Controller
 
     // ── Admin endpoints ───────────────────────────────────────────────────────
 
+    /**
+     * GET /api/{site}/open-collab/admin/payouts
+     * All payouts for the site, paginated, newest first.
+     */
+    public function adminIndex(): JsonResponse
+    {
+        $perPage = (int)($_GET['per_page'] ?? 25);
+        $payouts = $this->payoutRepository->forSite(SiteContext::getId(), $perPage);
+
+        // forSite returns a paginated array from the framework
+        $items = is_array($payouts) ? ($payouts['data'] ?? $payouts) : $payouts;
+
+        if (is_object($items) && method_exists($items, 'toArray')) {
+            $items = $items->toArray();
+        }
+
+        return $this->resourceResponse(
+            array_map(fn($p) => $this->formatPayout(
+                is_array($p) ? (object)$p : $p
+            ), (array)$items)
+        );
+    }
+
     private function formatPayout(\App\Models\Payout $payout): array
     {
         return [
             'id' => $payout->id,
+            'user_id' => $payout->user_id,
             'amount_pence' => $payout->amount,
             'amount_pounds' => number_format($payout->amount / 100, 2, '.', ''),
             'currency' => $payout->currency,

@@ -49,6 +49,8 @@ use App\Controllers\Offers\OfferStatisticsDetailController;
 use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ActivityFeedController;
+use App\Controllers\OpenCollab\Admin\AdminContractController;
+use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\AdminContributorController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticleCommentController;
@@ -1162,6 +1164,16 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);
     });
+
+    $router->get('/admin/contracts', [AdminContractController::class, 'index']);
+    $router->get('/admin/contracts/latest', [AdminContractController::class, 'latest']);
+    $router->post('/admin/contracts', [AdminContractController::class, 'store']);
+    $router->get('/admin/contracts/{id}', [AdminContractController::class, 'show']);
+
+    $router->get('/admin/guidelines', [AdminGuidelinesController::class, 'index']);
+    $router->get('/admin/guidelines/latest', [AdminGuidelinesController::class, 'latest']);
+    $router->post('/admin/guidelines', [AdminGuidelinesController::class, 'store']);
+    $router->get('/admin/guidelines/{id}', [AdminGuidelinesController::class, 'show']);
 
     // Epic 3: Article Management (Targets ContributorPageController)
     //$router->apiResource('pages', ContributorPageController::class);

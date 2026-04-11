@@ -62,6 +62,7 @@ use App\Controllers\OpenCollab\ContributorAccountPageController;
 use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
 use App\Controllers\OpenCollab\OnboardingPageController;
+use App\Controllers\OpenCollab\PayoutPageController;
 use App\Controllers\Product\MerchantDashboardController;
 use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
@@ -568,4 +569,5 @@ $router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageCo
     ->name('invitations.accept');
 $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings'])->name('contributor.earnings');
 $router->get('/{site}/open-collab/login', [\App\Controllers\OpenCollab\ContributorLoginPageController::class, 'login'])->name('contributor.login');
+$router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
 
