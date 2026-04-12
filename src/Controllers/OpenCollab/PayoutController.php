@@ -103,14 +103,8 @@ class PayoutController extends Controller
         // forSite returns a paginated array from the framework
         $items = is_array($payouts) ? ($payouts['data'] ?? $payouts) : $payouts;
 
-        if (is_object($items) && method_exists($items, 'toArray')) {
-            $items = $items->toArray();
-        }
-
-        return $this->resourceResponse(
-            array_map(fn($p) => $this->formatPayout(
-                is_array($p) ? (object)$p : $p
-            ), (array)$items)
+        return $this->jsonResponse(
+            $items->map(fn($p) => $this->formatPayout($p))->all()
         );
     }
 

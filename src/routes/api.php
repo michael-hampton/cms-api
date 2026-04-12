@@ -50,8 +50,8 @@ use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ActivityFeedController;
 use App\Controllers\OpenCollab\Admin\AdminContractController;
+use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
-use App\Controllers\OpenCollab\AdminContributorController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticleCommentController;
 use App\Controllers\OpenCollab\ArticleHistoryController;
@@ -59,6 +59,7 @@ use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorPageController;
+use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\PayoutController;
@@ -254,6 +255,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post(
             '/open-collab/payouts',
             [PayoutController::class, 'request']
+        );
+
+        $router->get(
+            '/open-collab/admin/payouts',
+            [PayoutController::class, 'adminIndex']
         );
 
         $router->post(
@@ -1241,7 +1247,13 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     // Triggers: ContributorPageController@destroy
     $router->delete('/pages/{id}', [ContributorPageController::class, 'destroy']);
 
-    $router->post('/invitations', [\App\Controllers\OpenCollab\InvitationController::class, 'store']);
+    $router->post('/invitations', [InvitationController::class, 'store']);
+
+    $router->post('/disputes', [EarningsDisputeController::class, 'store']);
+    $router->post('/admin/disputes/{id}/reject', [EarningsDisputeController::class, 'reject']);
+    $router->post('/admin/disputes/{id}/resolve', [EarningsDisputeController::class, 'resolve']);
+
+    $router->post('/admin/payment-terms', [\App\Controllers\OpenCollab\Admin\AdminPaymentTermsController::class, 'save']);
 
     $router->post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 

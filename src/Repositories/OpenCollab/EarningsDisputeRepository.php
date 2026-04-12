@@ -4,11 +4,12 @@ namespace App\Repositories\OpenCollab;
 
 use App\Enums\OpenCollab\DisputeStatus;
 use App\Models\EarningsDispute;
+use App\Models\Model;
 use App\Repositories\Repository;
 
 class EarningsDisputeRepository extends Repository
 {
-    public function createForUser(int $userId, int $ledgerId, string $reason): EarningsDispute
+    public function createForUser(int $userId, int $ledgerId, string $reason): Model
     {
         return $this->create([
             'user_id' => $userId,
@@ -48,10 +49,10 @@ class EarningsDisputeRepository extends Repository
     public function openForSite(int $siteId): \App\Framework\Support\Collection
     {
         return EarningsDispute::where('status', DisputeStatus::Open->value)
-            ->join('earnings_ledger', 'earnings_ledger.id', '=', 'earnings_disputes.earnings_ledger_id')
-            ->where('earnings_ledger.user_id', '>', 0) // scoped join to confirm ledger row exists
-            ->orderBy('earnings_disputes.created_at')
-            ->select('earnings_disputes.*')
+            ->join('oc_earnings_ledger', 'oc_earnings_ledger.id', '=', 'oc_earnings_disputes.earnings_ledger_id')
+            ->where('oc_earnings_ledger.user_id', '>', 0) // scoped join to confirm ledger row exists
+            ->orderBy('oc_earnings_disputes.created_at')
+            ->select('oc_earnings_disputes.*')
             ->get();
     }
 

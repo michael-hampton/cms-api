@@ -51,8 +51,8 @@ class AdminPayoutPageController extends Controller
 
     private function requireAdmin(): void
     {
-        $user = Auth::user();
-        if (!$user || !in_array($user->role ?? '', ['admin', 'agent'], true)) {
+        $user = Auth::getUser();
+        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
             header('Location: /login');
             exit;
         }

@@ -602,6 +602,30 @@ $router->get('/{site}/open-collab/admin/contributor-requests',
     [\App\Controllers\OpenCollab\Admin\AdminContributorRequestPageController::class, 'index'])
     ->name('admin.violations');
 
+$router->get('/{site}/open-collab/admin/disputes',
+    [\App\Controllers\OpenCollab\Admin\AdminDisputePageController::class, 'index'])
+    ->name('admin.disputes');
+
+$router->get('/{site}/open-collab/disputes',
+    [\App\Controllers\OpenCollab\ContributorDisputePageController::class, 'index'])
+    ->name('admin.disputes');
+
+$router->get('/{site}/open-collab/admin/payment-terms',
+    [\App\Controllers\OpenCollab\Admin\AdminPaymentTermsPageController::class, 'index'])
+    ->name('admin.payment-terms');
+
+$router->get('/{site}/open-collab/admin/payouts',
+    [\App\Controllers\OpenCollab\Admin\AdminPayoutPageController::class, 'index'])
+    ->name('admin.payouts');
+
+$router->get('/{site}/open-collab/admin/payouts/scheduled',
+    [\App\Controllers\OpenCollab\Admin\AdminScheduledPayoutsPageController::class, 'index'])
+    ->name('admin.scheduled');
+
+$router->get('/{site}/open-collab/earnings',
+    [\App\Controllers\OpenCollab\ContributorEarningsPageController::class, 'index'])
+    ->name('admin.earnings');
+
 $router->get('/{site}/open-collab/request-access',
     [\App\Controllers\OpenCollab\ContributorRequestPageController::class, 'show'])
     ->name('contributor.request-access');

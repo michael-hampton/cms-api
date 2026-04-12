@@ -24,6 +24,7 @@ class Payout extends Model
         'rejected_by',
         'rejected_at',
         'rejection_reason',
+        'created_at'
     ];
 
     protected $casts = [

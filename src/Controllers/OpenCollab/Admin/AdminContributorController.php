@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\OpenCollab;
+namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;

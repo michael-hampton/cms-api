@@ -27,7 +27,7 @@
 
             <div class="oc-sidebar__section-label">Content</div>
 
-            <a href="/admin/articles/pending"
+            <a href="/<?= $site ?>/open-collab/admin/articles/pending"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'articles' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
@@ -42,7 +42,7 @@
 
             <div class="oc-sidebar__section-label">Contributors</div>
 
-            <a href="/admin/contributors"
+            <a href="/<?= $site ?>/open-collab/admin/contributors"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'contributors' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
@@ -50,7 +50,7 @@
                 Contributors
             </a>
 
-            <a href="/admin/invitations"
+            <a href="/<?= $site ?>/open-collab/admin/invitations"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'invitations' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
@@ -59,7 +59,7 @@
                 Invitations
             </a>
 
-            <a href="/admin/violations"
+            <a href="/<?= $site ?>/open-collab/admin/violations"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'violations' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
@@ -69,7 +69,7 @@
                 Violations
             </a>
 
-            <a href="/admin/contributor-requests"
+            <a href="/<?= $site ?>/open-collab/admin/contributor-requests"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'contributor-requests' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
@@ -79,19 +79,9 @@
                 Requests
             </a>
 
-            <a href="/admin/contributors"
-               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'contributor-requests' ? 'active' : '' ?>">
-                <svg viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                          clip-rule="evenodd"/>
-                </svg>
-                Contributors
-            </a>
-
             <div class="oc-sidebar__section-label">Finance</div>
 
-            <a href="/admin/payouts"
+            <a href="/<?= $site ?>/open-collab/admin/payouts"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'payouts' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
@@ -102,9 +92,20 @@
                 Payouts
             </a>
 
+            <a href="/<?= $site ?>/open-collab/admin/disputes"
+               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'disputes' ? 'active' : '' ?>">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.077 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.077-2.354-1.253V5z"
+                          clip-rule="evenodd"/>
+                </svg>
+                Disputes
+            </a>
+
             <div class="oc-sidebar__section-label">Site Config</div>
 
-            <a href="/admin/contracts"
+            <a href="/<?= $site ?>/open-collab/admin/contracts"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'contracts' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
@@ -114,7 +115,7 @@
                 Contracts
             </a>
 
-            <a href="/admin/guidelines"
+            <a href="/<?= $site ?>/open-collab/admin/guidelines"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'guidelines' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
@@ -124,9 +125,20 @@
                 Guidelines
             </a>
 
+            <a href="/<?= $site ?>/open-collab/admin/payment-terms"
+               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'payment_terms' ? 'active' : '' ?>">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.077 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.077-2.354-1.253V5z"
+                          clip-rule="evenodd"/>
+                </svg>
+                Payment Terms
+            </a>
+
             <div class="oc-sidebar__section-label">Activity</div>
 
-            <a href="/admin/activity"
+            <a href="/<?= $site ?>/open-collab/admin/activity"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'activity' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd"
