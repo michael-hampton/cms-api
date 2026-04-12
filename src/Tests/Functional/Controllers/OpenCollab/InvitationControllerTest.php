@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Models\Invitation;
+use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -60,6 +61,65 @@ class InvitationControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
+    public function test_create_invitation_succeeds_when_previous_invitation_is_expired(): void
+    {
+        // An expired invitation should NOT block creating a fresh one
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'expired-then-reinvite@example.com',
+            'token' => bin2hex(random_bytes(32)),
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('-1 hour')), // expired
+        ]);
+
+        $response = $this->postForSite('/api/open-collab/invitations', [
+            'email' => 'expired-then-reinvite@example.com',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
+    public function test_create_invitation_succeeds_when_user_already_has_account(): void
+    {
+        // A user account existing should NOT block a new invitation (re-invitation after closure)
+        User::create([
+            'name' => 'Existing Contributor',
+            'email' => 'existing-contributor@example.com',
+            'password' => password_hash('secret', PASSWORD_DEFAULT),
+            'role' => 'contributor',
+            'is_contributor' => true,
+            'is_active' => false, // closed account
+        ]);
+
+        $response = $this->postForSite('/api/open-collab/invitations', [
+            'email' => 'existing-contributor@example.com',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $this->assertDatabaseHas('oc_invitations', [
+            'email' => 'existing-contributor@example.com',
+            'site_id' => $this->siteId,
+        ]);
+    }
+
+    public function test_create_invitation_succeeds_when_previous_invitation_was_revoked(): void
+    {
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'revoked-user@example.com',
+            'token' => bin2hex(random_bytes(32)),
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+            'revoked_at' => date('Y-m-d H:i:s', strtotime('-1 hour')),
+        ]);
+
+        $response = $this->postForSite('/api/open-collab/invitations', [
+            'email' => 'revoked-user@example.com',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
     public function test_unauthenticated_user_cannot_create_invitation(): void
     {
         $response = $this->postForSiteUnauthenticated('/api/open-collab/invitations', [
@@ -107,6 +167,42 @@ class InvitationControllerTest extends FunctionalTestCase
         ]);
         $refreshed = Invitation::find($invitation->id);
         $this->assertNotNull($refreshed->used_at);
+    }
+
+    public function test_accept_reactivates_existing_user_account(): void
+    {
+        // User already exists (e.g. previously closed), should be re-activated
+        $existingUser = User::create([
+            'name' => 'Old Name',
+            'email' => 'returning@example.com',
+            'password' => password_hash('oldpass', PASSWORD_DEFAULT),
+            'role' => 'contributor',
+            'is_contributor' => true,
+            'is_active' => false,
+            'site_id' => $this->siteId
+        ]);
+
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'returning@example.com',
+            'token' => $token,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'New Name', 'password' => 'newpassword123']
+        );
+
+        $this->assertEquals(201, $response->getStatusCode());
+
+        // Original user should be reactivated, not a duplicate created
+        $this->assertDatabaseHas('users', ['id' => $existingUser->id, 'is_active' => 1, 'name' => 'New Name']);
+
+        // Should NOT have created a second user with the same email
+        $this->assertEquals(1, User::where('email', 'returning@example.com')->count());
     }
 
     public function test_accept_returns_404_for_invalid_token(): void
@@ -174,6 +270,25 @@ class InvitationControllerTest extends FunctionalTestCase
         $response = $this->postForSiteUnauthenticated(
             "/api/open-collab/invitations/{$token}/accept",
             []
+        );
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_accept_requires_password_minimum_length(): void
+    {
+        $token = bin2hex(random_bytes(32));
+        Invitation::create([
+            'site_id' => $this->siteId,
+            'email' => 'shortpass@example.com',
+            'token' => $token,
+            'invited_by' => $this->authenticatedUser->id,
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+72 hours')),
+        ]);
+
+        $response = $this->postForSiteUnauthenticated(
+            "/api/open-collab/invitations/{$token}/accept",
+            ['name' => 'Short Pass', 'password' => 'abc']
         );
 
         $this->assertEquals(422, $response->getStatusCode());

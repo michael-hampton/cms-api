@@ -12,15 +12,13 @@ use App\Repositories\OpenCollab\GuidelinesContentRepository;
 /**
  * Admin CRUD for contributor brand guidelines.
  *
- * Mirrors AdminContractController exactly.
- * When a new version is created, the site's guidelines_version column is
- * updated to the new version number so ContributorOnboardingService picks it up.
- *
  * Routes:
- *   GET  /api/{site}/open-collab/admin/guidelines           — list all versions
- *   GET  /api/{site}/open-collab/admin/guidelines/latest    — latest version
- *   POST /api/{site}/open-collab/admin/guidelines           — create new version
- *   GET  /api/{site}/open-collab/admin/guidelines/{id}      — show one
+ *   GET    /api/{site}/open-collab/admin/guidelines           — list all versions
+ *   GET    /api/{site}/open-collab/admin/guidelines/latest    — latest version
+ *   POST   /api/{site}/open-collab/admin/guidelines           — create new version
+ *   GET    /api/{site}/open-collab/admin/guidelines/{id}      — show one
+ *   PUT    /api/{site}/open-collab/admin/guidelines/{id}      — update content (unsigned only)
+ *   DELETE /api/{site}/open-collab/admin/guidelines/{id}      — delete latest version only
  */
 class AdminGuidelinesController extends Controller
 {
@@ -31,13 +29,9 @@ class AdminGuidelinesController extends Controller
         parent::__construct();
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/guidelines
-     */
     public function index(): JsonResponse
     {
         $guidelines = $this->guidelinesContentRepository->allForSite(SiteContext::getId());
-
         return $this->jsonResponse(
             $guidelines->map(fn($g) => $this->formatGuideline($g))->toArray()
         );
@@ -54,42 +48,24 @@ class AdminGuidelinesController extends Controller
         ];
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/guidelines/latest
-     */
     public function latest(): JsonResponse
     {
         $guideline = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
-
         if (!$guideline) {
             return $this->errorResponse('No guidelines found for this site.', 404);
         }
-
         return $this->jsonResponse(['guideline' => $this->formatGuideline($guideline)]);
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/guidelines/{id}
-     */
     public function show(int $id): JsonResponse
     {
         $guideline = $this->guidelinesContentRepository->find($id);
-
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
         }
-
         return $this->jsonResponse(['guideline' => $this->formatGuideline($guideline)]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * POST /api/{site}/open-collab/admin/guidelines
-     * Creates a new version. Version is auto-incremented.
-     * Also updates sites.guidelines_version so the onboarding service detects the change.
-     * Body: { content: string }
-     */
     public function store(Request $request): JsonResponse
     {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -98,7 +74,6 @@ class AdminGuidelinesController extends Controller
         if (empty($content)) {
             return $this->errorResponse('Guidelines content is required.', 422);
         }
-
         if (mb_strlen($content) < 50) {
             return $this->errorResponse('Guidelines content must be at least 50 characters.', 422);
         }
@@ -106,8 +81,6 @@ class AdminGuidelinesController extends Controller
         $siteId = SiteContext::getId();
         $guideline = $this->guidelinesContentRepository->createVersion($siteId, $content);
 
-        // Keep Site.guidelines_version in sync so ContributorOnboardingService
-        // detects that contributors need to re-acknowledge.
         $site = Site::find($siteId);
         if ($site) {
             $site->update(['guidelines_version' => $guideline->version]);
@@ -117,5 +90,77 @@ class AdminGuidelinesController extends Controller
             'guideline' => $this->formatGuideline($guideline),
             'message' => "Guidelines version {$guideline->version} created.",
         ], 201);
+    }
+
+    /**
+     * PUT /api/{site}/open-collab/admin/guidelines/{id}
+     * Updates content. Only allowed if no contributor has acknowledged this version.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $guideline = $this->guidelinesContentRepository->find($id);
+        if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Guidelines not found.', 404);
+        }
+
+        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
+            return $this->errorResponse(
+                'This guidelines version has been acknowledged and cannot be edited. Create a new version instead.',
+                409
+            );
+        }
+
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $content = trim($body['content'] ?? $request->input('content', ''));
+
+        if (empty($content)) {
+            return $this->errorResponse('Guidelines content is required.', 422);
+        }
+        if (mb_strlen($content) < 50) {
+            return $this->errorResponse('Guidelines content must be at least 50 characters.', 422);
+        }
+
+        $guideline->update(['content' => $content]);
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($guideline->fresh()),
+            'message' => "Guidelines version {$guideline->version} updated.",
+        ]);
+    }
+
+    /**
+     * DELETE /api/{site}/open-collab/admin/guidelines/{id}
+     * Only the latest version can be deleted, and only if unacknowledged.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $guideline = $this->guidelinesContentRepository->find($id);
+        if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Guidelines not found.', 404);
+        }
+
+        $latest = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
+        if (!$latest || $latest->id !== $guideline->id) {
+            return $this->errorResponse('Only the latest guidelines version can be deleted.', 409);
+        }
+
+        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
+            return $this->errorResponse(
+                'This guidelines version has been acknowledged and cannot be deleted.',
+                409
+            );
+        }
+
+        $version = $guideline->version;
+        $guideline->delete();
+
+        // Roll back site guidelines_version pointer
+        $site = Site::find(SiteContext::getId());
+        $newLatest = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
+        if ($site) {
+            $site->update(['guidelines_version' => $newLatest ? $newLatest->version : 0]);
+        }
+
+        return $this->successResponse("Guidelines version {$version} deleted.");
     }
 }

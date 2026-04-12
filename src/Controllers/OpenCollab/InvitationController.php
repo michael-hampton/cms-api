@@ -65,6 +65,7 @@ class InvitationController extends Controller
                 token: $token,
                 name: $data['name'],
                 password: $data['password'],
+                siteId: SiteContext::getId()
             );
 
             $authRequest = new AuthLoginRequest(

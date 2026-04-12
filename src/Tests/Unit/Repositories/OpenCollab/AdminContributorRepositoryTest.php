@@ -18,17 +18,17 @@ class AdminContributorRepositoryTest extends RepositoryTestCase
         $matching = $this->createUser([
             'name' => 'Alice Contributor',
             'email' => 'alice@example.com',
-            'is_contributor' => true,
+            'role' => 'contributor',
         ]);
         $nonMatching = $this->createUser([
             'name' => 'Bob Writer',
             'email' => 'bob@example.com',
-            'is_contributor' => true,
+            'role' => 'contributor',
         ]);
         $nonContributor = $this->createUser([
             'name' => 'Alice Admin',
             'email' => 'alice-admin@example.com',
-            'is_contributor' => false,
+            'role' => 'user',
         ]);
 
         UserSite::create(['user_id' => $matching->id, 'site_id' => $this->siteId]);

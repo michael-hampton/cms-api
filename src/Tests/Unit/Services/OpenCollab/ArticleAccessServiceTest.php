@@ -8,6 +8,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ArticlePayment;
 use App\Models\Page;
+use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\OpenCollab\ArticleAccessService;
@@ -23,6 +24,7 @@ class ArticleAccessServiceTest extends FunctionalTestCase
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
     private MockInterface $logger;
+    private MockInterface $activityRepository;
 
     public function test_can_view_returns_true_for_free_page(): void
     {
@@ -266,6 +268,7 @@ class ArticleAccessServiceTest extends FunctionalTestCase
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
+        $this->activityRepository = Mockery::mock(ActivityRepository::class);
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -277,6 +280,7 @@ class ArticleAccessServiceTest extends FunctionalTestCase
             $this->eventDispatcher,
             $this->databaseMock,
             $this->logger,
+            $this->activityRepository
         );
     }
 

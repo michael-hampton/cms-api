@@ -64,6 +64,18 @@ class InvitationServiceTest extends FunctionalTestCase
         $this->service->create('guest@example.com', 99, 1);
     }
 
+    public function test_create_does_not_throw_when_user_already_exists_for_email(): void
+    {
+        // A user may already exist (re-invitation after closure) — only a live
+        // pending invitation should block creation, not the existence of a user account.
+        $this->invitationRepository->shouldReceive('hasPendingInviteForEmail')->andReturn(false);
+        $this->invitationRepository->shouldReceive('create')->once()->andReturn($this->makeInvitation());
+
+        // Should not throw
+        $invitation = $this->service->create('existing-user@example.com', 99, 1);
+        $this->assertInstanceOf(Invitation::class, $invitation);
+    }
+
     public function test_create_respects_custom_ttl_hours(): void
     {
         $this->invitationRepository
@@ -101,6 +113,11 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $expectedUser = $this->makeUser(['id' => 10, 'email' => 'guest@example.com']);
 
+        $this->userRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('guest@example.com', $this->siteId)
+            ->andReturn(null);
+
         $this->userRepository
             ->shouldReceive('create')
             ->once()
@@ -118,10 +135,39 @@ class InvitationServiceTest extends FunctionalTestCase
             ->with(5, 10)
             ->once();
 
-        $user = $this->service->accept('valid-token', 'Jane Doe', 'secret123');
+        $user = $this->service->accept('valid-token', 'Jane Doe', 'secret123', $this->siteId);
 
         $this->assertInstanceOf(User::class, $user);
         $this->assertEquals('guest@example.com', $user->email);
+    }
+
+    public function test_accept_reactivates_existing_user_instead_of_creating_duplicate(): void
+    {
+        $invitation = $this->makeInvitation(['id' => 5, 'site_id' => 1, 'email' => 'returning@example.com']);
+        $existingUser = $this->makeUser(['id' => 42, 'email' => 'returning@example.com', 'is_active' => false]);
+        $reactivatedUser = $this->makeUser(['id' => 42, 'email' => 'returning@example.com', 'is_active' => true]);
+
+        $this->invitationRepository->shouldReceive('findByToken')->andReturn($invitation);
+        $this->userRepository->shouldReceive('findByEmail')->with('returning@example.com', $this->siteId)->andReturn($existingUser);
+
+        // Must update, NOT create
+        $this->userRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(function (int $id, array $data): bool {
+                return $id === 42
+                    && $data['is_active'] === true
+                    && $data['is_contributor'] === true
+                    && $data['role'] === 'contributor'
+                    && password_verify('newpassword', $data['password']);
+            });
+        $this->userRepository->shouldNotReceive('create');
+        $this->userRepository->shouldReceive('find')->with(42)->andReturn($reactivatedUser);
+
+        $this->invitationRepository->shouldReceive('markAsUsed')->with(5, 42)->once();
+
+        $user = $this->service->accept('valid-token', 'Jane', 'newpassword', $this->siteId);
+        $this->assertEquals(42, $user->id);
+        $this->assertTrue($user->is_active);
     }
 
     public function test_accept_throws_for_missing_token(): void
@@ -135,7 +181,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->accept('ghost-token', 'Jane', 'password');
+        $this->service->accept('ghost-token', 'Jane', 'password', $this->siteId);
     }
 
     public function test_accept_throws_for_expired_invitation(): void
@@ -151,7 +197,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->accept('expired-token', 'Jane', 'password');
+        $this->service->accept('expired-token', 'Jane', 'password', $this->siteId);
     }
 
     public function test_accept_throws_for_already_used_invitation(): void
@@ -167,7 +213,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->accept('used-token', 'Jane', 'password');
+        $this->service->accept('used-token', 'Jane', 'password', $this->siteId);
     }
 
     public function test_accept_throws_for_revoked_invitation(): void
@@ -183,12 +229,17 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->accept('revoked-token', 'Jane', 'password');
+        $this->service->accept('revoked-token', 'Jane', 'password', $this->siteId);
     }
 
     public function test_accept_wraps_writes_in_transaction(): void
     {
         $this->databaseMock->shouldNotReceive('transaction')->byDefault();
+
+        $this->userRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('guest@example.com', $this->siteId)
+            ->andReturn(null);
 
         $invitation = $this->makeInvitation();
 
@@ -196,7 +247,7 @@ class InvitationServiceTest extends FunctionalTestCase
         $this->userRepository->shouldReceive('create')->andReturn($this->makeUser());
         $this->invitationRepository->shouldReceive('markAsUsed');
 
-        $result = $this->service->accept('valid-token', 'Jane', 'password');
+        $result = $this->service->accept('valid-token', 'Jane', 'password', $this->siteId);
 
         $this->assertInstanceOf(User::class, $result);
     }
@@ -207,6 +258,11 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->invitationRepository->shouldReceive('findByToken')->andReturn($invitation);
 
+        $this->userRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('guest@example.com', $this->siteId)
+            ->andReturn(null);
+
         $this->userRepository
             ->shouldReceive('create')
             ->andThrow(new \RuntimeException('DB failure'));
@@ -216,7 +272,7 @@ class InvitationServiceTest extends FunctionalTestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('DB failure');
 
-        $this->service->accept('valid-token', 'Jane', 'password');
+        $this->service->accept('valid-token', 'Jane', 'password', $this->siteId);
     }
 
     // -------------------------------------------------------------------------
@@ -235,6 +291,11 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $newUser = $this->makeUser(['id' => 10, 'email' => 'invited@example.com']);
 
+        $this->userRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('invited@example.com', $this->siteId)
+            ->andReturn(null);
+
         $this->userRepository
             ->shouldReceive('create')
             ->once()
@@ -251,9 +312,27 @@ class InvitationServiceTest extends FunctionalTestCase
             ->with(5, 999) // 999 = admin ID
             ->once();
 
-        $user = $this->service->acceptOnBehalf('valid-token', 'New Contributor', 'temp-pass', adminId: 999);
+        $user = $this->service->acceptOnBehalf('valid-token', 'New Contributor', 'temp-pass', adminId: 999, siteId: $this->siteId);
 
         $this->assertInstanceOf(User::class, $user);
+    }
+
+    public function test_accept_on_behalf_reactivates_existing_user(): void
+    {
+        $invitation = $this->makeInvitation(['id' => 5, 'site_id' => 1, 'email' => 'returning@example.com']);
+        $existingUser = $this->makeUser(['id' => 20, 'email' => 'returning@example.com', 'is_active' => false]);
+        $reactivated = $this->makeUser(['id' => 20, 'is_active' => true]);
+
+        $this->invitationRepository->shouldReceive('findByToken')->andReturn($invitation);
+        $this->userRepository->shouldReceive('findByEmail')->andReturn($existingUser);
+        $this->userRepository->shouldReceive('update')->once()
+            ->withArgs(fn($id, $data) => $id === 20 && $data['is_active'] === true);
+        $this->userRepository->shouldNotReceive('create');
+        $this->userRepository->shouldReceive('find')->with(20)->andReturn($reactivated);
+        $this->invitationRepository->shouldReceive('markAsUsed')->with(5, 999)->once();
+
+        $user = $this->service->acceptOnBehalf('valid-token', 'Name', 'pass', 999, $this->siteId);
+        $this->assertEquals(20, $user->id);
     }
 
     public function test_accept_on_behalf_throws_for_missing_token(): void
@@ -267,7 +346,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->acceptOnBehalf('ghost-token', 'Name', 'pass', 999);
+        $this->service->acceptOnBehalf('ghost-token', 'Name', 'pass', 999, $this->siteId);
     }
 
     public function test_accept_on_behalf_throws_for_non_pending_invitation(): void
@@ -282,7 +361,7 @@ class InvitationServiceTest extends FunctionalTestCase
 
         $this->expectException(InvalidInvitationException::class);
 
-        $this->service->acceptOnBehalf('used-token', 'Name', 'pass', 999);
+        $this->service->acceptOnBehalf('used-token', 'Name', 'pass', 999, $this->siteId);
     }
 
     public function test_accept_on_behalf_wraps_writes_in_transaction(): void
@@ -293,7 +372,12 @@ class InvitationServiceTest extends FunctionalTestCase
         $this->userRepository->shouldReceive('create')->andReturn($this->makeUser());
         $this->invitationRepository->shouldReceive('markAsUsed');
 
-        $result = $this->service->acceptOnBehalf('valid-token', 'Name', 'pass', 999);
+        $this->userRepository->shouldReceive('findByEmail')
+            ->once()
+            ->with('guest@example.com', $this->siteId)
+            ->andReturn(null);
+
+        $result = $this->service->acceptOnBehalf('valid-token', 'Name', 'pass', 999, $this->siteId);
 
         $this->assertInstanceOf(User::class, $result);
     }

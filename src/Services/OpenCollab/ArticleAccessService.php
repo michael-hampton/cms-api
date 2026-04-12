@@ -8,6 +8,7 @@ use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Page;
+use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 
@@ -30,6 +31,7 @@ class ArticleAccessService
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
         private readonly Logger                   $logger,
+        private readonly ActivityRepository $activityRepository
     )
     {
     }
@@ -114,6 +116,23 @@ class ArticleAccessService
             pageId: $payment->page_id,
             contributorId: (int)$page?->contributor_id,
         ));
+
+        if ($page && $page->contributor_id) {
+            try {
+                $this->activityRepository->record(
+                    siteId: (int)$payment->site_id,
+                    userId: (int)$page->contributor_id,
+                    type: \App\Enums\OpenCollab\ActivityEventType::PaymentReceived,
+                    payload: [
+                        'page_id' => $payment->page_id,
+                        'amount' => $payment->amount,
+                        'currency' => $payment->currency,
+                    ],
+                );
+            } catch (\Throwable) {
+                // Non-critical
+            }
+        }
     }
 
     /**

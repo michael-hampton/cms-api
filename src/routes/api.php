@@ -1195,11 +1195,15 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->get('/admin/contracts/latest', [AdminContractController::class, 'latest']);
     $router->post('/admin/contracts', [AdminContractController::class, 'store']);
     $router->get('/admin/contracts/{id}', [AdminContractController::class, 'show']);
+    $router->put('/admin/contracts/{id}', [AdminContractController::class, 'update']);
+    $router->delete('/admin/contracts/{id}', [AdminContractController::class, 'destroy']);
 
     $router->get('/admin/guidelines', [AdminGuidelinesController::class, 'index']);
     $router->get('/admin/guidelines/latest', [AdminGuidelinesController::class, 'latest']);
     $router->post('/admin/guidelines', [AdminGuidelinesController::class, 'store']);
     $router->get('/admin/guidelines/{id}', [AdminGuidelinesController::class, 'show']);
+    $router->put('/admin/guidelines/{id}', [AdminGuidelinesController::class, 'update']);
+    $router->delete('/admin/guidelines/{id}', [AdminGuidelinesController::class, 'destroy']);
 
     // Epic 3: Article Management (Targets ContributorPageController)
     //$router->apiResource('pages', ContributorPageController::class);
@@ -1251,3 +1255,6 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         [\App\Controllers\OpenCollab\ResendInvitationController::class, 'resend']
     );
 });
+
+$router->get('/api/{site}/open-collab/payouts/{id}/statement', [\App\Controllers\OpenCollab\PayoutStatementController::class, 'download']);
+

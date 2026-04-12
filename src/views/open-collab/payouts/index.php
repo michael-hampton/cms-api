@@ -101,16 +101,31 @@ $canRequest = $availableBalancePence >= 5000;
                             };
                             ?>
                             <span class="oc-badge oc-badge--<?= $statusClass ?>">
-                                <?= ucfirst(htmlspecialchars($payout->status ?? '')) ?>
-                            </span>
+                <?= ucfirst(htmlspecialchars($payout->status ?? '')) ?>
+            </span>
                         </td>
                         <td style="color:var(--slate);font-size:.82rem;font-family:monospace;">
                             <?= htmlspecialchars($payout->reference ?? '–') ?>
                         </td>
+                        <td style="text-align:right;">
+                            <?php if (in_array($payout->status, ['paid', 'approved'])): ?>
+                                <a href="/api/<?= htmlspecialchars($site) ?>/open-collab/payouts/<?= (int)$payout->id ?>/statement"
+                                   class="oc-btn oc-btn--ghost oc-btn--sm"
+                                   title="Download payout statement"
+                                   download>
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="13" style="margin-right:3px;">
+                                        <path fill-rule="evenodd"
+                                              d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                              clip-rule="evenodd"/>
+                                    </svg>
+                                    Statement
+                                </a>
+                            <?php endif; ?>
+                        </td>
                     </tr>
                     <?php if (!empty($payout->rejection_reason)): ?>
                         <tr>
-                            <td colspan="5"
+                            <td colspan="6"
                                 style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;">
                                 <strong>Rejection reason:</strong> <?= htmlspecialchars($payout->rejection_reason) ?>
                             </td>

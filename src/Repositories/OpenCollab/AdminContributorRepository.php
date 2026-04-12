@@ -19,7 +19,7 @@ class AdminContributorRepository extends Repository
     {
         $userIds = $this->userIdsForSite($siteId);
 
-        $builder = User::where('is_contributor', true)
+        $builder = User::where('role', 'contributor')
             ->whereIn('id', $userIds ?: [-1])
             ->orderBy('name');
 
@@ -54,7 +54,7 @@ class AdminContributorRepository extends Repository
 
         /** @var User|null */
         return User::where('id', $userId)
-            ->where('is_contributor', true)
+            ->where('role', 'contributor')
             ->first();
     }
 

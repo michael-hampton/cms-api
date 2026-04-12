@@ -11,7 +11,6 @@ class ContractRepository extends Repository
 {
     public function latestForSite(int $siteId): ?Contract
     {
-        /** @var Contract|null */
         return Contract::where('site_id', $siteId)
             ->orderByDesc('version')
             ->first();
@@ -19,7 +18,7 @@ class ContractRepository extends Repository
 
     public function getContractsForSite(int $siteId): ?Collection
     {
-        return \App\Models\Contract::where('site_id', $siteId)
+        return Contract::where('site_id', $siteId)
             ->orderByDesc('version')
             ->get();
     }
@@ -31,7 +30,16 @@ class ContractRepository extends Repository
             ->exists();
     }
 
-    public function getForUser(int $userId, int $contractId): UserContractSignature
+    /**
+     * Returns true if ANY user has signed this contract version.
+     * Used to guard against editing/deleting signed contracts.
+     */
+    public function hasAnySigned(int $contractId): bool
+    {
+        return UserContractSignature::where('contract_id', $contractId)->exists();
+    }
+
+    public function getForUser(int $userId, int $contractId): ?UserContractSignature
     {
         return UserContractSignature::where('user_id', $userId)
             ->where('contract_id', $contractId)

@@ -582,6 +582,26 @@ $router->get('/{site}/open-collab/admin/guidelines',
     [\App\Controllers\OpenCollab\Admin\AdminGuidelinesPageController::class, 'index'])
     ->name('admin.guidelines');
 
+$router->get('/{site}/open-collab/admin/contributors',
+    [\App\Controllers\OpenCollab\Admin\AdminContributorPageController::class, 'index'])
+    ->name('admin.contributors');
+
+$router->get('/{site}/open-collab/admin/violations',
+    [\App\Controllers\OpenCollab\Admin\AdminViolationPageController::class, 'index'])
+    ->name('admin.violations');
+
+$router->get('/{site}/open-collab/admin/contributors/{id}/violations',
+    [\App\Controllers\OpenCollab\Admin\AdminViolationPageController::class, 'contributor'])
+    ->name('admin.violations');
+
+$router->get('/{site}/open-collab/admin/contributors/{id}',
+    [\App\Controllers\OpenCollab\Admin\AdminContributorPageController::class, 'show'])
+    ->name('admin.contributors.show');
+
+$router->get('/{site}/open-collab/admin/contributor-requests',
+    [\App\Controllers\OpenCollab\Admin\AdminContributorRequestPageController::class, 'index'])
+    ->name('admin.violations');
+
 $router->get('/{site}/open-collab/request-access',
     [\App\Controllers\OpenCollab\ContributorRequestPageController::class, 'show'])
     ->name('contributor.request-access');

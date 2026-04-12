@@ -7,6 +7,7 @@ use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ContributorPageService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -19,6 +20,7 @@ class ContributorPageServiceTest extends FunctionalTestCase
     private MockInterface $pageService;
     private MockInterface $pageRepository;
     private MockInterface $eventDispatcher;
+    private MockInterface $activityRepository;
 
     public function test_create_injects_contributor_id_and_delegates_to_page_service(): void
     {
@@ -184,11 +186,13 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->pageService = Mockery::mock(PageService::class);
         $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
+        $this->activityRepository = Mockery::mock(ActivityRepository::class);
 
         $this->service = new ContributorPageService(
             $this->pageService,
             $this->pageRepository,
             $this->eventDispatcher,
+            $this->activityRepository
         );
     }
 

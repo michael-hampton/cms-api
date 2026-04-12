@@ -7,25 +7,28 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
+use App\Repositories\OpenCollab\InvitationRepository;
 
 /**
- * Renders admin HTML views for contributor management.
+ * Renders admin HTML views for contributor and invitation management.
  *
  * Routes:
- *   GET /admin/contributors         — search/list
- *   GET /admin/contributors/{id}    — profile view
+ *   GET /admin/contributors               — search/list
+ *   GET /admin/contributors/{id}          — profile view
+ *   GET /admin/contributors/{id}/invitations — contributor's invitation history
  */
 class AdminContributorPageController extends Controller
 {
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
+        private readonly InvitationRepository $invitationRepository,
     )
     {
         parent::__construct();
     }
 
     /**
-     * GET /admin/contributors
+     * GET /{site}/open-collab/admin/contributors
      */
     public function index(Request $request)
     {
@@ -50,17 +53,8 @@ class AdminContributorPageController extends Controller
         ]);
     }
 
-    private function requireAdmin(): void
-    {
-        $user = Auth::user();
-        if (!$user || !in_array($user->role ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
-    }
-
     /**
-     * GET /admin/contributors/{id}
+     * GET /{site}/open-collab/admin/contributors/{id}
      */
     public function show(int $id)
     {
@@ -69,17 +63,26 @@ class AdminContributorPageController extends Controller
         $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
 
         if (!$contributor) {
-            return $this->errorView(404, 'Contributor not found.');
+            http_response_code(404);
+            return $this->view('errors.404', ['message' => 'Contributor not found.']);
         }
 
         $values = is_array($contributor) ? $contributor : $contributor->toArray();
 
+        // Load invitation history for this contributor's email
+        $invitations = collect([]);
+        if (!empty($values['email'])) {
+            $invitations = $this->invitationRepository->getAllForSite(SiteContext::getId())
+                ->filter(fn($inv) => $inv->email === $values['email']);
+        }
+
         return $this->view('open-collab.admin.contributors.show', [
             'contributor' => $values,
+            'invitations' => $invitations,
             'pageTitle' => 'Contributor: ' . ($values['name'] ?? ''),
             'activeNav' => 'contributors',
             'breadcrumbs' => [
-                ['label' => 'Contributors', 'url' => '/admin/contributors'],
+                ['label' => 'Contributors', 'url' => '/' . SiteContext::slug() . '/open-collab/admin/contributors'],
                 ['label' => $values['name'] ?? 'Profile'],
             ],
             'currentUser' => Auth::user(),
@@ -87,9 +90,12 @@ class AdminContributorPageController extends Controller
         ]);
     }
 
-    private function errorView(int $status, string $message)
+    private function requireAdmin(): void
     {
-        http_response_code($status);
-        return $this->view('errors.' . $status, ['message' => $message]);
+        $user = Auth::getUser();
+        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
+            header('Location: /login');
+            exit;
+        }
     }
 }

@@ -490,6 +490,42 @@ $headerActions = '
 
         <div class="oc-card">
             <div class="oc-card__header">
+                <span class="oc-card__title" style="font-size:.95rem;">Publish options</span>
+            </div>
+            <div class="oc-card__body">
+                <div class="oc-form-group" style="margin-bottom:12px;">
+                    <label class="oc-label oc-label--optional" for="scheduled-at">Schedule for later</label>
+                    <input class="oc-input" type="datetime-local" id="scheduled-at"
+                           value="<?= $page && $page->scheduled_at ? date('Y-m-d\TH:i', strtotime($page->scheduled_at)) : '' ?>"
+                           min="<?= date('Y-m-d\TH:i', strtotime('+5 minutes')) ?>">
+                    <div class="oc-help">Leave blank to publish immediately.</div>
+                </div>
+                <button onclick="saveArticle('scheduled')" class="oc-btn oc-btn--ghost oc-btn--block oc-btn--sm"
+                        id="schedule-btn" style="<?= ($page && $page->status === 'scheduled') ? '' : '' ?>">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
+                        <path fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                              clip-rule="evenodd"/>
+                    </svg>
+                    <?= ($page && $page->status === 'scheduled') ? 'Update schedule' : 'Schedule' ?>
+                </button>
+                <?php if ($page && $page->status === 'scheduled'): ?>
+                    <div style="margin-top:8px;padding:8px 12px;background:var(--cream-dark);border-radius:6px;
+                        font-size:.75rem;color:var(--amber-dark,#b45309);display:flex;align-items:center;gap:6px;">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="12">
+                            <path fill-rule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                  clip-rule="evenodd"/>
+                        </svg>
+                        Scheduled
+                        for <?= $page->scheduled_at ? date('d M Y, H:i', strtotime($page->scheduled_at)) : '—' ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="oc-card">
+            <div class="oc-card__header">
                 <span class="oc-card__title" style="font-size:.95rem;">SEO</span>
             </div>
             <div class="oc-card__body">
@@ -740,7 +776,7 @@ $headerActions = '
 
         draftBtn.innerHTML = 'Save draft';
         draftBtn.disabled = false;
-        publishBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg> <?= $isEdit && ($page->status ?? '') === 'published' ? 'Update' : 'Publish' ?>`;
+        publishBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>  <?= $isEdit && in_array($page->status ?? '', ['published', 'scheduled']) ? 'Update' : 'Publish' ?>`;
         publishBtn.disabled = false;
     }
 
@@ -753,17 +789,45 @@ $headerActions = '
         const metaDesc = document.getElementById('meta-description').value.trim();
         const pricePence = isPaid ? Math.round(parseFloat(priceVal || '0') * 100) : 0;
 
+        // Scheduled date — only sent when status is 'scheduled'
+        const scheduledAtEl = document.getElementById('scheduled-at');
+        const scheduledAt = scheduledAtEl ? scheduledAtEl.value : null;
+
+        // Validate scheduled date if scheduling
+        if (status === 'scheduled') {
+            if (!scheduledAt) {
+                const errBox = document.getElementById('editor-errors');
+                errBox.textContent = 'Please select a date and time to schedule publication.';
+                errBox.style.display = 'block';
+                return false;
+            }
+            const scheduledDate = new Date(scheduledAt);
+            if (scheduledDate <= new Date()) {
+                const errBox = document.getElementById('editor-errors');
+                errBox.textContent = 'Scheduled date must be in the future.';
+                errBox.style.display = 'block';
+                return false;
+            }
+        }
+
         const payload = {
             site_id: SITE_ID,
             is_paid: isPaid,
             price: pricePence,
             forms: {
                 main: {title, content: html, subtitle: ''},
-                meta: {status, slug: slug || undefined},
+                meta: {
+                    status,
+                    slug: slug || undefined,
+                    // Include scheduled_at in meta when scheduling
+                    ...(status === 'scheduled' && scheduledAt ? {publish_date: scheduledAt} : {}),
+                },
                 seo: {meta_description: metaDesc, meta_title: title},
             },
             blocks: [],
             gallery_slides: [],
+            // Top-level scheduled_at for the service layer
+            ...(status === 'scheduled' && scheduledAt ? {scheduled_at: scheduledAt} : {}),
         };
 
         const url = PAGE_ID ? `/api/${SITE}/open-collab/pages/${PAGE_ID}` : `/api/${SITE}/open-collab/pages`;
@@ -784,7 +848,12 @@ $headerActions = '
             isDirty = false;
 
             if (res.ok) {
-                if (!opts.silent) showToast(status === 'published' ? '✓ Published!' : '✓ Draft saved');
+                if (!opts.silent) {
+                    const msg = status === 'published' ? '✓ Published!'
+                        : status === 'scheduled' ? '✓ Article scheduled'
+                            : '✓ Draft saved';
+                    showToast(msg);
+                }
                 const id = data?.data?.page?.id || PAGE_ID;
                 if (!PAGE_ID && id) {
                     window.location.href = `/articles/${id}/edit`;

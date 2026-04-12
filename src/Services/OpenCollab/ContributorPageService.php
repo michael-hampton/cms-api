@@ -2,36 +2,29 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\Pages\PageStatus;
 use App\Events\OpenCollab\PagePublishedByContributorEvent;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
 
 /**
  * Contributor-scoped page operations.
  *
- * This service enforces ownership rules and sets contributor-specific fields
- * before delegating the actual persistence to the existing PageService.
- *
- * It does NOT duplicate PageService logic. It wraps it.
- *
- * Responsibilities:
- *   - Enforce: contributors can only create/edit/publish their own pages
- *   - Set contributor_id and is_public_contribution on create
- *   - Fire PagePublishedByContributorEvent when a page transitions to published
- *
- * Services MUST NOT be called for side effects. PageService is called for
- * persistence orchestration, which is its job.
+ * Activity feed events are recorded here so contributor actions
+ * (create, update, delete) appear in the dashboard activity feed.
  */
 class ContributorPageService
 {
     public function __construct(
-        private readonly PageService     $pageService,
-        private readonly PageRepository  $pageRepository,
-        private readonly EventDispatcher $eventDispatcher,
+        private readonly PageService        $pageService,
+        private readonly PageRepository     $pageRepository,
+        private readonly EventDispatcher    $eventDispatcher,
+        private readonly ActivityRepository $activityRepository,
     )
     {
     }
@@ -43,18 +36,23 @@ class ContributorPageService
     {
         $requestData = $this->injectContributorDefaults($requestData, $contributorId);
 
-        return $this->pageService->createPageWithAllData($requestData, $siteId);
+        $page = $this->pageService->createPageWithAllData($requestData, $siteId);
+
+        // Record activity — non-critical, swallow failures
+        $this->recordActivity(
+            siteId: $siteId,
+            userId: $contributorId,
+            type: ActivityEventType::ArticleCreated,
+            payload: ['page_id' => $page->id, 'title' => $page->title],
+        );
+
+        return $page;
     }
 
-    /**
-     * Merges contributor-specific fields that must always be present on
-     * pages created or modified through this service.
-     */
     private function injectContributorDefaults(array $requestData, int $contributorId): array
     {
         $requestData['contributor_id'] = $contributorId;
         $requestData['is_public_contribution'] = true;
-
         return $requestData;
     }
 
@@ -83,6 +81,20 @@ class ContributorPageService
             $this->eventDispatcher->dispatch(
                 new PagePublishedByContributorEvent($updated, $contributorId)
             );
+
+            $this->recordActivity(
+                siteId: $siteId,
+                userId: $contributorId,
+                type: ActivityEventType::ArticlePublished,
+                payload: ['page_id' => $updated->id, 'title' => $updated->title],
+            );
+        } else {
+            $this->recordActivity(
+                siteId: $siteId,
+                userId: $contributorId,
+                type: ActivityEventType::ArticleUpdated,
+                payload: ['page_id' => $updated->id, 'title' => $updated->title],
+            );
         }
 
         return $updated;
@@ -101,6 +113,29 @@ class ContributorPageService
             throw new UnauthorisedPageAccessException();
         }
 
+        $siteId = (int)$page->site_id;
+        $title = $page->title;
+
         $this->pageRepository->delete($pageId);
+
+        $this->recordActivity(
+            siteId: $siteId,
+            userId: $contributorId,
+            type: ActivityEventType::ArticleUpdated,
+            payload: ['page_id' => $pageId, 'title' => $title, 'action' => 'deleted'],
+        );
+    }
+
+    /**
+     * Record activity, swallowing any errors since activity recording
+     * is non-critical and must never block the primary operation.
+     */
+    private function recordActivity(int $siteId, int $userId, ActivityEventType $type, array $payload = []): void
+    {
+        try {
+            $this->activityRepository->record($siteId, $userId, $type, $payload);
+        } catch (\Throwable) {
+            // Non-critical — do not propagate
+        }
     }
 }
