@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
@@ -9,6 +10,7 @@ use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
+use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 
 /**
@@ -19,10 +21,11 @@ use App\Repositories\OpenCollab\PayoutRepository;
  *                     − total paid payouts
  *                     − total in-flight payouts (pending + approved)
  *
- * This ensures a contributor cannot request more than they have available,
- * and prevents double-requesting while a payout is in flight.
+ * Every admin action (approve / decline / mark-paid) is written to payout_audits
+ * inside the same transaction as the status update.
  *
  * Lifecycle: request → (admin approves) → (admin marks paid)
+ *                    → (admin rejects)
  */
 class PayoutService
 {
@@ -31,6 +34,7 @@ class PayoutService
 
     public function __construct(
         private readonly PayoutRepository         $payoutRepository,
+        private readonly PayoutAuditRepository $payoutAuditRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
         private readonly EventDispatcher          $eventDispatcher,
@@ -39,11 +43,13 @@ class PayoutService
     {
     }
 
+    // ── Contributor ───────────────────────────────────────────────────────────
+
     /**
      * Contributor requests a payout for their full available balance.
      *
      * @throws \InvalidArgumentException if balance is below the minimum
-     * @throws \RuntimeException if there is already a payout in flight
+     * @throws \RuntimeException         if there is already a payout in flight
      */
     public function requestPayout(int $userId, int $siteId, string $method): \App\Models\Payout
     {
@@ -92,8 +98,11 @@ class PayoutService
         return max(0, $ledgerBalance - $paid - $inFlight);
     }
 
+    // ── Admin ─────────────────────────────────────────────────────────────────
+
     /**
      * Admin approves a pending payout.
+     * Audit entry written inside the same transaction.
      *
      * @throws \InvalidArgumentException if payout is not pending
      */
@@ -118,6 +127,12 @@ class PayoutService
                 'approved_at' => date('Y-m-d H:i:s'),
             ]);
 
+            $this->payoutAuditRepository->log(
+                payoutId: $payout->id,
+                action: PayoutAuditAction::Approved,
+                performedBy: $adminId,
+            );
+
             return $this->payoutRepository->find($payout->id);
         });
     }
@@ -128,7 +143,12 @@ class PayoutService
      *
      * @throws \InvalidArgumentException if payout is not approved
      */
-    public function markPaid(int $payoutId, int $adminId, ?string $reference = null, ?string $notes = null): \App\Models\Payout
+    public function markPaid(
+        int     $payoutId,
+        int     $adminId,
+        ?string $reference = null,
+        ?string $notes = null,
+    ): \App\Models\Payout
     {
         $payout = $this->payoutRepository->find($payoutId);
 
@@ -151,6 +171,13 @@ class PayoutService
                 'notes' => $notes,
             ]);
 
+            $this->payoutAuditRepository->log(
+                payoutId: $payout->id,
+                action: PayoutAuditAction::Paid,
+                performedBy: $adminId,
+                reason: $notes,
+            );
+
             return $this->payoutRepository->find($payout->id);
         });
 
@@ -161,6 +188,7 @@ class PayoutService
 
     /**
      * Admin rejects a pending payout (e.g. missing bank details).
+     * Reason is required — enforced at the controller level too.
      *
      * @throws \InvalidArgumentException if payout is not pending
      */
@@ -185,6 +213,13 @@ class PayoutService
                 'rejected_at' => date('Y-m-d H:i:s'),
                 'rejection_reason' => $reason,
             ]);
+
+            $this->payoutAuditRepository->log(
+                payoutId: $payout->id,
+                action: PayoutAuditAction::Declined,
+                performedBy: $adminId,
+                reason: $reason,
+            );
 
             return $this->payoutRepository->find($payout->id);
         });

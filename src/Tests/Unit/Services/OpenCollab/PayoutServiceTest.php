@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
@@ -10,6 +11,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Models\Payout;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
+use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\PayoutService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -22,6 +24,7 @@ class PayoutServiceTest extends FunctionalTestCase
     private MockInterface $payoutRepository;
     private MockInterface $ledgerRepository;
     private MockInterface $paymentRepository;
+    private MockInterface $payoutAuditRepository;
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
 
@@ -138,7 +141,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->assertTrue(true);
     }
 
-    public function test_approve_transitions_pending_to_approved(): void
+    public function test_approve_transitions_pending_to_approved_and_logs_audit(): void
     {
         $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
         $approved = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Approved->value]);
@@ -147,6 +150,9 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('update')
             ->once()
             ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Approved->value && $data['approved_by'] === 99);
+        $this->payoutAuditRepository->shouldReceive('log')
+            ->once()
+            ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Approved);
 
         $result = $this->service->approve(5, adminId: 99);
 
@@ -178,7 +184,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->service->approve(999, 99);
     }
 
-    public function test_mark_paid_transitions_approved_to_paid_and_dispatches_event(): void
+    public function test_mark_paid_transitions_approved_to_paid_logs_audit_and_dispatches_event(): void
     {
         $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Approved->value]);
         $paid = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Paid->value]);
@@ -189,6 +195,9 @@ class PayoutServiceTest extends FunctionalTestCase
             ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Paid->value
                 && $data['reference'] === 'REF-001'
             );
+        $this->payoutAuditRepository->shouldReceive('log')
+            ->once()
+            ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Paid);
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
             ->withArgs(fn($e) => $e instanceof PayoutProcessedEvent && $e->adminId === 99);
@@ -215,7 +224,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->service->markPaid(5, 99);
     }
 
-    public function test_reject_transitions_pending_to_rejected(): void
+    public function test_reject_transitions_pending_to_rejected_and_logs_audit_with_reason(): void
     {
         $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
         $rejected = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Rejected->value]);
@@ -226,6 +235,14 @@ class PayoutServiceTest extends FunctionalTestCase
             ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Rejected->value
                 && $data['rejection_reason'] === 'Missing bank details.'
             );
+        $this->payoutAuditRepository->shouldReceive('log')
+            ->once()
+            ->withArgs(function ($pid, $action, $adminId, $reason): bool {
+                return $pid === 5
+                    && $action === PayoutAuditAction::Declined
+                    && $adminId === 99
+                    && $reason === 'Missing bank details.';
+            });
 
         $result = $this->service->reject(5, 99, 'Missing bank details.');
 
@@ -258,9 +275,11 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->payoutAuditRepository = Mockery::mock(PayoutAuditRepository::class);
 
         $this->service = new PayoutService(
             $this->payoutRepository,
+            $this->payoutAuditRepository,
             $this->ledgerRepository,
             $this->paymentRepository,
             $this->eventDispatcher,
