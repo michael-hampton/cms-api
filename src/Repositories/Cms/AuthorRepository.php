@@ -136,4 +136,9 @@ class AuthorRepository extends Repository
 
         return $slug;
     }
+
+    public function isSlugTaken(string $slug): bool
+    {
+        return Author::where('slug', $slug)->exists();
+    }
 }

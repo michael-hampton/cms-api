@@ -64,8 +64,7 @@ class InvitationController extends Controller
             $user = $this->invitationService->accept(
                 token: $token,
                 name: $data['name'],
-                password: $data['password'],
-                siteId: SiteContext::getId()
+                password: $data['password']
             );
 
             $authRequest = new AuthLoginRequest(

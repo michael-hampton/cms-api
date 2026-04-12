@@ -5,6 +5,7 @@ namespace App\Repositories\OpenCollab;
 use App\Enums\OpenCollab\LedgerEntryType;
 use App\Framework\Support\Collection;
 use App\Models\EarningsLedger;
+use App\Models\Model;
 use App\Repositories\Repository;
 
 class EarningsLedgerRepository extends Repository
@@ -15,7 +16,7 @@ class EarningsLedgerRepository extends Repository
         int    $amount,
         string $currency,
         string $referenceId,
-    ): EarningsLedger
+    ): Model
     {
         return $this->create([
             'user_id' => $userId,
@@ -24,6 +25,7 @@ class EarningsLedgerRepository extends Repository
             'amount' => $amount,
             'currency' => $currency,
             'reference_id' => $referenceId,
+            'earned_at' => now()
         ]);
     }
 
@@ -33,7 +35,7 @@ class EarningsLedgerRepository extends Repository
         int    $amount,
         string $currency,
         string $referenceId,
-    ): EarningsLedger
+    ): Model
     {
         return $this->create([
             'user_id' => $userId,
@@ -42,6 +44,7 @@ class EarningsLedgerRepository extends Repository
             'amount' => -abs($amount),
             'currency' => $currency,
             'reference_id' => $referenceId,
+            'earned_at' => now()
         ]);
     }
 
@@ -56,10 +59,11 @@ class EarningsLedgerRepository extends Repository
      */
     public function eligibleForPayout(int $userId, \DateTime $cutoff): Collection
     {
-        return EarningsLedger::where('user_id', $userId)
-            ->where('created_at', '<=', $cutoff->format('Y-m-d H:i:s'))
+        return EarningsLedger::query()
+            ->where('user_id', $userId)
+            ->where('earned_at', '<=', $cutoff->format('Y-m-d H:i'))
             ->whereNull('paid_at')
-            ->orderBy('created_at')
+            ->orderBy('earned_at')
             ->get();
     }
 
@@ -70,14 +74,17 @@ class EarningsLedgerRepository extends Repository
      */
     public function eligibleGroupedBySiteAndUser(int $siteId, \DateTime $cutoff): array
     {
-        $rows = EarningsLedger::join('pages', 'pages.id', '=', 'earnings_ledger.article_id')
+        $table = (new EarningsLedger())->getTable();
+
+        $rows = EarningsLedger::query()
+            ->join('pages', 'pages.id', '=', "{$table}.article_id")
             ->where('pages.site_id', $siteId)
-            ->where('earnings_ledger.created_at', '<=', $cutoff->format('Y-m-d H:i:s'))
-            ->whereNull('earnings_ledger.paid_at')
+            ->where("{$table}.earned_at", '<=', $cutoff->format('Y-m-d H:i:s'))
+            ->whereNull("{$table}.paid_at")
             ->select(
-                'earnings_ledger.user_id',
-                'earnings_ledger.amount',
-                'earnings_ledger.currency',
+                "{$table}.user_id",
+                "{$table}.amount",
+                "{$table}.currency",
             )
             ->get();
 
@@ -99,7 +106,7 @@ class EarningsLedgerRepository extends Repository
     public function eligibleBalanceForContributor(int $userId, \DateTime $cutoff): int
     {
         return (int)EarningsLedger::where('user_id', $userId)
-            ->where('created_at', '<=', $cutoff->format('Y-m-d H:i:s'))
+            ->where('earned_at', '<=', $cutoff->format('Y-m-d H:i:s'))
             ->whereNull('paid_at')
             ->sum('amount');
     }

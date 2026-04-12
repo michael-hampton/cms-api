@@ -8,9 +8,10 @@ use App\Events\OpenCollab\PagePublishedByContributorEvent;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
-use App\Models\User;
 use App\Repositories\Cms\AuthorRepository;
+use App\Repositories\Cms\Pages\PageAuthorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
 
@@ -28,6 +29,8 @@ class ContributorPageService
         private readonly EventDispatcher    $eventDispatcher,
         private readonly ActivityRepository $activityRepository,
         private readonly AuthorRepository $authorRepository,
+        private readonly PageAuthorRepository    $pageAuthorRepository,
+        private readonly UserRepositoryInterface $userRepository,
     )
     {
     }
@@ -146,20 +149,17 @@ class ContributorPageService
 
     /**
      * Resolves or creates a guest Author for the contributor and links it to
-     * the page via the page_authors pivot table.
+     * the page via PageAuthorRepository.
      *
-     * "Guest" is expressed as status = 'guest' on the Author record. The
-     * AuthorRepository::findOrCreateFromUser() method creates authors with
-     * status = 'active' by default, so we patch it to 'guest' here only
-     * when the record is freshly created.
-     *
-     * Failure is non-critical — the page has already been created. We log
-     * and continue rather than rolling back a completed write.
+     * Uses UserRepositoryInterface to look up the contributor — no static calls.
+     * Uses AuthorRepository::findByEmail() to check for an existing author.
+     * Uses AuthorRepository::isSlugTaken() to generate a unique guest slug.
+     * Uses PageAuthorRepository::link() for the pivot write.
      */
     private function attachGuestAuthor(Page $page, int $contributorId, int $siteId): void
     {
         try {
-            $user = User::find($contributorId);
+            $user = $this->userRepository->find($contributorId);
 
             if (!$user) {
                 return;
@@ -168,7 +168,6 @@ class ContributorPageService
             $author = $this->authorRepository->findByEmail($user->email);
 
             if (!$author) {
-                // Brand-new author — create as guest
                 $author = $this->authorRepository->create([
                     'name' => $user->name ?? $user->email,
                     'email' => $user->email,
@@ -182,25 +181,15 @@ class ContributorPageService
                 ]);
             }
 
-            // Attach via page_authors pivot if not already linked.
-            $alreadyLinked = \App\Models\PageAuthor::where('page_id', $page->id)
-                ->where('author_id', $author->id)
-                ->exists();
-
-            if (!$alreadyLinked) {
-                \App\Models\PageAuthor::create([
-                    'page_id' => $page->id,
-                    'author_id' => $author->id,
-                ]);
-            }
+            $this->pageAuthorRepository->link($page->id, $author->id);
         } catch (\Throwable) {
             // Non-critical — page creation already succeeded.
         }
     }
 
     /**
-     * Generates a unique slug prefixed with 'guest-' so guest authors are
-     * clearly distinguishable from promoted, editorial authors.
+     * Generates a unique slug prefixed with 'guest-'.
+     * Uniqueness is checked via AuthorRepository::isSlugTaken() — no static calls.
      */
     private function generateGuestSlug(string $name): string
     {
@@ -209,7 +198,7 @@ class ContributorPageService
         $slug = $base;
         $counter = 1;
 
-        while (\App\Models\Author::where('slug', $slug)->exists()) {
+        while ($this->authorRepository->isSlugTaken($slug)) {
             $slug = $base . '-' . $counter;
             $counter++;
         }

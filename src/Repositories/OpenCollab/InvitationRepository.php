@@ -30,11 +30,6 @@ class InvitationRepository extends Repository
 
     /**
      * Marks the invitation as used.
-     *
-     * @param int $id Invitation ID
-     * @param int $acceptedBy User ID of whoever accepted:
-     *                         - new contributor (self-service)
-     *                         - admin user ID (on-behalf acceptance)
      */
     public function markAsUsed(int $id, int $acceptedBy): void
     {
@@ -54,9 +49,37 @@ class InvitationRepository extends Repository
     }
 
     /**
+     * Supersedes all non-used invitations for an email on a site by marking
+     * them as expired. Used before creating a replacement invitation during
+     * a self-service resend of an expired/revoked link.
+     */
+    public function expireAllForEmail(string $email, int $siteId): void
+    {
+        Invitation::where('email', $email)
+            ->where('site_id', $siteId)
+            ->whereNull('used_at')
+            ->update([
+                'expires_at' => date('Y-m-d H:i:s'), // set expiry to now → effectively expired
+            ]);
+    }
+
+    /**
+     * Lightweight rate limiting helper.
+     * Returns the number of invitations created for this email in the last hour.
+     * Used by ResendInvitationController to prevent abuse without Redis.
+     */
+    public function recentResendCount(string $email, int $siteId): int
+    {
+        $oneHourAgo = date('Y-m-d H:i:s', strtotime('-1 hour'));
+
+        return (int)Invitation::where('email', $email)
+            ->where('site_id', $siteId)
+            ->where('created_at', '>=', $oneHourAgo)
+            ->count();
+    }
+
+    /**
      * How many invitations for this site are currently expired (but not revoked/used).
-     * Used by cron jobs for monitoring — no status column to update since
-     * status is derived from expires_at at read time.
      */
     public function countExpired(int $siteId): int
     {
@@ -80,6 +103,15 @@ class InvitationRepository extends Repository
     public function resolveStatus(Invitation $invitation): InvitationStatus
     {
         return $invitation->resolveStatus();
+    }
+
+    public function findLatestForEmail(string $email, int $siteId): ?Invitation
+    {
+        return $this->model
+            ->where('email', $email)
+            ->where('site_id', $siteId)
+            ->orderByDesc('id')
+            ->first();
     }
 
     protected function getModelClass(): string

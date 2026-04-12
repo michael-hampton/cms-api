@@ -100,6 +100,7 @@ class EarningsDisputeService
                     'amount' => $adjustmentAmount,
                     'currency' => $ledgerEntry->currency ?? 'GBP',
                     'reference_id' => "dispute-{$dispute->id}",
+                    'earned_at' => now()
                 ]);
             }
 

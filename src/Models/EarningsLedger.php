@@ -13,9 +13,13 @@ class EarningsLedger extends Model
         'amount',
         'currency',
         'reference_id',
+        'paid_at',
+        'earned_at'
     ];
 
     protected $casts = [
         'amount' => 'integer',
+        'paid_at' => 'datetime',
+        'earned_at' => 'datetime'
     ];
 }

@@ -39,4 +39,28 @@ class PageAuthorRepository extends Repository
             ->pluck('author_id')
             ->toArray();
     }
+
+    public function isLinked(int $pageId, int $authorId): bool
+    {
+        return PageAuthor::where('page_id', $pageId)
+            ->where('author_id', $authorId)
+            ->exists();
+    }
+
+    public function link(int $pageId, int $authorId): void
+    {
+        if (!$this->isLinked($pageId, $authorId)) {
+            $this->create([
+                'page_id' => $pageId,
+                'author_id' => $authorId,
+            ]);
+        }
+    }
+
+    public function unlink(int $pageId, int $authorId): void
+    {
+        PageAuthor::where('page_id', $pageId)
+            ->where('author_id', $authorId)
+            ->delete();
+    }
 }

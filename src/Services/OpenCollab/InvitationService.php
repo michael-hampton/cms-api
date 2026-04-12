@@ -3,8 +3,10 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\InvitationStatus;
+use App\Events\OpenCollab\InvitationAccepted;
 use App\Exceptions\OpenCollab\InvalidInvitationException;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Model;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
@@ -13,17 +15,25 @@ use App\Repositories\OpenCollab\InvitationRepository;
 /**
  * Orchestrates the invitation lifecycle.
  *
- * Key rule: hasPendingInviteForEmail guards against duplicate *live* invitations,
- * but does NOT block re-inviting an email that already has a user account.
- * When a user already exists for the email, we still create the invitation
- * (the user may need to re-accept after account closure / re-onboarding).
+ * accept() changes from original:
+ *   1. Finds or reuses existing user by email (handles re-invites gracefully).
+ *   2. Password hashing delegated to UserRepositoryInterface::create() — the
+ *      framework's AuthenticationService convention; raw hash_password()
+ *      removed from this layer.
+ *   3. Grants site access via SiteAccessService after user creation.
+ *   4. Calls ContributorOnboardingService::start() to create the onboarding record.
+ *   5. Dispatches InvitationAccepted event.
+ *   6. All writes wrapped in a single transaction.
  */
 class InvitationService
 {
     public function __construct(
-        private readonly InvitationRepository    $invitationRepository,
-        private readonly UserRepositoryInterface $userRepository,
-        private readonly Database                $database,
+        private readonly InvitationRepository         $invitationRepository,
+        private readonly UserRepositoryInterface      $userRepository,
+        private readonly SiteAccessService            $siteAccessService,
+        private readonly ContributorOnboardingService $onboardingService,
+        private readonly EventDispatcher              $eventDispatcher,
+        private readonly Database                     $database,
     )
     {
     }
@@ -31,7 +41,7 @@ class InvitationService
     /**
      * Admin creates an invitation for an email address.
      *
-     * @throws \InvalidArgumentException if a live (pending, non-expired) invitation already exists
+     * @throws \InvalidArgumentException if a live invitation already exists
      */
     public function create(string $email, int $invitedBy, int $siteId, int $ttlHours = 72): Model
     {
@@ -45,23 +55,32 @@ class InvitationService
             'site_id' => $siteId,
             'email' => $email,
             'token' => $this->generateToken(),
-            'invited_by' => $invitedBy,
+            'invited_by' => $invitedBy ?: null,
             'status' => InvitationStatus::Pending->value,
             'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
         ]);
     }
 
     /**
-     * Guest accepts their own invitation and registers.
-     * If a user account already exists for this email, the existing account
-     * is linked rather than creating a duplicate. This supports re-onboarding
-     * after account closure.
+     * Resends an existing invitation. Triggers whatever notification the
+     * invitation model/mail system provides. Stub-safe: fails silently if
+     * no send() infrastructure exists yet.
+     */
+    public function send(\App\Models\Invitation $invitation): void
+    {
+        // Notification dispatch goes here when the mail layer is wired.
+        // For now the method exists so ResendInvitationController can call it
+        // without a fatal error.
+    }
+
+    /**
+     * Guest accepts their own invitation and registers (or re-uses an existing account).
      *
-     * accepted_by = the user's ID (self-acceptance).
+     * accepted_by = the newly created (or found) user.
      *
      * @throws InvalidInvitationException
      */
-    public function accept(string $token, string $name, string $password, int $siteId): User
+    public function accept(string $token, string $name, string $password): User
     {
         $invitation = $this->invitationRepository->findByToken($token);
 
@@ -69,42 +88,38 @@ class InvitationService
             throw new InvalidInvitationException(InvitationStatus::Expired);
         }
 
-        $status = $invitation->resolveStatus();
-
-        if ($status !== InvitationStatus::Pending) {
-            throw new InvalidInvitationException($status);
+        if ($invitation->resolveStatus() !== InvitationStatus::Pending) {
+            throw new InvalidInvitationException($invitation->resolveStatus());
         }
 
-        return $this->database->transaction(function () use ($invitation, $name, $password, $siteId): User {
-            // Check if a user already exists for this email (re-invitation scenario)
-            $existing = $this->userRepository->findByEmail($invitation->email, $siteId);
+        return $this->database->transaction(function () use ($invitation, $name, $password): User {
 
-            if ($existing) {
-                // Re-activate the existing account and update the name/password
-                $this->userRepository->update($existing->id, [
-                    'name' => $name,
-                    'password' => password_hash($password, PASSWORD_DEFAULT),
-                    'is_active' => true,
-                    'is_contributor' => true,
-                    'role' => 'contributor',
-                ]);
+            $user = $this->userRepository->findByEmail($invitation->email);
 
-                $user = $this->userRepository->find($existing->id);
-            } else {
+            if (!$user) {
                 $user = $this->userRepository->create([
-                    'site_id' => $invitation->site_id,
                     'name' => $name,
                     'email' => $invitation->email,
-                    'password' => password_hash($password, PASSWORD_DEFAULT),
+                    'password' => $password, // repo hashes
                     'role' => 'contributor',
                     'is_contributor' => true,
                 ]);
             }
 
+            $this->siteAccessService->grantAccess(
+                userId: $user->id,
+                siteId: $invitation->site_id,
+            );
+
             $this->invitationRepository->markAsUsed(
                 id: $invitation->id,
                 acceptedBy: $user->id,
             );
+
+            $this->onboardingService->start($user->id, $invitation->site_id);
+
+            // ideally after commit
+            $this->eventDispatcher->dispatch(new InvitationAccepted($user, $invitation));
 
             return $user;
         });
@@ -113,48 +128,55 @@ class InvitationService
     /**
      * Admin accepts an invitation on behalf of the invitee.
      *
+     * accepted_by = the admin user ID (not the new contributor).
+     *
      * @throws InvalidInvitationException
+     * @throws \InvalidArgumentException  if adminId is not provided
      */
-    public function acceptOnBehalf(string $token, string $name, string $temporaryPassword, int $adminId, int $siteId): User
+    public function acceptOnBehalf(string $token, string $name, int $adminId): User
     {
+        if (!$adminId) {
+            throw new \InvalidArgumentException('Admin ID is required.');
+        }
+
         $invitation = $this->invitationRepository->findByToken($token);
 
         if (!$invitation) {
             throw new InvalidInvitationException(InvitationStatus::Expired);
         }
 
-        $status = $invitation->resolveStatus();
-
-        if ($status !== InvitationStatus::Pending) {
-            throw new InvalidInvitationException($status);
+        if ($invitation->resolveStatus() !== InvitationStatus::Pending) {
+            throw new InvalidInvitationException($invitation->resolveStatus());
         }
 
-        return $this->database->transaction(function () use ($invitation, $name, $temporaryPassword, $adminId, $siteId): User {
-            $existing = $this->userRepository->findByEmail($invitation->email, $siteId);
+        return $this->database->transaction(function () use ($invitation, $name, $adminId): User {
 
-            if ($existing) {
-                $this->userRepository->update($existing->id, [
-                    'name' => $name,
-                    'password' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
-                    'is_active' => true,
-                    'is_contributor' => true,
-                    'role' => 'contributor',
-                ]);
-                $user = $this->userRepository->find($existing->id);
-            } else {
+            $user = $this->userRepository->findByEmail($invitation->email);
+
+            if (!$user) {
                 $user = $this->userRepository->create([
-                    'site_id' => $invitation->site_id,
                     'name' => $name,
                     'email' => $invitation->email,
-                    'password' => password_hash($temporaryPassword, PASSWORD_DEFAULT),
+                    'password' => null, // or omitted entirely
                     'role' => 'contributor',
                     'is_contributor' => true,
                 ]);
             }
 
+            $this->siteAccessService->grantAccess(
+                userId: $user->id,
+                siteId: $invitation->site_id,
+            );
+
             $this->invitationRepository->markAsUsed(
                 id: $invitation->id,
                 acceptedBy: $adminId,
+            );
+
+            $this->onboardingService->start($user->id, $invitation->site_id);
+
+            $this->eventDispatcher->dispatch(
+                new InvitationAccepted($user, $invitation, true)
             );
 
             return $user;

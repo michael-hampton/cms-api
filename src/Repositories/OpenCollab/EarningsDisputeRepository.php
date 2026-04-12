@@ -61,7 +61,7 @@ class EarningsDisputeRepository extends Repository
     public function forContributor(int $userId): \App\Framework\Support\Collection
     {
         return EarningsDispute::where('user_id', $userId)
-            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
     }
 

@@ -64,7 +64,10 @@ class PaymentTermsServiceTest extends FunctionalTestCase
 
         $result = $this->service->forSite(1);
 
-        $this->assertFalse($result->exists);
+        $this->assertInstanceOf(PaymentTerms::class, $result);
+        $this->assertSame(1, $result->site_id);
+        $this->assertSame(7, $result->payout_delay_days);
+        $this->assertSame(5000, $result->minimum_payout_amount);
     }
 
     public function test_save_delegates_to_repository_and_returns_terms(): void

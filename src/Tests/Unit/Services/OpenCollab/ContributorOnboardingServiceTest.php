@@ -23,29 +23,171 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
     private $guidelinesRepo;
     private $service;
 
-    public function test_pending_steps_returns_profile_when_bio_is_missing()
+    public function test_pending_steps_returns_profile_when_bio_missing()
     {
-        $site = new Site(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $user = Mockery::mock(ContributorProfile::class)->makePartial();
-        $user->bio = '';
+        $site = new Site([
+            'require_payment_setup' => false,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+        ]);
 
-        $this->profileRepo->allows()->findByUserId(1)->andReturn($user);
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = '';
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true); // guard
+
+        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
 
         $pending = $this->service->pendingSteps(1, $site);
-        $this->assertContains('profile', $pending);
+
+        $this->assertEquals(['profile'], $pending);
     }
+
+    public function test_pending_steps_returns_payment_when_not_setup()
+    {
+        $site = new Site([
+            'require_payment_setup' => true,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+        ]);
+
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'ok';
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(false);
+
+        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEquals(['payment'], $pending);
+    }
+
+    public function test_pending_steps_returns_contract_when_not_signed()
+    {
+        $site = new Site([
+            'id' => 10,
+            'require_payment_setup' => false,
+            'require_contracts' => true,
+            'require_guidelines_ack' => false,
+        ]);
+
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'ok';
+
+        $contract = Mockery::mock(Contract::class)->makePartial();
+        $contract->id = 5;
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
+
+        $this->contractRepo->shouldReceive('latestForSite')->once()->with(10)->andReturn($contract);
+        $this->contractRepo->shouldReceive('hasSigned')->once()->with(1, 5)->andReturn(false);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->with(1, 10)->andReturn(1);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEquals(['contract'], $pending);
+    }
+
+    public function test_pending_steps_returns_guidelines_when_not_acknowledged()
+    {
+        $site = new Site([
+            'id' => 10,
+            'require_payment_setup' => false,
+            'require_contracts' => false,
+            'require_guidelines_ack' => true,
+            'guidelines_version' => 2,
+        ]);
+
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'ok';
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
+
+        $contract = Mockery::mock(Contract::class)->makePartial();
+        $contract->id = 1;
+
+        $this->contractRepo->shouldReceive('latestForSite')->andReturn($contract);
+
+        $this->contractRepo->shouldReceive('hasSigned')->andReturn(true);
+
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')
+            ->once()
+            ->with(1, 10)
+            ->andReturn(null);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEquals(['guidelines'], $pending);
+    }
+
+    public function test_pending_steps_returns_empty_when_all_complete()
+    {
+        $site = new Site([
+            'id' => 10,
+            'require_payment_setup' => true,
+            'require_contracts' => true,
+            'require_guidelines_ack' => true,
+            'guidelines_version' => 2,
+        ]);
+
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'ok';
+
+        $contract = Mockery::mock(Contract::class)->makePartial();
+        $contract->id = 5;
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(true);
+
+        $this->contractRepo->shouldReceive('latestForSite')->once()->andReturn($contract);
+        $this->contractRepo->shouldReceive('hasSigned')->once()->andReturn(true);
+
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->andReturn(2);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEquals([], $pending);
+    }
+
+
 
     public function test_require_complete_throws_exception_if_steps_pending()
     {
-        $site = new Site(['require_payment_setup' => true]);
+        $site = new Site([
+            'id' => 10,
+            'require_payment_setup' => true,
+            'require_contracts' => false,        // 👈 disable
+            'require_guidelines_ack' => false,   // 👈 disable
+        ]);
 
-        $user = Mockery::mock(ContributorProfile::class)->makePartial();
-        $user->bio = 'Hello';
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'Hello';
 
-        $this->profileRepo->allows()->findByUserId(1)->andReturn($user);
-        $this->profileRepo->allows()->isPaymentSetup(1)->andReturn(false);
+        $this->profileRepo->shouldReceive('findByUserId')
+            ->once()
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->contractRepo->shouldReceive('latestForSite')
+            ->andReturn(null);
+
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')
+            ->andReturn(null);
+
+        $this->profileRepo->shouldReceive('isPaymentSetup')
+            ->once()
+            ->with(1)
+            ->andReturn(false);
 
         $this->expectException(OnboardingIncompleteException::class);
+
         $this->service->requireComplete(1, $site);
     }
 
@@ -56,22 +198,39 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
             'require_payment_setup' => true,
             'require_contracts' => true,
             'require_guidelines_ack' => true,
-            'guidelines_version' => 2
+            'guidelines_version' => 2,
         ]);
 
-        $user = Mockery::mock(ContributorProfile::class)->makePartial();
-        $user->bio = 'Full Bio';
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'Full Bio';
 
-        $contractor = Mockery::mock(Contract::class)->makePartial();
-        $contractor->id = 1;
+        $contract = Mockery::mock(Contract::class)->makePartial();
+        $contract->id = 5; // 👈 IMPORTANT: must match hasSigned()
 
-        $this->profileRepo->allows()->findByUserId(1)->andReturn($user);
-        $this->profileRepo->allows()->isPaymentSetup(1)->andReturn(true);
+        $this->profileRepo->shouldReceive('findByUserId')
+            ->once()
+            ->with(1)
+            ->andReturn($profile);
 
-        $this->contractRepo->allows()->latestForSite(10)->andReturn($contractor);
-        $this->contractRepo->allows()->hasSigned(1, 5)->andReturn(true);
+        $this->profileRepo->shouldReceive('isPaymentSetup')
+            ->once()
+            ->with(1)
+            ->andReturn(true);
 
-        $this->guidelinesRepo->allows()->latestAcknowledgedVersion(1, 10)->andReturn(2);
+        $this->contractRepo->shouldReceive('latestForSite')
+            ->once()
+            ->with(10)
+            ->andReturn($contract);
+
+        $this->contractRepo->shouldReceive('hasSigned')
+            ->once()
+            ->with(1, 5)
+            ->andReturn(true);
+
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')
+            ->once()
+            ->with(1, 10)
+            ->andReturn(2);
 
         $this->assertTrue($this->service->isComplete(1, $site));
     }

@@ -19,7 +19,7 @@ class GuidelinesRepository extends Repository
      * Returns the highest version acknowledged by this user for this site.
      * Returns 0 if none.
      */
-    public function latestAcknowledgedVersion(int $userId, int $siteId): int
+    public function latestAcknowledgedVersion(int $userId, int $siteId): ?int
     {
         return (int)UserGuidelinesAcknowledgement::where('user_id', $userId)
             ->where('site_id', $siteId)

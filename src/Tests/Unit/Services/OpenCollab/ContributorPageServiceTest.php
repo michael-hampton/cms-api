@@ -9,7 +9,9 @@ use App\Models\Author;
 use App\Models\Page;
 use App\Models\User;
 use App\Repositories\Cms\AuthorRepository;
+use App\Repositories\Cms\Pages\PageAuthorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ContributorPageService;
@@ -25,7 +27,8 @@ class ContributorPageServiceTest extends FunctionalTestCase
     private MockInterface $eventDispatcher;
     private MockInterface $activityRepository;
     private MockInterface $authorRepository;
-
+    private MockInterface $pageAuthorRepository;
+    private MockInterface $userRepository;
 
     public function test_create_injects_contributor_id_and_delegates_to_page_service(): void
     {
@@ -47,57 +50,65 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->assertSame($createdPage, $page);
     }
 
-    public function test_create_attaches_new_guest_author_when_no_author_exists_for_email(): void
+    public function test_create_resolves_contributor_via_user_repository_not_static_call(): void
     {
-        // Ensure DB is clean and tables exist
-        // (only needed if you're hitting real DB calls like Author::where)
-        // use RefreshDatabase on the class
+        $createdPage = $this->makePage(['id' => 10, 'contributor_id' => 7]);
+        $user = $this->makeUser(['id' => 7, 'email' => 'contrib@example.com', 'name' => 'Jane']);
+        $author = $this->makeAuthor(['id' => 3, 'email' => 'contrib@example.com']);
 
-        // 👉 Create the contributor user so User::find() works
-        User::create([
-            'id' => 7,
-            'email' => 'test@example.com',
-            'name' => 'Test User',
-            'password' => 'test'
-        ]);
+        $this->pageService->shouldReceive('createPageWithAllData')->andReturn($createdPage);
 
-        $createdPage = $this->makePage([
-            'id' => 10,
-            'contributor_id' => 7,
-            'status' => 'draft'
-        ]);
+        // Must use userRepository->find(), never a static User::find()
+        $this->userRepository->shouldReceive('find')->with(7)->once()->andReturn($user);
+        $this->authorRepository->shouldReceive('findByEmail')->with('contrib@example.com')->andReturn($author);
+        $this->pageAuthorRepository->shouldReceive('link')->with(10, 3)->once();
 
-        $this->pageService
-            ->shouldReceive('createPageWithAllData')
-            ->once()
-            ->andReturn($createdPage);
+        $this->service->createPage(['site_id' => 1, 'forms' => ['main' => ['title' => 'T']]], 7, 1);
+        $this->assertTrue(true);
+    }
 
-        // 👉 Expect lookup by THIS email
-        $this->authorRepository
-            ->shouldReceive('findByEmail')
-            ->once()
-            ->with('test@example.com')
-            ->andReturn(null);
+    public function test_create_creates_guest_author_when_none_exists_for_email(): void
+    {
+        $createdPage = $this->makePage(['id' => 10, 'contributor_id' => 7]);
+        $user = $this->makeUser(['id' => 7, 'email' => 'new@example.com', 'name' => 'New User']);
+        $newAuthor = $this->makeAuthor(['id' => 99, 'status' => 'guest']);
 
-        $this->authorRepository
-            ->shouldReceive('create')
+        $this->pageService->shouldReceive('createPageWithAllData')->andReturn($createdPage);
+        $this->userRepository->shouldReceive('find')->andReturn($user);
+        $this->authorRepository->shouldReceive('findByEmail')->andReturn(null);
+
+        // Slug uniqueness check via repository, not Author::where()
+        $this->authorRepository->shouldReceive('isSlugTaken')->andReturn(false);
+
+        $this->authorRepository->shouldReceive('create')
             ->once()
             ->withArgs(function (array $data): bool {
                 return $data['status'] === 'guest'
                     && str_starts_with($data['slug'], 'guest-')
-                    && $data['email'] === 'test@example.com';
+                    && $data['email'] === 'new@example.com';
             })
-            ->andReturn($this->makeAuthor([
-                'id' => 99,
-                'status' => 'guest'
-            ]));
+            ->andReturn($newAuthor);
 
-        $this->service->createPage(
-            ['site_id' => 1, 'forms' => ['main' => ['title' => 'T']]],
-            7,
-            1
-        );
+        $this->pageAuthorRepository->shouldReceive('link')->with(10, 99)->once();
 
+        $this->service->createPage(['site_id' => 1, 'forms' => ['main' => ['title' => 'T']]], 7, 1);
+        $this->assertTrue(true);
+    }
+
+    public function test_create_reuses_existing_author_and_does_not_create_new_one(): void
+    {
+        $createdPage = $this->makePage(['id' => 10, 'contributor_id' => 7]);
+        $user = $this->makeUser(['id' => 7, 'email' => 'exists@example.com']);
+        $existingAuthor = $this->makeAuthor(['id' => 5, 'status' => 'active']);
+
+        $this->pageService->shouldReceive('createPageWithAllData')->andReturn($createdPage);
+        $this->userRepository->shouldReceive('find')->andReturn($user);
+        $this->authorRepository->shouldReceive('findByEmail')->andReturn($existingAuthor);
+        $this->authorRepository->shouldNotReceive('create');
+        $this->authorRepository->shouldNotReceive('isSlugTaken');
+        $this->pageAuthorRepository->shouldReceive('link')->with(10, 5)->once();
+
+        $this->service->createPage(['site_id' => 1, 'forms' => ['main' => ['title' => 'T']]], 7, 1);
         $this->assertTrue(true);
     }
 
@@ -283,6 +294,18 @@ class ContributorPageServiceTest extends FunctionalTestCase
         return $author;
     }
 
+    private function makeUser(array $attributes = []): User
+    {
+        $defaults = [
+            'id' => 7,
+            'name' => 'Test User',
+            'email' => 'contributor@example.com',
+        ];
+        $user = new User(array_merge($defaults, $attributes));
+        $user->exists = true;
+        return $user;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -292,6 +315,9 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->activityRepository = Mockery::mock(ActivityRepository::class);
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
+        $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
+        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
+
 
         $this->service = new ContributorPageService(
             $this->pageService,
@@ -299,6 +325,8 @@ class ContributorPageServiceTest extends FunctionalTestCase
             $this->eventDispatcher,
             $this->activityRepository,
             $this->authorRepository,
+            $this->pageAuthorRepository,
+            $this->userRepository,
         );
     }
 
