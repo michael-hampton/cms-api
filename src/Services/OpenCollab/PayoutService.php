@@ -8,10 +8,16 @@ use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\Notifications\PayoutApprovedNotification;
+use App\Services\OpenCollab\Notifications\PayoutCreatedNotification;
+use App\Services\OpenCollab\Notifications\PayoutDeclinedNotification;
+use App\Services\OpenCollab\Notifications\PayoutPaidNotification;
 
 /**
  * Manual/batch payout management. No Stripe Connect involved.
@@ -37,8 +43,11 @@ class PayoutService
         private readonly PayoutAuditRepository $payoutAuditRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
+        private readonly UserRepositoryInterface $userRepository,
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
+        private readonly NotificationDispatcher  $notificationDispatcher,
+
     )
     {
     }
@@ -82,6 +91,13 @@ class PayoutService
 
         $this->eventDispatcher->dispatch(new PayoutRequestedEvent($payout, $userId));
 
+        $contributor = $this->userRepository->find($userId);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new PayoutCreatedNotification($payout, $contributor)
+            );
+        }
+
         return $payout;
     }
 
@@ -120,7 +136,7 @@ class PayoutService
             );
         }
 
-        return $this->database->transaction(function () use ($payout, $adminId): \App\Models\Payout {
+        $payout = $this->database->transaction(function () use ($payout, $adminId): \App\Models\Payout {
             $this->payoutRepository->update($payout->id, [
                 'status' => PayoutStatus::Approved->value,
                 'approved_by' => $adminId,
@@ -135,6 +151,15 @@ class PayoutService
 
             return $this->payoutRepository->find($payout->id);
         });
+
+        $contributor = $this->userRepository->find($payout->user_id);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new PayoutApprovedNotification($payout, $contributor)
+            );
+        }
+
+        return $payout;
     }
 
     /**
@@ -183,6 +208,13 @@ class PayoutService
 
         $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId));
 
+        $contributor = $this->userRepository->find($payout->user_id);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new PayoutPaidNotification($payout, $contributor, $reference)
+            );
+        }
+
         return $payout;
     }
 
@@ -206,7 +238,7 @@ class PayoutService
             );
         }
 
-        return $this->database->transaction(function () use ($payout, $adminId, $reason): \App\Models\Payout {
+        $payout = $this->database->transaction(function () use ($payout, $adminId, $reason): \App\Models\Payout {
             $this->payoutRepository->update($payout->id, [
                 'status' => PayoutStatus::Rejected->value,
                 'rejected_by' => $adminId,
@@ -223,5 +255,14 @@ class PayoutService
 
             return $this->payoutRepository->find($payout->id);
         });
+
+        $contributor = $this->userRepository->find($payout->user_id);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new PayoutDeclinedNotification($payout, $contributor, $reason)
+            );
+        }
+
+        return $payout;
     }
 }

@@ -1,0 +1,59 @@
+<?php
+
+namespace App\Framework\Notifications\Channels;
+
+use App\Framework\Mail\MailManager;
+use App\Framework\Notifications\AdminNotification;
+use App\Framework\Notifications\ChannelInterface;
+use App\Framework\Notifications\EmailableNotification;
+use App\Framework\Notifications\NotificationInterface;
+use App\Framework\Support\Logger;
+
+/**
+ * Delivers notifications to individual recipients via email.
+ *
+ * Supports any notification that:
+ *   (a) implements EmailableNotification, AND
+ *   (b) returns a non-empty recipientEmail(), AND
+ *   (c) does NOT implement AdminNotification
+ *       (admin-targeted notifications go through AdminEmailChannel)
+ *
+ * This channel has zero knowledge of domain notification classes or
+ * mailable implementations — that knowledge lives in the notification itself
+ * via toMailable().
+ */
+final class EmailChannel implements ChannelInterface
+{
+    public function __construct(
+        private readonly MailManager $mailManager,
+        private readonly Logger      $logger,
+    )
+    {
+    }
+
+    public function supports(NotificationInterface $notification): bool
+    {
+        return $notification instanceof EmailableNotification
+            && !($notification instanceof AdminNotification)
+            && !empty($notification->recipientEmail());
+    }
+
+    public function send(NotificationInterface $notification): bool
+    {
+        /** @var EmailableNotification $notification */
+        $email = $notification->recipientEmail();
+
+        try {
+            return $this->mailManager
+                ->to($email)
+                ->send($notification->toMailable());
+        } catch (\Throwable $e) {
+            $this->logger->error('EmailChannel: failed to send.', [
+                'notification' => get_class($notification),
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+}

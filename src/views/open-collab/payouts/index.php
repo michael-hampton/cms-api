@@ -82,7 +82,7 @@ $canRequest = $availableBalancePence >= 5000;
                 <?php foreach ($payouts as $payout): ?>
                     <tr>
                         <td style="white-space:nowrap;color:var(--slate);">
-                            <?= $payout->created_at ? date('d M Y', strtotime($payout->created_at)) : '–' ?>
+                            <?= $payout->created_at ? $payout->created_at->format('d M Y') : '–' ?>
                         </td>
                         <td style="font-weight:600;font-family:var(--font-display);font-size:1rem;color:var(--navy);">
                             £<?= number_format($payout->amount / 100, 2) ?>

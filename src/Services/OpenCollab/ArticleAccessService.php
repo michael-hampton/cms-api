@@ -6,11 +6,15 @@ use App\Events\OpenCollab\ArticlePurchasedEvent;
 use App\Exceptions\OpenCollab\DuplicatePurchaseException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Page;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
+use App\Services\OpenCollab\Notifications\ArticlePaymentFailedNotification;
+use App\Services\OpenCollab\Notifications\ArticlePaymentSucceededNotification;
 
 /**
  * The single authority for reading and writing article access.
@@ -31,7 +35,10 @@ class ArticleAccessService
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
         private readonly Logger                   $logger,
-        private readonly ActivityRepository $activityRepository
+        private readonly ActivityRepository     $activityRepository,
+        private readonly NotificationDispatcher $notificationDispatcher,
+        private readonly PageRepository         $pageRepository
+
     )
     {
     }
@@ -109,7 +116,7 @@ class ArticleAccessService
         // Fetch the updated payment for the event payload.
         $payment->refresh();
 
-        $page = \App\Models\Page::find($payment->page_id);
+        $page = $this->pageRepository->find($payment->page_id);
 
         $this->eventDispatcher->dispatch(new ArticlePurchasedEvent(
             payment: $payment,
@@ -117,7 +124,13 @@ class ArticleAccessService
             contributorId: (int)$page?->contributor_id,
         ));
 
-        if ($page && $page->contributor_id) {
+        if ($page) {
+            $this->notificationDispatcher->dispatch(
+                new ArticlePaymentSucceededNotification($payment, $page)
+            );
+        }
+
+        if ($page?->contributor_id) {
             try {
                 $this->activityRepository->record(
                     siteId: (int)$payment->site_id,
@@ -151,5 +164,12 @@ class ArticleAccessService
         }
 
         $this->paymentRepository->updateStatus($payment->id, 'failed');
+
+        $page = $this->pageRepository->find($payment->page_id);
+        if ($page) {
+            $this->notificationDispatcher->dispatch(
+                new ArticlePaymentFailedNotification($payment, $page)
+            );
+        }
     }
 }

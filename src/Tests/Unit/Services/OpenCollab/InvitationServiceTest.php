@@ -6,6 +6,7 @@ use App\Events\OpenCollab\InvitationAccepted;
 use App\Exceptions\OpenCollab\InvalidInvitationException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Invitation;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
@@ -26,6 +27,7 @@ class InvitationServiceTest extends FunctionalTestCase
     private MockInterface $onboardingService;
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
+    private MockInterface $notificationDispatcher;
 
     // ── create() ──────────────────────────────────────────────────────────────
 
@@ -390,10 +392,15 @@ class InvitationServiceTest extends FunctionalTestCase
         $this->onboardingService = Mockery::mock(ContributorOnboardingService::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
 
         $this->databaseMock
             ->shouldReceive('transaction')
             ->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->notificationDispatcher->shouldReceive('dispatch')
+            ->andReturn(1)
+            ->byDefault();
 
         $this->service = new InvitationService(
             $this->invitationRepository,
@@ -402,6 +409,7 @@ class InvitationServiceTest extends FunctionalTestCase
             $this->onboardingService,
             $this->eventDispatcher,
             $this->databaseMock,
+            $this->notificationDispatcher
         );
     }
 

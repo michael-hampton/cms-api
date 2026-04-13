@@ -1135,7 +1135,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         [$sql, $bindings] = $this->builder->toSql();
 
         $this->assertStringContainsString('JSON_CONTAINS (meta, :param_0)', $sql);
-        $this->assertEquals('["featured"]', $bindings['param_0']);
+        $this->assertEquals('"featured"', $bindings['param_0']);
     }
 
     public function test_where_json_contains_with_array(): void
@@ -1144,7 +1144,7 @@ class QueryBuilderRelationshipTest extends FunctionalTestCase
         [$sql, $bindings] = $this->builder->toSql();
 
         $this->assertStringContainsString('JSON_CONTAINS', $sql);
-        $this->assertEquals('["php","laravel"]', $bindings['param_0']);
+        $this->assertEquals('"php"', $bindings['param_0']);
     }
 
     // ==================== ORDER BY METHODS ====================

@@ -56,7 +56,7 @@ class AdminContributorController extends Controller
 
         $results = $this->contributorRepository->searchForSite(SiteContext::getId(), $query, $perPage);
 
-        return $this->resourceResponse($this->formatPaginatedUsers($results));
+        return $this->jsonResponse($this->formatPaginatedUsers($results));
     }
 
     private function formatPaginatedUsers(array $result): array

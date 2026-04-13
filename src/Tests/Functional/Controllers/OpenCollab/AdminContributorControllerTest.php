@@ -29,7 +29,7 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $items = array_values(array_filter($data, static fn($key) => is_int($key), ARRAY_FILTER_USE_KEY));
+        $items = array_values(array_filter($data['data'], static fn($key) => is_int($key), ARRAY_FILTER_USE_KEY));
 
         $this->assertCount(1, $items);
         $this->assertEquals($this->contributor->id, $items[0]['id']);

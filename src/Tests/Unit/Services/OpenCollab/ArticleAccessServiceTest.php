@@ -5,9 +5,11 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Events\OpenCollab\ArticlePurchasedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ArticlePayment;
 use App\Models\Page;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
@@ -25,6 +27,8 @@ class ArticleAccessServiceTest extends FunctionalTestCase
     private MockInterface $databaseMock;
     private MockInterface $logger;
     private MockInterface $activityRepository;
+    private NotificationDispatcher $notificationDispatcher;
+    private PageRepository $pageRepository;
 
     public function test_can_view_returns_true_for_free_page(): void
     {
@@ -269,10 +273,15 @@ class ArticleAccessServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
         $this->activityRepository = Mockery::mock(ActivityRepository::class);
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
+        $this->pageRepository = Mockery::mock(PageRepository::class);
 
         $this->databaseMock
             ->shouldReceive('transaction')
             ->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
+        $this->pageRepository->shouldReceive('find')->byDefault();
 
         $this->service = new ArticleAccessService(
             $this->accessRepository,
@@ -280,7 +289,9 @@ class ArticleAccessServiceTest extends FunctionalTestCase
             $this->eventDispatcher,
             $this->databaseMock,
             $this->logger,
-            $this->activityRepository
+            $this->activityRepository,
+            $this->notificationDispatcher,
+            $this->pageRepository
         );
     }
 

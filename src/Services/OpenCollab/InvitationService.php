@@ -7,10 +7,14 @@ use App\Events\OpenCollab\InvitationAccepted;
 use App\Exceptions\OpenCollab\InvalidInvitationException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Model;
 use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\InvitationRepository;
+use App\Services\OpenCollab\Notifications\InvitationAcceptedNotification;
+use App\Services\OpenCollab\Notifications\InvitationCreatedNotification;
+use App\Services\OpenCollab\Notifications\InvitationResentNotification;
 
 /**
  * Orchestrates the invitation lifecycle.
@@ -34,6 +38,8 @@ class InvitationService
         private readonly ContributorOnboardingService $onboardingService,
         private readonly EventDispatcher              $eventDispatcher,
         private readonly Database                     $database,
+        private readonly NotificationDispatcher $notificationDispatcher,
+
     )
     {
     }
@@ -51,7 +57,7 @@ class InvitationService
             );
         }
 
-        return $this->invitationRepository->create([
+        $invitation = $this->invitationRepository->create([
             'site_id' => $siteId,
             'email' => $email,
             'token' => $this->generateToken(),
@@ -59,6 +65,12 @@ class InvitationService
             'status' => InvitationStatus::Pending->value,
             'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
         ]);
+
+        $this->notificationDispatcher->dispatch(
+            new InvitationCreatedNotification($invitation)
+        );
+
+        return $invitation;
     }
 
     /**
@@ -68,9 +80,13 @@ class InvitationService
      */
     public function send(\App\Models\Invitation $invitation): void
     {
-        // Notification dispatch goes here when the mail layer is wired.
-        // For now the method exists so ResendInvitationController can call it
-        // without a fatal error.
+        if ($invitation->resolveStatus() !== InvitationStatus::Pending) {
+            return;
+        }
+
+        $this->notificationDispatcher->dispatch(
+            new InvitationResentNotification($invitation)
+        );
     }
 
     /**
@@ -120,6 +136,10 @@ class InvitationService
 
             // ideally after commit
             $this->eventDispatcher->dispatch(new InvitationAccepted($user, $invitation));
+
+            $this->notificationDispatcher->dispatch(
+                new InvitationAcceptedNotification($user, $invitation)
+            );
 
             return $user;
         });
@@ -177,6 +197,10 @@ class InvitationService
 
             $this->eventDispatcher->dispatch(
                 new InvitationAccepted($user, $invitation, true)
+            );
+
+            $this->notificationDispatcher->dispatch(
+                new InvitationAcceptedNotification($user, $invitation)
             );
 
             return $user;

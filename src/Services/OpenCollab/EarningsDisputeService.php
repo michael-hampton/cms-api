@@ -5,9 +5,14 @@ namespace App\Services\OpenCollab;
 use App\Enums\OpenCollab\DisputeStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
 use App\Framework\Database\Database;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\EarningsDispute;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\EarningsDisputeRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
+use App\Services\OpenCollab\Notifications\DisputeAdjustmentAppliedNotification;
+use App\Services\OpenCollab\Notifications\DisputeRaisedNotification;
+use App\Services\OpenCollab\Notifications\DisputeResolvedNotification;
 
 /**
  * Governs the earnings dispute lifecycle.
@@ -24,7 +29,9 @@ class EarningsDisputeService
     public function __construct(
         private readonly EarningsDisputeRepository $disputeRepository,
         private readonly EarningsLedgerRepository  $ledgerRepository,
+        private readonly UserRepositoryInterface $userRepository,
         private readonly Database                  $database,
+        private readonly NotificationDispatcher  $notificationDispatcher,
     )
     {
     }
@@ -51,7 +58,16 @@ class EarningsDisputeService
             );
         }
 
-        return $this->disputeRepository->createForUser($userId, $ledgerId, $reason);
+        $dispute = $this->disputeRepository->createForUser($userId, $ledgerId, $reason);
+
+        $contributor = $this->userRepository->find($userId);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new DisputeRaisedNotification($dispute, $contributor)
+            );
+        }
+
+        return $dispute;
     }
 
     /**
@@ -85,7 +101,7 @@ class EarningsDisputeService
             );
         }
 
-        return $this->database->transaction(function () use (
+        $resolved = $this->database->transaction(function () use (
             $dispute, $adminNotes, $adjustmentAmount, $adjustmentReason
         ): EarningsDispute {
             $resolved = $this->disputeRepository->markResolved($dispute->id, $adminNotes);
@@ -106,6 +122,27 @@ class EarningsDisputeService
 
             return $resolved;
         });
+
+        $contributor = $this->userRepository->find($dispute->user_id);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new DisputeResolvedNotification($resolved, $contributor, true, $adminNotes)
+            );
+
+            if ($adjustmentAmount !== null) {
+                $ledgerEntry = $this->ledgerRepository->find($dispute->earnings_ledger_id);
+                $this->notificationDispatcher->dispatch(
+                    new DisputeAdjustmentAppliedNotification(
+                        $resolved,
+                        $contributor,
+                        $adjustmentAmount,
+                        $ledgerEntry->currency ?? 'GBP',
+                    )
+                );
+            }
+        }
+
+        return $resolved;
     }
 
     /**
@@ -127,6 +164,15 @@ class EarningsDisputeService
             );
         }
 
-        return $this->disputeRepository->markRejected($dispute->id, $adminNotes);
+        $rejected = $this->disputeRepository->markRejected($dispute->id, $adminNotes);
+
+        $contributor = $this->userRepository->find($dispute->user_id);
+        if ($contributor) {
+            $this->notificationDispatcher->dispatch(
+                new DisputeResolvedNotification($rejected, $contributor, false, $adminNotes)
+            );
+        }
+
+        return $rejected;
     }
 }

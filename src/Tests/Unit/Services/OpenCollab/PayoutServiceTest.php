@@ -8,7 +8,9 @@ use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Payout;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
@@ -27,6 +29,8 @@ class PayoutServiceTest extends FunctionalTestCase
     private MockInterface $payoutAuditRepository;
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
+    private UserRepositoryInterface $userRepository;
+    private NotificationDispatcher $notificationDispatcher;
 
     // -------------------------------------------------------------------------
     // availableBalance()
@@ -276,14 +280,21 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
         $this->payoutAuditRepository = Mockery::mock(PayoutAuditRepository::class);
+        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
+
+        $this->userRepository->shouldReceive('find')->byDefault();
+        $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
 
         $this->service = new PayoutService(
             $this->payoutRepository,
             $this->payoutAuditRepository,
             $this->ledgerRepository,
             $this->paymentRepository,
+            $this->userRepository,
             $this->eventDispatcher,
             $this->databaseMock,
+            $this->notificationDispatcher
         );
     }
 

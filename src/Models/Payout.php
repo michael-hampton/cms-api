@@ -32,6 +32,7 @@ class Payout extends Model
         'approved_at' => 'datetime',
         'processed_at' => 'datetime',
         'rejected_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public function isPending(): bool
