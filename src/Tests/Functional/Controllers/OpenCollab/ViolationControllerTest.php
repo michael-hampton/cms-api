@@ -64,6 +64,17 @@ class ViolationControllerTest extends FunctionalTestCase
         $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 0]);
     }
 
+    public function test_store_returns_422_for_reason_that_is_too_short(): void
+    {
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
+            'type' => 'spam',
+            'severity' => 'low',
+            'reason' => 'short',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
     public function test_store_returns_422_for_invalid_payload(): void
     {
         $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
@@ -118,6 +129,92 @@ class ViolationControllerTest extends FunctionalTestCase
             'resolution_notes' => 'Issue investigated and cleared.',
         ]);
         $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 1]);
+    }
+
+    public function test_resolve_with_no_notes_still_succeeds(): void
+    {
+        $violation = ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'spam',
+            'severity' => 'low',
+            'reason' => 'Low severity spam violation that can be resolved silently.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/admin/violations/{$violation->id}/resolve", []);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseHas('oc_contributor_violations', [
+            'id' => $violation->id,
+            'resolved_by' => $this->authenticatedUser->id,
+        ]);
+    }
+
+    public function test_admin_can_list_all_violations_for_site(): void
+    {
+        ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'spam',
+            'severity' => 'low',
+            'reason' => 'Repeated low-quality spam submissions on the platform.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/admin/violations');
+        $data = json_decode($response->getContent(), true);
+
+        $items = array_values(array_filter($data['data'], fn($k) => is_int($k), ARRAY_FILTER_USE_KEY));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $items);
+        $this->assertEquals($this->contributor->id, $items[0]['user_id']);
+    }
+
+    public function test_resolve_returns_422_for_already_resolved_violation(): void
+    {
+        $violation = ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'quality',
+            'severity' => 'low',
+            'reason' => 'Quality violation that is already resolved in the system.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+            'resolved_at' => date('Y-m-d H:i:s'),
+            'resolved_by' => $this->authenticatedUser->id,
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/admin/violations/{$violation->id}/resolve", [
+            'notes' => 'Attempting to resolve an already resolved violation.',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_site_wide_list_does_not_include_violations_from_other_sites(): void
+    {
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-viol-site', 'is_default' => false]);
+
+        ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $otherSite->id,
+            'type' => 'policy',
+            'severity' => 'medium',
+            'reason' => 'Policy violation on a different site entirely.',
+            'action_taken' => ViolationAction::Warning->value,
+            'created_by' => $this->authenticatedUser->id,
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/admin/violations');
+        $data = json_decode($response->getContent(), true);
+        $items = array_values(array_filter($data['data'], fn($k) => is_int($k), ARRAY_FILTER_USE_KEY));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(0, $items);
     }
 
     protected function setUp(): void

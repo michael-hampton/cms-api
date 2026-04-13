@@ -16,6 +16,56 @@ class PayoutControllerTest extends FunctionalTestCase
 
     private User $contributor;
 
+    public function test_contributor_can_list_their_own_payouts(): void
+    {
+        $this->actingAs($this->contributor);
+
+        Payout::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'amount' => 7500,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Paid->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/payouts');
+
+        $data = json_decode($response->getContent(), true);
+        $items = array_values(array_filter($data['data'], fn($k) => is_int($k), ARRAY_FILTER_USE_KEY));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(1, $items);
+        $this->assertEquals($this->contributor->id, $items[0]['user_id']);
+    }
+
+    public function test_contributor_cannot_see_other_contributors_payouts(): void
+    {
+        $other = $this->createUser([
+            'email' => 'other-payout-contributor@example.com',
+            'role' => 'contributor',
+            'is_contributor' => true,
+        ]);
+
+        $this->actingAs($this->contributor);
+
+        Payout::create([
+            'user_id' => $other->id,
+            'site_id' => $this->siteId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Paid->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/payouts');
+        $data = json_decode($response->getContent(), true);
+        $items = array_values(array_filter($data, fn($k) => is_int($k), ARRAY_FILTER_USE_KEY));
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertCount(0, $items);
+    }
+
     public function test_balance_returns_available_balance_in_pence_and_pounds(): void
     {
         $this->actingAs($this->contributor);
@@ -87,6 +137,32 @@ class PayoutControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
+    public function test_unauthenticated_user_cannot_list_payouts(): void
+    {
+        $response = $this->getForSiteUnauthenticated('/api/open-collab/payouts');
+
+        $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    public function test_admin_can_list_all_site_payouts(): void
+    {
+        Payout::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'amount' => 9000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/admin/payouts');
+        $data = json_decode($response->getContent(), true);
+        $items = is_array($data['data'] ?? null) ? $data['data'] : $data;
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNotEmpty($items);
+    }
+
     public function test_request_returns_validation_errors_for_invalid_method(): void
     {
         $this->actingAs($this->contributor);
@@ -151,6 +227,22 @@ class PayoutControllerTest extends FunctionalTestCase
             'status' => PayoutStatus::Rejected->value,
             'rejection_reason' => 'Bank details are missing.',
         ]);
+    }
+
+    public function test_reject_returns_422_when_reason_is_missing(): void
+    {
+        $payout = Payout::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/admin/payouts/{$payout->id}/reject", []);
+
+        $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function test_mark_paid_returns_validation_errors_for_invalid_payload(): void

@@ -581,6 +581,7 @@ use App\Framework\Support\SiteContext;
 @include('member.subscriptions.components._billing-date-modal')
 <script>
     let currentSubscriptionId = null;
+    const SITE = '<?= SiteContext::slug() ?>';
 
     function openChangeBillingDateModal(subscriptionId, currentDay) {
         currentSubscriptionId = subscriptionId;

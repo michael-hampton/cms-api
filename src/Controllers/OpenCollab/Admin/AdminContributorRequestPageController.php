@@ -5,19 +5,18 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
-use App\Services\OpenCollab\ContributorRequestService;
 
 /**
  * Admin HTML view for contributor access request queue.
+ * Data is loaded client-side via ContributorRequestController::index,
+ * ::approve and ::reject.
  *
  * Routes:
  *   GET /{site}/open-collab/admin/contributor-requests
  */
 class AdminContributorRequestPageController extends Controller
 {
-    public function __construct(
-        private readonly ContributorRequestService $requestService,
-    )
+    public function __construct()
     {
         parent::__construct();
     }
@@ -29,10 +28,7 @@ class AdminContributorRequestPageController extends Controller
     {
         $this->requireAdmin();
 
-        $requests = $this->requestService->pendingForSite(SiteContext::getId());
-
         return $this->view('open-collab.admin.contributor-requests.index', [
-            'requests' => $requests,
             'pageTitle' => 'Access Requests',
             'activeNav' => 'contributors',
             'breadcrumbs' => [

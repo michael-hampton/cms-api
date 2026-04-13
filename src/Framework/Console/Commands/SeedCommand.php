@@ -10,7 +10,7 @@ use Exception;
 class SeedCommand extends Command
 {
     protected $signature = 'db:seed {--class= : The class name of the root seeder}';
-    protected $description = 'Run the database seeders';
+    public $description = 'Run the database seeders';
 
     public function handle(): int
     {

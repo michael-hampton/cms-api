@@ -3,6 +3,7 @@
 namespace App\Repositories\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutStatus;
+use App\Framework\Support\Collection;
 use App\Models\Payout;
 use App\Repositories\Repository;
 
@@ -62,6 +63,39 @@ class PayoutRepository extends Repository
                 PayoutStatus::Approved->value,
             ])
             ->sum('amount');
+    }
+
+    /**
+     * Returns true if a pending or approved payout exists for this
+     * contributor scoped to a specific currency.
+     * Used by the scheduler to allow concurrent payouts in different currencies.
+     */
+    public function hasInFlightForContributorAndCurrency(int $userId, string $currency): bool
+    {
+        return Payout::where('user_id', $userId)
+            ->whereIn('status', [
+                PayoutStatus::Pending->value,
+                PayoutStatus::Approved->value,
+            ])
+            ->where('currency', strtoupper($currency))
+            ->exists();
+    }
+
+    /**
+     * Returns all pending or approved payouts for a contributor.
+     * Filtering is done in the DB — do not load all payouts and filter in PHP.
+     * Used by ContributorTerminationService to cancel in-flight payouts on closure.
+     *
+     * @return Collection<Payout>
+     */
+    public function inFlightForContributor(int $userId): Collection
+    {
+        return Payout::where('user_id', $userId)
+            ->whereIn('status', [
+                PayoutStatus::Pending->value,
+                PayoutStatus::Approved->value,
+            ])
+            ->get();
     }
 
     protected function getModelClass(): string

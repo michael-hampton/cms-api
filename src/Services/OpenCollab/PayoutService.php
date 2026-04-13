@@ -38,16 +38,17 @@ class PayoutService
     // Minimum balance required before a payout can be requested (pence).
     private const MINIMUM_PAYOUT_PENCE = 5000; // £50.00
 
+    private const VALID_METHODS = ['bank_transfer', 'stripe'];
+
     public function __construct(
         private readonly PayoutRepository         $payoutRepository,
-        private readonly PayoutAuditRepository $payoutAuditRepository,
+        private readonly PayoutAuditRepository   $payoutAuditRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
         private readonly UserRepositoryInterface $userRepository,
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
         private readonly NotificationDispatcher  $notificationDispatcher,
-
     )
     {
     }
@@ -57,28 +58,38 @@ class PayoutService
     /**
      * Contributor requests a payout for their full available balance.
      *
+     * The balance check and in-flight guard are both performed inside the
+     * transaction to eliminate the race condition window between check and write.
+     *
+     * @throws \InvalidArgumentException if the payout method is invalid
      * @throws \InvalidArgumentException if balance is below the minimum
      * @throws \RuntimeException         if there is already a payout in flight
      */
     public function requestPayout(int $userId, int $siteId, string $method): \App\Models\Payout
     {
-        $available = $this->availableBalance($userId);
-
-        if ($available < self::MINIMUM_PAYOUT_PENCE) {
+        if (!in_array($method, self::VALID_METHODS, true)) {
             throw new \InvalidArgumentException(
-                "Minimum payout is £" . number_format(self::MINIMUM_PAYOUT_PENCE / 100, 2) .
-                ". Current available balance: £" . number_format($available / 100, 2) . "."
+                "Invalid payout method [{$method}]. Allowed: " . implode(', ', self::VALID_METHODS) . "."
             );
         }
 
-        $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
-        if ($inFlight > 0) {
-            throw new \RuntimeException(
-                "A payout of £" . number_format($inFlight / 100, 2) . " is already in progress."
-            );
-        }
+        $payout = $this->database->transaction(function () use ($userId, $siteId, $method): \App\Models\Payout {
+            $available = $this->availableBalance($userId);
 
-        $payout = $this->database->transaction(function () use ($userId, $siteId, $method, $available): \App\Models\Payout {
+            if ($available < self::MINIMUM_PAYOUT_PENCE) {
+                throw new \InvalidArgumentException(
+                    "Minimum payout is £" . number_format(self::MINIMUM_PAYOUT_PENCE / 100, 2) .
+                    ". Current available balance: £" . number_format($available / 100, 2) . "."
+                );
+            }
+
+            $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
+            if ($inFlight > 0) {
+                throw new \RuntimeException(
+                    "A payout of £" . number_format($inFlight / 100, 2) . " is already in progress."
+                );
+            }
+
             return $this->payoutRepository->create([
                 'user_id' => $userId,
                 'site_id' => $siteId,
@@ -120,7 +131,7 @@ class PayoutService
      * Admin approves a pending payout.
      * Audit entry written inside the same transaction.
      *
-     * @throws \InvalidArgumentException if payout is not pending
+     * @throws \InvalidArgumentException if payout is not found or not pending
      */
     public function approve(int $payoutId, int $adminId): \App\Models\Payout
     {
@@ -166,7 +177,7 @@ class PayoutService
      * Admin marks an approved payout as paid.
      * Records the payment reference for the audit trail.
      *
-     * @throws \InvalidArgumentException if payout is not approved
+     * @throws \InvalidArgumentException if payout is not found or not approved
      */
     public function markPaid(
         int     $payoutId,
@@ -222,7 +233,7 @@ class PayoutService
      * Admin rejects a pending payout (e.g. missing bank details).
      * Reason is required — enforced at the controller level too.
      *
-     * @throws \InvalidArgumentException if payout is not pending
+     * @throws \InvalidArgumentException if payout is not found or not pending
      */
     public function reject(int $payoutId, int $adminId, string $reason): \App\Models\Payout
     {

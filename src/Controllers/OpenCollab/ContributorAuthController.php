@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
@@ -53,6 +54,15 @@ class ContributorAuthController extends Controller
             );
 
             $response = $this->authenticationService->login($authRequest);
+
+            if ($response) {
+                Auth::login([
+                    'id' => $response->userId,
+                    'name' => $response->userName,
+                    'email' => $response->userEmail,
+                    'role' => $response->role,
+                ]);
+            }
 
             return $this->jsonResponse([
                 'token' => $response->accessToken,

@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Requests\OpenCollab\MarkPayoutPaidRequest;
@@ -43,9 +44,29 @@ class PayoutController extends Controller
         $userId = Auth::id();
         $payouts = $this->payoutRepository->forContributor($userId);
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $payouts->map(fn($p) => $this->formatPayout($p))->toArray()
         );
+    }
+
+    private function formatPayout(\App\Models\Payout $payout): array
+    {
+        return [
+            'id' => $payout->id,
+            'user_id' => $payout->user_id,
+            'amount_pence' => $payout->amount,
+            'amount_pounds' => number_format($payout->amount / 100, 2, '.', ''),
+            'currency' => $payout->currency,
+            'status' => $payout->status,
+            'method' => $payout->method,
+            'reference' => $payout->reference,
+            'notes' => $payout->notes,
+            'approved_at' => $payout->approved_at,
+            'processed_at' => $payout->processed_at,
+            'rejected_at' => $payout->rejected_at,
+            'rejection_reason' => $payout->rejection_reason,
+            'created_at' => $payout->created_at,
+        ];
     }
 
     /**
@@ -61,6 +82,8 @@ class PayoutController extends Controller
             'balance_pounds' => number_format($balance / 100, 2, '.', ''),
         ]);
     }
+
+    // ── Admin endpoints ───────────────────────────────────────────────────────
 
     /**
      * POST /api/{site}/open-collab/payouts
@@ -89,8 +112,6 @@ class PayoutController extends Controller
         }
     }
 
-    // ── Admin endpoints ───────────────────────────────────────────────────────
-
     /**
      * GET /api/{site}/open-collab/admin/payouts
      * All payouts for the site, paginated, newest first.
@@ -108,31 +129,15 @@ class PayoutController extends Controller
         );
     }
 
-    private function formatPayout(\App\Models\Payout $payout): array
-    {
-        return [
-            'id' => $payout->id,
-            'user_id' => $payout->user_id,
-            'amount_pence' => $payout->amount,
-            'amount_pounds' => number_format($payout->amount / 100, 2, '.', ''),
-            'currency' => $payout->currency,
-            'status' => $payout->status,
-            'method' => $payout->method,
-            'reference' => $payout->reference,
-            'notes' => $payout->notes,
-            'approved_at' => $payout->approved_at,
-            'processed_at' => $payout->processed_at,
-            'rejected_at' => $payout->rejected_at,
-            'rejection_reason' => $payout->rejection_reason,
-            'created_at' => $payout->created_at,
-        ];
-    }
-
     /**
      * POST /api/{site}/open-collab/admin/payouts/{id}/approve
      */
     public function approve(int $id): JsonResponse
     {
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 422);
+        }
+
         try {
             $payout = $this->payoutService->approve($id, Auth::id());
 
@@ -150,6 +155,10 @@ class PayoutController extends Controller
      */
     public function markPaid(MarkPayoutPaidRequest $request, int $id): JsonResponse
     {
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 422);
+        }
+
         try {
             $data = $request->validated();
             $payout = $this->payoutService->markPaid(
@@ -175,9 +184,13 @@ class PayoutController extends Controller
     /**
      * POST /api/{site}/open-collab/admin/payouts/{id}/reject
      */
-    public function reject(int $id): JsonResponse
+    public function reject(int $id, Request $request): JsonResponse
     {
-        $reason = $_POST['reason'] ?? (json_decode(file_get_contents('php://input'), true)['reason'] ?? '');
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 422);
+        }
+
+        $reason = $request->input('reason');
 
         if (empty($reason)) {
             return $this->errorResponse('A rejection reason is required.', 422);

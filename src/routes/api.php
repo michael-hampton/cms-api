@@ -62,6 +62,7 @@ use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\OnboardingController;
+use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
 use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\OpenCollab\ViolationController;
@@ -250,6 +251,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get(
             '/open-collab/payouts/balance',
             [PayoutController::class, 'balance']
+        );
+
+        $router->get(
+            '/open-collab/payouts',
+            [PayoutController::class, 'index']
         );
 
         $router->post(
@@ -1223,6 +1229,8 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->get('/pages/{pageId}/history', [ArticleHistoryController::class, 'index']);
     $router->post('/pages/{pageId}/history/{historyId}/restore', [ArticleHistoryController::class, 'restore']);
 
+    $router->post('/payments/{id}/retry', [PaymentRetryController::class, 'retry']);
+
     $router->post('/pages/{pageId}/purchase', [ArticlePaymentController::class, 'initiate']);
 
     $router->post('/auth/login', [ContributorAuthController::class, 'login']);
@@ -1250,8 +1258,12 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->post('/invitations', [InvitationController::class, 'store']);
 
     $router->post('/disputes', [EarningsDisputeController::class, 'store']);
+    $router->get('/disputes', [EarningsDisputeController::class, 'index']);
+    $router->get('/admin/disputes', [EarningsDisputeController::class, 'adminIndex']);
     $router->post('/admin/disputes/{id}/reject', [EarningsDisputeController::class, 'reject']);
     $router->post('/admin/disputes/{id}/resolve', [EarningsDisputeController::class, 'resolve']);
+
+    $router->get('/admin/violations', [ViolationController::class, 'siteIndex']);
 
     $router->post('/admin/payment-terms', [\App\Controllers\OpenCollab\Admin\AdminPaymentTermsController::class, 'save']);
 

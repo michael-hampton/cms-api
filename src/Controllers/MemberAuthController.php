@@ -208,6 +208,8 @@ class MemberAuthController extends Controller
             return $this->redirect($intendedUrl);
         }
 
+        die('no');
+
         return $this->back()->withErrors([
             'email' => 'Invalid credentials or account not activated'
         ]);

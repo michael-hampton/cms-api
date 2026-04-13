@@ -34,7 +34,7 @@ class ContributorRequestController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $body = $request->all();
 
         $email = trim($body['email'] ?? '');
         $name = trim($body['name'] ?? '');
@@ -86,7 +86,7 @@ class ContributorRequestController extends Controller
     {
         $requests = $this->requestService->pendingForSite(SiteContext::getId());
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $requests->map(fn($r) => $this->formatRequest($r))->toArray()
         );
     }

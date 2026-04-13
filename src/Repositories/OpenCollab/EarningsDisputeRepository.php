@@ -77,6 +77,18 @@ class EarningsDisputeRepository extends Repository
             ->exists();
     }
 
+    /**
+     * Returns true if ANY dispute (open, resolved, or rejected) exists
+     * for this user + ledger entry combination.
+     * Prevents re-raising a dispute that has already been handled.
+     */
+    public function hasAnyDisputeForLedgerEntry(int $userId, int $ledgerId): bool
+    {
+        return EarningsDispute::where('user_id', $userId)
+            ->where('earnings_ledger_id', $ledgerId)
+            ->exists();
+    }
+
     protected function getModelClass(): string
     {
         return EarningsDispute::class;

@@ -40,6 +40,19 @@ class UserSiteRepository extends Repository
             ->toArray();
     }
 
+    /**
+     * Returns true if the user has active site access on ANY site other
+     * than $excludingSiteId.
+     * Used by ContributorTerminationService to decide whether to deactivate
+     * the user account globally — we must not lock them out of other sites.
+     */
+    public function hasAnyOtherAccess(int $userId, int $excludingSiteId): bool
+    {
+        return UserSite::where('user_id', $userId)
+            ->where('site_id', '!=', $excludingSiteId)
+            ->exists();
+    }
+
     protected function getModelClass(): string
     {
         return UserSite::class;

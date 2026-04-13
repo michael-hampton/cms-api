@@ -33,7 +33,7 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $dispute = $this->makeDispute(['id' => 1, 'status' => DisputeStatus::Open->value]);
 
         $this->ledgerRepository->shouldReceive('find')->with(10)->andReturn($ledger);
-        $this->disputeRepository->shouldReceive('hasOpenDisputeForLedgerEntry')->with(7, 10)->andReturn(false);
+        $this->disputeRepository->shouldReceive('hasAnyDisputeForLedgerEntry')->with(7, 10)->andReturn(false);
         $this->disputeRepository->shouldReceive('createForUser')
             ->once()
             ->with(7, 10, 'Incorrect amount charged.')
@@ -42,36 +42,6 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $result = $this->service->raise(userId: 7, ledgerId: 10, reason: 'Incorrect amount charged.');
 
         $this->assertEquals(DisputeStatus::Open->value, $result->status);
-    }
-
-    private function makeLedger(array $attributes = []): EarningsLedger
-    {
-        $defaults = [
-            'id' => 10,
-            'user_id' => 7,
-            'article_id' => 5,
-            'type' => LedgerEntryType::Sale->value,
-            'amount' => 500,
-            'currency' => 'GBP',
-        ];
-        $model = new EarningsLedger(array_merge($defaults, $attributes));
-        $model->exists = true;
-        return $model;
-    }
-
-    private function makeDispute(array $attributes = []): EarningsDispute
-    {
-        $defaults = [
-            'id' => 1,
-            'user_id' => 7,
-            'earnings_ledger_id' => 10,
-            'reason' => 'Incorrect amount.',
-            'status' => DisputeStatus::Open->value,
-            'admin_notes' => null,
-        ];
-        $model = new EarningsDispute(array_merge($defaults, $attributes));
-        $model->exists = true;
-        return $model;
     }
 
     public function test_raise_throws_when_ledger_entry_not_found(): void
@@ -104,14 +74,42 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $ledger = $this->makeLedger(['user_id' => 7]);
 
         $this->ledgerRepository->shouldReceive('find')->andReturn($ledger);
-        $this->disputeRepository->shouldReceive('hasOpenDisputeForLedgerEntry')->andReturn(true);
+        $this->disputeRepository->shouldReceive('hasAnyDisputeForLedgerEntry')->andReturn(true);
         $this->disputeRepository->shouldNotReceive('createForUser');
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageMatches('/open dispute already exists/i');
+        $this->expectExceptionMessageMatches('/dispute has already been raised/i');
 
         $this->service->raise(7, 10, 'reason here too');
     }
+
+    public function test_raise_throws_when_resolved_dispute_already_exists_for_ledger_entry(): void
+    {
+        $ledger = $this->makeLedger(['user_id' => 7]);
+
+        $this->ledgerRepository->shouldReceive('find')->andReturn($ledger);
+        // hasAnyDisputeForLedgerEntry returns true even for resolved disputes
+        $this->disputeRepository->shouldReceive('hasAnyDisputeForLedgerEntry')->andReturn(true);
+        $this->disputeRepository->shouldNotReceive('createForUser');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->raise(7, 10, 'trying again after resolve');
+    }
+
+    public function test_raise_throws_when_rejected_dispute_already_exists_for_ledger_entry(): void
+    {
+        $ledger = $this->makeLedger(['user_id' => 7]);
+
+        $this->ledgerRepository->shouldReceive('find')->andReturn($ledger);
+        $this->disputeRepository->shouldReceive('hasAnyDisputeForLedgerEntry')->andReturn(true);
+        $this->disputeRepository->shouldNotReceive('createForUser');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service->raise(7, 10, 'trying again after reject');
+    }
+
 
     public function test_resolve_marks_dispute_resolved(): void
     {
@@ -121,7 +119,7 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $this->disputeRepository->shouldReceive('find')->with(3)->andReturn($dispute);
         $this->disputeRepository->shouldReceive('markResolved')
             ->once()
-            ->with(3, 'Reviewed and corrected.')
+            ->with(3, 'Reviewed and corrected.', 55)
             ->andReturn($resolved);
 
         $result = $this->service->resolve(3, adminId: 55, adminNotes: 'Reviewed and corrected.');
@@ -152,6 +150,7 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
             adminId: 55,
             adminNotes: 'Corrected by £5.',
             adjustmentAmount: 500,
+            adjustmentReason: 'Calculation error.',
         );
 
         $this->assertTrue(true);
@@ -195,6 +194,63 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $this->service->resolve(3, 55, 'notes');
     }
 
+    public function test_resolve_throws_when_adjustment_amount_provided_without_reason(): void
+    {
+        $dispute = $this->makeDispute(['id' => 3, 'status' => DisputeStatus::Open->value]);
+
+        $this->disputeRepository->shouldReceive('find')->andReturn($dispute);
+        $this->disputeRepository->shouldNotReceive('markResolved');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Adjustment reason is required/i');
+
+        $this->service->resolve(
+            disputeId: 3,
+            adminId: 55,
+            adminNotes: 'Adjustment needed.',
+            adjustmentAmount: 500,
+            adjustmentReason: null,
+        );
+    }
+
+    public function test_resolve_passes_admin_id_to_repository(): void
+    {
+        $dispute = $this->makeDispute(['id' => 3, 'status' => DisputeStatus::Open->value]);
+
+        $this->disputeRepository->shouldReceive('find')->andReturn($dispute);
+        $this->disputeRepository->shouldReceive('markResolved')
+            ->once()
+            ->withArgs(function ($id, $notes, $adminId): bool {
+                return $adminId === 55;
+            })
+            ->andReturn($this->makeDispute(['status' => DisputeStatus::Resolved->value]));
+
+        $this->service->resolve(3, adminId: 55, adminNotes: 'Done.');
+        $this->assertTrue(true);
+    }
+
+    public function test_resolve_throws_when_ledger_entry_missing_during_adjustment(): void
+    {
+        $dispute = $this->makeDispute(['id' => 3, 'status' => DisputeStatus::Open->value, 'earnings_ledger_id' => 10]);
+
+        $this->disputeRepository->shouldReceive('find')->andReturn($dispute);
+        $this->disputeRepository->shouldReceive('markResolved')->andReturn(
+            $this->makeDispute(['status' => DisputeStatus::Resolved->value])
+        );
+        $this->ledgerRepository->shouldReceive('find')->with(10)->andReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/ledger entry missing/i');
+
+        $this->service->resolve(
+            disputeId: 3,
+            adminId: 55,
+            adminNotes: 'Correcting.',
+            adjustmentAmount: 500,
+            adjustmentReason: 'Error in calculation.',
+        );
+    }
+
     public function test_resolve_wraps_writes_in_transaction(): void
     {
         $dispute = $this->makeDispute(['id' => 3, 'status' => DisputeStatus::Open->value]);
@@ -216,7 +272,7 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $this->disputeRepository->shouldReceive('find')->with(4)->andReturn($dispute);
         $this->disputeRepository->shouldReceive('markRejected')
             ->once()
-            ->with(4, 'Amount is correct per contract.')
+            ->with(4, 'Amount is correct per contract.', 55)
             ->andReturn($rejected);
 
         $result = $this->service->reject(4, adminId: 55, adminNotes: 'Amount is correct per contract.');
@@ -245,6 +301,52 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->service->reject(1, 55, 'notes');
+    }
+
+    public function test_reject_passes_admin_id_to_repository(): void
+    {
+        $dispute = $this->makeDispute(['id' => 4, 'status' => DisputeStatus::Open->value]);
+
+        $this->disputeRepository->shouldReceive('find')->andReturn($dispute);
+        $this->disputeRepository->shouldReceive('markRejected')
+            ->once()
+            ->withArgs(function ($id, $notes, $adminId): bool {
+                return $adminId === 55;
+            })
+            ->andReturn($this->makeDispute(['status' => DisputeStatus::Rejected->value]));
+
+        $this->service->reject(4, adminId: 55, adminNotes: 'No error found.');
+        $this->assertTrue(true);
+    }
+
+    private function makeLedger(array $attributes = []): EarningsLedger
+    {
+        $defaults = [
+            'id' => 10,
+            'user_id' => 7,
+            'article_id' => 5,
+            'type' => LedgerEntryType::Sale->value,
+            'amount' => 500,
+            'currency' => 'GBP',
+        ];
+        $model = new EarningsLedger(array_merge($defaults, $attributes));
+        $model->exists = true;
+        return $model;
+    }
+
+    private function makeDispute(array $attributes = []): EarningsDispute
+    {
+        $defaults = [
+            'id' => 1,
+            'user_id' => 7,
+            'earnings_ledger_id' => 10,
+            'reason' => 'Incorrect amount.',
+            'status' => DisputeStatus::Open->value,
+            'admin_notes' => null,
+        ];
+        $model = new EarningsDispute(array_merge($defaults, $attributes));
+        $model->exists = true;
+        return $model;
     }
 
     protected function setUp(): void

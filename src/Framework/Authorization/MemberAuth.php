@@ -31,9 +31,9 @@ class MemberAuth
             return false;
         }
 
-        if (!$member->isEmailVerified()) {
-            return false;
-        }
+//        if (!$member->isEmailVerified()) {
+//            return false;
+//        }
 
         if (!$member->verifyPassword($password)) {
             return false;

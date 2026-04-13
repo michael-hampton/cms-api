@@ -15,18 +15,33 @@ use App\Services\OpenCollab\ViolationService;
 
 /**
  * Routes:
- *   GET  /api/{site}/open-collab/admin/contributors/{userId}/violations        — list
- *   POST /api/{site}/open-collab/admin/contributors/{userId}/violations        — record
- *   POST /api/{site}/open-collab/admin/violations/{id}/resolve                 — resolve
+ *   GET  /api/{site}/open-collab/admin/violations                           — site-wide list
+ *   GET  /api/{site}/open-collab/admin/contributors/{userId}/violations     — per-contributor list
+ *   POST /api/{site}/open-collab/admin/contributors/{userId}/violations     — record
+ *   POST /api/{site}/open-collab/admin/violations/{id}/resolve              — resolve
  */
 class ViolationController extends Controller
 {
     public function __construct(
-        private readonly ViolationService                                 $violationService,
+        private readonly ViolationService $violationService,
         private readonly \App\Repositories\OpenCollab\ViolationRepository $violationRepository,
     )
     {
         parent::__construct();
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/violations
+     * Site-wide violations list — all contributors on the current site.
+     */
+    public function siteIndex(): JsonResponse
+    {
+        $limit = min((int)($_GET['limit'] ?? 100), 200);
+        $violations = $this->violationRepository->forSite(SiteContext::getId(), $limit);
+
+        return $this->resourceResponse(
+            ['data' => $violations['data']->map(fn($g) => $this->formatViolation($g))->toArray(), 'pagination' => $violations['pagination']]
+        );
     }
 
     /**
@@ -93,8 +108,6 @@ class ViolationController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     /**
      * POST /api/{site}/open-collab/admin/violations/{id}/resolve

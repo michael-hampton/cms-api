@@ -170,6 +170,7 @@ final class Help
             ],
 
             'Selection' => [
+                ['arg' => '--all', 'desc' => 'Ignore test selection from XML configuration file'],
                 ['arg' => '--list-suites', 'desc' => 'List available test suites'],
                 ['arg' => '--testsuite <name>', 'desc' => 'Only run tests from the specified test suite(s)'],
                 ['arg' => '--exclude-testsuite <name>', 'desc' => 'Exclude tests from the specified test suite(s)'],
@@ -242,11 +243,15 @@ final class Help
                 ['spacer' => ''],
 
                 ['arg' => '--order-by <order>', 'desc' => 'Run tests in order: default|defects|depends|duration|no-depends|random|reverse|size'],
+                ['arg' => '--resolve-dependencies', 'desc' => 'Alias for "--order-by depends"'],
+                ['arg' => '--ignore-dependencies', 'desc' => 'Alias for "--order-by no-depends"'],
+                ['arg' => '--random-order', 'desc' => 'Alias for "--order-by random"'],
                 ['arg' => '--random-order-seed <N>', 'desc' => 'Use the specified random seed when running tests in random order'],
+                ['arg' => '--reverse-order', 'desc' => 'Alias for "--order-by reverse"'],
             ],
 
             'Reporting' => [
-                ['arg' => '--colors <flag>', 'desc' => 'Use colors in output ("never", "auto" or "always")'],
+                ['arg' => '--colors=<flag>', 'desc' => 'Use colors in output ("never", "auto" or "always")'],
                 ['arg'    => '--columns <n>', 'desc' => 'Number of columns to use for progress output'],
                 ['arg'    => '--columns max', 'desc' => 'Use maximum number of columns for progress output'],
                 ['arg'    => '--stderr', 'desc' => 'Write to STDERR instead of STDOUT'],
@@ -301,6 +306,7 @@ final class Help
                 ['arg' => '--only-summary-for-coverage-text', 'desc' => 'Option for code coverage report in text format: only show summary'],
                 ['arg' => '--show-uncovered-for-coverage-text', 'desc' => 'Option for code coverage report in text format: show uncovered files'],
                 ['arg' => '--coverage-xml <dir>', 'desc' => 'Write code coverage report in XML format to directory'],
+                ['arg' => '--exclude-source-from-xml-coverage', 'desc' => 'Exclude <source> element from code coverage report in XML format'],
                 ['arg' => '--warm-coverage-cache', 'desc' => 'Warm static analysis cache'],
                 ['arg' => '--coverage-filter <dir>', 'desc' => 'Include <dir> in code coverage reporting'],
                 ['arg' => '--path-coverage', 'desc' => 'Report path coverage in addition to line coverage'],

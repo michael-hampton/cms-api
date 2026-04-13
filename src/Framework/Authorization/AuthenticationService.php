@@ -4,6 +4,7 @@ namespace App\Framework\Authorization;
 
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticationService
@@ -18,7 +19,7 @@ class AuthenticationService
     {
         $user = $this->userRepository->findByEmail(
             $request->email,
-            $request->siteId
+            null
         );
 
         if (!$user || !$user->verifyPassword($request->password)) {
@@ -38,7 +39,7 @@ class AuthenticationService
         $token = new PersonalAccessToken(
             'App\Domain\Auth\Entities\User',
             $user->id,
-            $request->siteId,
+            SiteContext::getId(),
             'auth_token',
             $plainTextToken,
             ['*']
@@ -52,7 +53,7 @@ class AuthenticationService
             userId: $user->id,
             userName: $user->name,
             userEmail: $user->email,
-            siteId: $user->site_id,
+            siteId: SiteContext::getId(),
             role: $user->role
         );
     }

@@ -53,7 +53,9 @@ class Member extends Model
     public static function findByEmail(string $email, int $siteId): ?self
     {
         return self::where('email', $email)
-            ->where('site_id', $siteId)
+            ->when(!empty($siteId), function ($query) use ($siteId) {
+                return $query->where('site_id', $siteId);
+            })
             ->first();
     }
 

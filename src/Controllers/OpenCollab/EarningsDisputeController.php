@@ -36,9 +36,12 @@ class EarningsDisputeController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $ledgerId = isset($body['earnings_ledger_id']) ? (int)$body['earnings_ledger_id'] : 0;
-        $reason = trim($body['reason'] ?? '');
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 401);
+        }
+
+        $ledgerId = $request->get('earnings_ledger_id') ?: 0;
+        $reason = trim($request->get('reason') ?? '');
 
         if ($ledgerId <= 0) {
             return $this->errorResponse('A valid earnings_ledger_id is required.', 422);
@@ -89,7 +92,7 @@ class EarningsDisputeController extends Controller
     {
         $disputes = $this->disputeRepository->forContributor(Auth::id());
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $disputes->map(fn($d) => $this->formatDispute($d))->toArray()
         );
     }
@@ -101,7 +104,7 @@ class EarningsDisputeController extends Controller
     {
         $disputes = $this->disputeRepository->openForSite(SiteContext::getId());
 
-        return $this->resourceResponse(
+        return $this->jsonResponse(
             $disputes->map(fn($d) => $this->formatDispute($d))->toArray()
         );
     }
@@ -110,12 +113,11 @@ class EarningsDisputeController extends Controller
      * POST /api/{site}/open-collab/admin/disputes/{id}/resolve
      * Body: { admin_notes: string, adjustment_amount?: int, adjustment_reason?: string }
      */
-    public function resolve(int $id): JsonResponse
+    public function resolve(int $id, Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $adminNotes = trim($body['admin_notes'] ?? '');
-        $adjustmentAmount = isset($body['adjustment_amount']) ? (int)$body['adjustment_amount'] : null;
-        $adjustmentReason = trim($body['adjustment_reason'] ?? '') ?: null;
+        $adminNotes = trim($request->get('admin_notes') ?? '');
+        $adjustmentAmount = $request->get('adjustment_amount') ?: null;
+        $adjustmentReason = trim($request->get('adjustment_reason', '')) ?: null;
 
         if (empty($adminNotes)) {
             return $this->errorResponse('Admin notes are required when resolving a dispute.', 422);
@@ -145,10 +147,9 @@ class EarningsDisputeController extends Controller
      * POST /api/{site}/open-collab/admin/disputes/{id}/reject
      * Body: { admin_notes: string }
      */
-    public function reject(int $id): JsonResponse
+    public function reject(int $id, Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $adminNotes = trim($body['admin_notes'] ?? '');
+        $adminNotes = trim($request->get('admin_notes') ?? '');
 
         if (empty($adminNotes)) {
             return $this->errorResponse('Admin notes are required when rejecting a dispute.', 422);

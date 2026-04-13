@@ -3,9 +3,10 @@
 /**
  * Template: open-collab/admin/disputes/index.php
  * Variables:
- *   $disputes    — Collection of EarningsDispute models (open)
  *   $site        — string
  *   $currentUser — AuthenticatedUser
+ *
+ * Data is loaded via JS/API so no server-side $disputes variable is needed.
  */
 ?>
 @endsection
@@ -91,90 +92,93 @@
     </div>
 </div>
 
-<?php if ($disputes->isEmpty()): ?>
-    <div class="oc-card" style="padding:64px 24px;text-align:center;">
-        <svg viewBox="0 0 20 20" fill="currentColor" width="36"
-             style="opacity:.15;display:block;margin:0 auto 16px;color:var(--green);">
+<!-- Filter bar -->
+<div class="oc-card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:200px;">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16"
+                 style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--slate-light);pointer-events:none;">
+                <path fill-rule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clip-rule="evenodd"/>
+            </svg>
+            <input class="oc-input" type="text" id="search-input"
+                   placeholder="Search by user ID or ledger ID…"
+                   style="padding-left:38px;"
+                   autocomplete="off">
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+            <button class="filter-pill filter-pill--active" data-status="all" onclick="setStatusFilter('all', this)">
+                All
+            </button>
+            <button class="filter-pill" data-status="open" onclick="setStatusFilter('open', this)">Open</button>
+            <button class="filter-pill" data-status="resolved" onclick="setStatusFilter('resolved', this)">Resolved
+            </button>
+            <button class="filter-pill" data-status="rejected" onclick="setStatusFilter('rejected', this)">Rejected
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-pill {
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1.5px solid var(--border);
+        background: #fff;
+        font-size: .78rem;
+        font-weight: 500;
+        color: var(--slate);
+        cursor: pointer;
+        transition: background .15s, color .15s, border-color .15s;
+        white-space: nowrap;
+    }
+
+    .filter-pill:hover {
+        border-color: var(--navy);
+        color: var(--navy);
+    }
+
+    .filter-pill--active {
+        background: var(--navy);
+        color: #fff;
+        border-color: var(--navy);
+    }
+</style>
+
+<!-- Results card -->
+<div class="oc-card">
+    <div class="oc-card__header">
+        <span class="oc-card__title" id="results-title">All Disputes</span>
+        <span id="results-count"
+              style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
+                     padding:2px 8px;border-radius:10px;font-weight:600;">—</span>
+    </div>
+
+    <div id="disputes-loading" style="padding:48px 24px;text-align:center;color:var(--slate);">
+        <div class="oc-spinner" style="margin:0 auto 12px;"></div>
+        Loading disputes…
+    </div>
+
+    <div id="disputes-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="32"
+             style="opacity:.2;display:block;margin:0 auto 12px;">
             <path fill-rule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                   clip-rule="evenodd"/>
         </svg>
-        <div style="font-size:1.05rem;font-weight:600;color:var(--navy);">No open disputes</div>
-        <div style="font-size:.875rem;color:var(--slate);margin-top:4px;">
-            All earnings disputes have been resolved.
-        </div>
-    </div>
-<?php else: ?>
-
-    <div class="oc-card" style="overflow:hidden;">
-        <div class="oc-card__header">
-            <span class="oc-card__title">Open Earnings Disputes</span>
-            <span style="font-size:.72rem;background:#fef3c7;color:#92400e;
-                         padding:2px 8px;border-radius:10px;font-weight:600;">
-                <?= $disputes->count() ?> open
-            </span>
-        </div>
-
-        <div style="display:flex;flex-direction:column;">
-            <?php foreach ($disputes as $i => $dispute):
-                $dArr = is_array($dispute) ? $dispute : (method_exists($dispute, 'toArray') ? $dispute->toArray() : (array)$dispute);
-                $isLast = $i === $disputes->count() - 1;
-                ?>
-                <div id="dispute-row-<?= (int)$dArr['id'] ?>"
-                     style="padding:18px 20px;<?= !$isLast ? 'border-bottom:1px solid var(--border);' : '' ?>">
-
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-                        <div style="flex:1;min-width:0;">
-                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
-                                <a href="/admin/contributors/<?= (int)$dArr['user_id'] ?>"
-                                   style="font-weight:600;color:var(--navy);text-decoration:none;">
-                                    User #<?= (int)$dArr['user_id'] ?>
-                                </a>
-                                <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
-                                             border-radius:10px;padding:2px 8px;font-family:monospace;">
-                                    Ledger #<?= (int)$dArr['earnings_ledger_id'] ?>
-                                </span>
-                                <span class="oc-badge oc-badge--waiting-approval" style="font-size:.65rem;">Open</span>
-                            </div>
-                            <div style="font-size:.875rem;color:var(--navy);line-height:1.55;margin-bottom:6px;
-                                        background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;
-                                        padding:10px 14px;">
-                                <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
-                                               color:var(--slate);display:block;margin-bottom:4px;">
-                                    Contributor's reason
-                                </strong>
-                                <?= htmlspecialchars($dArr['reason'] ?? '') ?>
-                            </div>
-                            <div style="font-size:.75rem;color:var(--slate-light);">
-                                Raised <?= !empty($dArr['created_at']) ? $dArr['created_at']->format('d M Y, H:i') : '' ?>
-                            </div>
-                        </div>
-
-                        <!-- Actions -->
-                        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
-                            <button onclick="openResolveModal(<?= (int)$dArr['id'] ?>)"
-                                    class="oc-btn oc-btn--primary oc-btn--sm">
-                                <svg viewBox="0 0 20 20" fill="currentColor" width="13">
-                                    <path fill-rule="evenodd"
-                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                          clip-rule="evenodd"/>
-                                </svg>
-                                Resolve
-                            </button>
-                            <button onclick="openRejectModal(<?= (int)$dArr['id'] ?>)"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    style="border-color:#fecaca;color:var(--red);">
-                                Reject
-                            </button>
-                        </div>
-                    </div>
-
-                </div>
-            <?php endforeach; ?>
-        </div>
+        <div style="font-weight:500;margin-bottom:6px;" id="empty-message">No disputes found</div>
+        <div style="font-size:.85rem;" id="empty-sub">All earnings disputes will appear here.</div>
     </div>
 
-<?php endif; ?>
+    <div id="disputes-error"
+         style="display:none;padding:32px 24px;text-align:center;color:var(--red);font-size:.875rem;">
+        Failed to load disputes.
+        <button onclick="loadDisputes()" class="oc-btn oc-btn--ghost oc-btn--sm" style="margin-left:8px;">Retry</button>
+    </div>
+
+    <div id="disputes-list" style="display:none;flex-direction:column;"></div>
+</div>
 
 @endsection
 
@@ -183,13 +187,163 @@
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // Show adjustment reason field when adjustment amount is filled
-    document.getElementById('resolve-adjustment')?.addEventListener('input', function () {
-        const group = document.getElementById('resolve-reason-group');
-        group.style.display = this.value ? 'block' : 'none';
+    let allDisputes = [];
+    let currentStatus = 'all';
+    let currentQuery = '';
+    let debounceTimer = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('search-input').addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                currentQuery = this.value.trim().toLowerCase();
+                renderDisputes();
+            }, 300);
+        });
+
+        loadDisputes();
     });
 
+    function setStatusFilter(status, btn) {
+        currentStatus = status;
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+        btn.classList.add('filter-pill--active');
+        renderDisputes();
+    }
+
+    async function loadDisputes() {
+        showState('loading');
+        try {
+            const res = await fetch(`/api/${SITE}/open-collab/admin/disputes`, {
+                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+            });
+            if (!res.ok) {
+                showState('error');
+                return;
+            }
+            const data = await res.json();
+            allDisputes = Array.isArray(data) ? data : (data.data ?? []);
+            renderDisputes();
+        } catch {
+            showState('error');
+        }
+    }
+
+    function renderDisputes() {
+        let filtered = allDisputes;
+
+        if (currentStatus !== 'all') {
+            filtered = filtered.filter(d => d.status === currentStatus);
+        }
+
+        if (currentQuery) {
+            filtered = filtered.filter(d =>
+                String(d.user_id).includes(currentQuery) ||
+                String(d.earnings_ledger_id).includes(currentQuery) ||
+                (d.reason ?? '').toLowerCase().includes(currentQuery)
+            );
+        }
+
+        document.getElementById('results-count').textContent = filtered.length;
+        document.getElementById('results-title').textContent =
+            currentStatus === 'all' ? 'All Disputes' : `${capitalise(currentStatus)} Disputes`;
+
+        if (!filtered.length) {
+            showState('empty');
+            document.getElementById('empty-message').textContent =
+                currentQuery ? `No disputes matching "${currentQuery}"` : 'No disputes found';
+            document.getElementById('empty-sub').textContent =
+                currentStatus !== 'all' ? `No ${currentStatus} disputes.` : 'Earnings disputes will appear here.';
+            return;
+        }
+
+        const list = document.getElementById('disputes-list');
+        list.innerHTML = '';
+
+        filtered.forEach((d, i) => {
+            const isLast = i === filtered.length - 1;
+            const statusBadge = {
+                open: 'oc-badge--waiting-approval',
+                resolved: 'oc-badge--published',
+                rejected: 'oc-badge--revoked',
+            }[d.status] ?? 'oc-badge--draft';
+
+            const createdAt = d.created_at
+                ? new Date(d.created_at).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+                : '';
+
+            const actionsHtml = d.status === 'open'
+                ? `<button onclick="openResolveModal(${d.id})" class="oc-btn oc-btn--primary oc-btn--sm">
+                       <svg viewBox="0 0 20 20" fill="currentColor" width="13">
+                           <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                       </svg>
+                       Resolve
+                   </button>
+                   <button onclick="openRejectModal(${d.id})" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">
+                       Reject
+                   </button>`
+                : `<span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${capitalise(d.status)}</span>`;
+
+            const adminNotesHtml = d.admin_notes
+                ? `<div style="margin-top:8px;padding:8px 12px;font-size:.78rem;
+                               background:${d.status === 'resolved' ? '#f0fdf4' : '#fff9f9'};
+                               border:1px solid ${d.status === 'resolved' ? '#bbf7d0' : '#fecaca'};
+                               border-radius:6px;color:var(--navy);">
+                       <strong style="color:${d.status === 'resolved' ? 'var(--green)' : 'var(--red)'};">Admin response:</strong>
+                       ${escHtml(d.admin_notes)}
+                   </div>`
+                : '';
+
+            const div = document.createElement('div');
+            div.id = `dispute-row-${d.id}`;
+            div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
+            div.innerHTML = `
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+                            <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${d.user_id}"
+                               style="font-weight:600;color:var(--navy);text-decoration:none;">
+                                User #${d.user_id}
+                            </a>
+                            <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
+                                         border-radius:10px;padding:2px 8px;font-family:monospace;">
+                                Ledger #${d.earnings_ledger_id}
+                            </span>
+                            <span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${capitalise(d.status)}</span>
+                        </div>
+                        <div style="font-size:.875rem;color:var(--navy);line-height:1.55;margin-bottom:4px;
+                                    background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;
+                                    padding:10px 14px;">
+                            <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
+                                           color:var(--slate);display:block;margin-bottom:4px;">
+                                Contributor's reason
+                            </strong>
+                            ${escHtml(d.reason ?? '')}
+                        </div>
+                        ${adminNotesHtml}
+                        <div style="font-size:.75rem;color:var(--slate-light);margin-top:4px;">${createdAt}</div>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
+                        ${actionsHtml}
+                    </div>
+                </div>`;
+            list.appendChild(div);
+        });
+
+        showState('list');
+    }
+
     // ── Resolve modal ─────────────────────────────────────────
+    document.getElementById('resolve-adjustment')?.addEventListener('input', function () {
+        document.getElementById('resolve-reason-group').style.display = this.value ? 'block' : 'none';
+    });
+
     function openResolveModal(id) {
         document.getElementById('resolve-dispute-id').value = id;
         document.getElementById('resolve-notes').value = '';
@@ -220,7 +374,6 @@
             return;
         }
 
-        // Convert pounds to pence — strict parsing
         let adjustmentAmount = null;
         if (adjRaw !== '') {
             const parsed = parseFloat(adjRaw);
@@ -229,7 +382,7 @@
                 errBox.style.display = 'block';
                 return;
             }
-            adjustmentAmount = Math.round(parsed * 100); // pence
+            adjustmentAmount = Math.round(parsed * 100);
         }
 
         if (adjustmentAmount !== null && !adjReason) {
@@ -261,7 +414,13 @@
         if (res.ok) {
             closeResolveModal();
             showToast('✓ Dispute resolved');
-            removeDisputeRow(id);
+            // Update in local cache and re-render
+            const dispute = allDisputes.find(d => d.id === parseInt(id));
+            if (dispute) {
+                dispute.status = 'resolved';
+                dispute.admin_notes = notes;
+            }
+            renderDisputes();
         } else {
             errBox.textContent = data.error || data.message || 'Resolve failed.';
             errBox.style.display = 'block';
@@ -313,7 +472,12 @@
         if (res.ok) {
             closeRejectModal();
             showToast('Dispute rejected');
-            removeDisputeRow(id);
+            const dispute = allDisputes.find(d => d.id === parseInt(id));
+            if (dispute) {
+                dispute.status = 'rejected';
+                dispute.admin_notes = notes;
+            }
+            renderDisputes();
         } else {
             errBox.textContent = data.error || data.message || 'Reject failed.';
             errBox.style.display = 'block';
@@ -322,12 +486,22 @@
         }
     }
 
-    function removeDisputeRow(id) {
-        const row = document.getElementById('dispute-row-' + id);
-        if (!row) return;
-        row.style.opacity = '.4';
-        row.style.pointerEvents = 'none';
-        setTimeout(() => row.remove(), 1000);
+    // ── Helpers ───────────────────────────────────────────────
+    function showState(state) {
+        document.getElementById('disputes-loading').style.display = state === 'loading' ? 'block' : 'none';
+        document.getElementById('disputes-empty').style.display = state === 'empty' ? 'block' : 'none';
+        document.getElementById('disputes-error').style.display = state === 'error' ? 'block' : 'none';
+        document.getElementById('disputes-list').style.display = state === 'list' ? 'flex' : 'none';
+    }
+
+    function capitalise(str) {
+        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function showToast(msg, ok = true) {
@@ -335,7 +509,9 @@
         el.textContent = msg;
         el.style.background = ok ? 'var(--navy)' : 'var(--red)';
         el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
+        setTimeout(() => {
+            el.style.opacity = '0';
+        }, 2800);
     }
 </script>
 @endsection

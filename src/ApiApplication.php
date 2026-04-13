@@ -56,6 +56,8 @@ use App\Framework\Http\Response;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
+use App\Framework\Notifications\Channels\EmailChannel;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Queue\DatabaseQueueDriver;
 use App\Framework\Queue\NullQueueDriver;
 use App\Framework\Queue\QueueDriverInterface;
@@ -247,6 +249,16 @@ class ApiApplication
                 return [
                     SubscriptionType::DIGITAL->value => $app->make(EmailDeliveryChannel::class),
                     SubscriptionType::PRINTED->value => $app->make(PrintDeliveryChannel::class),
+                ];
+            });
+
+        // Bind the channel map for DeliverIssueDeliveryJob.
+        // Keys are SubscriptionType enum values.
+        $this->container->when(NotificationDispatcher::class)
+            ->needs('$channels')
+            ->give(function ($app) {
+                return [
+                    $app->make(EmailChannel::class)
                 ];
             });
 

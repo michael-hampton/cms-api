@@ -5,19 +5,17 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
-use App\Repositories\OpenCollab\EarningsDisputeRepository;
 
 /**
  * Renders the admin earnings disputes management page.
+ * Data is loaded client-side via the EarningsDisputeController API endpoints.
  *
  * Routes:
  *   GET /admin/disputes
  */
 class AdminDisputePageController extends Controller
 {
-    public function __construct(
-        private readonly EarningsDisputeRepository $disputeRepository,
-    )
+    public function __construct()
     {
         parent::__construct();
     }
@@ -29,10 +27,7 @@ class AdminDisputePageController extends Controller
     {
         $this->requireAdmin();
 
-        $disputes = $this->disputeRepository->openForSite(SiteContext::getId());
-
         return $this->view('open-collab.admin.disputes.index', [
-            'disputes' => $disputes,
             'pageTitle' => 'Earnings Disputes',
             'activeNav' => 'disputes',
             'breadcrumbs' => [['label' => 'Earnings Disputes']],

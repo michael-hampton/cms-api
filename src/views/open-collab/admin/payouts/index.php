@@ -3,10 +3,14 @@
 /**
  * Template: open-collab/admin/payouts/index.php
  * Variables:
- *   $pendingPayouts — Collection of Payout models (status = pending)
- *   $allPayouts     — array of Payout models (all statuses, newest first)
- *   $site           — string
- *   $currentUser    — AuthenticatedUser
+ *   $site        — string
+ *   $currentUser — AuthenticatedUser
+ *
+ * All payout data is loaded client-side via:
+ *   GET  /api/{site}/open-collab/admin/payouts          — PayoutController::adminIndex
+ *   POST /api/{site}/open-collab/admin/payouts/{id}/approve
+ *   POST /api/{site}/open-collab/admin/payouts/{id}/paid
+ *   POST /api/{site}/open-collab/admin/payouts/{id}/reject
  */
 ?>
 @endsection
@@ -64,7 +68,8 @@
         <input type="hidden" id="paid-payout-id">
         <div class="oc-form-group">
             <label class="oc-label oc-label--optional" for="paid-reference">Payment reference</label>
-            <input class="oc-input" type="text" id="paid-reference" placeholder="e.g. BACS ref, transaction ID…">
+            <input class="oc-input" type="text" id="paid-reference"
+                   placeholder="e.g. BACS ref, transaction ID…">
         </div>
         <div class="oc-form-group">
             <label class="oc-label oc-label--optional" for="paid-notes">Notes</label>
@@ -74,66 +79,103 @@
         <div id="paid-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
         <div style="display:flex;gap:10px;">
             <button onclick="closePaidModal()" class="oc-btn oc-btn--ghost" style="flex:1;">Cancel</button>
-            <button onclick="submitMarkPaid()" class="oc-btn oc-btn--primary" style="flex:1;" id="paid-confirm-btn">
+            <button onclick="submitMarkPaid()" class="oc-btn oc-btn--primary" style="flex:1;"
+                    id="paid-confirm-btn">
                 Confirm paid
             </button>
         </div>
     </div>
 </div>
 
-<!-- Detail modal -->
-<div id="detail-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
-     onclick="if(event.target===this)closeDetailModal()">
-    <div style="background:#fff;border-radius:12px;max-width:560px;width:94%;max-height:80vh;
-                display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:700;color:var(--navy);" id="detail-title">Payout Details</span>
-            <button onclick="closeDetailModal()"
-                    style="background:none;border:none;cursor:pointer;color:var(--slate);font-size:1.2rem;">✕
-            </button>
-        </div>
-        <div id="detail-body" style="padding:24px;overflow-y:auto;flex:1;"></div>
-        <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;"
-             id="detail-actions"></div>
-    </div>
-</div>
-
-<!-- Stats bar -->
+<!-- Stats bar (populated from API) -->
 <div class="oc-stats" style="margin-bottom:24px;">
-    <?php
-    $pendingCount = count($pendingPayouts);
-    $pendingTotal = 0;
-    foreach ($pendingPayouts as $p) {
-        $pendingTotal += (int)($p->amount ?? 0);
-    }
-    ?>
     <div class="oc-stat oc-stat--accent">
         <div class="oc-stat__label">Pending Review</div>
-        <div class="oc-stat__value"><?= $pendingCount ?></div>
+        <div class="oc-stat__value" id="stat-pending">—</div>
         <div class="oc-stat__sub">Awaiting approval</div>
     </div>
     <div class="oc-stat">
         <div class="oc-stat__label">Pending Amount</div>
-        <div class="oc-stat__value">£<?= number_format($pendingTotal / 100, 2) ?></div>
+        <div class="oc-stat__value" id="stat-pending-amount">—</div>
         <div class="oc-stat__sub">Total in queue</div>
     </div>
     <div class="oc-stat">
         <div class="oc-stat__label">Total Payouts</div>
-        <div class="oc-stat__value"><?= count($allPayouts) ?></div>
+        <div class="oc-stat__value" id="stat-total">—</div>
         <div class="oc-stat__sub">All time</div>
     </div>
 </div>
 
-<!-- Quick actions: pending queue -->
-<?php if ($pendingCount > 0): ?>
-    <div class="oc-card" style="margin-bottom:24px;border-left:3px solid var(--amber);">
-        <div class="oc-card__header">
-            <span class="oc-card__title">Pending Approval</span>
-            <span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:10px;font-weight:600;">
-            <?= $pendingCount ?> pending
-        </span>
+<!-- Filter / search bar -->
+<div class="oc-card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:200px;">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16"
+                 style="position:absolute;left:12px;top:50%;transform:translateY(-50%);
+                        color:var(--slate-light);pointer-events:none;">
+                <path fill-rule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clip-rule="evenodd"/>
+            </svg>
+            <input class="oc-input" type="text" id="search-input"
+                   placeholder="Search by contributor ID or reference…"
+                   style="padding-left:38px;" autocomplete="off">
         </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-pill filter-pill--active" onclick="setFilter('all', this)">All</button>
+            <button class="filter-pill" onclick="setFilter('pending', this)">Pending</button>
+            <button class="filter-pill" onclick="setFilter('approved', this)">Approved</button>
+            <button class="filter-pill" onclick="setFilter('paid', this)">Paid</button>
+            <button class="filter-pill" onclick="setFilter('rejected', this)">Rejected</button>
+        </div>
+        <a href="/<?= htmlspecialchars($site) ?>/open-collab/admin/payouts/scheduled"
+           class="oc-btn oc-btn--ghost oc-btn--sm" style="flex-shrink:0;">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="13" style="margin-right:4px;">
+                <path fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                      clip-rule="evenodd"/>
+            </svg>
+            View schedule
+        </a>
+    </div>
+</div>
+
+<style>
+    .filter-pill {
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1.5px solid var(--border);
+        background: #fff;
+        font-size: .78rem;
+        font-weight: 500;
+        color: var(--slate);
+        cursor: pointer;
+        transition: background .15s, color .15s, border-color .15s;
+        white-space: nowrap;
+    }
+
+    .filter-pill:hover {
+        border-color: var(--navy);
+        color: var(--navy);
+    }
+
+    .filter-pill--active {
+        background: var(--navy);
+        color: #fff;
+        border-color: var(--navy);
+    }
+</style>
+
+<!-- Pending queue (shown only when pending filter active or all) -->
+<div id="pending-card" style="display:none;margin-bottom:24px;border-left:3px solid var(--amber);"
+     class="oc-card">
+    <div class="oc-card__header">
+        <span class="oc-card__title">Pending Approval</span>
+        <span id="pending-card-count"
+              style="font-size:.72rem;background:#fef3c7;color:#92400e;
+                     padding:2px 8px;border-radius:10px;font-weight:600;">0 pending</span>
+    </div>
+    <div id="pending-table-wrap" style="overflow-x:auto;">
         <table class="oc-table">
             <thead>
             <tr>
@@ -146,86 +188,39 @@
                 <th>Actions</th>
             </tr>
             </thead>
-            <tbody>
-            <?php foreach ($pendingPayouts as $payout): ?>
-                <tr id="pending-row-<?= (int)$payout->id ?>">
-                    <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
-                        PAY-<?= str_pad($payout->id, 6, '0', STR_PAD_LEFT) ?>
-                    </td>
-                    <td>
-                        <a href="/admin/contributors/<?= (int)$payout->user_id ?>"
-                           style="font-weight:500;color:var(--navy);text-decoration:none;">
-                            User #<?= (int)$payout->user_id ?>
-                        </a>
-                    </td>
-                    <td style="font-weight:600;color:var(--navy);">
-                        £<?= number_format((int)$payout->amount / 100, 2) ?>
-                    </td>
-                    <td style="font-size:.82rem;color:var(--slate);">
-                        <?= htmlspecialchars(strtoupper($payout->currency ?? 'GBP')) ?>
-                    </td>
-                    <td style="font-size:.82rem;color:var(--slate);">
-                        <?= htmlspecialchars(ucwords(str_replace('_', ' ', $payout->method ?? ''))) ?>
-                    </td>
-                    <td style="font-size:.78rem;color:var(--slate);">
-                        <?= $payout->created_at ? date('d M Y', strtotime($payout->created_at)) : '–' ?>
-                    </td>
-                    <td>
-                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                            <button onclick="approvePayout(<?= (int)$payout->id ?>, this)"
-                                    class="oc-btn oc-btn--primary oc-btn--sm"
-                                    id="approve-btn-<?= (int)$payout->id ?>">
-                                Approve
-                            </button>
-                            <button onclick="openDeclineModal(<?= (int)$payout->id ?>)"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    style="border-color:#fecaca;color:var(--red);">
-                                Decline
-                            </button>
-                            <button onclick="viewDetail(<?= (int)$payout->id ?>)"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm">
-                                Details
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            </tbody>
+            <tbody id="pending-tbody"></tbody>
         </table>
     </div>
-<?php endif; ?>
+</div>
 
-<!-- All payouts table -->
+<!-- All payouts results card -->
 <div class="oc-card">
     <div class="oc-card__header">
-        <span class="oc-card__title">All Payouts</span>
-        <div style="display:flex;gap:8px;align-items:center;">
-            <a href="/<?= $site ?>/open-collab/admin/payouts/scheduled" class="oc-btn oc-btn--ghost oc-btn--sm">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="13" style="margin-right:4px;">
-                    <path fill-rule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                          clip-rule="evenodd"/>
-                </svg>
-                View schedule
-            </a>
-            <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);padding:2px 8px;border-radius:10px;font-weight:600;">
-                <?= count($allPayouts) ?>
-            </span>
-        </div>
+        <span class="oc-card__title" id="results-title">All Payouts</span>
+        <span id="results-count"
+              style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
+                     padding:2px 8px;border-radius:10px;font-weight:600;">—</span>
     </div>
 
-    <?php if (empty($allPayouts)): ?>
-        <div style="padding:48px 24px;text-align:center;color:var(--slate);">
-            <svg viewBox="0 0 20 20" fill="currentColor" width="32"
-                 style="opacity:.2;display:block;margin:0 auto 12px;">
-                <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-                <path fill-rule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.077 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.077-2.354-1.253V5z"
-                      clip-rule="evenodd"/>
-            </svg>
-            <div style="font-weight:500;">No payouts yet</div>
-        </div>
-    <?php else: ?>
+    <div id="payouts-loading" style="padding:48px 24px;text-align:center;color:var(--slate);">
+        <div class="oc-spinner" style="margin:0 auto 12px;"></div>
+        Loading payouts…
+    </div>
+
+    <div id="payouts-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">
+        <div style="font-weight:500;" id="empty-message">No payouts yet</div>
+        <div style="font-size:.85rem;margin-top:4px;" id="empty-sub"></div>
+    </div>
+
+    <div id="payouts-error"
+         style="display:none;padding:32px 24px;text-align:center;color:var(--red);font-size:.875rem;">
+        Failed to load payouts.
+        <button onclick="loadPayouts()" class="oc-btn oc-btn--ghost oc-btn--sm"
+                style="margin-left:8px;">Retry
+        </button>
+    </div>
+
+    <div id="payouts-table-wrap" style="display:none;overflow-x:auto;">
         <table class="oc-table">
             <thead>
             <tr>
@@ -238,78 +233,9 @@
                 <th>Actions</th>
             </tr>
             </thead>
-            <tbody>
-            <?php foreach ($allPayouts as $payout):
-                $pArr = is_object($payout) ? $payout : (object)$payout;
-                $status = $pArr->status ?? 'pending';
-                $statusClass = match ($status) {
-                    'paid' => 'oc-badge--published',
-                    'approved' => 'oc-badge--free',
-                    'pending' => 'oc-badge--waiting-approval',
-                    'rejected' => 'oc-badge--revoked',
-                    default => 'oc-badge--draft',
-                };
-                ?>
-                <tr id="all-row-<?= (int)$pArr->id ?>">
-                    <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
-                        PAY-<?= str_pad($pArr->id, 6, '0', STR_PAD_LEFT) ?>
-                    </td>
-                    <td>
-                        <a href="/admin/contributors/<?= (int)$pArr->user_id ?>"
-                           style="font-weight:500;color:var(--navy);text-decoration:none;">
-                            User #<?= (int)$pArr->user_id ?>
-                        </a>
-                    </td>
-                    <td style="font-weight:600;">
-                        <?= strtoupper($pArr->currency ?? 'GBP') === 'GBP' ? '£' : '$' ?><?= number_format((int)$pArr->amount / 100, 2) ?>
-                    </td>
-                    <td style="font-size:.82rem;color:var(--slate);">
-                        <?= htmlspecialchars(strtoupper($pArr->currency ?? 'GBP')) ?>
-                    </td>
-                    <td>
-                        <span class="oc-badge <?= $statusClass ?>">
-                            <?= ucfirst($status) ?>
-                        </span>
-                    </td>
-                    <td style="font-size:.78rem;color:var(--slate);">
-                        <?= $pArr->created_at ? date('d M Y', strtotime($pArr->created_at)) : '–' ?>
-                    </td>
-                    <td>
-                        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                            <button onclick="viewDetail(<?= (int)$pArr->id ?>)"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm">Details
-                            </button>
-                            <?php if ($status === 'approved'): ?>
-                                <button onclick="openPaidModal(<?= (int)$pArr->id ?>)"
-                                        class="oc-btn oc-btn--primary oc-btn--sm">
-                                    Mark paid
-                                </button>
-                            <?php endif; ?>
-                            <?php if (in_array($status, ['paid', 'approved'])): ?>
-                                <a href="/api/<?= htmlspecialchars($site) ?>/open-collab/admin/payouts/<?= (int)$pArr->id ?>/statement"
-                                   class="oc-btn oc-btn--ghost oc-btn--sm" download>
-                                    <svg viewBox="0 0 20 20" fill="currentColor" width="12" style="margin-right:3px;">
-                                        <path fill-rule="evenodd"
-                                              d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                                              clip-rule="evenodd"/>
-                                    </svg>
-                                    PDF
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php if (!empty($pArr->rejection_reason)): ?>
-                <tr>
-                    <td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;">
-                        <strong>Decline reason:</strong> <?= htmlspecialchars($pArr->rejection_reason) ?>
-                    </td>
-                </tr>
-            <?php endif; ?>
-            <?php endforeach; ?>
-            </tbody>
+            <tbody id="payouts-tbody"></tbody>
         </table>
-    <?php endif; ?>
+    </div>
 </div>
 
 @endsection
@@ -319,7 +245,206 @@
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // ── Approve ───────────────────────────────────────────────
+    let allPayouts = [];
+    let currentFilter = 'all';
+    let searchQuery = '';
+    let debounceTimer = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('search-input').addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                searchQuery = this.value.trim().toLowerCase();
+                renderPayouts();
+            }, 300);
+        });
+
+        loadPayouts();
+    });
+
+    function setFilter(status, btn) {
+        currentFilter = status;
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+        btn.classList.add('filter-pill--active');
+        renderPayouts();
+    }
+
+    // ── Load ──────────────────────────────────────────────────────────────────
+    async function loadPayouts() {
+        showState('loading');
+        try {
+            const res = await fetch(`/api/${SITE}/open-collab/admin/payouts?per_page=200`, {
+                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+            });
+            if (!res.ok) {
+                showState('error');
+                return;
+            }
+
+            const data = await res.json();
+            allPayouts = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+
+            updateStats();
+            renderPayouts();
+        } catch {
+            showState('error');
+        }
+    }
+
+    function updateStats() {
+        const pending = allPayouts.filter(p => p.status === 'pending');
+        const pendingTotal = pending.reduce((s, p) => s + (p.amount_pence ?? p.amount ?? 0), 0);
+
+        document.getElementById('stat-pending').textContent = pending.length;
+        document.getElementById('stat-pending-amount').textContent = '£' + (pendingTotal / 100).toFixed(2);
+        document.getElementById('stat-total').textContent = allPayouts.length;
+    }
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    function renderPayouts() {
+        let filtered = allPayouts;
+
+        if (currentFilter !== 'all') {
+            filtered = filtered.filter(p => p.status === currentFilter);
+        }
+
+        if (searchQuery) {
+            filtered = filtered.filter(p =>
+                String(p.user_id).includes(searchQuery) ||
+                (p.reference ?? '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        document.getElementById('results-count').textContent = filtered.length;
+        document.getElementById('results-title').textContent =
+            currentFilter === 'all' ? 'All Payouts' : capitalise(currentFilter) + ' Payouts';
+
+        // Pending quick-action card
+        const pendingItems = allPayouts.filter(p => p.status === 'pending');
+        const pendingCard = document.getElementById('pending-card');
+        if (pendingItems.length > 0 && (currentFilter === 'all' || currentFilter === 'pending')) {
+            pendingCard.style.display = 'block';
+            document.getElementById('pending-card-count').textContent = `${pendingItems.length} pending`;
+            renderPendingTable(pendingItems);
+        } else {
+            pendingCard.style.display = 'none';
+        }
+
+        if (!filtered.length) {
+            showState('empty');
+            document.getElementById('empty-message').textContent =
+                searchQuery ? `No payouts matching "${searchQuery}"` : 'No payouts yet';
+            document.getElementById('empty-sub').textContent =
+                currentFilter !== 'all' ? `No ${currentFilter} payouts.` : '';
+            return;
+        }
+
+        renderMainTable(filtered);
+        showState('table');
+    }
+
+    function renderPendingTable(items) {
+        document.getElementById('pending-tbody').innerHTML = items.map(p => {
+            const currency = (p.currency ?? 'GBP').toUpperCase();
+            const symbol = currency === 'GBP' ? '£' : '$';
+            const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
+            const createdAt = fmtDate(p.created_at);
+            return `<tr id="pending-row-${p.id}">
+                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
+                    PAY-${String(p.id).padStart(6, '0')}
+                </td>
+                <td>
+                    <a href="/admin/contributors/${p.user_id}"
+                       style="font-weight:500;color:var(--navy);text-decoration:none;">
+                        User #${p.user_id}
+                    </a>
+                </td>
+                <td style="font-weight:600;color:var(--navy);">${symbol}${amount}</td>
+                <td style="font-size:.82rem;color:var(--slate);">${escHtml(currency)}</td>
+                <td style="font-size:.82rem;color:var(--slate);">
+                    ${escHtml((p.method ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+                </td>
+                <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
+                <td>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button onclick="approvePayout(${p.id}, this)"
+                                class="oc-btn oc-btn--primary oc-btn--sm"
+                                id="approve-btn-${p.id}">
+                            Approve
+                        </button>
+                        <button onclick="openDeclineModal(${p.id})"
+                                class="oc-btn oc-btn--ghost oc-btn--sm"
+                                style="border-color:#fecaca;color:var(--red);">
+                            Decline
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderMainTable(items) {
+        const rows = items.map(p => {
+            const status = p.status ?? 'pending';
+            const statusCls = {
+                paid: 'oc-badge--published', approved: 'oc-badge--free',
+                pending: 'oc-badge--waiting-approval', rejected: 'oc-badge--revoked',
+            }[status] ?? 'oc-badge--draft';
+            const currency = (p.currency ?? 'GBP').toUpperCase();
+            const symbol = currency === 'GBP' ? '£' : '$';
+            const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
+            const createdAt = fmtDate(p.created_at);
+
+            const pdfBtn = ['paid', 'approved'].includes(status)
+                ? `<a href="/api/${escHtml(SITE)}/open-collab/admin/payouts/${p.id}/statement"
+                      class="oc-btn oc-btn--ghost oc-btn--sm" download>
+                       <svg viewBox="0 0 20 20" fill="currentColor" width="12" style="margin-right:3px;">
+                           <path fill-rule="evenodd"
+                                 d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                 clip-rule="evenodd"/>
+                       </svg>PDF
+                   </a>`
+                : '';
+
+            const markPaidBtn = status === 'approved'
+                ? `<button onclick="openPaidModal(${p.id})" class="oc-btn oc-btn--primary oc-btn--sm">
+                       Mark paid
+                   </button>`
+                : '';
+
+            const rejectionRow = p.rejection_reason
+                ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;">
+                       <strong>Decline reason:</strong> ${escHtml(p.rejection_reason)}
+                   </td></tr>`
+                : '';
+
+            return `<tr id="all-row-${p.id}">
+                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
+                    PAY-${String(p.id).padStart(6, '0')}
+                </td>
+                <td>
+                    <a href="/admin/contributors/${p.user_id}"
+                       style="font-weight:500;color:var(--navy);text-decoration:none;">
+                        User #${p.user_id}
+                    </a>
+                </td>
+                <td style="font-weight:600;">${symbol}${amount}</td>
+                <td style="font-size:.82rem;color:var(--slate);">${escHtml(currency)}</td>
+                <td><span class="oc-badge ${statusCls}" id="badge-${p.id}">${capitalise(status)}</span></td>
+                <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
+                <td>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                        ${markPaidBtn}
+                        ${pdfBtn}
+                    </div>
+                </td>
+            </tr>${rejectionRow}`;
+        });
+
+        document.getElementById('payouts-tbody').innerHTML = rows.join('');
+    }
+
+    // ── Approve ───────────────────────────────────────────────────────────────
     async function approvePayout(id, btn) {
         if (!confirm('Approve this payout request?')) return;
         btn.disabled = true;
@@ -333,9 +458,14 @@
 
         if (res.ok) {
             showToast('✓ Payout approved');
-            // Update badge in both rows
-            updateRowStatus(id, 'Approved', 'oc-badge--free');
-            document.getElementById('pending-row-' + id)?.remove();
+            // Update local cache and re-render
+            const p = allPayouts.find(x => x.id === id);
+            if (p) {
+                p.status = 'approved';
+                p.approved_at = new Date().toISOString();
+            }
+            updateStats();
+            renderPayouts();
         } else {
             showToast(data.error || data.message || 'Approval failed', false);
             btn.disabled = false;
@@ -343,7 +473,7 @@
         }
     }
 
-    // ── Decline modal ─────────────────────────────────────────
+    // ── Decline modal ─────────────────────────────────────────────────────────
     function openDeclineModal(id) {
         document.getElementById('decline-payout-id').value = id;
         document.getElementById('decline-reason').value = '';
@@ -386,8 +516,13 @@
         if (res.ok) {
             closeDeclineModal();
             showToast('Payout declined');
-            updateRowStatus(id, 'Rejected', 'oc-badge--revoked');
-            document.getElementById('pending-row-' + id)?.remove();
+            const p = allPayouts.find(x => x.id === parseInt(id));
+            if (p) {
+                p.status = 'rejected';
+                p.rejection_reason = reason;
+            }
+            updateStats();
+            renderPayouts();
         } else {
             errBox.textContent = data.error || data.message || 'Decline failed.';
             errBox.style.display = 'block';
@@ -396,7 +531,7 @@
         }
     }
 
-    // ── Mark paid modal ───────────────────────────────────────
+    // ── Mark paid modal ───────────────────────────────────────────────────────
     function openPaidModal(id) {
         document.getElementById('paid-payout-id').value = id;
         document.getElementById('paid-reference').value = '';
@@ -428,14 +563,24 @@
                 'Authorization': `Bearer ${TOKEN()}`,
                 'Accept': 'application/json',
             },
-            body: JSON.stringify({reference: reference || undefined, notes: notes || undefined}),
+            body: JSON.stringify({
+                reference: reference || undefined,
+                notes: notes || undefined,
+            }),
         });
         const data = await res.json();
 
         if (res.ok) {
             closePaidModal();
             showToast('✓ Payout marked as paid');
-            updateRowStatus(id, 'Paid', 'oc-badge--published');
+            const p = allPayouts.find(x => x.id === parseInt(id));
+            if (p) {
+                p.status = 'paid';
+                p.reference = reference || p.reference;
+                p.processed_at = new Date().toISOString();
+            }
+            updateStats();
+            renderPayouts();
         } else {
             errBox.textContent = data.error || data.message || 'Failed.';
             errBox.style.display = 'block';
@@ -444,92 +589,30 @@
         }
     }
 
-    // ── Detail modal ──────────────────────────────────────────
-    async function viewDetail(id) {
-        document.getElementById('detail-title').textContent = 'Payout PAY-' + String(id).padStart(6, '0');
-        document.getElementById('detail-body').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
-        document.getElementById('detail-actions').innerHTML = '';
-        document.getElementById('detail-modal').style.display = 'grid';
-
-        // Fetch from the admin list endpoint (reuse existing data via a search)
-        // Since there's no single-payout admin endpoint, we fetch all and filter
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/payouts?per_page=200`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`},
-            });
-            const data = await res.json();
-            const items = data?.data ?? data ?? [];
-            const payout = items.find(p => (p.id || p) === id || p.id === id);
-
-            if (!payout) {
-                document.getElementById('detail-body').innerHTML = '<p style="color:var(--slate);">Payout not found.</p>';
-                return;
-            }
-
-            const fmtDate = str => str ? new Date(str).toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-            }) : '–';
-            const currency = (payout.currency || 'GBP').toUpperCase();
-            const symbol = currency === 'GBP' ? '£' : '$';
-            const amount = ((payout.amount_pence || payout.amount || 0) / 100).toFixed(2);
-
-            document.getElementById('detail-body').innerHTML = `
-                <dl style="display:grid;grid-template-columns:140px 1fr;gap:10px 16px;font-size:.875rem;">
-                    <dt style="color:var(--slate);font-weight:500;">Payout ID</dt>
-                    <dd style="font-family:monospace;">PAY-${String(id).padStart(6, '0')}</dd>
-                    <dt style="color:var(--slate);font-weight:500;">Contributor</dt>
-                    <dd>User #${payout.user_id}</dd>
-                    <dt style="color:var(--slate);font-weight:500;">Amount</dt>
-                    <dd style="font-weight:700;font-size:1.05rem;">${symbol}${amount}</dd>
-                    <dt style="color:var(--slate);font-weight:500;">Currency</dt>
-                    <dd>${currency}</dd>
-                    <dt style="color:var(--slate);font-weight:500;">Method</dt>
-                    <dd>${(payout.method || '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</dd>
-                    <dt style="color:var(--slate);font-weight:500;">Status</dt>
-                    <dd><span class="oc-badge oc-badge--${getStatusClass(payout.status)}">${(payout.status || '').charAt(0).toUpperCase() + (payout.status || '').slice(1)}</span></dd>
-                    <dt style="color:var(--slate);font-weight:500;">Requested</dt>
-                    <dd>${fmtDate(payout.created_at)}</dd>
-                    ${payout.approved_at ? `<dt style="color:var(--slate);font-weight:500;">Approved</dt><dd>${fmtDate(payout.approved_at)}</dd>` : ''}
-                    ${payout.processed_at ? `<dt style="color:var(--slate);font-weight:500;">Processed</dt><dd>${fmtDate(payout.processed_at)}</dd>` : ''}
-                    ${payout.reference ? `<dt style="color:var(--slate);font-weight:500;">Reference</dt><dd style="font-family:monospace;">${payout.reference}</dd>` : ''}
-                    ${payout.notes ? `<dt style="color:var(--slate);font-weight:500;">Notes</dt><dd>${payout.notes}</dd>` : ''}
-                    ${payout.rejection_reason ? `<dt style="color:var(--slate);font-weight:500;">Decline reason</dt><dd style="color:var(--red);">${payout.rejection_reason}</dd>` : ''}
-                </dl>`;
-
-            const actionsEl = document.getElementById('detail-actions');
-            if ((payout.status === 'paid' || payout.status === 'approved') && payout.id) {
-                actionsEl.innerHTML += `<a href="/api/${SITE}/open-collab/admin/payouts/${payout.id}/statement" class="oc-btn oc-btn--ghost oc-btn--sm" download>Download statement PDF</a>`;
-            }
-            actionsEl.innerHTML += `<button onclick="closeDetailModal()" class="oc-btn oc-btn--primary oc-btn--sm">Close</button>`;
-        } catch {
-            document.getElementById('detail-body').innerHTML = '<p style="color:var(--red);">Failed to load details.</p>';
-        }
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function showState(state) {
+        document.getElementById('payouts-loading').style.display = state === 'loading' ? 'block' : 'none';
+        document.getElementById('payouts-empty').style.display = state === 'empty' ? 'block' : 'none';
+        document.getElementById('payouts-error').style.display = state === 'error' ? 'block' : 'none';
+        document.getElementById('payouts-table-wrap').style.display = state === 'table' ? 'block' : 'none';
     }
 
-    function closeDetailModal() {
-        document.getElementById('detail-modal').style.display = 'none';
+    function fmtDate(str) {
+        if (!str) return '—';
+        return new Date(str).toLocaleDateString('en-GB', {
+            day: 'numeric', month: 'short', year: 'numeric',
+        });
     }
 
-    // ── Helpers ───────────────────────────────────────────────
-    function getStatusClass(status) {
-        return {
-            paid: 'published',
-            approved: 'free',
-            pending: 'waiting-approval',
-            rejected: 'revoked'
-        }[status] || 'draft';
+    function capitalise(str) {
+        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
     }
 
-    function updateRowStatus(id, label, cls) {
-        const row = document.getElementById('all-row-' + id);
-        if (!row) return;
-        const badge = row.querySelector('.oc-badge');
-        if (badge) {
-            badge.className = 'oc-badge ' + cls;
-            badge.textContent = label;
-        }
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function showToast(msg, ok = true) {
@@ -537,7 +620,9 @@
         el.textContent = msg;
         el.style.background = ok ? 'var(--navy)' : 'var(--red)';
         el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
+        setTimeout(() => {
+            el.style.opacity = '0';
+        }, 2800);
     }
 </script>
 @endsection

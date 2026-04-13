@@ -118,6 +118,7 @@ class ProductListController extends Controller
         );
 
         $result = $this->productRepository->search($criteria);
+
         $boostContext = $request->input('boost_context', BoostContext::Listing->value);
 
         try {

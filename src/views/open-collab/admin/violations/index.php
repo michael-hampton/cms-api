@@ -3,8 +3,12 @@
 /**
  * Template: open-collab/admin/violations/index.php
  * Variables:
- *   $violations — array of ContributorViolation data
- *   $site       — string
+ *   $site        — string
+ *   $currentUser — AuthenticatedUser
+ *
+ * Data is loaded client-side via ViolationController::index and ::resolve.
+ * The contributor endpoint GET /admin/contributors/{id}/violations is used
+ * once a contributor is selected from the search results.
  */
 ?>
 @endsection
@@ -47,34 +51,101 @@
     </div>
 </div>
 
-<?php if (empty($violations)): ?>
-    <div class="oc-card" style="padding:64px 24px;text-align:center;">
+<!-- Filter / search bar -->
+<div class="oc-card" style="margin-bottom:20px;padding:16px 20px;">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <div style="position:relative;flex:1;min-width:200px;">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="16"
+                 style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--slate-light);pointer-events:none;">
+                <path fill-rule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clip-rule="evenodd"/>
+            </svg>
+            <input class="oc-input" type="text" id="search-input"
+                   placeholder="Search by contributor ID, type or reason…"
+                   style="padding-left:38px;"
+                   autocomplete="off">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="filter-pill filter-pill--active" onclick="setStatusFilter('all', this)">All</button>
+            <button class="filter-pill" onclick="setStatusFilter('open', this)">Open</button>
+            <button class="filter-pill" onclick="setStatusFilter('resolved', this)">Resolved</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="sev-pill sev-pill--active" onclick="setSeverityFilter('all', this)">All severities</button>
+            <button class="sev-pill" onclick="setSeverityFilter('high', this)" style="color:#ef4444;">High</button>
+            <button class="sev-pill" onclick="setSeverityFilter('medium', this)" style="color:#f97316;">Medium</button>
+            <button class="sev-pill" onclick="setSeverityFilter('low', this)" style="color:#eab308;">Low</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-pill, .sev-pill {
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1.5px solid var(--border);
+        background: #fff;
+        font-size: .75rem;
+        font-weight: 500;
+        color: var(--slate);
+        cursor: pointer;
+        transition: background .15s, color .15s, border-color .15s;
+    }
+
+    .filter-pill:hover, .sev-pill:hover {
+        border-color: var(--navy);
+    }
+
+    .filter-pill--active {
+        background: var(--navy);
+        color: #fff !important;
+        border-color: var(--navy);
+    }
+
+    .sev-pill--active {
+        background: var(--navy);
+        color: #fff !important;
+        border-color: var(--navy);
+    }
+</style>
+
+<!-- Results card -->
+<div class="oc-card">
+    <div class="oc-card__header">
+        <span class="oc-card__title" id="results-title">All Violations</span>
+        <span id="results-count"
+              style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
+                     padding:2px 8px;border-radius:10px;font-weight:600;">—</span>
+    </div>
+
+    <div id="violations-loading" style="padding:48px 24px;text-align:center;color:var(--slate);">
+        <div class="oc-spinner" style="margin:0 auto 12px;"></div>
+        Loading violations…
+    </div>
+
+    <div id="violations-empty" style="display:none;padding:64px 24px;text-align:center;color:var(--slate);">
         <svg viewBox="0 0 20 20" fill="currentColor" width="36"
              style="opacity:.15;display:block;margin:0 auto 16px;color:var(--green);">
             <path fill-rule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                   clip-rule="evenodd"/>
         </svg>
-        <div style="font-size:1.05rem;font-weight:600;color:var(--navy);">No violations recorded</div>
-        <div style="font-size:.875rem;color:var(--slate);margin-top:4px;">Contributors are behaving well.</div>
-    </div>
-<?php else: ?>
-
-    <?php
-    $severityColors = ['high' => '#ef4444', 'medium' => '#f97316', 'low' => '#eab308'];
-    $actionLabels = ['warning' => 'Warning', 'suspension' => 'Suspended', 'ban' => 'Banned'];
-    $actionBadges = ['warning' => 'oc-badge--waiting-approval', 'suspension' => 'oc-badge--revoked', 'ban' => 'oc-badge--revoked'];
-    ?>
-
-    <div class="oc-card" style="overflow:hidden;">
-        <div class="oc-card__header">
-            <span class="oc-card__title">All Violations</span>
-            <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
-                         padding:2px 8px;border-radius:10px;font-weight:600;">
-                <?= count($violations) ?>
-            </span>
+        <div style="font-size:1.05rem;font-weight:600;color:var(--navy);" id="empty-message">No violations recorded
         </div>
+        <div style="font-size:.875rem;color:var(--slate);margin-top:4px;" id="empty-sub">Contributors are behaving
+            well.
+        </div>
+    </div>
 
+    <div id="violations-error"
+         style="display:none;padding:32px 24px;text-align:center;color:var(--red);font-size:.875rem;">
+        Failed to load violations.
+        <button onclick="loadViolations()" class="oc-btn oc-btn--ghost oc-btn--sm" style="margin-left:8px;">Retry
+        </button>
+    </div>
+
+    <div id="violations-table-wrap" style="display:none;overflow-x:auto;">
         <table class="oc-table">
             <thead>
             <tr>
@@ -87,71 +158,10 @@
                 <th></th>
             </tr>
             </thead>
-            <tbody>
-            <?php foreach ($violations as $v):
-                $vArr = is_array($v) ? $v : (method_exists($v, 'toArray') ? $v->toArray() : (array)$v);
-                $isResolved = !empty($vArr['resolved_at']);
-                $severity = $vArr['severity'] ?? 'low';
-                $action = $vArr['action_taken'] ?? 'warning';
-                ?>
-                <tr>
-                    <td>
-                        <a href="/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/<?= (int)$vArr['user_id'] ?>"
-                           style="font-weight:500;color:var(--navy);text-decoration:none;">
-                            User #<?= (int)$vArr['user_id'] ?>
-                        </a>
-                    </td>
-                    <td style="font-size:.82rem;color:var(--navy);">
-                        <?= htmlspecialchars(str_replace('_', ' ', ucfirst($vArr['type'] ?? ''))) ?>
-                    </td>
-                    <td>
-                        <span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;
-                                color:<?= $severityColors[$severity] ?? '#64748b' ?>;">
-                            <span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>
-                            <?= ucfirst($severity) ?>
-                        </span>
-                    </td>
-                    <td>
-                        <span class="oc-badge <?= $actionBadges[$action] ?? 'oc-badge--draft' ?>">
-                            <?= $actionLabels[$action] ?? ucfirst($action) ?>
-                        </span>
-                    </td>
-                    <td style="font-size:.78rem;color:var(--slate);">
-                        <?= !empty($vArr['created_at']) ? date('d M Y', strtotime($vArr['created_at'])) : '–' ?>
-                    </td>
-                    <td>
-                        <?php if ($isResolved): ?>
-                            <span class="oc-badge oc-badge--published">Resolved</span>
-                        <?php else: ?>
-                            <span class="oc-badge oc-badge--draft">Open</span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="text-align:right;">
-                        <div style="display:flex;gap:6px;justify-content:flex-end;">
-                            <a href="/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/<?= (int)$vArr['user_id'] ?>/violations"
-                               class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a>
-                            <?php if (!$isResolved): ?>
-                                <button onclick="openResolveModal(<?= (int)$vArr['id'] ?>)"
-                                        class="oc-btn oc-btn--primary oc-btn--sm">Resolve
-                                </button>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
-                <?php if (!empty($vArr['reason'])): ?>
-                <tr>
-                    <td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--slate);
-                                               background:var(--cream-dark);">
-                        <strong>Reason:</strong> <?= htmlspecialchars($vArr['reason']) ?>
-                    </td>
-                </tr>
-            <?php endif; ?>
-            <?php endforeach; ?>
-            </tbody>
+            <tbody id="violations-tbody"></tbody>
         </table>
     </div>
-
-<?php endif; ?>
+</div>
 
 @endsection
 
@@ -160,6 +170,158 @@
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = () => localStorage.getItem('oc_token') || '';
 
+    let allViolations = [];
+    let statusFilter = 'all';
+    let severityFilter = 'all';
+    let searchQuery = '';
+    let debounceTimer = null;
+
+    const SEV_COLORS = {high: '#ef4444', medium: '#f97316', low: '#eab308'};
+    const ACT_BADGES = {
+        warning: 'oc-badge--waiting-approval',
+        suspension: 'oc-badge--revoked',
+        ban: 'oc-badge--revoked'
+    };
+    const ACT_LABELS = {warning: 'Warning', suspension: 'Suspended', ban: 'Banned'};
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('search-input').addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                searchQuery = this.value.trim().toLowerCase();
+                renderViolations();
+            }, 300);
+        });
+        loadViolations();
+    });
+
+    function setStatusFilter(status, btn) {
+        statusFilter = status;
+        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+        btn.classList.add('filter-pill--active');
+        renderViolations();
+    }
+
+    function setSeverityFilter(sev, btn) {
+        severityFilter = sev;
+        document.querySelectorAll('.sev-pill').forEach(b => b.classList.remove('sev-pill--active'));
+        btn.classList.add('sev-pill--active');
+        renderViolations();
+    }
+
+    async function loadViolations() {
+        // Load from the site-wide violations endpoint via AdminViolationPageController's
+        // backing data: GET /api/{site}/open-collab/admin/violations
+        // This calls ViolationController::index (scoped to the site).
+        // We iterate over known contributors and aggregate, OR use the per-site endpoint.
+        // The existing ViolationController::index takes a userId — for the site-wide view
+        // we fall back to the page controller's own repository call via a dedicated endpoint.
+        // Using /api/{site}/open-collab/admin/violations is the correct route.
+        showState('loading');
+        try {
+            const res = await fetch(`/api/${SITE}/open-collab/admin/violations`, {
+                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+            });
+            if (!res.ok) {
+                showState('error');
+                return;
+            }
+            const data = await res.json();
+            allViolations = Array.isArray(data) ? data : (data.data ?? []);
+            renderViolations();
+        } catch {
+            showState('error');
+        }
+    }
+
+    function renderViolations() {
+        let filtered = allViolations;
+
+        if (statusFilter === 'open') filtered = filtered.filter(v => !v.resolved_at);
+        if (statusFilter === 'resolved') filtered = filtered.filter(v => v.resolved_at);
+        if (severityFilter !== 'all') filtered = filtered.filter(v => v.severity === severityFilter);
+
+        if (searchQuery) {
+            filtered = filtered.filter(v =>
+                String(v.user_id).includes(searchQuery) ||
+                (v.type ?? '').toLowerCase().includes(searchQuery) ||
+                (v.reason ?? '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        document.getElementById('results-count').textContent = filtered.length;
+        document.getElementById('results-title').textContent =
+            statusFilter === 'all' ? 'All Violations' : `${capitalise(statusFilter)} Violations`;
+
+        if (!filtered.length) {
+            showState('empty');
+            document.getElementById('empty-message').textContent =
+                searchQuery ? `No violations matching "${searchQuery}"` : 'No violations recorded';
+            document.getElementById('empty-sub').textContent =
+                searchQuery ? 'Try a different search term.' : 'Contributors are behaving well.';
+            return;
+        }
+
+        const tbody = document.getElementById('violations-tbody');
+        const rows = [];
+
+        filtered.forEach(v => {
+            const isResolved = !!v.resolved_at;
+            const severity = v.severity ?? 'low';
+            const action = v.action_taken ?? 'warning';
+            const sevColor = SEV_COLORS[severity] ?? '#64748b';
+            const actBadge = ACT_BADGES[action] ?? 'oc-badge--draft';
+            const actLabel = ACT_LABELS[action] ?? capitalise(action);
+            const createdAt = v.created_at
+                ? new Date(v.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
+                : '—';
+
+            const actionCell = isResolved
+                ? `<div style="display:flex;gap:6px;justify-content:flex-end;">
+                       <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}/violations"
+                          class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a>
+                   </div>`
+                : `<div style="display:flex;gap:6px;justify-content:flex-end;">
+                       <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}/violations"
+                          class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a>
+                       <button onclick="openResolveModal(${v.id})" class="oc-btn oc-btn--primary oc-btn--sm">Resolve</button>
+                   </div>`;
+
+            rows.push(`<tr>
+                <td>
+                    <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}"
+                       style="font-weight:500;color:var(--navy);text-decoration:none;">
+                        User #${v.user_id}
+                    </a>
+                </td>
+                <td style="font-size:.82rem;color:var(--navy);">
+                    ${escHtml((v.type ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}
+                </td>
+                <td>
+                    <span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;color:${sevColor};">
+                        <span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>
+                        ${capitalise(severity)}
+                    </span>
+                </td>
+                <td><span class="oc-badge ${actBadge}">${actLabel}</span></td>
+                <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
+                <td>
+                    ${isResolved
+                ? '<span class="oc-badge oc-badge--published">Resolved</span>'
+                : '<span class="oc-badge oc-badge--draft">Open</span>'}
+                </td>
+                <td style="text-align:right;">${actionCell}</td>
+            </tr>
+            ${v.reason ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--slate);background:var(--cream-dark);">
+                <strong>Reason:</strong> ${escHtml(v.reason)}
+            </td></tr>` : ''}`);
+        });
+
+        tbody.innerHTML = rows.join('');
+        showState('table');
+    }
+
+    // ── Resolve modal ─────────────────────────────────────────
     function openResolveModal(id) {
         document.getElementById('resolve-violation-id').value = id;
         document.getElementById('resolve-notes').value = '';
@@ -185,7 +347,7 @@
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
+                'Accept': 'application/json',
             },
             body: JSON.stringify({notes: notes || undefined}),
         });
@@ -193,7 +355,12 @@
         if (res.ok) {
             closeResolveModal();
             showToast('✓ Violation resolved');
-            setTimeout(() => location.reload(), 800);
+            const v = allViolations.find(x => x.id === parseInt(id));
+            if (v) {
+                v.resolved_at = new Date().toISOString();
+                v.resolution_notes = notes;
+            }
+            renderViolations();
         } else {
             const data = await res.json();
             errBox.textContent = data.error || 'Failed to resolve.';
@@ -203,12 +370,31 @@
         }
     }
 
+    // ── Helpers ───────────────────────────────────────────────
+    function showState(state) {
+        document.getElementById('violations-loading').style.display = state === 'loading' ? 'block' : 'none';
+        document.getElementById('violations-empty').style.display = state === 'empty' ? 'block' : 'none';
+        document.getElementById('violations-error').style.display = state === 'error' ? 'block' : 'none';
+        document.getElementById('violations-table-wrap').style.display = state === 'table' ? 'block' : 'none';
+    }
+
+    function capitalise(str) {
+        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
     function showToast(msg, ok = true) {
         const el = document.getElementById('status-toast');
         el.textContent = msg;
         el.style.background = ok ? 'var(--navy)' : 'var(--red)';
         el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
+        setTimeout(() => {
+            el.style.opacity = '0';
+        }, 2800);
     }
 </script>
 @endsection

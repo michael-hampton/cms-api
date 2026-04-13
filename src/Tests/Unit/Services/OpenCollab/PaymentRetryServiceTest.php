@@ -20,7 +20,7 @@ class PaymentRetryServiceTest extends FunctionalTestCase
 
     // ── retry() ───────────────────────────────────────────────────────────────
 
-    public function test_retry_returns_client_secret_and_increments_attempt_count(): void
+    public function test_retry_returns_client_secret_and_does_not_increment_attempt_count(): void
     {
         $payment = $this->makeFailedPayment(['id' => 1, 'attempt_count' => 1]);
         $intent = $this->makeStripeIntent('requires_payment_method', 'secret_xyz');
@@ -30,11 +30,13 @@ class PaymentRetryServiceTest extends FunctionalTestCase
             ->with('pi_test')
             ->once()
             ->andReturn($intent);
+
+        // attempt_count must NOT be incremented on retry initiation
         $this->paymentRepository->shouldReceive('update')
             ->once()
             ->withArgs(function ($id, array $data): bool {
                 return $id === 1
-                    && $data['attempt_count'] === 2
+                    && !array_key_exists('attempt_count', $data)
                     && $data['status'] === 'pending';
             });
 
@@ -44,38 +46,18 @@ class PaymentRetryServiceTest extends FunctionalTestCase
         $this->assertEquals(1, $result['payment_id']);
     }
 
-    private function makeFailedPayment(array $attributes = []): ArticlePayment
+    public function test_retry_accepts_requires_confirmation_as_retryable_state(): void
     {
-        return $this->makePayment(array_merge(['status' => 'failed'], $attributes));
-    }
+        $payment = $this->makeFailedPayment(['id' => 1, 'attempt_count' => 0]);
+        $intent = $this->makeStripeIntent('requires_confirmation', 'secret_abc');
 
-    private function makePayment(array $attributes = []): ArticlePayment
-    {
-        $defaults = [
-            'id' => 1,
-            'user_id' => 7,
-            'page_id' => 10,
-            'site_id' => 1,
-            'email' => 'buyer@example.com',
-            'stripe_payment_intent_id' => 'pi_test',
-            'status' => 'failed',
-            'amount' => 500,
-            'currency' => 'gbp',
-            'attempt_count' => 0,
-            'failure_reason' => null,
-        ];
-        $payment = new ArticlePayment(array_merge($defaults, $attributes));
-        $payment->exists = true;
-        return $payment;
-    }
+        $this->paymentRepository->shouldReceive('find')->andReturn($payment);
+        $this->paymentIntentGateway->shouldReceive('retrieve')->andReturn($intent);
+        $this->paymentRepository->shouldReceive('update');
 
-    private function makeStripeIntent(string $status, string $clientSecret): object
-    {
-        return (object)[
-            'id' => 'pi_test',
-            'status' => $status,
-            'client_secret' => $clientSecret,
-        ];
+        $result = $this->service->retry(1, 7);
+
+        $this->assertEquals('secret_abc', $result['client_secret']);
     }
 
     public function test_retry_throws_when_payment_not_found(): void
@@ -141,6 +123,26 @@ class PaymentRetryServiceTest extends FunctionalTestCase
         $this->service->retry(1, 7);
     }
 
+    public function test_retry_re_checks_max_retries_inside_transaction_to_prevent_race(): void
+    {
+        // Simulate: initial check passes, but by the time we're inside the
+        // transaction the record has been updated concurrently to max retries.
+        $payment = $this->makeFailedPayment(['id' => 1, 'attempt_count' => 2]);
+        $freshPayment = $this->makeFailedPayment(['id' => 1, 'attempt_count' => 3]);
+        $intent = $this->makeStripeIntent('requires_payment_method', 'secret');
+
+        $this->paymentRepository->shouldReceive('find')
+            ->with(1)
+            ->andReturn($payment, $freshPayment); // second call (inside tx) returns stale
+        $this->paymentIntentGateway->shouldReceive('retrieve')->andReturn($intent);
+        $this->paymentRepository->shouldNotReceive('update');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/Maximum retry attempts/i');
+
+        $this->service->retry(1, 7);
+    }
+
     public function test_retry_wraps_counter_update_in_transaction(): void
     {
         $payment = $this->makeFailedPayment(['attempt_count' => 0]);
@@ -197,6 +199,68 @@ class PaymentRetryServiceTest extends FunctionalTestCase
 
         $this->service->recordFailure('pi_x');
         $this->assertTrue(true);
+    }
+
+    public function test_retry_then_record_failure_increments_count_exactly_once(): void
+    {
+        // Demonstrates that retry() does NOT increment, recordFailure() does.
+        // Net result after one retry + one failure = attempt_count goes up by 1 only.
+        $payment = $this->makeFailedPayment(['id' => 1, 'attempt_count' => 1]);
+        $intent = $this->makeStripeIntent('requires_payment_method', 'secret');
+
+        // retry() — must not touch attempt_count
+        $this->paymentRepository->shouldReceive('find')->with(1)->andReturn($payment);
+        $this->paymentIntentGateway->shouldReceive('retrieve')->andReturn($intent);
+        $this->paymentRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn($id, array $data) => !array_key_exists('attempt_count', $data));
+
+        $this->service->retry(1, 7);
+
+        // recordFailure() — increments from 1 to 2
+        $this->paymentRepository->shouldReceive('findByPaymentIntentId')
+            ->with('pi_test')
+            ->andReturn($payment);
+        $this->paymentRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn($id, array $data) => $data['attempt_count'] === 2);
+
+        $this->service->recordFailure('pi_test', 'Insufficient funds.');
+        $this->assertTrue(true);
+    }
+
+    private function makeFailedPayment(array $attributes = []): ArticlePayment
+    {
+        return $this->makePayment(array_merge(['status' => 'failed'], $attributes));
+    }
+
+    private function makePayment(array $attributes = []): ArticlePayment
+    {
+        $defaults = [
+            'id' => 1,
+            'user_id' => 7,
+            'page_id' => 10,
+            'site_id' => 1,
+            'email' => 'buyer@example.com',
+            'stripe_payment_intent_id' => 'pi_test',
+            'status' => 'failed',
+            'amount' => 500,
+            'currency' => 'gbp',
+            'attempt_count' => 0,
+            'failure_reason' => null,
+        ];
+        $payment = new ArticlePayment(array_merge($defaults, $attributes));
+        $payment->exists = true;
+        return $payment;
+    }
+
+    private function makeStripeIntent(string $status, string $clientSecret): object
+    {
+        return (object)[
+            'id' => 'pi_test',
+            'status' => $status,
+            'client_secret' => $clientSecret,
+        ];
     }
 
     protected function setUp(): void

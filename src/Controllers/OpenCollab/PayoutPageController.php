@@ -39,15 +39,7 @@ class PayoutPageController extends Controller
     {
         $this->requireAuth();
 
-        $userId = Auth::id();
-
-        $availableBalance = $this->payoutService->availableBalance($userId);
-        $payouts = $this->payoutRepository->forContributor($userId, 50);
-
         return $this->view('open-collab.payouts.index', [
-            'availableBalancePence' => $availableBalance,
-            'availableBalancePounds' => number_format($availableBalance / 100, 2),
-            'payouts' => $payouts,
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);

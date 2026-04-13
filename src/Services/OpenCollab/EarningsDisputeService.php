@@ -39,8 +39,11 @@ class EarningsDisputeService
     /**
      * Contributor raises a dispute against one of their ledger entries.
      *
+     * A dispute can only ever be raised once per ledger entry — regardless
+     * of whether a prior dispute was resolved or rejected.
+     *
      * @throws \InvalidArgumentException if the ledger entry does not belong to the user
-     * @throws \RuntimeException         if an open dispute already exists for this entry
+     * @throws \RuntimeException         if any dispute (open, resolved, or rejected) already exists for this entry
      */
     public function raise(int $userId, int $ledgerId, string $reason): EarningsDispute
     {
@@ -52,9 +55,10 @@ class EarningsDisputeService
             );
         }
 
-        if ($this->disputeRepository->hasOpenDisputeForLedgerEntry($userId, $ledgerId)) {
+        // Block re-disputes regardless of prior dispute status.
+        if ($this->disputeRepository->hasAnyDisputeForLedgerEntry($userId, $ledgerId)) {
             throw new \RuntimeException(
-                "An open dispute already exists for ledger entry [{$ledgerId}]."
+                "A dispute has already been raised for ledger entry [{$ledgerId}]."
             );
         }
 
@@ -79,7 +83,8 @@ class EarningsDisputeService
      * @param int|null $adjustmentAmount Pence. Positive = credit, negative = debit. null = no adjustment.
      * @param string|null $adjustmentReason Required when $adjustmentAmount is provided.
      *
-     * @throws \InvalidArgumentException if the dispute is not open
+     * @throws \InvalidArgumentException if the dispute is not found or not open
+     * @throws \InvalidArgumentException if adjustmentAmount is provided without adjustmentReason
      */
     public function resolve(
         int     $disputeId,
@@ -101,13 +106,25 @@ class EarningsDisputeService
             );
         }
 
+        if ($adjustmentAmount !== null && empty($adjustmentReason)) {
+            throw new \InvalidArgumentException(
+                'Adjustment reason is required when an adjustment amount is provided.'
+            );
+        }
+
         $resolved = $this->database->transaction(function () use (
-            $dispute, $adminNotes, $adjustmentAmount, $adjustmentReason
+            $dispute, $adminId, $adminNotes, $adjustmentAmount, $adjustmentReason
         ): EarningsDispute {
-            $resolved = $this->disputeRepository->markResolved($dispute->id, $adminNotes);
+            $resolved = $this->disputeRepository->markResolved($dispute->id, $adminNotes, $adminId);
 
             if ($adjustmentAmount !== null) {
                 $ledgerEntry = $this->ledgerRepository->find($dispute->earnings_ledger_id);
+
+                if (!$ledgerEntry) {
+                    throw new \RuntimeException(
+                        "Original ledger entry missing for dispute [{$dispute->id}]."
+                    );
+                }
 
                 $this->ledgerRepository->create([
                     'user_id' => $dispute->user_id,
@@ -115,8 +132,8 @@ class EarningsDisputeService
                     'type' => LedgerEntryType::Adjustment->value,
                     'amount' => $adjustmentAmount,
                     'currency' => $ledgerEntry->currency ?? 'GBP',
-                    'reference_id' => "dispute-{$dispute->id}",
-                    'earned_at' => now()
+                    'reference_id' => sprintf('dispute:%d', $dispute->id),
+                    'earned_at' => now(),
                 ]);
             }
 
@@ -148,7 +165,7 @@ class EarningsDisputeService
     /**
      * Admin rejects a dispute.
      *
-     * @throws \InvalidArgumentException if the dispute is not open
+     * @throws \InvalidArgumentException if the dispute is not found or not open
      */
     public function reject(int $disputeId, int $adminId, string $adminNotes): EarningsDispute
     {
@@ -164,7 +181,7 @@ class EarningsDisputeService
             );
         }
 
-        $rejected = $this->disputeRepository->markRejected($dispute->id, $adminNotes);
+        $rejected = $this->disputeRepository->markRejected($dispute->id, $adminNotes, $adminId);
 
         $contributor = $this->userRepository->find($dispute->user_id);
         if ($contributor) {

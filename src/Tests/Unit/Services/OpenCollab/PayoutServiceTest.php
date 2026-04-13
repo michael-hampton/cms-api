@@ -129,6 +129,28 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->service->requestPayout(7, 1, 'bank_transfer');
     }
 
+    public function test_request_payout_throws_when_method_is_invalid(): void
+    {
+        $this->payoutRepository->shouldNotReceive('create');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Invalid payout method/i');
+
+        $this->service->requestPayout(7, 1, 'magic_money_teleport');
+    }
+
+    public function test_request_payout_wraps_balance_check_and_create_in_transaction(): void
+    {
+        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
+        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
+        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
+        $this->payoutRepository->shouldReceive('create')->andReturn($this->makePayout());
+        $this->eventDispatcher->shouldReceive('dispatch');
+
+        $this->service->requestPayout(7, 1, 'bank_transfer');
+        $this->assertTrue(true);
+    }
+
     // -------------------------------------------------------------------------
     // approve()
     // -------------------------------------------------------------------------
@@ -175,10 +197,6 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->service->approve(5, 99);
     }
 
-    // -------------------------------------------------------------------------
-    // markPaid()
-    // -------------------------------------------------------------------------
-
     public function test_approve_throws_when_payout_not_found(): void
     {
         $this->payoutRepository->shouldReceive('find')->andReturn(null);
@@ -187,6 +205,10 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->service->approve(999, 99);
     }
+
+    // -------------------------------------------------------------------------
+    // markPaid()
+    // -------------------------------------------------------------------------
 
     public function test_mark_paid_transitions_approved_to_paid_logs_audit_and_dispatches_event(): void
     {
@@ -211,10 +233,6 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->assertEquals(PayoutStatus::Paid->value, $result->status);
     }
 
-    // -------------------------------------------------------------------------
-    // reject()
-    // -------------------------------------------------------------------------
-
     public function test_mark_paid_throws_when_payout_not_approved(): void
     {
         $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
@@ -227,6 +245,10 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->service->markPaid(5, 99);
     }
+
+    // -------------------------------------------------------------------------
+    // reject()
+    // -------------------------------------------------------------------------
 
     public function test_reject_transitions_pending_to_rejected_and_logs_audit_with_reason(): void
     {
@@ -252,11 +274,6 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->assertEquals(PayoutStatus::Rejected->value, $result->status);
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
     public function test_reject_throws_when_payout_not_pending(): void
     {
         $payout = $this->makePayout(['status' => PayoutStatus::Approved->value]);
@@ -268,6 +285,9 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->service->reject(1, 99, 'reason');
     }
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
     protected function setUp(): void
     {

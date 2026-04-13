@@ -6,19 +6,19 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
-use App\Repositories\OpenCollab\ViolationRepository;
 
 /**
  * Admin HTML views for violation management.
+ * Site-wide list data is loaded client-side via ViolationController::siteIndex.
+ * Per-contributor view still loads server-side for the detail page.
  *
  * Routes:
- *   GET /{site}/open-collab/admin/violations                      — site-wide list
- *   GET /{site}/open-collab/admin/contributors/{id}/violations    — per-contributor
+ *   GET /{site}/open-collab/admin/violations                      — site-wide list (API-driven)
+ *   GET /{site}/open-collab/admin/contributors/{id}/violations    — per-contributor (server-side)
  */
 class AdminViolationPageController extends Controller
 {
     public function __construct(
-        private readonly ViolationRepository        $violationRepository,
         private readonly AdminContributorRepository $contributorRepository,
     )
     {
@@ -32,14 +32,7 @@ class AdminViolationPageController extends Controller
     {
         $this->requireAdmin();
 
-        $violations = $this->violationRepository->forSite(SiteContext::getId(), 50);
-        $items = is_array($violations) ? ($violations['data'] ?? $violations) : $violations;
-        if (is_object($items) && method_exists($items, 'toArray')) {
-            $items = $items->toArray();
-        }
-
         return $this->view('open-collab.admin.violations.index', [
-            'violations' => $items,
             'pageTitle' => 'Violations',
             'activeNav' => 'violations',
             'breadcrumbs' => [['label' => 'Violations']],
@@ -64,11 +57,11 @@ class AdminViolationPageController extends Controller
 
         $values = is_array($contributor) ? $contributor : $contributor->toArray();
 
-        $violations = $this->violationRepository->forContributor($id, SiteContext::getId());
-
+        // Per-contributor violations are loaded server-side on this detail page
+        // (the contributor violations view already loads from its own API call via JS).
         return $this->view('open-collab.admin.violations.contributor', [
             'contributor' => $values,
-            'violations' => $violations,
+            'violations' => collect([]), // loaded client-side in the view JS
             'pageTitle' => 'Violations: ' . ($values['name'] ?? ''),
             'activeNav' => 'violations',
             'breadcrumbs' => [

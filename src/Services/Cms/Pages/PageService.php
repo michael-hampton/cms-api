@@ -74,6 +74,7 @@ class PageService
             $pageId = $requestData['id'] ?? null;
 
             $mainData = $this->extractMainPageData($requestData);
+            $mainData['page_type'] = $mainData['page_type'] ?: 'content';
 
             if (!empty($mainData['title']) && empty($mainData['slug'])) {
                 $mainData['slug'] = Str::slug($mainData['title']);

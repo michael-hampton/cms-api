@@ -394,30 +394,11 @@
     SITE = '<?= \App\Framework\Support\SiteContext::slug()?>'
     CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
     window.INITIAL_DATA = {
-        cartCount: {
-    {
-        $cartCount
+        cartCount: <?= $cartCount ?>,
+        cartProductIds: <?=json_encode($cartProductIds)?>,
+        wishlistCount: <?= $wishlistCount ?>,
+        wishlistProductIds: <?=json_encode($wishlistProductIds)?>
     }
-    },
-    cartProductIds:     {
-        !!json_encode($cartProductIds)
-        !!
-    }
-    ,
-    wishlistCount:      {
-        {
-            $wishlistCount
-        }
-    }
-    ,
-    wishlistProductIds: {
-        !!json_encode($wishlistProductIds)
-        !!
-    }
-    ,
-    }
-    ;
-
 </script>
 
 @js('deals-carousel.js')

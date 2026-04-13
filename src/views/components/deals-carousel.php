@@ -175,7 +175,7 @@
         height: 200px;
         object-fit: cover;
         margin: 0 !important;
-        min-width: 100%;
+        /*min-width: 100%;*/
     }
 
     .deal-content {

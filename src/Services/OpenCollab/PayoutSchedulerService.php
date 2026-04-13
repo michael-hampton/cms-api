@@ -16,13 +16,13 @@ use App\Repositories\OpenCollab\PayoutRepository;
  *   2. Group by user_id then by currency.
  *   3. For each (user, currency) group: sum the amount.
  *   4. Skip groups below the site minimum threshold.
- *   5. Skip groups that already have an in-flight payout.
+ *   5. Skip groups that already have an in-flight payout for that same currency.
  *   6. Create one pending Payout per (user, currency) group.
  *   7. Each payout creation is wrapped in its own transaction — a failure
  *      for one user does not block others.
  *
  * One payout per: user + currency. This is enforced by checking in-flight
- * totals before creating, mirroring the manual requestPayout guard.
+ * totals scoped by currency before creating, mirroring the manual requestPayout guard.
  */
 class PayoutSchedulerService
 {
@@ -46,18 +46,18 @@ class PayoutSchedulerService
         $terms = $this->paymentTermsService->forSite($siteId);
         $cutoff = (new \DateTime())->modify("-{$terms->payout_delay_days} days");
 
-        // All eligible entries across all contributors for this site.
-        // We scope this per-user in the repository to avoid loading everything at once.
         $eligibleByUser = $this->ledgerRepository->eligibleGroupedBySiteAndUser($siteId, $cutoff);
 
         $created = 0;
 
         foreach ($eligibleByUser as $userId => $entriesByUser) {
-            // Group entries by currency for this user.
             $byCurrency = $this->groupByCurrency($entriesByUser);
 
             foreach ($byCurrency as $currency => $entries) {
-                $totalPence = array_sum(array_column($entries, 'amount'));
+                $totalPence = array_sum(array_map(
+                    fn($e) => (int)($e['amount'] ?? 0),
+                    $entries
+                ));
 
                 // Enforce minimum threshold.
                 if ($totalPence < $terms->minimum_payout_amount) {
@@ -70,9 +70,9 @@ class PayoutSchedulerService
                     continue;
                 }
 
-                // Prevent duplicate in-flight payout.
-                $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
-                if ($inFlight > 0) {
+                // Prevent duplicate in-flight payout scoped to this currency.
+                $inFlight = $this->payoutRepository->hasInFlightForContributorAndCurrency($userId, $currency);
+                if ($inFlight) {
                     $this->logger->info('Skipping scheduler payout — in-flight payout exists.', [
                         'user_id' => $userId,
                         'currency' => $currency,
@@ -88,7 +88,7 @@ class PayoutSchedulerService
                             'amount' => $totalPence,
                             'currency' => strtoupper($currency),
                             'status' => PayoutStatus::Pending->value,
-                            'method' => 'bank_transfer', // default; contributor may update in settings
+                            'method' => 'bank_transfer',
                         ]);
                     });
 
@@ -100,7 +100,6 @@ class PayoutSchedulerService
                         'amount' => $totalPence,
                     ]);
                 } catch (\Throwable $e) {
-                    // Non-critical per user — log and continue to next group.
                     $this->logger->error('Scheduler failed to create payout for user.', [
                         'user_id' => $userId,
                         'currency' => $currency,
