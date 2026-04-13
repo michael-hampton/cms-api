@@ -112,42 +112,40 @@ class EarningsDisputeControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
-//    public function test_store_returns_409_when_dispute_already_raised_for_ledger_entry(): void
-//    {
-//        $this->actingAs($this->contributor);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('raise')
-//            ->andThrow(new \RuntimeException('A dispute has already been raised for ledger entry [10].'))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/disputes', [
-//            'earnings_ledger_id' => 10,
-//            'reason'             => 'This is a valid reason for the dispute.',
-//        ]);
-//
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(409, $response->getStatusCode());
-//        $this->assertStringContainsString('already been raised', $data['error']);
-//    }
+    public function test_store_returns_409_when_dispute_already_raised_for_ledger_entry(): void
+    {
+        $this->actingAs($this->contributor);
 
-//    public function test_store_returns_422_when_ledger_entry_does_not_belong_to_user(): void
-//    {
-//        $this->actingAs($this->contributor);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('raise')
-//            ->andThrow(new \InvalidArgumentException('Ledger entry [10] not found or does not belong to user.'))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/disputes', [
-//            'earnings_ledger_id' => 10,
-//            'reason'             => 'This is a valid reason for the dispute.',
-//        ]);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//    }
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('raise')
+            ->andThrow(new \RuntimeException('A dispute has already been raised for ledger entry [10].'))
+        );
+
+        $response = $this->postForSite('/api/open-collab/disputes', [
+            'earnings_ledger_id' => 10,
+            'reason' => 'This is a valid reason for the dispute.',
+        ]);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(409, $response->getStatusCode());
+        $this->assertStringContainsString('already been raised', $data['error']);
+    }
+
+    public function test_store_returns_422_when_ledger_entry_does_not_belong_to_user(): void
+    {
+        $this->actingAs($this->contributor);
+
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('raise')
+            ->andThrow(new \InvalidArgumentException('Ledger entry [10] not found or does not belong to user.'))
+        );
+
+        $response = $this->postForSite('/api/open-collab/disputes', [
+            'earnings_ledger_id' => 10,
+            'reason' => 'This is a valid reason for the dispute.',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 
     public function test_store_returns_401_for_unauthenticated_request(): void
     {
@@ -291,53 +289,49 @@ class EarningsDisputeControllerTest extends FunctionalTestCase
 
     // ── POST /admin/disputes/{id}/resolve ────────────────────────────────────
 
-//    public function test_admin_can_resolve_a_dispute(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('resolve')
-//            ->once()
-//            ->withArgs(fn($disputeId, $adminId, $adminNotes) =>
-//                $disputeId === 7
-//                && $adminId === $this->admin->id
-//                && $adminNotes === 'We reviewed and confirmed the error.'
-//            )
-//            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Resolved->value]))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
-//            'admin_notes' => 'We reviewed and confirmed the error.',
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $this->assertEquals(DisputeStatus::Resolved->value, $data['data']['dispute']['status']);
-//        $this->assertStringContainsString('resolved', strtolower($data['data']['message']));
-//    }
+    public function test_admin_can_resolve_a_dispute(): void
+    {
+        $this->actingAs($this->admin);
 
-//    public function test_admin_can_resolve_dispute_with_adjustment(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('resolve')
-//            ->once()
-//            ->withArgs(fn($disputeId, $adminId, $adminNotes, $adjustmentAmount, $adjustmentReason) =>
-//                $adjustmentAmount === 500
-//                && $adjustmentReason === 'Calculation error on our side.'
-//            )
-//            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Resolved->value]))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
-//            'admin_notes'       => 'Confirmed error, adjusting by £5.',
-//            'adjustment_amount' => 500,
-//            'adjustment_reason' => 'Calculation error on our side.',
-//        ]);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//    }
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('resolve')
+            ->once()
+            ->withArgs(fn($disputeId, $adminId, $adminNotes) => $disputeId === 7
+                && $adminId === $this->admin->id
+                && $adminNotes === 'We reviewed and confirmed the error.'
+            )
+            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Resolved->value]))
+        );
+
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
+            'admin_notes' => 'We reviewed and confirmed the error.',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(DisputeStatus::Resolved->value, $data['data']['dispute']['status']);
+        $this->assertStringContainsString('resolved', strtolower($data['data']['message']));
+    }
+
+    public function test_admin_can_resolve_dispute_with_adjustment(): void
+    {
+        $this->actingAs($this->admin);
+
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('resolve')
+            ->once()
+            ->withArgs(fn($disputeId, $adminId, $adminNotes, $adjustmentAmount, $adjustmentReason) => $adjustmentAmount === 500
+                && $adjustmentReason === 'Calculation error on our side.'
+            )
+            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Resolved->value]))
+        );
+
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
+            'admin_notes' => 'Confirmed error, adjusting by £5.',
+            'adjustment_amount' => 500,
+            'adjustment_reason' => 'Calculation error on our side.',
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+    }
 
     public function test_resolve_returns_422_when_admin_notes_are_missing(): void
     {
@@ -350,68 +344,64 @@ class EarningsDisputeControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('Admin notes', $data['error']);
     }
 
-//    public function test_resolve_returns_422_when_dispute_is_not_open(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('resolve')
-//            ->andThrow(new \InvalidArgumentException('Dispute [7] is not open (status: resolved).'))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
-//            'admin_notes' => 'Trying to resolve an already-resolved dispute.',
-//        ]);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//    }
+    public function test_resolve_returns_422_when_dispute_is_not_open(): void
+    {
+        $this->actingAs($this->admin);
 
-//    public function test_resolve_returns_422_when_adjustment_amount_given_without_reason(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('resolve')
-//            ->andThrow(new \InvalidArgumentException('Adjustment reason is required when an adjustment amount is provided.'))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
-//            'admin_notes'       => 'Some notes here.',
-//            'adjustment_amount' => 500,
-//            // adjustment_reason intentionally omitted
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//        $this->assertStringContainsString('Adjustment reason', $data['error']);
-//    }
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('resolve')
+            ->andThrow(new \InvalidArgumentException('Dispute [7] is not open (status: resolved).'))
+        );
 
-    // ── POST /admin/disputes/{id}/reject ─────────────────────────────────────
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
+            'admin_notes' => 'Trying to resolve an already-resolved dispute.',
+        ]);
 
-//    public function test_admin_can_reject_a_dispute(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('reject')
-//            ->once()
-//            ->withArgs(fn($disputeId, $adminId, $adminNotes) =>
-//                $disputeId === 7
-//                && $adminId === $this->admin->id
-//                && $adminNotes === 'The amount charged is correct per the contract.'
-//            )
-//            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Rejected->value]))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/reject', [
-//            'admin_notes' => 'The amount charged is correct per the contract.',
-//        ]);
-//        $data = json_decode($response->getContent(), true);
-//
-//        $this->assertEquals(200, $response->getStatusCode());
-//        $this->assertEquals(DisputeStatus::Rejected->value, $data['data']['dispute']['status']);
-//        $this->assertStringContainsString('rejected', strtolower($data['data']['message']));
-//    }
+        $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_resolve_returns_422_when_adjustment_amount_given_without_reason(): void
+    {
+        $this->actingAs($this->admin);
+
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('resolve')
+            ->andThrow(new \InvalidArgumentException('Adjustment reason is required when an adjustment amount is provided.'))
+        );
+
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/resolve', [
+            'admin_notes' => 'Some notes here.',
+            'adjustment_amount' => 500,
+            // adjustment_reason intentionally omitted
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(422, $response->getStatusCode());
+        $this->assertStringContainsString('Adjustment reason', $data['error']);
+    }
+
+    //── POST /admin/disputes/{id}/reject ─────────────────────────────────────
+
+    public function test_admin_can_reject_a_dispute(): void
+    {
+        $this->actingAs($this->admin);
+
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('reject')
+            ->once()
+            ->withArgs(fn($disputeId, $adminId, $adminNotes) => $disputeId === 7
+                && $adminId === $this->admin->id
+                && $adminNotes === 'The amount charged is correct per the contract.'
+            )
+            ->andReturn($this->makeDisputeModel(['status' => DisputeStatus::Rejected->value]))
+        );
+
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/reject', [
+            'admin_notes' => 'The amount charged is correct per the contract.',
+        ]);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(DisputeStatus::Rejected->value, $data['data']['dispute']['status']);
+        $this->assertStringContainsString('rejected', strtolower($data['data']['message']));
+    }
 
     public function test_reject_returns_422_when_admin_notes_are_missing(): void
     {
@@ -424,21 +414,20 @@ class EarningsDisputeControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('Admin notes', $data['error']);
     }
 
-//    public function test_reject_returns_422_when_dispute_is_not_open(): void
-//    {
-//        $this->actingAs($this->admin);
-//
-//        $this->bindDisputeService(fn($mock) =>
-//        $mock->shouldReceive('reject')
-//            ->andThrow(new \InvalidArgumentException('Dispute [7] is not open (status: rejected).'))
-//        );
-//
-//        $response = $this->postForSite('/api/open-collab/admin/disputes/7/reject', [
-//            'admin_notes' => 'Trying to reject an already-rejected dispute.',
-//        ]);
-//
-//        $this->assertEquals(422, $response->getStatusCode());
-//    }
+    public function test_reject_returns_422_when_dispute_is_not_open(): void
+    {
+        $this->actingAs($this->admin);
+
+        $this->bindDisputeService(fn($mock) => $mock->shouldReceive('reject')
+            ->andThrow(new \InvalidArgumentException('Dispute [7] is not open (status: rejected).'))
+        );
+
+        $response = $this->postForSite('/api/open-collab/admin/disputes/7/reject', [
+            'admin_notes' => 'Trying to reject an already-rejected dispute.',
+        ]);
+
+        $this->assertEquals(422, $response->getStatusCode());
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
