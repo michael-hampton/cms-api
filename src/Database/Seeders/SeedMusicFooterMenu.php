@@ -10,7 +10,7 @@ class SeedMusicFooterMenu extends Seeder
 {
     public function run(): void
     {
-        $siteId = 7;
+        $siteId = 20;
 
         $menu = Menu::create([
             'name' => 'Music Footer Menu',

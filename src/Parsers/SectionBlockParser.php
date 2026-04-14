@@ -28,11 +28,11 @@ class SectionBlockParser extends BaseBlockParser
                 new MaxLengthRule(255)
             ],
             'headingType' => [
-                new RequiredRule(),
+                //new RequiredRule(),
                 new MaxLengthRule(10)
             ],
             'navigationText' => [
-                new RequiredRule(),
+                //new RequiredRule(),
                 new MaxLengthRule(255)
             ],
             'excludeFromNav' => [

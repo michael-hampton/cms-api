@@ -38,7 +38,7 @@ class GolfMonthlyReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(46);
+        $this->site = Site::find(11);
 
         if (!$this->site) {
             echo "Golf Monthly site not found.\n";
@@ -188,15 +188,15 @@ class GolfMonthlyReviewSeeder extends Seeder
                 'status' => 'published',
                 'page_type' => 'content',
                 'meta_title' => $reviewData['title'] . ' - Golf Monthly',
-                'site_id' => 46,
+                'site_id' => 11,
             ]);
 
-            $category = Category::where('slug', strtolower(str_replace(' ', '-', $reviewData['category'])))->where('site_id', 46)->first();
+            $category = Category::where('slug', strtolower(str_replace(' ', '-', $reviewData['category'])))->where('site_id', 11)->first();
             if ($category) {
                 PageCategory::create(['page_id' => $page->id, 'category_id' => $category->id]);
             }
 
-            $tag = Tag::where('slug', strtolower(str_replace(' ', '-', $reviewData['brand'])))->where('site_id', 46)->first();
+            $tag = Tag::where('slug', strtolower(str_replace(' ', '-', $reviewData['brand'])))->where('site_id', 11)->first();
             if ($tag) {
                 PageTag::create(['page_id' => $page->id, 'tag_id' => $tag->id]);
             }
@@ -251,7 +251,7 @@ class GolfMonthlyReviewSeeder extends Seeder
 
     private function addReviewSectionToHomepage(array $reviewPages): void
     {
-        $homepage = Page::where('slug', 'home')->where('site_id', 46)->first();
+        $homepage = Page::where('slug', 'home')->where('site_id', 11)->first();
         if (!$homepage) return;
 
         echo "Adding reviews to homepage.\n";

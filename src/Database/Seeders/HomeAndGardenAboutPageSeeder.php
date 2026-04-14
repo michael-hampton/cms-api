@@ -46,7 +46,7 @@ class HomeAndGardenAboutPageSeeder extends Seeder
             'page_type' => 'content',
             'meta_title' => 'About Us - Haven & Hearth',
             'meta_description' => 'Learn about Haven & Hearth - your trusted source for home design inspiration, gardening tips, and lifestyle content since 2010.',
-            'site_id' => 6,
+            'site_id' => 9,
         ]);
 
         $blocks = [

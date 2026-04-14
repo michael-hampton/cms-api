@@ -635,7 +635,7 @@ class VogueNoirSeeder extends Seeder
             'page_type' => 'content',
             'meta_title' => $data['title'] . ' - TechWeekly',
             'meta_description' => $data['custom_fields']['excerpt'] ?? '',
-            'site_id' => 6,
+            'site_id' => 4,
         ]);
 
         if (!empty($data['author'])) {
@@ -648,12 +648,12 @@ class VogueNoirSeeder extends Seeder
         }
 
         foreach ($data['tags'] as $tagName) {
-            $tag = $this->tagRepository->findOrCreateByName($tagName, 1);
+            $tag = $this->tagRepository->findOrCreateByName($tagName, 4);
             $page->tags(true)->attach($tag->id);
         }
 
         foreach ($data['categories'] as $categoryName) {
-            $category = $this->categoryRepository->findOrCreateByName($categoryName, 1);
+            $category = $this->categoryRepository->findOrCreateByName($categoryName, 4);
             $page->categories(true)->attach($category->id);
         }
 
@@ -682,7 +682,7 @@ class VogueNoirSeeder extends Seeder
 
     private function createArticleGrid($pages): void
     {
-        $site = Site::find(6);
+        $site = Site::find(4);
 
         $items = [];
 

@@ -8,12 +8,9 @@ class BadgeSeeder
 {
     public function run()
     {
-        $siteId = 52;
-
         $badges = [
             // Engagement Badges
             [
-                'site_id' => $siteId,
                 'name' => 'First Steps',
                 'slug' => 'first-steps',
                 'description' => 'Posted your first comment',
@@ -26,7 +23,6 @@ class BadgeSeeder
                 'points' => 50
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Conversationalist',
                 'slug' => 'conversationalist',
                 'description' => 'Posted 10 comments',
@@ -39,7 +35,6 @@ class BadgeSeeder
                 'points' => 100
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Chatterbox',
                 'slug' => 'chatterbox',
                 'description' => 'Posted 50 comments',
@@ -54,7 +49,6 @@ class BadgeSeeder
 
             // Content Badges
             [
-                'site_id' => $siteId,
                 'name' => 'Bookworm',
                 'slug' => 'bookworm',
                 'description' => 'Read 10 pages',
@@ -67,7 +61,6 @@ class BadgeSeeder
                 'points' => 50
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Scholar',
                 'slug' => 'scholar',
                 'description' => 'Read 50 pages',
@@ -80,7 +73,6 @@ class BadgeSeeder
                 'points' => 150
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Encyclopedia',
                 'slug' => 'encyclopedia',
                 'description' => 'Read 100 pages',
@@ -95,7 +87,6 @@ class BadgeSeeder
 
             // Loyalty Badges
             [
-                'site_id' => $siteId,
                 'name' => 'Newbie',
                 'slug' => 'newbie',
                 'description' => 'Been a member for 7 days',
@@ -108,7 +99,6 @@ class BadgeSeeder
                 'points' => 25
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Regular',
                 'slug' => 'regular',
                 'description' => 'Been a member for 30 days',
@@ -121,7 +111,6 @@ class BadgeSeeder
                 'points' => 100
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Veteran',
                 'slug' => 'veteran',
                 'description' => 'Been a member for 90 days',
@@ -134,7 +123,6 @@ class BadgeSeeder
                 'points' => 250
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Legend',
                 'slug' => 'legend',
                 'description' => 'Been a member for 365 days',
@@ -149,7 +137,6 @@ class BadgeSeeder
 
             // Engagement - Likes
             [
-                'site_id' => $siteId,
                 'name' => 'Appreciator',
                 'slug' => 'appreciator',
                 'description' => 'Liked 10 pages',
@@ -162,7 +149,6 @@ class BadgeSeeder
                 'points' => 50
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Super Fan',
                 'slug' => 'super-fan',
                 'description' => 'Liked 50 pages',
@@ -177,7 +163,6 @@ class BadgeSeeder
 
             // Special Purchase Badges
             [
-                'site_id' => $siteId,
                 'name' => 'First Purchase',
                 'slug' => 'first-purchase',
                 'description' => 'Made your first purchase',
@@ -190,7 +175,6 @@ class BadgeSeeder
                 'points' => 100
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Loyal Customer',
                 'slug' => 'loyal-customer',
                 'description' => 'Made 5 purchases',
@@ -203,7 +187,6 @@ class BadgeSeeder
                 'points' => 200
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'VIP Shopper',
                 'slug' => 'vip-shopper',
                 'description' => 'Made 10 purchases',
@@ -216,7 +199,6 @@ class BadgeSeeder
                 'points' => 500
             ],
             [
-                'site_id' => $siteId,
                 'name' => 'Big Spender',
                 'slug' => 'big-spender',
                 'description' => 'Spent over £1000',

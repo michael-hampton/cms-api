@@ -38,7 +38,7 @@ class GamesadarDealSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(38); // Assuming GamesRadar is site ID 4
+        $this->site = Site::find(6); // Assuming GamesRadar is site ID 4
 
         if (!$this->site) {
             echo "GamesRadar site not found.\n";

@@ -44,22 +44,20 @@ class TheWeekSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createMenu();
-//        $this->createHomepage();
-//        $this->createArticles();
-//        $this->createAboutPage();
-//        $this->createContactPage();
+        $this->createSite();
+        $this->createTags();
+        $this->createCategories();
+        $this->createMenu();
+        $this->createHomepage();
+        $this->createArticles();
+        $this->createAboutPage();
+        $this->createContactPage();
         $this->createPageGrid();
-        //$this->createMenuNavItems();
+        $this->createMenuNavItems();
     }
 
     private function createPageGrid(): void
     {
-        $this->site = Site::find(51);
-
         $articles = Page::where('page_type', 'content')->where('status', 'published')->where('site_id', 51)->get();
 
 

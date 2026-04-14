@@ -50,16 +50,16 @@ final class NewsFeedBlockDto extends BaseBlockDto
             self::validateEnum($data['layout'], self::ALLOWED_LAYOUTS, 'grid', 'layout'),
             (int)$data['limit'],
             $data['categoryId'],
-            (bool)$data['showImages'],
-            (bool)$data['showExcerpts'],
-            (bool)$data['showDates'],
+            (bool)$data['showImages'] ?? false,
+            (bool)$data['showExcerpts'] ?? false,
+            (bool)$data['showDates'] ?? false,
             $data['customArticleIds'],
             $data['title'],
-            $data['subtitle'],
+            $data['subtitle'] ?? '',
             (int)$data['columns'],
-            $data['showAuthor'],
-            $data['showCategory'],
-            $data['showReadTime'],
+            $data['showAuthor'] ?? false,
+            $data['showCategory'] ?? false,
+            $data['showReadTime'] ?? false,
             $data['items']
         );
     }

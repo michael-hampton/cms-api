@@ -9,7 +9,7 @@ class SeedFoodFooterMenu
 {
     public function run(): void
     {
-        $siteId = 9;
+        $siteId = 5;
 
         $menu = Menu::create([
             'name' => 'Food Footer Menu',

@@ -25,7 +25,7 @@ class GoCompareZoneSeeder extends Seeder
     private function createHomepage(): void
     {
         $page = Page::where('slug', 'home')
-            ->where('site_id', 28)
+            ->where('site_id', 10)
             ->first();
 
         $blocks = [

@@ -74,7 +74,7 @@ class PageService
             $pageId = $requestData['id'] ?? null;
 
             $mainData = $this->extractMainPageData($requestData);
-            $mainData['page_type'] = $mainData['page_type'] ?: 'content';
+            $mainData['page_type'] = $mainData['page_type'] ?? 'content';
 
             if (!empty($mainData['title']) && empty($mainData['slug'])) {
                 $mainData['slug'] = Str::slug($mainData['title']);
@@ -155,6 +155,9 @@ class PageService
             // Use BlockParserService to validate and parse blocks
             $this->blockParserService->replacePageBlocks($pageId, $blocks);
         } catch (ValidationException $e) {
+            dd($e->getErrors());
+            echo $e->getMessage();
+            die('here');
             throw new ValidationException('Block validation failed', $e->getErrors());
         } catch (Exception $e) {
             throw new Exception("Failed to process blocks: {$e->getMessage()}");

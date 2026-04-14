@@ -12,6 +12,7 @@ enum InfoType: string
     case RECIPE = 'recipe';
     case INSTRUCTIONS = 'instructions';
     case UPDATE = 'update';
+    case DISCLAIMER = 'disclaimer';
 
     public static function values(): array
     {

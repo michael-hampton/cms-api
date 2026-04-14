@@ -39,24 +39,20 @@ class FashionMagazineSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        $this->createMenu();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createCustomFields();
-//        $this->createHomepage();
-//        $this->createArticles();
-//        $this->createAboutPage();
-//        $this->createContactPage();
+        $this->createSite();
+        $this->createMenu();
+        $this->createTags();
+        $this->createCategories();
+        $this->createCustomFields();
+        $this->createHomepage();
+        $this->createArticles();
+        $this->createAboutPage();
+        $this->createContactPage();
     }
 
     public function createSite(): void
     {
-        $this->site = Site::create([
-            'name' => 'VOGUE NOIR - Fashion Forward',
-            'is_active' => true,
-            'slug' => 'vogue-noir',
-        ]);
+        $this->site = Site::find(4);
     }
 
     private function createMenu(): void

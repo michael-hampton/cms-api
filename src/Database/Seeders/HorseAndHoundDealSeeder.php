@@ -38,7 +38,7 @@ class HorseAndHoundDealSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(29); // Assuming Horse & Hound is site ID 6
+        $this->site = Site::find(12); // Assuming Horse & Hound is site ID 6
 
         if (!$this->site) {
             echo "Horse & Hound site not found.\n";

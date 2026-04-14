@@ -10,7 +10,7 @@ class GoCompareFooterSeeder extends Seeder
 {
     public function run(): void
     {
-        $siteId = 28; // Adjust based on your site ID
+        $siteId = 10; // Adjust based on your site ID
 
         $menu = Menu::create([
             'name' => 'GoCompare Footer Menu',

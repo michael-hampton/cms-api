@@ -39,7 +39,7 @@ class VogueNoirAccessoriesSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(6); // Vogue Noir site ID
+        $this->site = Site::find(4); // Vogue Noir site ID
 
         if (!$this->site) {
             echo "Vogue Noir site not found.\n";

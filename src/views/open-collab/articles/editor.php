@@ -2,14 +2,11 @@
 <?php
 /**
  * Template: open-collab/articles/editor.php
- * Works for both create ($page === null) and edit ($page instanceof Page)
  *
- * Variables:
- *   $page             — null|Page
- *   $site             — string  (site slug)
- *   $siteId           — int
- *   $currentUser      — AuthenticatedUser
- *   $readabilityScore — float|null
+ * Block-based editor. Three default blocks (heading, text, image) are always
+ * present and cannot be removed. Additional blocks of any type can be added.
+ * Text blocks use individual Quill instances. SEO and Comments live in the
+ * sidebar exactly as in the original template.
  */
 
 use App\Framework\Authorization\Auth;
@@ -59,7 +56,7 @@ $headerActions = '
     /* ── Editor layout ─────────────────────────────────────── */
     .editor-shell {
         display: grid;
-        grid-template-columns:1fr 300px;
+        grid-template-columns: 1fr 300px;
         gap: 20px;
         align-items: start;
     }
@@ -69,7 +66,6 @@ $headerActions = '
         flex-direction: column;
         gap: 16px;
     }
-
     .editor-sidebar {
         display: flex;
         flex-direction: column;
@@ -78,47 +74,442 @@ $headerActions = '
         top: calc(var(--header-h) + 20px);
     }
 
-    /* ── Quill overrides ────────────────────────────────────── */
-    .oc-quill-wrap {
+    /* ── Block builder ──────────────────────────────────────── */
+    .block-builder {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .block-card {
         background: #fff;
         border: 1.5px solid var(--border);
         border-radius: var(--radius);
         overflow: hidden;
     }
 
-    .oc-quill-wrap .ql-toolbar {
+    /* Default blocks: no visible header chrome (header hidden) */
+    .block-card--default > .block-card__header {
+        display: none;
+    }
+
+    /* Default blocks still get the card chrome so they look like the original elements */
+    .block-card--default {
+        border: none;
+        background: transparent;
+    }
+
+    .block-card__header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--cream-dark);
+        border-bottom: 1px solid var(--border);
+        user-select: none;
+    }
+
+    .block-card__drag {
+        cursor: grab;
+        color: var(--slate-light);
+        font-size: .85rem;
+        line-height: 1;
+        padding: 2px 4px;
+    }
+
+    .block-card__drag:active {
+        cursor: grabbing;
+    }
+
+    .block-card__type-badge {
+        font-size: .65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: var(--slate);
+        background: var(--slate-pale, #f0f2f5);
+        border-radius: 4px;
+        padding: 2px 7px;
+    }
+
+    .block-card__spacer {
+        flex: 1;
+    }
+
+    .block-card__move-btn,
+    .block-card__remove-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--slate-light);
+        padding: 3px 5px;
+        border-radius: 4px;
+        font-size: .78rem;
+        line-height: 1;
+        transition: background .12s, color .12s;
+    }
+
+    .block-card__move-btn:hover {
+        background: var(--border);
+        color: var(--navy);
+    }
+
+    .block-card__remove-btn:hover {
+        background: #fee2e2;
+        color: var(--red);
+    }
+
+    .block-card__body {
+        padding: 0;
+    }
+
+    /* ── Quill inside a block ───────────────────────────────── */
+    .block-quill-wrap {
+        background: #fff;
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+
+    /* For non-default blocks, add the card border */
+    .block-card:not(.block-card--default) .block-quill-wrap {
+        border-top: none; /* header provides top border already */
+    }
+
+    .block-card--default .block-quill-wrap {
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+    }
+
+    .block-quill-wrap .ql-toolbar {
         border: none;
         border-bottom: 1px solid var(--border);
         padding: 10px 12px;
         background: var(--cream-dark);
     }
 
-    .oc-quill-wrap .ql-container {
+    .block-quill-wrap .ql-container {
         border: none;
         font-family: var(--font-body);
         font-size: 1rem;
-        min-height: 420px;
     }
 
-    .oc-quill-wrap .ql-editor {
+    .block-quill-wrap .ql-editor {
         padding: 20px 24px;
-        min-height: 420px;
+        min-height: 220px;
         line-height: 1.8;
         color: var(--navy);
     }
 
-    .oc-quill-wrap .ql-editor p {
+    .block-quill-wrap .ql-editor p {
         margin-bottom: .75em;
+    }
+
+    .block-quill-wrap--compact .ql-editor {
+        min-height: 120px;
     }
 
     .ql-snow .ql-picker-label {
         color: var(--slate);
     }
 
-    /* ── Drag-over state ────────────────────────────────────── */
-    .oc-quill-wrap.drag-over {
+    /* ── Block body field styles ────────────────────────────── */
+    .block-card__body-inner {
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .block-card--default .block-card__body-inner {
+        padding: 0;
+    }
+
+    .block-field-label {
+        font-size: .72rem;
+        font-weight: 600;
+        color: var(--slate);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        margin-bottom: 4px;
+        display: block;
+    }
+
+    .block-field-row {
+        display: flex;
+        gap: 10px;
+    }
+
+    .block-field-row > * {
+        flex: 1;
+    }
+
+    /* Image block drop zone */
+    .block-image-drop {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        text-align: center;
+        cursor: pointer;
+        background: var(--cream-dark);
+        transition: border-color .15s, background .15s;
+    }
+
+    .block-image-drop:hover,
+    .block-image-drop.drag-over {
         border-color: var(--amber);
-        background: var(--amber-pale,.fffbeb);
+        background: rgba(245, 158, 11, .05);
+    }
+
+    .block-image-drop__hint {
+        font-size: .78rem;
+        color: var(--slate);
+    }
+
+    .block-image-preview {
+        position: relative;
+        display: inline-block;
+    }
+
+    .block-image-preview img {
+        max-height: 160px;
+        border-radius: 6px;
+        border: 1.5px solid var(--border);
+        display: block;
+    }
+
+    .block-image-preview__remove {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--red);
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        font-size: .7rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Default image block — styled like the original image-upload-zone */
+    .block-card--default .block-image-wrap {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        background: var(--cream-dark);
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .block-card--default .block-image-wrap.drag-over {
+        border-color: var(--amber);
+        background: rgba(245, 158, 11, .06);
+    }
+
+    .block-image-wrap__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .block-image-wrap__title {
+        font-size: .8rem;
+        font-weight: 700;
+        color: var(--navy);
+        text-transform: uppercase;
+        letter-spacing: .06em;
+    }
+
+    .block-image-wrap__hint {
+        font-size: .72rem;
+        color: var(--slate);
+    }
+
+    .block-image-thumbs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        min-height: 36px;
+    }
+
+    .block-image-thumb {
+        position: relative;
+        width: 64px;
+        height: 64px;
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1.5px solid var(--border);
+        background: #f0f0f2;
+        flex-shrink: 0;
+    }
+
+    .block-image-thumb img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .block-image-thumb__remove {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, .55);
+        color: #fff;
+        font-size: .65rem;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+
+    .block-image-empty {
+        font-size: .75rem;
+        color: var(--slate);
+        text-align: center;
+        padding: 4px 0;
+    }
+
+    /* List block */
+    .list-items-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .list-item-row {
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+    }
+
+    .list-item-row textarea {
+        flex: 1;
+        min-height: 36px;
+        resize: none;
+    }
+
+    .list-item-remove {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--slate-light);
+        font-size: .85rem;
+        padding: 4px;
+        border-radius: 4px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .list-item-remove:hover {
+        background: #fee2e2;
+        color: var(--red);
+    }
+
+    /* ── Shared input reset inside block bodies ─────────────── */
+    .block-card__body-inner input[type="text"],
+    .block-card__body-inner input[type="number"],
+    .block-card__body-inner select,
+    .block-card__body-inner textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        padding: 8px 12px;
+        font-size: .88rem;
+        font-family: var(--font-body);
+        color: var(--navy);
+        background: #fff;
+        outline: none;
+    }
+
+    .block-card__body-inner textarea {
+        resize: vertical;
+    }
+
+    .block-card__body-inner input[type="text"]:focus,
+    .block-card__body-inner input[type="number"]:focus,
+    .block-card__body-inner select:focus,
+    .block-card__body-inner textarea:focus {
+        border-color: var(--amber);
+    }
+
+    /* ── Add block toolbar ──────────────────────────────────── */
+    .add-block-row {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        border: 1.5px dashed var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        background: var(--cream-dark);
+    }
+
+    .add-block-row__label {
+        font-size: .72rem;
+        font-weight: 600;
+        color: var(--slate);
+        text-transform: uppercase;
+        letter-spacing: .07em;
+        padding: 0 14px;
+        white-space: nowrap;
+    }
+
+    .add-block-type-btn {
+        background: none;
+        border: none;
+        border-left: 1px solid var(--border);
+        cursor: pointer;
+        padding: 9px 13px;
+        font-size: .75rem;
+        font-weight: 600;
+        color: var(--navy);
+        transition: background .12s;
+        white-space: nowrap;
+    }
+
+    .add-block-type-btn:hover {
+        background: #fff;
+        color: var(--amber-dark, #b45309);
+    }
+
+    /* ── Drag state ─────────────────────────────────────────── */
+    .block-card.dragging {
+        opacity: .4;
+    }
+
+    .block-card.drag-over-top {
+        border-top: 2.5px solid var(--amber);
+    }
+
+    .block-card.drag-over-bottom {
+        border-bottom: 2.5px solid var(--amber);
+    }
+
+    /* ── Upload progress overlay ────────────────────────────── */
+    #upload-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 25, 41, .55);
+        z-index: 900;
+        display: none;
+        place-items: center;
+    }
+
+    #upload-overlay .upload-card {
+        background: #fff;
+        border-radius: 12px;
+        padding: 32px 40px;
+        text-align: center;
+        min-width: 220px;
     }
 
     /* ── Autosave indicator ─────────────────────────────────── */
@@ -148,7 +539,6 @@ $headerActions = '
         max-height: 320px;
         overflow-y: auto;
     }
-
     .history-item {
         padding: 10px 14px;
         cursor: pointer;
@@ -162,7 +552,6 @@ $headerActions = '
     .history-item:hover {
         background: var(--cream-dark);
     }
-
     .history-item__dot {
         width: 8px;
         height: 8px;
@@ -187,7 +576,6 @@ $headerActions = '
     .history-item.active {
         background: var(--navy);
     }
-
     .history-item.active .history-item__summary,
     .history-item.active .history-item__meta {
         color: #fff;
@@ -197,7 +585,113 @@ $headerActions = '
         background: var(--amber);
     }
 
-    /* ── Comments panel ─────────────────────────────────────── */
+    /* ── Version diff modal ─────────────────────────────────── */
+    #diff-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 500;
+        background: rgba(15, 25, 41, .65);
+        display: none;
+        place-items: center;
+        padding: 20px;
+    }
+
+    #diff-modal.open {
+        display: grid;
+    }
+
+    .diff-modal-panel {
+        background: #fff;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 1100px;
+        max-height: 90vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+    }
+
+    .diff-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .diff-modal-header h3 {
+        font-size: .95rem;
+        font-weight: 700;
+        color: var(--navy);
+        margin: 0;
+    }
+
+    .diff-modal-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0;
+        flex: 1;
+        overflow: hidden;
+    }
+
+    .diff-col {
+        overflow-y: auto;
+        padding: 20px;
+        border-right: 1px solid var(--border);
+    }
+
+    .diff-col:last-child {
+        border-right: none;
+    }
+
+    .diff-col__title {
+        font-size: .68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: var(--slate);
+        margin-bottom: 12px;
+    }
+
+    .diff-col__content {
+        font-size: .85rem;
+        line-height: 1.7;
+        color: var(--navy);
+    }
+
+    .diff-col__content h2 {
+        font-size: 1.1rem;
+        margin: .5em 0 .25em;
+    }
+
+    .diff-col__content h3 {
+        font-size: .95rem;
+        margin: .5em 0 .2em;
+    }
+
+    .diff-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+    }
+
+    /* ── Restore banner ─────────────────────────────────────── */
+    #restore-banner {
+        background: var(--amber-pale, #fffbeb);
+        border: 1.5px solid var(--amber-dark, #b45309);
+        border-radius: var(--radius);
+        padding: 12px 16px;
+        display: none;
+        align-items: center;
+        gap: 12px;
+        font-size: .82rem;
+        color: var(--amber-dark, #b45309);
+    }
+
+    /* ── Comment styles ─────────────────────────────────────── */
     .comment-thread {
         border-left: 2px solid var(--border);
         padding-left: 12px;
@@ -266,75 +760,56 @@ $headerActions = '
         border-left: 2px solid var(--border);
     }
 
-    /* ── Reply / new comment form ───────────────────────────── */
-    .comment-form {
-        margin-top: 8px;
+    /* ── Heading block (default, styled like original title card) */
+    .block-heading-wrap {
+        background: #fff;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px 24px 0;
     }
 
-    .comment-form textarea {
+    .block-heading-wrap input.heading-title-input {
+        border: none;
+        outline: none;
         width: 100%;
-        resize: vertical;
-        min-height: 60px;
-        padding: 8px 10px;
-        border: 1.5px solid var(--border);
-        border-radius: 6px;
-        font-size: .82rem;
-        font-family: var(--font-body);
+        font-family: var(--font-display);
+        font-size: 1.6rem;
+        font-weight: 700;
         color: var(--navy);
-        background: #fff;
+        padding: 0 0 16px;
+        background: transparent;
         box-sizing: border-box;
     }
 
-    .comment-form textarea:focus {
+    .block-heading-wrap input.heading-subtitle-input {
+        border: none;
         outline: none;
-        border-color: var(--navy);
+        width: 100%;
+        font-family: var(--font-body);
+        font-size: 1rem;
+        font-weight: 400;
+        color: var(--slate);
+        padding: 0 0 14px;
+        background: transparent;
+        box-sizing: border-box;
     }
 
-    .comment-form__actions {
+    /* Non-default heading block */
+    .block-heading-inner {
         display: flex;
-        justify-content: flex-end;
+        flex-direction: column;
         gap: 8px;
-        margin-top: 6px;
-    }
-
-    /* ── Upload progress overlay ────────────────────────────── */
-    #upload-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 25, 41, .55);
-        z-index: 900;
-        display: none;
-        place-items: center;
-    }
-
-    #upload-overlay .upload-card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 32px 40px;
-        text-align: center;
-        min-width: 220px;
-    }
-
-    /* ── Restore banner ─────────────────────────────────────── */
-    #restore-banner {
-        background: var(--amber-pale,.fffbeb);
-        border: 1.5px solid var(--amber-dark, #b45309);
-        border-radius: var(--radius);
-        padding: 12px 16px;
-        display: none;
-        align-items: center;
-        gap: 12px;
-        font-size: .82rem;
-        color: var(--amber-dark, #b45309);
     }
 </style>
 
+<!-- Toast -->
 <div id="save-status"
      style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
             background:var(--navy);color:#fff;padding:8px 18px;border-radius:20px;
             font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;
             z-index:300;pointer-events:none;"></div>
 
+<!-- Upload overlay -->
 <div id="upload-overlay">
     <div class="upload-card">
         <div class="oc-spinner" style="margin:0 auto 12px;width:28px;height:28px;border-width:3px;"></div>
@@ -343,6 +818,7 @@ $headerActions = '
     </div>
 </div>
 
+<!-- Restore banner -->
 <div id="restore-banner">
     <svg viewBox="0 0 20 20" fill="currentColor" width="16" style="flex-shrink:0;">
         <path fill-rule="evenodd"
@@ -356,106 +832,95 @@ $headerActions = '
     <button onclick="cancelRestore()" class="oc-btn oc-btn--ghost oc-btn--sm">Cancel</button>
 </div>
 
+<!-- Version diff modal -->
+<div id="diff-modal" role="dialog" aria-modal="true" aria-label="Version comparison">
+    <div class="diff-modal-panel">
+        <div class="diff-modal-header">
+            <h3 id="diff-modal-title">Comparing versions</h3>
+            <button onclick="closeDiffModal()" class="oc-btn oc-btn--ghost oc-btn--sm" aria-label="Close">✕</button>
+        </div>
+        <div class="diff-modal-body">
+            <div class="diff-col" id="diff-old">
+                <div class="diff-col__title">Previous version</div>
+                <div class="diff-col__content" id="diff-old-content"></div>
+            </div>
+            <div class="diff-col" id="diff-new">
+                <div class="diff-col__title">Current version</div>
+                <div class="diff-col__content" id="diff-new-content"></div>
+            </div>
+        </div>
+        <div class="diff-modal-footer">
+            <button onclick="closeDiffModal()" class="oc-btn oc-btn--ghost">Close</button>
+            <button onclick="restoreFromDiff()" class="oc-btn oc-btn--amber" id="diff-restore-btn">Restore this
+                version
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Validation errors -->
 <div id="editor-errors" class="oc-form-errors" style="display:none;margin-bottom:16px;" role="alert"></div>
+
+<!-- Hidden file input for block image uploads -->
+<input type="file" id="block-image-file-input" accept="image/*" style="display:none;">
+<!-- Hidden file input for default image block uploads (multiple) -->
+<input type="file" id="default-image-file-input" accept="image/*" multiple style="display:none;">
 
 <div class="editor-shell">
 
+    <!-- ── Main column ─────────────────────────────────────────── -->
     <div class="editor-main">
 
-        <div class="oc-card" style="padding:20px 24px 0;">
-            <input
-                    type="text"
-                    id="article-title"
-                    class="oc-editor__title"
-                    placeholder="Article title…"
-                    value="<?= htmlspecialchars($page->title ?? '') ?>"
-                    autocomplete="off"
-                    style="border:none;outline:none;width:100%;font-family:var(--font-display);
-                       font-size:1.6rem;font-weight:700;color:var(--navy);
-                       padding:0 0 16px;background:transparent;"
-            >
+        <!-- Block builder — JS populates this -->
+        <div id="block-builder" class="block-builder"></div>
+
+        <!-- Add block toolbar -->
+        <div class="add-block-row">
+            <span class="add-block-row__label">+ Add block</span>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('text')">Text</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('heading')">Heading</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('section')">Section</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('quote')">Quote</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('info')">Info</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('list')">List</button>
+            <button type="button" class="add-block-type-btn" onclick="addBlock('image')">Image</button>
         </div>
 
-        <div class="oc-quill-wrap" id="quill-wrap">
-            <div id="quill-toolbar">
-                <span class="ql-formats">
-                    <select class="ql-header">
-                        <option value="2">Heading</option>
-                        <option value="3">Sub-heading</option>
-                        <option selected></option>
-                    </select>
-                </span>
-                <span class="ql-formats">
-                    <button class="ql-bold"></button>
-                    <button class="ql-italic"></button>
-                    <button class="ql-underline"></button>
-                    <button class="ql-strike"></button>
-                </span>
-                <span class="ql-formats">
-                    <button class="ql-blockquote"></button>
-                    <button class="ql-code-block"></button>
-                </span>
-                <span class="ql-formats">
-                    <button class="ql-list" value="ordered"></button>
-                    <button class="ql-list" value="bullet"></button>
-                </span>
-                <span class="ql-formats">
-                    <button class="ql-link"></button>
-                    <button class="ql-image" id="custom-image-btn" title="Upload image"></button>
-                </span>
-                <span class="ql-formats">
-                    <button class="ql-clean"></button>
-                </span>
-                <span class="ql-formats" style="margin-left:auto;">
-                    <span id="autosave-indicator">
-                        <svg viewBox="0 0 20 20" fill="currentColor" width="12" id="autosave-icon">
-                            <path fill-rule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clip-rule="evenodd"/>
-                        </svg>
-                        <span id="autosave-text">All changes saved</span>
-                    </span>
-                </span>
-            </div>
-            <div id="quill-editor"><?= $page->content ?? '' ?></div>
-        </div>
-
-        <div style="font-size:.72rem;color:var(--slate-light);text-align:center;padding:4px 0;">
-            Drag &amp; drop images into the editor, or use the image button in the toolbar
-        </div>
-
+        <!-- Readability score -->
         <?php if ($rScore !== null): ?>
             <div style="padding:12px 16px;background:#fff;border:1px solid var(--border);
                     border-radius:var(--radius);display:flex;align-items:center;gap:12px;">
-            <span style="font-size:.75rem;font-weight:600;color:var(--slate);
-                         letter-spacing:.06em;text-transform:uppercase;">Readability</span>
+                <span style="font-size:.75rem;font-weight:600;color:var(--slate);
+                             letter-spacing:.06em;text-transform:uppercase;">Readability</span>
                 <span class="oc-readability oc-readability--<?= $rGrade ?>">
-                <strong><?= $rGrade ?>:</strong> <?= htmlspecialchars($rLabel) ?>
-                <div class="oc-readability__bar" style="margin-left:4px;">
-                    <div class="oc-readability__fill"
-                         style="width:<?= (int)$rScore ?>%;background:currentColor;opacity:.6;"></div>
-                </div>
-            </span>
+                    <strong><?= $rGrade ?>:</strong> <?= htmlspecialchars($rLabel) ?>
+                    <div class="oc-readability__bar" style="margin-left:4px;">
+                        <div class="oc-readability__fill"
+                             style="width:<?= (int)$rScore ?>%;background:currentColor;opacity:.6;"></div>
+                    </div>
+                </span>
                 <span style="margin-left:auto;font-size:.75rem;color:var(--slate-light);"><?= $rScore ?>/100</span>
             </div>
         <?php endif; ?>
 
     </div>
 
+    <!-- ── Sidebar ──────────────────────────────────────────────── -->
     <div class="editor-sidebar">
 
         <?php if ($isEdit): ?>
             <div style="padding:12px 16px;background:#fff;border:1px solid var(--border);
                     border-radius:var(--radius);display:flex;align-items:center;
                     justify-content:space-between;">
-            <span style="font-size:.78rem;font-weight:600;color:var(--slate);
-                         text-transform:uppercase;letter-spacing:.06em;">Status</span>
+                <span style="font-size:.78rem;font-weight:600;color:var(--slate);
+                             text-transform:uppercase;letter-spacing:.06em;">Status</span>
                 <span class="oc-badge oc-badge--<?= htmlspecialchars($page->status) ?>">
-                <?= ucfirst(htmlspecialchars($page->status)) ?>
-            </span>
+                    <?= ucfirst(htmlspecialchars($page->status)) ?>
+                </span>
             </div>
         <?php endif; ?>
 
+        <!-- Monetisation -->
         <div class="oc-card">
             <div class="oc-card__header">
                 <span class="oc-card__title" style="font-size:.95rem;">Monetisation</span>
@@ -488,42 +953,47 @@ $headerActions = '
             </div>
         </div>
 
+        <!-- Publish options -->
         <div class="oc-card">
             <div class="oc-card__header">
                 <span class="oc-card__title" style="font-size:.95rem;">Publish options</span>
             </div>
             <div class="oc-card__body">
                 <div class="oc-form-group" style="margin-bottom:12px;">
-                    <label class="oc-label oc-label--optional" for="scheduled-at">Schedule for later</label>
-                    <input class="oc-input" type="datetime-local" id="scheduled-at"
-                           value="<?= $page && $page->scheduled_at ? date('Y-m-d\TH:i', strtotime($page->scheduled_at)) : '' ?>"
-                           min="<?= date('Y-m-d\TH:i', strtotime('+5 minutes')) ?>">
-                    <div class="oc-help">Leave blank to publish immediately.</div>
+                    <label class="oc-label" for="article-visibility">Visibility</label>
+                    <select class="oc-input" id="article-visibility">
+                        <option value="public" <?= ($page?->visibility ?? 'public') === 'public' ? 'selected' : '' ?>>
+                            Public
+                        </option>
+                        <option value="premium" <?= ($page?->visibility ?? '') === 'premium' ? 'selected' : '' ?>>
+                            Premium
+                        </option>
+                        <option value="members" <?= ($page?->visibility ?? '') === 'members' ? 'selected' : '' ?>>
+                            Members only
+                        </option>
+                        <option value="private" <?= ($page?->visibility ?? '') === 'private' ? 'selected' : '' ?>>
+                            Private
+                        </option>
+                    </select>
                 </div>
-                <button onclick="saveArticle('scheduled')" class="oc-btn oc-btn--ghost oc-btn--block oc-btn--sm"
-                        id="schedule-btn" style="<?= ($page && $page->status === 'scheduled') ? '' : '' ?>">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                        <path fill-rule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    <?= ($page && $page->status === 'scheduled') ? 'Update schedule' : 'Schedule' ?>
-                </button>
-                <?php if ($page && $page->status === 'scheduled'): ?>
-                    <div style="margin-top:8px;padding:8px 12px;background:var(--cream-dark);border-radius:6px;
-                        font-size:.75rem;color:var(--amber-dark,#b45309);display:flex;align-items:center;gap:6px;">
-                        <svg viewBox="0 0 20 20" fill="currentColor" width="12">
-                            <path fill-rule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                  clip-rule="evenodd"/>
-                        </svg>
-                        Scheduled
-                        for <?= $page->scheduled_at ? date('d M Y, H:i', strtotime($page->scheduled_at)) : '—' ?>
-                    </div>
-                <?php endif; ?>
+                <label class="oc-label oc-label--optional" for="scheduled-at">Schedule for later</label>
+                <input class="oc-input" type="datetime-local" id="scheduled-at"
+                       value="<?= $page && $page->scheduled_at ? date('Y-m-d\TH:i', strtotime($page->scheduled_at)) : '' ?>"
+                       min="<?= date('Y-m-d\TH:i', strtotime('+5 minutes')) ?>">
+                <div class="oc-help">Leave blank to publish immediately.</div>
             </div>
+            <button onclick="saveArticle('scheduled')"
+                    class="oc-btn oc-btn--ghost oc-btn--block oc-btn--sm" id="schedule-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14">
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                          clip-rule="evenodd"/>
+                </svg>
+                <?= ($page && $page->status === 'scheduled') ? 'Update schedule' : 'Schedule' ?>
+            </button>
         </div>
 
+        <!-- SEO -->
         <div class="oc-card">
             <div class="oc-card__header">
                 <span class="oc-card__title" style="font-size:.95rem;">SEO</span>
@@ -546,6 +1016,8 @@ $headerActions = '
         </div>
 
         <?php if ($isEdit): ?>
+
+            <!-- Version history -->
             <div class="oc-card" id="history-card">
                 <div class="oc-card__header" style="cursor:pointer;" onclick="toggleHistory()">
                     <span class="oc-card__title" style="font-size:.95rem;">Version history</span>
@@ -564,31 +1036,28 @@ $headerActions = '
                     </div>
                 </div>
             </div>
-        <?php endif; ?>
 
-        <?php if ($isEdit): ?>
+            <!-- Comments -->
             <div class="oc-card" id="comments-card">
                 <div class="oc-card__header">
                     <span class="oc-card__title" style="font-size:.95rem;">Comments</span>
                     <span id="comment-count-badge"
                           style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
-                             padding:2px 7px;border-radius:10px;font-weight:600;">0</span>
+                                 padding:2px 7px;border-radius:10px;font-weight:600;">0</span>
                 </div>
                 <div class="oc-card__body" id="comments-body"
                      style="padding:12px 16px;max-height:360px;overflow-y:auto;">
                     <div style="text-align:center;color:var(--slate);font-size:.82rem;padding:16px 0;"
-                         id="comments-empty">
-                        No comments yet.
+                         id="comments-empty">No comments yet.
                     </div>
                 </div>
                 <div style="padding:12px 16px;border-top:1px solid var(--border);">
-                <textarea id="new-comment-input" placeholder="Add a comment…"
-                          style="width:100%;resize:none;min-height:64px;padding:8px 10px;
-                                 border:1.5px solid var(--border);border-radius:6px;
-                                 font-size:.82rem;font-family:var(--font-body);
-                                 color:var(--navy);background:#fff;box-sizing:border-box;"
-                          onkeydown="if(event.ctrlKey&&event.key==='Enter'){postComment();}">
-                </textarea>
+                    <textarea id="new-comment-input" placeholder="Add a comment…"
+                              style="width:100%;resize:none;min-height:64px;padding:8px 10px;
+                                     border:1.5px solid var(--border);border-radius:6px;
+                                     font-size:.82rem;font-family:var(--font-body);
+                                     color:var(--navy);background:#fff;box-sizing:border-box;"
+                              onkeydown="if(event.ctrlKey&&event.key==='Enter'){postComment();}"></textarea>
                     <div style="display:flex;justify-content:flex-end;margin-top:6px;">
                         <button onclick="postComment()" class="oc-btn oc-btn--primary oc-btn--sm">
                             Post <span style="font-size:.7rem;color:rgba(255,255,255,.6);margin-left:4px;">Ctrl+↵</span>
@@ -596,13 +1065,12 @@ $headerActions = '
                     </div>
                 </div>
             </div>
-        <?php endif; ?>
 
-        <?php if ($isEdit): ?>
+            <!-- Danger zone -->
             <div class="oc-card" style="border-color:#fecaca;">
                 <div class="oc-card__body" style="padding:16px 18px;">
                     <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;
-                             text-transform:uppercase;color:var(--red);margin-bottom:10px;">
+                                text-transform:uppercase;color:var(--red);margin-bottom:10px;">
                         Danger zone
                     </div>
                     <?php if ($page->status === 'published'): ?>
@@ -617,80 +1085,788 @@ $headerActions = '
                     </button>
                 </div>
             </div>
+
         <?php endif; ?>
 
     </div>
-
 </div>
-
-<input type="file" id="image-file-input" accept="image/*" style="display:none;">
 
 @endsection
 
 @section('scripts')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script>
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     // Constants
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const PAGE_ID = <?= $isEdit ? (int)$page->id : 'null' ?>;
     const SITE_ID = <?= (int)($siteId ?? 1) ?>;
     const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Quill initialisation
-    // ─────────────────────────────────────────────────────────────────────────────
-    const quill = new Quill('#quill-editor', {
-        theme: 'snow',
-        modules: {
-            toolbar: '#quill-toolbar',
-            clipboard: {matchVisual: false},
-        },
-        placeholder: 'Start writing your article…',
-    });
+    // =============================================================================
+    // Block state
+    // =============================================================================
+    /**
+     * Default block IDs — these three blocks are always present and cannot be
+     * removed. They are always first in the list, in order: heading, text, image.
+     */
+    const DEFAULT_BLOCK_IDS = {heading: '__default_heading__', text: '__default_text__', image: '__default_image__'};
 
-    // Remove default image handler; replace with our upload handler
-    const toolbar = quill.getModule('toolbar');
-    toolbar.addHandler('image', () => document.getElementById('image-file-input').click());
+    /**
+     * blocks[] — each entry:
+     *   { id, type, isDefault, order, ...typeFields }
+     *
+     * Types: heading | section | text | quote | info | list | image
+     */
+    let blocks = [];
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Autosave
-    // ─────────────────────────────────────────────────────────────────────────────
-    let autosaveTimer = null;
-    let isDirty = false;
-    let lastSavedHash = '';
-    let isRestoreMode = false;
-    let pendingSnapshot = null; // holds snapshot content during restore preview
+    // Quill instances keyed by block id
+    const quillInstances = {};
 
-    function contentHash(str) {
-        // Cheap hash to avoid saving when content hasn't changed
-        let h = 0;
-        for (let i = 0; i < str.length; i++) {
-            h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+    // Default image block uploaded images: [{ id, url, alt }]
+    let defaultImageItems = [];
+
+    // =============================================================================
+    // Initialise block state
+    // =============================================================================
+    (function initBlocks() {
+        <?php if ($isEdit && !empty($page->blocks)): ?>
+        const raw = <?= json_encode($page->blocks) ?>;
+        if (Array.isArray(raw) && raw.length) {
+            raw.forEach((b, i) => {
+                blocks.push({...b, id: b.id ?? uid(), order: b.order ?? i, isDefault: false});
+            });
+            // Ensure we always have the three default blocks at positions 0-2
+            ensureDefaultBlocks();
+            reorder();
+            return;
         }
-        return h;
+        <?php endif; ?>
+        // Fresh article — seed with three default blocks
+        blocks = [
+            {
+                id: DEFAULT_BLOCK_IDS.heading, type: 'heading', isDefault: true, order: 0,
+                level: 2, text: '<?= addslashes(htmlspecialchars($page->title ?? '')) ?>', subtitle: ''
+            },
+            {
+                id: DEFAULT_BLOCK_IDS.text, type: 'text', isDefault: true, order: 1,
+                content: '<?= addslashes($page->content ?? '') ?>'
+            },
+            {
+                id: DEFAULT_BLOCK_IDS.image, type: 'image', isDefault: true, order: 2,
+                src: '', alt: '', caption: '', layout: 'full', alignment: 'center'
+            },
+        ];
+    })();
+
+    function ensureDefaultBlocks() {
+        const hasDefault = (type) => blocks.some(b => b.id === DEFAULT_BLOCK_IDS[type]);
+        const defaultDefs = [
+            {
+                id: DEFAULT_BLOCK_IDS.heading, type: 'heading', isDefault: true, order: -3,
+                level: 2, text: '', subtitle: ''
+            },
+            {
+                id: DEFAULT_BLOCK_IDS.text, type: 'text', isDefault: true, order: -2,
+                content: ''
+            },
+            {
+                id: DEFAULT_BLOCK_IDS.image, type: 'image', isDefault: true, order: -1,
+                src: '', alt: '', caption: '', layout: 'full', alignment: 'center'
+            },
+        ];
+        defaultDefs.forEach(def => {
+            if (!hasDefault(def.type)) blocks.unshift(def);
+        });
+        // Ensure defaults are pinned to the front
+        const defaults = blocks.filter(b => b.isDefault);
+        const extras = blocks.filter(b => !b.isDefault);
+        // Sort defaults by canonical order
+        const order = [DEFAULT_BLOCK_IDS.heading, DEFAULT_BLOCK_IDS.text, DEFAULT_BLOCK_IDS.image];
+        defaults.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+        blocks = [...defaults, ...extras];
     }
 
+    function uid() {
+        return Math.random().toString(36).slice(2, 10);
+    }
+
+    function blockDefaults(type) {
+        switch (type) {
+            case 'text':
+                return {content: ''};
+            case 'heading':
+                return {level: 2, text: '', subtitle: ''};
+            case 'section':
+                return {level: 2, title: ''};
+            case 'quote':
+                return {text: '', attribution: ''};
+            case 'info':
+                return {infoType: 'disclaimer', description: ''};
+            case 'list':
+                return {listType: 'ul', items: ['']};
+            case 'image':
+                return {src: '', alt: '', caption: '', layout: 'full', alignment: 'center'};
+            default:
+                return {};
+        }
+    }
+
+    function addBlock(type, afterId = null) {
+        const block = {id: uid(), type, isDefault: false, order: 0, ...blockDefaults(type)};
+        if (afterId) {
+            const idx = blocks.findIndex(b => b.id === afterId);
+            blocks.splice(idx + 1, 0, block);
+        } else {
+            blocks.push(block);
+        }
+        reorder();
+        renderBlocks();
+        scheduleAutosave();
+        setTimeout(() => {
+            const card = document.querySelector(`[data-block-id="${block.id}"]`);
+            card?.querySelector('textarea, input, .ql-editor')?.focus();
+        }, 80);
+    }
+
+    function removeBlock(id) {
+        const b = blocks.find(b => b.id === id);
+        if (!b || b.isDefault) return; // default blocks cannot be removed
+        if (quillInstances[id]) {
+            quillInstances[id] = null;
+            delete quillInstances[id];
+        }
+        blocks = blocks.filter(b => b.id !== id);
+        reorder();
+        renderBlocks();
+        scheduleAutosave();
+    }
+
+    function moveBlock(id, dir) {
+        const b = blocks.find(b => b.id === id);
+        if (!b || b.isDefault) return; // cannot move default blocks
+        const nonDefaultStart = blocks.findIndex(b => !b.isDefault);
+        const idx = blocks.findIndex(b => b.id === id);
+        const swap = dir === 'up' ? idx - 1 : idx + 1;
+        if (swap < nonDefaultStart || swap >= blocks.length) return;
+        [blocks[idx], blocks[swap]] = [blocks[swap], blocks[idx]];
+        reorder();
+        renderBlocks();
+        scheduleAutosave();
+    }
+
+    function reorder() {
+        blocks.forEach((b, i) => {
+            b.order = i;
+        });
+    }
+
+    function patchBlock(id, field, value) {
+        const b = blocks.find(b => b.id === id);
+        if (!b) return;
+        if (field.includes('.')) {
+            const [arr, idx] = field.split('.');
+            b[arr][parseInt(idx)] = value;
+        } else {
+            b[field] = value;
+        }
+        scheduleAutosave();
+    }
+
+    function addListItem(blockId) {
+        const b = blocks.find(b => b.id === blockId);
+        if (!b) return;
+        b.items.push('');
+        renderBlocks();
+        scheduleAutosave();
+        setTimeout(() => {
+            const card = document.querySelector(`[data-block-id="${blockId}"]`);
+            const inputs = card?.querySelectorAll('.list-item-row textarea');
+            inputs?.[inputs.length - 1]?.focus();
+        }, 30);
+    }
+
+    function removeListItem(blockId, idx) {
+        const b = blocks.find(b => b.id === blockId);
+        if (!b || b.items.length <= 1) return;
+        b.items.splice(idx, 1);
+        renderBlocks();
+        scheduleAutosave();
+    }
+
+    // =============================================================================
+    // Rendering
+    // =============================================================================
+    function renderBlocks() {
+        const container = document.getElementById('block-builder');
+
+        // Snapshot Quill contents before wiping the DOM
+        Object.keys(quillInstances).forEach(id => {
+            const q = quillInstances[id];
+            if (!q) return;
+            const b = blocks.find(b => b.id === id);
+            if (b) b.content = q.root.innerHTML;
+        });
+
+        container.innerHTML = '';
+        blocks.forEach(b => container.appendChild(buildBlockCard(b)));
+
+        // Re-initialise Quill for every text block
+        blocks.forEach(b => {
+            if (b.type === 'text') initQuillForBlock(b);
+        });
+
+        initDragDrop();
+    }
+
+    function buildBlockCard(b) {
+        const card = document.createElement('div');
+        card.className = 'block-card' + (b.isDefault ? ' block-card--default' : '');
+        if (!b.isDefault) card.draggable = true;
+        card.dataset.blockId = b.id;
+
+        const labels = {
+            text: 'Text', heading: 'Heading', section: 'Section',
+            quote: 'Quote', info: 'Info', list: 'List', image: 'Image',
+        };
+
+        // Header (only for non-default blocks)
+        if (!b.isDefault) {
+            card.innerHTML = `
+        <div class="block-card__header">
+            <span class="block-card__drag" title="Drag to reorder">⠿</span>
+            <span class="block-card__type-badge">${labels[b.type] ?? b.type}</span>
+            <span class="block-card__spacer"></span>
+            <button type="button" class="block-card__move-btn" title="Move up"   onclick="moveBlock('${b.id}','up')">↑</button>
+            <button type="button" class="block-card__move-btn" title="Move down" onclick="moveBlock('${b.id}','down')">↓</button>
+            <button type="button" class="block-card__remove-btn" title="Remove"  onclick="removeBlock('${b.id}')">✕</button>
+        </div>`;
+        }
+
+        const body = document.createElement('div');
+        body.className = 'block-card__body';
+        body.innerHTML = blockBodyHTML(b);
+        card.appendChild(body);
+        return card;
+    }
+
+    function blockBodyHTML(b) {
+        const id = b.id;
+
+        switch (b.type) {
+            // ── Heading ──────────────────────────────────────────────────
+            case 'heading': {
+                if (b.isDefault) {
+                    // Styled like the original title card
+                    return `<div class="block-heading-wrap">
+                    <input type="text" class="heading-title-input"
+                           id="article-title"
+                           placeholder="Article title…"
+                           value="${escAttr(b.text ?? '')}"
+                           autocomplete="off"
+                           oninput="patchBlock('${id}','text',this.value);autoSlug(this.value);"
+                           onblur="autoSlug(this.value)">
+                </div>`;
+                }
+                return `<div class="block-card__body-inner block-heading-inner">
+                <div>
+                    <label class="block-field-label">Level</label>
+                    <select oninput="patchBlock('${id}','level',parseInt(this.value))">
+                        <option value="2" ${b.level == 2 ? 'selected' : ''}>H2 — Heading</option>
+                        <option value="3" ${b.level == 3 ? 'selected' : ''}>H3 — Sub-heading</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block-field-label">Heading text</label>
+                    <textarea rows="2" placeholder="Heading…"
+                        oninput="patchBlock('${id}','text',this.value)">${escHtml(b.text ?? '')}</textarea>
+                </div>
+                <div>
+                    <label class="block-field-label">Subtitle <span style="font-weight:400;color:var(--slate-light);">(optional)</span></label>
+                    <textarea rows="2" placeholder="Sub-heading or intro line…"
+                        oninput="patchBlock('${id}','subtitle',this.value)">${escHtml(b.subtitle ?? '')}</textarea>
+                </div>
+            </div>`;
+            }
+
+            // ── Section ──────────────────────────────────────────────────
+            case 'section': {
+                return `<div class="block-card__body-inner">
+                <div>
+                    <label class="block-field-label">Heading type</label>
+                    <select oninput="patchBlock('${id}','level',parseInt(this.value))">
+                        <option value="2" ${(b.level ?? 2) == 2 ? 'selected' : ''}>H2 — Section heading</option>
+                        <option value="3" ${(b.level ?? 2) == 3 ? 'selected' : ''}>H3 — Sub-section</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block-field-label">Title</label>
+                    <textarea rows="2" placeholder="Section title…"
+                        oninput="patchBlock('${id}','title',this.value)">${escHtml(b.title ?? '')}</textarea>
+                </div>
+            </div>`;
+            }
+
+            // ── Text (Quill) ─────────────────────────────────────────────
+            case 'text': {
+                const isDefault = b.isDefault;
+                const wrapClass = 'block-quill-wrap' + (isDefault ? '' : ' block-quill-wrap--compact');
+                // Quill is initialised after DOM insertion via initQuillForBlock()
+                return `<div class="${wrapClass}" id="quill-wrap-${id}">
+                <div id="quill-toolbar-${id}">
+                    <span class="ql-formats">
+                        <select class="ql-header">
+                            <option value="2">Heading</option>
+                            <option value="3">Sub-heading</option>
+                            <option selected></option>
+                        </select>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-bold"></button>
+                        <button class="ql-italic"></button>
+                        <button class="ql-underline"></button>
+                        <button class="ql-strike"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-blockquote"></button>
+                        <button class="ql-code-block"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-list" value="ordered"></button>
+                        <button class="ql-list" value="bullet"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-link"></button>
+                    </span>
+                    <span class="ql-formats">
+                        <button class="ql-clean"></button>
+                    </span>
+                    ${isDefault ? `<span class="ql-formats" style="margin-left:auto;">
+                        <span id="autosave-indicator">
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="12" id="autosave-icon">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                            <span id="autosave-text">All changes saved</span>
+                        </span>
+                    </span>` : ''}
+                </div>
+                <div id="quill-editor-${id}">${b.content ?? ''}</div>
+            </div>`;
+            }
+
+            // ── Quote ────────────────────────────────────────────────────
+            case 'quote':
+                return `<div class="block-card__body-inner">
+                <div>
+                    <label class="block-field-label">Quote text</label>
+                    <textarea rows="4" placeholder="Quote…"
+                        oninput="patchBlock('${id}','text',this.value)">${escHtml(b.text ?? '')}</textarea>
+                </div>
+                <div>
+                    <label class="block-field-label">Attribution <span style="font-weight:400;color:var(--slate-light);">(optional)</span></label>
+                    <input type="text" placeholder="— Name or source"
+                        value="${escAttr(b.attribution ?? '')}"
+                        oninput="patchBlock('${id}','attribution',this.value)">
+                </div>
+            </div>`;
+
+            // ── Info ─────────────────────────────────────────────────────
+            case 'info':
+                return `<div class="block-card__body-inner">
+                <div>
+                    <label class="block-field-label">Info type</label>
+                    <select oninput="patchBlock('${id}','infoType',this.value)">
+                        <option value="disclaimer" ${b.infoType === 'disclaimer' ? 'selected' : ''}>Disclaimer</option>
+                        <option value="tip"        ${b.infoType === 'tip' ? 'selected' : ''}>Tip</option>
+                        <option value="warning"    ${b.infoType === 'warning' ? 'selected' : ''}>Warning</option>
+                        <option value="note"       ${b.infoType === 'note' ? 'selected' : ''}>Note</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block-field-label">Content</label>
+                    <textarea rows="4" placeholder="Info block content…"
+                        oninput="patchBlock('${id}','description',this.value)">${escHtml(b.description ?? '')}</textarea>
+                </div>
+            </div>`;
+
+            // ── List ─────────────────────────────────────────────────────
+            case 'list': {
+                const items = b.items?.length ? b.items : [''];
+                return `<div class="block-card__body-inner">
+                <div>
+                    <label class="block-field-label">List type</label>
+                    <select oninput="patchBlock('${id}','listType',this.value)">
+                        <option value="ul" ${b.listType === 'ul' ? 'selected' : ''}>Unordered (bullets)</option>
+                        <option value="ol" ${b.listType === 'ol' ? 'selected' : ''}>Ordered (numbered)</option>
+                    </select>
+                </div>
+                <div class="list-items-wrap">
+                    <label class="block-field-label">Items</label>
+                    ${items.map((item, i) => `
+                    <div class="list-item-row">
+                        <textarea rows="2" placeholder="Item ${i + 1}…"
+                            oninput="patchBlock('${id}','items.${i}',this.value)">${escHtml(item)}</textarea>
+                        <button type="button" class="list-item-remove" title="Remove item"
+                                onclick="removeListItem('${id}',${i})">✕</button>
+                    </div>`).join('')}
+                </div>
+                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
+                        style="align-self:flex-start;"
+                        onclick="addListItem('${id}')">+ Add item</button>
+            </div>`;
+            }
+
+            // ── Image ─────────────────────────────────────────────────────
+            case 'image': {
+                if (b.isDefault) {
+                    // Styled like the original image-upload-zone
+                    return `<div class="block-image-wrap" id="default-image-wrap"
+                             ondragover="event.preventDefault();this.classList.add('drag-over')"
+                             ondragleave="this.classList.remove('drag-over')"
+                             ondrop="handleDefaultImageDrop(event)">
+                    <div class="block-image-wrap__header">
+                        <span class="block-image-wrap__title">Images</span>
+                        <span class="block-image-wrap__hint">Drag &amp; drop images here — saved as image blocks</span>
+                        <button type="button" onclick="document.getElementById('default-image-file-input').click()"
+                                class="oc-btn oc-btn--ghost oc-btn--sm" style="font-size:.75rem;padding:4px 10px;">
+                            + Upload
+                        </button>
+                    </div>
+                    <div class="block-image-thumbs" id="default-image-thumbs">
+                        <span class="block-image-empty" id="default-image-empty">No images added yet</span>
+                    </div>
+                </div>`;
+                }
+
+                // Non-default image block
+                return `<div class="block-card__body-inner">
+                <div>
+                    <label class="block-field-label">Image</label>
+                    ${b.src
+                    ? `<div class="block-image-preview">
+                                <img src="${escAttr(b.src)}" alt="${escAttr(b.alt ?? '')}">
+                                <button type="button" class="block-image-preview__remove"
+                                        onclick="clearBlockImage('${id}')" title="Remove image">✕</button>
+                           </div>`
+                    : `<div class="block-image-drop" id="img-drop-${id}"
+                                 onclick="triggerBlockImagePick('${id}')"
+                                 ondragover="event.preventDefault();this.classList.add('drag-over')"
+                                 ondragleave="this.classList.remove('drag-over')"
+                                 ondrop="handleBlockImageDrop(event,'${id}')">
+                                <div class="block-image-drop__hint">
+                                    <svg viewBox="0 0 20 20" fill="currentColor" width="20"
+                                         style="color:var(--slate-light);display:block;margin:0 auto 6px;">
+                                        <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Click or drag &amp; drop an image here
+                                </div>
+                           </div>`
+                }
+                </div>
+                <div>
+                    <label class="block-field-label">Alt text</label>
+                    <input class="oc-input" type="text" placeholder="Describe the image for accessibility…"
+                        value="${escAttr(b.alt ?? '')}"
+                        oninput="patchBlock('${id}','alt',this.value)">
+                </div>
+                <div>
+                    <label class="block-field-label">Caption <span style="font-weight:400;color:var(--slate-light);">(optional)</span></label>
+                    <input class="oc-input" type="text" placeholder="Image caption…"
+                        value="${escAttr(b.caption ?? '')}"
+                        oninput="patchBlock('${id}','caption',this.value)">
+                </div>
+                <div class="block-field-row">
+                    <div>
+                        <label class="block-field-label">Layout</label>
+                        <select class="oc-input" oninput="patchBlock('${id}','layout',this.value)">
+                            <option value="full"   ${b.layout === 'full' ? 'selected' : ''}>Full width</option>
+                            <option value="wide"   ${b.layout === 'wide' ? 'selected' : ''}>Wide</option>
+                            <option value="normal" ${b.layout === 'normal' ? 'selected' : ''}>Normal</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block-field-label">Alignment</label>
+                        <select class="oc-input" oninput="patchBlock('${id}','alignment',this.value)">
+                            <option value="center" ${b.alignment === 'center' ? 'selected' : ''}>Centre</option>
+                            <option value="left"   ${b.alignment === 'left' ? 'selected' : ''}>Left</option>
+                            <option value="right"  ${b.alignment === 'right' ? 'selected' : ''}>Right</option>
+                        </select>
+                    </div>
+                </div>
+            </div>`;
+            }
+
+            default:
+                return `<div class="block-card__body-inner"><span style="color:var(--slate);font-size:.82rem;">Unknown block type: ${escHtml(b.type)}</span></div>`;
+        }
+    }
+
+    // =============================================================================
+    // Quill initialisation per text block
+    // =============================================================================
+    function initQuillForBlock(b) {
+        const toolbarId = `quill-toolbar-${b.id}`;
+        const editorId = `quill-editor-${b.id}`;
+        const editorEl = document.getElementById(editorId);
+        if (!editorEl) return;
+        if (quillInstances[b.id]) return; // already mounted
+
+        const q = new Quill(`#${editorId}`, {
+            theme: 'snow',
+            modules: {
+                toolbar: `#${toolbarId}`,
+                clipboard: {matchVisual: false},
+            },
+            placeholder: 'Start writing…',
+        });
+
+        quillInstances[b.id] = q;
+
+        q.on('text-change', () => {
+            b.content = q.root.innerHTML;
+            scheduleAutosave();
+        });
+    }
+
+    // =============================================================================
+    // Default image block
+    // =============================================================================
+    function renderDefaultImageThumbs() {
+        const container = document.getElementById('default-image-thumbs');
+        if (!container) return;
+        const empty = document.getElementById('default-image-empty');
+        container.querySelectorAll('.block-image-thumb').forEach(el => el.remove());
+
+        if (!defaultImageItems.length) {
+            if (empty) empty.style.display = '';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        defaultImageItems.forEach(img => {
+            const wrap = document.createElement('div');
+            wrap.className = 'block-image-thumb';
+            wrap.innerHTML = `<img src="${escAttr(img.url)}" alt="${escAttr(img.alt)}">
+            <button class="block-image-thumb__remove" title="Remove"
+                    onclick="removeDefaultImage('${img.id}')">✕</button>`;
+            container.appendChild(wrap);
+        });
+    }
+
+    function removeDefaultImage(id) {
+        defaultImageItems = defaultImageItems.filter(i => i.id !== id);
+        // Update default image block src (use first image if any)
+        const defImg = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.image);
+        if (defImg) defImg.src = defaultImageItems[0]?.url ?? '';
+        renderDefaultImageThumbs();
+        scheduleAutosave();
+    }
+
+    document.getElementById('default-image-file-input').addEventListener('change', function () {
+        Array.from(this.files).forEach(f => uploadDefaultImage(f));
+        this.value = '';
+    });
+
+    function handleDefaultImageDrop(event) {
+        event.preventDefault();
+        document.getElementById('default-image-wrap')?.classList.remove('drag-over');
+        Array.from(event.dataTransfer?.files ?? [])
+            .filter(f => f.type.startsWith('image/'))
+            .forEach(f => uploadDefaultImage(f));
+    }
+
+    async function uploadDefaultImage(file) {
+        if (!file.type.startsWith('image/')) {
+            showToast('Only image files are supported', false);
+            return;
+        }
+        const url = await uploadImageXHR(file);
+        if (!url) return;
+        const item = {id: uid(), url, alt: file.name.replace(/\.[^.]+$/, '')};
+        defaultImageItems.push(item);
+        // Keep the default block's src pointing at the first uploaded image
+        const defImg = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.image);
+        if (defImg && !defImg.src) defImg.src = url;
+        renderDefaultImageThumbs();
+        scheduleAutosave();
+        showToast('Image added');
+    }
+
+    // =============================================================================
+    // Non-default image block upload
+    // =============================================================================
+    let _pendingImageBlockId = null;
+
+    function triggerBlockImagePick(blockId) {
+        _pendingImageBlockId = blockId;
+        document.getElementById('block-image-file-input').click();
+    }
+
+    document.getElementById('block-image-file-input').addEventListener('change', function () {
+        if (this.files[0] && _pendingImageBlockId) uploadBlockImage(_pendingImageBlockId, this.files[0]);
+        this.value = '';
+        _pendingImageBlockId = null;
+    });
+
+    function handleBlockImageDrop(event, blockId) {
+        event.preventDefault();
+        document.getElementById(`img-drop-${blockId}`)?.classList.remove('drag-over');
+        const file = Array.from(event.dataTransfer?.files ?? []).find(f => f.type.startsWith('image/'));
+        if (file) uploadBlockImage(blockId, file);
+    }
+
+    async function uploadBlockImage(blockId, file) {
+        if (!file.type.startsWith('image/')) {
+            showToast('Only image files are supported', false);
+            return;
+        }
+        const url = await uploadImageXHR(file);
+        if (!url) return;
+        patchBlock(blockId, 'src', url);
+        if (!blocks.find(b => b.id === blockId)?.alt) patchBlock(blockId, 'alt', file.name.replace(/\.[^.]+$/, ''));
+        renderBlocks();
+        showToast('Image uploaded');
+    }
+
+    function clearBlockImage(blockId) {
+        patchBlock(blockId, 'src', '');
+        renderBlocks();
+    }
+
+    // =============================================================================
+    // XHR image upload helper
+    // =============================================================================
+    async function uploadImageXHR(file) {
+        const overlay = document.getElementById('upload-overlay');
+        const pctEl = document.getElementById('upload-pct');
+        overlay.style.display = 'grid';
+        pctEl.textContent = '';
+        const formData = new FormData();
+        formData.append('image', file);
+        try {
+            return await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `/api/${SITE}/images`);
+                xhr.setRequestHeader('Authorization', `Bearer ${TOKEN()}`);
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.upload.onprogress = e => {
+                    if (e.lengthComputable) pctEl.textContent = `${Math.round(e.loaded / e.total * 100)}%`;
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            const imgUrl = data?.data?.image?.url || data?.image?.url || data?.url;
+                            if (imgUrl) resolve(imgUrl); else reject(new Error('No URL in response'));
+                        } catch {
+                            reject(new Error('Invalid response'));
+                        }
+                    } else {
+                        reject(new Error(`Upload failed: ${xhr.status}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Network error'));
+                xhr.send(formData);
+            });
+        } catch (err) {
+            showToast(err.message || 'Upload failed', false);
+            return null;
+        } finally {
+            overlay.style.display = 'none';
+        }
+    }
+
+    // =============================================================================
+    // Drag-and-drop reordering (non-default blocks only)
+    // =============================================================================
+    let dragSrcId = null;
+    const nonDefaultStart = () => blocks.findIndex(b => !b.isDefault);
+
+    function initDragDrop() {
+        document.querySelectorAll('.block-card:not(.block-card--default)').forEach(card => {
+            card.addEventListener('dragstart', e => {
+                dragSrcId = card.dataset.blockId;
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('dragging');
+                document.querySelectorAll('.block-card').forEach(c => {
+                    c.classList.remove('drag-over-top', 'drag-over-bottom');
+                });
+                dragSrcId = null;
+            });
+            card.addEventListener('dragover', e => {
+                if (!dragSrcId || card.dataset.blockId === dragSrcId) return;
+                e.preventDefault();
+                const rect = card.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                card.classList.toggle('drag-over-top', e.clientY < mid);
+                card.classList.toggle('drag-over-bottom', e.clientY >= mid);
+            });
+            card.addEventListener('dragleave', () => {
+                card.classList.remove('drag-over-top', 'drag-over-bottom');
+            });
+            card.addEventListener('drop', e => {
+                e.preventDefault();
+                if (!dragSrcId || card.dataset.blockId === dragSrcId) return;
+                const tgtBlock = blocks.find(b => b.id === card.dataset.blockId);
+                if (tgtBlock?.isDefault) return; // cannot drop onto default blocks
+                const rect = card.getBoundingClientRect();
+                const mid = rect.top + rect.height / 2;
+                const before = e.clientY < mid;
+                const srcIdx = blocks.findIndex(b => b.id === dragSrcId);
+                const tgtIdx = blocks.findIndex(b => b.id === card.dataset.blockId);
+                const [moved] = blocks.splice(srcIdx, 1);
+                const insert = before ? tgtIdx : tgtIdx + (srcIdx < tgtIdx ? 0 : 1);
+                blocks.splice(Math.max(nonDefaultStart(), insert - (srcIdx < tgtIdx && !before ? 1 : 0)), 0, moved);
+                reorder();
+                renderBlocks();
+                scheduleAutosave();
+            });
+        });
+    }
+
+    // =============================================================================
+    // Initial render
+    // =============================================================================
+    renderBlocks();
+
+    // =============================================================================
+    // Autosave indicator helpers
+    // =============================================================================
     function setAutosaveState(state, text) {
         const el = document.getElementById('autosave-indicator');
         const txt = document.getElementById('autosave-text');
         const icon = document.getElementById('autosave-icon');
-
+        if (!el) return;
         el.className = state;
-        txt.textContent = text;
-
+        if (txt) txt.textContent = text;
         const icons = {
             idle: '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>',
             saving: '<path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>',
             saved: '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>',
             error: '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>',
         };
-        icon.innerHTML = icons[state] ?? icons.idle;
+        if (icon) icon.innerHTML = icons[state] ?? icons.idle;
+    }
+
+    // =============================================================================
+    // Autosave
+    // =============================================================================
+    let autosaveTimer = null;
+    let isDirty = false;
+    let lastSavedHash = '';
+    let isRestoreMode = false;
+
+    function contentHash(str) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+        return h;
     }
 
     function scheduleAutosave() {
-        if (!PAGE_ID) return; // only autosave on existing articles
+        if (!PAGE_ID) return;
         isDirty = true;
         clearTimeout(autosaveTimer);
         setAutosaveState('saving', 'Saving…');
@@ -699,36 +1875,22 @@ $headerActions = '
 
     async function doAutosave() {
         if (!PAGE_ID || isRestoreMode) return;
-
-        const html = quill.root.innerHTML;
-        const title = document.getElementById('article-title').value.trim();
-        const hash = contentHash(html + title);
-
+        const hash = contentHash(JSON.stringify(blocks) + JSON.stringify(defaultImageItems));
         if (hash === lastSavedHash) {
             setAutosaveState('saved', 'All changes saved');
             return;
         }
-
         try {
             const ok = await persistArticle('draft', {silent: true});
             if (ok) {
                 lastSavedHash = hash;
                 setAutosaveState('saved', 'All changes saved');
-            } else {
-                setAutosaveState('error', 'Save failed');
-            }
+            } else setAutosaveState('error', 'Save failed');
         } catch {
             setAutosaveState('error', 'Save failed');
         }
     }
 
-    // Wire Quill content changes to autosave
-    quill.on('text-change', scheduleAutosave);
-
-    // Wire title changes
-    document.getElementById('article-title').addEventListener('input', scheduleAutosave);
-
-    // Dirty-state browser warning (only for manual navigation)
     window.addEventListener('beforeunload', e => {
         if (isDirty) {
             e.preventDefault();
@@ -736,25 +1898,172 @@ $headerActions = '
         }
     });
 
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
+    // Slug auto-generation
+    // =============================================================================
+    function autoSlug(titleVal) {
+        const slugField = document.getElementById('article-slug');
+        if (!slugField || slugField.value) return;
+        slugField.value = titleVal.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .slice(0, 100);
+    }
+
+    // Paid toggle
+    document.getElementById('is-paid').addEventListener('change', function () {
+        document.getElementById('price-field').style.display = this.checked ? 'block' : 'none';
+    });
+
+    // =============================================================================
+    // Build blocks payload for API
+    // =============================================================================
+    function buildBlocksPayload() {
+        // Snapshot all Quill instances
+        Object.keys(quillInstances).forEach(id => {
+            const q = quillInstances[id];
+            if (!q) return;
+            const b = blocks.find(b => b.id === id);
+            if (b) b.content = q.root.innerHTML;
+        });
+
+        const payload = [];
+        let order = 0;
+
+        blocks.forEach(b => {
+            switch (b.type) {
+                case 'heading':
+                    payload.push({
+                        type: 'heading', order: order++, level: b.level ?? 2,
+                        text: b.text ?? '', subtitle: b.subtitle ?? ''
+                    });
+                    break;
+                case 'section':
+                    payload.push({
+                        type: 'section', order: order++, level: b.level ?? 2,
+                        title: b.title ?? ''
+                    });
+                    break;
+                case 'text':
+                    // Parse the Quill HTML into paragraph blocks
+                    parseQuillHTML(b.content ?? '', payload, order);
+                    order = payload.length;
+                    break;
+                case 'quote':
+                    payload.push({
+                        type: 'quote', order: order++, text: b.text ?? '',
+                        attribution: b.attribution ?? ''
+                    });
+                    break;
+                case 'info':
+                    payload.push({
+                        type: 'info', order: order++, infoType: b.infoType ?? 'disclaimer',
+                        description: b.description ?? ''
+                    });
+                    break;
+                case 'list':
+                    payload.push({
+                        type: 'list', order: order++, listType: b.listType ?? 'ul',
+                        items: b.items ?? []
+                    });
+                    break;
+                case 'image':
+                    if (b.isDefault) {
+                        // Expand into one image block per uploaded image
+                        if (defaultImageItems.length) {
+                            defaultImageItems.forEach(img => {
+                                payload.push({
+                                    type: 'image', order: order++, src: img.url,
+                                    alt: img.alt, caption: '', layout: 'full', alignment: 'center'
+                                });
+                            });
+                        }
+                    } else if (b.src) {
+                        payload.push({
+                            type: 'image', order: order++, src: b.src,
+                            alt: b.alt ?? '', caption: b.caption ?? '',
+                            layout: b.layout ?? 'full', alignment: b.alignment ?? 'center'
+                        });
+                    }
+                    break;
+            }
+        });
+
+        return payload;
+    }
+
+    /**
+     * Minimal Quill HTML → structured blocks converter.
+     * Pushes text/heading/list/quote/info blocks into the target array.
+     */
+    function parseQuillHTML(html, target, startOrder) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        let order = startOrder;
+        const paraAccum = [];
+
+        function flushParas() {
+            if (!paraAccum.length) return;
+            target.push({type: 'text', order: order++, paragraphs: [...paraAccum]});
+            paraAccum.length = 0;
+        }
+
+        tmp.childNodes.forEach(node => {
+            if (node.nodeType === 3) { // text node
+                const t = node.textContent.trim();
+                if (t) paraAccum.push(t);
+                return;
+            }
+            const tag = node.tagName?.toLowerCase();
+            if (!tag) return;
+
+            if (tag === 'h2') {
+                flushParas();
+                target.push({type: 'heading', order: order++, level: 2, text: node.innerHTML, subtitle: ''});
+            } else if (tag === 'h3') {
+                flushParas();
+                target.push({type: 'heading', order: order++, level: 3, text: node.innerHTML, subtitle: ''});
+            } else if (tag === 'blockquote') {
+                flushParas();
+                target.push({type: 'quote', order: order++, text: node.innerHTML, attribution: ''});
+            } else if (tag === 'pre') {
+                flushParas();
+                target.push({type: 'info', order: order++, infoType: 'disclaimer', description: node.innerHTML});
+            } else if (tag === 'ol' || tag === 'ul') {
+                flushParas();
+                const items = Array.from(node.querySelectorAll('li')).map(li => li.innerHTML);
+                target.push({type: 'list', order: order++, listType: tag, items});
+            } else if (tag === 'p') {
+                const t = node.innerHTML.trim();
+                if (t && t !== '<br>') paraAccum.push(t);
+                else if (paraAccum.length) flushParas();
+            }
+        });
+
+        flushParas();
+    }
+
+    // =============================================================================
     // Save / publish
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     async function saveArticle(status) {
         const errBox = document.getElementById('editor-errors');
         errBox.style.display = 'none';
 
-        const title = document.getElementById('article-title').value.trim();
+        // Title comes from the default heading block
+        const titleBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.heading);
+        const title = (titleBlock?.text ?? '').trim();
         if (!title) {
             errBox.textContent = 'Please give your article a title before saving.';
             errBox.style.display = 'block';
-            document.getElementById('article-title').focus();
+            document.querySelector('#article-title')?.focus();
             return;
         }
 
         const isPaid = document.getElementById('is-paid').checked;
         const priceVal = document.getElementById('article-price').value;
         const pricePence = isPaid ? Math.round(parseFloat(priceVal || '0') * 100) : 0;
-
         if (isPaid && pricePence < 50) {
             errBox.textContent = 'Minimum price is £0.50.';
             errBox.style.display = 'block';
@@ -763,7 +2072,6 @@ $headerActions = '
 
         const draftBtn = document.getElementById('save-draft-btn');
         const publishBtn = document.getElementById('publish-btn');
-
         if (status === 'draft') {
             draftBtn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
             draftBtn.disabled = true;
@@ -776,24 +2084,27 @@ $headerActions = '
 
         draftBtn.innerHTML = 'Save draft';
         draftBtn.disabled = false;
-        publishBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg>  <?= $isEdit && in_array($page->status ?? '', ['published', 'scheduled']) ? 'Update' : 'Publish' ?>`;
+        publishBtn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd"/></svg> <?= $isEdit && in_array($page->status ?? '', ['published', 'scheduled']) ? 'Update' : 'Publish' ?>`;
         publishBtn.disabled = false;
     }
 
     async function persistArticle(status, opts = {}) {
-        const title = document.getElementById('article-title').value.trim();
-        const html = quill.root.innerHTML;
+        const titleBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.heading);
+        const title = (titleBlock?.text ?? '').trim();
+
+        // Primary content = first Quill block HTML
+        const defaultTextBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.text);
+        const q = defaultTextBlock ? quillInstances[defaultTextBlock.id] : null;
+        const html = q ? q.root.innerHTML : (defaultTextBlock?.content ?? '');
+
         const isPaid = document.getElementById('is-paid').checked;
         const priceVal = document.getElementById('article-price').value;
         const slug = document.getElementById('article-slug').value.trim();
         const metaDesc = document.getElementById('meta-description').value.trim();
         const pricePence = isPaid ? Math.round(parseFloat(priceVal || '0') * 100) : 0;
+        const scheduledAt = document.getElementById('scheduled-at')?.value ?? null;
+        const visibility = document.getElementById('article-visibility')?.value ?? 'public';
 
-        // Scheduled date — only sent when status is 'scheduled'
-        const scheduledAtEl = document.getElementById('scheduled-at');
-        const scheduledAt = scheduledAtEl ? scheduledAtEl.value : null;
-
-        // Validate scheduled date if scheduling
         if (status === 'scheduled') {
             if (!scheduledAt) {
                 const errBox = document.getElementById('editor-errors');
@@ -801,14 +2112,15 @@ $headerActions = '
                 errBox.style.display = 'block';
                 return false;
             }
-            const scheduledDate = new Date(scheduledAt);
-            if (scheduledDate <= new Date()) {
+            if (new Date(scheduledAt) <= new Date()) {
                 const errBox = document.getElementById('editor-errors');
                 errBox.textContent = 'Scheduled date must be in the future.';
                 errBox.style.display = 'block';
                 return false;
             }
         }
+
+        const blocksPayload = buildBlocksPayload();
 
         const payload = {
             site_id: SITE_ID,
@@ -819,14 +2131,13 @@ $headerActions = '
                 meta: {
                     status,
                     slug: slug || undefined,
-                    // Include scheduled_at in meta when scheduling
+                    visibility,
                     ...(status === 'scheduled' && scheduledAt ? {publish_date: scheduledAt} : {}),
                 },
                 seo: {meta_description: metaDesc, meta_title: title},
             },
-            blocks: [],
+            blocks: blocksPayload,
             gallery_slides: [],
-            // Top-level scheduled_at for the service layer
             ...(status === 'scheduled' && scheduledAt ? {scheduled_at: scheduledAt} : {}),
         };
 
@@ -843,7 +2154,6 @@ $headerActions = '
                 },
                 body: JSON.stringify(payload),
             });
-
             const data = await res.json();
             isDirty = false;
 
@@ -855,9 +2165,7 @@ $headerActions = '
                     showToast(msg);
                 }
                 const id = data?.data?.page?.id || PAGE_ID;
-                if (!PAGE_ID && id) {
-                    window.location.href = `/articles/${id}/edit`;
-                }
+                if (!PAGE_ID && id) window.location.href = `/articles/${id}/edit`;
                 return true;
             } else {
                 if (!opts.silent) {
@@ -875,138 +2183,27 @@ $headerActions = '
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Image upload — toolbar button + drag-and-drop
-    // ─────────────────────────────────────────────────────────────────────────────
-    async function uploadImageFile(file) {
-        if (!file || !file.type.startsWith('image/')) {
-            showToast('Only image files are supported', false);
-            return;
-        }
-
-        const overlay = document.getElementById('upload-overlay');
-        const pctEl = document.getElementById('upload-pct');
-        overlay.style.display = 'grid';
-        pctEl.textContent = '';
-
-        const formData = new FormData();
-        formData.append('image', file);
-
-        try {
-            // Use XMLHttpRequest to get upload progress
-            const url = await new Promise((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', `/api/${SITE}/images`);
-                xhr.setRequestHeader('Authorization', `Bearer ${TOKEN()}`);
-                xhr.setRequestHeader('Accept', 'application/json');
-
-                xhr.upload.onprogress = e => {
-                    if (e.lengthComputable) {
-                        pctEl.textContent = `${Math.round(e.loaded / e.total * 100)}%`;
-                    }
-                };
-
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            const data = JSON.parse(xhr.responseText);
-                            // ImageController returns data.data.image.url
-                            const imgUrl = data?.data?.image?.url
-                                || data?.image?.url
-                                || data?.url;
-                            if (imgUrl) resolve(imgUrl);
-                            else reject(new Error('No URL in response'));
-                        } catch {
-                            reject(new Error('Invalid response'));
-                        }
-                    } else {
-                        reject(new Error(`Upload failed: ${xhr.status}`));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('Network error'));
-                xhr.send(formData);
-            });
-
-            // Insert image at current cursor position
-            const range = quill.getSelection(true);
-            quill.insertEmbed(range.index, 'image', url, 'user');
-            quill.setSelection(range.index + 1);
-            scheduleAutosave();
-        } catch (err) {
-            showToast(err.message || 'Image upload failed', false);
-        } finally {
-            overlay.style.display = 'none';
-        }
-    }
-
-    // Toolbar file input
-    document.getElementById('image-file-input').addEventListener('change', function () {
-        if (this.files[0]) uploadImageFile(this.files[0]);
-        this.value = '';
-    });
-
-    // Drag-and-drop onto the editor wrapper
-    const quillWrap = document.getElementById('quill-wrap');
-
-    quillWrap.addEventListener('dragover', e => {
-        e.preventDefault();
-        quillWrap.classList.add('drag-over');
-    });
-    quillWrap.addEventListener('dragleave', () => quillWrap.classList.remove('drag-over'));
-    quillWrap.addEventListener('drop', e => {
-        e.preventDefault();
-        quillWrap.classList.remove('drag-over');
-        const file = e.dataTransfer?.files?.[0];
-        if (file) uploadImageFile(file);
-    });
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Auto-generate slug from title on blur
-    // ─────────────────────────────────────────────────────────────────────────────
-    document.getElementById('article-title').addEventListener('blur', function () {
-        const slugField = document.getElementById('article-slug');
-        if (!slugField.value && this.value) {
-            slugField.value = this.value.toLowerCase()
-                .replace(/[^a-z0-9\s-]/g, '')
-                .replace(/\s+/g, '-')
-                .replace(/-+/g, '-')
-                .slice(0, 100);
-        }
-    });
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Paid toggle
-    // ─────────────────────────────────────────────────────────────────────────────
-    document.getElementById('is-paid').addEventListener('change', function () {
-        document.getElementById('price-field').style.display = this.checked ? 'block' : 'none';
-    });
-
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     // Delete
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     async function confirmDelete() {
         if (!PAGE_ID) return;
         if (!confirm('Delete this article permanently? This cannot be undone.')) return;
-
         const res = await fetch(`/api/${SITE}/open-collab/pages/${PAGE_ID}`, {
             method: 'DELETE',
             headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
         });
-
-        if (res.ok || res.status === 204) {
-            window.location.href = '/articles';
-        } else {
-            showToast('Could not delete article. Please try again.', false);
-        }
+        if (res.ok || res.status === 204) window.location.href = '/articles';
+        else showToast('Could not delete article. Please try again.', false);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Version history
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
+    // Version history + diff modal
+    // =============================================================================
     let historyLoaded = false;
-    let previewingEntry = null; // { id, snapshot }
-    let originalContent = null; // content before preview
-    let originalTitle = null;
+    let previewingEntry = null;
+    let originalBlocks = null;
+    let diffEntry = null;
 
     function toggleHistory() {
         const body = document.getElementById('history-body');
@@ -1014,101 +2211,137 @@ $headerActions = '
         const open = body.style.display === 'none';
         body.style.display = open ? 'block' : 'none';
         chevron.style.transform = open ? 'rotate(180deg)' : '';
-
         if (open && !historyLoaded && PAGE_ID) loadHistory();
     }
 
     async function loadHistory() {
         const list = document.getElementById('history-list');
         list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--slate);font-size:.82rem;">Loading…</div>';
-
         try {
             const res = await fetch(`/api/${SITE}/open-collab/pages/${PAGE_ID}/history`, {
                 headers: {'Authorization': `Bearer ${TOKEN()}`},
             });
             const data = await res.json();
             const items = data?.data?.history ?? data?.history ?? [];
-
-            console.log('items', data)
-
             if (!items.length) {
                 list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--slate);font-size:.82rem;">No version history yet.</div>';
                 return;
             }
-
             list.innerHTML = '';
             items.forEach(entry => {
                 const el = document.createElement('div');
                 el.className = 'history-item';
                 el.dataset.id = entry.id;
                 el.innerHTML = `
-                <div class="history-item__dot"></div>
-                <div>
-                    <div class="history-item__summary">${escHtml(entry.action_label ?? entry.action ?? 'Updated')}</div>
-                    <div class="history-item__meta">
-                        ${escHtml(entry.user_name ?? 'You')} · ${formatDate(entry.created_at)}
-                    </div>
-                    ${entry.change_summary ? `<div style="font-size:.7rem;color:var(--slate);margin-top:2px;">${escHtml(entry.change_summary)}</div>` : ''}
-                </div>`;
-                el.addEventListener('click', () => previewVersion(entry));
+            <div class="history-item__dot"></div>
+            <div style="flex:1;min-width:0;">
+                <div class="history-item__summary">${escHtml(entry.action_label ?? entry.action ?? 'Updated')}</div>
+                <div class="history-item__meta">${escHtml(entry.user_name ?? 'You')} · ${formatDate(entry.created_at)}</div>
+                ${entry.change_summary ? `<div style="font-size:.7rem;color:var(--slate);margin-top:2px;">${escHtml(entry.change_summary)}</div>` : ''}
+            </div>
+            ${entry.snapshot ? `<button class="oc-btn oc-btn--ghost oc-btn--sm" style="font-size:.68rem;padding:3px 7px;flex-shrink:0;"
+                onclick="openDiffModal(event,${JSON.stringify(entry).replace(/"/g, '&quot;')})">Compare</button>` : ''}`;
+                el.addEventListener('click', e => {
+                    if (!e.target.closest('button')) previewVersion(entry);
+                });
                 list.appendChild(el);
             });
-
             historyLoaded = true;
         } catch {
             list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--red);font-size:.82rem;">Failed to load history.</div>';
         }
     }
 
-    function previewVersion(entry) {
+    function openDiffModal(event, entry) {
+        event.stopPropagation();
         if (!entry.snapshot) {
-            showToast('No snapshot available for this version', false);
+            showToast('No snapshot available', false);
             return;
         }
+        diffEntry = entry;
+        const snap = entry.snapshot;
+        document.getElementById('diff-modal-title').textContent =
+            `Comparing: ${entry.action_label ?? entry.action ?? 'version'} (${formatDate(entry.created_at)})`;
+        const titleBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.heading);
+        document.getElementById('diff-old-content').innerHTML =
+            `<div style="margin-bottom:8px;font-size:.95rem;font-weight:700;color:var(--navy);">${escHtml(snap.title ?? '')}</div>` +
+            (snap.content ?? '<em style="color:var(--slate)">No content snapshot</em>');
+        document.getElementById('diff-new-content').innerHTML =
+            `<div style="margin-bottom:8px;font-size:.95rem;font-weight:700;color:var(--navy);">${escHtml(titleBlock?.text ?? '')}</div>` +
+            (quillInstances[DEFAULT_BLOCK_IDS.text]?.root.innerHTML ?? '');
+        document.getElementById('diff-modal').classList.add('open');
+    }
 
-        // Highlight selected row
+    function closeDiffModal() {
+        document.getElementById('diff-modal').classList.remove('open');
+        diffEntry = null;
+    }
+
+    document.getElementById('diff-modal').addEventListener('click', function (e) {
+        if (e.target === this) closeDiffModal();
+    });
+
+    async function restoreFromDiff() {
+        if (!diffEntry?.snapshot) {
+            showToast('No snapshot to restore', false);
+            return;
+        }
+        const snap = diffEntry.snapshot;
+        // Restore title into default heading block
+        const titleBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.heading);
+        if (titleBlock && snap.title) titleBlock.text = snap.title;
+        // Restore content into default text block Quill
+        const q = quillInstances[DEFAULT_BLOCK_IDS.text];
+        if (q && snap.content) q.root.innerHTML = snap.content;
+        closeDiffModal();
+        const ok = await persistArticle('draft');
+        if (ok) {
+            showToast('✓ Version restored');
+            historyLoaded = false;
+        }
+    }
+
+    function previewVersion(entry) {
+        if (!entry.snapshot) {
+            showToast('No snapshot available', false);
+            return;
+        }
         document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
         document.querySelector(`.history-item[data-id="${entry.id}"]`)?.classList.add('active');
-
-        // Stash current content on first preview
         if (!isRestoreMode) {
-            originalContent = quill.root.innerHTML;
-            originalTitle = document.getElementById('article-title').value;
+            originalBlocks = JSON.parse(JSON.stringify(blocks));
         }
-
         isRestoreMode = true;
         previewingEntry = entry;
-
-        // Load snapshot into editor (read-only visual)
         const snap = entry.snapshot;
-        quill.root.innerHTML = snap.content ?? '';
-        if (snap.title) document.getElementById('article-title').value = snap.title;
-
-        // Show banner
-        const banner = document.getElementById('restore-banner');
+        const titleBlock = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.heading);
+        if (titleBlock && snap.title) {
+            titleBlock.text = snap.title;
+            const titleInput = document.getElementById('article-title');
+            if (titleInput) titleInput.value = snap.title;
+        }
+        const q = quillInstances[DEFAULT_BLOCK_IDS.text];
+        if (q && snap.content) q.root.innerHTML = snap.content;
         document.getElementById('restore-banner-text').textContent =
             `Previewing version from ${formatDate(entry.created_at)}.`;
-        banner.style.display = 'flex';
+        document.getElementById('restore-banner').style.display = 'flex';
     }
 
     async function confirmRestore() {
         if (!previewingEntry || !PAGE_ID) return;
-
         const btn = document.getElementById('restore-confirm-btn');
         btn.disabled = true;
         btn.innerHTML = '<div class="oc-spinner"></div> Restoring…';
-
         try {
             const res = await fetch(`/api/${SITE}/open-collab/pages/${PAGE_ID}/history/${previewingEntry.id}/restore`, {
                 method: 'POST',
                 headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
             });
-
             if (res.ok) {
                 isDirty = false;
                 showToast('✓ Version restored and saved');
                 cancelRestore();
-                historyLoaded = false; // force reload of history list
+                historyLoaded = false;
             } else {
                 showToast('Restore failed. Please try again.', false);
             }
@@ -1121,24 +2354,20 @@ $headerActions = '
     }
 
     function cancelRestore() {
-        if (originalContent !== null) {
-            quill.root.innerHTML = originalContent;
+        if (originalBlocks) {
+            blocks = originalBlocks;
+            renderBlocks();
         }
-        if (originalTitle !== null) {
-            document.getElementById('article-title').value = originalTitle;
-        }
-        originalContent = null;
-        originalTitle = null;
+        originalBlocks = null;
         isRestoreMode = false;
         previewingEntry = null;
-
         document.getElementById('restore-banner').style.display = 'none';
         document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
-    // Inline comments
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
+    // Comments
+    // =============================================================================
     let commentsCache = [];
 
     <?php if ($isEdit): ?>
@@ -1150,7 +2379,7 @@ $headerActions = '
             const data = await res.json();
             commentsCache = data?.data ?? [];
             renderComments(commentsCache);
-        } catch { /* non-critical — fail silently */
+        } catch {
         }
     })();
     <?php endif; ?>
@@ -1159,41 +2388,28 @@ $headerActions = '
         const body = document.getElementById('comments-body');
         const empty = document.getElementById('comments-empty');
         const badge = document.getElementById('comment-count-badge');
-
-        const total = countAllComments(comments);
-
+        const total = comments.reduce((a, c) => a + 1 + (c.replies?.length ?? 0), 0);
         badge.textContent = total;
-
         if (!comments.length) {
             empty.style.display = 'block';
             body.querySelectorAll('.comment-thread').forEach(el => el.remove());
             return;
         }
-
         empty.style.display = 'none';
         body.querySelectorAll('.comment-thread').forEach(el => el.remove());
-
-        comments.forEach(comment => {
-            body.insertBefore(buildCommentThread(comment), empty);
-        });
-    }
-
-    function countAllComments(comments) {
-        return comments.reduce((acc, c) => acc + 1 + (c.replies?.length ?? 0), 0);
+        comments.forEach(c => body.insertBefore(buildCommentThread(c), empty));
     }
 
     function buildCommentThread(comment) {
         const wrap = document.createElement('div');
         wrap.className = 'comment-thread top-level';
         wrap.appendChild(buildCommentEl(comment, false));
-
         if (comment.replies?.length) {
-            const repliesWrap = document.createElement('div');
-            repliesWrap.className = 'replies';
-            comment.replies.forEach(r => repliesWrap.appendChild(buildCommentEl(r, true)));
-            wrap.appendChild(repliesWrap);
+            const r = document.createElement('div');
+            r.className = 'replies';
+            comment.replies.forEach(rep => r.appendChild(buildCommentEl(rep, true)));
+            wrap.appendChild(r);
         }
-
         return wrap;
     }
 
@@ -1201,49 +2417,40 @@ $headerActions = '
         const el = document.createElement('div');
         el.className = 'comment-item';
         el.dataset.commentId = comment.id;
-
-        const currentUserId = <?= Auth::id() ?? 'null' ?>;
-        const isOwn = comment.user_id === currentUserId;
-
+        const isOwn = comment.user_id === <?= Auth::id() ?? 'null' ?>;
         el.innerHTML = `
-        <div class="comment-item__header">
-            <span class="comment-item__author">${escHtml(comment.user_name ?? 'Unknown')}</span>
-            <span class="comment-item__time">${formatDate(comment.created_at)}</span>
-        </div>
-        <div class="comment-item__body">${escHtml(comment.content)}</div>
-        <div class="comment-item__actions">
-            ${!isReply ? `<button class="comment-action-btn" onclick="showReplyForm(${comment.id}, this)">Reply</button>` : ''}
-            ${isOwn ? `<button class="comment-action-btn" style="color:var(--red);" onclick="deleteComment(${comment.id})">Delete</button>` : ''}
-        </div>
-        ${!isReply ? `<div id="reply-form-${comment.id}" class="comment-form" style="display:none;"></div>` : ''}`;
-
+    <div class="comment-item__header">
+        <span class="comment-item__author">${escHtml(comment.user_name ?? 'Unknown')}</span>
+        <span class="comment-item__time">${formatDate(comment.created_at)}</span>
+    </div>
+    <div class="comment-item__body">${escHtml(comment.content)}</div>
+    <div class="comment-item__actions">
+        ${!isReply ? `<button class="comment-action-btn" onclick="showReplyForm(${comment.id}, this)">Reply</button>` : ''}
+        ${isOwn ? `<button class="comment-action-btn" style="color:var(--red);" onclick="deleteComment(${comment.id})">Delete</button>` : ''}
+    </div>
+    ${!isReply ? `<div id="reply-form-${comment.id}" class="comment-form" style="display:none;"></div>` : ''}`;
         return el;
     }
 
     function showReplyForm(parentId, btn) {
         const formEl = document.getElementById(`reply-form-${parentId}`);
         if (!formEl) return;
-
         if (formEl.style.display !== 'none') {
             formEl.style.display = 'none';
             return;
         }
-
         formEl.innerHTML = `
-        <textarea placeholder="Write a reply…"
-                  style="width:100%;resize:none;min-height:56px;padding:8px 10px;
-                         border:1.5px solid var(--border);border-radius:6px;
-                         font-size:.82rem;font-family:var(--font-body);
-                         color:var(--navy);background:#fff;box-sizing:border-box;"
-                  id="reply-input-${parentId}"></textarea>
-        <div class="comment-form__actions">
-            <button class="oc-btn oc-btn--ghost oc-btn--sm"
-                    onclick="document.getElementById('reply-form-${parentId}').style.display='none'">
-                Cancel
-            </button>
-            <button class="oc-btn oc-btn--primary oc-btn--sm"
-                    onclick="postReply(${parentId})">Post reply</button>
-        </div>`;
+    <textarea placeholder="Write a reply…"
+              style="width:100%;resize:none;min-height:56px;padding:8px 10px;
+                     border:1.5px solid var(--border);border-radius:6px;
+                     font-size:.82rem;font-family:var(--font-body);
+                     color:var(--navy);background:#fff;box-sizing:border-box;"
+              id="reply-input-${parentId}"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+        <button class="oc-btn oc-btn--ghost oc-btn--sm"
+                onclick="document.getElementById('reply-form-${parentId}').style.display='none'">Cancel</button>
+        <button class="oc-btn oc-btn--primary oc-btn--sm" onclick="postReply(${parentId})">Post reply</button>
+    </div>`;
         formEl.style.display = 'block';
         document.getElementById(`reply-input-${parentId}`)?.focus();
     }
@@ -1252,25 +2459,18 @@ $headerActions = '
         const input = document.getElementById('new-comment-input');
         const content = input.value.trim();
         if (!content) return;
-
         try {
             const res = await fetch(`/api/${SITE}/open-collab/pages/${PAGE_ID}/comments`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                },
+                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN()}`},
                 body: JSON.stringify({content}),
             });
             const data = await res.json();
-
             if (res.ok) {
                 input.value = '';
                 commentsCache.push(data.data.comment);
                 renderComments(commentsCache);
-            } else {
-                showToast(data.message || 'Failed to post comment', false);
-            }
+            } else showToast(data.message || 'Failed to post comment', false);
         } catch {
             showToast('Network error', false);
         }
@@ -1280,29 +2480,21 @@ $headerActions = '
         const input = document.getElementById(`reply-input-${parentId}`);
         const content = input?.value.trim();
         if (!content) return;
-
         try {
             const res = await fetch(`/api/${SITE}/open-collab/pages/${PAGE_ID}/comments/${parentId}/reply`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                },
+                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN()}`},
                 body: JSON.stringify({content}),
             });
             const data = await res.json();
-
             if (res.ok) {
-                // Inject reply into cache
                 const parent = commentsCache.find(c => c.id === parentId);
                 if (parent) {
                     parent.replies = parent.replies ?? [];
                     parent.replies.push(data.data.comment);
                 }
                 renderComments(commentsCache);
-            } else {
-                showToast(data.message || 'Failed to post reply', false);
-            }
+            } else showToast(data.message || 'Failed to post reply', false);
         } catch {
             showToast('Network error', false);
         }
@@ -1310,30 +2502,24 @@ $headerActions = '
 
     async function deleteComment(id) {
         if (!confirm('Delete this comment?')) return;
-
         try {
             const res = await fetch(`/api/${SITE}/open-collab/comments/${id}`, {
-                method: 'DELETE',
-                headers: {'Authorization': `Bearer ${TOKEN()}`},
+                method: 'DELETE', headers: {'Authorization': `Bearer ${TOKEN()}`},
             });
-
             if (res.ok) {
-                // Remove from cache (top-level or reply)
                 commentsCache = commentsCache
                     .map(c => ({...c, replies: (c.replies ?? []).filter(r => r.id !== id)}))
                     .filter(c => c.id !== id);
                 renderComments(commentsCache);
-            } else {
-                showToast('Could not delete comment', false);
-            }
+            } else showToast('Could not delete comment', false);
         } catch {
             showToast('Network error', false);
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     // Utilities
-    // ─────────────────────────────────────────────────────────────────────────────
+    // =============================================================================
     function showToast(msg, ok = true) {
         const el = document.getElementById('save-status');
         el.textContent = msg;
@@ -1347,23 +2533,17 @@ $headerActions = '
     function escHtml(str) {
         if (str == null) return '';
         return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escAttr(str) {
+        return escHtml(str ?? '');
     }
 
     function formatDate(str) {
         if (!str) return '';
-        const d = new Date(str);
-        return d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+        return new Date(str).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
     }
-
-    // ─────────────────────────────────────────────────────────────────────────────
-    // History API route wired through ArticlePageController
-    // GET  /api/{site}/open-collab/pages/{id}/history
-    // POST /api/{site}/open-collab/pages/{id}/history/{histId}/restore
-    // These delegate to PageHistoryService which already exists in the CMS layer.
-    // ─────────────────────────────────────────────────────────────────────────────
 </script>
 @endsection

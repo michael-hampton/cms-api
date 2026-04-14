@@ -9,7 +9,7 @@ class SetPagesPrivateForSite10Seeder extends Seeder
 {
     public function run(): void
     {
-        $page = Page::where('site_id', 10)
+        $page = Page::where('site_id', 3)
             ->where('slug', 'home')
             ->first();
 

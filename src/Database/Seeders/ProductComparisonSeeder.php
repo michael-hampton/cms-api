@@ -24,14 +24,14 @@ class ProductComparisonSeeder
         $category = Category::create([
             'name' => 'Beds',
             'slug' => 'beds',
-            'site_id' => 52
+            'site_id' => 7
         ]);
 
         // Create brand
         $brand = Brand::create([
             'name' => 'Sleep Co',
             'slug' => 'sleep-co',
-            'site_id' => 52
+            'site_id' => 7
         ]);
 
         // Create spec groups
@@ -62,7 +62,7 @@ class ProductComparisonSeeder
             'sale_price' => 499.99,
             'category_id' => $category->id,
             'brand_id' => $brand->id,
-            'site_id' => 52,
+            'site_id' => 7,
             'is_active' => true
         ]);
 
@@ -121,7 +121,7 @@ class ProductComparisonSeeder
             'sale_price' => 599.99,
             'category_id' => $category->id,
             'brand_id' => $brand->id,
-            'site_id' => 52,
+            'site_id' => 7,
             'is_active' => true
         ]);
 
@@ -178,7 +178,7 @@ class ProductComparisonSeeder
             'price' => 399.99,
             'category_id' => $category->id,
             'brand_id' => $brand->id,
-            'site_id' => 52,
+            'site_id' => 7,
             'is_active' => true
         ]);
 

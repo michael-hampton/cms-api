@@ -11,7 +11,7 @@ class SeedFashionFooterMenu extends Seeder
 
     public function run(): void
     {
-        $siteId = 6;
+        $siteId = 4;
 
         $menu = Menu::create([
             'name' => 'Fashion Footer Menu',

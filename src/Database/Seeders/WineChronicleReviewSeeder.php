@@ -38,7 +38,7 @@ class WineChronicleReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(10);
+        $this->site = Site::find(3);
 
         if (!$this->site) {
             echo "Wine Chronicle site not found.\n";

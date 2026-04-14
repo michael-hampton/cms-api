@@ -11,7 +11,7 @@ class SeedHomeGardenFooterMenu extends Seeder
 
     public function run(): void
     {
-        $siteId = 8;
+        $siteId = 9;
 
         $menu = Menu::create([
             'name' => 'Home Garden Footer Menu',

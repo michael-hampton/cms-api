@@ -20,20 +20,20 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->assignTechWeeklyCategories();
-//        $this->assignHavenHearthCategories();
-//        $this->assignSoundwaveCategories();
-//        $this->assignWineChronicleCategories();
-//        $this->assignMusicWeekCategories();
-//        $this->assignGamesRadarCategories();
-//        $this->assignHorseAndHoundCategories();
+        $this->assignTechWeeklyCategories();
+        $this->assignHavenHearthCategories();
+        $this->assignSoundwaveCategories();
+        $this->assignWineChronicleCategories();
+        $this->assignMusicWeekCategories();
+        $this->assignGamesRadarCategories();
+        $this->assignHorseAndHoundCategories();
         $this->assignGoCompareCategories();
         $this->assignVogueNoirCategories();
     }
 
     private function assignGoCompareCategories(): void
     {
-        $siteId = 28;
+        $siteId = 10;
 
         // Insurance Categories
         $carInsuranceCategory = $this->categoryRepository->findOrCreateByName('Car Insurance', $siteId);
@@ -113,7 +113,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignVogueNoirCategories(): void
     {
-        $siteId = 6;
+        $siteId = 4;
 
         // Runway Shows
         $runwayCategory = $this->categoryRepository->findOrCreateByName('Runway Shows', $siteId);
@@ -251,7 +251,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignHavenHearthCategories(): void
     {
-        $siteId = 8;
+        $siteId = 9;
 
         // --- Existing Assignments ---
         // Interior Design categories
@@ -346,7 +346,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignSoundwaveCategories(): void
     {
-        $siteId = 7;
+        $siteId = 20;
 
         // --- Existing Assignments ---
         // Features - Interviews
@@ -460,7 +460,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignWineChronicleCategories(): void
     {
-        $siteId = 21; // Using site_id 21 based on your SQL
+        $siteId = 3; // Using site_id 21 based on your SQL
 
         // --- Existing Assignments ---
         // Wine Reviews - By Region - Bordeaux
@@ -573,7 +573,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignMusicWeekCategories(): void
     {
-        $siteId = 37;
+        $siteId = 21;
 
         // --- Core Assignments based on original seeding and required Categories (Ensuring categories exist) ---
 
@@ -647,7 +647,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignGamesRadarCategories(): void
     {
-        $siteId = 38;
+        $siteId = 6;
 
         // --- Existing Assignments ---
         // Reviews - Game Reviews
@@ -734,7 +734,7 @@ class PageCategoryAssignmentSeeder extends Seeder
 
     private function assignHorseAndHoundCategories(): void
     {
-        $siteId = 29;
+        $siteId = 12;
 
         // --- Existing Assignments ---
         // News - Breaking News

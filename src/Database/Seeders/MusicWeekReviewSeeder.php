@@ -38,7 +38,7 @@ class MusicWeekReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(37);
+        $this->site = Site::find(21);
 
         if (!$this->site) {
             echo "Music Week site not found.\n";

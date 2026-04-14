@@ -45,35 +45,35 @@ class ComprehensiveContentSeeder extends Seeder
     public function run(): void
     {
         // 1. Create products for MoneyWeek
-//        $this->createMoneyWeekProducts();
-//
-//        $this->createGamesRadarProducts();
-//
-//        $this->createHorseAndHoundProducts();
-//
-//        $this->createTechWeeklyProducts();
-//
-//        $this->createVogueNoirProducts();
-//
-//        $this->createWineChronicleProducts();
-//
-//        // 2. Add product grids to MoneyWeek homepage
-//        $this->addProductGridsToMoneyWeek();
-//
-//        $this->addProductGridsToGamesRadar();
-//
-//        $this->addProductGridsToHorseAndHound();
-//
-//        $this->addProductGridsToTechWeekly();
-//
-//        $this->addProductGridsToVogueNoir();
-//
-//        $this->addProductGridsToWineChronicle();
-//
-//        // 3. Add team block to MoneyWeek homepage
-//        $this->addTeamBlockToMoneyWeek();
-//
-//        $this->addTeamBlockToHavenAndHearth();
+        $this->createMoneyWeekProducts();
+
+        $this->createGamesRadarProducts();
+
+        $this->createHorseAndHoundProducts();
+
+        $this->createTechWeeklyProducts();
+
+        $this->createVogueNoirProducts();
+
+        $this->createWineChronicleProducts();
+
+        // 2. Add product grids to MoneyWeek homepage
+        $this->addProductGridsToMoneyWeek();
+
+        $this->addProductGridsToGamesRadar();
+
+        $this->addProductGridsToHorseAndHound();
+
+        $this->addProductGridsToTechWeekly();
+
+        $this->addProductGridsToVogueNoir();
+
+        $this->addProductGridsToWineChronicle();
+
+        // 3. Add team block to MoneyWeek homepage
+        $this->addTeamBlockToMoneyWeek();
+
+        $this->addTeamBlockToHavenAndHearth();
 
         // 4. Create Haven & Hearth themed content
         $this->createHavenHearthThemedContent();

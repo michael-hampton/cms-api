@@ -16,7 +16,7 @@ class BlockPayloadValidator
         'banner', 'product', 'stats', 'testimonial', 'list', 'table',
         'info', 'person', 'hero', 'section', 'product-comparison',
         'schema', 'award', 'note', 'buying-guide', 'contact-form',
-        'deal', 'offer', 'reward',
+        'deal', 'offer', 'reward', 'gallery'
     ];
 
     public function __construct(

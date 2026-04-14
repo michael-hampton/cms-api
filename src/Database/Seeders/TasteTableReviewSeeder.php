@@ -38,7 +38,7 @@ class TasteTableReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(9);
+        $this->site = Site::find(5);
 
         if (!$this->site) {
             echo "Taste & Table site not found.\n";

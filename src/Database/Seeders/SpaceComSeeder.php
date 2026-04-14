@@ -44,25 +44,21 @@ class SpaceComSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(50);
-
-//        $this->createSite();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createMenu();
-//        $this->createHomepage();
+        $this->createSite();
+        $this->createTags();
+        $this->createCategories();
+        $this->createMenu();
+        $this->createHomepage();
         $this->createArticles();
-//        $this->createAboutPage();
-//        $this->createContactPage();
+        $this->createAboutPage();
+        $this->createContactPage();
         $this->createPageGrid();
-        //$this->createMenuNavItems();
+        $this->createMenuNavItems();
     }
 
     private function createPageGrid(): void
     {
         $items = [];
-
-        $this->site = Site::find(50);
 
         $articles = Page::where('page_type', 'content')->where('status', 'published')->where('site_id', 50)->get();
 

@@ -44,30 +44,28 @@ class GolfMonthlySeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        echo '============ tags================';
-//        $this->createTags();
-//        echo '============ categories================';
-//        $this->createCategories();
-//        echo '============ menu================';
-//        $this->createMenu();
-//        echo '============ homepage================';
-//        $this->createHomepage();
-//        echo '============ articles================';
-//        $this->createArticles();
-//        echo '============ about ================';
-//        $this->createAboutPage();
-//        echo '============ contact ================';
-//        $this->createContactPage();
+        $this->createSite();
+        echo '============ tags================';
+        $this->createTags();
+        echo '============ categories================';
+        $this->createCategories();
+        echo '============ menu================';
+        $this->createMenu();
+        echo '============ homepage================';
+        $this->createHomepage();
+        echo '============ articles================';
+        $this->createArticles();
+        echo '============ about ================';
+        $this->createAboutPage();
+        echo '============ contact ================';
+        $this->createContactPage();
         $this->createPageGrid();
-//        $this->createMenuNavItems();
+        $this->createMenuNavItems();
     }
 
     private function createPageGrid(): void
     {
         $items = [];
-
-        $this->site = Site::find(46);
 
         $articles = Page::where('page_type', 'content')->where('status', 'published')->where('site_id', 46)->get();
 

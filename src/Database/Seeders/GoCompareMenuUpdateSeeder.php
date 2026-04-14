@@ -16,7 +16,7 @@ class GoCompareMenuUpdateSeeder extends Seeder
 
     private function updateGoCompareMenuLinks(): void
     {
-        $site = Site::find(28);
+        $site = Site::find(10);
         if (!$site) {
             echo "GoCompare site not found\n";
             return;

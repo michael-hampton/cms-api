@@ -20,6 +20,7 @@ use App\Controllers\Front\CompetitionController;
 use App\Controllers\Front\ContentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
+use App\Controllers\Front\RegionContentController;
 use App\Controllers\Front\ReviewPageController;
 use App\Controllers\Front\TagViewController;
 use App\Controllers\Front\WebPageController;
@@ -77,6 +78,7 @@ use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Framework\Middleware\AuthenticateCrmPortal;
 use App\Framework\Middleware\AuthenticateMerchantPortal;
+use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireMemberAuth;
 
 /*
@@ -516,12 +518,12 @@ $router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductMod
 
 
 // Apply page member access check to content routes
-//$router->get('{slug}', [ContentController::class, 'show'])
-//    ->middleware([CheckPageMemberAccess::class]);
+$router->get('{slug}', [ContentController::class, 'show'])
+    ->middleware([CheckPageMemberAccess::class]);
 
-//$router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
-//    //->middleware([CheckPageMemberAccess::class])
-//    ->where('regionSlug', 'asia-pacific|europe|americas');
+$router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
+    //->middleware([CheckPageMemberAccess::class])
+    ->where('regionSlug', 'asia-pacific|europe|americas');
 
 // In your routes file — adjust to your router's API
 

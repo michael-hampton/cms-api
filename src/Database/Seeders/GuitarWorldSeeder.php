@@ -52,11 +52,7 @@ class GuitarWorldSeeder extends Seeder
 
     private function createSite(): void
     {
-        $this->site = Site::create([
-            'name' => 'Guitar World',
-            'slug' => 'guitar-world',
-            'is_active' => true,
-        ]);
+        $this->site = Site::find(7);
     }
 
     private function createMenu(): void

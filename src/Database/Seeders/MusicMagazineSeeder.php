@@ -38,15 +38,15 @@ class MusicMagazineSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        $this->createMenu();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createCustomFields();
-//        $this->createHomepage();
-//        $this->createAboutPage();
-//        $this->createContactPage();
-//        $this->createArticles();
+        $this->createSite();
+        $this->createMenu();
+        $this->createTags();
+        $this->createCategories();
+        $this->createCustomFields();
+        $this->createHomepage();
+        $this->createAboutPage();
+        $this->createContactPage();
+        $this->createArticles();
     }
 
     private function createSite(): void
@@ -85,7 +85,7 @@ class MusicMagazineSeeder extends Seeder
         ];
 
         foreach ($tags as $tagName) {
-            $this->tagRepository->findOrCreateByName($tagName, 1);
+            $this->tagRepository->findOrCreateByName($tagName, $this->site->id);
         }
     }
 
@@ -146,7 +146,7 @@ class MusicMagazineSeeder extends Seeder
                 'type' => $field['type'],
                 'is_active' => true,
                 'sort_order' => 10,
-                'site_id' => 1
+                'site_id' => $this->site->id
             ]);
         }
     }
@@ -160,7 +160,7 @@ class MusicMagazineSeeder extends Seeder
             'status' => 'published',
             'meta_title' => 'SOUNDWAVE - The Pulse of Music Culture',
             'meta_description' => 'Discover the latest in music news, album reviews, artist interviews, and live concert coverage. Your guide to everything music.',
-            'site_id' => 1
+            'site_id' => $this->site->id
         ]);
 
         $featuredTag = $this->tagRepository->findOrCreateByName('featured', 1);
@@ -448,7 +448,7 @@ class MusicMagazineSeeder extends Seeder
             'status' => 'published',
             'meta_title' => 'About Us - SOUNDWAVE Music Magazine',
             'meta_description' => 'Learn about SOUNDWAVE - 15 years of music journalism excellence, bringing you the best in reviews, interviews, and music culture.',
-            'site_id' => 1
+            'site_id' => $this->site->id
         ]);
 
         $blocks = [
@@ -565,7 +565,7 @@ class MusicMagazineSeeder extends Seeder
             'status' => 'published',
             'meta_title' => 'Contact Us - SOUNDWAVE',
             'meta_description' => 'Get in touch with the SOUNDWAVE team. Send us your music, story ideas, or just say hello.',
-            'site_id' => 1
+            'site_id' => $this->site->id
         ]);
 
         $blocks = [
@@ -777,18 +777,18 @@ class MusicMagazineSeeder extends Seeder
             'meta_title' => $data['title'] . ' - SOUNDWAVE',
             'meta_description' => $data['excerpt'],
             'page_type' => 'content',
-            'site_id' => 1
+            'site_id' => $this->site->id
         ]);
 
         // Add tags
         foreach ($data['tags'] as $tagName) {
-            $tag = $this->tagRepository->findOrCreateByName($tagName, 1);
+            $tag = $this->tagRepository->findOrCreateByName($tagName, $this->site->id);
             $page->tags(true)->attach($tag->id);
         }
 
         // Add categories
         foreach ($data['categories'] as $categoryName) {
-            $category = $this->categoryRepository->findOrCreateByName($categoryName, 1);
+            $category = $this->categoryRepository->findOrCreateByName($categoryName, $this->site->id);
             $page->categories(true)->attach($category->id);
         }
 

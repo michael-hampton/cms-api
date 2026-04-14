@@ -14,7 +14,7 @@ class CreateNewsletterRequest extends FormRequest
             'interval' => ['required', 'in:daily,weekly,biweekly,monthly'],
             'active' => ['boolean'],
             'is_default' => ['boolean'],
-            'content_type' => ['required', 'in:manual,auto_pages'],
+            'content_type' => ['required', 'in:manual,auto_pages,custom_blocks'],
             'max_pages' => ['integer', 'min:1'],
             'sort_by' => ['string'],
             'sort_order' => ['in:asc,desc'],

@@ -55,7 +55,7 @@ class SubscriptionBundleSeeder extends Seeder
                     'description' => "Bundle of {$planA->name} and {$planB->name}.",
                     'bundle_price' => $bundlePrice,
                     'total_price' => $totalPrice,
-                    'site_id' => 1,
+                    'site_id' => $planA->site_id,
                     'is_active' => true,
                     'start_date' => null,
                     'end_date' => null,

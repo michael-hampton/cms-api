@@ -12,7 +12,7 @@ use App\Models\NewsletterLayout;
  */
 class CuratesMastheadDemoSeeder
 {
-    public function run(int $siteId = 1): void
+    public function run(int $siteId = 7): void
     {
         $layout = NewsletterLayout::where('slug', 'curates-masthead')
             ->whereNull('site_id')

@@ -37,7 +37,11 @@ class GardenSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::where('slug', 'haven-hearth')->first();
+        $this->site = Site::create([
+            'name' => 'Haven Hearth',
+            'slug' => 'haven-hearth',
+            'is_active' => true,
+        ]);
 
         $this->createArticles();
     }

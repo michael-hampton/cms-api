@@ -38,7 +38,7 @@ class VogueNoirReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(6);
+        $this->site = Site::find(4);
 
         if (!$this->site) {
             echo "Vogue Noir site not found.\n";

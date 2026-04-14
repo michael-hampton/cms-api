@@ -92,16 +92,27 @@ class SubscriptionPlansSeeder extends Seeder
 
         foreach ($planTemplates as $index => $template) {
             $plan = $this->createPlan($site, $template, $index);
-            $this->createPricingTiers($plan, $template);
+
+            if (!$plan) {
+                continue;
+            }
+
+            $this->createPricingTiers($plan, $template, $site);
         }
     }
 
     /**
      * Create a subscription plan
      */
-    private function createPlan(Site $site, array $template, int $index): Model
+    private function createPlan(Site $site, array $template, int $index): ?Model
     {
         $slug = Str::slug($template['name']) . '-' . Str::slug($site->name);
+
+        $exists = SubscriptionPlan::where('slug', $slug)->first();
+
+        if ($exists) {
+            return null;
+        }
 
         return SubscriptionPlan::create([
             'site_id' => $site->id,
@@ -131,7 +142,7 @@ class SubscriptionPlansSeeder extends Seeder
     /**
      * Create pricing tiers for a plan
      */
-    private function createPricingTiers(SubscriptionPlan $plan, array $template): void
+    private function createPricingTiers(SubscriptionPlan $plan, array $template, Site $site): void
     {
         $basePrice = $template['base_price'];
         $hasDigital = !$template['print_only'];
@@ -185,6 +196,7 @@ class SubscriptionPlansSeeder extends Seeder
                 'is_default' => $tier['is_default'] ?? false,
                 'sort_order' => $index,
                 'is_active' => true,
+                'site_id' => $site->id
             ]);
         }
     }

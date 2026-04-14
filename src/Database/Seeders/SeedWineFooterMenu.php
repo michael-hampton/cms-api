@@ -9,7 +9,7 @@ class SeedWineFooterMenu
 {
     public function run(): void
     {
-        $siteId = 10;
+        $siteId = 3;
 
         $menu = Menu::create([
             'name' => 'Wine Footer Menu',

@@ -28,7 +28,7 @@ class SpotlightLayoutTestSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(52);
+        $this->site = Site::find(7);
 
         if (!$this->site) {
             echo "Site ID 52 not found.\n";

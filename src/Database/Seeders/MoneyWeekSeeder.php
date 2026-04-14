@@ -44,23 +44,21 @@ class MoneyWeekSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createMenu();
-//        $this->createHomepage();
-//        $this->createArticles();
-//        $this->createAboutPage();
-//        $this->createContactPage();
+        $this->createSite();
+        $this->createTags();
+        $this->createCategories();
+        $this->createMenu();
+        $this->createHomepage();
+        $this->createArticles();
+        $this->createAboutPage();
+        $this->createContactPage();
         $this->createPageGrid();
-//        $this->createMenuNavItems();
+        $this->createMenuNavItems();
     }
 
     private function createPageGrid(): void
     {
         $items = [];
-
-        $this->site = Site::find(49);
 
         $articles = Page::where('page_type', 'content')->where('status', 'published')->where('site_id', 49)->get();
 

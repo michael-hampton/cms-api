@@ -37,7 +37,7 @@ class GoCompareMissingArticlesSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::where('id', 28)->first();
+        $this->site = Site::where('id', 10)->first();
         $this->createArticles();
     }
 

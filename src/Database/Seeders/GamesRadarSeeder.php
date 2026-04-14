@@ -54,11 +54,7 @@ class GamesRadarSeeder extends Seeder
 
     private function createSite(): void
     {
-        $this->site = Site::create([
-            'name' => 'GamesRadar+ - Gaming News & Reviews',
-            'slug' => 'gamesradar',
-            'is_active' => true,
-        ]);
+        $this->site = Site::find(6);
     }
 
     private function createMenu(): void

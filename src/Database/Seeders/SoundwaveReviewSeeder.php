@@ -37,7 +37,7 @@ class SoundwaveReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(7);
+        $this->site = Site::find(20);
 
         if (!$this->site) {
             echo "Soundwave site not found.\n";
@@ -45,7 +45,7 @@ class SoundwaveReviewSeeder extends Seeder
         }
 
         $reviewPages = $this->createReviewPages();
-        //$this->addReviewSectionToHomepage($reviewPages);
+        $this->addReviewSectionToHomepage($reviewPages);
     }
 
     private function createReviewPages(): array

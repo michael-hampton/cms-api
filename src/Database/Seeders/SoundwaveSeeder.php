@@ -149,18 +149,18 @@ class SoundwaveSeeder extends Seeder
             'meta_title' => $data['title'] . ' - SOUNDWAVE',
             'meta_description' => $data['excerpt'],
             'page_type' => 'content',
-            'site_id' => 7
+            'site_id' => 20
         ]);
 
         // Add tags
         foreach ($data['tags'] as $tagName) {
-            $tag = $this->tagRepository->findOrCreateByName($tagName, 1);
+            $tag = $this->tagRepository->findOrCreateByName($tagName, 20);
             $page->tags(true)->attach($tag->id);
         }
 
         // Add categories
         foreach ($data['categories'] as $categoryName) {
-            $category = $this->categoryRepository->findOrCreateByName($categoryName, 1);
+            $category = $this->categoryRepository->findOrCreateByName($categoryName, 20);
             $page->categories(true)->attach($category->id);
         }
 
@@ -327,7 +327,7 @@ class SoundwaveSeeder extends Seeder
 
     private function createArticleGrid($pages): void
     {
-        $site = Site::find(6);
+        $site = Site::find(20);
 
         $items = [];
 
@@ -405,7 +405,7 @@ class SoundwaveSeeder extends Seeder
             'is_active' => true,
             'use_hero' => true,
             'items' => $items,
-            'site_id' => 7
+            'site_id' => 20
         ]);
     }
 }

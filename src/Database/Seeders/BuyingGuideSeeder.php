@@ -457,7 +457,7 @@ class BuyingGuideSeeder extends Seeder
 
     private function createVogueNoirGuides(): void
     {
-        $siteId = 6;
+        $siteId = 4;
 
         $guides = [
             [
@@ -680,7 +680,7 @@ class BuyingGuideSeeder extends Seeder
 
     private function createGoCompareGuides(): void
     {
-        $siteId = 28;
+        $siteId = 10;
 
         $guides = [
             [
@@ -865,7 +865,7 @@ class BuyingGuideSeeder extends Seeder
 
     private function createGamesRadarGuides(): void
     {
-        $siteId = 38;
+        $siteId = 6;
 
         $guides = [
             [

@@ -11,7 +11,7 @@ class HomeGardenPageGridSeeder extends Seeder
 {
     public function run(): void
     {
-        $site = Site::find(8);
+        $site = Site::find(9);
 
         if (!$site) {
             echo "Site with ID 8 not found. Please check the site ID.\n";

@@ -40,21 +40,21 @@ class FoodRecipeSeeder extends Seeder
 
     public function run(): void
     {
-//        $this->createSite();
-//        $this->createMenu();
-//        $this->createTags();
-//        $this->createCategories();
-//        $this->createCustomFields();
-//        $this->createHomepage();
-//        $this->createComprehensiveArticle(); // Uses ALL blocks
-//        $this->createAboutPage();
-//        $this->createContactPage();
-//        $this->createArticle2(); // Mexican Street Tacos
-//        $this->createArticle3(); // Asian Noodle Bowls
-//        $this->createArticle4(); // Perfect Chocolate Cake
-//        $this->createArticle5(); // Mediterranean Diet Guide
-//        $this->createArticle6(); // Kitchen Knife Buying Guide
-//        $this->attachArticlesToHomepage();
+        $this->createSite();
+        $this->createMenu();
+        $this->createTags();
+        $this->createCategories();
+        $this->createCustomFields();
+        $this->createHomepage();
+        $this->createComprehensiveArticle(); // Uses ALL blocks
+        $this->createAboutPage();
+        $this->createContactPage();
+        $this->createArticle2(); // Mexican Street Tacos
+        $this->createArticle3(); // Asian Noodle Bowls
+        $this->createArticle4(); // Perfect Chocolate Cake
+        $this->createArticle5(); // Mediterranean Diet Guide
+        $this->createArticle6(); // Kitchen Knife Buying Guide
+        $this->attachArticlesToHomepage();
     }
 
     public function attachArticlesToHomepage(): void
@@ -165,11 +165,7 @@ class FoodRecipeSeeder extends Seeder
 
     private function createSite(): void
     {
-        $this->site = Site::create([
-            'name' => 'Taste & Table - Food Magazine',
-            'slug' => 'taste-table',
-            'is_active' => true,
-        ]);
+        $this->site = Site::find(5);
     }
 
     private function createMenu(): void

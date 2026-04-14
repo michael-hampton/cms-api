@@ -38,7 +38,7 @@ class GolfMonthlyDealSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(46); // Assuming Golf Monthly is site ID 5
+        $this->site = Site::find(11); // Assuming Golf Monthly is site ID 5
 
         if (!$this->site) {
             echo "Golf Monthly site not found.\n";

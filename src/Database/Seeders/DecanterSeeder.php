@@ -52,11 +52,7 @@ class DecanterSeeder extends Seeder
 
     private function createSite(): void
     {
-        $this->site = Site::create([
-            'name' => 'The Wine Chronicle - Fine Wine & Spirits',
-            'slug' => 'wine-chronicle',
-            'is_active' => true,
-        ]);
+        $this->site = Site::find(3);
     }
 
     private function createMenu(): void

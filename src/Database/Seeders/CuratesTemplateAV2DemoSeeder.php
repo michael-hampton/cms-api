@@ -7,7 +7,7 @@ use App\Models\NewsletterLayout;
 
 class CuratesTemplateAV2DemoSeeder
 {
-    public function run(int $siteId = 1): void
+    public function run(int $siteId = 7): void
     {
         $layout = NewsletterLayout::where('slug', 'curates-template-a-v2')
             ->whereNull('site_id')

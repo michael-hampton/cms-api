@@ -36,7 +36,7 @@ class GamesRadarReviewSeeder extends Seeder
 
     public function run(): void
     {
-        $this->site = Site::find(38);
+        $this->site = Site::find(6);
 
         if (!$this->site) {
             echo "TechWeekly site not found.\n";
