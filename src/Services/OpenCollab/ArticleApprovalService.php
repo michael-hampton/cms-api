@@ -8,26 +8,28 @@ use App\Enums\Pages\PageStatus;
 use App\Events\OpenCollab\ArticleApprovedEvent;
 use App\Events\OpenCollab\ArticleRejectedEvent;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
+use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
  * Governs the contributor article moderation lifecycle.
  *
- * Allowed transitions this service owns:
- *   draft / on_hold  → waiting_approval  (contributor submits)
- *   waiting_approval → published          (admin approves)
+ * Policy enforcement is injected via ContributorPolicy so the permission
+ * logic is not duplicated here. The service throws OnboardingIncompleteException
+ * when the policy blocks an action — callers translate this to the appropriate
+ * HTTP response.
+ *
+ * Allowed transitions:
+ *   draft / on_hold  → waiting_approval  (contributor submits — policy checked)
+ *   waiting_approval → published          (admin approves — no policy check needed)
  *   waiting_approval → on_hold            (admin rejects)
- *
- * This service does NOT handle free-form status changes; those stay in
- * the CMS PageService. It only touches articles owned by contributors.
- *
- * Every state change that writes to the DB goes through a transaction.
- * Events handle side-effects (notifications, activity feed).
  */
 class ArticleApprovalService
 {
@@ -36,6 +38,8 @@ class ArticleApprovalService
         private readonly ActivityRepository $activityRepository,
         private readonly EventDispatcher    $eventDispatcher,
         private readonly Database           $database,
+        private readonly ContributorPolicy $policy,
+        private readonly SiteRepository    $siteRepository
     )
     {
     }
@@ -44,8 +48,9 @@ class ArticleApprovalService
      * Contributor submits their article for review.
      * Transitions: draft|on_hold → waiting_approval
      *
-     * @throws \InvalidArgumentException if the page cannot be submitted
      * @throws UnauthorisedPageAccessException if the contributor does not own the page
+     * @throws OnboardingIncompleteException   if compliance steps are outstanding
+     * @throws \InvalidArgumentException       if the page cannot be submitted
      */
     public function submitForReview(int $pageId, int $contributorId): Page
     {
@@ -53,6 +58,20 @@ class ArticleApprovalService
 
         if (!$page || (int)$page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
+        }
+
+        // Load site to pass to the policy. Falls back to a minimal Site model
+        // if the page site_id is not resolvable (shouldn't happen in practice).
+        $site = $this->siteRepository->find($page->site_id);
+
+        if (!$site) {
+            throw new \InvalidArgumentException("Site [{$page->site_id}] not found.");
+        }
+
+        if (!$this->policy->canSubmitForReview($contributorId, $site)) {
+            $pending = [];
+
+            throw new OnboardingIncompleteException($pending);
         }
 
         $submittableStatuses = [
@@ -139,7 +158,6 @@ class ArticleApprovalService
     /**
      * Admin rejects a contributor article.
      * Transitions: waiting_approval → on_hold
-     * The contributor can edit and resubmit from on_hold.
      *
      * @throws \InvalidArgumentException if the article is not in waiting_approval
      */
@@ -166,7 +184,7 @@ class ArticleApprovalService
                 'rejection_notes' => $notes,
                 'approved_by' => null,
                 'approved_at' => null,
-                'resubmission_count' => (int)$page->resubmission_count, // preserve existing count
+                'resubmission_count' => (int)$page->resubmission_count,
             ]);
 
             $this->activityRepository->record(
@@ -192,10 +210,10 @@ class ArticleApprovalService
     /**
      * Contributor resubmits an article after rejection.
      * Transitions: on_hold → waiting_approval
-     * Increments resubmission_count so admins can see how many times it has cycled.
      *
      * @throws UnauthorisedPageAccessException if the contributor does not own the page
-     * @throws \InvalidArgumentException if the article is not on_hold
+     * @throws OnboardingIncompleteException   if compliance steps are outstanding
+     * @throws \InvalidArgumentException       if the article is not on_hold
      */
     public function resubmit(int $pageId, int $contributorId): Page
     {
@@ -203,6 +221,16 @@ class ArticleApprovalService
 
         if (!$page || (int)$page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
+        }
+
+        $site = $this->siteRepository->find($page->site_id);
+
+        if (!$site) {
+            throw new \InvalidArgumentException("Site [{$page->site_id}] not found.");
+        }
+
+        if (!$this->policy->canSubmitForReview($contributorId, $site)) {
+            throw new OnboardingIncompleteException([]);
         }
 
         if ($page->status !== PageStatus::ON_HOLD->value) {
@@ -241,7 +269,6 @@ class ArticleApprovalService
 
     /**
      * Returns all articles awaiting approval for a site.
-     * Used by the admin review queue.
      */
     public function pendingReviewForSite(int $siteId): \App\Framework\Support\Collection
     {

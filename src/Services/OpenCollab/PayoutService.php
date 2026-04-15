@@ -6,9 +6,13 @@ use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
+use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
+use App\Models\Model;
+use App\Models\Payout;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
@@ -18,26 +22,17 @@ use App\Services\OpenCollab\Notifications\PayoutApprovedNotification;
 use App\Services\OpenCollab\Notifications\PayoutCreatedNotification;
 use App\Services\OpenCollab\Notifications\PayoutDeclinedNotification;
 use App\Services\OpenCollab\Notifications\PayoutPaidNotification;
+use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
- * Manual/batch payout management. No Stripe Connect involved.
+ * Manual/batch payout management.
  *
- * Balance calculation:
- *   available balance = total earnings from ledger
- *                     − total paid payouts
- *                     − total in-flight payouts (pending + approved)
- *
- * Every admin action (approve / decline / mark-paid) is written to payout_audits
- * inside the same transaction as the status update.
- *
- * Lifecycle: request → (admin approves) → (admin marks paid)
- *                    → (admin rejects)
+ * requestPayout() enforces the ContributorPolicy — a contributor must have
+ * completed all onboarding steps (including payment details) before withdrawing.
  */
 class PayoutService
 {
-    // Minimum balance required before a payout can be requested (pence).
     private const MINIMUM_PAYOUT_PENCE = 5000; // £50.00
-
     private const VALID_METHODS = ['bank_transfer', 'stripe'];
 
     public function __construct(
@@ -49,6 +44,8 @@ class PayoutService
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
         private readonly NotificationDispatcher  $notificationDispatcher,
+        private readonly ContributorPolicy       $policy,
+        private readonly SiteRepository          $siteRepository
     )
     {
     }
@@ -58,14 +55,11 @@ class PayoutService
     /**
      * Contributor requests a payout for their full available balance.
      *
-     * The balance check and in-flight guard are both performed inside the
-     * transaction to eliminate the race condition window between check and write.
-     *
-     * @throws \InvalidArgumentException if the payout method is invalid
-     * @throws \InvalidArgumentException if balance is below the minimum
-     * @throws \RuntimeException         if there is already a payout in flight
+     * @throws OnboardingIncompleteException if the contributor has not completed onboarding
+     * @throws \InvalidArgumentException     if the payout method is invalid or balance is too low
+     * @throws \RuntimeException             if there is already a payout in flight
      */
-    public function requestPayout(int $userId, int $siteId, string $method): \App\Models\Payout
+    public function requestPayout(int $userId, int $siteId, string $method): Payout
     {
         if (!in_array($method, self::VALID_METHODS, true)) {
             throw new \InvalidArgumentException(
@@ -73,7 +67,18 @@ class PayoutService
             );
         }
 
-        $payout = $this->database->transaction(function () use ($userId, $siteId, $method): \App\Models\Payout {
+        $site = $this->siteRepository->find($siteId);
+
+        if (!$site) {
+            throw new \InvalidArgumentException("Site [{$siteId}] not found.");
+        }
+
+        if (!$this->policy->canWithdraw($userId, $site)) {
+            $pending = []; // pendingSteps will be evaluated by the policy internally
+            throw new OnboardingIncompleteException($pending);
+        }
+
+        $payout = $this->database->transaction(function () use ($userId, $siteId, $method): Model {
             $available = $this->availableBalance($userId);
 
             if ($available < self::MINIMUM_PAYOUT_PENCE) {
@@ -128,9 +133,6 @@ class PayoutService
     // ── Admin ─────────────────────────────────────────────────────────────────
 
     /**
-     * Admin approves a pending payout.
-     * Audit entry written inside the same transaction.
-     *
      * @throws \InvalidArgumentException if payout is not found or not pending
      */
     public function approve(int $payoutId, int $adminId): \App\Models\Payout
@@ -174,9 +176,6 @@ class PayoutService
     }
 
     /**
-     * Admin marks an approved payout as paid.
-     * Records the payment reference for the audit trail.
-     *
      * @throws \InvalidArgumentException if payout is not found or not approved
      */
     public function markPaid(
@@ -230,9 +229,6 @@ class PayoutService
     }
 
     /**
-     * Admin rejects a pending payout (e.g. missing bank details).
-     * Reason is required — enforced at the controller level too.
-     *
      * @throws \InvalidArgumentException if payout is not found or not pending
      */
     public function reject(int $payoutId, int $adminId, string $reason): \App\Models\Payout

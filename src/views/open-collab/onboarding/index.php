@@ -24,18 +24,47 @@
         <!-- Step Indicator -->
         <?php
         $allSteps = ['profile', 'payment', 'contract', 'guidelines'];
-        $stepLabels = ['Profile', 'Payment', 'Contract', 'Guidelines'];
+
+        $stepLabels = [
+                'profile' => 'Profile',
+                'payment' => 'Payment',
+                'contract' => 'Contract',
+                'guidelines' => 'Guidelines',
+        ];
+
         $stepIcons = [
                 'profile' => '<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>',
                 'payment' => '<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>',
                 'contract' => '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>',
                 'guidelines' => '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>',
         ];
+
+        // ✅ extract step names from structured data
+        $pendingStepNames = array_column($pendingSteps, 'step');
+
+        // ✅ optionally filter steps based on site config
+        $allSteps = array_values(array_filter($allSteps, function ($step) use ($site) {
+            return match ($step) {
+                'payment' => $site->require_payment_setup ?? true,
+                'contract' => $site->require_contracts ?? true,
+                'guidelines' => $site->require_guidelines_ack ?? true,
+                default => true,
+            };
+        }));
+
+        // ✅ determine current step safely if not passed
+        $currentStep = $currentStep['step'] ?? ($pendingSteps[0]['step'] ?? null);
+
+        // ✅ map pending steps by key for easy lookup
+        $pendingMap = [];
+        foreach ($pendingSteps as $step) {
+            $pendingMap[$step['step']] = $step;
+        }
         ?>
         <div class="oc-steps" style="margin-bottom:36px;">
             <?php foreach ($allSteps as $i => $s): ?>
                 <?php
-                $done = !in_array($s, $pendingSteps);
+                $done = !in_array($s, $pendingStepNames, true);
                 $active = $currentStep === $s;
                 $cls = $done ? 'done' : ($active ? 'active' : 'pending');
                 ?>
@@ -51,7 +80,7 @@
                             <?= $i + 1 ?>
                         <?php endif; ?>
                     </div>
-                    <span class="oc-step__label"><?= $stepLabels[$i] ?></span>
+                    <span class="oc-step__label"><?= $stepLabels[$s] ?></span>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -68,7 +97,8 @@
                             <?= ['profile' => 'Set up your profile', 'payment' => 'Payment details', 'contract' => 'Sign the contract', 'guidelines' => 'Brand guidelines'][$currentStep] ?>
                         </div>
                         <div style="font-size:.78rem;color:var(--slate);">
-                            Step <?= (array_search($currentStep, $allSteps) + 1) ?> of <?= count($allSteps) ?>
+                            <?php $stepIndex = array_search($currentStep, $allSteps, true); ?>
+                            Step <?= $stepIndex !== false ? $stepIndex + 1 : 1 ?> of <?= count($allSteps) ?>
                         </div>
                     </div>
                 </div>
@@ -78,6 +108,12 @@
 
                 <div id="form-errors" class="oc-form-errors" style="display:none;" role="alert"></div>
                 <div id="form-success" class="oc-alert oc-alert--success" style="display:none;" role="status"></div>
+
+                <?php if ($currentStep && isset($pendingMap[$currentStep])): ?>
+                    <div class="oc-alert oc-alert--info" style="margin-bottom:16px;">
+                        <?= htmlspecialchars($pendingMap[$currentStep]['reason']) ?>
+                    </div>
+                <?php endif; ?>
 
                 <!-- ── PROFILE STEP ─────────────────────────── -->
                 <?php if ($currentStep === 'profile'): ?>

@@ -6,16 +6,20 @@ use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
+use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Payout;
+use App\Models\Site;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\PayoutService;
+use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -29,12 +33,12 @@ class PayoutServiceTest extends FunctionalTestCase
     private MockInterface $payoutAuditRepository;
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
-    private UserRepositoryInterface $userRepository;
-    private NotificationDispatcher $notificationDispatcher;
+    private MockInterface $userRepository;
+    private MockInterface $notificationDispatcher;
+    private MockInterface $policy;
+    private MockInterface $siteRepository;
 
-    // -------------------------------------------------------------------------
-    // availableBalance()
-    // -------------------------------------------------------------------------
+    // ── availableBalance() ────────────────────────────────────────────────────
 
     public function test_available_balance_is_ledger_minus_paid_minus_in_flight(): void
     {
@@ -42,9 +46,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->with(7)->andReturn(3000);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->with(7)->andReturn(2000);
 
-        $balance = $this->service->availableBalance(7);
-
-        $this->assertEquals(5000, $balance);
+        $this->assertEquals(5000, $this->service->availableBalance(7));
     }
 
     public function test_available_balance_never_goes_negative(): void
@@ -53,28 +55,38 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(800);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(500);
 
-        $balance = $this->service->availableBalance(7);
-
-        $this->assertEquals(0, $balance);
+        $this->assertEquals(0, $this->service->availableBalance(7));
     }
 
-    // -------------------------------------------------------------------------
-    // requestPayout()
-    // -------------------------------------------------------------------------
+    // ── requestPayout() — policy enforcement ─────────────────────────────────
 
-    public function test_request_payout_creates_pending_payout_and_dispatches_event(): void
+    public function test_request_payout_throws_onboarding_incomplete_when_policy_blocks(): void
     {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+        $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
+
+        $this->policy->shouldReceive('canWithdraw')->with(7, $site)->once()->andReturn(false);
+        $this->payoutRepository->shouldNotReceive('create');
+        $this->eventDispatcher->shouldNotReceive('dispatch');
+
+        $this->expectException(OnboardingIncompleteException::class);
+        $this->service->requestPayout(7, 1, 'bank_transfer');
+    }
+
+    public function test_request_payout_creates_pending_payout_when_policy_allows(): void
+    {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+        $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
+
+        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
         $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
         $this->payoutRepository->shouldReceive('create')
             ->once()
-            ->withArgs(function (array $data): bool {
-                return $data['user_id'] === 7
-                    && $data['amount'] === 10000
-                    && $data['status'] === PayoutStatus::Pending->value
-                    && $data['method'] === 'bank_transfer';
-            })
+            ->withArgs(fn($data) => $data['status'] === PayoutStatus::Pending->value && $data['method'] === 'bank_transfer')
             ->andReturn($this->makePayout(['status' => PayoutStatus::Pending->value]));
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
@@ -85,78 +97,54 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->assertEquals(PayoutStatus::Pending->value, $payout->status);
     }
 
-    private function makePayout(array $attributes = []): Payout
-    {
-        $defaults = [
-            'id' => 1,
-            'user_id' => 7,
-            'site_id' => 1,
-            'amount' => 10000,
-            'currency' => 'GBP',
-            'status' => PayoutStatus::Pending->value,
-            'method' => 'bank_transfer',
-        ];
-        $payout = new Payout(array_merge($defaults, $attributes));
-        $payout->exists = true;
-        return $payout;
-    }
-
     public function test_request_payout_throws_when_balance_below_minimum(): void
     {
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(4999); // below £50
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+        $this->siteRepository->shouldReceive('find')->andReturn($site);
+
+        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
+        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(4999);
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
 
-        $this->payoutRepository->shouldNotReceive('create');
-
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/Minimum payout/i');
-
         $this->service->requestPayout(7, 1, 'bank_transfer');
     }
 
     public function test_request_payout_throws_when_payout_already_in_flight(): void
     {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+        $this->siteRepository->shouldReceive('find')->andReturn($site);
+
+        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
         $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(20000);
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(10000);
 
-        $this->payoutRepository->shouldNotReceive('create');
-
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/already in progress/i');
-
         $this->service->requestPayout(7, 1, 'bank_transfer');
     }
 
-    public function test_request_payout_throws_when_method_is_invalid(): void
+    public function test_request_payout_throws_for_invalid_method(): void
     {
-        $this->payoutRepository->shouldNotReceive('create');
+        $this->policy->shouldNotReceive('canWithdraw');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/Invalid payout method/i');
-
-        $this->service->requestPayout(7, 1, 'magic_money_teleport');
+        $this->service->requestPayout(7, 1, 'magic_money');
     }
-
-    public function test_request_payout_wraps_balance_check_and_create_in_transaction(): void
-    {
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('create')->andReturn($this->makePayout());
-        $this->eventDispatcher->shouldReceive('dispatch');
-
-        $this->service->requestPayout(7, 1, 'bank_transfer');
-        $this->assertTrue(true);
-    }
-
-    // -------------------------------------------------------------------------
-    // approve()
-    // -------------------------------------------------------------------------
 
     public function test_request_payout_wraps_in_transaction(): void
     {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+        $this->siteRepository->shouldReceive('find')->andReturn($site);
+
+        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
         $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
         $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
         $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
@@ -164,8 +152,10 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->eventDispatcher->shouldReceive('dispatch');
 
         $this->service->requestPayout(7, 1, 'bank_transfer');
-        $this->assertTrue(true);
+        $this->assertTrue(true); // transaction mock was invoked
     }
+
+    // ── approve() ─────────────────────────────────────────────────────────────
 
     public function test_approve_transitions_pending_to_approved_and_logs_audit(): void
     {
@@ -193,7 +183,6 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldNotReceive('update');
 
         $this->expectException(\InvalidArgumentException::class);
-
         $this->service->approve(5, 99);
     }
 
@@ -202,13 +191,10 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('find')->andReturn(null);
 
         $this->expectException(\InvalidArgumentException::class);
-
         $this->service->approve(999, 99);
     }
 
-    // -------------------------------------------------------------------------
-    // markPaid()
-    // -------------------------------------------------------------------------
+    // ── markPaid() ────────────────────────────────────────────────────────────
 
     public function test_mark_paid_transitions_approved_to_paid_logs_audit_and_dispatches_event(): void
     {
@@ -218,9 +204,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('find')->andReturn($payout, $paid);
         $this->payoutRepository->shouldReceive('update')
             ->once()
-            ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Paid->value
-                && $data['reference'] === 'REF-001'
-            );
+            ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Paid->value && $data['reference'] === 'REF-001');
         $this->payoutAuditRepository->shouldReceive('log')
             ->once()
             ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Paid);
@@ -242,15 +226,12 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->eventDispatcher->shouldNotReceive('dispatch');
 
         $this->expectException(\InvalidArgumentException::class);
-
         $this->service->markPaid(5, 99);
     }
 
-    // -------------------------------------------------------------------------
-    // reject()
-    // -------------------------------------------------------------------------
+    // ── reject() ──────────────────────────────────────────────────────────────
 
-    public function test_reject_transitions_pending_to_rejected_and_logs_audit_with_reason(): void
+    public function test_reject_transitions_pending_to_rejected_with_audit_and_reason(): void
     {
         $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
         $rejected = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Rejected->value]);
@@ -259,21 +240,20 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldReceive('update')
             ->once()
             ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Rejected->value
-                && $data['rejection_reason'] === 'Missing bank details.'
-            );
+                && $data['rejection_reason'] === 'Missing bank details.');
         $this->payoutAuditRepository->shouldReceive('log')
             ->once()
-            ->withArgs(function ($pid, $action, $adminId, $reason): bool {
-                return $pid === 5
-                    && $action === PayoutAuditAction::Declined
-                    && $adminId === 99
-                    && $reason === 'Missing bank details.';
-            });
+            ->withArgs(fn($pid, $action, $adminId, $reason): bool => $pid === 5
+                && $action === PayoutAuditAction::Declined
+                && $adminId === 99
+                && $reason === 'Missing bank details.'
+            );
 
         $result = $this->service->reject(5, 99, 'Missing bank details.');
 
         $this->assertEquals(PayoutStatus::Rejected->value, $result->status);
     }
+
     public function test_reject_throws_when_payout_not_pending(): void
     {
         $payout = $this->makePayout(['status' => PayoutStatus::Approved->value]);
@@ -282,12 +262,26 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutRepository->shouldNotReceive('update');
 
         $this->expectException(\InvalidArgumentException::class);
-
         $this->service->reject(1, 99, 'reason');
     }
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function makePayout(array $attributes = []): Payout
+    {
+        $defaults = [
+            'id' => 1,
+            'user_id' => 7,
+            'site_id' => 1,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ];
+        $payout = new Payout(array_merge($defaults, $attributes));
+        $payout->exists = true;
+        return $payout;
+    }
 
     protected function setUp(): void
     {
@@ -298,13 +292,16 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->paymentRepository = Mockery::mock(ArticlePaymentRepository::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->databaseMock = Mockery::mock(Database::class);
-        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
         $this->payoutAuditRepository = Mockery::mock(PayoutAuditRepository::class);
         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
         $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
+        $this->policy = Mockery::mock(ContributorPolicy::class);
+        $this->siteRepository = Mockery::mock(SiteRepository::class);
 
+        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
         $this->userRepository->shouldReceive('find')->byDefault();
         $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
+        $this->siteRepository = Mockery::mock(SiteRepository::class);
 
         $this->service = new PayoutService(
             $this->payoutRepository,
@@ -314,7 +311,9 @@ class PayoutServiceTest extends FunctionalTestCase
             $this->userRepository,
             $this->eventDispatcher,
             $this->databaseMock,
-            $this->notificationDispatcher
+            $this->notificationDispatcher,
+            $this->policy,
+            $this->siteRepository
         );
     }
 

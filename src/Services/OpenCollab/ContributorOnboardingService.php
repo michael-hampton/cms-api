@@ -13,15 +13,20 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
 /**
  * Single authority for contributor onboarding state.
  *
- * Onboarding steps (strict order):
- *   1. Profile setup        — bio present
- *   2. Payment setup        — stripe token stored
- *   3. Contract signed      — latest site contract signature exists
- *   4. Guidelines accepted  — latest site guidelines acknowledged
+ * Onboarding completion is DERIVED at runtime — never stored as source of truth.
+ * The DB status column is a convenience snapshot only (used for admin queries).
  *
- * start() creates an initial onboarding record when a contributor accepts
- * their invitation. This is idempotent — calling it twice for the same
- * user+site is safe.
+ * pendingSteps() returns structured data:
+ * [
+ *   ['step' => 'contract', 'reason' => '...', 'meta' => ['contract_id' => 5, ...]]
+ * ]
+ *
+ * completedSteps() returns only the steps that are *applicable* to this site
+ * configuration and have been satisfied — it never reports a step as done if
+ * the site doesn't require it.
+ *
+ * syncStatus() writes a convenience snapshot but MUST NOT be used for
+ * permission decisions. Always call pendingSteps() / isComplete() for that.
  */
 class ContributorOnboardingService
 {
@@ -32,6 +37,8 @@ class ContributorOnboardingService
     )
     {
     }
+
+    // ── Public API ────────────────────────────────────────────────────────────
 
     /**
      * Called when a contributor accepts their invitation.
@@ -52,14 +59,14 @@ class ContributorOnboardingService
             'user_id' => $userId,
             'site_id' => $siteId,
             'status' => 'incomplete',
+            'started_at' => date('Y-m-d H:i:s'),
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
     }
 
     /**
-     * Throws if onboarding is not complete.
-     * Call this before any publish operation.
+     * Throws if the contributor has any blocking pending steps.
      *
      * @throws OnboardingIncompleteException
      */
@@ -73,16 +80,85 @@ class ContributorOnboardingService
     }
 
     /**
-     * Returns the list of pending step names for this contributor on this site.
-     * Empty array means onboarding is complete.
+     * Returns structured pending steps for this contributor on this site.
+     * Empty array means the contributor is fully compliant.
+     *
+     * Each entry: ['step' => string, 'reason' => string, 'meta' => array]
+     *
+     * @return array<int, array{step: string, reason: string, meta: array<string, mixed>}>
      */
     public function pendingSteps(int $userId, Site $site): array
     {
         return $this->pendingStepsFromRequirements(
             $userId,
-            $this->mapSiteToRequirements($site)
+            $this->mapSiteToRequirements($site),
         );
     }
+
+    /**
+     * Returns the names of steps that are required by this site AND have been satisfied.
+     * Steps not required by the site are excluded entirely.
+     *
+     * @return array<int, string>
+     */
+    public function completedSteps(int $userId, Site $site): array
+    {
+        $req = $this->mapSiteToRequirements($site);
+        $allSteps = $this->applicableStepsFromRequirements($req);
+
+        $pendingStepNames = array_column(
+            $this->pendingStepsFromRequirements($userId, $req),
+            'step',
+        );
+
+        return array_values(array_diff($allSteps, $pendingStepNames));
+    }
+
+    /**
+     * Persists a convenience status snapshot on the onboarding record.
+     * Auto-starts the record if it does not exist (lazy init).
+     *
+     * This snapshot MUST NOT be used for permission checks — always derive
+     * from pendingSteps() at runtime. The snapshot is for admin queries only.
+     */
+    public function syncStatus(int $userId, Site $site): void
+    {
+        $record = ContributorOnboarding::where('user_id', $userId)
+            ->where('site_id', $site->id)
+            ->first();
+
+        // Lazy init — create the record if missing so syncStatus is always safe to call.
+        if (!$record) {
+            $this->start($userId, $site->id);
+
+            $record = ContributorOnboarding::where('user_id', $userId)
+                ->where('site_id', $site->id)
+                ->first();
+
+            if (!$record) {
+                return;
+            }
+        }
+
+        $isComplete = $this->isComplete($userId, $site);
+        $newStatus = $isComplete ? 'complete' : 'incomplete';
+        $completedAt = $isComplete ? date('Y-m-d H:i:s') : null;
+
+        // Do NOT use array_filter here — completed_at must be explicitly cleared
+        // to null when a contributor becomes incomplete again (e.g. new contract).
+        $record->update([
+            'status' => $newStatus,
+            'completed_at' => $completedAt,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function isComplete(int $userId, Site $site): bool
+    {
+        return empty($this->pendingSteps($userId, $site));
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
 
     private function mapSiteToRequirements(Site $site): OnboardingRequirements
     {
@@ -95,6 +171,34 @@ class ContributorOnboardingService
         );
     }
 
+    /**
+     * Returns only the step names that are applicable to this site configuration.
+     * Profile is always required; all others depend on site flags.
+     *
+     * @return array<int, string>
+     */
+    private function applicableStepsFromRequirements(OnboardingRequirements $req): array
+    {
+        $steps = ['profile'];
+
+        if ($req->requirePaymentSetup) {
+            $steps[] = 'payment';
+        }
+
+        if ($req->requireContracts) {
+            $steps[] = 'contract';
+        }
+
+        if ($req->requireGuidelines) {
+            $steps[] = 'guidelines';
+        }
+
+        return $steps;
+    }
+
+    /**
+     * @return array<int, array{step: string, reason: string, meta: array<string, mixed>}>
+     */
     private function pendingStepsFromRequirements(int $userId, OnboardingRequirements $req): array
     {
         $pending = [];
@@ -102,35 +206,51 @@ class ContributorOnboardingService
         $profile = $this->profileRepository->findByUserId($userId);
 
         if (!$profile || !$profile->bio) {
-            $pending[] = 'profile';
+            $pending[] = [
+                'step' => 'profile',
+                'reason' => 'Your profile bio is required before contributing.',
+                'meta' => [],
+            ];
         }
 
         if ($req->requirePaymentSetup && !$this->profileRepository->isPaymentSetup($userId)) {
-            $pending[] = 'payment';
+            $pending[] = [
+                'step' => 'payment',
+                'reason' => 'Payment details must be set up to receive earnings.',
+                'meta' => [],
+            ];
         }
 
         if ($req->requireContracts) {
             $contract = $this->contractRepository->latestForSite($req->siteId);
 
             if ($contract && !$this->contractRepository->hasSigned($userId, $contract->id)) {
-                $pending[] = 'contract';
+                $pending[] = [
+                    'step' => 'contract',
+                    'reason' => 'A new contributor agreement requires your signature.',
+                    'meta' => [
+                        'contract_id' => $contract->id,
+                        'contract_version' => $contract->version,
+                    ],
+                ];
             }
         }
 
         if ($req->requireGuidelines) {
-            $ack = $this->guidelinesRepository
-                ->latestAcknowledgedVersion($userId, $req->siteId);
+            $ack = $this->guidelinesRepository->latestAcknowledgedVersion($userId, $req->siteId);
 
             if ($ack < $req->guidelinesVersion) {
-                $pending[] = 'guidelines';
+                $pending[] = [
+                    'step' => 'guidelines',
+                    'reason' => 'The brand guidelines have been updated and require acknowledgement.',
+                    'meta' => [
+                        'required_version' => $req->guidelinesVersion,
+                        'acknowledged_version' => $ack,
+                    ],
+                ];
             }
         }
 
         return $pending;
-    }
-
-    public function isComplete(int $userId, Site $site): bool
-    {
-        return empty($this->pendingSteps($userId, $site));
     }
 }

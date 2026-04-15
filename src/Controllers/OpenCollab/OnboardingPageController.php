@@ -46,7 +46,7 @@ class OnboardingPageController extends Controller
             'currentStep' => $currentStep,
             'pendingSteps' => $pending,
             'site' => SiteContext::slug(),
-            'contract' => $currentStep === 'contract'
+            'contract' => $currentStep['step'] === 'contract'
                 ? $this->contractRepository->latestForSite($site->id)
                 : null,
             'siteGuidelinesVersion' => (int)($site->guidelines_version ?? 1),

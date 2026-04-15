@@ -29,7 +29,11 @@ class Site extends Model
         'linkedin_url',
         'settings',
         'url_handle',
-        'logo_image_id'
+        'logo_image_id',
+        'guidelines_version',
+        'require_payment_setup',
+        'require_contracts',
+        'require_guidelines_ack'
     ];
 
     protected $casts = [

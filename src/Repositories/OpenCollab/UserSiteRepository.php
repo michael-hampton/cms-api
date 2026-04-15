@@ -40,6 +40,15 @@ class UserSiteRepository extends Repository
             ->toArray();
     }
 
+    public function userIdsForSite(int $siteId)
+    {
+        return UserSite::where('site_id', $siteId)
+            ->get()
+            ->pluck('user_id')
+            ->map(fn($id) => (int)$id)
+            ->toArray();
+    }
+
     /**
      * Returns true if the user has active site access on ANY site other
      * than $excludingSiteId.
