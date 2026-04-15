@@ -2,6 +2,7 @@
 
 namespace App\Repositories\OpenCollab;
 
+use App\Models\Guideline;
 use App\Models\UserGuidelinesAcknowledgement;
 use App\Repositories\Repository;
 
@@ -23,6 +24,12 @@ class GuidelinesRepository extends Repository
     {
         return (int)UserGuidelinesAcknowledgement::where('user_id', $userId)
             ->where('site_id', $siteId)
+            ->max('version');
+    }
+
+    public function latestVersion(int $siteId): ?int
+    {
+        return (int)Guideline::where('site_id', $siteId)
             ->max('version');
     }
 

@@ -51,55 +51,6 @@ class MemberConsentController extends Controller
     }
 
     /**
-     * Update consent preferences
-     */
-    public function update(Request $request)
-    {
-        if (!MemberAuth::check()) {
-            return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-
-        $member = MemberAuth::getMember();
-        $consents = $request->input('consents', []);
-        $context = ConsentActionContext::fromRequest($request, 'web');
-
-        try {
-            $results = [];
-
-            foreach ($consents as $consentCode => $granted) {
-                try {
-                    if ($granted) {
-                        $results[$consentCode] = $this->commandService->grantConsent(
-                            $member,
-                            $consentCode,
-                            $context
-                        );
-                    } else {
-                        $results[$consentCode] = $this->commandService->revokeConsent(
-                            $member,
-                            $consentCode,
-                            $context
-                        );
-                    }
-                } catch (\Exception $e) {
-                    $results[$consentCode] = ['error' => $e->getMessage()];
-                }
-            }
-
-            return $this->resourceResponse([
-                'success' => true,
-                'message' => 'Consent preferences updated successfully',
-                'results' => $results
-            ]);
-        } catch (\Exception $e) {
-            return $this->jsonResponse([
-                'success' => false,
-                'message' => 'Failed to update consent preferences: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
      * Grant specific consent
      */
     public function grant(Request $request, string $consentCode)

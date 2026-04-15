@@ -300,8 +300,9 @@
         <div class="nav-links">
             <a href="/member/dashboard" class="nav-link">Dashboard</a>
             <a href="/member/reading-history" class="nav-link">Reading History</a>
-            <form method="POST" action="/member/logout" style="display: inline;">
-                <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer;">Logout</button>
+            <form method="POST" action="/member/logout" style="display:inline;">
+                <button type="submit" class="nav-link" style="background:none;border:none;cursor:pointer;">Logout
+                </button>
             </form>
         </div>
     </div>
@@ -312,86 +313,107 @@
         <h1 class="page-title">❤️ Liked Pages</h1>
         <p class="page-subtitle">Your collection of favorite pages and content</p>
     </div>
-
-    <div class="stats-bar">
-        <div class="stat-item">
-            <span class="stat-icon">❤️</span>
-            <div class="stat-info">
-                <h3><?= $totalLikes ?></h3>
-                <p>Total Likes</p>
-            </div>
-        </div>
+    <div id="liked-pages-root">
+        <p style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading liked pages…</p>
     </div>
-
-    <?php if ($likedPages->isEmpty()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">💔</div>
-            <h2>No Liked Pages Yet</h2>
-            <p>Start exploring and like pages to build your collection of favorites.</p>
-            <a href="/" class="btn-primary">Explore Content</a>
-        </div>
-    <?php else: ?>
-        <div class="pages-grid">
-            <?php foreach ($likedPages as $like): ?>
-                <?php $page = $like->page; ?>
-                <?php if ($page): ?>
-                    <div class="page-card">
-                        <span class="like-badge">❤️</span>
-                        <a href="/<?= htmlspecialchars($page->slug) ?>" style="text-decoration: none; color: inherit;">
-                            <?php if ($page->listing_image_id): ?>
-                                <img src="/images/<?= $page->listing_image_id ?>" alt="<?= htmlspecialchars($page->title) ?>" class="page-image">
-                            <?php else: ?>
-                                <div class="page-image"></div>
-                            <?php endif; ?>
-                            <div class="page-content">
-                                <h3 class="page-title-text"><?= htmlspecialchars($page->title) ?></h3>
-                                <?php if ($page->listing_synopsis): ?>
-                                    <p class="page-excerpt"><?= htmlspecialchars($page->listing_synopsis) ?></p>
-                                <?php endif; ?>
-                                <div class="page-meta">
-                                    <span>❤️ Liked on <?= $like->liked_at->format('M j, Y') ?></span>
-                                    <button class="unlike-btn" onclick="unlikePage(event, <?= $page->id ?>)">Unlike</button>
-                                </div>
-                            </div>
-                        </a>
-                    </div>
-                <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 </div>
 
 <script>
-    async function unlikePage(event, pageId) {
-        event.preventDefault();
-        event.stopPropagation();
+    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
 
-        if (!confirm('Remove this page from your liked pages?')) {
+    async function loadLikedPages() {
+        try {
+            const res = await fetch(`/api/${SITE_SLUG}/member/liked-pages`);
+            if (res.status === 401) {
+                window.location.href = `/${SITE_SLUG}/member/login`;
+                return;
+            }
+            const json = await res.json();
+            if (!json.success) throw new Error('Failed to load');
+            renderLikedPages(json.data.liked_pages, json.data.total_likes);
+        } catch {
+            document.getElementById('liked-pages-root').innerHTML =
+                '<p style="color:var(--danger-color);text-align:center;">Failed to load liked pages. Please refresh.</p>';
+        }
+    }
+
+    function renderLikedPages(likedPages, totalLikes) {
+        const root = document.getElementById('liked-pages-root');
+
+        const statsBar = `
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-icon">❤️</span>
+                <div class="stat-info"><h3>${totalLikes}</h3><p>Total Likes</p></div>
+            </div>
+        </div>`;
+
+        if (!likedPages.length) {
+            root.innerHTML = statsBar + `
+            <div class="empty-state">
+                <div class="empty-state-icon">💔</div>
+                <h2>No Liked Pages Yet</h2>
+                <p>Start exploring and like pages to build your collection of favorites.</p>
+                <a href="/" class="btn-primary">Explore Content</a>
+            </div>`;
             return;
         }
 
+        const cards = likedPages.map(like => {
+            const page = like.page;
+            if (!page) return '';
+            return `
+            <div class="page-card">
+                <span class="like-badge">❤️</span>
+                <a href="/${escHtml(page.slug)}" style="text-decoration:none;color:inherit;">
+                    ${page.listing_image_id
+                ? `<img src="/images/${page.listing_image_id}" alt="${escHtml(page.title)}" class="page-image">`
+                : `<div class="page-image"></div>`}
+                    <div class="page-content">
+                        <h3 class="page-title-text">${escHtml(page.title)}</h3>
+                        ${page.listing_synopsis ? `<p class="page-excerpt">${escHtml(page.listing_synopsis)}</p>` : ''}
+                        <div class="page-meta">
+                            <span>❤️ Liked on ${formatDate(like.liked_at)}</span>
+                            <button class="unlike-btn" onclick="unlikePage(event, ${page.id})">Unlike</button>
+                        </div>
+                    </div>
+                </a>
+            </div>`;
+        }).join('');
+
+        root.innerHTML = statsBar + `<div class="pages-grid">${cards}</div>`;
+    }
+
+    async function unlikePage(event, pageId) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!confirm('Remove this page from your liked pages?')) return;
         try {
-            const response = await fetch(`/api/pages/${pageId}/like`, {
+            const res = await fetch(`/api/<?= $site->slug ?>/pages/like/${pageId}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
             });
-
-            const data = await response.json();
-
+            const data = await res.json();
             if (data.success) {
-                // Reload page to show updated list
                 window.location.reload();
             } else {
                 alert('Failed to unlike page');
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch {
             alert('An error occurred. Please try again.');
         }
     }
+
+    function formatDate(str) {
+        return str ? new Date(str).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'}) : '';
+    }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadLikedPages);
 </script>
 </body>
 </html>

@@ -342,6 +342,153 @@
                 width: 100%;
             }
         }
+
+        .preference-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .preference-item:hover {
+            border-color: #3498db;
+            background: #f8f9fa;
+        }
+
+        .preference-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .preference-info p {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #3498db;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        /*.btn {*/
+        /*    display: inline-block;*/
+        /*    padding: 14px 28px;*/
+        /*    border: none;*/
+        /*    border-radius: 8px;*/
+        /*    font-size: 16px;*/
+        /*    font-weight: 600;*/
+        /*    cursor: pointer;*/
+        /*    text-decoration: none;*/
+        /*    transition: all 0.3s ease;*/
+        /*}*/
+
+        /*.btn-primary {*/
+        /*    background: #3498db;*/
+        /*    color: white;*/
+        /*}*/
+
+        /*.btn-primary:hover {*/
+        /*    background: #2980b9;*/
+        /*    transform: translateY(-2px);*/
+        /*    box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);*/
+        /*}*/
+
+        /*.btn-secondary {*/
+        /*    background: #95a5a6;*/
+        /*    color: white;*/
+        /*}*/
+
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #2c3e50;
+        }
+
+        .info-box p {
+            font-size: 14px;
+            color: #5a6c7d;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .preference-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -350,24 +497,12 @@
 
 <div class="container">
     <div class="breadcrumb">
-        <a href="/<?= $site->slug ?>/member/dashboard">Dashboard</a>
+        <a id="dashboardLink">Dashboard</a>
         <span>›</span>
         <span>Account Details</span>
     </div>
 
-    <?php if ($msg = message()): ?>
-        <div class="message success">
-            <span>✓</span>
-            <?= htmlspecialchars($msg) ?>
-        </div>
-    <?php endif; ?>
-
-    <?php if ($error = message()): ?>
-        <div class="message error">
-            <span>✕</span>
-            <?= htmlspecialchars($error) ?>
-        </div>
-    <?php endif; ?>
+    <div id="messageContainer"></div>
 
     <div class="page-header">
         <h1>Account Details</h1>
@@ -383,63 +518,38 @@
             </h2>
         </div>
 
-        <form method="POST" action="/<?= $site->slug ?>/member/account-details">
+        <form method="POST" id="accountForm">
             <div class="form-grid">
                 <div class="form-group">
                     <label class="form-label" for="first_name">
                         First Name <span class="required">*</span>
                     </label>
-                    <input
-                        type="text"
-                        id="first_name"
-                        name="first_name"
-                        class="form-input"
-                        value="<?= htmlspecialchars($member->first_name ?? '') ?>"
-                        required
-                    >
+                    <input type="text" id="first_name" name="first_name" class="form-input" data-bind="first_name"
+                           required>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="last_name">
                         Last Name <span class="required">*</span>
                     </label>
-                    <input
-                        type="text"
-                        id="last_name"
-                        name="last_name"
-                        class="form-input"
-                        value="<?= htmlspecialchars($member->last_name ?? '') ?>"
-                        required
-                    >
+                    <input type="text" id="last_name" name="last_name" class="form-input" data-bind="last_name"
+                           required>
                 </div>
 
                 <div class="form-group full-width">
                     <label class="form-label" for="display_name">
                         Display Name
                     </label>
-                    <input
-                        type="text"
-                        id="display_name"
-                        name="display_name"
-                        class="form-input"
-                        value="<?= htmlspecialchars($member->display_name ?? '') ?>"
-                        placeholder="<?= htmlspecialchars($member->fullName) ?>"
-                    >
-                    <span class="form-hint">This name will be displayed publicly on your comments and profile</span>
+                    <input type="text" id="display_name" name="display_name" class="form-input"
+                           data-bind="display_name">
+                    <span class="form-hint" data-bind="display_name_placeholder"></span>
                 </div>
 
                 <div class="form-group full-width">
                     <label class="form-label" for="email">
                         Email Address <span class="required">*</span>
                     </label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        class="form-input"
-                        value="<?= htmlspecialchars($member->email) ?>"
-                        required
-                    >
+                    <input type="email" id="email" name="email" class="form-input" data-bind="email" required>
                     <span class="form-hint">Changing your email will require re-verification</span>
                 </div>
             </div>
@@ -448,9 +558,7 @@
                 <button type="submit" class="btn btn-primary">
                     💾 Save Changes
                 </button>
-                <a href="/<?= $site->slug ?>/member/dashboard" class="btn btn-secondary">
-                    Cancel
-                </a>
+                <a id="cancelLink" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
     </div>
@@ -467,65 +575,42 @@
         <div class="info-grid">
             <div class="info-row">
                 <div class="info-label">Account Status</div>
-                <div class="info-value">
-                    <?php if ($member->isActive()): ?>
-                        <span class="badge success">✓ Active</span>
-                    <?php else: ?>
-                        <span class="badge warning">⚠ Inactive</span>
-                    <?php endif; ?>
-                </div>
+                <div class="info-value" data-bind="account_status"></div>
             </div>
 
             <div class="info-row">
                 <div class="info-label">Email Status</div>
-                <div class="info-value">
-                    <?php if ($member->isEmailVerified()): ?>
-                        <span class="badge success">✓ Verified</span>
-                    <?php else: ?>
-                        <span class="badge warning">⚠ Not Verified</span>
-                    <?php endif; ?>
-                </div>
+                <div class="info-value" data-bind="email_status"></div>
             </div>
 
             <div class="info-row">
                 <div class="info-label">Member Since</div>
-                <div class="info-value">
-                    <?= $member->created_at ? $member->created_at->format('F j, Y') : 'N/A' ?>
-                </div>
+                <div class="info-value" data-bind="created_at"></div>
             </div>
 
             <div class="info-row">
                 <div class="info-label">Last Login</div>
-                <div class="info-value">
-                    <?= $member->last_login_at ? $member->last_login_at->format('F j, Y g:i A') : 'Never' ?>
-                </div>
+                <div class="info-value" data-bind="last_login_at"></div>
             </div>
 
             <div class="info-row">
                 <div class="info-label">Member ID</div>
                 <div class="info-value">
-                    <code style="background: var(--bg-light); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
-                        #<?= $member->id ?>
-                    </code>
+                    <code style="background: var(--bg-light); padding: 0.25rem 0.5rem; border-radius: 0.25rem;"
+                          data-bind="id"></code>
                 </div>
             </div>
 
-            <?php if (!$member->roles->isEmpty()): ?>
-                <div class="info-row">
-                    <div class="info-label">Roles</div>
-                    <div class="info-value">
-                        <div class="role-list">
-                            <?php foreach ($member->roles as $role): ?>
-                                <span class="badge info"><?= htmlspecialchars($role->name) ?></span>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
+            <div class="info-row">
+                <div class="info-label">Roles</div>
+                <div class="info-value">
+                    <div class="role-list" data-bind="roles"></div>
                 </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 
-    <!-- Quick Actions Card -->
+    <!-- Quick Actions -->
     <div class="card">
         <div class="card-header">
             <h2 class="card-title">
@@ -535,19 +620,17 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 1rem;">
-            <a href="/<?= $site->slug ?>/member/settings" class="btn btn-secondary">
+            <a id="passwordLink" class="btn btn-secondary">
                 🔑 Change Password
             </a>
 
-            <?php if (!$member->isEmailVerified()): ?>
-                <a href="/<?= $site->slug ?>/member/resend-verification" class="btn btn-secondary">
-                    📧 Resend Verification Email
-                </a>
-            <?php endif; ?>
+            <a id="verificationLink" class="btn btn-secondary" style="display:none;">
+                📧 Resend Verification Email
+            </a>
         </div>
     </div>
 
-    <!-- Add this section to the settings page -->
+    <!-- Privacy -->
     <div class="card">
         <div class="card-header">
             <h2 class="card-title">
@@ -556,36 +639,19 @@
             </h2>
         </div>
 
-        <form method="POST" action="/member/settings/privacy">
-            @csrf
+        <form id="privacyForm">
             <div class="form-group">
                 <div class="checkbox-group">
-                    <input
-                            type="checkbox"
-                            id="show_activity"
-                            name="show_activity"
-                            value="1"
-                            <?= $member->show_activity ? 'checked' : '' ?>
-                    >
-                    <label for="show_activity">
-                        Show my activity publicly
-                    </label>
+                    <input type="checkbox" id="show_activity" name="show_activity">
+                    <label for="show_activity">Show my activity publicly</label>
                 </div>
                 <span class="form-hint">Allow others to see your reading activity and engagement</span>
             </div>
 
             <div class="form-group">
                 <div class="checkbox-group">
-                    <input
-                            type="checkbox"
-                            id="show_badges"
-                            name="show_badges"
-                            value="1"
-                            <?= $member->show_badges ? 'checked' : '' ?>
-                    >
-                    <label for="show_badges">
-                        Show my badges publicly
-                    </label>
+                    <input type="checkbox" id="show_badges" name="show_badges">
+                    <label for="show_badges">Show my badges publicly</label>
                 </div>
                 <span class="form-hint">Display your earned badges on your profile</span>
             </div>
@@ -597,8 +663,304 @@
             </div>
         </form>
     </div>
-
-    @include('member/components/global-communication-preferences', ['preferences' => $preferences])
 </div>
+
+<div class="container">
+    <div class="header">
+        <h1>Communication Preferences</h1>
+        <p id="siteNameText"></p>
+    </div>
+
+    <div class="info-box">
+        <strong>Important</strong>
+        <p>These preferences control marketing and promotional emails. You will always receive important transactional
+            emails.</p>
+    </div>
+
+    <form id="preferencesForm">
+        <div class="card">
+
+            <div class="section-title">Email Preferences</div>
+
+            <div class="preference-item">
+                <div class="preference-info">
+                    <h3>Marketing Emails</h3>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="marketing_emails">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="preference-item">
+                <div class="preference-info">
+                    <h3>Special Offers</h3>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="special_offers">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="preference-item">
+                <div class="preference-info">
+                    <h3>Product Updates</h3>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="product_updates">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="preference-item">
+                <div class="preference-info">
+                    <h3>Newsletter</h3>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="newsletter">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="preference-item">
+                <div class="preference-info">
+                    <h3>Third-Party Communications</h3>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" name="third_party_communications">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button type="submit" class="btn btn-primary">Save Preferences</button>
+            <a id="backLink" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', load);
+    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+
+    async function load() {
+        const res = await fetch('/api/' + SITE_SLUG + '/member/account-details');
+        const json = await res.json();
+
+        if (!json.success) return;
+
+        const {member, preferences, site_slug} = json.data;
+
+        hydrate(member, preferences, site_slug);
+    }
+
+    function hydrate(member, preferences, slug) {
+
+        // links
+        document.getElementById('dashboardLink').href = `/${slug}/member/dashboard`;
+        document.getElementById('cancelLink').href = `/${slug}/member/dashboard`;
+        document.getElementById('backLink').href = `/${slug}/member/dashboard`;
+        document.getElementById('passwordLink').href = `/${slug}/member/settings`;
+        document.getElementById('verificationLink').href = `/${slug}/member/resend-verification`;
+
+        // basic fields
+        setValue('first_name', member.first_name);
+        setValue('last_name', member.last_name);
+        const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim();
+
+// If display_name exists, use it, otherwise fallback
+        setValue('display_name', member.display_name || fullName);
+
+// Always show fallback as placeholder
+        setText('display_name_placeholder', fullName);
+        setValue('email', member.email);
+
+        setText('display_name_placeholder', member.first_name + ' ' + member.last_name);
+
+        setText('id', `#${member.id}`);
+
+        setText('created_at', formatDate(member.created_at));
+        setText('last_login_at', formatDate(member.last_login_at, true));
+
+        // badges
+        setHTML('account_status',
+            member.is_active
+                ? '<span class="badge success">✓ Active</span>'
+                : '<span class="badge warning">⚠ Inactive</span>'
+        );
+
+        const verified = !!member.email_verified_at;
+
+        setHTML('email_status',
+            verified
+                ? '<span class="badge success">✓ Verified</span>'
+                : '<span class="badge warning">⚠ Not Verified</span>'
+        );
+
+        if (!verified) {
+            document.getElementById('verificationLink').style.display = 'inline-block';
+        }
+
+        // roles
+        const roleContainer = document.querySelector('[data-bind="roles"]');
+        roleContainer.innerHTML = '';
+        member.roles.forEach(r => {
+            const span = document.createElement('span');
+            span.className = 'badge info';
+            span.textContent = r.name;
+            roleContainer.appendChild(span);
+        });
+
+        // preferences
+        setCheckbox('marketing_emails', preferences?.marketing_emails ?? true);
+        setCheckbox('special_offers', preferences?.special_offers ?? true);
+        setCheckbox('product_updates', preferences?.product_updates ?? true);
+        setCheckbox('newsletter', preferences?.newsletter ?? true);
+        setCheckbox('third_party_communications', preferences?.third_party_communications ?? false);
+
+        document.getElementById('siteNameText').innerText = `Manage how ${slug} communicates with you`;
+        setCheckbox('show_activity', member.show_activity ?? false);
+        setCheckbox('show_badges', member.show_badges ?? false);
+    }
+
+    function setValue(key, val) {
+        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.value = val || '');
+    }
+
+    function setText(key, val) {
+        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.textContent = val || '');
+    }
+
+    function setHTML(key, val) {
+        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.innerHTML = val);
+    }
+
+    function setCheckbox(name, val) {
+        const el = document.querySelector(`input[name="${name}"]`);
+        if (el) el.checked = !!val;
+    }
+
+    function formatDate(obj, withTime = false) {
+        if (!obj || !obj.date) return 'N/A';
+
+        const d = new Date(obj.date);
+
+        const datePart = d.toLocaleDateString('en-GB', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        if (!withTime) return datePart;
+
+        const timePart = d.toLocaleTimeString('en-GB', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        return `${datePart} ${timePart}`;
+    }
+
+    document.getElementById('accountForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+
+        const payload = {
+            first_name: form.first_name.value,
+            last_name: form.last_name.value,
+            display_name: form.display_name.value,
+            email: form.email.value
+        };
+
+        const res = await fetch('/api/' + SITE_SLUG + '/member/account-details', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+
+        handleResponse(json, 'Account details updated');
+    });
+
+    document.getElementById('privacyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+
+        const payload = {
+            show_activity: form.show_activity.checked ? 1 : 0,
+            show_badges: form.show_badges.checked ? 1 : 0
+        };
+
+        const res = await fetch('/api/' + SITE_SLUG + '/member/settings/privacy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+
+        handleResponse(json, 'Privacy settings updated');
+    });
+
+    document.getElementById('preferencesForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+
+        const payload = {
+            marketing_emails: form.marketing_emails.checked ? 1 : 0,
+            special_offers: form.special_offers.checked ? 1 : 0,
+            product_updates: form.product_updates.checked ? 1 : 0,
+            newsletter: form.newsletter.checked ? 1 : 0,
+            third_party_communications: form.third_party_communications.checked ? 1 : 0
+        };
+
+        const res = await fetch('/api/' + SITE_SLUG + '/member/settings/communication-preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+
+        handleResponse(json, 'Preferences saved');
+    });
+
+    function handleResponse(json, successMessage) {
+        const container = document.getElementById('messageContainer');
+
+        if (json.success) {
+            container.innerHTML = `
+            <div class="message success">
+                <span>✓</span>
+                ${successMessage}
+            </div>
+        `;
+        } else {
+            container.innerHTML = `
+            <div class="message error">
+                <span>✕</span>
+                ${json.message || 'Something went wrong'}
+            </div>
+        `;
+        }
+
+        window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+</script>
 </body>
 </html>

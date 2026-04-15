@@ -441,93 +441,7 @@
         </div>
     </div>
 
-    <?php
-    $categoryInfo = [
-            'essential' => ['icon' => '🔒', 'title' => 'Essential', 'description' => 'Required for the website to function'],
-            'functional' => ['icon' => '⚙️', 'title' => 'Functional', 'description' => 'Enhance your experience'],
-            'analytics' => ['icon' => '📊', 'title' => 'Analytics', 'description' => 'Help us improve our service'],
-            'marketing' => ['icon' => '📢', 'title' => 'Marketing', 'description' => 'Personalized content and offers'],
-            'preferences' => ['icon' => '🎨', 'title' => 'Preferences', 'description' => 'Remember your settings']
-    ];
-
-    foreach ($consents as $category => $categoryConsents):
-        $info = $categoryInfo[$category] ?? ['icon' => '📄', 'title' => ucfirst($category), 'description' => ''];
-        ?>
-        <div class="consent-category">
-            <div class="category-header">
-                <div class="category-icon <?= $category ?>">
-                    <?= $info['icon'] ?>
-                </div>
-                <div>
-                    <h2 class="category-title"><?= $info['title'] ?></h2>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
-                        <?= $info['description'] ?>
-                    </p>
-                </div>
-            </div>
-
-            <?php foreach ($categoryConsents as $consent): ?>
-                <div class="consent-item" data-consent-code="<?= htmlspecialchars($consent['consent_type']['code']) ?>">
-                    <div class="consent-header">
-                        <div class="consent-info">
-                            <div class="consent-name">
-                                <?= htmlspecialchars($consent['consent_type']['name']) ?>
-                                <?php if ($consent['consent_type']['required']): ?>
-                                    <span class="required-badge">Required</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="consent-description">
-                                <?= htmlspecialchars($consent['consent_type']['description']) ?>
-                            </div>
-
-                            <?php if ($consent['is_granted']): ?>
-                                <span class="consent-status granted">
-                            ✓ Active
-                        </span>
-                            <?php else: ?>
-                                <span class="consent-status not-granted">
-                            ✕ Not Active
-                        </span>
-                            <?php endif; ?>
-
-                            <div class="consent-meta">
-                                <?php if ($consent['granted_at']): ?>
-                                    <div class="meta-item">
-                                        <span>📅</span>
-                                        <span>Granted: <?= $consent['granted_at']->format('M j, Y') ?></span>
-                                    </div>
-                                <?php endif; ?>
-
-                                <?php if ($consent['expires_at']): ?>
-                                    <div class="meta-item">
-                                        <span>⏰</span>
-                                        <span>Expires: <?= $consent['expires_at']->format('M j, Y') ?></span>
-                                    </div>
-                                <?php endif; ?>
-
-                                <?php if ($consent['consent_type']['retention_days']): ?>
-                                    <div class="meta-item">
-                                        <span>🗄️</span>
-                                        <span>Data retained for <?= $consent['consent_type']['retention_days'] ?> days</span>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <label class="toggle-switch">
-                            <input
-                                    type="checkbox"
-                                    <?= $consent['is_granted'] ? 'checked' : '' ?>
-                                    <?= $consent['consent_type']['required'] ? 'disabled' : '' ?>
-                                    onchange="toggleConsent(this, '<?= htmlspecialchars($consent['consent_type']['code']) ?>')"
-                            >
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endforeach; ?>
+    <div id="consentsContainer"></div>
 
     <!-- Global Communication Preferences Section -->
     <div class="consent-category">
@@ -768,10 +682,227 @@
     let pendingChanges = {};
     let communicationChanges = {};
 
+    const categoryInfo = {
+        essential: {
+            icon: '🔒',
+            title: 'Essential',
+            description: 'Required for the website to function'
+        },
+        functional: {
+            icon: '⚙️',
+            title: 'Functional',
+            description: 'Enhance your experience'
+        },
+        analytics: {
+            icon: '📊',
+            title: 'Analytics',
+            description: 'Help us improve our service'
+        },
+        marketing: {
+            icon: '📢',
+            title: 'Marketing',
+            description: 'Personalized content and offers'
+        },
+        preferences: {
+            icon: '🎨',
+            title: 'Preferences',
+            description: 'Remember your settings'
+        }
+    };
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    async function init() {
+        const [typesRes, consentsRes] = await Promise.all([
+            fetch('/api/' + SITE + '/member/consent/types'),
+            fetch('/api/' + SITE + '/member/consent')
+        ]);
+
+        const typesJson = await typesRes.json();
+        const consentsJson = await consentsRes.json();
+
+        if (!typesJson.success || !consentsJson.success) return;
+
+        const merged = mergeConsents(typesJson.data, consentsJson.consents);
+
+        renderConsents(merged);
+        setLastUpdated();
+    }
+
+    function mergeConsents(types, userConsents) {
+
+        const map = {};
+
+        // flatten user consents by code
+        Object.values(userConsents).flat().forEach(c => {
+            map[c.consent_type.code] = c;
+        });
+
+        // rebuild grouped structure
+        const grouped = {};
+
+        types.forEach(type => {
+            if (!type.is_active) return;
+
+            const user = map[type.code] || null;
+
+            if (!grouped[type.category]) {
+                grouped[type.category] = [];
+            }
+
+            grouped[type.category].push({
+                ...type,
+                is_granted: user?.is_granted ?? false,
+                granted_at: user?.granted_at ?? null,
+                expires_at: user?.expires_at ?? null
+            });
+        });
+
+        return grouped;
+    }
+
+    function renderConsents(consents) {
+        const container = document.getElementById('consentsContainer');
+        container.innerHTML = '';
+
+        Object.entries(consents).forEach(([category, items]) => {
+
+            const info = categoryInfo[category] || {
+                icon: '📄',
+                title: capitalize(category),
+                description: ''
+            };
+
+            const categoryEl = document.createElement('div');
+            categoryEl.className = 'consent-category';
+
+            categoryEl.innerHTML = `
+            <div class="category-header">
+                <div class="category-icon ${category}">
+                    ${info.icon}
+                </div>
+                <div>
+                    <h2 class="category-title">${info.title}</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">
+                        ${info.description}
+                    </p>
+                </div>
+            </div>
+        `;
+
+            items.forEach(consent => {
+                categoryEl.appendChild(renderConsentItem(consent));
+            });
+
+            container.appendChild(categoryEl);
+        });
+    }
+
+    function renderConsentItem(consent) {
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'consent-item';
+        wrapper.dataset.consentCode = consent.code;
+
+        const isGranted = consent.is_granted;
+        const isRequired = consent.required;
+
+        wrapper.innerHTML = `
+        <div class="consent-header">
+            <div class="consent-info">
+                <div class="consent-name">
+                    ${consent.name}
+                    ${isRequired ? '<span class="required-badge">Required</span>' : ''}
+                </div>
+
+                <div class="consent-description">
+                    ${consent.description}
+                </div>
+
+                <span class="consent-status ${isGranted ? 'granted' : 'not-granted'}">
+                    ${isGranted ? '✓ Active' : '✕ Not Active'}
+                </span>
+
+                <div class="consent-meta">
+                    ${renderMeta(consent)}
+                </div>
+            </div>
+
+            <label class="toggle-switch">
+                <input
+                    type="checkbox"
+                    ${isGranted ? 'checked' : ''}
+                    ${isRequired ? 'disabled' : ''}
+                >
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    `;
+
+        const checkbox = wrapper.querySelector('input');
+
+        checkbox.addEventListener('change', () => {
+            toggleConsent(checkbox, consent.code, wrapper);
+        });
+
+        return wrapper;
+    }
+
+    function renderMeta(consent) {
+
+        let html = '';
+
+        if (consent.granted_at) {
+            html += `
+            <div class="meta-item">
+                <span>📅</span>
+                <span>Granted: ${formatShortDate(consent.granted_at)}</span>
+            </div>
+        `;
+        }
+
+        if (consent.expires_at) {
+            html += `
+            <div class="meta-item">
+                <span>⏰</span>
+                <span>Expires: ${formatShortDate(consent.expires_at)}</span>
+            </div>
+        `;
+        }
+
+        if (consent.retention_days) {
+            html += `
+            <div class="meta-item">
+                <span>🗄️</span>
+                <span>Data retained for ${consent.retention_days} days</span>
+            </div>
+        `;
+        }
+
+        return html;
+    }
+
+    function formatShortDate(obj) {
+        if (!obj?.date) return '';
+        const d = new Date(obj.date);
+
+        return d.toLocaleDateString('en-GB', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    }
+
     function toggleConsent(checkbox, consentCode) {
+        updateConsentUIState(checkbox);
         pendingChanges[consentCode] = checkbox.checked;
         updateLastModified();
         showSavePrompt();
+    }
+
+    function setLastUpdated() {
+        document.getElementById('last-updated').textContent =
+            new Date().toLocaleString();
     }
 
     function toggleCommunicationPreference(checkbox, preferenceKey) {
@@ -789,7 +920,7 @@
         try {
             // Save consents
             if (Object.keys(pendingChanges).length > 0) {
-                const consentResponse = await fetch(`/${SITE}/member/consent/update`, {
+                const consentResponse = await fetch(`/api/${SITE}/member/consent/update`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -807,7 +938,7 @@
 
             // Save communication preferences
             if (Object.keys(communicationChanges).length > 0) {
-                const commResponse = await fetch(`/${SITE}/member/communication-preferences`, {
+                const commResponse = await fetch(`/api/${SITE}/member/settings/communication-preferences`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -827,12 +958,22 @@
             pendingChanges = {};
             communicationChanges = {};
             hideSavePrompt();
-            setTimeout(() => location.reload(), 1500);
+            //setTimeout(() => location.reload(), 1500);
 
         } catch (error) {
             console.error('Error saving preferences:', error);
             showAlert('✕ Failed to save preferences: ' + error.message, 'error');
         }
+    }
+
+    function updateConsentUIState(checkbox) {
+        const wrapper = checkbox.closest('.consent-item');
+        const status = wrapper.querySelector('.consent-status');
+
+        const granted = checkbox.checked;
+
+        status.className = `consent-status ${granted ? 'granted' : 'not-granted'}`;
+        status.textContent = granted ? '✓ Active' : '✕ Not Active';
     }
 
     function showAlert(message, type = 'success') {

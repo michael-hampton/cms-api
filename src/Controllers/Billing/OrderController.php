@@ -25,6 +25,7 @@ use App\Services\Billing\Order\OrderPaymentService;
 use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\OrderService;
 use App\Services\Billing\PaymentService;
+use App\Services\Billing\Refund\RefundService;
 use Exception;
 
 class OrderController extends Controller
@@ -36,7 +37,8 @@ class OrderController extends Controller
         private readonly OrderCreationService $orderCreationService,
         private readonly OrderUpdateService   $orderUpdateService,
         private readonly OrderManager         $orderManager,
-        private readonly OrderPaymentService  $orderPaymentService
+        private readonly OrderPaymentService $orderPaymentService,
+        private readonly RefundService       $refundService
     )
     {
         parent::__construct();
@@ -202,8 +204,7 @@ class OrderController extends Controller
             $refundData = $request->all();
             $refundData['order_id'] = $id;
 
-            $refundService = \App\Framework\Container::getInstance()->resolve(\App\Services\Billing\Refund\RefundService::class);
-            $refund = $refundService->createRefund($refundData, $request->user()->id ?? null);
+            $refund = $this->refundService->createRefund($refundData, $request->user()->id ?? null);
 
             return $this->jsonResponse([
                 'message' => 'Refund processed successfully',

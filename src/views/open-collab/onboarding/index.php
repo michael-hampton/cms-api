@@ -22,65 +22,21 @@
     <div style="width:100%;max-width:580px;">
 
         <!-- Step Indicator -->
-        <?php
-        $allSteps = ['profile', 'payment', 'contract', 'guidelines'];
-
-        $stepLabels = [
-                'profile' => 'Profile',
-                'payment' => 'Payment',
-                'contract' => 'Contract',
-                'guidelines' => 'Guidelines',
-        ];
-
-        $stepIcons = [
-                'profile' => '<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>',
-                'payment' => '<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>',
-                'contract' => '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>',
-                'guidelines' => '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>',
-        ];
-
-        // ✅ extract step names from structured data
-        $pendingStepNames = array_column($pendingSteps, 'step');
-
-        // ✅ optionally filter steps based on site config
-        $allSteps = array_values(array_filter($allSteps, function ($step) use ($site) {
-            return match ($step) {
-                'payment' => $site->require_payment_setup ?? true,
-                'contract' => $site->require_contracts ?? true,
-                'guidelines' => $site->require_guidelines_ack ?? true,
-                default => true,
-            };
-        }));
-
-        // ✅ determine current step safely if not passed
-        $currentStep = $currentStep['step'] ?? ($pendingSteps[0]['step'] ?? null);
-
-        // ✅ map pending steps by key for easy lookup
-        $pendingMap = [];
-        foreach ($pendingSteps as $step) {
-            $pendingMap[$step['step']] = $step;
-        }
-        ?>
         <div class="oc-steps" style="margin-bottom:36px;">
-            <?php foreach ($allSteps as $i => $s): ?>
-                <?php
-                $done = !in_array($s, $pendingStepNames, true);
-                $active = $currentStep === $s;
-                $cls = $done ? 'done' : ($active ? 'active' : 'pending');
-                ?>
-                <div class="oc-step oc-step--<?= $cls ?>">
+            <?php foreach ($vm->steps() as $step): ?>
+                <div class="oc-step oc-step--<?= $step->cssState() ?>">
                     <div class="oc-step__dot">
-                        <?php if ($done): ?>
+                        <?php if ($step->isDone): ?>
                             <svg viewBox="0 0 20 20" fill="currentColor" width="13">
                                 <path fill-rule="evenodd"
                                       d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                       clip-rule="evenodd"/>
                             </svg>
                         <?php else: ?>
-                            <?= $i + 1 ?>
+                            <?= $step->oneBasedIndex ?>
                         <?php endif; ?>
                     </div>
-                    <span class="oc-step__label"><?= $stepLabels[$s] ?></span>
+                    <span class="oc-step__label"><?= $step->label ?></span>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -90,15 +46,12 @@
             <div class="oc-card__header" style="padding:22px 28px;">
                 <div style="display:flex;align-items:center;gap:12px;">
                     <div style="width:38px;height:38px;background:var(--navy);border-radius:8px;display:grid;place-items:center;flex-shrink:0;">
-                        <svg viewBox="0 0 20 20" fill="var(--amber)" width="18"><?= $stepIcons[$currentStep] ?></svg>
+                        <svg viewBox="0 0 20 20" fill="var(--amber)" width="18"><?= $vm->currentStepIcon() ?></svg>
                     </div>
                     <div>
-                        <div class="oc-card__title" style="margin-bottom:2px;">
-                            <?= ['profile' => 'Set up your profile', 'payment' => 'Payment details', 'contract' => 'Sign the contract', 'guidelines' => 'Brand guidelines'][$currentStep] ?>
-                        </div>
+                        <div class="oc-card__title" style="margin-bottom:2px;"><?= $vm->currentStepTitle() ?></div>
                         <div style="font-size:.78rem;color:var(--slate);">
-                            <?php $stepIndex = array_search($currentStep, $allSteps, true); ?>
-                            Step <?= $stepIndex !== false ? $stepIndex + 1 : 1 ?> of <?= count($allSteps) ?>
+                            Step <?= $vm->currentStepNumber() ?> of <?= $vm->totalSteps() ?>
                         </div>
                     </div>
                 </div>
@@ -109,14 +62,14 @@
                 <div id="form-errors" class="oc-form-errors" style="display:none;" role="alert"></div>
                 <div id="form-success" class="oc-alert oc-alert--success" style="display:none;" role="status"></div>
 
-                <?php if ($currentStep && isset($pendingMap[$currentStep])): ?>
+                <?php if ($vm->currentStepReason()): ?>
                     <div class="oc-alert oc-alert--info" style="margin-bottom:16px;">
-                        <?= htmlspecialchars($pendingMap[$currentStep]['reason']) ?>
+                        <?= htmlspecialchars($vm->currentStepReason()) ?>
                     </div>
                 <?php endif; ?>
 
                 <!-- ── PROFILE STEP ─────────────────────────── -->
-                <?php if ($currentStep === 'profile'): ?>
+                <?php if ($vm->currentStepName() === 'profile'): ?>
                     <form id="onboarding-form" novalidate>
                         <p style="font-size:.875rem;color:var(--slate);margin-bottom:22px;">
                             Tell readers a little about you. This appears on your articles and public profile.
@@ -130,7 +83,7 @@
                             <div class="oc-error-msg" id="bio-error"></div>
                         </div>
                         <button type="submit" class="oc-btn oc-btn--amber oc-btn--block" id="submit-btn">
-                            Save & continue
+                            Save &amp; continue
                             <svg viewBox="0 0 20 20" fill="currentColor" width="16">
                                 <path fill-rule="evenodd"
                                       d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
@@ -140,7 +93,7 @@
                     </form>
 
                     <!-- ── PAYMENT STEP ─────────────────────────── -->
-                <?php elseif ($currentStep === 'payment'): ?>
+                <?php elseif ($vm->currentStepName() === 'payment'): ?>
                     <form id="onboarding-form" novalidate>
                         <div class="oc-alert oc-alert--info" style="margin-bottom:20px;">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="16">
@@ -158,45 +111,43 @@
                                     <input type="radio" name="payment_method_type" value="stripe" checked
                                            style="display:none;" id="pm-stripe">
                                     <div class="payment-method-card" data-for="pm-stripe"
-                                         style="border:2px solid var(--navy);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:10px;background:var(--navy);">
-                                        <svg viewBox="0 0 20 20" fill="var(--amber)" width="18">
+                                         style="border:2px solid var(--navy);background:var(--navy);border-radius:8px;padding:12px;text-align:center;">
+                                        <svg viewBox="0 0 20 20" fill="var(--amber)" width="22"
+                                             style="margin-bottom:6px;">
                                             <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
                                             <path fill-rule="evenodd"
                                                   d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"
                                                   clip-rule="evenodd"/>
                                         </svg>
-                                        <span style="font-weight:600;font-size:.85rem;color:#fff;">Card / Stripe</span>
+                                        <span style="display:block;font-size:.78rem;font-weight:600;color:#fff;">Card (Stripe)</span>
                                     </div>
                                 </label>
                                 <label style="cursor:pointer;">
                                     <input type="radio" name="payment_method_type" value="bank_transfer"
                                            style="display:none;" id="pm-bank">
                                     <div class="payment-method-card" data-for="pm-bank"
-                                         style="border:2px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;gap:10px;">
-                                        <svg viewBox="0 0 20 20" fill="var(--slate)" width="18">
+                                         style="border:2px solid var(--border);border-radius:8px;padding:12px;text-align:center;">
+                                        <svg viewBox="0 0 20 20" fill="var(--slate)" width="22"
+                                             style="margin-bottom:6px;">
                                             <path fill-rule="evenodd"
-                                                  d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z"
+                                                  d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V8a2 2 0 00-2-2h-5L9 4H4zm7 5a1 1 0 10-2 0v1H8a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V9z"
                                                   clip-rule="evenodd"/>
                                         </svg>
-                                        <span style="font-weight:600;font-size:.85rem;color:var(--slate);">Bank transfer</span>
+                                        <span style="display:block;font-size:.78rem;font-weight:600;color:var(--slate);">Bank transfer</span>
                                     </div>
                                 </label>
                             </div>
                         </div>
 
-                        <!-- Stripe card element -->
                         <div id="stripe-section">
                             <div class="oc-form-group">
                                 <label class="oc-label">Card details</label>
                                 <div id="stripe-card-element"
-                                     style="border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:#fff;transition:border-color .15s;">
-                                </div>
-                                <div id="stripe-card-errors"
-                                     style="font-size:.75rem;color:var(--red);margin-top:5px;"></div>
+                                     style="border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:#fff;"></div>
+                                <div id="stripe-card-errors" class="oc-error-msg" style="margin-top:6px;"></div>
                             </div>
                         </div>
 
-                        <!-- Bank transfer section -->
                         <div id="bank-section" style="display:none;">
                             <div class="oc-form-group">
                                 <label class="oc-label" for="bank-account">Account email / reference</label>
@@ -233,8 +184,9 @@
                         </button>
                     </form>
 
-                    <!-- ── CONTRACT STEP ────────────────────────── -->
-                <?php elseif ($currentStep === 'contract'): ?>
+                    <!-- ── CONTRACT STEP ─────────────────────────── -->
+                <?php elseif ($vm->currentStepName() === 'contract'): ?>
+                    <?php $meta = $vm->currentStepMeta(); ?>
                     <form id="onboarding-form" novalidate>
                         <?php if ($contract): ?>
                             <input type="hidden" name="contract_id" value="<?= (int)$contract->id ?>">
@@ -267,8 +219,9 @@
                         <?php endif; ?>
                     </form>
 
-                    <!-- ── GUIDELINES STEP ──────────────────────── -->
-                <?php elseif ($currentStep === 'guidelines'): ?>
+                    <!-- ── GUIDELINES STEP ─────────────────────────── -->
+                <?php elseif ($vm->currentStepName() === 'guidelines'): ?>
+                    <?php $meta = $vm->currentStepMeta(); ?>
                     <form id="onboarding-form" novalidate>
                         <input type="hidden" name="version" value="<?= (int)($siteGuidelinesVersion ?? 1) ?>">
                         <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
@@ -309,17 +262,18 @@
                             </svg>
                         </button>
                     </form>
+
                 <?php endif; ?>
 
-            </div><!-- /card body -->
-        </div><!-- /card -->
+            </div>
+        </div>
 
     </div>
 </main>
 
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = localStorage.getItem('oc_token') || '';
+    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
     // Payment method toggle
     document.querySelectorAll('[name="payment_method_type"]').forEach(radio => {
@@ -328,7 +282,6 @@
             document.getElementById('stripe-section').style.display = isStripe ? 'block' : 'none';
             document.getElementById('bank-section').style.display = isStripe ? 'none' : 'block';
 
-            // Visual card selection
             document.querySelectorAll('.payment-method-card').forEach(card => {
                 const forId = card.dataset.for;
                 const checked = document.getElementById(forId)?.checked;
@@ -342,7 +295,7 @@
 
     // Stripe init (only on payment step)
     let stripe, cardElement;
-    <?php if ($currentStep === 'payment'): ?>
+    <?php if ($vm->currentStepName() === 'payment'): ?>
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
     if (STRIPE_KEY) {
         stripe = Stripe(STRIPE_KEY);
@@ -354,9 +307,9 @@
                     fontFamily: "'DM Sans', sans-serif",
                     fontSize: '15px',
                     color: '#0f1929',
-                    '::placeholder': {color: '#94a3b8'}
-                }
-            }
+                    '::placeholder': {color: '#94a3b8'},
+                },
+            },
         });
         cardElement.mount('#stripe-card-element');
         cardElement.on('change', ({error}) => {
@@ -365,7 +318,6 @@
     }
     <?php endif; ?>
 
-    // Generic form submit handler
     document.getElementById('onboarding-form')?.addEventListener('submit', async function (e) {
         e.preventDefault();
         const btn = document.getElementById('submit-btn');
@@ -373,15 +325,13 @@
         const okBox = document.getElementById('form-success');
         errBox.style.display = 'none';
         okBox.style.display = 'none';
-
         btn.disabled = true;
         btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
 
-        const step = '<?= $currentStep ?>';
+        const step = '<?= $vm->currentStepName() ?>';
         let payload = {};
         let endpoint = step;
 
-        // Build payload per step
         if (step === 'profile') {
             const bio = document.getElementById('bio')?.value.trim();
             if (!bio || bio.length < 20) {
@@ -407,16 +357,15 @@
                 payload = {
                     payment_method_type: 'stripe',
                     stripe_token: stripeToken.id,
-                    tax_country: document.getElementById('tax-country')?.value || ''
+                    tax_country: document.getElementById('tax-country')?.value || '',
                 };
             } else {
                 payload = {
                     payment_method_type: 'bank_transfer',
                     stripe_token: document.getElementById('bank-account')?.value || 'bank',
-                    tax_country: document.getElementById('tax-country')?.value || ''
+                    tax_country: document.getElementById('tax-country')?.value || '',
                 };
             }
-            endpoint = 'payment';
         }
 
         if (step === 'contract') {
@@ -436,10 +385,10 @@
             const agreed = document.getElementById('guidelines-agreed')?.checked;
             const version = this.querySelector('[name="version"]')?.value;
             if (!agreed) {
-                btn.disabled = false;
-                btn.textContent = 'Complete onboarding';
                 errBox.textContent = 'Please acknowledge the guidelines.';
                 errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Complete onboarding';
                 return;
             }
             payload = {version: parseInt(version), agreed: true};
@@ -451,20 +400,17 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Authorization': `Bearer ${TOKEN}`
+                    'Authorization': `Bearer ${TOKEN()}`,
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
             });
-
             const data = await res.json();
 
             if (res.ok) {
                 window.location.reload();
             } else {
                 let msg = data.message || 'An error occurred.';
-                if (data.errors) {
-                    msg = Object.values(data.errors).flat().join(' ');
-                }
+                if (data.errors) msg = Object.values(data.errors).flat().join(' ');
                 errBox.textContent = msg;
                 errBox.style.display = 'block';
                 btn.disabled = false;

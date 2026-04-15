@@ -376,65 +376,9 @@
         </a>
     </div>
 
-    <?php if ($orders->isEmpty()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">🛍️</div>
-            <h3>No Orders Yet</h3>
-            <p>You haven't placed any orders yet. Start shopping to see your orders here.</p>
-            <a href="/" class="btn btn-primary">Start Shopping</a>
-        </div>
-    <?php else: ?>
-    <div class="orders-list">
-        <?php foreach ($orders as $order): ?>
-        <div class="order-card">
-            <div class="order-header">
-                <div>
-                    <div class="order-number">Order #<?= htmlspecialchars($order->order_number) ?></div>
-                    <div class="order-date">
-                        Placed on <?= $order->created_at->format('F j, Y') ?>
-                    </div>
-                </div>
-                <span class="status-badge <?= strtolower($order->status) ?>">
-                            <?= htmlspecialchars($order->status) ?>
-                        </span>
-            </div>
-
-            <div class="order-details">
-                <div class="detail-item">
-                    <span class="detail-label">Total Amount</span>
-                    <span class="detail-value"><?= htmlspecialchars($order->currency) ?> <?= number_format($order->total, 2) ?></span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Payment Status</span>
-                    <span class="detail-value" style="color: <?= $order->isPaid() ? 'var(--success-color)' : 'var(--warning-color)' ?>">
-                                <?= $order->isPaid() ? 'Paid' : 'Pending' ?>
-                            </span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Items</span>
-                    <span class="detail-value"><?= $order->items->count() ?> item(s)</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Payment Method</span>
-                    <span class="detail-value"><?= htmlspecialchars($order->payment_method ?: 'N/A') ?></span>
-                </div>
-            </div>
-
-            <div class="order-actions">
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/orders/<?= $order->id ?>"
-                   class="btn btn-primary btn-sm">
-                    View Details
-                </a>
-
-                    <button onclick="cancelOrder(<?= $order->id ?>)" class="btn btn-secondary btn-sm">
-                        Cancel Order
-                    </button>
-
-            </div>
-        </div>
-        <?php endforeach; ?>
+    <div class="orders-list" id="orders-container">
+        <div class="loader">Loading orders...</div>
     </div>
-    <?php endif; ?>
 </main>
 
 <div class="cancel-modal-overlay" style="display: none;">
@@ -486,6 +430,74 @@
 </div>
 
 <script>
+    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+
+    async function loadOrders() {
+        const response = await fetch(`/api/${SITE_SLUG}/member/orders`);
+        const {data: orders} = await response.json();
+
+        const container = document.getElementById('orders-container');
+
+        if (orders.length === 0) {
+            container.innerHTML = '<p>No orders found.</p>';
+            return;
+        }
+
+        container.innerHTML = orders.map(order => `
+        <div class="order-card">
+            <div class="order-header">
+                <div>
+                    <div class="order-number">Order #${order.order_number}</div>
+                    <div class="order-date">
+                        Placed on ${new Date(order.created_at).toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        })}
+                    </div>
+                </div>
+                <span class="status-badge ${order.status.toLowerCase()}">
+                    ${order.status}
+                </span>
+            </div>
+
+            <div class="order-details">
+                <div class="detail-item">
+                    <span class="detail-label">Total Amount</span>
+                    <span class="detail-value">${order.currency} ${(order.total).toFixed(2)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Payment Status</span>
+                    <span class="detail-value" style="color: ${order.is_paid ? 'var(--success-color)' : 'var(--warning-color)'}">
+                        ${order.is_paid ? 'Paid' : 'Pending'}
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Items</span>
+                    <span class="detail-value">${order.items?.length} item(s)</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Payment Method</span>
+                    <span class="detail-value">${order.payment_method || 'N/A'}</span>
+                </div>
+            </div>
+
+            <div class="order-actions">
+                <a href="/${SITE_SLUG}/member/orders/${order.id}" class="btn btn-primary btn-sm">
+                    View Details
+                </a>
+                ${order.can_cancel ? `
+                    <button onclick="cancelOrder(${order.id})" class="btn btn-secondary btn-sm">
+                        Cancel Order
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadOrders);
+
     async function cancelOrder(orderId) {
         document.getElementById('cancelOrderId').value = orderId;
         document.querySelector('.cancel-modal-overlay').style.display = 'flex';
@@ -502,7 +514,7 @@
         }
 
         try {
-            const response = await fetch(`/member/orders/${orderId}/cancel`, {
+            const response = await fetch(`/api/${SITE_SLUG}/member/orders/${orderId}/cancel`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

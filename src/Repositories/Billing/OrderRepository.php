@@ -136,6 +136,7 @@ class OrderRepository extends Repository
     public function getByUser(int $userId, ?int $limit = null): Collection
     {
         $query = Order::with([
+            'items',
             'items.product',  // ✅ Eager load nested
             'user',
             'shippingAddress',
@@ -202,7 +203,7 @@ class OrderRepository extends Repository
 
     public function getOrderById(int $id): ?Order
     {
-        return Order::with(['items', 'user', 'item.product', 'history', 'refunds']) // ADD 'history'
+        return Order::with(['items', 'user', 'item.product', 'history', 'refunds', 'billingAddress', 'shippingAddress']) // ADD 'history'
         ->find($id);
     }
 

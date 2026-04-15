@@ -415,50 +415,21 @@
     </style>
 </head>
 <body>
+
 @include('member._header')
 
 <main class="container">
     <div class="page-header">
         <h1 class="page-title">🏆 My Badges</h1>
-        <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-            <?= $earnedBadges->count() ?> earned • <?= $earnedBadges->count() + $unearnedBadges->count() ?> total
-            available
+        <p id="badge-stats-summary" style="color: var(--text-secondary); margin-top: 0.5rem;">
+            Loading badges...
         </p>
     </div>
 
-    <!-- Badges Carousel (Earned First, Then Unearned) -->
     <div class="carousel-section">
         <h2 class="section-title">All Badges</h2>
         <div class="carousel-container">
             <div class="badges-carousel" id="badgesCarousel">
-                <?php
-                // Show earned badges first
-                foreach ($earnedBadges as $badge):
-                    $memberBadge = $member->badges->firstWhere('id', $badge->id);
-                    ?>
-                    <div class="carousel-badge">
-                        <div class="badge-tier-indicator <?= htmlspecialchars($badge->tier) ?>"></div>
-                        <div class="carousel-badge-icon"><?= $badge->icon ?></div>
-                        <div class="carousel-badge-name"><?= htmlspecialchars($badge->name) ?></div>
-                        <div class="carousel-badge-tier <?= htmlspecialchars($badge->tier) ?>">
-                            <?= htmlspecialchars($badge->tier) ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-
-                <?php
-                // Then show unearned badges
-                foreach ($unearnedBadges as $badge):
-                    ?>
-                    <div class="carousel-badge locked">
-                        <div class="badge-tier-indicator <?= htmlspecialchars($badge->tier) ?>"></div>
-                        <div class="carousel-badge-icon">🔒</div>
-                        <div class="carousel-badge-name"><?= htmlspecialchars($badge->name) ?></div>
-                        <div class="carousel-badge-tier <?= htmlspecialchars($badge->tier) ?>">
-                            <?= htmlspecialchars($badge->tier) ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
             </div>
         </div>
 
@@ -469,329 +440,229 @@
         <div class="carousel-dots" id="carouselDots"></div>
     </div>
 
-    <!-- My Badges Section (Earned Badges with Category Filter) -->
-    <?php if ($earnedBadges->count() > 0): ?>
-        <div class="section">
-            <h2 class="section-title">My Badges</h2>
-
-            <div class="filter-tabs">
-                <button class="filter-tab active" onclick="filterEarnedBadges('all')">All</button>
-                <?php foreach ($categories as $category): ?>
-                    <button class="filter-tab" onclick="filterEarnedBadges('<?= htmlspecialchars($category) ?>')">
-                        <?= htmlspecialchars(ucfirst($category)) ?>
-                    </button>
-                <?php endforeach; ?>
-            </div>
-
-            <div class="badges-grid" id="earnedBadgesGrid">
-                <?php foreach ($earnedBadges as $badge): ?>
-                    <?php $memberBadge = $member->badges->where('id', $badge->id)->first(); ?>
-                    <div class="badge-card" data-category="<?= htmlspecialchars($badge->category) ?>">
-                        <div class="badge-tier-indicator <?= htmlspecialchars($badge->tier) ?>"></div>
-                        <div class="badge-icon"><?= $badge->icon ?></div>
-                        <div class="badge-tier <?= htmlspecialchars($badge->tier) ?>">
-                            <?= htmlspecialchars($badge->tier) ?>
-                        </div>
-                        <div class="badge-name"><?= htmlspecialchars($badge->name) ?></div>
-                        <div class="badge-description">
-                            <?= htmlspecialchars($badge->description) ?>
-                        </div>
-                        <?php if ($badge->points > 0): ?>
-                            <div class="badge-points">+<?= $badge->points ?> points</div>
-                        <?php endif; ?>
-                        <div class="badge-earned-date">
-                            Earned <?= $memberBadge->earned_at?->format('M j, Y') ?>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+    <div class="section" id="earnedSection" style="display: none;">
+        <h2 class="section-title">My Badges</h2>
+        <div class="filter-tabs" id="earnedFilterTabs">
+            <button class="filter-tab active" onclick="filterToggle(this, 'all')">All</button>
         </div>
-    <?php endif; ?>
+        <div class="badges-grid" id="earnedBadgesGrid"></div>
+    </div>
 
-    <!-- Earn Badges Section (Unearned with Category Filter & Pagination) -->
-    <?php if ($unearnedBadges->count() > 0): ?>
-        <div class="section">
-            <h2 class="section-title">Earn These Badges</h2>
-
-            <div class="filter-tabs">
-                <button class="filter-tab active" onclick="filterUnearnedBadges('all')">All</button>
-                <?php foreach ($categories as $category): ?>
-                    <button class="filter-tab" onclick="filterUnearnedBadges('<?= htmlspecialchars($category) ?>')">
-                        <?= htmlspecialchars(ucfirst($category)) ?>
-                    </button>
-                <?php endforeach; ?>
-            </div>
-
-            <div class="badges-grid" id="unearnedBadgesGrid">
-                <?php
-                $initialShow = 6;
-                $count = 0;
-                foreach ($unearnedBadges as $badge):
-                    $count++;
-                    $hidden = $count > $initialShow ? 'style="display: none;"' : '';
-                    ?>
-                    <div class="badge-card locked"
-                         data-category="<?= htmlspecialchars($badge->category) ?>" <?= $hidden ?>>
-                        <div class="badge-tier-indicator <?= htmlspecialchars($badge->tier) ?>"></div>
-                        <div class="badge-icon">🔒</div>
-                        <div class="badge-tier <?= htmlspecialchars($badge->tier) ?>">
-                            <?= htmlspecialchars($badge->tier) ?>
-                        </div>
-                        <div class="badge-name"><?= htmlspecialchars($badge->name) ?></div>
-                        <div class="badge-description">
-                            <?= htmlspecialchars($badge->description) ?>
-                        </div>
-                        <?php if ($badge->points > 0): ?>
-                            <div class="badge-points">+<?= $badge->points ?> points</div>
-                        <?php endif; ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <?php if ($unearnedBadges->count() > $initialShow): ?>
-                <div class="show-more-container">
-                    <button class="show-more-btn" onclick="showMoreBadges()">
-                        Show More
-                    </button>
-                </div>
-            <?php endif; ?>
+    <div class="section" id="unearnedSection" style="display: none;">
+        <h2 class="section-title">Earn These Badges</h2>
+        <div class="filter-tabs" id="unearnedFilterTabs">
+            <button class="filter-tab active" onclick="filterToggle(this, 'all')">All</button>
         </div>
-    <?php endif; ?>
-
-    <?php if ($earnedBadges->count() === 0 && $unearnedBadges->count() === 0): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">🏆</div>
-            <h2>No Badges Available</h2>
-            <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-                Check back soon for new badges to earn!
-            </p>
+        <div class="badges-grid" id="unearnedBadgesGrid"></div>
+        <div class="show-more-container" id="showMoreWrapper" style="display: none;">
+            <button class="show-more-btn" onclick="showMoreBadges()">Show More</button>
         </div>
-    <?php endif; ?>
+    </div>
+
+    <div id="empty-state" class="empty-state" style="display: none;">
+        <div class="empty-state-icon">🏆</div>
+        <h2>No Badges Available</h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">Check back soon for new badges!</p>
+    </div>
 </main>
 
 <script>
+    // State
+    let earnedBadges = [];
+    let unearnedBadges = [];
     let currentPage = 1;
     const itemsPerPage = 6;
     let currentCarouselIndex = 0;
-    const carousel = document.getElementById('badgesCarousel');
-    const badges = carousel.querySelectorAll('.carousel-badge');
-    const itemsPerView = window.innerWidth < 768 ? 2 : window.innerWidth < 1024 ? 3 : 5;
-    const totalPages = Math.ceil(badges.length / itemsPerView);
+    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
-    function setupCarousel() {
-        // Create dots
-        const dotsContainer = document.getElementById('carouselDots');
-        dotsContainer.innerHTML = '';
-        for (let i = 0; i < totalPages; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
-            dot.onclick = () => goToPage(i);
-            dotsContainer.appendChild(dot);
-        }
+    async function init() {
+        try {
+            const response = await fetch('/api/' + SITE_SLUG + '/member/badges');
+            const res = await response.json();
 
-        updateCarousel();
-    }
+            if (res.success) {
+                earnedBadges = res.data.earned_badges;
+                unearnedBadges = res.data.unearned_badges;
 
-    function moveCarousel(direction) {
-        currentCarouselIndex += direction;
-        if (currentCarouselIndex < 0) currentCarouselIndex = 0;
-        if (currentCarouselIndex >= totalPages) currentCarouselIndex = totalPages - 1;
-        updateCarousel();
-    }
+                renderSummary(earnedBadges.length, unearnedBadges.length);
+                renderCarousel();
+                renderFilters(res.data.categories);
+                renderEarned('all');
+                renderUnearned('all');
 
-    function goToPage(index) {
-        currentCarouselIndex = index;
-        updateCarousel();
-    }
-
-    function updateCarousel() {
-        const badgeWidth = 216; // 200px + 16px gap
-        const offset = -currentCarouselIndex * badgeWidth * itemsPerView;
-        carousel.style.transform = `translateX(${offset}px)`;
-
-        // Update dots
-        document.querySelectorAll('.carousel-dot').forEach((dot, index) => {
-            dot.classList.toggle('active', index === currentCarouselIndex);
-        });
-
-        // Update button states
-        document.getElementById('prevBtn').disabled = currentCarouselIndex === 0;
-        document.getElementById('nextBtn').disabled = currentCarouselIndex >= totalPages - 1;
-    }
-
-    // Auto-scroll carousel every 5 seconds
-    let carouselInterval = setInterval(() => {
-        if (currentCarouselIndex < totalPages - 1) {
-            moveCarousel(1);
-        } else {
-            currentCarouselIndex = -1;
-            moveCarousel(1);
-        }
-    }, 5000);
-
-    // Pause auto-scroll on hover
-    carousel.addEventListener('mouseenter', () => clearInterval(carouselInterval));
-    carousel.addEventListener('mouseleave', () => {
-        carouselInterval = setInterval(() => {
-            if (currentCarouselIndex < totalPages - 1) {
-                moveCarousel(1);
-            } else {
-                currentCarouselIndex = -1;
-                moveCarousel(1);
+                if (earnedBadges.length === 0 && unearnedBadges.length === 0) {
+                    document.getElementById('empty-state').style.display = 'block';
+                }
             }
-        }, 5000);
-    });
+        } catch (e) {
+            console.error("Failed to load badges", e);
+        }
+    }
 
-    // Initialize carousel
-    setupCarousel();
+    function renderSummary(earned, unearned) {
+        document.getElementById('badge-stats-summary').textContent =
+            `${earned} earned • ${earned + unearned} total available`;
+    }
 
-    // Recalculate on resize
-    window.addEventListener('resize', setupCarousel);
+    function renderCarousel() {
+        const container = document.getElementById('badgesCarousel');
 
-    function filterEarnedBadges(category) {
-        // Update active tab
-        const tabs = document.querySelectorAll('.filter-tabs')[0].querySelectorAll('.filter-tab');
-        tabs.forEach(tab => {
-            tab.classList.remove('active');
-            const tabText = tab.textContent.trim().toLowerCase();
-            if (tabText === category || (category === 'all' && tabText === 'all')) {
-                tab.classList.add('active');
-            }
-        });
+        // Map earned
+        const earnedHtml = earnedBadges.map(b => `
+            <div class="carousel-badge">
+                <div class="badge-tier-indicator ${b.tier}"></div>
+                <div class="carousel-badge-icon">${b.icon || '🏆'}</div>
+                <div class="carousel-badge-name">${b.name}</div>
+                <div class="carousel-badge-tier ${b.tier}">${b.tier}</div>
+            </div>
+        `).join('');
 
-        // Filter badges
+        // Map unearned
+        const unearnedHtml = unearnedBadges.map(b => `
+            <div class="carousel-badge locked">
+                <div class="badge-tier-indicator ${b.tier}"></div>
+                <div class="carousel-badge-icon">🔒</div>
+                <div class="carousel-badge-name">${b.name}</div>
+                <div class="carousel-badge-tier ${b.tier}">${b.tier}</div>
+            </div>
+        `).join('');
+
+        container.innerHTML = earnedHtml + unearnedHtml;
+        setupCarouselLogic();
+    }
+
+    function renderFilters(categories) {
+        const earnedTabs = document.getElementById('earnedFilterTabs');
+        const unearnedTabs = document.getElementById('unearnedFilterTabs');
+
+        // Create the HTML for the dynamic categories
+        const html = categories.map(cat => `
+        <button class="filter-tab" onclick="filterToggle(this, '${cat}')">
+            ${cat.charAt(0).toUpperCase() + cat.slice(1)}
+        </button>
+    `).join('');
+
+        // Append to the existing "All" buttons
+        earnedTabs.innerHTML += html;
+        unearnedTabs.innerHTML += html;
+    }
+
+    function renderEarned(category) {
         const grid = document.getElementById('earnedBadgesGrid');
-        const badges = grid.querySelectorAll('.badge-card');
-        let visibleCount = 0;
 
-        badges.forEach(badge => {
-            const badgeCategory = badge.dataset.category;
-            if (category === 'all' || badgeCategory === category) {
-                badge.style.display = 'block';
-                visibleCount++;
-            } else {
-                badge.style.display = 'none';
-            }
-        });
+        // CRITICAL: Ensure 'all' shows everything
+        const filtered = (category === 'all')
+            ? earnedBadges
+            : earnedBadges.filter(b => b.category && b.category.toLowerCase() === category);
 
-        // Show/hide no results message
-        let noResultsMsg = grid.querySelector('.no-results-message');
-        if (visibleCount === 0) {
-            if (!noResultsMsg) {
-                noResultsMsg = document.createElement('div');
-                noResultsMsg.className = 'no-results-message';
-                noResultsMsg.innerHTML = `
-                <div class="no-results-icon">🔍</div>
-                <h3>No Badges Found</h3>
-                <p>You haven't earned any badges in this category yet.</p>
-            `;
-                grid.appendChild(noResultsMsg);
-            }
-            noResultsMsg.style.display = 'flex';
-            grid.style.minHeight = '400px';
-        } else {
-            if (noResultsMsg) {
-                noResultsMsg.style.display = 'none';
-            }
-            grid.style.minHeight = 'auto';
+        if (earnedBadges.length > 0) document.getElementById('earnedSection').style.display = 'block';
+
+        if (filtered.length === 0) {
+            grid.innerHTML = `<div class="no-results-message" style="display: flex;">
+                            <div class="no-results-icon">🔍</div>
+                            <h3>No Badges Found</h3>
+                            <p>You haven't earned any badges in this category yet.</p>
+                          </div>`;
+            return;
         }
+
+        grid.innerHTML = filtered.map(b => `
+        <div class="badge-card">
+            <div class="badge-tier-indicator ${b.tier}"></div>
+            <div class="badge-icon">${b.icon || '🏆'}</div>
+            <div class="badge-tier ${b.tier}">${b.tier}</div>
+            <div class="badge-name">${b.name}</div>
+            <div class="badge-description">${b.description || ''}</div>
+            ${b.points > 0 ? `<div class="badge-points">+${b.points} points</div>` : ''}
+            <div class="badge-earned-date">Earned ${new Date().toLocaleDateString()}</div>
+        </div>
+    `).join('');
     }
 
-    function filterUnearnedBadges(category) {
-        // Update active tab
-        const tabs = document.querySelectorAll('.filter-tabs')[1].querySelectorAll('.filter-tab');
-        tabs.forEach(tab => {
-            tab.classList.remove('active');
-            const tabText = tab.textContent.trim().toLowerCase();
-            if (tabText === category || (category === 'all' && tabText === 'all')) {
-                tab.classList.add('active');
-            }
-        });
-
-        // Reset pagination
-        currentPage = 1;
-
-        // Filter and show badges
+    function renderUnearned(category) {
         const grid = document.getElementById('unearnedBadgesGrid');
-        const badges = grid.querySelectorAll('.badge-card');
-        let visibleCount = 0;
 
-        badges.forEach(badge => {
-            const badgeCategory = badge.dataset.category;
-            const shouldShow = category === 'all' || badgeCategory === category;
+        // CRITICAL: Ensure 'all' shows everything
+        const filtered = (category === 'all')
+            ? unearnedBadges
+            : unearnedBadges.filter(b => b.category && b.category.toLowerCase() === category);
 
-            if (shouldShow) {
-                visibleCount++;
-                badge.style.display = visibleCount <= itemsPerPage ? 'block' : 'none';
-            } else {
-                badge.style.display = 'none';
-            }
-        });
+        if (unearnedBadges.length > 0) document.getElementById('unearnedSection').style.display = 'block';
 
-        // Show/hide no results message
-        let noResultsMsg = grid.querySelector('.no-results-message');
-        if (visibleCount === 0) {
-            if (!noResultsMsg) {
-                noResultsMsg = document.createElement('div');
-                noResultsMsg.className = 'no-results-message';
-                noResultsMsg.innerHTML = `
-                <div class="no-results-icon">🔍</div>
-                <h3>No Badges Found</h3>
-                <p>There are no badges available in this category.</p>
-            `;
-                grid.appendChild(noResultsMsg);
-            }
-            noResultsMsg.style.display = 'flex';
-            grid.style.minHeight = '400px';
+        const toShow = filtered.slice(0, currentPage * itemsPerPage);
+
+        if (toShow.length === 0) {
+            grid.innerHTML = `<div class="no-results-message" style="display: flex;">
+                            <div class="no-results-icon">🔍</div>
+                            <h3>No Badges Found</h3>
+                            <p>There are no badges available in this category.</p>
+                          </div>`;
         } else {
-            if (noResultsMsg) {
-                noResultsMsg.style.display = 'none';
-            }
-            grid.style.minHeight = 'auto';
+            grid.innerHTML = toShow.map(b => `
+            <div class="badge-card locked">
+                <div class="badge-tier-indicator ${b.tier}"></div>
+                <div class="badge-icon">🔒</div>
+                <div class="badge-tier ${b.tier}">${b.tier}</div>
+                <div class="badge-name">${b.name}</div>
+                <div class="badge-description">${b.description || ''}</div>
+                ${b.points > 0 ? `<div class="badge-points">+${b.points} points</div>` : ''}
+            </div>
+        `).join('');
         }
 
-        // Update show more button
-        updateShowMoreButton();
+        const wrapper = document.getElementById('showMoreWrapper');
+        wrapper.style.display = filtered.length > toShow.length ? 'block' : 'none';
+    }
+
+    // --- Interaction Helpers ---
+
+    function filterToggle(btn, cat) {
+        const parent = btn.parentElement;
+
+        // Update active UI state
+        parent.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Normalize category to lowercase for comparison
+        const targetCat = cat.toLowerCase();
+
+        if (parent.id === 'earnedFilterTabs') {
+            renderEarned(targetCat);
+        } else {
+            currentPage = 1; // Reset pagination when filtering
+            renderUnearned(targetCat);
+        }
     }
 
     function showMoreBadges() {
         currentPage++;
-        const badges = document.querySelectorAll('#unearnedBadgesGrid .badge-card');
-        const maxToShow = currentPage * itemsPerPage;
-        let visibleCount = 0;
-
-        badges.forEach(badge => {
-            if (badge.style.display !== 'none' || badge.style.display === '') {
-                visibleCount++;
-                if (visibleCount <= maxToShow) {
-                    badge.style.display = 'block';
-                }
-            }
-        });
-
-        updateShowMoreButton();
+        const activeTab = document.querySelector('#unearnedFilterTabs .filter-tab.active');
+        // Simple way to get category: textContent is usually enough or store in data-cat
+        const cat = activeTab.textContent.trim().toLowerCase() === 'all' ? 'all' : activeTab.textContent.trim().toLowerCase();
+        renderUnearned(cat);
     }
 
-    function updateShowMoreButton() {
-        const button = document.querySelector('.show-more-btn');
-        if (!button) return;
+    // Re-use your original carousel logic
+    function setupCarouselLogic() {
+        const carousel = document.getElementById('badgesCarousel');
+        const badges = carousel.querySelectorAll('.carousel-badge');
+        const itemsPerView = window.innerWidth < 768 ? 2 : window.innerWidth < 1024 ? 3 : 5;
+        const totalPages = Math.ceil(badges.length / itemsPerView);
 
-        const badges = Array.from(document.querySelectorAll('#unearnedBadgesGrid .badge-card'));
-        const visibleBadges = badges.filter(b => {
-            const computedStyle = window.getComputedStyle(b);
-            return computedStyle.display !== 'none';
-        });
+        window.moveCarousel = (direction) => {
+            currentCarouselIndex = Math.max(0, Math.min(totalPages - 1, currentCarouselIndex + direction));
+            const badgeWidth = 216;
+            carousel.style.transform = `translateX(${-currentCarouselIndex * badgeWidth * itemsPerView}px)`;
 
-        const allShown = visibleBadges.length === 0 || visibleBadges.every(b => b.style.display === 'block');
+            document.getElementById('prevBtn').disabled = currentCarouselIndex === 0;
+            document.getElementById('nextBtn').disabled = currentCarouselIndex >= totalPages - 1;
+        };
 
-        if (allShown) {
-            button.disabled = true;
-            button.textContent = 'All Badges Shown';
-        } else {
-            button.disabled = false;
-            button.textContent = 'Show More';
-        }
+        // Trigger initial state
+        moveCarousel(0);
     }
+
+    document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

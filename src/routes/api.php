@@ -35,7 +35,15 @@ use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
-use App\Controllers\Members\MemberAddressController;
+use App\Controllers\Members\Api\MemberActivityApiController;
+use App\Controllers\Members\Api\MemberAddressApiController;
+use App\Controllers\Members\Api\MemberApiController;
+use App\Controllers\Members\Api\MemberCommentsApiController;
+use App\Controllers\Members\Api\MemberConsentApiController;
+use App\Controllers\Members\Api\MemberDashboardApiController;
+use App\Controllers\Members\Api\MemberLikedPagesApiController;
+use App\Controllers\Members\Api\MemberReadingHistoryApiController;
+use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
 use App\Controllers\MenuController;
@@ -117,6 +125,55 @@ $router->post('/api/{site}/internal/workflow/run', [\App\Controllers\WorkflowCon
 $router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowController::class, 'logs']);
 $router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
+
+// Member Dashboard API
+$router->get('/{site}/api/member/dashboard', [MemberDashboardApiController::class, 'index']);
+
+// Member Activity & Badges API
+$router->get('/api/{site}/member/activity', [MemberActivityApiController::class, 'index']);
+$router->get('/api/{site}/member/badges', [MemberActivityApiController::class, 'badges']);
+
+// Member Badge notification API (existing MemberBadgeController, already API-shaped)
+$router->get('/{site}/api/member/badges/new', [MemberBadgeController::class, 'getNewBadges']);
+$router->post('/{site}/api/member/badges/mark-shown', [MemberBadgeController::class, 'markBadgeShown']);
+$router->post('/{site}/api/member/badges/mark-as-shown', [MemberBadgeController::class, 'markAsShown']);
+
+$router->get('/api/{site}/member/addresses/search', [MemberAddressApiController::class, 'search']);
+$router->get('/api/{site}/member/{memberId}/addresses', [MemberAddressApiController::class, 'show']);
+$router->post('/api/{site}/member/addresses', [MemberAddressApiController::class, 'store']);
+$router->delete('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'destroy']);
+$router->post('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'update']); // If you don't support PUT
+$router->put('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'update']);
+$router->post('/api/{site}/member/addresses/{id}/delete', [MemberAddressApiController::class, 'destroy']);
+$router->post('/api/{site}/member/addresses/{id}/set-default', [MemberAddressApiController::class, 'setDefault']);
+
+// Member Comments API
+$router->get('/api/{site}/member/comments', [MemberCommentsApiController::class, 'index']);
+$router->delete('/api/{site}/member/comments/{commentId}', [MemberCommentsApiController::class, 'destroy']);
+
+$router->get('/api/{site}/member/account-details', [MemberApiController::class, 'me']);
+$router->post('/api/{site}/member/account-details', [MemberApiController::class, 'updateAccountDetails']);
+$router->post('/api/{site}/member/settings/privacy', [MemberApiController::class, 'updatePrivacy']);
+$router->post('/api/{site}/member/settings/communication-preferences', [MemberApiController::class, 'updateCommunicationPreferences']);
+$router->post('/api/{site}/member/consent/update', [MemberConsentApiController::class, 'update']);
+$router->get('/api/{site}/member/consent', [MemberConsentApiController::class, 'index']);
+$router->get('/api/{site}/member/consent/types', [MemberConsentApiController::class, 'getConsentTypes']);
+
+// Member Liked Pages API
+$router->get('/api/{site}/member/liked-pages', [MemberLikedPagesApiController::class, 'index']);
+$router->post('/api/{site}/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
+
+$router->get('/{site}/api/member/wishlist', 'App\Controllers\Members\Api\MemberWishlistApiController@index');
+$router->delete('/{site}/api/member/wishlist/{id}', 'App\Controllers\Members\Api\MemberWishlistApiController@remove');
+
+// Orders API
+$router->get('/api/{site}/member/orders', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'index']);
+$router->get('/api/{site}/member/orders/{id}', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'show']);
+$router->post('/api/{site}/member/orders/{orderId}/cancel', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'cancel']);
+$router->post('/api/{site}/member/orders/{id}/refund', [OrderController::class, 'refund']);
+
+// Member Reading History API
+$router->get('/{site}/api/member/reading-history', [MemberReadingHistoryApiController::class, 'index']);
 
 $router->post(
     '/api/{site}/open-collab/pages/{pageId}/purchase',
@@ -1020,7 +1077,6 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->get('/members/{memberId}/addresses', [AddressController::class, 'getMemberAddresses']);
 
-        $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
         $router->get('/pages/like-status/{pageId}', [PageLikeController::class, 'status']);
 
 // Member routes for viewing history and liked pages
@@ -1189,7 +1245,7 @@ $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportContro
 //reccommendations
 $router->get('/api/{siteName}/recommendations/products', [RecommendationController::class, 'products']);
 
-$router->get('/api/{site}/member/current-address', [MemberAddressController::class, 'getCurrentAddress']);
+$router->get('/api/{site}/member/current-address', [MemberAddressApiController::class, 'getCurrentAddress']);
 $router->get('/api/{site}/address-lookup', [AddressController::class, 'lookup']);
 
 $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router) {

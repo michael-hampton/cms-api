@@ -1,13 +1,15 @@
 <?php
 
-namespace App\Controllers\Members;
+namespace App\Controllers\Members\Api;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
-use App\Framework\Http\Request;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\Address;
 use App\Models\Member;
+use App\Models\Order;
+use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Members\CommentRepository;
@@ -25,33 +27,38 @@ use App\Services\Recommendations\ProductRecommendationService;
 use App\Services\Rewards\RewardsService;
 use App\Services\Subscriptions\SubscriptionListingService;
 
-class MemberDashboardController extends Controller
+class MemberDashboardApiController extends Controller
 {
     public function __construct(
-        private readonly OrderRepository          $orderRepository,
-        private readonly SubscriptionRepository   $subscriptionRepository,
-        private readonly SubscriberRepository     $subscriberRepository,
-        private readonly CommentRepository        $commentRepository,
-        private MemberRepository                  $memberRepository,
-        private readonly PageRepository           $pageRepository,
-        private NewsletterRepository              $newsletterRepository,
-        private readonly PageViewRepository       $pageViewRepository,
-        private readonly PageLikeRepository       $pageLikeRepository,
-        private readonly BadgeService             $badgeService,
+        private readonly OrderRepository              $orderRepository,
+        private readonly SubscriptionRepository       $subscriptionRepository,
+        private readonly SubscriberRepository         $subscriberRepository,
+        private readonly CommentRepository            $commentRepository,
+        private readonly MemberRepository             $memberRepository,
+        private readonly PageRepository               $pageRepository,
+        private readonly NewsletterRepository         $newsletterRepository,
+        private readonly PageViewRepository           $pageViewRepository,
+        private readonly PageLikeRepository           $pageLikeRepository,
+        private readonly BadgeService                 $badgeService,
         private readonly MemberActivityRepository     $activityRepository,
         private readonly ContentRecommendationService $contentRecommendationService,
         private readonly RewardsService               $rewardService,
         private readonly ProductRecommendationService $productRecommendationService,
-        private readonly SubscriptionListingService $subscriptionListingService,
-        private readonly ArticleGiftingService      $articleGiftingService
-    ) {
+        private readonly SubscriptionListingService   $subscriptionListingService,
+        private readonly ArticleGiftingService        $articleGiftingService
+    )
+    {
         parent::__construct();
     }
 
-    public function index(Request $request)
+    /**
+     * GET /api/member/dashboard
+     * Returns all data required to render the member dashboard.
+     */
+    public function index(): JsonResponse
     {
         if (!MemberAuth::check()) {
-            return $this->redirect('/' . SiteContext::slug() . '/member/login');
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $member = MemberAuth::getMember();
@@ -60,9 +67,7 @@ class MemberDashboardController extends Controller
         $memberObj = Member::with(['badges', 'points'])->find($member->id);
 
         $progress = $this->badgeService->getMemberProgress($memberObj);
-
         $recentActivities = $this->activityRepository->getMemberActivities($member->id, 20);
-
         $activityTrends = $this->badgeService->getActivityTrends($memberObj, 30);
 
         $recommendedPages = [];
@@ -81,24 +86,20 @@ class MemberDashboardController extends Controller
                 $trendingConversations = $this->contentRecommendationService
                     ->getTrendingConversations($siteId, 3);
 
-                // Get product recommendations
                 $recommendedProducts = $this->productRecommendationService
                     ->getFormattedRecommendations($member, $siteId, 6);
             } catch (\Exception $e) {
-                // Log error but don't break dashboard
                 \App\Framework\Support\Logger::error('Failed to load recommendations', [
                     'member_id' => $member->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
 
-
-        // Get counts for dashboard cards
         $stats = [
             'orders' => $this->orderRepository->getOrderCount(),
             'subscriptions' => $this->subscriptionRepository->countActiveSubscriptions($member->id, $siteId),
-            'newsletters' => $this->getNewsletterCount($member->email, $siteId),
+            'newsletters' => $this->subscriberRepository->getNewslettersForMember($member->email, $siteId)->count(),
             'addresses' => Address::where('member_id', $member->id)->count(),
             'comments' => $this->commentRepository->countApprovedCommentsByEmail($member->email),
             'pages_read' => $this->pageViewRepository->getUniquePagesViewedByMember($member->id, $siteId),
@@ -106,16 +107,14 @@ class MemberDashboardController extends Controller
         ];
 
         $this->rewardService->checkAndAwardRewards($member, $siteId);
-
         $unclaimedRewards = $this->rewardService->getUnclaimedRewards($member, $siteId);
 
         $giftedArticles = [];
         if ($member->isEmailVerified()) {
             try {
-
                 $gifts = $this->articleGiftingService->getGiftedArticlesForMember($member, $siteId);
                 $giftedArticles = [
-                    'received' => $gifts['received']->take(5), // Show latest 5
+                    'received' => $gifts['received']->take(5),
                     'given' => $gifts['given']->take(5),
                     'received_count' => $gifts['received']->count(),
                     'given_count' => $gifts['given']->count(),
@@ -123,7 +122,7 @@ class MemberDashboardController extends Controller
             } catch (\Exception $e) {
                 \App\Framework\Support\Logger::error('Failed to load gifted articles', [
                     'member_id' => $member->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
@@ -138,31 +137,43 @@ class MemberDashboardController extends Controller
             } catch (\Exception $e) {
                 \App\Framework\Support\Logger::error('Failed to load subscriptions', [
                     'member_id' => $member->id,
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
             }
         }
 
-        return $this->view(!empty($request->input('old')) ? 'member/dashboard-old' : 'member/dashboard', [
-            'member' => $memberObj,
-            'site' => SiteContext::get(),
-            'stats' => $stats,
-            'recommendedPages' => $recommendedPages,
-            'recommendedProducts' => $recommendedProducts,
-            'progress' => $progress,
-            'activity_trends' => $activityTrends,
-            'recent_activities' => $recentActivities,
-            'badges' => $memberObj->badges ?? collect(),
-            'trendingPages' => $trendingPages,
-            'trendingConversations' => $trendingConversations,
-            'unclaimedRewards' => $unclaimedRewards,
-            'giftedArticles' => $giftedArticles,
-            'groupedSubscriptions' => $groupedSubscriptions,
-        ]);
-    }
+        // Recent orders & subscriptions (previously inlined in the view)
+        $recentOrders = Order::where('user_id', $member->id)
+            ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
 
-    private function getNewsletterCount(string $email, int $siteId): int
-    {
-        return $this->subscriberRepository->getNewslettersForMember($email, $siteId)->count();
+        $allSubscriptions = Subscription::where('member_id', $member->id)
+            ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->limit(10)
+            ->get();
+
+        return $this->resourceResponse([
+            'success' => true,
+            'data' => [
+                'member' => $memberObj->toArray(),
+                'stats' => $stats,
+                'progress' => $progress,
+                'activity_trends' => $activityTrends,
+                'recent_activities' => $recentActivities,
+                'badges' => $memberObj->badges ?? collect(),
+                'recommended_pages' => $recommendedPages,
+                'recommended_products' => $recommendedProducts,
+                'trending_pages' => $trendingPages,
+                'trending_conversations' => $trendingConversations,
+                'unclaimed_rewards' => $unclaimedRewards,
+                'gifted_articles' => $giftedArticles,
+                'grouped_subscriptions' => $groupedSubscriptions,
+                'recent_orders' => $recentOrders,
+                'all_subscriptions' => $allSubscriptions,
+            ],
+        ]);
     }
 }

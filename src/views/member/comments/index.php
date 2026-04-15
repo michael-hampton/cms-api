@@ -240,142 +240,128 @@
     </style>
 </head>
 <body>
-
 @include('member._header')
-
 
 <main class="container">
     <div class="page-header">
         <div>
             <h1 class="page-title">My Comments</h1>
-            <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-                View and manage all your comments
-            </p>
+            <p style="color:var(--text-secondary);margin-top:.5rem;">View and manage all your comments</p>
         </div>
-        <a href="/member/dashboard" class="btn btn-secondary">
-            ← Back to Dashboard
-        </a>
+        <a href="/member/dashboard" class="btn btn-secondary">← Back to Dashboard</a>
     </div>
 
     <div id="alert-container"></div>
-
-    <?php if ($comments->isEmpty()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">💬</div>
-            <h3>No Comments Yet</h3>
-            <p>You haven't posted any comments yet. Start engaging with content!</p>
-            <a href="/" class="btn btn-secondary">Browse Content</a>
-        </div>
-    <?php else: ?>
-        <div class="comments-list">
-            <?php foreach ($comments as $comment): ?>
-                <div class="comment-card" data-comment-id="<?= $comment->id ?>">
-                    <div class="comment-header">
-                        <div class="comment-meta">
-                            <div class="comment-page">
-                                <?php
-                                $page = $comment->page();
-                                echo $page ? htmlspecialchars($page->title) : 'Page';
-                                ?>
-                            </div>
-                            <div class="comment-date">
-                                Posted on <?= date('F j, Y \a\t g:i A', strtotime($comment->created_at)) ?>
-                            </div>
-                        </div>
-                        <span class="status-badge <?= strtolower($comment->status) ?>">
-                            <?= htmlspecialchars($comment->status) ?>
-                        </span>
-                    </div>
-
-                    <div class="comment-content">
-                        <?= nl2br(htmlspecialchars($comment->content)) ?>
-                    </div>
-
-                    <div class="comment-actions">
-                        <?php if ($page = $comment->page()): ?>
-                            <a href="/<?= htmlspecialchars($page->slug) ?>#comment-<?= $comment->id ?>"
-                               class="btn btn-secondary btn-sm">
-                                View on Page
-                            </a>
-                        <?php endif; ?>
-                        <button onclick="deleteComment(<?= $comment->id ?>)" class="btn btn-danger btn-sm">
-                            Delete Comment
-                        </button>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
+    <div id="comments-root">
+        <p style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading comments…</p>
+    </div>
 </main>
 
 <script>
-    async function deleteComment(commentId) {
-        if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
+
+    async function loadComments() {
+        try {
+            const res = await fetch(`/api/${SITE_SLUG}/member/comments`);
+            if (res.status === 401) {
+                window.location.href = `/${SITE_SLUG}/member/login`;
+                return;
+            }
+            const json = await res.json();
+            if (!json.success) throw new Error('Failed to load');
+            renderComments(json.data.comments);
+        } catch {
+            document.getElementById('comments-root').innerHTML =
+                '<p style="color:var(--danger-color);text-align:center;">Failed to load comments. Please refresh.</p>';
+        }
+    }
+
+    function renderComments(comments) {
+        const root = document.getElementById('comments-root');
+        if (!comments.length) {
+            root.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">💬</div>
+                <h3>No Comments Yet</h3>
+                <p>You haven't posted any comments yet. Start engaging with content!</p>
+                <a href="/" class="btn btn-secondary">Browse Content</a>
+            </div>`;
             return;
         }
 
+        root.innerHTML = `<div class="comments-list">
+        ${comments.map(c => `
+            <div class="comment-card" data-comment-id="${c.id}">
+                <div class="comment-header">
+                    <div class="comment-meta">
+                        <div class="comment-page">${escHtml(c.page_title ?? 'Page')}</div>
+                        <div class="comment-date">Posted on ${formatDate(c.created_at)}</div>
+                    </div>
+                    <span class="status-badge ${escHtml(c.status.toLowerCase())}">${escHtml(c.status)}</span>
+                </div>
+                <div class="comment-content">${escHtml(c.content).replace(/\n/g, '<br>')}</div>
+                <div class="comment-actions">
+                    ${c.page_slug ? `<a href="/${escHtml(c.page_slug)}#comment-${c.id}" class="btn btn-secondary btn-sm">View on Page</a>` : ''}
+                    <button onclick="deleteComment(${c.id})" class="btn btn-danger btn-sm">Delete Comment</button>
+                </div>
+            </div>`).join('')}
+    </div>`;
+    }
+
+    async function deleteComment(commentId) {
+        if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) return;
         try {
-            const response = await fetch(`/<?= \App\Framework\Support\SiteContext::slug() ?>/member/comments/${commentId}`, {
+            const res = await fetch(`/api/${SITE_SLUG}/member/comments/${commentId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: {'Content-Type': 'application/json'}
             });
-
-            const data = await response.json();
-
+            const data = await res.json();
             if (data.success) {
                 showAlert('Comment deleted successfully', 'success');
-
-                // Remove the comment card from the DOM
-                const commentCard = document.querySelector(`[data-comment-id="${commentId}"]`);
-                if (commentCard) {
-                    commentCard.style.transition = 'opacity 0.3s, transform 0.3s';
-                    commentCard.style.opacity = '0';
-                    commentCard.style.transform = 'translateX(-20px)';
-
+                const card = document.querySelector(`[data-comment-id="${commentId}"]`);
+                if (card) {
+                    card.style.transition = 'opacity .3s, transform .3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'translateX(-20px)';
                     setTimeout(() => {
-                        commentCard.remove();
-
-                        // Check if there are no more comments
-                        const remainingComments = document.querySelectorAll('.comment-card');
-                        if (remainingComments.length === 0) {
-                            location.reload();
-                        }
+                        card.remove();
+                        if (!document.querySelectorAll('.comment-card').length) loadComments();
                     }, 300);
                 }
             } else {
                 showAlert(data.message || 'Failed to delete comment', 'error');
             }
-        } catch (error) {
-            console.error('Error:', error);
+        } catch {
             showAlert('Failed to delete comment', 'error');
         }
     }
 
-    function showAlert(message, type = 'success') {
-        const alertContainer = document.getElementById('alert-container');
-        const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
-
-        alertContainer.innerHTML = `
-            <div class="alert ${alertClass}">
-                <span>${type === 'success' ? '✓' : '✕'}</span>
-                ${escapeHtml(message)}
-            </div>
-        `;
-
+    function showAlert(message, type) {
+        const c = document.getElementById('alert-container');
+        c.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'error'}">
+        <span>${type === 'success' ? '✓' : '✕'}</span>${escHtml(message)}</div>`;
         setTimeout(() => {
-            alertContainer.innerHTML = '';
+            c.innerHTML = '';
         }, 5000);
-
         window.scrollTo({top: 0, behavior: 'smooth'});
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    function formatDate(str) {
+        return str ? new Date(str).toLocaleDateString('en-GB', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        }) : '';
     }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadComments);
 </script>
 </body>
 </html>

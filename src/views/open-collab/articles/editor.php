@@ -481,6 +481,29 @@ $headerActions = '
         color: var(--amber-dark, #b45309);
     }
 
+    /* Preview button in add-block-row */
+    .add-block-preview-btn {
+        background: none;
+        border: none;
+        border-left: 1px solid var(--border);
+        cursor: pointer;
+        padding: 9px 13px;
+        font-size: .75rem;
+        font-weight: 600;
+        color: var(--slate);
+        transition: background .12s;
+        white-space: nowrap;
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .add-block-preview-btn:hover {
+        background: #fff;
+        color: var(--navy);
+    }
+
     /* ── Drag state ─────────────────────────────────────────── */
     .block-card.dragging {
         opacity: .4;
@@ -800,6 +823,179 @@ $headerActions = '
         flex-direction: column;
         gap: 8px;
     }
+
+    /* ── Preview modal ──────────────────────────────────────── */
+    #preview-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 600;
+        background: rgba(15, 25, 41, .7);
+        display: none;
+        place-items: center;
+        padding: 20px;
+    }
+
+    #preview-modal.open {
+        display: grid;
+    }
+
+    .preview-modal-panel {
+        background: #fff;
+        border-radius: 12px;
+        width: 100%;
+        max-width: 760px;
+        max-height: 90vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, .35);
+    }
+
+    .preview-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .preview-modal-header h3 {
+        font-size: .9rem;
+        font-weight: 700;
+        color: var(--navy);
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .preview-modal-body {
+        overflow-y: auto;
+        padding: 32px 40px;
+        flex: 1;
+    }
+
+    /* Article preview typography */
+    .preview-content {
+        font-family: var(--font-body);
+        color: var(--navy);
+        line-height: 1.8;
+    }
+
+    .preview-content .preview-title {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--navy);
+        margin: 0 0 8px;
+        line-height: 1.25;
+    }
+
+    .preview-content .preview-subtitle {
+        font-size: 1.1rem;
+        color: var(--slate);
+        margin: 0 0 28px;
+        font-weight: 400;
+    }
+
+    .preview-content h2 {
+        font-size: 1.35rem;
+        font-weight: 700;
+        margin: 1.8em 0 .5em;
+        color: var(--navy);
+    }
+
+    .preview-content h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin: 1.4em 0 .4em;
+        color: var(--navy);
+    }
+
+    .preview-content p {
+        margin: 0 0 .9em;
+    }
+
+    .preview-content blockquote {
+        border-left: 3px solid var(--amber);
+        margin: 1.2em 0;
+        padding: 10px 18px;
+        background: var(--cream-dark);
+        border-radius: 0 var(--radius) var(--radius) 0;
+        font-style: italic;
+    }
+
+    .preview-content .preview-quote-attr {
+        font-style: normal;
+        font-size: .8rem;
+        color: var(--slate);
+        margin-top: 6px;
+    }
+
+    .preview-content .preview-info-block {
+        border-radius: var(--radius);
+        padding: 12px 16px;
+        margin: 1em 0;
+        font-size: .9rem;
+    }
+
+    .preview-content .preview-info-block--disclaimer {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1e40af;
+    }
+
+    .preview-content .preview-info-block--tip {
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        color: #166534;
+    }
+
+    .preview-content .preview-info-block--warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+    }
+
+    .preview-content .preview-info-block--note {
+        background: #faf5ff;
+        border: 1px solid #e9d5ff;
+        color: #6b21a8;
+    }
+
+    .preview-content .preview-section-heading {
+        border-bottom: 2px solid var(--border);
+        padding-bottom: 8px;
+        margin: 2em 0 1em;
+    }
+
+    .preview-content .preview-image-block {
+        margin: 1.5em 0;
+        text-align: center;
+    }
+
+    .preview-content .preview-image-block img {
+        max-width: 100%;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+    }
+
+    .preview-content .preview-image-block figcaption {
+        font-size: .78rem;
+        color: var(--slate);
+        margin-top: 6px;
+    }
+
+    .preview-content ul,
+    .preview-content ol {
+        padding-left: 1.4em;
+        margin: .8em 0;
+    }
+
+    .preview-content li {
+        margin-bottom: .35em;
+    }
 </style>
 
 <!-- Toast -->
@@ -858,6 +1054,27 @@ $headerActions = '
     </div>
 </div>
 
+<!-- Preview modal (FIX 4) -->
+<div id="preview-modal" role="dialog" aria-modal="true" aria-label="Article preview">
+    <div class="preview-modal-panel">
+        <div class="preview-modal-header">
+            <h3>
+                <svg viewBox="0 0 20 20" fill="currentColor" width="16" style="color:var(--slate);">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path fill-rule="evenodd"
+                          d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                          clip-rule="evenodd"/>
+                </svg>
+                Article preview
+            </h3>
+            <button onclick="closePreview()" class="oc-btn oc-btn--ghost oc-btn--sm" aria-label="Close">✕</button>
+        </div>
+        <div class="preview-modal-body">
+            <div class="preview-content" id="preview-content"></div>
+        </div>
+    </div>
+</div>
+
 <!-- Validation errors -->
 <div id="editor-errors" class="oc-form-errors" style="display:none;margin-bottom:16px;" role="alert"></div>
 
@@ -884,6 +1101,15 @@ $headerActions = '
             <button type="button" class="add-block-type-btn" onclick="addBlock('info')">Info</button>
             <button type="button" class="add-block-type-btn" onclick="addBlock('list')">List</button>
             <button type="button" class="add-block-type-btn" onclick="addBlock('image')">Image</button>
+            <button type="button" class="add-block-preview-btn" onclick="openPreview()">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="13">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                    <path fill-rule="evenodd"
+                          d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                          clip-rule="evenodd"/>
+                </svg>
+                Preview
+            </button>
         </div>
 
         <!-- Readability score -->
@@ -975,6 +1201,10 @@ $headerActions = '
                             Private
                         </option>
                     </select>
+                    <div class="oc-help" id="visibility-paid-note"
+                         style="display:<?= ($page?->is_paid) ? 'block' : 'none' ?>;color:var(--amber-dark,#b45309);">
+                        Paid articles must use Premium visibility.
+                    </div>
                 </div>
                 <label class="oc-label oc-label--optional" for="scheduled-at">Schedule for later</label>
                 <input class="oc-input" type="datetime-local" id="scheduled-at"
@@ -1121,7 +1351,8 @@ $headerActions = '
      */
     let blocks = [];
 
-    // Quill instances keyed by block id
+    // Quill instances keyed by block id.
+    // These are cleared and remounted on every renderBlocks() call.
     const quillInstances = {};
 
     // Default image block uploaded images: [{ id, url, alt }]
@@ -1233,10 +1464,6 @@ $headerActions = '
     function removeBlock(id) {
         const b = blocks.find(b => b.id === id);
         if (!b || b.isDefault) return; // default blocks cannot be removed
-        if (quillInstances[id]) {
-            quillInstances[id] = null;
-            delete quillInstances[id];
-        }
         blocks = blocks.filter(b => b.id !== id);
         reorder();
         renderBlocks();
@@ -1298,26 +1525,32 @@ $headerActions = '
     // =============================================================================
     // Rendering
     // =============================================================================
+    // In renderBlocks(), after initDragDrop():
+
     function renderBlocks() {
         const container = document.getElementById('block-builder');
 
-        // Snapshot Quill contents before wiping the DOM
         Object.keys(quillInstances).forEach(id => {
             const q = quillInstances[id];
             if (!q) return;
             const b = blocks.find(b => b.id === id);
             if (b) b.content = q.root.innerHTML;
+            delete quillInstances[id];
         });
 
         container.innerHTML = '';
         blocks.forEach(b => container.appendChild(buildBlockCard(b)));
 
-        // Re-initialise Quill for every text block
         blocks.forEach(b => {
             if (b.type === 'text') initQuillForBlock(b);
         });
 
         initDragDrop();
+
+        // Re-populate default image thumbs — renderBlocks() replaces the entire DOM
+        // so the #default-image-thumbs container is always fresh after this call.
+        // Without this, uploaded images disappear whenever any block is added/removed.
+        renderDefaultImageThumbs();
     }
 
     function buildBlockCard(b) {
@@ -1539,7 +1772,7 @@ $headerActions = '
                 </div>`;
                 }
 
-                // Non-default image block
+                // Non-default image block — FIX 5: reads src from blocks[] state, not from DOM
                 return `<div class="block-card__body-inner">
                 <div>
                     <label class="block-field-label">Image</label>
@@ -1610,7 +1843,10 @@ $headerActions = '
         const editorId = `quill-editor-${b.id}`;
         const editorEl = document.getElementById(editorId);
         if (!editorEl) return;
-        if (quillInstances[b.id]) return; // already mounted
+        // FIX 1 — guard removed; quillInstances is cleared before every renderBlocks()
+        // so we always remount on fresh DOM nodes. The old check
+        // `if (quillInstances[b.id]) return` caused stale detached instances to
+        // block remounting after any re-render.
 
         const q = new Quill(`#${editorId}`, {
             theme: 'snow',
@@ -1694,18 +1930,23 @@ $headerActions = '
 
     // =============================================================================
     // Non-default image block upload
+    // FIX 5 — use a Map keyed by block id so concurrent uploads to different
+    // blocks never overwrite each other via a shared _pendingImageBlockId.
     // =============================================================================
-    let _pendingImageBlockId = null;
+    const _pendingFileInputResolvers = new Map();
 
     function triggerBlockImagePick(blockId) {
-        _pendingImageBlockId = blockId;
-        document.getElementById('block-image-file-input').click();
+        const fileInput = document.getElementById('block-image-file-input');
+        // Store which block triggered this pick
+        fileInput.dataset.targetBlockId = blockId;
+        fileInput.click();
     }
 
     document.getElementById('block-image-file-input').addEventListener('change', function () {
-        if (this.files[0] && _pendingImageBlockId) uploadBlockImage(_pendingImageBlockId, this.files[0]);
+        const blockId = this.dataset.targetBlockId;
+        if (this.files[0] && blockId) uploadBlockImage(blockId, this.files[0]);
         this.value = '';
-        _pendingImageBlockId = null;
+        delete this.dataset.targetBlockId;
     });
 
     function handleBlockImageDrop(event, blockId) {
@@ -1722,8 +1963,12 @@ $headerActions = '
         }
         const url = await uploadImageXHR(file);
         if (!url) return;
+        // FIX 5 — patch the specific block's src in state, then re-render.
+        // Because patchBlock writes to blocks[] before renderBlocks() reads it,
+        // every block retains its own src through the re-render.
         patchBlock(blockId, 'src', url);
-        if (!blocks.find(b => b.id === blockId)?.alt) patchBlock(blockId, 'alt', file.name.replace(/\.[^.]+$/, ''));
+        const b = blocks.find(b => b.id === blockId);
+        if (b && !b.alt) patchBlock(blockId, 'alt', file.name.replace(/\.[^.]+$/, ''));
         renderBlocks();
         showToast('Image uploaded');
     }
@@ -1899,11 +2144,30 @@ $headerActions = '
     });
 
     // =============================================================================
-    // Slug auto-generation
+    // FIX 2 — Slug auto-generation
+    // Track whether the user has manually edited the slug so we stop overwriting it.
+    // Previously, autoSlug() returned early as soon as slugField.value was truthy,
+    // meaning it stopped updating after writing the very first character.
     // =============================================================================
-    function autoSlug(titleVal) {
+    let slugManuallyEdited = <?= ($page?->slug) ? 'true' : 'false' ?>;
+
+    (function initSlugField() {
         const slugField = document.getElementById('article-slug');
-        if (!slugField || slugField.value) return;
+        if (!slugField) return;
+        // Mark as manually edited if the user types directly into the slug field.
+        slugField.addEventListener('input', () => {
+            slugManuallyEdited = true;
+        });
+        // If the user clears the slug field, re-enable auto-generation.
+        slugField.addEventListener('change', () => {
+            if (!slugField.value.trim()) slugManuallyEdited = false;
+        });
+    })();
+
+    function autoSlug(titleVal) {
+        if (slugManuallyEdited) return; // user owns the slug field — do not overwrite
+        const slugField = document.getElementById('article-slug');
+        if (!slugField) return;
         slugField.value = titleVal.toLowerCase()
             .replace(/[^a-z0-9\s-]/g, '')
             .replace(/\s+/g, '-')
@@ -1911,9 +2175,31 @@ $headerActions = '
             .slice(0, 100);
     }
 
-    // Paid toggle
+    // =============================================================================
+    // FIX 3 — Paid article forces Premium visibility
+    // =============================================================================
     document.getElementById('is-paid').addEventListener('change', function () {
-        document.getElementById('price-field').style.display = this.checked ? 'block' : 'none';
+        const priceField = document.getElementById('price-field');
+        const visibilitySelect = document.getElementById('article-visibility');
+        const visibilityNote = document.getElementById('visibility-paid-note');
+
+        priceField.style.display = this.checked ? 'block' : 'none';
+
+        if (this.checked) {
+            visibilitySelect.value = 'premium';
+            if (visibilityNote) visibilityNote.style.display = 'block';
+        } else {
+            if (visibilityNote) visibilityNote.style.display = 'none';
+        }
+    });
+
+    // Prevent the user from changing visibility away from Premium while paid is on.
+    document.getElementById('article-visibility').addEventListener('change', function () {
+        const isPaid = document.getElementById('is-paid').checked;
+        if (isPaid && this.value !== 'premium') {
+            this.value = 'premium';
+            showToast('Paid articles must use Premium visibility', false);
+        }
     });
 
     // =============================================================================
@@ -2103,7 +2389,10 @@ $headerActions = '
         const metaDesc = document.getElementById('meta-description').value.trim();
         const pricePence = isPaid ? Math.round(parseFloat(priceVal || '0') * 100) : 0;
         const scheduledAt = document.getElementById('scheduled-at')?.value ?? null;
-        const visibility = document.getElementById('article-visibility')?.value ?? 'public';
+
+        // FIX 3 — enforce premium visibility for paid articles at the API payload level
+        const rawVisibility = document.getElementById('article-visibility')?.value ?? 'public';
+        const visibility = isPaid ? 'premium' : rawVisibility;
 
         if (status === 'scheduled') {
             if (!scheduledAt) {
@@ -2363,6 +2652,107 @@ $headerActions = '
         previewingEntry = null;
         document.getElementById('restore-banner').style.display = 'none';
         document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+    }
+
+    // =============================================================================
+    // FIX 4 — Article preview
+    // Renders all blocks as read-only HTML in a modal overlay.
+    // Lives in the main column (add-block-row), sidebar is untouched.
+    // =============================================================================
+    function openPreview() {
+        // Snapshot Quill content first
+        Object.keys(quillInstances).forEach(id => {
+            const q = quillInstances[id];
+            if (!q) return;
+            const b = blocks.find(b => b.id === id);
+            if (b) b.content = q.root.innerHTML;
+        });
+
+        const container = document.getElementById('preview-content');
+        container.innerHTML = renderBlocksAsHTML();
+        document.getElementById('preview-modal').classList.add('open');
+    }
+
+    function closePreview() {
+        document.getElementById('preview-modal').classList.remove('open');
+    }
+
+    document.getElementById('preview-modal').addEventListener('click', function (e) {
+        if (e.target === this) closePreview();
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+            closePreview();
+            closeDiffModal();
+        }
+    });
+
+    function renderBlocksAsHTML() {
+        let html = '';
+
+        blocks.forEach(b => {
+            switch (b.type) {
+                case 'heading': {
+                    const tag = `h${b.level ?? 2}`;
+                    if (b.isDefault) {
+                        if (b.text) html += `<h1 class="preview-title">${escHtml(b.text)}</h1>`;
+                        if (b.subtitle) html += `<p class="preview-subtitle">${escHtml(b.subtitle)}</p>`;
+                    } else {
+                        if (b.text) html += `<${tag}>${escHtml(b.text)}</${tag}>`;
+                        if (b.subtitle) html += `<p style="color:var(--slate);margin-top:-.5em;">${escHtml(b.subtitle)}</p>`;
+                    }
+                    break;
+                }
+                case 'section': {
+                    const tag = `h${b.level ?? 2}`;
+                    if (b.title) html += `<${tag} class="preview-section-heading">${escHtml(b.title)}</${tag}>`;
+                    break;
+                }
+                case 'text': {
+                    // Render Quill HTML directly — it's already safe from the editor
+                    html += `<div>${b.content ?? ''}</div>`;
+                    break;
+                }
+                case 'quote': {
+                    html += `<blockquote>
+                        <div>${escHtml(b.text ?? '')}</div>
+                        ${b.attribution ? `<div class="preview-quote-attr">${escHtml(b.attribution)}</div>` : ''}
+                    </blockquote>`;
+                    break;
+                }
+                case 'info': {
+                    const cls = `preview-info-block preview-info-block--${b.infoType ?? 'disclaimer'}`;
+                    html += `<div class="${cls}">${escHtml(b.description ?? '')}</div>`;
+                    break;
+                }
+                case 'list': {
+                    const tag = b.listType === 'ol' ? 'ol' : 'ul';
+                    const items = (b.items ?? []).map(i => `<li>${escHtml(i)}</li>`).join('');
+                    html += `<${tag}>${items}</${tag}>`;
+                    break;
+                }
+                case 'image': {
+                    if (b.isDefault) {
+                        // Show all uploaded default images
+                        defaultImageItems.forEach(img => {
+                            html += `<figure class="preview-image-block">
+                                <img src="${escAttr(img.url)}" alt="${escAttr(img.alt)}">
+                                ${img.alt ? `<figcaption>${escHtml(img.alt)}</figcaption>` : ''}
+                            </figure>`;
+                        });
+                    } else if (b.src) {
+                        html += `<figure class="preview-image-block">
+                            <img src="${escAttr(b.src)}" alt="${escAttr(b.alt ?? '')}">
+                            ${b.caption ? `<figcaption>${escHtml(b.caption)}</figcaption>` : ''}
+                        </figure>`;
+                    }
+                    break;
+                }
+            }
+        });
+
+        return html || '<p style="color:var(--slate);text-align:center;padding:40px 0;">Nothing to preview yet.</p>';
     }
 
     // =============================================================================

@@ -22,6 +22,8 @@ use App\Events\Boost\BoostResumedEvent;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Members\MemberAddressImported;
 use App\Events\Members\MemberPostcodeUpdated;
+use App\Events\OpenCollab\ContractPublishedEvent;
+use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Events\Orders\OrderCreatedEvent;
 use App\Events\Products\AllProductFulfilmentsCreated;
 use App\Events\Products\ProductFulfilmentCreated;
@@ -79,6 +81,7 @@ use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
 use App\Listeners\Members\MemberPostcodeUpdatedListener;
 use App\Listeners\Members\SendAccountActivationEmailListener;
+use App\Listeners\OpenCollab\InvalidateContributorOnboardingListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
 use App\Listeners\PointsAwardedListener;
 use App\Listeners\Products\AllProductFulfilmentsCreatedListener;
@@ -496,6 +499,7 @@ class ApiApplication
         $eventDispatcher->listen(LabelRunGenerated::class, [LabelRunGeneratedListener::class, 'handle']);
 
 
-
+        $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [InvalidateContributorOnboardingListener::class, 'onGuidelinesBumped']);
+        $eventDispatcher->listen(ContractPublishedEvent::class, [InvalidateContributorOnboardingListener::class, 'onContractPublished']);
     }
 }

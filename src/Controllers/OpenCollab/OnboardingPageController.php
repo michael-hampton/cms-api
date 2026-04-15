@@ -7,13 +7,16 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
+use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\ViewModels\OpenCollab\OnboardingPageViewModel;
 
 class OnboardingPageController extends Controller
 {
     public function __construct(
         private readonly ContributorOnboardingService $onboardingService,
         private readonly ContractRepository $contractRepository,
+        private readonly GuidelinesRepository $guidelinesRepository
     )
     {
         parent::__construct();
@@ -40,16 +43,17 @@ class OnboardingPageController extends Controller
             exit;
         }
 
-        $currentStep = $pending[0];
+        $viewModel = new OnboardingPageViewModel($pending, $site);
 
         return $this->view('open-collab.onboarding.index', [
-            'currentStep' => $currentStep,
-            'pendingSteps' => $pending,
-            'site' => SiteContext::slug(),
-            'contract' => $currentStep['step'] === 'contract'
+            'vm' => $viewModel,
+            // Passed separately because the view needs them for JS/Stripe init,
+            // not for step logic.
+            'contract' => $viewModel->currentStepName() === 'contract'
                 ? $this->contractRepository->latestForSite($site->id)
                 : null,
-            'siteGuidelinesVersion' => (int)($site->guidelines_version ?? 1),
+            'siteGuidelinesVersion' => $this->guidelinesRepository->latestVersion($site->id),
+            'site' => SiteContext::slug(),
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'currentUser' => Auth::user(),
         ]);

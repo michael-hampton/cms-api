@@ -184,7 +184,7 @@ $router->post('/{site}/comments', CommentController::class, 'store');
 $router->get('/{site}/member/activity', [MemberActivityController::class, 'index']);
 $router->get('/{site}/member/activity/badges', [MemberActivityController::class, 'badges']);
 $router->get('/{site}/member/account-details', [MemberController::class, 'accountDetails']);
-$router->post('/{site}/member/account-details', [MemberController::class, 'updateAccountDetails']);
+
 $router->get('/{site}/member/new-badges', [MemberBadgeController::class, 'getNewBadges']);
 $router->post('/{site}/member/badge-shown', [MemberBadgeController::class, 'markBadgeShown']);
 
@@ -272,7 +272,7 @@ $router->get('/{site}/member/consent/audit-trail', 'App\Controllers\Members\Memb
 $router->get('/{site}/member/consent/download-data', 'App\Controllers\Members\MemberConsentController@downloadData');
 
 // Consent API endpoints (JSON)
-$router->post('/{site}/member/consent/update', 'App\Controllers\Members\MemberConsentController@update');
+
 $router->post('/{site}/member/consent/grant/{consentCode}', 'App\Controllers\Members\MemberConsentController@grant');
 $router->post('/{site}/member/consent/revoke/{consentCode}', 'App\Controllers\Members\MemberConsentController@revoke');
 $router->post('/{site}/member/consent/withdrawal-request', 'App\Controllers\Members\MemberConsentController@createWithdrawalRequest');
@@ -315,7 +315,7 @@ $router->post('/{site}/member/subscriptions/{subscriptionId}/update-billing-date
 $router->post('/{site}/member/subscriptions/{subscriptionId}/preview-billing-change', [MemberSubscriptionsController::class, 'previewBillingDateChange']);
 
 $router->get('/{site}/member/profile/communication-preferences', [MemberController::class, 'communicationPreferences']);
-$router->post('/{site}/member/profile/communication-preferences', [MemberController::class, 'updateCommunicationPreferences']);
+
 
 // Delivery Pause/Resume
 $router->post('/{site}/member/subscriptions/{subscriptionId}/pause-delivery', [MemberSubscriptionsController::class, 'pauseDelivery']);
@@ -333,16 +333,10 @@ $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']
 $router->get('/subscription-confirmation', [SubscriptionConfirmationController::class, 'show']);
 
 $router->get('/{site}/member/addresses', [MemberAddressController::class, 'index']);
-$router->get('/{site}/member/addresses/search', [MemberAddressController::class, 'search']);
 $router->get('/{site}/member/addresses/create', [MemberAddressController::class, 'create']);
-$router->get('/{site}/member/{memberId}/addresses', [MemberAddressController::class, 'show']);
-$router->post('/{site}/member/addresses', [MemberAddressController::class, 'store']);
+
 $router->get('/{site}/member/addresses/{id}/edit', [MemberAddressController::class, 'edit']);
-$router->put('/{site}/member/addresses/{id}', [MemberAddressController::class, 'update']);
-$router->delete('/{site}/member/addresses/{id}', [MemberAddressController::class, 'destroy']);
-$router->post('/{site}/member/addresses/{id}', [MemberAddressController::class, 'update']); // If you don't support PUT
-$router->post('/{site}/member/addresses/{id}/delete', [MemberAddressController::class, 'destroy']);
-$router->post('/{site}/member/addresses/{id}/set-default', [MemberAddressController::class, 'setDefault']);
+
 
 $router->get('/member/me', [MemberController::class, 'me']);
 

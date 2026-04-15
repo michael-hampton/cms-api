@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -87,6 +88,8 @@ class AdminContractController extends Controller
             'content' => $content,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+
+        event(new ContractPublishedEvent($contract, $siteId));
 
         return $this->jsonResponse([
             'contract' => $this->formatContract($contract),

@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -68,8 +69,7 @@ class AdminGuidelinesController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $content = trim($body['content'] ?? $request->input('content', ''));
+        $content = $request->input('content', '');
 
         if (empty($content)) {
             return $this->errorResponse('Guidelines content is required.', 422);
@@ -85,6 +85,8 @@ class AdminGuidelinesController extends Controller
         if ($site) {
             $site->update(['guidelines_version' => $guideline->version]);
         }
+
+        event(new GuidelinesVersionBumpedEvent($guideline, $siteId, $guideline->version));
 
         return $this->jsonResponse([
             'guideline' => $this->formatGuideline($guideline),

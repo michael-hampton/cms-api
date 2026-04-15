@@ -250,7 +250,6 @@
     </style>
 </head>
 <body>
-
 @include('member._header')
 
 <div class="container">
@@ -258,74 +257,92 @@
         <h1 class="page-title">📚 Reading History</h1>
         <p class="page-subtitle">Track your reading journey and revisit pages you've explored</p>
     </div>
-
-    <div class="stats-bar">
-        <div class="stat-item">
-            <span class="stat-icon">📖</span>
-            <div class="stat-info">
-                <h3><?= $totalPagesRead ?></h3>
-                <p>Unique Pages Read</p>
-            </div>
-        </div>
+    <div id="reading-history-root">
+        <p style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading reading history…</p>
     </div>
-
-    <?php if ($recentlyViewed->isEmpty()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">📚</div>
-            <h2>No Reading History Yet</h2>
-            <p>Start exploring content to build your reading history.</p>
-            <a href="/" class="btn-primary">Start Reading</a>
-        </div>
-    <?php else: ?>
-        <div class="timeline">
-            <?php foreach ($recentlyViewed as $view): ?>
-                <?php $page = $view->page; ?>
-                <?php if ($page): ?>
-                    <div class="timeline-item">
-                        <div class="timeline-marker"></div>
-                        <div class="timeline-content">
-                            <div class="timeline-date">
-                                <span>🕐</span>
-                                <?php
-                                $viewedDate = $view->viewed_at->getTimestamp();
-                                $now = time();
-                                $diff = $now - $viewedDate;
-
-                                if ($diff < 3600) {
-                                    echo floor($diff / 60) . ' minutes ago';
-                                } elseif ($diff < 86400) {
-                                    echo floor($diff / 3600) . ' hours ago';
-                                } elseif ($diff < 604800) {
-                                    echo floor($diff / 86400) . ' days ago';
-                                } else {
-                                    echo $view->viewed_at->format('M j, Y \a\t g:i A');
-                                }
-                                ?>
-                            </div>
-                            <h3 class="timeline-title">
-                                <a href="/<?= htmlspecialchars($page->slug) ?>">
-                                    <?= htmlspecialchars($page->title) ?>
-                                </a>
-                            </h3>
-                            <?php if ($page->listing_synopsis): ?>
-                                <p class="timeline-excerpt"><?= htmlspecialchars($page->listing_synopsis) ?></p>
-                            <?php endif; ?>
-                            <div class="timeline-meta">
-                                <?php if (!empty($page->categories)): ?>
-                                    <span class="meta-badge">
-                                        📁 <?= htmlspecialchars($page->categories->first()->name) ?>
-                                    </span>
-                                <?php endif; ?>
-                                <span class="meta-badge">
-                                    📅 <?= $page->created_at->format('M j, Y') ?>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 </div>
+
+<script>
+    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
+
+    async function loadReadingHistory() {
+        try {
+            const res = await fetch(`/${SITE_SLUG}/api/member/reading-history`);
+            if (res.status === 401) {
+                window.location.href = `/${SITE_SLUG}/member/login`;
+                return;
+            }
+            const json = await res.json();
+            if (!json.success) throw new Error('Failed to load');
+            renderHistory(json.data.recently_viewed, json.data.total_pages_read);
+        } catch {
+            document.getElementById('reading-history-root').innerHTML =
+                '<p style="color:var(--danger-color);text-align:center;">Failed to load history. Please refresh.</p>';
+        }
+    }
+
+    function renderHistory(views, totalPagesRead) {
+        const root = document.getElementById('reading-history-root');
+
+        const statsBar = `
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-icon">📖</span>
+                <div class="stat-info"><h3>${totalPagesRead}</h3><p>Unique Pages Read</p></div>
+            </div>
+        </div>`;
+
+        if (!views.length) {
+            root.innerHTML = statsBar + `
+            <div class="empty-state">
+                <div class="empty-state-icon">📚</div>
+                <h2>No Reading History Yet</h2>
+                <p>Start exploring content to build your reading history.</p>
+                <a href="/" class="btn-primary">Start Reading</a>
+            </div>`;
+            return;
+        }
+
+        const items = views.map(view => {
+            const page = view.page;
+            if (!page) return '';
+            return `
+            <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="timeline-content">
+                    <div class="timeline-date"><span>🕐</span>${timeAgo(view.viewed_at)}</div>
+                    <h3 class="timeline-title">
+                        <a href="/${escHtml(page.slug)}">${escHtml(page.title)}</a>
+                    </h3>
+                    ${page.listing_synopsis ? `<p class="timeline-excerpt">${escHtml(page.listing_synopsis)}</p>` : ''}
+                    <div class="timeline-meta">
+                        <span class="meta-badge">📅 ${formatDate(page.created_at)}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        root.innerHTML = statsBar + `<div class="timeline">${items}</div>`;
+    }
+
+    function timeAgo(str) {
+        const diff = Math.floor((Date.now() - new Date(str).getTime()) / 1000);
+        if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+        return formatDate(str);
+    }
+
+    function formatDate(str) {
+        return str ? new Date(str).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'}) : '';
+    }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadReadingHistory);
+</script>
 </body>
 </html>

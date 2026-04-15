@@ -67,52 +67,6 @@ class MemberController extends Controller
         ]);
     }
 
-    public function updateAccountDetails(Request $request)
-    {
-        try {
-            $site = SiteContext::get();
-            $member = MemberAuth::member();
-
-            $data = $request->only(['first_name', 'last_name', 'display_name', 'email']);
-
-            // Check if email is being updated
-            $emailChanged = isset($data['email']) && $data['email'] !== $member->email;
-            $oldEmail = $member->email;
-
-            $updatedMember = $this->memberRepository->updateAccountDetails($member->id, $data);
-
-            if (!$updatedMember) {
-                return $this->back();
-            }
-
-            // Update Stripe customer email if changed and customer exists
-            if ($emailChanged && $updatedMember->stripe_customer_id) {
-                try {
-                    $this->stripeProcessor->updateCustomerEmail(
-                        $updatedMember->stripe_customer_id,
-                        $data['email']
-                    );
-                } catch (\Exception $e) {
-                    // Log error but don't fail the update
-                    \App\Framework\Support\Logger::error('Failed to update Stripe customer email', [
-                        'member_id' => $member->id,
-                        'stripe_customer_id' => $updatedMember->stripe_customer_id,
-                        'old_email' => $oldEmail,
-                        'new_email' => $data['email'],
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-
-            return $this->redirect("/{$site->slug}/member/account-details");
-
-        } catch (\InvalidArgumentException $e) {
-            return $this->back();
-        } catch (\Exception $e) {
-            return $this->back();
-        }
-    }
-
     public function communicationPreferences()
     {
         if (!MemberAuth::check()) {
@@ -126,37 +80,5 @@ class MemberController extends Controller
             'site' => SiteContext::get(),
             'preferences' => $member->communication_preferences ?? []
         ]);
-    }
-
-    public function updateCommunicationPreferences(Request $request)
-    {
-        if (!MemberAuth::check()) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-
-        $member = MemberAuth::member();
-
-        $preferences = [
-            'marketing_emails' => $request->input('marketing_emails', false),
-            'special_offers' => $request->input('special_offers', false),
-            'third_party_communications' => $request->input('third_party_communications', false),
-            'product_updates' => $request->input('product_updates', false),
-            'newsletter' => $request->input('newsletter', false)
-        ];
-
-        $updated = $this->subscriptionService->updateCommunicationPreferences(
-            $member->id,
-            $preferences
-        );
-
-        if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest') {
-            return $this->jsonResponse([
-                'success' => true,
-                'message' => 'Communication preferences updated successfully'
-            ]);
-        }
-
-        $_SESSION['flash_success'] = 'Communication preferences updated successfully';
-        return $this->redirect('/' . SiteContext::slug() . '/member/account-details');
     }
 }

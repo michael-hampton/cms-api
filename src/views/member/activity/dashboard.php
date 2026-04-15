@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Activity Dashboard - <?= htmlspecialchars($site->name) ?></title>
     <style>
+        /* All original styles remain 1:1 */
         * {
             margin: 0;
             padding: 0;
@@ -33,7 +34,7 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
@@ -54,7 +55,7 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -64,48 +65,137 @@
             padding: 1.5rem;
             border-radius: 1rem;
             box-shadow: var(--shadow);
-        }
-
-        .stat-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .stat-icon {
-            width: 3rem;
-            height: 3rem;
-            border-radius: 0.75rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
+            border: 1px solid var(--border-color);
         }
 
         .stat-label {
             color: var(--text-secondary);
             font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
         }
 
-        .badges-showcase {
+        .stat-value {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-footer {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .card {
             background: white;
-            padding: 2rem;
             border-radius: 1rem;
             box-shadow: var(--shadow);
-            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
         }
 
-        .section-title {
-            font-size: 1.5rem;
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
             font-weight: 600;
-            margin-bottom: 1.5rem;
+        }
+
+        .chart-container {
+            padding: 1.5rem;
+            height: 300px;
+            position: relative;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .activity-list {
+            list-style: none;
+        }
+
+        .activity-item {
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: background-color 0.2s;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .activity-icon.points {
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        .activity-icon.badge {
+            background: #eef2ff;
+            color: #4f46e5;
+        }
+
+        .activity-info {
+            flex: 1;
+        }
+
+        .activity-text {
+            font-size: 0.9375rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .activity-date {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+        }
+
+        .activity-points {
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+
+        .activity-points.positive {
+            color: var(--success-color);
+        }
+
+        .activity-points.negative {
+            color: var(--danger-color);
+        }
+
+        .loader {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
         }
 
         .badges-grid {
@@ -144,7 +234,7 @@
             text-transform: uppercase;
         }
 
-        .progress-section {
+        .badges-showcase {
             background: white;
             padding: 2rem;
             border-radius: 1rem;
@@ -152,128 +242,116 @@
             margin-bottom: 2rem;
         }
 
-        .progress-item {
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
             margin-bottom: 1.5rem;
         }
 
-        .progress-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .progress-header {
+        .stat-header {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 0.5rem;
+            align-items: center;
+            margin-bottom: 1rem;
         }
 
-        .progress-bar-container {
-            height: 0.75rem
-            background: var(--bg-light);
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            transition: width 0.3s;
-        }
-
-        .activity-feed {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-        }
-
-        .activity-item {
-            display: flex;
-            gap: 1rem;
-            padding: 1rem 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .activity-item:last-child {
-            border-bottom: none;
-        }
-
-        .activity-icon {
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 50%;
-            background: var(--bg-light);
+        .stat-icon {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
+            font-size: 1.5rem;
         }
 
-        .activity-content {
-            flex: 1;
-        }
-
-        .activity-text {
-            font-size: 0.9375rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .activity-time {
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-
-        .activity-points {
-            color: var(--success-color);
-            font-weight: 600;
-        }
-
-        .chart-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: var(--shadow);
-            margin-bottom: 2rem;
-        }
-
-        .chart {
-            height: 300px;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 1rem;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .badges-grid {
-                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-            }
-        }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-@include('member._header')
 
+@include('member.partials.nav')
 
-<main class="container">
+<div class="container">
+
     <div class="page-header">
         <h1 class="page-title">Activity & Achievements</h1>
         <p class="page-subtitle">Track your engagement and earn badges</p>
     </div>
 
-    <!-- Stats Grid -->
-    <div class="stats-grid">
+    <div class="stats-grid" id="stats-container">
+        <div class="stat-card">
+            <div class="loader">Loading stats...</div>
+        </div>
+    </div>
+
+    <div id="badges-showcase-container"></div>
+    <div id="next-badges-container"></div>
+
+    <div class="main-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Activity Overview</h2>
+            </div>
+            <div class="chart-container">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Recent Activity</h2>
+                <a href="/member/activity"
+                   style="font-size: 0.875rem; color: var(--primary-color); text-decoration: none;">View All</a>
+            </div>
+            <div class="activity-list" id="recent-activity-list">
+                <div class="loader">Loading activity...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug()?>'
+
+    async function initDashboard() {
+        try {
+            const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>'
+            const response = await fetch('/api/' + SITE_SLUG + '/member/activity');
+            const result = await response.json();
+
+            if (result.success) {
+                const {progress, recent_activities, activity_trends, member_badges, next_badges} = result.data;
+
+                // 1. FIX: Extract labels and counts from the array of objects
+                const labels = activity_trends.map(item => item.date);
+                const counts = activity_trends.map(item => item.count); // or item.points depending on what you want to graph
+
+                // 2. Render UI Components
+                renderStats(progress);
+                renderBadges(member_badges); // Use member_badges from your JSON
+                renderActivity(recent_activities);
+                renderNextBadges(next_badges);
+
+                // 3. Pass the newly created arrays to the chart function
+                drawActivityChart(labels, counts);
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard:', error);
+        }
+    }
+
+    function renderStats(progress) {
+        const container = document.getElementById('stats-container');
+        const s = progress.stats; // Access nested stats (comments, pages_read, etc.)
+
+        container.innerHTML = `
         <div class="stat-card">
             <div class="stat-header">
                 <div class="stat-icon" style="background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);">
                     🏆
                 </div>
             </div>
-            <div class="stat-value"><?= number_format($progress['total_points']) ?></div>
+            <div class="stat-value">${progress.total_points.toLocaleString()}</div>
             <div class="stat-label">Total Points</div>
         </div>
 
@@ -283,7 +361,7 @@
                     🎖️
                 </div>
             </div>
-            <div class="stat-value"><?= $progress['badges_earned'] ?> / <?= $progress['badges_available'] ?></div>
+            <div class="stat-value">${progress.badges_earned} / ${progress.badges_available}</div>
             <div class="stat-label">Badges Earned</div>
         </div>
 
@@ -293,7 +371,7 @@
                     💬
                 </div>
             </div>
-            <div class="stat-value"><?= number_format($progress['stats']['comments']) ?></div>
+            <div class="stat-value">${s.comments.toLocaleString()}</div>
             <div class="stat-label">Comments Posted</div>
         </div>
 
@@ -303,7 +381,7 @@
                     📚
                 </div>
             </div>
-            <div class="stat-value"><?= number_format($progress['stats']['pages_read']) ?></div>
+            <div class="stat-value">${s.pages_read.toLocaleString()}</div>
             <div class="stat-label">Pages Read</div>
         </div>
 
@@ -313,7 +391,7 @@
                     ❤️
                 </div>
             </div>
-            <div class="stat-value"><?= number_format($progress['stats']['likes']) ?></div>
+            <div class="stat-value">${s.likes.toLocaleString()}</div>
             <div class="stat-label">Likes Given</div>
         </div>
 
@@ -323,232 +401,221 @@
                     📅
                 </div>
             </div>
-            <div class="stat-value"><?= number_format($progress['stats']['member_days']) ?></div>
+            <div class="stat-value">${s.member_days.toLocaleString()}</div>
             <div class="stat-label">Days as Member</div>
         </div>
-    </div>
+    `;
+    }
 
-    <!-- Recent Badges -->
-    <?php if (!$member->badges->isEmpty()): ?>
+    function renderBadges(memberBadges) {
+        const container = document.getElementById('badges-showcase-container');
+        if (!memberBadges || memberBadges.length === 0) {
+            container.innerHTML = ''; // Matches PHP if (!$member->badges->isEmpty())
+            return;
+        }
+
+        const badgeItems = memberBadges.slice(0, 8).map(badge => `
+        <div class="badge-item">
+            <div class="badge-icon">${badge.icon || '🏆'}</div>
+            <div class="badge-name">${badge.name}</div>
+            <div class="badge-tier">${badge.tier}</div>
+        </div>
+    `).join('');
+
+        container.innerHTML = `
         <div class="badges-showcase">
             <h2 class="section-title">Recent Badges</h2>
             <div class="badges-grid">
-                <?php foreach ($member->badges->take(8) as $badge): ?>
-                    <div class="badge-item">
-                        <div class="badge-icon"><?= $badge->icon ?></div>
-                        <div class="badge-name"><?= htmlspecialchars($badge->name) ?></div>
-                        <div class="badge-tier"><?= htmlspecialchars($badge->tier) ?></div>
-                    </div>
-                <?php endforeach; ?>
+                ${badgeItems}
             </div>
             <div style="text-align: center; margin-top: 1.5rem;">
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/activity/badges"
+                <a href="/${SITE_SLUG}/member/activity/badges"
                    style="color: var(--primary-color); text-decoration: none; font-weight: 500;">
                     View All Badges →
                 </a>
             </div>
         </div>
-    <?php endif; ?>
+    `;
+    }
 
-    <!-- Progress Towards Next Badges -->
-    <?php if (!empty($progress['next_badges'])): ?>
+    function renderNextBadges(nextBadges) {
+        const container = document.getElementById('next-badges-container');
+        if (!nextBadges || nextBadges.length === 0) {
+            container.innerHTML = ''; // Matches PHP if (!empty($progress['next_badges']))
+            return;
+        }
+
+        const progressItems = nextBadges.map(item => `
+        <div class="progress-item">
+            <div class="progress-header">
+                <div>
+                    <strong>${item.badge.icon || '✨'} ${item.badge.name}</strong>
+                    <span style="font-size: 0.875rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                        ${item.badge.description || ''}
+                    </span>
+                </div>
+                <span style="font-weight: 600;">
+                    ${Math.round(item.progress.percentage)}%
+                </span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" style="width: ${item.progress.percentage}%"></div>
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                ${item.progress.met} of ${item.progress.total} requirements met
+            </div>
+        </div>
+    `).join('');
+
+        container.innerHTML = `
         <div class="progress-section">
             <h2 class="section-title">Next Badges to Earn</h2>
-            <?php foreach ($progress['next_badges'] as $badgeProgress): ?>
-                <div class="progress-item">
-                    <div class="progress-header">
-                        <div>
-                            <strong><?= $badgeProgress['badge']->icon ?> <?= htmlspecialchars($badgeProgress['badge']->name) ?></strong>
-                            <span style="font-size: 0.875rem; color: var(--text-secondary); margin-left: 0.5rem;">
-                        <?= htmlspecialchars($badgeProgress['badge']->description) ?>
-                    </span>
-                        </div>
-                        <span style="font-weight: 600;">
-                    <?= number_format($badgeProgress['progress']['percentage']) ?>%
-                </span>
-                    </div>
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" style="width: <?= $badgeProgress['progress']['percentage'] ?>%"></div>
-                    </div>
-                    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                        <?= $badgeProgress['progress']['met'] ?> of <?= $badgeProgress['progress']['total'] ?>
-                        requirements met
-                    </div>
-                </div>
-            <?php endforeach; ?>
+            ${progressItems}
         </div>
-    <?php endif; ?>
+    `;
+    }
 
-    <!-- Activity Trends Chart -->
-    <div class="chart-container">
-        <h2 class="section-title">Activity Trends (Last 30 Days)</h2>
-        <canvas id="activityChart" width="1250" height="500"></canvas>
-    </div>
+    function renderActivity(activities) {
+        const container = document.getElementById('recent-activity-list');
 
-    <!-- Recent Activity Feed -->
-    <div class="activity-feed">
-        <h2 class="section-title">Recent Activity</h2>
-        <?php if ($recent_activities->isEmpty()): ?>
+        // 1. Handle Empty State (Match original PHP logic)
+        if (!activities || activities.length === 0) {
+            container.innerHTML = `
             <p style="text-align: center; color: var(--text-secondary); padding: 2rem;">
                 No recent activity yet. Start engaging to see your activity here!
-            </p>
-        <?php else: ?>
-            <?php foreach ($recent_activities as $activity): ?>
-                <div class="activity-item">
-                    <div class="activity-icon">
-                        <?php
-                        $icons = [
-                                'comment' => '💬',
-                                'like' => '❤️',
-                                'read' => '📖',
-                                'share' => '↗️',
-                                'purchase' => '🛍️'
-                        ];
-                        echo $icons[$activity->activity_type] ?? '✨';
-                        ?>
+            </p>`;
+            return;
+        }
+
+        // 2. Define Original PHP Mappings
+        const icons = {
+            'comment': '💬',
+            'like': '❤️',
+            'read': '📖',
+            'share': '↗️',
+            'purchase': '🛍️'
+        };
+
+        const actions = {
+            'comment': 'Posted a comment',
+            'like': 'Liked a page',
+            'read': 'Read a page',
+            'share': 'Shared content',
+            'purchase': 'Made a purchase'
+        };
+
+        // 3. Build the Feed
+        let html = '';
+
+        html += activities.map(activity => {
+            const icon = icons[activity.activity_type] || '✨';
+            const actionText = actions[activity.activity_type] || 'Activity';
+
+            // Use the nested date from your JSON: activity.activity_date.date
+            const timeAgo = formatDiffForHumans(activity.activity_date);
+
+            return `
+            <div class="activity-item">
+                <div class="activity-icon">
+                    ${icon}
+                </div>
+                <div class="activity-content">
+                    <div class="activity-text">
+                        ${actionText}
                     </div>
-                    <div class="activity-content">
-                        <div class="activity-text">
-                            <?php
-                            $actions = [
-                                    'comment' => 'Posted a comment',
-                                    'like' => 'Liked a page',
-                                    'read' => 'Read a page',
-                                    'share' => 'Shared content',
-                                    'purchase' => 'Made a purchase'
-                            ];
-                            echo $actions[$activity->activity_type] ?? 'Activity';
-                            ?>
-                        </div>
-                        <div class="activity-time">
-                            <?= diffForHumans($activity->activity_date) ?>
-                            <?php if ($activity->points > 0): ?>
-                                <span class="activity-points">+<?= $activity->points ?> points</span>
-                            <?php endif; ?>
-                        </div>
+                    <div class="activity-time">
+                        ${timeAgo}
+                        ${activity.points > 0 ? `
+                            <span class="activity-points">+${activity.points} points</span>
+                        ` : ''}
                     </div>
                 </div>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </div>
-</main>
+            </div>
+        `;
+        }).join('');
 
-<script>
-    const activityData = <?= json_encode($activity_trends) ?>;
-    const canvas = document.getElementById('activityChart');
-    const ctx = canvas.getContext('2d');
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const padding = 60; // bigger padding for labels
-
-    const labels = activityData.map(d => d.date);
-    const counts = activityData.map(d => d.count);
-
-    // Compute scales
-    const maxCount = Math.max(...counts, 5);
-    const minCount = 0;
-    const xStep = (width - 2 * padding) / (counts.length - 1);
-    const yScale = (height - 2 * padding) / (maxCount - minCount);
-
-    // Draw axes
-    ctx.strokeStyle = '#ccc';
-    ctx.lineWidth = 1.5;
-
-    // Y-axis
-    ctx.beginPath();
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, height - padding);
-    ctx.stroke();
-
-    // X-axis
-    ctx.beginPath();
-    ctx.moveTo(padding, height - padding);
-    ctx.lineTo(width - padding, height - padding);
-    ctx.stroke();
-
-    // Draw curve and fill
-    ctx.strokeStyle = '#667eea';
-    ctx.fillStyle = 'rgba(102,126,234,0.2)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-
-    counts.forEach((count, i) => {
-        const x = padding + i * xStep;
-        const y = height - padding - (count - minCount) * yScale;
-        if (i === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            const prevX = padding + (i - 1) * xStep;
-            const prevY = height - padding - (counts[i - 1] - minCount) * yScale;
-            const cx = (prevX + x) / 2;
-            const cy = (prevY + y) / 2;
-            ctx.quadraticCurveTo(prevX, prevY, cx, cy);
-        }
-    });
-
-    // Last point
-    const lastX = padding + (counts.length - 1) * xStep;
-    const lastY = height - padding - (counts[counts.length - 1] - minCount) * yScale;
-    ctx.lineTo(lastX, lastY);
-    ctx.stroke();
-
-    // Fill under the curve
-    ctx.lineTo(lastX, height - padding);
-    ctx.lineTo(padding, height - padding);
-    ctx.closePath();
-    ctx.fill();
-
-    // Draw points and labels
-    ctx.fillStyle = '#667eea';
-    ctx.font = '14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-
-    counts.forEach((count, i) => {
-        const x = padding + i * xStep;
-        const y = height - padding - (count - minCount) * yScale;
-        // Draw point
-        ctx.beginPath();
-        ctx.arc(x, y, 6, 0, Math.PI * 2);
-        ctx.fill();
-        // Draw label above point
-        ctx.fillStyle = '#000';
-        ctx.fillText(count, x, y - 10);
-        ctx.fillStyle = '#667eea';
-    });
-
-    // Draw X labels
-    ctx.fillStyle = '#000';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    labels.forEach((label, i) => {
-        const x = padding + i * xStep;
-        ctx.fillText(new Date(label).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric'
-        }), x, height - padding + 8);
-    });
-
-    // Draw Y labels
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i <= maxCount; i += Math.ceil(maxCount / 5)) {
-        const y = height - padding - (i - minCount) * yScale;
-        ctx.fillText(i, padding - 10, y);
+        container.innerHTML = html;
     }
 
-    // Optional: draw grid lines
-    ctx.strokeStyle = '#eee';
-    ctx.lineWidth = 1;
-    for (let i = 1; i <= 5; i++) {
-        const y = height - padding - i * (height - 2 * padding) / 5;
+    /**
+     * JS Equivalent of PHP diffForHumans()
+     */
+    function formatDiffForHumans(dateString) {
+        const now = new Date();
+        // Replace space with T to make it ISO compliant for safari/older browsers
+        const past = new Date(dateString.replace(' ', 'T'));
+        const diffInSeconds = Math.floor((now - past) / 1000);
+
+        if (diffInSeconds < 60) return 'Just now';
+
+        const minutes = Math.floor(diffInSeconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days}d ago`;
+
+        return past.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
+    }
+
+    function drawActivityChart(labels, counts) {
+        const canvas = document.getElementById('activityChart');
+        const ctx = canvas.getContext('2d');
+        const padding = 40;
+        const width = canvas.offsetWidth;
+        const height = canvas.offsetHeight;
+
+        // Match high-DPI displays
+        canvas.width = width * window.devicePixelRatio;
+        canvas.height = height * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+        const maxCount = Math.max(...counts, 5);
+        const minCount = 0;
+        const xStep = (width - padding * 2) / (labels.length - 1);
+        const yScale = (height - padding * 2) / (maxCount - minCount);
+
+        // Draw Line
         ctx.beginPath();
-        ctx.moveTo(padding, y);
-        ctx.lineTo(width - padding, y);
+        ctx.strokeStyle = '#667eea';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+
+        counts.forEach((count, i) => {
+            const x = padding + i * xStep;
+            const y = height - padding - (count - minCount) * yScale;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
         ctx.stroke();
+
+        // Draw Points & Labels (Original dashboard logic)
+        ctx.fillStyle = '#667eea';
+        counts.forEach((count, i) => {
+            const x = padding + i * xStep;
+            const y = height - padding - (count - minCount) * yScale;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw date label on X axis
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '10px sans-serif';
+            ctx.textAlign = 'center';
+            if (i % 5 === 0 || i === labels.length - 1) {
+                const date = new Date(labels[i]);
+                ctx.fillText(date.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric'
+                }), x, height - padding + 20);
+            }
+            ctx.fillStyle = '#667eea';
+        });
     }
+
+    document.addEventListener('DOMContentLoaded', initDashboard);
 </script>
 </body>
 </html>
