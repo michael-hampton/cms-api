@@ -742,7 +742,6 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', load);
-    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
     async function load() {
         const res = await fetch('/api/' + SITE_SLUG + '/member/account-details');

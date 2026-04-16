@@ -465,7 +465,7 @@
 
     async function loadSavedAddresses() {
         try {
-            const res = await fetch(`/${SITE}/member/${window.currentMember.id}/addresses?type=shipping`);
+            const res = await fetch(`/api/${SITE}/${window.currentMember.id}/addresses?type=shipping`);
             const data = await res.json();
             if (data.items?.length) displaySavedAddresses(data.items);
         } catch (e) {

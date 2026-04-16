@@ -4,6 +4,7 @@ namespace App\Controllers\Front;
 use App\Controllers\Controller;
 use App\DTO\Comments\CreateCommentDTO;
 use App\Events\ActivityTracking;
+use App\Events\Members\CommentPostedByMember;
 use App\Exceptions\Comments\InvalidCommentStatusException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
@@ -35,6 +36,10 @@ class CommentController extends Controller
             $comment = $this->commentService->createComment($dto);
 
             $this->activityTracking->trackComment($comment);
+
+            if ($comment->member_id) {
+                event(new CommentPostedByMember($comment->member_id, SiteContext::getId(), $request->get('page_id')));
+            }
 
             return $this->resourceResponse([
                 'success' => true,

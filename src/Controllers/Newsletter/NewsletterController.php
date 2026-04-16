@@ -55,12 +55,12 @@ class NewsletterController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
 
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $configuration = SearchConfigurationFactory::create('newsletters');
             $engine = new SearchEngine($configuration);
 

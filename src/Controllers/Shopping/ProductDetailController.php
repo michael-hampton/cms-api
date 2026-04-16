@@ -140,7 +140,7 @@ class ProductDetailController extends Controller
         ]);
     }
 
-    public function getProductOffers(int $productId, string $siteName): JsonResponse
+    public function getProductOffers(int $productId, string $site): JsonResponse
     {
         try {
             $currencyCode = $this->currencyResolver->resolveUpperCase();
@@ -164,7 +164,7 @@ class ProductDetailController extends Controller
         }
     }
 
-    public function getProductBundles(int $productId, string $siteName): JsonResponse
+    public function getProductBundles(int $productId, string $site): JsonResponse
     {
         try {
             $bundles = ProductOfferBundle::with([

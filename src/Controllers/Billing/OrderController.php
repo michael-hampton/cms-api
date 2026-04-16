@@ -44,10 +44,10 @@ class OrderController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->orderRepository->search($criteria);
 
             $formattedData = $result->getData();
@@ -70,11 +70,11 @@ class OrderController extends Controller
         }
     }
 
-    public function store(CreateOrderRequest $request, string $siteName): JsonResponse
+    public function store(CreateOrderRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
 
             $items = $data['items'];
             unset($data['items']);
@@ -113,7 +113,7 @@ class OrderController extends Controller
         }
     }
 
-    public function update(int $id, UpdateOrderRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateOrderRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -132,7 +132,7 @@ class OrderController extends Controller
         }
     }
 
-    public function updateItems(int $id, UpdateOrderItemsRequest $request, string $siteName): JsonResponse
+    public function updateItems(int $id, UpdateOrderItemsRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -157,7 +157,7 @@ class OrderController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->orderManager->delete($id);
@@ -173,7 +173,7 @@ class OrderController extends Controller
         }
     }
 
-    public function cancel(int $id, Request $request, string $siteName): JsonResponse
+    public function cancel(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $reason = $request->get('reason');
@@ -186,7 +186,7 @@ class OrderController extends Controller
         }
     }
 
-    public function complete(int $id, Request $request, string $siteName): JsonResponse
+    public function complete(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $order = $this->orderUpdateService->complete($id);
@@ -215,7 +215,7 @@ class OrderController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $cloneOrder = Container::getInstance()->make(CloneOrder::class);
@@ -233,7 +233,7 @@ class OrderController extends Controller
         }
     }
 
-    public function byStatus(Request $request, string $siteName): JsonResponse
+    public function byStatus(Request $request, string $site): JsonResponse
     {
         try {
             $status = $request->get('status');
@@ -251,7 +251,7 @@ class OrderController extends Controller
         }
     }
 
-    public function byUser(int $userId, Request $request, string $siteName): JsonResponse
+    public function byUser(int $userId, Request $request, string $site): JsonResponse
     {
         try {
             $limit = $request->get('limit');
@@ -264,7 +264,7 @@ class OrderController extends Controller
         }
     }
 
-    public function revenue(Request $request, string $siteName): JsonResponse
+    public function revenue(Request $request, string $site): JsonResponse
     {
         try {
             $startDate = $request->get('start_date');
@@ -317,7 +317,7 @@ class OrderController extends Controller
         }
     }
 
-    public function payments($id, Request $request, string $siteName): JsonResponse
+    public function payments($id, Request $request, string $site): JsonResponse
     {
         try {
             $order = $this->orderService->getOrderById($id);
@@ -337,7 +337,7 @@ class OrderController extends Controller
         }
     }
 
-    public function createPayment($id, CreatePaymentRequest $request, string $siteName): JsonResponse
+    public function createPayment($id, CreatePaymentRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();

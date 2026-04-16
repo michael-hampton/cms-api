@@ -53,11 +53,11 @@ class PageController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $userId = Auth::id();
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $criteria->addFilter('exclude_private_internal', $userId); //hide private and internal from search
             $result = $this->pageRepository->search($criteria);
             // Format blocks in the paginated data
@@ -87,7 +87,7 @@ class PageController extends Controller
         }
     }
 
-    public function store(StorePageRequest $request, string $siteName): JsonResponse
+    public function store(StorePageRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->all();
@@ -134,7 +134,7 @@ class PageController extends Controller
         }
     }
 
-    public function update(int $id, UpdatePageRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdatePageRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->all();
@@ -163,7 +163,7 @@ class PageController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->pageService->deletePage($id);
@@ -332,7 +332,7 @@ class PageController extends Controller
         }
     }
 
-    public function bulkUpdate(Request $request, string $siteName): JsonResponse
+    public function bulkUpdate(Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);
@@ -354,7 +354,7 @@ class PageController extends Controller
         }
     }
 
-    public function duplicate(int $id, string $siteName): JsonResponse
+    public function duplicate(int $id, string $site): JsonResponse
     {
         try {
             /** @var ClonePage $handler */
@@ -373,7 +373,7 @@ class PageController extends Controller
         }
     }
 
-    public function cloneToSite(int $id, string $siteName, Request $request): JsonResponse
+    public function cloneToSite(int $id, string $site, Request $request): JsonResponse
     {
         try {
             $targetSiteId = $request->get('target_site_id');
@@ -400,7 +400,7 @@ class PageController extends Controller
         }
     }
 
-    public function bulkDelete(Request $request, string $siteName): JsonResponse
+    public function bulkDelete(Request $request, string $site): JsonResponse
     {
         try {
             $ids = $request->get('ids', []);
@@ -422,7 +422,7 @@ class PageController extends Controller
         }
     }
 
-    public function bulkUpdateStatus(Request $request, string $siteName): JsonResponse
+    public function bulkUpdateStatus(Request $request, string $site): JsonResponse
     {
         try {
             $ids = $request->get('ids', []);
@@ -449,7 +449,7 @@ class PageController extends Controller
         }
     }
 
-    public function approve(int $id, Request $request, string $siteName): JsonResponse
+    public function approve(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id'); // Get from authenticated user
@@ -466,7 +466,7 @@ class PageController extends Controller
         }
     }
 
-    public function reject(int $id, Request $request, string $siteName): JsonResponse
+    public function reject(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id');
@@ -484,7 +484,7 @@ class PageController extends Controller
         }
     }
 
-    public function putOnHold(int $id, Request $request, string $siteName): JsonResponse
+    public function putOnHold(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id');
@@ -502,7 +502,7 @@ class PageController extends Controller
         }
     }
 
-    public function makePrivate(int $id, Request $request, string $siteName): JsonResponse
+    public function makePrivate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id');
@@ -519,7 +519,7 @@ class PageController extends Controller
         }
     }
 
-    public function bulkApprove(Request $request, string $siteName): JsonResponse
+    public function bulkApprove(Request $request, string $site): JsonResponse
     {
         try {
             $ids = $request->get('ids', []);
@@ -546,7 +546,7 @@ class PageController extends Controller
         }
     }
 
-    public function makeInternal(int $id, Request $request, string $siteName): JsonResponse
+    public function makeInternal(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id');
@@ -563,7 +563,7 @@ class PageController extends Controller
         }
     }
 
-    public function getCalendarPages(Request $request, string $siteName): JsonResponse
+    public function getCalendarPages(Request $request, string $site): JsonResponse
     {
         try {
             $startDate = $request->get('start_date');
@@ -580,7 +580,7 @@ class PageController extends Controller
                 return $this->errorResponse('start_date and end_date are required', 422);
             }
 
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             if (!empty($search)) {
                 $criteria->setSearchQuery($search);
@@ -832,7 +832,7 @@ class PageController extends Controller
         ]);
     }
 
-    public function bulkSchedule(Request $request, string $siteName): JsonResponse
+    public function bulkSchedule(Request $request, string $site): JsonResponse
     {
         try {
             $schedules = $request->get('schedules', []);
@@ -882,7 +882,7 @@ class PageController extends Controller
 //        ]);
 //    }
 
-    public function updateSchedule(int $id, Request $request, string $siteName): JsonResponse
+    public function updateSchedule(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $scheduledDate = $request->get('scheduled_date');
@@ -908,7 +908,7 @@ class PageController extends Controller
         }
     }
 
-    public function unpublish(int $id, Request $request, string $siteName): JsonResponse
+    public function unpublish(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $userId = $request->get('user_id');
@@ -929,7 +929,7 @@ class PageController extends Controller
         }
     }
 
-    public function getCollaborators(string $siteName, int $pageId): JsonResponse
+    public function getCollaborators(string $site, int $pageId): JsonResponse
     {
         try {
             // Verify user has access to this page
@@ -949,7 +949,7 @@ class PageController extends Controller
         }
     }
 
-    public function getBrief(string $siteName, int $pageId): JsonResponse
+    public function getBrief(string $site, int $pageId): JsonResponse
     {
         try {
             $page = $this->pageRepository->find($pageId);
@@ -1010,7 +1010,7 @@ class PageController extends Controller
         }
     }
 
-    public function removeCollaborator(string $siteName, int $pageId, int $collaboratorId): JsonResponse
+    public function removeCollaborator(string $site, int $pageId, int $collaboratorId): JsonResponse
     {
         try {
             $success = $this->collaboratorRepository->remove($collaboratorId);

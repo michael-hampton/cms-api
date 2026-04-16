@@ -22,12 +22,12 @@ class VariantController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
 
             // Use search infrastructure
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             $result = $this->variantService->searchVariants($criteria);
 

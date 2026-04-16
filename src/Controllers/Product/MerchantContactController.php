@@ -25,10 +25,10 @@ class MerchantContactController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->merchantContactRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, MerchantContactResource::class);
@@ -39,7 +39,7 @@ class MerchantContactController extends Controller
         }
     }
 
-    public function store(CreateMerchantContactRequest $request, string $siteName): JsonResponse
+    public function store(CreateMerchantContactRequest $request, string $site): JsonResponse
     {
         try {
             $contact = $this->contactService->createContact($request->validated());
@@ -72,7 +72,7 @@ class MerchantContactController extends Controller
         }
     }
 
-    public function update(UpdateMerchantContactRequest $request, int $id, string $siteName): JsonResponse
+    public function update(UpdateMerchantContactRequest $request, int $id, string $site): JsonResponse
     {
         try {
             $contact = $this->contactService->updateContact($id, $request->validated());
@@ -92,7 +92,7 @@ class MerchantContactController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         try {
             $deleted = $this->contactService->deleteContact($id);
@@ -107,7 +107,7 @@ class MerchantContactController extends Controller
         }
     }
 
-    public function getByMerchant(int $merchantId, string $siteName): JsonResponse
+    public function getByMerchant(int $merchantId, string $site): JsonResponse
     {
         try {
             $contacts = $this->contactService->getContactsByMerchant($merchantId);

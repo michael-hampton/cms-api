@@ -248,8 +248,6 @@
 </div>
 
 <script>
-    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
-
     async function loadLikedPages() {
         try {
             const res = await fetch(`/api/${SITE_SLUG}/member/liked-pages`);

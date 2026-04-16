@@ -34,10 +34,10 @@ class AuthorController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->authorRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, AuthorResource::class);
@@ -49,11 +49,11 @@ class AuthorController extends Controller
         }
     }
 
-    public function store(CreateAuthorRequest $request, string $siteName): JsonResponse
+    public function store(CreateAuthorRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
 
             $avatarFile = $request->hasFile('avatar') ? $request->file('avatar') : null;
 
@@ -99,7 +99,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function update(int $id, UpdateAuthorRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateAuthorRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -120,7 +120,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->authorService->delete($id, $request->get('reassignId'));
@@ -147,7 +147,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function merge(Request $request, string $siteName): JsonResponse
+    public function merge(Request $request, string $site): JsonResponse
     {
         try {
             $sourceId = $request->get('source_author_id');
@@ -168,7 +168,7 @@ class AuthorController extends Controller
         }
     }
 
-    public function checkDelete(int $id, string $siteName): JsonResponse
+    public function checkDelete(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->authorService->checkDeletable($id);

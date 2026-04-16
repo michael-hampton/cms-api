@@ -318,6 +318,50 @@
     .carousel-dot.active {
         background: #ffa41c;
     }
+
+    .deals-search-container {
+        position: relative;
+        margin-bottom: 1.5rem;
+        max-width: 400px;
+    }
+
+    .deals-search-input {
+        width: 100%;
+        padding: 0.6rem 1rem 0.6rem 2.5rem;
+        border: 1px solid #d5d9d9;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .deals-search-input:focus {
+        outline: none;
+        border-color: #007185;
+        box-shadow: 0 0 0 3px rgba(0, 113, 133, 0.15);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #888;
+        pointer-events: none;
+    }
+
+    /* Handling "No Results" state */
+    .deals-no-results {
+        display: none;
+        padding: 3rem;
+        text-align: center;
+        color: #565959;
+        width: 100%;
+    }
+
+    /* Ensure hidden cards don't affect layout during search */
+    .deal-card.is-hidden {
+        display: none !important;
+    }
 </style>
 
 <div class="deals-carousel-wrapper">
@@ -333,6 +377,19 @@
         </button>
     </div>
 
+    <div class="deals-search-container">
+        <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text"
+               id="deals-search"
+               class="deals-search-input"
+               placeholder="Search deals (e.g. 'Apple', '50% off')..."
+               onkeyup="filterDeals()">
+    </div>
+
     <div class="deals-carousel" id="deals-carousel">
         <button class="carousel-arrow carousel-arrow-left" onclick="event.stopPropagation(); scrollCarousel(-1)">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -340,10 +397,14 @@
             </svg>
         </button>
 
-        <div class="deals-carousel-track">
+        <div class="deals-carousel-track" id="deals-track">
             <?php foreach ($todaysDeals ?? [] as $deal): ?>
-                <?php include __DIR__ . '/../../views/components/deal-card.php'; ?>
+                @include('components/deal-card', ['deal' => $deal])
             <?php endforeach; ?>
+
+            <div id="no-deals-msg" class="deals-no-results">
+                <p>No deals match your search.</p>
+            </div>
         </div>
 
         <button class="carousel-arrow carousel-arrow-right" onclick="event.stopPropagation(); scrollCarousel(1)">
@@ -355,3 +416,45 @@
 
     <div class="carousel-dots" id="carousel-dots"></div>
 </div>
+
+<script>
+    function filterDeals() {
+        const input = document.getElementById('deals-search');
+        const filter = input.value.toLowerCase();
+        const track = document.getElementById('deals-track');
+        const cards = track.getElementsByClassName('deal-card');
+        const noResults = document.getElementById('no-deals-msg');
+        let visibleCount = 0;
+
+        // Loop through all deal cards
+        for (let i = 0; i < cards.length; i++) {
+            // Check against data-title attribute (or card text content)
+            const title = cards[i].getAttribute('data-title') || cards[i].innerText.toLowerCase();
+
+            if (title.indexOf(filter) > -1) {
+                cards[i].classList.remove('is-hidden');
+                visibleCount++;
+            } else {
+                cards[i].classList.add('is-hidden');
+            }
+        }
+
+        // Toggle No Results message
+        noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+
+        // Reset Carousel Position to start so visible items are aligned
+        track.scrollLeft = 0;
+
+        // Hide arrows if results are fewer than what fits on screen
+        const prevBtn = document.getElementById('deals-prev');
+        const nextBtn = document.getElementById('deals-next');
+
+        if (visibleCount <= 1) {
+            prevBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+        } else {
+            prevBtn.style.display = 'flex';
+            nextBtn.style.display = 'flex';
+        }
+    }
+</script>

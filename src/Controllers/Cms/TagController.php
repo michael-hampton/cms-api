@@ -38,10 +38,10 @@ class TagController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);;
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);;
             $result = $this->tagRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, TagResource::class);
@@ -68,7 +68,7 @@ class TagController extends Controller
         }
     }
 
-    public function store(CreateTagRequest $request, string $siteName): JsonResponse
+    public function store(CreateTagRequest $request, string $site): JsonResponse
     {
         try {
             $tag = $this->tagRepository->create($request->validated());
@@ -78,7 +78,7 @@ class TagController extends Controller
         }
     }
 
-    public function update(int $id, UpdateTagRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateTagRequest $request, string $site): JsonResponse
     {
         try {
             $tag = $this->tagRepository->update($id, $request->validated());
@@ -91,7 +91,7 @@ class TagController extends Controller
         }
     }
 
-    public function destroy(Request $request, int $id, string $siteName): JsonResponse
+    public function destroy(Request $request, int $id, string $site): JsonResponse
     {
         try {
             $reassignToId = $request->input('reassignId');
@@ -190,7 +190,7 @@ class TagController extends Controller
         }
     }
 
-    public function checkDelete(int $id, string $siteName): JsonResponse
+    public function checkDelete(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->tagService->checkDeletable($id);
@@ -208,7 +208,7 @@ class TagController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();

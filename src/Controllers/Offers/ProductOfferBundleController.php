@@ -32,10 +32,10 @@ class ProductOfferBundleController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $configuration = SearchConfigurationFactory::create('product_offer_bundle');
             $engine = new SearchEngine($configuration);
 
@@ -53,7 +53,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function store(StoreProductOfferBundleRequest $request, string $siteName): JsonResponse
+    public function store(StoreProductOfferBundleRequest $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -84,7 +84,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function show(int $bundleId, string $siteName): JsonResponse
+    public function show(int $bundleId, string $site): JsonResponse
     {
         try {
             $bundle = $this->bundleService->getBundle($bundleId);
@@ -102,7 +102,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function update(int $bundleId, UpdateProductOfferBundleRequest $request, string $siteName): JsonResponse
+    public function update(int $bundleId, UpdateProductOfferBundleRequest $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -138,7 +138,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function destroy(int $bundleId, string $siteName): JsonResponse
+    public function destroy(int $bundleId, string $site): JsonResponse
     {
         try {
             $deleted = $this->bundleService->deleteBundle($bundleId);
@@ -156,7 +156,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function publish(int $bundleId, string $siteName): JsonResponse
+    public function publish(int $bundleId, string $site): JsonResponse
     {
         try {
             $userId = auth()->id() ?? 1;
@@ -176,7 +176,7 @@ class ProductOfferBundleController extends Controller
         }
     }
 
-    public function reject(int $bundleId, Request $request, string $siteName): JsonResponse
+    public function reject(int $bundleId, Request $request, string $site): JsonResponse
     {
         try {
             $userId = auth()->id() ?? 1;
@@ -211,7 +211,7 @@ class ProductOfferBundleController extends Controller
      *
      * Body: { "ids": [1, 2, 3] }
      */
-    public function bulkPublish(Request $request, string $siteName): JsonResponse
+    public function bulkPublish(Request $request, string $site): JsonResponse
     {
         try {
             $ids = $request->input('ids');
@@ -240,7 +240,7 @@ class ProductOfferBundleController extends Controller
      *
      * Body: { "ids": [1, 2, 3] }
      */
-    public function bulkDelete(BulkActionRequest $request, string $siteName): JsonResponse
+    public function bulkDelete(BulkActionRequest $request, string $site): JsonResponse
     {
         try {
             $ids = $request->input('ids');

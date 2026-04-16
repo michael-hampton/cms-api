@@ -20,7 +20,7 @@ class MenuController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName)
+    public function index(Request $request, string $site)
     {
         try {
             $type = $request->get('type'); // Get type from query params
@@ -34,9 +34,9 @@ class MenuController extends Controller
                     ], 422);
                 }
 
-                $menus = $this->menuRepository->getMenusByType($type, $siteName);
+                $menus = $this->menuRepository->getMenusByType($type, $site);
             } else {
-                $menus = $this->menuRepository->getAllMenus($siteName);
+                $menus = $this->menuRepository->getAllMenus($site);
             }
 
             return $this->jsonResponse([
@@ -100,7 +100,7 @@ class MenuController extends Controller
         }
     }
 
-    public function store(CreateMenuRequest $request, string $siteName): JsonResponse
+    public function store(CreateMenuRequest $request, string $site): JsonResponse
     {
         try {
             $menu = $this->menuService->createMenu($request->validated());
@@ -118,7 +118,7 @@ class MenuController extends Controller
         }
     }
 
-    public function update(UpdateMenuRequest $request, int $id, string $siteName): JsonResponse
+    public function update(UpdateMenuRequest $request, int $id, string $site): JsonResponse
     {
         try {
             $menu = $this->menuService->updateMenu($id, $request->validated());
@@ -137,7 +137,7 @@ class MenuController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         try {
             $this->menuService->deleteMenu($id);

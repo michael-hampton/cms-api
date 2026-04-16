@@ -26,10 +26,10 @@ class SubscriptionPlanPricingController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, ?int $planId = null, string $siteName = '')
+    public function index(Request $request, ?int $planId = null, string $site = '')
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             if (!empty($planId)) {
                 $criteria->addFilter('plan_id', $planId);

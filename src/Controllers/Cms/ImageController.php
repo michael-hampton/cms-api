@@ -24,10 +24,10 @@ class ImageController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);;
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);;
             $result = $this->imageRepository->search($criteria);
 
             return $this->searchResponse($result);
@@ -36,7 +36,7 @@ class ImageController extends Controller
         }
     }
 
-    public function store(CreateImageRequest $request, string $siteName): JsonResponse
+    public function store(CreateImageRequest $request, string $site): JsonResponse
     {
         try {
             $file = $request->file('image');
@@ -83,7 +83,7 @@ class ImageController extends Controller
         }
     }
 
-    public function update(int $id, UpdateImageRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateImageRequest $request, string $site): JsonResponse
     {
         try {
             $metadata = $request->validated();
@@ -111,7 +111,7 @@ class ImageController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $hardDelete = $request->get('hard_delete', false);
@@ -130,7 +130,7 @@ class ImageController extends Controller
         }
     }
 
-    public function bulkDestroy(Request $request, string $siteName): JsonResponse
+    public function bulkDestroy(Request $request, string $site): JsonResponse
     {
         try {
             $imageIds = $request->get('image_ids', []);
@@ -152,7 +152,7 @@ class ImageController extends Controller
         }
     }
 
-    public function recent(Request $request, string $siteName): JsonResponse
+    public function recent(Request $request, string $site): JsonResponse
     {
         try {
             $limit = (int)$request->get('limit', 10);
@@ -180,7 +180,7 @@ class ImageController extends Controller
         }
     }
 
-    public function unused(Request $request, string $siteName): JsonResponse
+    public function unused(Request $request, string $site): JsonResponse
     {
         try {
             $olderThanDays = $request->get('older_than_days');
@@ -198,7 +198,7 @@ class ImageController extends Controller
         }
     }
 
-    public function cleanup(Request $request, string $siteName): JsonResponse
+    public function cleanup(Request $request, string $site): JsonResponse
     {
         try {
             $olderThanDays = (int)$request->get('older_than_days', 30);
@@ -215,7 +215,7 @@ class ImageController extends Controller
         }
     }
 
-    public function trackUsage(Request $request, string $siteName): JsonResponse
+    public function trackUsage(Request $request, string $site): JsonResponse
     {
         try {
             $imageId = (int)$request->get('image_id');
@@ -236,7 +236,7 @@ class ImageController extends Controller
         }
     }
 
-    public function removeUsage(Request $request, string $siteName): JsonResponse
+    public function removeUsage(Request $request, string $site): JsonResponse
     {
         try {
             $imageId = (int)$request->get('image_id');
@@ -257,10 +257,10 @@ class ImageController extends Controller
         }
     }
 
-    public function categories(string $siteName): JsonResponse
+    public function categories(string $site): JsonResponse
     {
         try {
-            $categories = $this->imageService->getCategories($siteName);
+            $categories = $this->imageService->getCategories($site);
 
             return $this->jsonResponse([
                 'categories' => $categories->toArray()
@@ -271,7 +271,7 @@ class ImageController extends Controller
         }
     }
 
-    public function createCategory(CreateImageCategoryRequest $request, string $siteName): JsonResponse
+    public function createCategory(CreateImageCategoryRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -304,7 +304,7 @@ class ImageController extends Controller
         return sprintf("%.1f %s", $bytes / pow(1024, $factor), $units[$factor]);
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $metadata = [
@@ -335,7 +335,7 @@ class ImageController extends Controller
         }
     }
 
-    public function archive(int $id, Request $request, string $siteName): JsonResponse
+    public function archive(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->imageService->archiveImage($id);
@@ -350,7 +350,7 @@ class ImageController extends Controller
         }
     }
 
-    public function bulkArchive(Request $request, string $siteName): JsonResponse
+    public function bulkArchive(Request $request, string $site): JsonResponse
     {
         try {
             $imageIds = $request->get('image_ids', []);
@@ -370,7 +370,7 @@ class ImageController extends Controller
         }
     }
 
-    public function unarchive(int $id, Request $request, string $siteName): JsonResponse
+    public function unarchive(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->imageService->unarchiveImage($id);

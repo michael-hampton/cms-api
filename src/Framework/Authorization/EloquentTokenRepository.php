@@ -9,7 +9,7 @@ class EloquentTokenRepository
 {
     public function create(PersonalAccessToken $token): PersonalAccessToken
     {
-        $personalAccessToken = \App\Models\PersonalAccessToken::create([
+        $attributes = [
             'tokenable_type' => $token->getTokenableType(),
             'tokenable_id' => $token->getTokenableId(),
             'site_id' => $token->getSiteId(),
@@ -19,7 +19,13 @@ class EloquentTokenRepository
             'expires_at' => null,
             'created_at' => (new DateTime())->format('Y-m-d H:i:s'),
             'updated_at' => (new DateTime())->format('Y-m-d H:i:s')
-        ]);
+        ];
+
+        if ($this->hasUserIdColumn() && $token->getTokenableType() === \App\Models\User::class) {
+            $attributes['user_id'] = $token->getTokenableId();
+        }
+
+        $personalAccessToken = \App\Models\PersonalAccessToken::create($attributes);
 
         return new PersonalAccessToken(
             $token->getTokenableType(),
@@ -59,7 +65,13 @@ class EloquentTokenRepository
 
     public function revokeUserTokens(int $userId, int $siteId): void
     {
-        \App\Models\PersonalAccessToken::where('tokenable_id', $userId)
+        $this->revokeTokensFor(\App\Models\User::class, $userId, $siteId);
+    }
+
+    public function revokeTokensFor(string $tokenableType, int $tokenableId, int $siteId): void
+    {
+        \App\Models\PersonalAccessToken::where('tokenable_type', $tokenableType)
+            ->where('tokenable_id', $tokenableId)
             ->where('site_id', $siteId)
             ->delete();
     }
@@ -83,5 +95,27 @@ class EloquentTokenRepository
         }
 
         return true;
+    }
+
+    private function hasUserIdColumn(): bool
+    {
+        static $hasUserIdColumn;
+
+        if ($hasUserIdColumn !== null) {
+            return $hasUserIdColumn;
+        }
+
+        try {
+            $result = Database::getInstance()->query(
+                "SHOW COLUMNS FROM `personal_access_tokens` LIKE ?",
+                ['user_id']
+            );
+
+            $hasUserIdColumn = $result->rowCount() > 0;
+        } catch (\Throwable) {
+            $hasUserIdColumn = false;
+        }
+
+        return $hasUserIdColumn;
     }
 }

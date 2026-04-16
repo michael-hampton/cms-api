@@ -5,6 +5,7 @@ namespace App\Framework\Authorization;
 use App\Framework\Http\MiddlewareInterface;
 use App\Framework\Http\Request;
 use App\Framework\Http\Response;
+use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticateWithToken implements MiddlewareInterface
@@ -29,16 +30,16 @@ class AuthenticateWithToken implements MiddlewareInterface
             ], 401);
         }
 
-        $userId = $this->authService->validateToken($token, $siteId);
+        $accessToken = $this->authService->validateAccessToken($token, $siteId);
 
-        if (!$userId) {
+        if (!$accessToken || $accessToken->getTokenableType() !== User::class) {
             return Response::json([
                 'success' => false,
                 'message' => 'Invalid or expired token',
             ], 401);
         }
 
-        $user = $this->userRepository->findById($userId, $siteId);
+        $user = $this->userRepository->findById($accessToken->getTokenableId(), $siteId);
 
         if (!$user) {
             return Response::json([

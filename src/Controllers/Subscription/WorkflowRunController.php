@@ -46,10 +46,10 @@ class WorkflowRunController extends Controller
      *   started_before — ISO-8601 date string upper bound on started_at
      *   per_page       — default 25, max 100
      */
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->runRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, WorkflowRunResource::class);

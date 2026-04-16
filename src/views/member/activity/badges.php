@@ -589,7 +589,6 @@
     let unearnedBadges = [];
     let currentPage = 1;
     const ITEMS_PER_PAGE = 6;
-    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
     /* Carousel state */
     let currentCarouselIndex = 0;

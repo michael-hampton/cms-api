@@ -29,7 +29,7 @@ class PaymentController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $status = $request->query('status');
@@ -49,7 +49,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function show($id, string $siteName): JsonResponse
+    public function show($id, string $site): JsonResponse
     {
         try {
             $payment = $this->paymentRepository->find($id);
@@ -67,7 +67,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function process(int $id, Request $request, string $siteName): JsonResponse
+    public function process(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -83,7 +83,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function complete(int $id, Request $request, string $siteName): JsonResponse
+    public function complete(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -99,7 +99,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function fail(int $id, FailPaymentRequest $request, string $siteName): JsonResponse
+    public function fail(int $id, FailPaymentRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -119,7 +119,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function cancel(int $id, Request $request, string $siteName): JsonResponse
+    public function cancel(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -136,7 +136,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function retry(int $id, Request $request, string $siteName): JsonResponse
+    public function retry(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $payment = $this->paymentService->retryPayment($id);
@@ -150,7 +150,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function refund(int $id, RefundPaymentRequest $request, string $siteName): JsonResponse
+    public function refund(int $id, RefundPaymentRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -170,7 +170,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function byTransaction(Request $request, string $siteName): JsonResponse
+    public function byTransaction(Request $request, string $site): JsonResponse
     {
         try {
             $transactionId = $request->query('transaction_id');
@@ -194,7 +194,7 @@ class PaymentController extends Controller
         }
     }
 
-    public function totalCollected(Request $request, string $siteName): JsonResponse
+    public function totalCollected(Request $request, string $site): JsonResponse
     {
         try {
             $startDate = $request->query('start_date');

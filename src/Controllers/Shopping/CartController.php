@@ -5,6 +5,7 @@ namespace App\Controllers\Shopping;
 use App\Controllers\Controller;
 use App\DTO\Checkout\DeliveryMethodConfig;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Events\Members\OrderCreatedByMember;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -56,7 +57,7 @@ class CartController extends Controller
         private readonly CartMigrationService   $cartMigration,
         private GiftResolutionService           $giftResolutionService,
         private readonly SubscriptionRepository $subscriptionRepository,
-        private readonly CurrencyResolver $currencyResolver,
+        private readonly CurrencyResolver       $currencyResolver,
     )
     {
         parent::__construct();
@@ -403,22 +404,21 @@ class CartController extends Controller
         if (!empty($data['multi_merchant']) && $data['multi_merchant'] === true) {
             $result = $this->checkoutService->processMultiMerchantCheckout($data, $siteId);
             $statusCode = $result['success'] ? 200 : 400;
+            event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId()));
             $this->clearCheckoutSession();
             return $this->resourceResponse($result, $statusCode);
         }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
         $statusCode = $result['success'] ? 200 : 400;
+
+        if (MemberAuth::check() && $result['success']) {
+            event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId(), $result['order_id']));
+        }
+
         $this->clearCheckoutSession();
 
         return $this->resourceResponse($result, $statusCode);
-    }
-
-    private function clearCheckoutSession(): void
-    {
-        Session::forget('applied_voucher_code');
-        Session::forget('checkout_token');
-        Session::forget('pending_otp_email');
     }
 
     private function processSubscription(Request $request): array
@@ -432,9 +432,18 @@ class CartController extends Controller
 
         $result = $this->subscriptionCheckoutService->processCheckout($data, $siteId);
 
+        event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId()));
+
         Session::forget('applied_voucher_code');
 
         return $result;
+    }
+
+    private function clearCheckoutSession(): void
+    {
+        Session::forget('applied_voucher_code');
+        Session::forget('checkout_token');
+        Session::forget('pending_otp_email');
     }
 
     public function add(Request $request)

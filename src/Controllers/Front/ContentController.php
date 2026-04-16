@@ -4,6 +4,7 @@ namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
 use App\Events\ActivityTracking;
+use App\Events\Members\PageViewedByMember;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
@@ -91,6 +92,10 @@ class ContentController extends Controller
             $_SERVER['HTTP_USER_AGENT'] ?? null,
             $_SERVER['HTTP_REFERER'] ?? null
         );
+
+        if ($memberId) {
+            event(new PageViewedByMember($memberId, $page->id, $siteId));
+        }
 
         $this->activityTracking->trackPageView($page);
 

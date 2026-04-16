@@ -31,10 +31,10 @@ class MerchantController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->merchantRepository->search($criteria);
             $collection = new PaginatedResourceCollection($result, MerchantResource::class);
 
@@ -44,7 +44,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function store(CreateMerchantRequest $request, string $siteName): JsonResponse
+    public function store(CreateMerchantRequest $request, string $site): JsonResponse
     {
         try {
             $logoFile = $request->hasFile('logo') ? $request->file('logo') : null;
@@ -82,7 +82,7 @@ class MerchantController extends Controller
         return $this->jsonResponse(['merchant' => $merchant]);
     }
 
-    public function update(UpdateMerchantRequest $request, int $id, string $siteName): JsonResponse
+    public function update(UpdateMerchantRequest $request, int $id, string $site): JsonResponse
     {
         try {
             $logoFile = $request->hasFile('logo') ? $request->file('logo') : null;
@@ -116,7 +116,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         $deleted = $this->merchantService->deleteMerchant($id);
 
@@ -131,7 +131,7 @@ class MerchantController extends Controller
         ], 200);
     }
 
-    public function toggleStatus(int $id, string $siteName): JsonResponse
+    public function toggleStatus(int $id, string $site): JsonResponse
     {
         try {
             $merchant = $this->merchantService->toggleStatus($id);
@@ -151,7 +151,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function bulkUpdateStatus(Request $request, string $siteName): JsonResponse
+    public function bulkUpdateStatus(Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -173,7 +173,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function bulkDelete(Request $request, string $siteName): JsonResponse
+    public function bulkDelete(Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -194,7 +194,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function active(Request $request, string $siteName): JsonResponse
+    public function active(Request $request, string $site): JsonResponse
     {
         try {
             $merchants = $this->merchantService->getActiveMerchants();
@@ -208,7 +208,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function statistics(string $siteName, Request $request): JsonResponse
+    public function statistics(string $site, Request $request): JsonResponse
     {
         $merchantId = $request->get('merchant_id') ?? null;
 
@@ -280,7 +280,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function deleteNote(int $id, string $siteName): JsonResponse
+    public function deleteNote(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->merchantRepository->deleteNote($id);
@@ -300,7 +300,7 @@ class MerchantController extends Controller
         }
     }
 
-    public function getTransactions(int $id, Request $request, string $siteName): JsonResponse
+    public function getTransactions(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $filters = [

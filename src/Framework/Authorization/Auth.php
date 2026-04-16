@@ -150,13 +150,13 @@ class Auth
         // Use your authentication service to validate token
         // This assumes you have a token repository/service
         $authService = app(AuthenticationService::class);
-        $userId = $authService->validateToken($token, SiteContext::getId());
+        $accessToken = $authService->validateAccessToken($token, SiteContext::getId());
 
-        if (!$userId) {
+        if (!$accessToken || $accessToken->getTokenableType() !== User::class) {
             return null;
         }
 
-        $user = User::find($userId);
+        $user = User::find($accessToken->getTokenableId());
 
         if (!$user) {
             return null;

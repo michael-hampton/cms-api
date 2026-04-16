@@ -21,7 +21,7 @@ class MemberController extends Controller
         parent::__construct();
     }
 
-    public function search(Request $request, string $siteName)
+    public function search(Request $request, string $site)
     {
         try {
             $site = SiteContext::get();

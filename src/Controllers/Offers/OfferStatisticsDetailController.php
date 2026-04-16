@@ -40,7 +40,7 @@ class OfferStatisticsDetailController extends Controller
         'unique_clickers',
     ];
 
-    public function show(Request $request, string $siteName, string $type): JsonResponse
+    public function show(Request $request, string $site, string $type): JsonResponse
     {
         if (!in_array($type, self::ALLOWED_TYPES, true)) {
             return $this->errorResponse('Unknown statistics type', 422);

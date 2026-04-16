@@ -18,7 +18,7 @@ class PageHistoryController extends Controller
         parent::__construct();
     }
 
-    public function index(int $pageId, string $siteName): JsonResponse
+    public function index(int $pageId, string $site): JsonResponse
     {
         try {
             $limit = $_GET['limit'] ?? 50;
@@ -34,7 +34,7 @@ class PageHistoryController extends Controller
         }
     }
 
-    public function show(int $id, string $siteName): JsonResponse
+    public function show(int $id, string $site): JsonResponse
     {
         try {
             $entry = $this->historyService->getHistoryEntry($id);
@@ -51,11 +51,11 @@ class PageHistoryController extends Controller
         }
     }
 
-    public function recent(Request $request, string $siteName): JsonResponse
+    public function recent(Request $request, string $site): JsonResponse
     {
         try {
             $limit = $request->get('limit', 20);
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
 
             $history = $this->historyService->getRecentHistory($siteId, (int)$limit);
 
@@ -69,7 +69,7 @@ class PageHistoryController extends Controller
         }
     }
 
-    public function userHistory(int $userId, string $siteName): JsonResponse
+    public function userHistory(int $userId, string $site): JsonResponse
     {
         try {
             $limit = $_GET['limit'] ?? 50;
@@ -85,7 +85,7 @@ class PageHistoryController extends Controller
         }
     }
 
-    public function restore(int $historyId, string $siteName): JsonResponse
+    public function restore(int $historyId, string $site): JsonResponse
     {
         try {
             $page = $this->historyService->restoreFromHistory($historyId);

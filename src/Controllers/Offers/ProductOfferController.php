@@ -35,9 +35,9 @@ class ProductOfferController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, int $productId, string $siteName)
+    public function index(Request $request, int $productId, string $site)
     {
-        $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+        $criteria = SearchCriteriaParser::fromRequest($request, $site);
         $configuration = SearchConfigurationFactory::create('product_offer');
         $engine = new SearchEngine($configuration);
 
@@ -52,7 +52,7 @@ class ProductOfferController extends Controller
         ]);
     }
 
-    public function categoryOffers(int $categoryId, string $siteName): JsonResponse
+    public function categoryOffers(int $categoryId, string $site): JsonResponse
     {
         try {
             $offers = $this->offerService->getActiveOffersForCategory($categoryId);
@@ -66,7 +66,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function store(int $productId, CreateProductOfferRequest $request, string $siteName): JsonResponse
+    public function store(int $productId, CreateProductOfferRequest $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -96,7 +96,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function update(int $productId, int $offerId, UpdateProductOfferRequest $request, string $siteName): JsonResponse
+    public function update(int $productId, int $offerId, UpdateProductOfferRequest $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -132,7 +132,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function destroy(int $productId, int $offerId, string $siteName): JsonResponse
+    public function destroy(int $productId, int $offerId, string $site): JsonResponse
     {
         try {
             $deleted = $this->offerService->deleteOffer($offerId);
@@ -150,7 +150,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function publish(int $productId, int $offerId, string $siteName): JsonResponse
+    public function publish(int $productId, int $offerId, string $site): JsonResponse
     {
         try {
             $userId = auth()->id() ?? 1;
@@ -170,7 +170,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function reject(int $productId, int $offerId, Request $request, string $siteName): JsonResponse
+    public function reject(int $productId, int $offerId, Request $request, string $site): JsonResponse
     {
         try {
             $userId = auth()->id() ?? 1;
@@ -196,10 +196,10 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function allOffers(Request $request, string $siteName): JsonResponse
+    public function allOffers(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $configuration = SearchConfigurationFactory::create('product_offer');
             $engine = new SearchEngine($configuration);
 
@@ -217,7 +217,7 @@ class ProductOfferController extends Controller
         }
     }
 
-    public function getStatistics(Request $request, string $siteName): JsonResponse
+    public function getStatistics(Request $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -260,7 +260,7 @@ class ProductOfferController extends Controller
      *
      * Body: { "ids": [1, 2, 3] }
      */
-    public function bulkPublish(Request $request, string $siteName): JsonResponse
+    public function bulkPublish(Request $request, string $site): JsonResponse
     {
         try {
             $ids = $request->input('ids');
@@ -289,7 +289,7 @@ class ProductOfferController extends Controller
      *
      * Body: { "ids": [1, 2, 3] }
      */
-    public function bulkDelete(BulkActionRequest $request, string $siteName): JsonResponse
+    public function bulkDelete(BulkActionRequest $request, string $site): JsonResponse
     {
         try {
             $ids = $request->input('ids');

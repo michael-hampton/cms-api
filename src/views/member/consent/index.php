@@ -675,6 +675,28 @@
             </button>
         </div>
     </div>
+
+    <div class="consent-category" id="audit-history-panel" style="margin-top: 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+            <div>
+                <h2 style="font-size:1.375rem;font-weight:700;margin-bottom:.25rem;">📋 Consent History</h2>
+                <p style="color:var(--text-secondary);font-size:.9rem;">
+                    A full record of every change to your consent preferences.
+                </p>
+            </div>
+            <a href="/member/consent/audit-trail" style="font-size:.85rem;color:var(--primary-color);
+           text-decoration:none;font-weight:500;">View full page →</a>
+        </div>
+
+        <div id="audit-history-loading" style="padding:1.5rem 0;color:var(--text-secondary);font-size:.9rem;">
+            Loading history…
+        </div>
+        <div id="audit-history-empty"
+             style="display:none;padding:1.5rem 0;color:var(--text-secondary);font-size:.9rem;">
+            No consent changes recorded yet.
+        </div>
+        <div id="audit-history-list" style="display:none;"></div>
+    </div>
 </main>
 
 <script>
@@ -725,6 +747,7 @@
 
         const merged = mergeConsents(typesJson.data, consentsJson.consents);
 
+        loadaud
         renderConsents(merged);
         setLastUpdated();
     }
@@ -1030,6 +1053,75 @@
             console.error('Error requesting deletion:', error);
             showAlert('✕ Failed to submit request', 'error');
         }
+    }
+
+    (async function loadAuditHistory() {
+        const listEl = document.getElementById('audit-history-list');
+        const loadingEl = document.getElementById('audit-history-loading');
+        const emptyEl = document.getElementById('audit-history-empty');
+
+        try {
+            const res = await fetch(`/api/${SITE}/member/consent/audit-history`);
+            const data = await res.json();
+
+            loadingEl.style.display = 'none';
+
+            if (!data.success || !data.audit_trail?.length) {
+                emptyEl.style.display = 'block';
+                return;
+            }
+
+            const actionColour = {
+                granted: {bg: '#d1fae5', colour: '#065f46'},
+                revoked: {bg: '#fee2e2', colour: '#991b1b'},
+                updated: {bg: '#fef3c7', colour: '#92400e'},
+                expired: {bg: '#f3f4f6', colour: '#4b5563'},
+            };
+
+            const rows = data.audit_trail.slice(0, 10).map(entry => {
+                const ac = actionColour[entry.action] ?? actionColour.expired;
+                const badge = `<span style="padding:.25rem .6rem;border-radius:.4rem;font-size:.75rem;font-weight:600;
+                           text-transform:uppercase;background:${ac.bg};color:${ac.colour};">
+                           ${entry.action}</span>`;
+
+                const stateChange = (entry.previous_state !== null)
+                    ? `<span style="font-size:.8rem;color:var(--text-secondary);margin-left:.5rem;">
+                       ${entry.previous_state ? 'Granted' : 'Not Granted'} → ${entry.new_state ? 'Granted' : 'Not Granted'}
+                   </span>`
+                    : '';
+
+                return `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                        padding:.875rem 0;border-bottom:1px solid var(--border-color);">
+                <div>
+                    ${badge}
+                    <span style="font-weight:600;margin-left:.5rem;font-size:.9rem;">
+                        ${escHtml(entry.consent_type.name)}
+                    </span>
+                    ${stateChange}
+                    <div style="font-size:.78rem;color:var(--text-secondary);margin-top:.25rem;">
+                        ${escHtml(entry.source.charAt(0).toUpperCase() + entry.source.slice(1))}
+                        ${entry.admin_email ? ` · ${escHtml(entry.admin_email)}` : ''}
+                    </div>
+                </div>
+                <div style="font-size:.78rem;color:var(--text-secondary);white-space:nowrap;margin-left:1rem;">
+                    ${entry.created_at ?? ''}
+                </div>
+            </div>`;
+            }).join('');
+
+            listEl.innerHTML = rows;
+            listEl.style.display = 'block';
+
+        } catch (e) {
+            loadingEl.textContent = 'Failed to load consent history.';
+        }
+    })();
+
+    function escHtml(str) {
+        if (typeof str !== 'string') return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
 </script>
 </body>

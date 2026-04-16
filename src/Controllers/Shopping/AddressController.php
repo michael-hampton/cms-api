@@ -29,6 +29,8 @@ class AddressController extends Controller
         try {
             $memberId = $request->get('member_id');
 
+            die('here');
+
             if (!$memberId) {
                 return $this->errorResponse('Member ID is required', 400);
             }

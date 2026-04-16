@@ -33,10 +33,10 @@ class VoucherController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->voucherRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, VoucherResource::class);
@@ -47,7 +47,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function store(CreateVoucherRequest $request, string $siteName): JsonResponse
+    public function store(CreateVoucherRequest $request, string $site): JsonResponse
     {
         try {
             $validated = $request->validated();
@@ -67,7 +67,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function show(int $id, string $siteName): JsonResponse
+    public function show(int $id, string $site): JsonResponse
     {
         try {
             $voucher = $this->voucherRepository->find($id);
@@ -82,7 +82,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function update(int $id, UpdateVoucherRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateVoucherRequest $request, string $site): JsonResponse
     {
         try {
             $validated = $request->validated();
@@ -106,7 +106,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->voucherService->delete($id);
@@ -121,7 +121,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function checkDelete(int $id, string $siteName): JsonResponse
+    public function checkDelete(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->voucherService->checkDeletable($id);
@@ -131,7 +131,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function alternatives(int $id, string $siteName): JsonResponse
+    public function alternatives(int $id, string $site): JsonResponse
     {
         try {
             $alternatives = $this->voucherService->getAlternativeVouchers($id);
@@ -141,7 +141,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function duplicate(int $id, string $siteName, Request $request): JsonResponse
+    public function duplicate(int $id, string $site, Request $request): JsonResponse
     {
         try {
             $newCode = $request->get('code', null);
@@ -158,7 +158,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function validate(Request $request, string $siteName): JsonResponse
+    public function validate(Request $request, string $site): JsonResponse
     {
         try {
             $code = $request->get('code');
@@ -267,7 +267,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function active(string $siteName): JsonResponse
+    public function active(string $site): JsonResponse
     {
         try {
             $vouchers = $this->voucherRepository->getActiveVouchers();
@@ -317,7 +317,7 @@ class VoucherController extends Controller
         }
     }
 
-    public function redemptions(int $id, string $siteName): JsonResponse
+    public function redemptions(int $id, string $site): JsonResponse
     {
         try {
             $redemptions = $this->voucherRepository->getRedemptionsByVoucher($id);

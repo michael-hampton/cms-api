@@ -35,11 +35,11 @@ class ProductController extends Controller
     }
 
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             // Use search infrastructure
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             $result = $this->productRepository->search($criteria);
 
@@ -51,7 +51,7 @@ class ProductController extends Controller
         }
     }
 
-    public function store(CreateProductRequest $request, string $siteName): JsonResponse
+    public function store(CreateProductRequest $request, string $site): JsonResponse
     {
         try {
             // Get the image file if uploaded
@@ -89,7 +89,7 @@ class ProductController extends Controller
         return $this->jsonResponse(['product' => $product]);
     }
 
-    public function update(UpdateProductRequest $request, int $id, string $siteName): JsonResponse
+    public function update(UpdateProductRequest $request, int $id, string $site): JsonResponse
     {
         try {
             $imageFile = $request->hasFile('image') ? $request->file('image') : null;
@@ -120,7 +120,7 @@ class ProductController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         $deleted = $this->productService->deleteProduct($id);
 
@@ -135,7 +135,7 @@ class ProductController extends Controller
         ], 200);
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -192,7 +192,7 @@ class ProductController extends Controller
         return $this->jsonResponse($history->toArray());
     }
 
-    public function merchants(Request $request, string $siteName): JsonResponse
+    public function merchants(Request $request, string $site): JsonResponse
     {
         try {
             $merchants = $this->productRepository->getAllMerchantLookups();
@@ -209,7 +209,7 @@ class ProductController extends Controller
         }
     }
 
-    public function productMerchants(int $id, Request $request, string $siteName): JsonResponse
+    public function productMerchants(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $merchants = $this->productRepository->getProductMerchantsWithDetails($id);
@@ -223,7 +223,7 @@ class ProductController extends Controller
         }
     }
 
-    public function variants(int $id, string $siteName): JsonResponse
+    public function variants(int $id, string $site): JsonResponse
     {
         try {
             $variants = $this->productRepository->getVariants($id);
@@ -237,7 +237,7 @@ class ProductController extends Controller
         }
     }
 
-    public function updateVariant(int $productId, int $variantId, Request $request, string $siteName): JsonResponse
+    public function updateVariant(int $productId, int $variantId, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->only(['sku', 'name', 'price', 'sale_price', 'price_modifier', 'is_active']);
@@ -257,7 +257,7 @@ class ProductController extends Controller
         }
     }
 
-    public function deleteVariant(int $productId, int $variantId, string $siteName): JsonResponse
+    public function deleteVariant(int $productId, int $variantId, string $site): JsonResponse
     {
         try {
             $deleted = $this->productRepository->deleteVariant($variantId);
@@ -275,7 +275,7 @@ class ProductController extends Controller
         }
     }
 
-    public function updateVariantImages(int $productId, int $variantId, Request $request, string $siteName): JsonResponse
+    public function updateVariantImages(int $productId, int $variantId, Request $request, string $site): JsonResponse
     {
         try {
             $images = $request->input('images', []);
@@ -301,7 +301,7 @@ class ProductController extends Controller
         }
     }
 
-    public function pages(int $id, Request $request, string $siteName): JsonResponse
+    public function pages(int $id, Request $request, string $site): JsonResponse
     {
         try {
 
@@ -334,7 +334,7 @@ class ProductController extends Controller
             ->toArray();
     }
 
-    public function specificationGroups(string $siteName): JsonResponse
+    public function specificationGroups(string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();

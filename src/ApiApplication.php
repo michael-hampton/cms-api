@@ -20,8 +20,13 @@ use App\Events\Boost\BoostLimitBreachedEvent;
 use App\Events\Boost\BoostPausedEvent;
 use App\Events\Boost\BoostResumedEvent;
 use App\Events\DatabaseEventSubscriber;
+use App\Events\Members\CommentPostedByMember;
 use App\Events\Members\MemberAddressImported;
 use App\Events\Members\MemberPostcodeUpdated;
+use App\Events\Members\OrderCreatedByMember;
+use App\Events\Members\PageLikedByMember;
+use App\Events\Members\PageViewedByMember;
+use App\Events\Members\RewardClaimedByMember;
 use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Events\Orders\OrderCreatedEvent;
@@ -80,6 +85,7 @@ use App\Listeners\Boost\SendBoostResumedNotification;
 use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
 use App\Listeners\Members\MemberPostcodeUpdatedListener;
+use App\Listeners\Members\RecordMemberEngagementMetric;
 use App\Listeners\Members\SendAccountActivationEmailListener;
 use App\Listeners\OpenCollab\InvalidateContributorOnboardingListener;
 use App\Listeners\Orders\SendOrderConfirmationListener;
@@ -105,6 +111,8 @@ use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
+use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
+use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\StripePriceGateway;
@@ -216,6 +224,7 @@ class ApiApplication
         );
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(AddressLookupServiceInterface::class, AddressLookupService::class);
+        $this->container->bind(PaymentIntentGateway::class, StripePaymentIntentGateway::class);
 
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 
@@ -501,5 +510,11 @@ class ApiApplication
 
         $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [InvalidateContributorOnboardingListener::class, 'onGuidelinesBumped']);
         $eventDispatcher->listen(ContractPublishedEvent::class, [InvalidateContributorOnboardingListener::class, 'onContractPublished']);
+
+        $eventDispatcher->listen(PageViewedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageView']);
+        $eventDispatcher->listen(PageLikedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageLike']);
+        $eventDispatcher->listen(CommentPostedByMember::class, [RecordMemberEngagementMetric::class, 'handleComment']);
+        $eventDispatcher->listen(RewardClaimedByMember::class, [RecordMemberEngagementMetric::class, 'handleRewardClaimed']);
+        $eventDispatcher->listen(OrderCreatedByMember::class, [RecordMemberEngagementMetric::class, 'handleOrderCreated']);
     }
 }

@@ -748,7 +748,6 @@
 <div id="cancelModal" class="cancel-modal-overlay" style="display: none"></div>
 
 <script>
-    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
     const ORDER_ID = window.location.pathname.split('/').pop();
     let orderData = null;
     let currentRefundType = 'full';

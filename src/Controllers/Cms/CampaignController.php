@@ -27,11 +27,11 @@ class CampaignController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->campaignRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, CampaignResource::class);

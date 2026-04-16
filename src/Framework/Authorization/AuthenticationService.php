@@ -5,6 +5,8 @@ namespace App\Framework\Authorization;
 use App\Framework\Authorization\Exceptions\InactiveUserException;
 use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
+use App\Models\User;
 use App\Repositories\Cms\UserRepositoryInterface;
 
 class AuthenticationService
@@ -37,7 +39,7 @@ class AuthenticationService
         $plainTextToken = $this->tokenGenerator->generate();
 
         $token = new PersonalAccessToken(
-            'App\Domain\Auth\Entities\User',
+            User::class,
             $user->id,
             SiteContext::getId(),
             'auth_token',
@@ -63,14 +65,15 @@ class AuthenticationService
         $accessToken = $this->tokenRepository->findByToken($token, $siteId);
 
         if ($accessToken) {
-            $this->tokenRepository->revokeUserTokens(
+            $this->tokenRepository->revokeTokensFor(
+                $accessToken->getTokenableType(),
                 $accessToken->getTokenableId(),
                 $siteId
             );
         }
     }
 
-    public function validateToken(string $token, int $siteId): ?int
+    public function validateAccessToken(string $token, int $siteId): ?PersonalAccessToken
     {
         $accessToken = $this->tokenRepository->findByToken($token, $siteId);
 
@@ -80,7 +83,38 @@ class AuthenticationService
 
         $this->tokenRepository->updateLastUsed($accessToken->getId());
 
+        return $accessToken;
+    }
+
+    public function validateToken(string $token, int $siteId): ?int
+    {
+        $accessToken = $this->validateAccessToken($token, $siteId);
+
+        if (!$accessToken) {
+            return null;
+        }
+
         return $accessToken->getTokenableId();
+    }
+
+    public function createMemberToken(Member $member, int $siteId): string
+    {
+        $this->tokenRepository->revokeTokensFor(Member::class, $member->id, $siteId);
+
+        $plainTextToken = $this->tokenGenerator->generate();
+
+        $token = new PersonalAccessToken(
+            Member::class,
+            $member->id,
+            $siteId,
+            'auth_token',
+            $plainTextToken,
+            ['*']
+        );
+
+        $this->tokenRepository->create($token);
+
+        return $plainTextToken;
     }
 
     public function getUserId(): ?int

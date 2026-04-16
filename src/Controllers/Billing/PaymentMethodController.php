@@ -21,7 +21,7 @@ class PaymentMethodController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $methods = $this->paymentMethodRepository->getAllOrdered();
@@ -35,7 +35,7 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function active(Request $request, string $siteName): JsonResponse
+    public function active(Request $request, string $site): JsonResponse
     {
         try {
             $methods = $this->paymentMethodRepository->getActive();
@@ -49,7 +49,7 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function show($id, string $siteName): JsonResponse
+    public function show($id, string $site): JsonResponse
     {
         try {
             $method = $this->paymentMethodRepository->find($id);
@@ -67,7 +67,7 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function store(CreatePaymentMethodRequest $request, string $siteName): JsonResponse
+    public function store(CreatePaymentMethodRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -86,7 +86,7 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function update(int $id, UpdatePaymentMethodRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdatePaymentMethodRequest $request, string $site): JsonResponse
     {
         try {
             $method = $this->paymentMethodRepository->find($id);
@@ -110,7 +110,7 @@ class PaymentMethodController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $method = $this->paymentMethodRepository->find($id);

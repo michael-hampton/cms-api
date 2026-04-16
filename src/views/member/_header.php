@@ -905,6 +905,25 @@ $notificationCount = count($notifications);
 </header>
 
 <script>
+    const originalFetch = window.fetch;
+    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
+
+    window.fetch = (url, options = {}) => {
+        const token = getMemberApiToken();
+
+        const fullUrl = typeof url === 'string' ? url : url.url;
+
+        // only apply to member API
+        if (token && fullUrl.includes('/api/' + SITE_SLUG + '/member')) {
+            options.headers = {
+                ...(options.headers || {}),
+                Authorization: `Bearer ${token}`
+            };
+        }
+
+        return originalFetch(url, options);
+    };
+
     function toggleMobileMenu() {
         const navContainer = document.getElementById('navContainer');
         navContainer.classList.toggle('active');
@@ -964,4 +983,12 @@ $notificationCount = count($notifications);
             dropdown.classList.remove('active');
         }
     });
+
+    function getMemberApiToken() {
+        return localStorage.getItem(`member_api_token:${SITE_SLUG}`) || '';
+    }
+
+    function clearMemberApiToken() {
+        localStorage.removeItem(`member_api_token:${SITE_SLUG}`);
+    }
 </script>

@@ -384,7 +384,7 @@
                 <div class="message"><?= htmlspecialchars($msg) ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/login">
+            <form id="loginForm">
                 @csrf
                 <div class="form-group">
                     <label for="email">Email Address</label>
@@ -428,7 +428,8 @@
                     <?php endif; ?>
                 </div>
 
-                <button type="submit" class="btn">Sign In</button>
+                <button type="submit" class="btn" id="loginBtn">Sign In</button>
+                <div id="loginError" style="display:none;" class="error"></div>
 
                 <div class="login-footer">
                     <div class="login-links">
@@ -510,5 +511,51 @@
         </div>
     </div>
 </div>
+
+<script>
+    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
+
+    document.getElementById('loginForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const btn = document.getElementById('loginBtn');
+        const errorEl = document.getElementById('loginError');
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in…';
+        errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch(`/api/${SITE_SLUG}/member/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({email, password}),
+            });
+
+            const data = await res.json();
+
+            if (data.success && data.token) {
+                alert(SITE_SLUG)
+                localStorage.setItem(`member_api_token:${SITE_SLUG}`, data.token);
+                window.location.href = `/${SITE_SLUG}/member/dashboard`;
+            } else {
+                errorEl.textContent = data.message || 'Invalid credentials. Please try again.';
+                errorEl.style.display = 'flex';
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        } catch {
+            errorEl.textContent = 'An error occurred. Please try again.';
+            errorEl.style.display = 'flex';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    });
+</script>
 </body>
 </html>

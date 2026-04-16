@@ -37,10 +37,10 @@ class BriefController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->briefService->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, BriefResource::class);
@@ -50,7 +50,7 @@ class BriefController extends Controller
         }
     }
 
-    public function show(int $id, string $siteName): JsonResponse
+    public function show(int $id, string $site): JsonResponse
     {
         try {
             $brief = $this->briefService->getCompleteBrief($id);
@@ -67,7 +67,7 @@ class BriefController extends Controller
         }
     }
 
-    public function store(StoreBriefRequest $request, string $siteName): JsonResponse
+    public function store(StoreBriefRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -83,7 +83,7 @@ class BriefController extends Controller
         }
     }
 
-    public function update(int $id, UpdateBriefRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateBriefRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -99,7 +99,7 @@ class BriefController extends Controller
         }
     }
 
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->deleteBrief($id);
@@ -114,7 +114,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addAttachment(int $id, AddBriefAttachmentRequest $request, string $siteName): JsonResponse
+    public function addAttachment(int $id, AddBriefAttachmentRequest $request, string $site): JsonResponse
     {
         try {
             $attachment = $this->briefService->addAttachment($id, $request->all());
@@ -125,7 +125,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateAttachment(int $id, int $attachmentId, Request $request, string $siteName): JsonResponse
+    public function updateAttachment(int $id, int $attachmentId, Request $request, string $site): JsonResponse
     {
         try {
             $attachment = $this->briefService->updateAttachment($id, $attachmentId, $request->all());
@@ -140,7 +140,7 @@ class BriefController extends Controller
         }
     }
 
-    public function deleteAttachment(int $id, int $attachmentId, string $siteName): JsonResponse
+    public function deleteAttachment(int $id, int $attachmentId, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->deleteAttachment($id, $attachmentId);
@@ -155,7 +155,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addComment(int $id, AddBriefCommentRequest $request, string $siteName): JsonResponse
+    public function addComment(int $id, AddBriefCommentRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -169,7 +169,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateComment(int $id, int $commentId, UpdateBriefCommentRequest $request, string $siteName): JsonResponse
+    public function updateComment(int $id, int $commentId, UpdateBriefCommentRequest $request, string $site): JsonResponse
     {
         try {
             $comment = $this->briefService->updateComment($id, $commentId, [
@@ -186,7 +186,7 @@ class BriefController extends Controller
         }
     }
 
-    public function deleteComment(int $id, int $commentId, string $siteName): JsonResponse
+    public function deleteComment(int $id, int $commentId, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->deleteComment($id, $commentId);
@@ -201,7 +201,7 @@ class BriefController extends Controller
         }
     }
 
-    public function resolveComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
+    public function resolveComment(int $id, int $commentId, Request $request, string $site): JsonResponse
     {
         try {
             $comment = $this->briefService->resolveComment($id, $commentId, $request->get('user_id'));
@@ -212,7 +212,7 @@ class BriefController extends Controller
         }
     }
 
-    public function unresolveComment(int $id, int $commentId, Request $request, string $siteName): JsonResponse
+    public function unresolveComment(int $id, int $commentId, Request $request, string $site): JsonResponse
     {
         try {
             $comment = $this->briefService->unresolveComment($id, $commentId);
@@ -227,7 +227,7 @@ class BriefController extends Controller
         }
     }
 
-    public function convertToPage(int $id, Request $request, string $siteName): JsonResponse
+    public function convertToPage(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->convertToPage($id, $request->all());
@@ -240,7 +240,7 @@ class BriefController extends Controller
         }
     }
 
-    public function archive(int $id, string $siteName): JsonResponse
+    public function archive(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->archiveBrief($id);
@@ -255,7 +255,7 @@ class BriefController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $newBrief = $this->briefService->duplicateBrief($id, $request->get('user_id'));
@@ -268,7 +268,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateStatus(int $id, Request $request, string $siteName): JsonResponse
+    public function updateStatus(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $brief = $this->briefService->updateStatus($id, $request->get('status'), $request->get('user_id'));
@@ -281,7 +281,7 @@ class BriefController extends Controller
         }
     }
 
-    public function bulkUpdateStatus(Request $request, string $siteName): JsonResponse
+    public function bulkUpdateStatus(Request $request, string $site): JsonResponse
     {
         try {
             $briefIds = $request->get('brief_ids', []);
@@ -303,7 +303,7 @@ class BriefController extends Controller
         }
     }
 
-    public function bulkAssign(Request $request, string $siteName): JsonResponse
+    public function bulkAssign(Request $request, string $site): JsonResponse
     {
         try {
             $briefIds = $request->get('brief_ids', []);
@@ -331,7 +331,7 @@ class BriefController extends Controller
         }
     }
 
-    public function bulkDelete(Request $request, string $siteName): JsonResponse
+    public function bulkDelete(Request $request, string $site): JsonResponse
     {
         try {
             $briefIds = $request->get('brief_ids', []);
@@ -348,7 +348,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getTemplates(Request $request, string $siteName): JsonResponse
+    public function getTemplates(Request $request, string $site): JsonResponse
     {
         try {
             $templates = $this->briefService->getTemplatesForSite(SiteContext::getId());
@@ -359,7 +359,7 @@ class BriefController extends Controller
         }
     }
 
-    public function createFromTemplate(int $templateId, Request $request, string $siteName): JsonResponse
+    public function createFromTemplate(int $templateId, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();
@@ -375,7 +375,7 @@ class BriefController extends Controller
         }
     }
 
-    public function saveAsTemplate(int $id, Request $request, string $siteName): JsonResponse
+    public function saveAsTemplate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $template = $this->briefService->saveAsTemplate($id, [
@@ -391,7 +391,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getCollaborators(int $id, string $siteName): JsonResponse
+    public function getCollaborators(int $id, string $site): JsonResponse
     {
         try {
             $collaborators = $this->briefService->getCollaborators($id);
@@ -401,7 +401,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addCollaborator(int $id, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
+    public function addCollaborator(int $id, AddBriefCollaboratorRequest $request, string $site): JsonResponse
     {
         try {
             $collaborator = $this->briefService->addCollaborator($id, $request->all(), $request->get('user_id'));
@@ -412,7 +412,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateCollaborator(int $id, int $collaboratorId, AddBriefCollaboratorRequest $request, string $siteName): JsonResponse
+    public function updateCollaborator(int $id, int $collaboratorId, AddBriefCollaboratorRequest $request, string $site): JsonResponse
     {
         try {
             $updated = $this->briefService->updateCollaborator($id, $collaboratorId, $request->all());
@@ -423,7 +423,7 @@ class BriefController extends Controller
         }
     }
 
-    public function removeCollaborator(int $id, int $collaboratorId, string $siteName): JsonResponse
+    public function removeCollaborator(int $id, int $collaboratorId, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->removeCollaborator($collaboratorId);
@@ -438,7 +438,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getTasks(int $id, string $siteName): JsonResponse
+    public function getTasks(int $id, string $site): JsonResponse
     {
         try {
             $tasks = $this->briefService->getTasks($id);
@@ -448,7 +448,7 @@ class BriefController extends Controller
         }
     }
 
-    public function createTask(int $id, CreateBriefTaskRequest $request, string $siteName): JsonResponse
+    public function createTask(int $id, CreateBriefTaskRequest $request, string $site): JsonResponse
     {
         try {
             $task = $this->briefService->createTask($id, $request->all());
@@ -461,7 +461,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateTask(int $id, int $taskId, UpdateBriefTaskRequest $request, string $siteName): JsonResponse
+    public function updateTask(int $id, int $taskId, UpdateBriefTaskRequest $request, string $site): JsonResponse
     {
         try {
             $task = $this->briefService->updateTask($taskId, $request->all());
@@ -472,7 +472,7 @@ class BriefController extends Controller
         }
     }
 
-    public function deleteTask(int $id, int $taskId, string $siteName): JsonResponse
+    public function deleteTask(int $id, int $taskId, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->deleteTask($taskId);
@@ -517,7 +517,7 @@ class BriefController extends Controller
         ]);
     }
 
-    public function getVersions(int $id, string $siteName): JsonResponse
+    public function getVersions(int $id, string $site): JsonResponse
     {
         try {
             $versions = $this->briefService->getVersions($id);
@@ -527,7 +527,7 @@ class BriefController extends Controller
         }
     }
 
-    public function restoreVersion(int $id, int $versionId, Request $request, string $siteName): JsonResponse
+    public function restoreVersion(int $id, int $versionId, Request $request, string $site): JsonResponse
     {
         try {
             $this->briefService->restoreVersion($id, $versionId, $request->get('user_id'));
@@ -537,7 +537,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getActivityLog(int $id, string $siteName): JsonResponse
+    public function getActivityLog(int $id, string $site): JsonResponse
     {
         try {
             $activities = $this->briefService->getActivityLog($id);
@@ -547,7 +547,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getRelationships(int $id, string $siteName): JsonResponse
+    public function getRelationships(int $id, string $site): JsonResponse
     {
         try {
             $relationships = $this->briefService->getRelationships($id);
@@ -557,7 +557,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addRelationship(int $id, AddBriefRelationshipRequest $request, string $siteName): JsonResponse
+    public function addRelationship(int $id, AddBriefRelationshipRequest $request, string $site): JsonResponse
     {
         try {
             $relationship = $this->briefService->addRelationship($id, $request->all());
@@ -568,7 +568,7 @@ class BriefController extends Controller
         }
     }
 
-    public function removeRelationship(int $id, int $relationshipId, string $siteName): JsonResponse
+    public function removeRelationship(int $id, int $relationshipId, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->removeRelationship($relationshipId);
@@ -583,7 +583,7 @@ class BriefController extends Controller
         }
     }
 
-    public function addWorkflowChange(int $id, AddBriefWorkflowChangeRequest $request, string $siteName): JsonResponse
+    public function addWorkflowChange(int $id, AddBriefWorkflowChangeRequest $request, string $site): JsonResponse
     {
         try {
             $workflow = $this->briefService->addWorkflowChange($id, $request->all());
@@ -594,7 +594,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getWorkflowHistory(int $id, string $siteName): JsonResponse
+    public function getWorkflowHistory(int $id, string $site): JsonResponse
     {
         try {
             $history = $this->briefService->getWorkflowHistory($id);
@@ -604,7 +604,7 @@ class BriefController extends Controller
         }
     }
 
-    public function setDeadline(int $id, SetBriefDeadlineRequest $request, string $siteName): JsonResponse
+    public function setDeadline(int $id, SetBriefDeadlineRequest $request, string $site): JsonResponse
     {
         try {
             $deadline = $this->briefService->setDeadline($id, $request->all());
@@ -617,7 +617,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getDeadline(int $id, string $siteName): JsonResponse
+    public function getDeadline(int $id, string $site): JsonResponse
     {
         try {
             $deadline = $this->briefService->getDeadline($id);
@@ -627,7 +627,7 @@ class BriefController extends Controller
         }
     }
 
-    public function deleteDeadline(int $id, string $siteName): JsonResponse
+    public function deleteDeadline(int $id, string $site): JsonResponse
     {
         try {
             $result = $this->briefService->deleteDeadline($id);
@@ -642,7 +642,7 @@ class BriefController extends Controller
         }
     }
 
-    public function uploadAttachment(int $id, Request $request, string $siteName): JsonResponse
+    public function uploadAttachment(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $file = $request->file('file');
@@ -674,7 +674,7 @@ class BriefController extends Controller
         }
     }
 
-    public function clone(int $id, Request $request, string $siteName): JsonResponse
+    public function clone(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $clone = $this->briefService->cloneBrief(
@@ -700,7 +700,7 @@ class BriefController extends Controller
         }
     }
 
-    public function createSchedule(int $id, Request $request, string $siteName): JsonResponse
+    public function createSchedule(int $id, Request $request, string $site): JsonResponse
     {
         try {
 
@@ -718,7 +718,7 @@ class BriefController extends Controller
         }
     }
 
-    public function getSchedule(int $id, string $siteName): JsonResponse
+    public function getSchedule(int $id, string $site): JsonResponse
     {
         try {
             $schedule = $this->briefService->getSchedule($id);
@@ -731,7 +731,7 @@ class BriefController extends Controller
         }
     }
 
-    public function updateSchedule(int $id, Request $request, string $siteName): JsonResponse
+    public function updateSchedule(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $schedule = $this->briefService->updateSchedule($id, $request->all());
@@ -746,7 +746,7 @@ class BriefController extends Controller
         }
     }
 
-    public function deleteSchedule(int $id, string $siteName): JsonResponse
+    public function deleteSchedule(int $id, string $site): JsonResponse
     {
         try {
             $deactivated = $this->briefService->deactivateSchedule($id);
@@ -764,7 +764,7 @@ class BriefController extends Controller
     public function convertBriefToArticle(
         int                          $id,
         ConvertBriefToArticleRequest $request,
-        string                       $siteName
+        string $site
     ): JsonResponse
     {
         try {
@@ -784,7 +784,7 @@ class BriefController extends Controller
         }
     }
 
-    public function runSchedule(int $id, string $siteName): JsonResponse
+    public function runSchedule(int $id, string $site): JsonResponse
     {
         try {
             $schedule = $this->briefService->getSchedule($id);

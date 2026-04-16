@@ -25,10 +25,10 @@ class GiftPromotionController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->giftPromotionRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, GiftPromotionResource::class);
@@ -39,7 +39,7 @@ class GiftPromotionController extends Controller
         }
     }
 
-    public function store(GiftPromotionRequest $request, string $siteName): JsonResponse
+    public function store(GiftPromotionRequest $request, string $site): JsonResponse
     {
         try {
             $siteId = SiteContext::getId();
@@ -54,7 +54,7 @@ class GiftPromotionController extends Controller
         }
     }
 
-    public function update(int $id, GiftPromotionRequest $request, string $siteName): JsonResponse
+    public function update(int $id, GiftPromotionRequest $request, string $site): JsonResponse
     {
         try {
             $promotion = $this->giftPromotionService->update($id, $request->validated());
@@ -67,7 +67,7 @@ class GiftPromotionController extends Controller
         }
     }
 
-    public function toggleActive(int $id, string $siteName): JsonResponse
+    public function toggleActive(int $id, string $site): JsonResponse
     {
         try {
             $promotion = $this->giftPromotionService->toggleActive($id);
@@ -78,7 +78,7 @@ class GiftPromotionController extends Controller
         }
     }
 
-    public function exclusions(int $id, string $siteName): JsonResponse
+    public function exclusions(int $id, string $site): JsonResponse
     {
         try {
             $promotion = $this->giftPromotionRepository->find($id);

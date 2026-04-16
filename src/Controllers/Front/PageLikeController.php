@@ -4,6 +4,7 @@ namespace App\Controllers\Front;
 
 use App\Controllers\Controller;
 use App\Events\ActivityTracking;
+use App\Events\Members\PageLikedByMember;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
@@ -44,6 +45,7 @@ class PageLikeController extends Controller
 
         if ($result['liked'] === true) {
             $this->activityTracking->trackLike($result['like']);
+            event(new PageLikedByMember($member->id, $pageId, $siteId));
         }
 
         return $this->resourceResponse([

@@ -33,7 +33,7 @@ class NewsletterIssueController extends Controller
     /**
      * GET /api/newsletters/{newsletterId}/issues
      */
-    public function index(Request $request, int $newsletterId, string $siteName): JsonResponse
+    public function index(Request $request, int $newsletterId, string $site): JsonResponse
     {
         try {
             $siteId = $request->getSiteId();
@@ -42,7 +42,7 @@ class NewsletterIssueController extends Controller
                 return $this->errorResponse('Newsletter not found', 404);
             }
 
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $criteria->addFilter('newsletter_id', $newsletterId);
 
             $result = $this->issueRepository->search($criteria);

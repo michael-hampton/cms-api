@@ -90,7 +90,16 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                     <dt style="color:var(--slate);font-weight:500;">ID</dt>
                     <dd style="color:var(--navy);font-family:monospace;">#<?= (int)$contributor['id'] ?></dd>
                     <dt style="color:var(--slate);font-weight:500;">Role</dt>
-                    <dd style="color:var(--navy);"><?= htmlspecialchars($contributor['role'] ?? 'contributor') ?></dd>
+                    <dd>
+                        <select id="role-select" class="oc-select" style="font-size:.8rem;padding:4px 8px;"
+                                onchange="updateRole(<?= (int)$contributor['id'] ?>, this.value)">
+                            <?php foreach (['contributor', 'editor', 'admin'] as $r): ?>
+                                <option value="<?= $r ?>" <?= ($contributor['role'] ?? 'contributor') === $r ? 'selected' : '' ?>>
+                                    <?= ucfirst($r) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </dd>
                     <dt style="color:var(--slate);font-weight:500;">Joined</dt>
                     <dd style="color:var(--navy);">
                         <?= !empty($contributor['created_at']) ? date('d M Y', strtotime($contributor['created_at'])) : '–' ?>
@@ -299,6 +308,19 @@ $isActive = (bool)($contributor['is_active'] ?? true);
             method: 'POST', headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
         });
         res.ok ? showToast('Access revoked') : showToast('Failed', false);
+    }
+
+    async function updateRole(id, role) {
+        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/role`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${TOKEN()}`,
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({role}),
+        });
+        res.ok ? showToast('Role updated') : showToast('Failed to update role', false);
     }
 
     async function sendNewInvite() {

@@ -561,7 +561,6 @@
 </div>
 
 <script>
-    const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
     /* ─── Toast ──────────────────────────────────────────── */
     function showToast(message, type = 'info', duration = 5000) {

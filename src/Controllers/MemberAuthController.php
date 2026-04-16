@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -20,6 +21,7 @@ use App\Services\PasswordResetService;
 class MemberAuthController extends Controller
 {
     public function __construct(
+        private readonly AuthenticationService $authenticationService,
         private readonly EmailVerificationService $emailVerificationService,
         private readonly PasswordResetService     $passwordResetService,
         private readonly ArticleGiftingService    $articleGiftingService
@@ -194,22 +196,74 @@ class MemberAuthController extends Controller
     {
         $credentials = $request->validated();
         $site = SiteContext::slug();
+        $expectsJson = $request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
+            $request->getHeader('Content-Type') === 'application/json' ||
+            str_contains((string)$request->getHeader('Accept', ''), 'application/json') ||
+            str_contains($request->getUri(), '/api/');
 
         if (MemberAuth::attempt($credentials)) {
+            $member = MemberAuth::getMember();
 
             $intendedUrl = $request->session()->get('intended_url', '/' . $site . '/member/dashboard');
             $request->session()->forget('intended_url');
 
-            if ($request->getHeader('X-Requested-With') === 'XMLHttpRequest' ||
-                $request->getHeader('Content-Type') === 'application/json') {
-                return $this->resourceResponse(['success' => true]);
+            if ($expectsJson) {
+                $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
+
+                return $this->resourceResponse([
+                    'success' => true,
+                    'member' => [
+                        'id' => $member->id,
+                        'email' => $member->email,
+                        'first_name' => $member->first_name,
+                        'last_name' => $member->last_name,
+                        'display_name' => $member->display_name,
+                        'email_verified_at' => $member->email_verified_at,
+                    ],
+                    'token' => $token,
+                ]);
             }
 
             return $this->redirect($intendedUrl);
         }
 
+        if ($expectsJson) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Invalid credentials or account not activated',
+            ], 401);
+        }
+
         return $this->back()->withErrors([
             'email' => 'Invalid credentials or account not activated'
+        ]);
+    }
+
+    public function apiLogin(LoginRequest $request)
+    {
+        $credentials = $request->validated();
+
+        if (!MemberAuth::attempt($credentials)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Invalid credentials or account not activated',
+            ], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
+
+        return $this->resourceResponse([
+            'success' => true,
+            'member' => [
+                'id' => $member->id,
+                'email' => $member->email,
+                'first_name' => $member->first_name,
+                'last_name' => $member->last_name,
+                'display_name' => $member->display_name,
+                'email_verified_at' => $member->email_verified_at,
+            ],
+            'token' => $token,
         ]);
     }
 

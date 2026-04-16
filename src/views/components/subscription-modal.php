@@ -1278,7 +1278,14 @@ $apiBase = '/api/' . $site;
                 subGoToStep(1);
             }
 
-            if (!isManual) subTrackModalShown();
+            if (!isManual) {
+                // Mark as shown on server (for logged-in users)
+                fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                subTrackModalShown();
+            }
         }
 
         function closeSubscriptionModal() {

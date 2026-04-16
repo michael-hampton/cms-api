@@ -1,4 +1,4 @@
-<div class="deal-card">
+<div class="deal-card" data-title="<?= strtolower(htmlspecialchars($deal['title'])) ?>">
 
     <div class="deal-header-actions">
         <div class="deal-badge">

@@ -38,7 +38,7 @@ class BriefPresetController extends Controller
      *
      * Returns all presets (system + custom) for the current site.
      */
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
             $templates = $this->briefService->getTemplatesForSite(SiteContext::getId());
@@ -54,7 +54,7 @@ class BriefPresetController extends Controller
      *
      * Returns a single preset.  404 if not found.
      */
-    public function show(int $id, string $siteName): JsonResponse
+    public function show(int $id, string $site): JsonResponse
     {
         try {
             $preset = $this->briefTemplateRepository->find($id);
@@ -76,7 +76,7 @@ class BriefPresetController extends Controller
      *
      * Creates a new preset.  Returns 201.
      */
-    public function store(StoreBriefPresetRequest $request, string $siteName): JsonResponse
+    public function store(StoreBriefPresetRequest $request, string $site): JsonResponse
     {
         $guard = $this->assertSiteAdmin($request);
         if ($guard !== null) {
@@ -118,7 +118,7 @@ class BriefPresetController extends Controller
      *
      * Updates an existing preset.  Returns 200.
      */
-    public function update(int $id, UpdateBriefPresetRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateBriefPresetRequest $request, string $site): JsonResponse
     {
         $guard = $this->assertSiteAdmin($request);
         if ($guard !== null) {
@@ -146,7 +146,7 @@ class BriefPresetController extends Controller
      *
      * Deletes a preset.  Returns 204.
      */
-    public function destroy(int $id, string $siteName): JsonResponse
+    public function destroy(int $id, string $site): JsonResponse
     {
         $guard = $this->assertSiteAdmin(null);
         if ($guard !== null) {
@@ -174,7 +174,7 @@ class BriefPresetController extends Controller
      * Creates a Brief (and BriefTasks from default_subtasks) using the preset
      * as a template.  Returns 201 with the new Brief resource.
      */
-    public function createFromPreset(int $id, Request $request, string $siteName): JsonResponse
+    public function createFromPreset(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();

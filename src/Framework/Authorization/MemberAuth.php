@@ -45,20 +45,7 @@ class MemberAuth
 
     public static function login(Member $member): void
     {
-        // Load roles
-        $member->roles(true);
-        $roles = $member->roles(true)->get();
-        $rolesSlugs = $roles->pluck('slug')->toArray();
-
-        self::$member = new AuthenticatedMember(
-            $member->id,
-            $member->email,
-            $member->first_name,
-            $member->last_name,
-            $member->display_name,
-            $rolesSlugs
-        );
-        self::$member->exists = true;
+        self::$member = self::buildAuthenticatedMember($member);
 
         // Store in session
         Session::put('member_id', $member->id);
@@ -66,7 +53,7 @@ class MemberAuth
         Session::put('member_first_name', $member->first_name);
         Session::put('member_last_name', $member->last_name);
         Session::put('member_display_name', $member->display_name);
-        Session::put('member_roles', $rolesSlugs);
+        Session::put('member_roles', self::$member->roles);
         Session::put('member_authenticated', true);
 
         // Regenerate session ID for security
@@ -80,6 +67,11 @@ class MemberAuth
         ]);
 
         Event::fire('member.login', $member->toArray());
+    }
+
+    public static function authenticateApi(Member $member): void
+    {
+        self::$member = self::buildAuthenticatedMember($member);
     }
 
     public static function logout(): void
@@ -116,6 +108,10 @@ class MemberAuth
 
     public static function getMember(): ?Member
     {
+        if (self::$member !== null) {
+            return Member::find(self::$member->id);
+        }
+
         $memberId = Session::get('member_id');
 
         if (!$memberId) {
@@ -144,15 +140,7 @@ class MemberAuth
 
             $rolesSlugs = $roles->pluck('slug')->toArray();
 
-            self::$member = new AuthenticatedMember(
-                $member->id,
-                $member->email,
-                $member->first_name,
-                $member->last_name,
-                $member->display_name,
-                $rolesSlugs
-            );
-            self::$member->exists = true;
+            self::$member = self::buildAuthenticatedMember($member, $rolesSlugs);
 
             return self::$member;
         }
@@ -169,5 +157,25 @@ class MemberAuth
     public static function setMember(?AuthenticatedMember $member): void
     {
         self::$member = $member;
+    }
+
+    private static function buildAuthenticatedMember(Member $member, ?array $rolesSlugs = null): AuthenticatedMember
+    {
+        if ($rolesSlugs === null) {
+            $member->roles(true);
+            $rolesSlugs = $member->roles(true)->get()->pluck('slug')->toArray();
+        }
+
+        $authenticatedMember = new AuthenticatedMember(
+            $member->id,
+            $member->email,
+            $member->first_name,
+            $member->last_name,
+            $member->display_name,
+            $rolesSlugs
+        );
+        $authenticatedMember->exists = true;
+
+        return $authenticatedMember;
     }
 }

@@ -11,6 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 use App\Requests\OpenCollab\CloseContributorAccountRequest;
+use App\Services\Cms\UserService;
 use App\Services\OpenCollab\ContributorTerminationService;
 use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\SiteAccessService;
@@ -39,6 +40,7 @@ class AdminContributorController extends Controller
         private readonly SiteAccessService             $siteAccessService,
         private readonly InvitationService             $invitationService,
         private readonly InvitationRepository          $invitationRepository,
+        private readonly UserService $userService
     )
     {
         parent::__construct();
@@ -246,5 +248,29 @@ class AdminContributorController extends Controller
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/role
+     *
+     * Body: { "role": "editor" }
+     */
+    public function updateRole(Request $request, int $id): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        $role = $request->get('role');
+
+        if (!$role) {
+            return $this->errorResponse('Role is required.', 422);
+        }
+
+        $this->userService->updateUser($id, ['role' => $role]);
+
+        return $this->successResponse('Role updated.');
     }
 }

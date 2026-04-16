@@ -50,10 +50,10 @@ class PrintFulfillmentController extends Controller
      *   search      — partial match on full_name, postcode, or tracking_number
      *   per_page    — default 25, max 100
      */
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->fulfillmentRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, PrintFulfillmentResource::class);

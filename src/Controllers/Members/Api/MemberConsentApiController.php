@@ -5,6 +5,7 @@ namespace App\Controllers\Members\Api;
 use App\Controllers\Controller;
 use App\DTO\Consents\ConsentActionContext;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Models\Member;
 use App\Repositories\Members\Consents\ConsentTypeRepository;
@@ -116,5 +117,40 @@ class MemberConsentApiController extends Controller
                 'message' => 'Failed to update consent preferences: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function auditHistory(Request $request): JsonResponse
+    {
+        if (!MemberAuth::check()) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $consentCode = $request->input('consent_code'); // optional filter
+
+        $auditTrail = $this->queryService->getAuditTrail($member, $consentCode);
+
+        $serialized = array_map(function (array $entry) {
+            return [
+                'action' => $entry['action'],
+                'source' => $entry['source'],
+                'ip_address' => $entry['ip_address'] ?? null,
+                'reason' => $entry['reason'] ?? null,
+                'previous_state' => $entry['previous_state'] ?? null,
+                'new_state' => $entry['new_state'] ?? null,
+                'created_at' => $entry['created_at']?->format('Y-m-d H:i:s'),
+                'consent_type' => [
+                    'code' => $entry['consentType']['code'],
+                    'name' => $entry['consentType']['name'],
+                    'category' => $entry['consentType']['category'],
+                ],
+                'admin_email' => $entry['adminUser']['email'] ?? null,
+            ];
+        }, $auditTrail);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'audit_trail' => $serialized,
+        ]);
     }
 }

@@ -48,10 +48,10 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function payments(Request $request, string $siteName)
+    public function payments(Request $request, string $site)
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->paymentRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, PaymentResource::class);
@@ -62,10 +62,10 @@ class SubscriptionController extends Controller
         }
     }
 
-    public function plans(Request $request, string $siteName)
+    public function plans(Request $request, string $site)
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             // Eager-load regionSets at the query level so the resource can read them
             $result = $this->subscriptionPlanRepository->search($criteria);

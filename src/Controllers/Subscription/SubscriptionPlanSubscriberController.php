@@ -40,7 +40,7 @@ class SubscriptionPlanSubscriberController extends Controller
      *   per_page int  default 25, max 100
      *   status   string  optional — filters by subscription status
      */
-    public function planSubscribers(Request $request, string $siteName, int $planId): mixed
+    public function planSubscribers(Request $request, string $site, int $planId): mixed
     {
         try {
             $page = max(1, (int)($request->get('page', 1)));
@@ -81,7 +81,7 @@ class SubscriptionPlanSubscriberController extends Controller
     /**
      * Full detail for a single subscription (member + plan eager-loaded).
      */
-    public function show(Request $request, string $siteName, int $subscriptionId): mixed
+    public function show(Request $request, string $site, int $subscriptionId): mixed
     {
         try {
             $siteId = SiteContext::getId();
@@ -111,7 +111,7 @@ class SubscriptionPlanSubscriberController extends Controller
      * the member_id from the subscription rather than asking the caller to
      * supply it (preventing enumeration of other members' preferences).
      */
-    public function preferences(Request $request, string $siteName, int $subscriptionId): mixed
+    public function preferences(Request $request, string $site, int $subscriptionId): mixed
     {
         try {
             $siteId = SiteContext::getId();

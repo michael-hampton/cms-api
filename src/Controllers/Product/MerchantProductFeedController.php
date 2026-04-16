@@ -25,10 +25,10 @@ class MerchantProductFeedController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, int $merchantId, string $siteName): JsonResponse
+    public function index(Request $request, int $merchantId, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $criteria->addFilter('merchant_id', $merchantId);
 
             $result = $this->feedRepository->search($criteria);
@@ -40,7 +40,7 @@ class MerchantProductFeedController extends Controller
         }
     }
 
-    public function store(CreateMerchantProductFeedRequest $request, int $merchantId, string $siteName): JsonResponse
+    public function store(CreateMerchantProductFeedRequest $request, int $merchantId, string $site): JsonResponse
     {
         try {
             $data = array_merge($request->validated(), ['merchant_id' => $merchantId]);
@@ -76,7 +76,7 @@ class MerchantProductFeedController extends Controller
         }
     }
 
-    public function update(UpdateMerchantProductFeedRequest $request, int $merchantId, int $feedId, string $siteName): JsonResponse
+    public function update(UpdateMerchantProductFeedRequest $request, int $merchantId, int $feedId, string $site): JsonResponse
     {
         try {
             $updated = $this->feedService->updateFeed($feedId, $request->validated());
@@ -98,7 +98,7 @@ class MerchantProductFeedController extends Controller
         }
     }
 
-    public function destroy(int $merchantId, int $feedId, string $siteName): JsonResponse
+    public function destroy(int $merchantId, int $feedId, string $site): JsonResponse
     {
         $feed = $this->feedService->getFeed($feedId);
 
@@ -115,7 +115,7 @@ class MerchantProductFeedController extends Controller
         ], 200);
     }
 
-    public function fetch(int $merchantId, int $feedId, string $siteName): JsonResponse
+    public function fetch(int $merchantId, int $feedId, string $site): JsonResponse
     {
         try {
             $feed = $this->feedService->getFeed($feedId);
@@ -137,7 +137,7 @@ class MerchantProductFeedController extends Controller
         }
     }
 
-    public function download(int $merchantId, int $feedId, string $siteName): JsonResponse
+    public function download(int $merchantId, int $feedId, string $site): JsonResponse
     {
         try {
             $feed = $this->feedService->getFeed($feedId);

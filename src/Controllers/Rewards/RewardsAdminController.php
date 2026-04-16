@@ -37,7 +37,7 @@ class RewardsAdminController extends Controller
         ]);
     }
 
-    public function search(Request $request, string $siteName)
+    public function search(Request $request, string $site)
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthorized'], 401);
@@ -45,7 +45,7 @@ class RewardsAdminController extends Controller
 
         $siteId = SiteContext::getId();
 
-        $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+        $criteria = SearchCriteriaParser::fromRequest($request, $site);
         $configuration = SearchConfigurationFactory::create('reward');
         $engine = new SearchEngine($configuration);
 

@@ -45,6 +45,7 @@ use App\Controllers\Members\Api\MemberLikedPagesApiController;
 use App\Controllers\Members\Api\MemberNewslettersApiController;
 use App\Controllers\Members\Api\MemberOrdersApiController;
 use App\Controllers\Members\Api\MemberReadingHistoryApiController;
+use App\Controllers\Members\Api\MemberRewardsApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
@@ -103,6 +104,7 @@ use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
 use App\Controllers\Subscription\WorkflowRunController;
 use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
+use App\Framework\Middleware\AuthenticateMemberWithToken;
 
 $router->get('/api/boosts', [BoostController::class, 'index']);
 $router->get('/api/boosts/{id}', [BoostController::class, 'show']);
@@ -128,68 +130,84 @@ $router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowCon
 $router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
 
-// Member Dashboard API
-$router->get('/{site}/api/member/dashboard', [MemberDashboardApiController::class, 'index']);
+$router->post('/api/{site}/member/auth/login', [\App\Controllers\MemberAuthController::class, 'apiLogin']);
 
-// Member Activity & Badges API
-$router->get('/api/{site}/member/activity', [MemberActivityApiController::class, 'index']);
-$router->get('/api/{site}/member/badges', [MemberActivityApiController::class, 'badges']);
+$router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
+    $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
+    $router->get('/dashboard/overview', [MemberDashboardApiController::class, 'overview']);
+    $router->get('/dashboard/activity', [MemberDashboardApiController::class, 'activity']);
+    $router->get('/dashboard/discovery', [MemberDashboardApiController::class, 'discovery']);
+    $router->get('/dashboard/newsletters', [MemberDashboardApiController::class, 'newsletters']);
+    $router->get('/dashboard/rewards', [MemberDashboardApiController::class, 'rewards']);
+    $router->get('/dashboard/subscriptions', [MemberDashboardApiController::class, 'subscriptions']);
+
+    // Member Activity & Badges API
+    $router->get('/activity', [MemberActivityApiController::class, 'index']);
+
 
 // Member Badge notification API (existing MemberBadgeController, already API-shaped)
-$router->get('/{site}/api/member/badges/new', [MemberBadgeController::class, 'getNewBadges']);
-$router->post('/{site}/api/member/badges/mark-shown', [MemberBadgeController::class, 'markBadgeShown']);
-$router->post('/{site}/api/member/badges/mark-as-shown', [MemberBadgeController::class, 'markAsShown']);
+    $router->get('/badges', [MemberActivityApiController::class, 'badges']);
+    $router->get('/badges/new', [MemberBadgeController::class, 'getNewBadges']);
+    $router->post('/badges/mark-shown', [MemberBadgeController::class, 'markBadgeShown']);
+    $router->post('/badges/mark-as-shown', [MemberBadgeController::class, 'markAsShown']);
 
-$router->get('/api/{site}/member/addresses/search', [MemberAddressApiController::class, 'search']);
-$router->get('/api/{site}/member/{memberId}/addresses', [MemberAddressApiController::class, 'show']);
-$router->post('/api/{site}/member/addresses', [MemberAddressApiController::class, 'store']);
-$router->delete('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'destroy']);
-$router->post('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'update']); // If you don't support PUT
-$router->put('/api/{site}/member/addresses/{id}', [MemberAddressApiController::class, 'update']);
-$router->post('/api/{site}/member/addresses/{id}/delete', [MemberAddressApiController::class, 'destroy']);
-$router->post('/api/{site}/member/addresses/{id}/set-default', [MemberAddressApiController::class, 'setDefault']);
+    $router->get('/addresses/search', [MemberAddressApiController::class, 'index']);
+    $router->get('/addresses', [MemberAddressApiController::class, 'show']);
+    $router->post('/addresses', [MemberAddressApiController::class, 'store']);
+    $router->delete('/addresses/{id}', [MemberAddressApiController::class, 'destroy']);
+    $router->post('/addresses/{id}', [MemberAddressApiController::class, 'update']); // If you don't support PUT
+    $router->put('/addresses/{id}', [MemberAddressApiController::class, 'update']);
+    $router->post('/addresses/{id}/delete', [MemberAddressApiController::class, 'destroy']);
+    $router->post('/addresses/{id}/set-default', [MemberAddressApiController::class, 'setDefault']);
 
 // Member Comments API
-$router->get('/api/{site}/member/comments', [MemberCommentsApiController::class, 'index']);
-$router->delete('/api/{site}/member/comments/{commentId}', [MemberCommentsApiController::class, 'destroy']);
+    $router->get('/comments', [MemberCommentsApiController::class, 'index']);
+    $router->delete('/comments/{commentId}', [MemberCommentsApiController::class, 'destroy']);
 
-$router->get('/api/{site}/member/account-details', [MemberApiController::class, 'me']);
-$router->post('/api/{site}/member/account-details', [MemberApiController::class, 'updateAccountDetails']);
-$router->post('/api/{site}/member/settings/privacy', [MemberApiController::class, 'updatePrivacy']);
-$router->post('/api/{site}/member/settings/communication-preferences', [MemberApiController::class, 'updateCommunicationPreferences']);
-$router->post('/api/{site}/member/consent/update', [MemberConsentApiController::class, 'update']);
-$router->get('/api/{site}/member/consent', [MemberConsentApiController::class, 'index']);
-$router->get('/api/{site}/member/consent/types', [MemberConsentApiController::class, 'getConsentTypes']);
+    $router->get('/account-details', [MemberApiController::class, 'me']);
+    $router->post('/account-details', [MemberApiController::class, 'updateAccountDetails']);
+    $router->post('/settings/privacy', [MemberApiController::class, 'updatePrivacy']);
+    $router->post('/settings/communication-preferences', [MemberApiController::class, 'updateCommunicationPreferences']);
+    $router->post('/consent/update', [MemberConsentApiController::class, 'update']);
+    $router->get('/consent/audit-history', [MemberConsentApiController::class, 'auditHistory']);
+    $router->get('/consent', [MemberConsentApiController::class, 'index']);
+    $router->get('/consent/types', [MemberConsentApiController::class, 'getConsentTypes']);
 
 // Member Liked Pages API
-$router->get('/api/{site}/member/liked-pages', [MemberLikedPagesApiController::class, 'index']);
-$router->post('/api/{site}/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
+    $router->get('/liked-pages', [MemberLikedPagesApiController::class, 'index']);
+    $router->post('/pages/like/{pageId}', [PageLikeController::class, 'toggle']);
 
-$router->get('/{site}/api/member/wishlist', 'App\Controllers\Members\Api\MemberWishlistApiController@index');
-$router->delete('/{site}/api/member/wishlist/{id}', 'App\Controllers\Members\Api\MemberWishlistApiController@remove');
+    $router->get('/wishlist', 'App\Controllers\Members\Api\MemberWishlistApiController@index');
+    $router->delete('/wishlist/{id}', 'App\Controllers\Members\Api\MemberWishlistApiController@remove');
+
+    $router->get('/stats', [\App\Controllers\Members\Api\MemberStatsApiController::class, 'stats']);
+
+    $router->get('/rewards', [MemberRewardsApiController::class, 'rewards']);
+    $router->post('/rewards/{rewardId}/claim', [MemberRewardsApiController::class, 'claim']);
+
+    $router->post('/rewards/{rewardId}/track/{action}', [MemberRewardsApiController::class, 'trackClick']);
+
 
 // Orders API
-$router->get('/api/{site}/member/orders', [MemberOrdersApiController::class, 'index']);
-$router->get('/api/{site}/member/orders/{id}', [MemberOrdersApiController::class, 'show']);
-$router->post('/api/{site}/member/orders/{orderId}/cancel', [MemberOrdersApiController::class, 'cancel']);
-$router->post('/api/{site}/member/orders/{id}/refund', [OrderController::class, 'refund']);
+    $router->get('/orders', [MemberOrdersApiController::class, 'index']);
+    $router->get('/orders/{id}', [MemberOrdersApiController::class, 'show']);
+    $router->post('/orders/{orderId}/cancel', [MemberOrdersApiController::class, 'cancel']);
+    $router->post('/orders/{id}/refund', [OrderController::class, 'refund']);
 
-$router->get('/api/{site}/member/newsletters', [MemberNewslettersApiController::class, 'index']);
-$router->post('/api/{site}/member/newsletters/unsubscribe', [MemberNewslettersApiController::class, 'unsubscribe']);
-$router->post('/api/{site}/member/newsletter/signup', [MemberNewslettersApiController::class, 'subscribe']);
-$router->post('/api/{site}/member/newsletters/bulk-subscribe', [MemberNewslettersApiController::class, 'bulkSubscribe']);
+    $router->get('/newsletters', [MemberNewslettersApiController::class, 'index']);
+    $router->post('/newsletters/unsubscribe', [MemberNewslettersApiController::class, 'unsubscribe']);
+    $router->post('/newsletter/signup', [MemberNewslettersApiController::class, 'subscribe']);
+    $router->post('/newsletters/bulk-subscribe', [MemberNewslettersApiController::class, 'bulkSubscribe']);
 // In the member newsletters section
-$router->post('/api/{site}/member/newsletters/upgrade-options', [MemberNewslettersApiController::class, 'getUpgradeOptions']);
-$router->post('/api/{site}/member/newsletters/process-upgrade', [MemberNewslettersApiController::class, 'processUpgrade']);
+    $router->post('/newsletters/upgrade-options', [MemberNewslettersApiController::class, 'getUpgradeOptions']);
+    $router->post('/newsletters/process-upgrade', [MemberNewslettersApiController::class, 'processUpgrade']);
 
 
 // Member Reading History API
-$router->get('/api/{site}/member/reading-history', [MemberReadingHistoryApiController::class, 'index']);
+    $router->get('/reading-history', [MemberReadingHistoryApiController::class, 'index']);
 
-$router->post(
-    '/api/{site}/open-collab/pages/{pageId}/purchase',
-    [ArticlePaymentController::class, 'initiate']
-);
+
+});
 
 // Guest: accept an invitation and register
 $router->post(
@@ -207,7 +225,7 @@ $router->post(
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {
 
     // Pages API
-    $router->group(['prefix' => '{siteName}'], function ($router) {
+    $router->group(['prefix' => '{site}'], function ($router) {
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
 
         $router->post(
@@ -577,10 +595,6 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/payment-methods/{id}', [PaymentMethodController::class, 'show']);
         $router->put('/payment-methods/{id}', [PaymentMethodController::class, 'update']);
         $router->delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy']);
-
-        $router->get('/member/activity/stats', 'Api\MemberActivityApiController@stats');
-        $router->get('/member/activity/trends', 'Api\MemberActivityApiController@trends');
-        $router->get('/member/badges/progress', 'Api\MemberActivityApiController@badgeProgress');
 
         $router->get('/email-themes', [EmailThemeController::class, 'index']);
         $router->get('/email-themes/active', [EmailThemeController::class, 'getActive']);
@@ -1162,10 +1176,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
 });
 
-$router->post('/api/{siteName}/vouchers/validate', VoucherController::class, 'validate');
-$router->post('/api/{siteName}/vouchers/{id}/apply', VoucherController::class, 'apply');
+$router->post('/api/{site}/vouchers/validate', VoucherController::class, 'validate');
+$router->post('/api/{site}/vouchers/{id}/apply', VoucherController::class, 'apply');
 
-$router->post('/api/{siteName}/newsletter/web/signup', [NewsletterController::class, 'signup']);
+$router->post('/api/{site}/newsletter/web/signup', [NewsletterController::class, 'signup']);
 
 
 $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'getCustomFields');
@@ -1194,7 +1208,7 @@ $router->post('/api/menu-items/reorder', MenuItemController::class, 'reorder');
 $router->get('/authors/{slug}', 'AuthorViewController@show');
 
 //Auth
-$router->post('/api/{siteName}/auth/login', AuthController::class, 'login');
+$router->post('/api/{site}/auth/login', AuthController::class, 'login');
 $router->get('/api/sites', SiteController::class, 'index');
 
 $router->get('/api/{site}/cart', CartController::class, 'index');
@@ -1239,7 +1253,7 @@ $router->delete('/comments/{commentId}', [CommentController::class, 'destroy']);
 // Deals routes
 $router->post('/api/deals/refresh', [DealsController::class, 'refresh']);
 $router->get('/api/deals/carousel', [DealsController::class, 'carousel']);
-$router->get('/api/{siteName}/deals/filtered', [DealsController::class, 'filtered']);
+$router->get('/api/{site}/deals/filtered', [DealsController::class, 'filtered']);
 
 // Price alerts
 $router->post('/api/price-alerts', [DealsController::class, 'createPriceAlert']);
@@ -1254,7 +1268,7 @@ $router->post('/api/{site}/vouchers/remove-voucher', VoucherController::class, '
 $router->post('/api/{site}/merchants/{merchantId}/import', [MerchantImportController::class, 'import']);
 
 //reccommendations
-$router->get('/api/{siteName}/recommendations/products', [RecommendationController::class, 'products']);
+$router->get('/api/{site}/recommendations/products', [RecommendationController::class, 'products']);
 
 $router->get('/api/{site}/member/current-address', [MemberAddressApiController::class, 'getCurrentAddress']);
 $router->get('/api/{site}/address-lookup', [AddressController::class, 'lookup']);
@@ -1318,6 +1332,9 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     // Triggers: ContributorPageController@update
     $router->put('/pages/{id}', [ContributorPageController::class, 'update']);
 
+    $router->post('/admin/contributors/{id}/role', [AdminContributorController::class, 'updateRole']);
+
+
     // DELETE /api/{site}/open-collab/pages/{id}
     // Triggers: ContributorPageController@destroy
     $router->delete('/pages/{id}', [ContributorPageController::class, 'destroy']);
@@ -1348,4 +1365,3 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 });
 
 $router->get('/api/{site}/open-collab/payouts/{id}/statement', [\App\Controllers\OpenCollab\PayoutStatementController::class, 'download']);
-

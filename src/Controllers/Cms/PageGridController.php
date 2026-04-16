@@ -27,10 +27,10 @@ class PageGridController extends Controller
     /**
      * Display a listing of page grids.
      */
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             // Use the search engine
             $config = SearchConfigurationFactory::create('page_grid');

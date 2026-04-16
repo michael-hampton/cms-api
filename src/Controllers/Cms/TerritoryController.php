@@ -40,10 +40,10 @@ class TerritoryController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->repository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, TerritoryResource::class);
@@ -53,7 +53,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function store(CreateTerritoryRequest $request, string $siteName): JsonResponse
+    public function store(CreateTerritoryRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->validated();
@@ -82,7 +82,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function update(int $id, UpdateTerritoryRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateTerritoryRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->validated();
@@ -96,7 +96,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $reassignToId = $request->get('reassign_to_territory_id');
@@ -132,7 +132,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function reorder(Request $request, string $siteName): JsonResponse
+    public function reorder(Request $request, string $site): JsonResponse
     {
         try {
             $orderedIds = $request->get('ordered_ids', []);
@@ -144,7 +144,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function bulkUpdateRegionSet(Request $request, string $siteName): JsonResponse
+    public function bulkUpdateRegionSet(Request $request, string $site): JsonResponse
     {
         try {
             $territoryIds = $request->get('territory_ids', []);
@@ -162,7 +162,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function getByRegionSet(int $regionSetId, string $siteName): JsonResponse
+    public function getByRegionSet(int $regionSetId, string $site): JsonResponse
     {
         try {
             $territories = $this->repository->getByRegionSet($regionSetId);
@@ -172,7 +172,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function getActive(string $siteName): JsonResponse
+    public function getActive(string $site): JsonResponse
     {
         try {
             $territories = $this->repository->getActive();
@@ -182,7 +182,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function assignPages(int $id, Request $request, string $siteName): JsonResponse
+    public function assignPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);
@@ -199,7 +199,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function unassignPages(int $id, Request $request, string $siteName): JsonResponse
+    public function unassignPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);
@@ -216,7 +216,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function searchAvailablePages(int $id, Request $request, string $siteName): JsonResponse
+    public function searchAvailablePages(int $id, Request $request, string $site): JsonResponse
     {
 
         try {
@@ -232,7 +232,7 @@ class TerritoryController extends Controller
         }
     }
 
-    public function getPages(int $id, Request $request, string $siteName): JsonResponse
+    public function getPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $territory = $this->repository->find($id);
@@ -244,7 +244,7 @@ class TerritoryController extends Controller
             // Add territory filter to the request
             $request->merge(['territory_id' => $id]);
 
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             $result = $this->pageRepository->search($criteria);
 

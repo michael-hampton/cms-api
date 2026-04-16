@@ -258,8 +258,6 @@
 </main>
 
 <script>
-    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
-
     async function loadComments() {
         try {
             const res = await fetch(`/api/${SITE_SLUG}/member/comments`);

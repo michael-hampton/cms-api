@@ -32,10 +32,10 @@ class CustomFieldDefinitionController extends Controller
         parent::__construct();
     }
 
-    public function index(string $siteName): JsonResponse
+    public function index(string $site): JsonResponse
     {
         try {
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
             $fields = $this->customFieldDefinitionRepository->getActive($siteId);
             return $this->jsonResponse(['fields' => $fields]);
         } catch (Exception $e) {
@@ -43,10 +43,10 @@ class CustomFieldDefinitionController extends Controller
         }
     }
 
-    public function grouped(string $siteName): JsonResponse
+    public function grouped(string $site): JsonResponse
     {
         try {
-            $grouped = $this->customFieldDefinitionRepository->getGroupedFields($siteName);
+            $grouped = $this->customFieldDefinitionRepository->getGroupedFields($site);
             $result = [];
             foreach ($grouped as $group => $fields) {
                 $result[$group] = array_map(fn($field) => $field->toArray(), $fields);

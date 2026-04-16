@@ -31,10 +31,10 @@ class EmailThemeController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->emailThemeRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, EmailThemeResource::class);
@@ -46,11 +46,11 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function store(CreateEmailThemeRequest $request, string $siteName): JsonResponse
+    public function store(CreateEmailThemeRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
 
             $logoFile = $request->hasFile('logo') ? $request->file('logo') : null;
 
@@ -71,13 +71,13 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function show($id, string $siteName): JsonResponse
+    public function show($id, string $site): JsonResponse
     {
         try {
             if (is_numeric($id)) {
                 $theme = $this->emailThemeService->getThemeById((int)$id);
             } else {
-                $siteId = Site::resolveSite($siteName);
+                $siteId = Site::resolveSite($site);
                 $theme = $this->emailThemeService->getThemeBySlug($id, $siteId);
             }
 
@@ -94,7 +94,7 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function update(int $id, UpdateEmailThemeRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateEmailThemeRequest $request, string $site): JsonResponse
     {
         try {
             $data = $request->validated();
@@ -117,7 +117,7 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $result = $this->emailThemeService->deleteTheme($id);
@@ -133,10 +133,10 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function getActive(string $siteName): JsonResponse
+    public function getActive(string $site): JsonResponse
     {
         try {
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
             $themes = $this->emailThemeService->getActiveThemes($siteId);
 
             return $this->jsonResponse([
@@ -148,10 +148,10 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function setDefault(int $id, Request $request, string $siteName): JsonResponse
+    public function setDefault(int $id, Request $request, string $site): JsonResponse
     {
         try {
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
             $result = $this->emailThemeService->setDefaultTheme($id, $siteId);
 
             if (!$result) {
@@ -165,10 +165,10 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function alternatives(int $id, string $siteName): JsonResponse
+    public function alternatives(int $id, string $site): JsonResponse
     {
         try {
-            $siteId = Site::resolveSite($siteName);
+            $siteId = Site::resolveSite($site);
             $themes = $this->emailThemeService->getAlternativeThemes($id, $siteId);
 
             return $this->jsonResponse([
@@ -180,7 +180,7 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $data = $request->all();

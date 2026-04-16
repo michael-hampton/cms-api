@@ -18,10 +18,10 @@ class PipelineController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             $results = $this->pageRepository->searchPipeline($criteria);
 
@@ -34,7 +34,7 @@ class PipelineController extends Controller
         }
     }
 
-    public function updateStage(int $id, Request $request, string $siteName): JsonResponse
+    public function updateStage(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $status = $request->get('status');
@@ -63,7 +63,7 @@ class PipelineController extends Controller
         }
     }
 
-    public function metrics(Request $request, string $siteName): JsonResponse
+    public function metrics(Request $request, string $site): JsonResponse
     {
         try {
             $siteId = $request->get('site_id');
@@ -79,7 +79,7 @@ class PipelineController extends Controller
         }
     }
 
-    public function bulkUpdateStage(Request $request, string $siteName): JsonResponse
+    public function bulkUpdateStage(Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);

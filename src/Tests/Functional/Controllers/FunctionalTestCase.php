@@ -89,7 +89,7 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function ensureSiteExists()
     {
-        if (!empty($this->siteId)) {
+        if (!empty($this->siteId) && Site::find($this->siteId)) {
             return;
         }
 

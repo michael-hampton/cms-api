@@ -377,8 +377,6 @@
 </div>
 
 <script>
-    const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
-
     /* ─── Toast ──────────────────────────────────────────── */
     function showToast(message, type = 'info', duration = 5000) {
         const icons = {error: '✕', info: 'ℹ'};

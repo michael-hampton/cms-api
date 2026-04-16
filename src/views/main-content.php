@@ -30,6 +30,7 @@ $pageGridAdded = false;
 
                 <div class="page-layout <?= $html['hasSidebar'] ? 'has-sidebar' : 'full-width' ?>">
 
+
                     <!-- Main Content Area -->
                     <div class="main-content <?= $html['hasSidebar'] ? 'with-sidebar' : 'full-width' ?>">
 
@@ -37,10 +38,16 @@ $pageGridAdded = false;
 
                         <!-- After the page header section -->
                         <?php if ($page->page_type === 'landing-page' && !empty($categories)): ?>
-                            @include('categories-widget', ['page' => $page])
+                            @include('components/categories-widget', ['page' => $page, 'layout' => 'carousel'])
                         <?php endif; ?>
 
+                        @include('components/activity-feed-widget')
+
+                        @include('components/trending-widget')
+
                         @include('components/product-section')
+
+                        @include('components/newsletter-signup-widget')
 
                         <!-- Blog Comments Section -->
                         @if($page->page_type !== 'landing-page')
@@ -68,6 +75,13 @@ $pageGridAdded = false;
                 </div>
             <?php endif; ?>
 
+            <?php if ($page->page_type === 'landing-page' && !empty($categoriesWithPages)): ?>
+                @include('components/category-pages', [
+                'categories' => $categoriesWithPages,
+                'site' => \App\Framework\Support\SiteContext::slug()
+                ])
+            <?php endif; ?>
+
             <script>
                 const site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
             </script>
@@ -91,13 +105,6 @@ $pageGridAdded = false;
     $footerRenderer = new \App\Services\FooterRenderer();
     echo $footerRenderer->renderFooter($footerMenu);
 } ?>
-
-<?php if ($page->page_type === 'landing-page' && !empty($categoriesWithPages)): ?>
-    @include('components/category-pages', [
-    'categories' => $categoriesWithPages,
-    'site' => \App\Framework\Support\SiteContext::slug()
-    ])
-<?php endif; ?>
 
 
 @include('consent-banner', ['site' => $site])

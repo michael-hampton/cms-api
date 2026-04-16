@@ -31,10 +31,10 @@ class IssueDeliveryController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->issueDeliveryRepository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, IssueDeliveryResource::class);

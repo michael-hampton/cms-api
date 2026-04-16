@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($page->is_paid ? 'Purchase Article' : 'Subscription Required') ?></title>
 
-    <?php if ($page->is_paid): ?>
-        {{-- Stripe.js is loaded only when payment is actually required --}}
+    <?php
+    dd($page->is_paid);
+    if ($page->is_paid): ?>
         <script src="https://js.stripe.com/v3/" defer></script>
     <?php endif; ?>
 

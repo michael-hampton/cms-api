@@ -48,7 +48,7 @@ class GiftedArticleRepository extends Repository
     {
         return GiftedArticle::where('gifted_by_member_id', $memberId)
             ->where('site_id', $siteId)
-            ->with(['page', 'recipient'])
+            ->with(['page', 'recipient', 'giftedBy'])
             ->orderBy('gifted_at', 'desc')
             ->get();
     }

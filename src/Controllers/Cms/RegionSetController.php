@@ -41,10 +41,10 @@ class RegionSetController extends Controller
         parent::__construct();
     }
 
-    public function index(Request $request, string $siteName): JsonResponse
+    public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->repository->search($criteria);
 
             $collection = new PaginatedResourceCollection($result, RegionSetResource::class);
@@ -54,7 +54,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function store(CreateRegionSetRequest $request, string $siteName): JsonResponse
+    public function store(CreateRegionSetRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->validated();
@@ -87,7 +87,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function update(int $id, UpdateRegionSetRequest $request, string $siteName): JsonResponse
+    public function update(int $id, UpdateRegionSetRequest $request, string $site): JsonResponse
     {
         try {
             $requestData = $request->validated();
@@ -102,7 +102,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $siteName): JsonResponse
+    public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $reassignToId = $request->get('reassign_to_region_set_id');
@@ -138,7 +138,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function duplicate(int $id, Request $request, string $siteName): JsonResponse
+    public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $cloneRegionSet = Container::getInstance()->make(CloneRegionSet::class);
@@ -151,7 +151,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function reorder(Request $request, string $siteName): JsonResponse
+    public function reorder(Request $request, string $site): JsonResponse
     {
         try {
             $orderedIds = $request->get('ordered_ids', []);
@@ -163,7 +163,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function getActive(string $siteName): JsonResponse
+    public function getActive(string $site): JsonResponse
     {
         try {
             $regionSets = $this->repository->getActive();
@@ -173,7 +173,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function getPages(int $id, Request $request, string $siteName): JsonResponse
+    public function getPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $regionSet = $this->repository->find($id);
@@ -185,7 +185,7 @@ class RegionSetController extends Controller
             // Add region_set filter to the request
             $request->merge(['region_set_id' => $id]);
 
-            $criteria = SearchCriteriaParser::fromRequest($request, $siteName);
+            $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
             $result = $this->pageRepository->search($criteria);
 
@@ -196,7 +196,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function searchAvailablePages(int $id, Request $request, string $siteName): JsonResponse
+    public function searchAvailablePages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $query = $request->get('q', '');
@@ -211,7 +211,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function assignPages(int $id, Request $request, string $siteName): JsonResponse
+    public function assignPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);
@@ -228,7 +228,7 @@ class RegionSetController extends Controller
         }
     }
 
-    public function unassignPages(int $id, Request $request, string $siteName): JsonResponse
+    public function unassignPages(int $id, Request $request, string $site): JsonResponse
     {
         try {
             $pageIds = $request->get('page_ids', []);

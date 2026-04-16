@@ -23,7 +23,7 @@ class MemberAddressApiController extends Controller
         parent::__construct();
     }
 
-    public function search()
+    public function index()
     {
         if (!MemberAuth::check()) {
             return $this->redirect('/member/login');
@@ -31,6 +31,13 @@ class MemberAddressApiController extends Controller
 
         $member = MemberAuth::member();
         $addresses = $this->addressRepository->getAddressesForMember($member->id);
+
+        return $this->resourceResponse(['items' => $addresses->toArray()]);
+    }
+
+    public function search(int $memberId)
+    {
+        $addresses = $this->addressRepository->getAddressesForMember($memberId);
 
         return $this->resourceResponse(['items' => $addresses->toArray()]);
     }

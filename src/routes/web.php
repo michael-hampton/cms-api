@@ -190,9 +190,7 @@ $router->post('/{site}/member/badge-shown', [MemberBadgeController::class, 'mark
 
 $router->get('/{site}/member/rewards', [RewardsController::class, 'index']);
 $router->get('/{site}/member/rewards/{id}', [RewardsController::class, 'show']); // View single reward details
-$router->post('/{site}/member/rewards/{rewardId}/claim', [RewardsController::class, 'claim']);
 
-$router->post('/{site}/member/rewards/{rewardId}/track/{action}', [RewardsController::class, 'trackClick']);
 $router->post('/{site}/member/badge-modal-shown', [MemberBadgeController::class, 'markAsShown']);
 
 $router->get('/{site}/member/gifted-articles', [GiftedArticlesController::class, 'index']);
@@ -329,11 +327,14 @@ $router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);
 $router->post('/api/{site}/wishlist', [WishlistController::class, 'add']);
 $router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 'remove']);
 
+$router->get('/api/{site}/{memberId}/addresses', [\App\Controllers\Members\Api\MemberAddressApiController::class, 'search']);
+
 $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
 $router->get('/subscription-confirmation', [SubscriptionConfirmationController::class, 'show']);
 
 $router->get('/{site}/member/addresses', [MemberAddressController::class, 'index']);
 $router->get('/{site}/member/addresses/create', [MemberAddressController::class, 'create']);
+
 
 $router->get('/{site}/member/addresses/{id}/edit', [MemberAddressController::class, 'edit']);
 

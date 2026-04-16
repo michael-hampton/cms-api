@@ -6,8 +6,12 @@ use Stripe\StripeClient;
 
 class StripePaymentIntentGateway implements PaymentIntentGateway
 {
-    public function __construct(private StripeClient $stripe)
+    private readonly StripeClient $stripe;
+
+    public function __construct()
     {
+        $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
+        $this->stripe = new StripeClient($secretKey);
     }
 
     public function create(array $data)
