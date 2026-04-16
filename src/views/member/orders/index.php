@@ -30,6 +30,87 @@
             color: var(--text-primary);
         }
 
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, .1);
+            pointer-events: all;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            font-size: 1.1rem;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+
+        /* Layout */
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -48,6 +129,7 @@
             font-weight: 700;
         }
 
+        /* Buttons */
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
@@ -70,6 +152,38 @@
             background: var(--primary-dark);
         }
 
+        .btn-secondary {
+            background: white;
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Orders list */
         .orders-list {
             display: flex;
             flex-direction: column;
@@ -85,7 +199,7 @@
         }
 
         .order-card:hover {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, .1);
         }
 
         .order-header {
@@ -100,7 +214,6 @@
         .order-number {
             font-size: 1.125rem;
             font-weight: 600;
-            color: var(--text-primary);
         }
 
         .order-date {
@@ -166,22 +279,7 @@
             margin-top: 1rem;
         }
 
-        .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.875rem;
-        }
-
-        .btn-secondary {
-            background: white;
-            color: var(--text-primary);
-            border: 2px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-
+        /* Empty state */
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -204,6 +302,156 @@
         .empty-state p {
             color: var(--text-secondary);
             margin-bottom: 1.5rem;
+        }
+
+        /* Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 0.5rem;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Cancel modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .modal-box {
+            background: white;
+            border-radius: 1rem;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, .1);
+            border-top: 4px solid var(--danger-color);
+            animation: modalIn 0.25s ease;
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+            background: linear-gradient(to bottom, #fef2f2, white);
+            border-radius: 1rem 1rem 0 0;
+        }
+
+        .modal-header-icon {
+            font-size: 2rem;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+        }
+
+        .modal-header p {
+            margin: 0.25rem 0 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-weight: normal;
+        }
+
+        .checkbox-label input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .warning-box {
+            padding: 1rem;
+            background: #fffbeb;
+            border: 1px solid #fbbf24;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .warning-box strong {
+            color: #92400e;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .warning-box ul {
+            margin: 0.5rem 0 0 1.25rem;
+            padding: 0;
+            color: #78350f;
         }
 
         @media (max-width: 768px) {
@@ -231,171 +479,56 @@
                 justify-content: center;
             }
         }
-
-        .cancel-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 1rem;
-        }
-
-        .cancel-modal-container {
-            background: white;
-            border-radius: 1rem;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            border-top: 4px solid var(--danger-color);
-        }
-
-        .cancel-modal-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            gap: 1rem;
-            align-items: flex-start;
-            background: linear-gradient(to bottom, #fef2f2 0%, white 100%);
-        }
-
-        .cancel-warning-icon {
-            font-size: 2rem;
-        }
-
-        .cancel-modal-header h2 {
-            margin: 0;
-            font-size: 1.25rem;
-            color: var(--text-primary);
-        }
-
-        .cancel-modal-header p {
-            margin: 0.25rem 0 0 0;
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
-        .cancel-modal-close {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 0.25rem 0.5rem;
-        }
-
-        .cancel-modal-body {
-            padding: 1.5rem;
-        }
-
-        .cancel-form-group {
-            margin-bottom: 1rem;
-        }
-
-        .cancel-form-group label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
-            color: var(--text-primary);
-        }
-
-        .cancel-form-control {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .cancel-checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: normal !important;
-            cursor: pointer;
-        }
-
-        .cancel-checkbox-label input {
-            width: 18px;
-            height: 18px;
-        }
-
-        .cancel-warning-box {
-            padding: 1rem;
-            background: #fef3c7;
-            border: 1px solid #fbbf24;
-            border-radius: 0.5rem;
-            margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-
-        .cancel-warning-box strong {
-            color: #92400e;
-            display: block;
-            margin-bottom: 0.5rem;
-        }
-
-        .cancel-warning-box ul {
-            margin: 0.5rem 0 0 1.25rem;
-            padding: 0;
-            color: #78350f;
-        }
-
-        .cancel-modal-footer {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            gap: 0.75rem;
-            justify-content: flex-end;
-        }
     </style>
 </head>
 <body>
 
 @include('member._header')
 
+<div class="toast-container" id="toastContainer"></div>
+
 <main class="container">
     <div class="page-header">
         <div>
             <h1 class="page-title">My Orders</h1>
-            <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-                View and track all your orders
-            </p>
+            <p style="color:var(--text-secondary);margin-top:0.5rem;">View and track all your orders</p>
         </div>
-        <a href="/member/dashboard" class="btn btn-secondary">
+        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/dashboard" class="btn btn-secondary">
             ← Back to Dashboard
         </a>
     </div>
 
     <div class="orders-list" id="orders-container">
-        <div class="loader">Loading orders...</div>
+        <!-- Skeleton loaders -->
+        <?php for ($i = 0; $i < 3; $i++): ?>
+            <div class="order-card">
+                <div class="skeleton" style="height:1.25rem;width:40%;margin-bottom:0.75rem;"></div>
+                <div class="skeleton" style="height:1rem;width:25%;margin-bottom:1rem;"></div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;">
+                    <?php for ($j = 0; $j < 4; $j++): ?>
+                        <div class="skeleton" style="height:2.5rem;"></div>
+                    <?php endfor; ?>
+                </div>
+            </div>
+        <?php endfor; ?>
     </div>
 </main>
 
-<div class="cancel-modal-overlay" style="display: none;">
-    <div class="cancel-modal-container">
-        <div class="cancel-modal-header">
-            <div class="cancel-warning-icon">⚠️</div>
+<!-- Cancel modal -->
+<div class="modal-backdrop" id="cancelModalBackdrop" style="display:none;" onclick="handleBackdropClick(event)">
+    <div class="modal-box" id="cancelModalBox">
+        <div class="modal-header">
+            <div class="modal-header-icon">⚠️</div>
             <div>
                 <h2>Cancel Order</h2>
                 <p>This action will cancel the order and cannot be undone</p>
             </div>
-            <button class="cancel-modal-close" onclick="this.closest('.cancel-modal-overlay').remove()">×</button>
         </div>
-        <div class="cancel-modal-body">
-            <div class="cancel-form-group">
+        <div class="modal-body">
+            <div class="form-group">
                 <label>Cancellation Reason *</label>
-                <select id="cancelReason" class="cancel-form-control" required>
-                    <option value="">Select a reason...</option>
+                <select id="cancelReason" class="form-control">
+                    <option value="">Select a reason…</option>
                     <option value="customer_request">Customer Request</option>
                     <option value="out_of_stock">Out of Stock</option>
                     <option value="payment_failed">Payment Failed</option>
@@ -404,14 +537,14 @@
                     <option value="other">Other</option>
                 </select>
             </div>
-            <div class="cancel-form-group">
-                <label class="cancel-checkbox-label">
+            <div class="form-group">
+                <label class="checkbox-label">
                     <input type="checkbox" id="notifyCustomer" checked>
                     <span>Send cancellation notification to customer</span>
                 </label>
             </div>
-            <div class="cancel-warning-box">
-                <strong>Important:</strong> Cancelling this order will:
+            <div class="warning-box">
+                <strong>Important: Cancelling this order will:</strong>
                 <ul>
                     <li>Mark the order as cancelled in the system</li>
                     <li>Release any reserved inventory</li>
@@ -419,12 +552,10 @@
                 </ul>
             </div>
         </div>
-        <div class="cancel-modal-footer">
-            <input type="hidden" id="cancelOrderId" value="">
-            <button class="btn btn-secondary" onclick="this.closest('.cancel-modal-overlay').style.display='none'">Keep
-                Order
-            </button>
-            <button class="btn btn-danger" onclick="confirmCancelOrder()">Cancel Order</button>
+        <div class="modal-footer">
+            <input type="hidden" id="cancelOrderId">
+            <button class="btn btn-secondary" onclick="closeCancelModal()">Keep Order</button>
+            <button class="btn btn-danger" id="confirmCancelBtn" onclick="confirmCancelOrder()">Cancel Order</button>
         </div>
     </div>
 </div>
@@ -432,108 +563,173 @@
 <script>
     const SITE_SLUG = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
-    async function loadOrders() {
-        const response = await fetch(`/api/${SITE_SLUG}/member/orders`);
-        const {data: orders} = await response.json();
+    /* ─── Toast ──────────────────────────────────────────── */
+    function showToast(message, type = 'info', duration = 5000) {
+        const icons = {success: '✓', error: '✕', info: 'ℹ'};
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <span>${icons[type] || 'ℹ'}</span>
+            <span style="flex:1;">${message}</span>
+            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            if (!toast.parentElement) return;
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
 
+    /* ─── Load orders ────────────────────────────────────── */
+    async function loadOrders() {
+        try {
+            const response = await fetch(`/api/${SITE_SLUG}/member/orders`);
+            if (!response.ok) throw new Error('Server error ' + response.status);
+            const json = await response.json();
+            if (!json.success) throw new Error(json.message || 'Failed to load orders');
+            renderOrders(json.data);
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to load orders. Please refresh.', 'error');
+            document.getElementById('orders-container').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <h3>Failed to Load Orders</h3>
+                    <p>Please try refreshing the page.</p>
+                    <button class="btn btn-primary" onclick="loadOrders()">Retry</button>
+                </div>`;
+        }
+    }
+
+    function renderOrders(orders) {
         const container = document.getElementById('orders-container');
 
-        if (orders.length === 0) {
-            container.innerHTML = '<p>No orders found.</p>';
+        if (!orders || orders.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">🛍️</div>
+                    <h3>No Orders Yet</h3>
+                    <p>You haven't placed any orders yet. Start shopping to see your orders here.</p>
+                    <a href="/" class="btn btn-primary">Start Shopping</a>
+                </div>`;
             return;
         }
 
-        container.innerHTML = orders.map(order => `
-        <div class="order-card">
-            <div class="order-header">
-                <div>
-                    <div class="order-number">Order #${order.order_number}</div>
-                    <div class="order-date">
-                        Placed on ${new Date(order.created_at).toLocaleDateString('en-US', {
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric'
-        })}
+        container.innerHTML = orders.map(order => {
+            const statusClass = (order.status || '').toLowerCase();
+            const date = new Date(order.created_at).toLocaleDateString('en-US', {
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+
+            return `
+            <div class="order-card">
+                <div class="order-header">
+                    <div>
+                        <div class="order-number">Order #${escHtml(order.order_number)}</div>
+                        <div class="order-date">Placed on ${date}</div>
+                    </div>
+                    <span class="status-badge ${statusClass}">${escHtml(order.status)}</span>
+                </div>
+
+                <div class="order-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Total Amount</span>
+                        <span class="detail-value">${escHtml(order.currency)} ${parseFloat(order.total).toFixed(2)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Payment Status</span>
+                        <span class="detail-value" style="color:${order.is_paid ? 'var(--success-color)' : 'var(--warning-color)'}">
+                            ${order.is_paid ? 'Paid' : 'Pending'}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Items</span>
+                        <span class="detail-value">${order.items?.length ?? 0} item(s)</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Payment Method</span>
+                        <span class="detail-value">${escHtml(order.payment_method || 'N/A')}</span>
                     </div>
                 </div>
-                <span class="status-badge ${order.status.toLowerCase()}">
-                    ${order.status}
-                </span>
-            </div>
 
-            <div class="order-details">
-                <div class="detail-item">
-                    <span class="detail-label">Total Amount</span>
-                    <span class="detail-value">${order.currency} ${(order.total).toFixed(2)}</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Payment Status</span>
-                    <span class="detail-value" style="color: ${order.is_paid ? 'var(--success-color)' : 'var(--warning-color)'}">
-                        ${order.is_paid ? 'Paid' : 'Pending'}
-                    </span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Items</span>
-                    <span class="detail-value">${order.items?.length} item(s)</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Payment Method</span>
-                    <span class="detail-value">${order.payment_method || 'N/A'}</span>
-                </div>
-            </div>
-
-            <div class="order-actions">
-                <a href="/${SITE_SLUG}/member/orders/${order.id}" class="btn btn-primary btn-sm">
-                    View Details
-                </a>
-                ${order.can_cancel ? `
-                    <button onclick="cancelOrder(${order.id})" class="btn btn-secondary btn-sm">
+                <div class="order-actions">
+                    <a href="/${SITE_SLUG}/member/orders/${order.id}" class="btn btn-primary btn-sm">
+                        View Details
+                    </a>
+                    ${order.can_cancel ? `
+                    <button onclick="openCancelModal(${order.id})" class="btn btn-secondary btn-sm">
                         Cancel Order
-                    </button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+                    </button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
     }
 
-    document.addEventListener('DOMContentLoaded', loadOrders);
-
-    async function cancelOrder(orderId) {
+    /* ─── Cancel modal ───────────────────────────────────── */
+    function openCancelModal(orderId) {
         document.getElementById('cancelOrderId').value = orderId;
-        document.querySelector('.cancel-modal-overlay').style.display = 'flex';
+        document.getElementById('cancelReason').value = '';
+        document.getElementById('notifyCustomer').checked = true;
+        document.getElementById('confirmCancelBtn').disabled = false;
+        document.getElementById('cancelModalBackdrop').style.display = 'flex';
+    }
+
+    function closeCancelModal() {
+        document.getElementById('cancelModalBackdrop').style.display = 'none';
+    }
+
+    function handleBackdropClick(e) {
+        if (e.target === document.getElementById('cancelModalBackdrop')) closeCancelModal();
     }
 
     async function confirmCancelOrder() {
         const reason = document.getElementById('cancelReason').value;
-        const notifyCustomer = document.getElementById('notifyCustomer').checked;
-        const orderId = document.getElementById('cancelOrderId').value
+        const notify = document.getElementById('notifyCustomer').checked;
+        const orderId = document.getElementById('cancelOrderId').value;
+        const btn = document.getElementById('confirmCancelBtn');
 
         if (!reason) {
-            alert('Please select a cancellation reason');
+            showToast('Please select a cancellation reason.', 'error');
+            document.getElementById('cancelReason').focus();
             return;
         }
+
+        btn.disabled = true;
+        btn.textContent = 'Cancelling…';
 
         try {
             const response = await fetch(`/api/${SITE_SLUG}/member/orders/${orderId}/cancel`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reason, notify_customer: notify})
             });
-
             const data = await response.json();
 
             if (data.success) {
-                alert('Order cancelled successfully');
-                location.reload();
+                closeCancelModal();
+                showToast('Order cancelled successfully.', 'success');
+                setTimeout(loadOrders, 800);
             } else {
-                alert(data.message || 'Failed to cancel order');
+                showToast(data.message || 'Failed to cancel order.', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Cancel Order';
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to cancel order');
+        } catch {
+            showToast('An error occurred. Please try again.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Cancel Order';
         }
     }
+
+    function escHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadOrders);
 </script>
 </body>
 </html>

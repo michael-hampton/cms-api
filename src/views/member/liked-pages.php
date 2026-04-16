@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Liked Pages - <?= htmlspecialchars($site->name ?? 'Site') ?></title>
     <style>
-        * {
+        *, *::before, *::after {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
         }
 
         :root {
@@ -20,8 +20,8 @@
             --bg-light: #f5f7fa;
             --text-primary: #1f2937;
             --text-secondary: #6b7280;
-            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow: 0 1px 3px rgba(0, 0, 0, .1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, .1);
         }
 
         body {
@@ -29,50 +29,6 @@
             background: var(--bg-light);
             min-height: 100vh;
             color: var(--text-primary);
-        }
-
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-decoration: none;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 1.5rem;
-            align-items: center;
-        }
-
-        .nav-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav-link:hover {
-            color: var(--primary-color);
         }
 
         .container {
@@ -88,7 +44,7 @@
         .page-title {
             font-size: 2rem;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: .5rem;
         }
 
         .page-subtitle {
@@ -110,7 +66,7 @@
         .stat-item {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: .75rem;
         }
 
         .stat-icon {
@@ -120,11 +76,10 @@
         .stat-info h3 {
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--text-primary);
         }
 
         .stat-info p {
-            font-size: 0.875rem;
+            font-size: .875rem;
             color: var(--text-secondary);
         }
 
@@ -133,15 +88,12 @@
             grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
             gap: 1.5rem;
         }
-
         .page-card {
             background: white;
             border-radius: 1rem;
             overflow: hidden;
             box-shadow: var(--shadow);
-            transition: all 0.3s ease;
-            text-decoration: none;
-            color: inherit;
+            transition: all .3s ease;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -156,7 +108,8 @@
             width: 100%;
             height: 200px;
             object-fit: cover;
-            background: linear-gradient(135deg, var(--primary-color)20 0%, var(--secondary-color)20 100%);
+            display: block;
+            background: linear-gradient(135deg, #667eea20, #764ba220);
         }
 
         .page-content {
@@ -169,13 +122,11 @@
         .page-title-text {
             font-size: 1.125rem;
             font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: .5rem;
             line-height: 1.4;
         }
-
         .page-excerpt {
-            font-size: 0.875rem;
+            font-size: .875rem;
             color: var(--text-secondary);
             line-height: 1.6;
             display: -webkit-box;
@@ -184,7 +135,6 @@
             overflow: hidden;
             flex: 1;
         }
-
         .page-meta {
             display: flex;
             align-items: center;
@@ -192,7 +142,7 @@
             margin-top: 1rem;
             padding-top: 1rem;
             border-top: 1px solid var(--border-color);
-            font-size: 0.8125rem;
+            font-size: .8125rem;
             color: var(--text-secondary);
         }
 
@@ -202,8 +152,8 @@
             right: 1rem;
             background: var(--danger-color);
             color: white;
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
+            padding: .5rem .75rem;
+            border-radius: .5rem;
             font-size: 1rem;
             box-shadow: var(--shadow);
         }
@@ -211,12 +161,12 @@
         .unlike-btn {
             background: var(--bg-light);
             border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
+            padding: .5rem 1rem;
+            border-radius: .5rem;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: .875rem;
             color: var(--text-secondary);
-            transition: all 0.2s;
+            transition: all .2s;
         }
 
         .unlike-btn:hover {
@@ -235,13 +185,12 @@
         .empty-state-icon {
             font-size: 4rem;
             margin-bottom: 1rem;
-            opacity: 0.5;
+            opacity: .5;
         }
 
         .empty-state h2 {
             font-size: 1.5rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: .5rem;
         }
 
         .empty-state p {
@@ -251,13 +200,13 @@
 
         .btn-primary {
             display: inline-block;
-            padding: 0.75rem 1.5rem;
+            padding: .75rem 1.5rem;
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             color: white;
             text-decoration: none;
-            border-radius: 0.5rem;
+            border-radius: .5rem;
             font-weight: 500;
-            transition: transform 0.2s;
+            transition: transform .2s;
         }
 
         .btn-primary:hover {
@@ -266,10 +215,6 @@
 
         @media (max-width: 768px) {
             .container {
-                padding: 1rem;
-            }
-
-            .header-content {
                 padding: 1rem;
             }
 
@@ -286,32 +231,16 @@
             .pages-grid {
                 grid-template-columns: 1fr;
             }
-
-            .nav-links {
-                gap: 1rem;
-            }
         }
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/" class="logo"><?= htmlspecialchars($site->name ?? 'Site') ?></a>
-        <div class="nav-links">
-            <a href="/member/dashboard" class="nav-link">Dashboard</a>
-            <a href="/member/reading-history" class="nav-link">Reading History</a>
-            <form method="POST" action="/member/logout" style="display:inline;">
-                <button type="submit" class="nav-link" style="background:none;border:none;cursor:pointer;">Logout
-                </button>
-            </form>
-        </div>
-    </div>
-</header>
+@include('member._header')
 
 <div class="container">
     <div class="page-header">
         <h1 class="page-title">❤️ Liked Pages</h1>
-        <p class="page-subtitle">Your collection of favorite pages and content</p>
+        <p class="page-subtitle">Your collection of favourite pages and content</p>
     </div>
     <div id="liked-pages-root">
         <p style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading liked pages…</p>
@@ -341,21 +270,21 @@
         const root = document.getElementById('liked-pages-root');
 
         const statsBar = `
-        <div class="stats-bar">
-            <div class="stat-item">
-                <span class="stat-icon">❤️</span>
-                <div class="stat-info"><h3>${totalLikes}</h3><p>Total Likes</p></div>
-            </div>
-        </div>`;
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-icon">❤️</span>
+                    <div class="stat-info"><h3>${totalLikes}</h3><p>Total Likes</p></div>
+                </div>
+            </div>`;
 
         if (!likedPages.length) {
             root.innerHTML = statsBar + `
-            <div class="empty-state">
-                <div class="empty-state-icon">💔</div>
-                <h2>No Liked Pages Yet</h2>
-                <p>Start exploring and like pages to build your collection of favorites.</p>
-                <a href="/" class="btn-primary">Explore Content</a>
-            </div>`;
+                <div class="empty-state">
+                    <div class="empty-state-icon">💔</div>
+                    <h2>No Liked Pages Yet</h2>
+                    <p>Start exploring and like pages to build your collection of favourites.</p>
+                    <a href="/" class="btn-primary">Explore Content</a>
+                </div>`;
             return;
         }
 
@@ -363,22 +292,25 @@
             const page = like.page;
             if (!page) return '';
             return `
-            <div class="page-card">
-                <span class="like-badge">❤️</span>
-                <a href="/${escHtml(page.slug)}" style="text-decoration:none;color:inherit;">
-                    ${page.listing_image_id
+                <div class="page-card" data-page-id="${page.id}">
+                    <span class="like-badge">❤️</span>
+                    <a href="/${escHtml(page.slug)}" style="text-decoration:none;color:inherit;display:contents;">
+                        ${page.listing_image_id
                 ? `<img src="/images/${page.listing_image_id}" alt="${escHtml(page.title)}" class="page-image">`
                 : `<div class="page-image"></div>`}
-                    <div class="page-content">
-                        <h3 class="page-title-text">${escHtml(page.title)}</h3>
-                        ${page.listing_synopsis ? `<p class="page-excerpt">${escHtml(page.listing_synopsis)}</p>` : ''}
-                        <div class="page-meta">
-                            <span>❤️ Liked on ${formatDate(like.liked_at)}</span>
-                            <button class="unlike-btn" onclick="unlikePage(event, ${page.id})">Unlike</button>
+                        <div class="page-content">
+                            <h3 class="page-title-text">${escHtml(page.title)}</h3>
+                            ${page.listing_synopsis
+                ? `<p class="page-excerpt">${escHtml(page.listing_synopsis)}</p>`
+                : ''}
+                            <div class="page-meta">
+                                <span>❤️ Liked on ${formatDate(like.liked_at)}</span>
+                                <button class="unlike-btn"
+                                    onclick="unlikePage(event, ${page.id})">Unlike</button>
+                            </div>
                         </div>
-                    </div>
-                </a>
-            </div>`;
+                    </a>
+                </div>`;
         }).join('');
 
         root.innerHTML = statsBar + `<div class="pages-grid">${cards}</div>`;
@@ -389,13 +321,23 @@
         event.stopPropagation();
         if (!confirm('Remove this page from your liked pages?')) return;
         try {
-            const res = await fetch(`/api/<?= $site->slug ?>/pages/like/${pageId}`, {
+            // Uses SITE_SLUG constant — not a hardcoded PHP string inside JS
+            const res = await fetch(`/api/${SITE_SLUG}/pages/like/${pageId}`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
             });
             const data = await res.json();
             if (data.success) {
-                window.location.reload();
+                // Animate card out before reloading
+                const card = document.querySelector(`[data-page-id="${pageId}"]`);
+                if (card) {
+                    card.style.transition = 'opacity .3s,transform .3s';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(.95)';
+                    setTimeout(() => loadLikedPages(), 300);
+                } else {
+                    loadLikedPages();
+                }
             } else {
                 alert('Failed to unlike page');
             }

@@ -986,20 +986,24 @@
 
     async function confirmCancelOrder() {
         const reasonSelect = document.getElementById('cancelReason');
-        const reason = reasonSelect ? reasonSelect.value : null;
+        const reason = reasonSelect ? reasonSelect.value : '';
 
         if (!reason) {
             alert('Please select a cancellation reason');
             return;
         }
 
+        const notifyEl = document.getElementById('notifyCustomer');
+
         try {
             const response = await fetch(`/api/${SITE_SLUG}/member/orders/${ORDER_ID}/cancel`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({reason: reason})
+                body: JSON.stringify({
+                    reason,
+                    notify_customer: notifyEl ? notifyEl.checked : true,
+                }),
             });
-
             const data = await response.json();
             if (data.success) {
                 alert('Order cancelled successfully');
@@ -1008,7 +1012,8 @@
                 alert(data.message || 'Failed to cancel order');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Cancel error:', error);
+            alert('Failed to cancel order. Please try again.');
         }
     }
 
@@ -1037,9 +1042,7 @@
     function calculatePartialAmount() {
         let total = 0;
         document.querySelectorAll('.refund-qty-input').forEach(input => {
-            const quantity = parseInt(input.value) || 0;
-            const price = parseFloat(input.dataset.price) || 0;
-            total += quantity * price;
+            total += (parseInt(input.value) || 0) * (parseFloat(input.dataset.price) || 0);
         });
         return total;
     }
@@ -1052,7 +1055,7 @@
                 items.push({
                     id: input.dataset.itemId,
                     product_name: input.dataset.productName,
-                    quantity: quantity,
+                    quantity,
                     amount: quantity * parseFloat(input.dataset.price),
                     product_id: input.dataset.productId,
                 });
@@ -1062,17 +1065,20 @@
     }
 
     function updatePartialRefund() {
-        let total = 0;
-        document.querySelectorAll('.refund-qty-input').forEach(input => {
-            total += (parseInt(input.value) || 0) * parseFloat(input.dataset.price);
-        });
-        updateRefundDisplay(total);
+        updateRefundDisplay(calculatePartialAmount());
     }
 
     function updateRefundDisplay(amount) {
-        const pct = (amount / orderData.total) * 100;
-        document.getElementById('refundAmountDisplay').textContent = `${orderData.currency} ${amount.toFixed(2)}`;
-        document.getElementById('refundProgressBar').style.width = `${pct}%`;
+        const pct = orderData.total > 0 ? (amount / orderData.total) * 100 : 0;
+
+        const amountEl = document.getElementById('refundAmount');
+        if (amountEl) amountEl.textContent = `${orderData.currency} ${amount.toFixed(2)}`;
+
+        const barEl = document.getElementById('refundProgressBar');
+        if (barEl) barEl.style.width = `${Math.min(pct, 100)}%`;
+
+        const pctEl = document.getElementById('refundPercentage');
+        if (pctEl) pctEl.textContent = `${Math.round(pct)}% of order total`;
     }
 
     async function processRefund() {
@@ -1120,7 +1126,8 @@
     }
 
     function openRefundModal() {
-        document.getElementById('refundModal').style.display = 'flex';
+        document.getElementById('refundModal').style.display = 'block';
+        document.body.style.overflow = 'hidden';
     }
 
     function openCancelModal() {

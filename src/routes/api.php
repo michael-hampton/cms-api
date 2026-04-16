@@ -173,7 +173,7 @@ $router->post('/api/{site}/member/orders/{orderId}/cancel', [\App\Controllers\Me
 $router->post('/api/{site}/member/orders/{id}/refund', [OrderController::class, 'refund']);
 
 // Member Reading History API
-$router->get('/{site}/api/member/reading-history', [MemberReadingHistoryApiController::class, 'index']);
+$router->get('/api/{site}/member/reading-history', [MemberReadingHistoryApiController::class, 'index']);
 
 $router->post(
     '/api/{site}/open-collab/pages/{pageId}/purchase',

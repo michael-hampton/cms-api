@@ -31,6 +31,81 @@
             color: var(--text-primary);
         }
 
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            pointer-events: all;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            font-size: 1.1rem;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
+
+        /* Layout */
         .container {
             max-width: 1400px;
             margin: 0 auto;
@@ -52,6 +127,7 @@
             font-size: 1rem;
         }
 
+        /* Stats bar */
         .stats-bar {
             background: white;
             border-radius: 1rem;
@@ -84,6 +160,7 @@
             color: var(--text-secondary);
         }
 
+        /* Timeline */
         .timeline {
             background: white;
             border-radius: 1rem;
@@ -164,6 +241,7 @@
             gap: 1rem;
             font-size: 0.8125rem;
             color: var(--text-secondary);
+            flex-wrap: wrap;
         }
 
         .meta-badge {
@@ -176,6 +254,7 @@
             font-weight: 500;
         }
 
+        /* Empty state */
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -216,12 +295,25 @@
             transform: translateY(-2px);
         }
 
+        /* Skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: 0.5rem;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
         @media (max-width: 768px) {
             .container {
-                padding: 1rem;
-            }
-
-            .header-content {
                 padding: 1rem;
             }
 
@@ -242,91 +334,151 @@
             .timeline-item {
                 padding-left: 1.5rem;
             }
-
-            .nav-links {
-                gap: 1rem;
-            }
         }
     </style>
 </head>
 <body>
+
 @include('member._header')
+
+<div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
     <div class="page-header">
         <h1 class="page-title">📚 Reading History</h1>
         <p class="page-subtitle">Track your reading journey and revisit pages you've explored</p>
     </div>
+
     <div id="reading-history-root">
-        <p style="text-align:center;color:var(--text-secondary);padding:2rem;">Loading reading history…</p>
+        <!-- Skeleton loader -->
+        <div class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-icon">📖</span>
+                <div class="stat-info">
+                    <div class="skeleton" style="height:1.75rem;width:3rem;margin-bottom:.25rem;"></div>
+                    <div class="skeleton" style="height:.875rem;width:7rem;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="timeline">
+            <?php for ($i = 0; $i < 4; $i++): ?>
+                <div class="timeline-item" style="opacity:<?= 1 - $i * 0.15 ?>;">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="skeleton" style="height:.75rem;width:25%;margin-bottom:.75rem;"></div>
+                        <div class="skeleton" style="height:1.25rem;width:60%;margin-bottom:.5rem;"></div>
+                        <div class="skeleton" style="height:.875rem;width:80%;margin-bottom:.5rem;"></div>
+                        <div class="skeleton" style="height:.875rem;width:40%;"></div>
+                    </div>
+                </div>
+            <?php endfor; ?>
+        </div>
     </div>
 </div>
 
 <script>
     const SITE_SLUG = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>';
 
+    /* ─── Toast ──────────────────────────────────────────── */
+    function showToast(message, type = 'info', duration = 5000) {
+        const icons = {error: '✕', info: 'ℹ'};
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <span>${icons[type] || 'ℹ'}</span>
+            <span style="flex:1;">${message}</span>
+            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            if (!toast.parentElement) return;
+            toast.style.animation = 'slideOut 0.3s ease forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+
+    /* ─── Load ───────────────────────────────────────────── */
     async function loadReadingHistory() {
         try {
-            const res = await fetch(`/${SITE_SLUG}/api/member/reading-history`);
-            if (res.status === 401) {
-                window.location.href = `/${SITE_SLUG}/member/login`;
-                return;
-            }
+            const res = await fetch(`/api/${SITE_SLUG}/member/reading-history`);
+            if (!res.ok) throw new Error('Server error ' + res.status);
             const json = await res.json();
             if (!json.success) throw new Error('Failed to load');
             renderHistory(json.data.recently_viewed, json.data.total_pages_read);
-        } catch {
-            document.getElementById('reading-history-root').innerHTML =
-                '<p style="color:var(--danger-color);text-align:center;">Failed to load history. Please refresh.</p>';
+        } catch (e) {
+            console.error(e);
+            showToast('Failed to load reading history. Please refresh.', 'error');
+            document.getElementById('reading-history-root').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <h2>Failed to Load</h2>
+                    <p>Please try refreshing the page.</p>
+                    <button class="btn-primary" style="border:none;cursor:pointer;" onclick="loadReadingHistory()">Retry</button>
+                </div>`;
         }
     }
 
+    /* ─── Render ─────────────────────────────────────────── */
     function renderHistory(views, totalPagesRead) {
         const root = document.getElementById('reading-history-root');
 
         const statsBar = `
-        <div class="stats-bar">
-            <div class="stat-item">
-                <span class="stat-icon">📖</span>
-                <div class="stat-info"><h3>${totalPagesRead}</h3><p>Unique Pages Read</p></div>
-            </div>
-        </div>`;
-
-        if (!views.length) {
-            root.innerHTML = statsBar + `
-            <div class="empty-state">
-                <div class="empty-state-icon">📚</div>
-                <h2>No Reading History Yet</h2>
-                <p>Start exploring content to build your reading history.</p>
-                <a href="/" class="btn-primary">Start Reading</a>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-icon">📖</span>
+                    <div class="stat-info">
+                        <h3>${totalPagesRead}</h3>
+                        <p>Unique Pages Read</p>
+                    </div>
+                </div>
             </div>`;
+
+        if (!views || views.length === 0) {
+            root.innerHTML = statsBar + `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📚</div>
+                    <h2>No Reading History Yet</h2>
+                    <p>Start exploring content to build your reading history.</p>
+                    <a href="/" class="btn-primary">Start Reading</a>
+                </div>`;
             return;
         }
 
         const items = views.map(view => {
             const page = view.page;
             if (!page) return '';
+
+            /* Category badge — restored from original */
+            const categoryBadge = page.category_name
+                ? `<span class="meta-badge">📁 ${esc(page.category_name)}</span>`
+                : '';
+
             return `
-            <div class="timeline-item">
-                <div class="timeline-marker"></div>
-                <div class="timeline-content">
-                    <div class="timeline-date"><span>🕐</span>${timeAgo(view.viewed_at)}</div>
-                    <h3 class="timeline-title">
-                        <a href="/${escHtml(page.slug)}">${escHtml(page.title)}</a>
-                    </h3>
-                    ${page.listing_synopsis ? `<p class="timeline-excerpt">${escHtml(page.listing_synopsis)}</p>` : ''}
-                    <div class="timeline-meta">
-                        <span class="meta-badge">📅 ${formatDate(page.created_at)}</span>
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-date"><span>🕐</span>${timeAgo(view.viewed_at)}</div>
+                        <h3 class="timeline-title">
+                            <a href="/${esc(page.slug)}">${esc(page.title)}</a>
+                        </h3>
+                        ${page.listing_synopsis ? `<p class="timeline-excerpt">${esc(page.listing_synopsis)}</p>` : ''}
+                        <div class="timeline-meta">
+                            ${categoryBadge}
+                            <span class="meta-badge">📅 ${formatDate(page.created_at)}</span>
+                        </div>
                     </div>
-                </div>
-            </div>`;
-        }).join('');
+                </div>`;
+        }).filter(Boolean).join('');
 
         root.innerHTML = statsBar + `<div class="timeline">${items}</div>`;
     }
 
+    /* ─── Helpers ────────────────────────────────────────── */
     function timeAgo(str) {
-        const diff = Math.floor((Date.now() - new Date(str).getTime()) / 1000);
+        if (!str) return '';
+        const dateStr = (str.date || str).replace(' ', 'T');
+        const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+        if (diff < 60) return 'Just now';
         if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
         if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
         if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
@@ -334,10 +486,12 @@
     }
 
     function formatDate(str) {
-        return str ? new Date(str).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'}) : '';
+        if (!str) return '';
+        const d = str.date || str;
+        return new Date(d).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'});
     }
 
-    function escHtml(str) {
+    function esc(str) {
         if (str == null) return '';
         return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }

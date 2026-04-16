@@ -21,6 +21,7 @@ class MemberLikedPagesController extends Controller
 
         return $this->view('member/liked-pages', [
             'site' => SiteContext::get(),
+            'member' => MemberAuth::getMember()
         ]);
     }
 }
