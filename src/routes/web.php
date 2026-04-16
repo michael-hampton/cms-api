@@ -390,7 +390,6 @@ $router->post('/{siteSlug}/member/hub/polls/vote', [MemberHubApiController::clas
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 
-$router->post('/{site}/member/newsletters/bulk-subscribe', [MemberNewslettersController::class, 'bulkSubscribe']);;
 
 $router->get('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'index']);
 $router->get('/{site}/admin/subscription-plans/create', [AdminSubscriptionPlansController::class, 'create']);
@@ -438,11 +437,7 @@ $router->get('{site}/faqs', [FaqController::class, 'subscriptions']);
 
 // Member Newsletters Routes
 $router->get('/{site}/member/newsletters', [MemberNewslettersController::class, 'index']);
-$router->post('/{site}/member/newsletters/unsubscribe', [MemberNewslettersController::class, 'unsubscribe']);
-$router->post('/{site}/member/newsletter/signup', [MemberNewslettersController::class, 'subscribe']);
-// In the member newsletters section
-$router->post('/{site}/member/newsletters/upgrade-options', [MemberNewslettersController::class, 'getUpgradeOptions']);
-$router->post('/{site}/member/newsletters/process-upgrade', [MemberNewslettersController::class, 'processUpgrade']);
+
 
 $router->get('/{site}/member/support', [MemberSupportController::class, 'index']);
 $router->post('/{site}/member/support/submit', [MemberSupportController::class, 'submit']);

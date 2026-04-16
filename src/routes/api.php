@@ -42,6 +42,8 @@ use App\Controllers\Members\Api\MemberCommentsApiController;
 use App\Controllers\Members\Api\MemberConsentApiController;
 use App\Controllers\Members\Api\MemberDashboardApiController;
 use App\Controllers\Members\Api\MemberLikedPagesApiController;
+use App\Controllers\Members\Api\MemberNewslettersApiController;
+use App\Controllers\Members\Api\MemberOrdersApiController;
 use App\Controllers\Members\Api\MemberReadingHistoryApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
@@ -167,10 +169,19 @@ $router->get('/{site}/api/member/wishlist', 'App\Controllers\Members\Api\MemberW
 $router->delete('/{site}/api/member/wishlist/{id}', 'App\Controllers\Members\Api\MemberWishlistApiController@remove');
 
 // Orders API
-$router->get('/api/{site}/member/orders', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'index']);
-$router->get('/api/{site}/member/orders/{id}', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'show']);
-$router->post('/api/{site}/member/orders/{orderId}/cancel', [\App\Controllers\Members\Api\MemberOrdersApiController::class, 'cancel']);
+$router->get('/api/{site}/member/orders', [MemberOrdersApiController::class, 'index']);
+$router->get('/api/{site}/member/orders/{id}', [MemberOrdersApiController::class, 'show']);
+$router->post('/api/{site}/member/orders/{orderId}/cancel', [MemberOrdersApiController::class, 'cancel']);
 $router->post('/api/{site}/member/orders/{id}/refund', [OrderController::class, 'refund']);
+
+$router->get('/api/{site}/member/newsletters', [MemberNewslettersApiController::class, 'index']);
+$router->post('/api/{site}/member/newsletters/unsubscribe', [MemberNewslettersApiController::class, 'unsubscribe']);
+$router->post('/api/{site}/member/newsletter/signup', [MemberNewslettersApiController::class, 'subscribe']);
+$router->post('/api/{site}/member/newsletters/bulk-subscribe', [MemberNewslettersApiController::class, 'bulkSubscribe']);
+// In the member newsletters section
+$router->post('/api/{site}/member/newsletters/upgrade-options', [MemberNewslettersApiController::class, 'getUpgradeOptions']);
+$router->post('/api/{site}/member/newsletters/process-upgrade', [MemberNewslettersApiController::class, 'processUpgrade']);
+
 
 // Member Reading History API
 $router->get('/api/{site}/member/reading-history', [MemberReadingHistoryApiController::class, 'index']);
