@@ -13,6 +13,7 @@ use App\Events\ModelUpdated;
 use App\Events\ModelUpdating;
 use App\Framework\Database\Database;
 use App\Framework\Database\QueryBuilder;
+use App\Framework\Database\RawExpression;
 use App\Framework\Database\Relations\EagerLoader;
 use App\Framework\Database\Relations\RelationBuilder;
 use App\Framework\Database\Relations\RelationHandlerFactory;
@@ -425,8 +426,12 @@ abstract class Model
 
         // Add ON DUPLICATE KEY UPDATE
         $updateParts = [];
-        foreach ($update as $column) {
-            $updateParts[] = "`{$column}` = VALUES(`{$column}`)";
+        foreach ($update as $column => $value) {
+            if ($value instanceof RawExpression) {
+                $updateParts[] = "`{$column}` = {$value->value}";
+            } else {
+                $updateParts[] = "`{$column}` = VALUES(`{$column}`)";
+            }
         }
 
         $sql .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);

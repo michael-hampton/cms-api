@@ -635,9 +635,9 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return $this->items[$index];
     }
 
-    public function keys()
+    public function keys(): static
     {
-        return array_keys($this->items);
+        return new static(array_keys($this->items));
     }
 
     public function has(mixed $key): bool
@@ -937,6 +937,37 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         }
 
         return true;
+    }
+
+    public function reverse(): static
+    {
+        return new static(array_reverse($this->items, true));
+    }
+
+    public function countBy(callable|string $callback): static
+    {
+        $result = [];
+
+        foreach ($this->items as $item) {
+
+            if (is_string($callback)) {
+                // array access
+                if (is_array($item)) {
+                    $key = $item[$callback] ?? null;
+                } // object / model access
+                else {
+                    $key = $item->{$callback} ?? null;
+                }
+            } else {
+                $key = $callback($item);
+            }
+
+            $key = $key ?? 'null';
+
+            $result[$key] = ($result[$key] ?? 0) + 1;
+        }
+
+        return new static($result);
     }
 
 }

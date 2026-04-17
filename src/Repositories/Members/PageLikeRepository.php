@@ -8,6 +8,14 @@ use App\Repositories\Repository;
 
 class PageLikeRepository extends Repository
 {
+    public function countForMember(int $memberId, int $siteId): int
+    {
+        return $this->countWhere([
+            'member_id' => $memberId,
+            'site_id' => $siteId,
+        ]);
+    }
+
     protected function getModelClass(): string
     {
         return PageLike::class;

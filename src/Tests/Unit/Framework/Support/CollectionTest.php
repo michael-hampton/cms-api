@@ -997,7 +997,7 @@ class CollectionTest extends TestCase
     public function test_keys_returns_all_keys(): void
     {
         $c = new Collection(['a' => 1, 'b' => 2, 'c' => 3]);
-        $this->assertEquals(['a', 'b', 'c'], $c->keys());
+        $this->assertEquals(['a', 'b', 'c'], $c->keys()->all());
     }
 
     public function test_has_returns_true_for_existing_key(): void

@@ -339,6 +339,15 @@ class RewardsRepository extends Repository implements TrackableRepository
         ];
     }
 
+    public function countClaimedForMember(int $memberId, int $siteId): int
+    {
+        return $this->model->newQuery()
+            ->where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->whereNotNull('claimed_at')
+            ->count();
+    }
+
     protected function getModelClass(): string
     {
         return MemberReward::class;

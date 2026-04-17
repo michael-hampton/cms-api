@@ -28,6 +28,13 @@ abstract class Repository
 
     abstract protected function getModelClass(): string;
 
+    protected function countWhere(array $conditions): int
+    {
+        return $this->model->newQuery()
+            ->where($conditions)
+            ->count();
+    }
+
     public function findMany(array $ids, array $relations = []): Collection
     {
         if (!empty($relations) && is_array($relations)) {
