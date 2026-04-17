@@ -9,6 +9,7 @@ class MemberActivityAnalyticsRepository extends Repository
 {
     public function upsert(int $memberId, int $siteId, array $data): MemberActivityAnalytics
     {
+        unset($data['counters']);
         return MemberActivityAnalytics::updateOrCreate(
             [
                 'member_id' => $memberId,

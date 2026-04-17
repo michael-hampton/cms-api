@@ -5,6 +5,7 @@ namespace App\Console;
 use App\Framework\Console\Command;
 use App\Framework\Console\ReportsCommandResult;
 use App\Models\Member;
+use App\Models\Site;
 use App\Services\Members\MemberStatEngine;
 
 class BuildMemberStats extends Command
@@ -25,28 +26,32 @@ class BuildMemberStats extends Command
     public function handle(): int
     {
         $result = $this->createResult('members:build-stats');
-        $siteId = (int)$this->argument('site_id');
+        $sites = Site::all();
 
-        Member::where('site_id', $siteId)
-            ->when(
-                $this->option('member_id'),
-                fn($q) => $q->where('id', (int)$this->option('member_id'))
-            )
-            ->chunkById(100, function ($members) use ($result, $siteId) {
-                foreach ($members as $member) {
-                    try {
-                        $this->engine->rebuild($member->id, $siteId);
-                        $result->incrementSucceeded();
-                    } catch (\Throwable $e) {
-                        $this->reportFailure(
-                            result: $result,
-                            message: "Failed to build stats for member {$member->id}: {$e->getMessage()}",
-                            context: ['member_id' => $member->id, 'site_id' => $siteId],
-                            throwable: $e
-                        );
+        foreach ($sites as $site) {
+
+            Member::query()
+                ->chunkById(100, function ($members) use ($site, $result) {
+
+                    foreach ($members as $member) {
+
+                        try {
+                            $this->engine->rebuild($member->id, $site->id);
+                            $result->incrementSucceeded();
+                        } catch (\Throwable $e) {
+                            $this->reportFailure(
+                                result: $result,
+                                message: "Failed for member {$member->id}, site {$site->id}: {$e->getMessage()}",
+                                context: [
+                                    'member_id' => $member->id,
+                                    'site_id' => $site->id,
+                                ],
+                                throwable: $e
+                            );
+                        }
                     }
-                }
-            });
+                });
+        }
 
         $this->reportResult($result);
 

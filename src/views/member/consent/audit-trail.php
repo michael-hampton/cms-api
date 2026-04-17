@@ -20,7 +20,7 @@
             --bg-light: #f5f7fa;
             --text-primary: #1f2937;
             --text-secondary: #6b7280;
-            --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow: 0 1px 3px rgba(0, 0, 0, .1);
         }
 
         body {
@@ -29,48 +29,13 @@
             color: var(--text-primary);
         }
 
-        .header {
-            background: white;
-            box-shadow: var(--shadow);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1rem 2rem;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            text-decoration: none;
-        }
-
-        .nav a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            margin-left: 1.5rem;
-            font-weight: 500;
-            transition: color 0.2s;
-        }
-
-        .nav a:hover {
-            color: var(--primary-color);
-        }
-
         .container {
             max-width: 1200px;
             margin: 0 auto;
             padding: 2rem;
         }
 
+        /* ── Page header card ───────────────────────────── */
         .page-header {
             background: white;
             border-radius: 1rem;
@@ -82,16 +47,17 @@
         .page-title {
             font-size: 2rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            margin-bottom: .5rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: .75rem;
         }
 
         .page-subtitle {
             color: var(--text-secondary);
         }
 
+        /* ── Filters ────────────────────────────────────── */
         .filters {
             background: white;
             border-radius: 1rem;
@@ -101,28 +67,54 @@
             display: flex;
             gap: 1rem;
             flex-wrap: wrap;
+            align-items: flex-end;
         }
 
         .filter-group {
             flex: 1;
-            min-width: 200px;
+            min-width: 180px;
         }
 
         .filter-label {
             display: block;
             font-weight: 500;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            margin-bottom: .5rem;
+            font-size: .875rem;
         }
 
         .filter-input {
             width: 100%;
-            padding: 0.75rem;
+            padding: .75rem;
             border: 1px solid var(--border-color);
-            border-radius: 0.5rem;
-            font-size: 0.9375rem;
+            border-radius: .5rem;
+            font-size: .9375rem;
+            background: white;
+            color: var(--text-primary);
         }
 
+        /* ── Export button ──────────────────────────────── */
+        .export-btn {
+            padding: .75rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: .75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all .3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+        }
+
+        .export-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, .3);
+        }
+
+        /* ── Timeline ───────────────────────────────────── */
         .timeline {
             position: relative;
         }
@@ -175,25 +167,26 @@
             border-radius: 1rem;
             padding: 1.5rem;
             box-shadow: var(--shadow);
-            transition: all 0.3s;
+            transition: all .3s;
         }
 
         .timeline-card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
             transform: translateX(4px);
         }
 
         .card-header {
             display: flex;
             justify-content: space-between;
-            align-items: start;
+            align-items: flex-start;
             margin-bottom: 1rem;
         }
 
+        /* ── Action badges ──────────────────────────────── */
         .action-badge {
-            padding: 0.375rem 0.75rem;
-            border-radius: 0.5rem;
-            font-size: 0.8125rem;
+            padding: .375rem .75rem;
+            border-radius: .5rem;
+            font-size: .8125rem;
             font-weight: 600;
             text-transform: uppercase;
         }
@@ -221,9 +214,10 @@
         .consent-name {
             font-size: 1.125rem;
             font-weight: 600;
-            margin-bottom: 0.5rem;
+            margin-top: .375rem;
         }
 
+        /* ── Detail grid ────────────────────────────────── */
         .consent-details {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -234,35 +228,37 @@
         .detail-item {
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: .25rem;
         }
 
         .detail-label {
-            font-size: 0.75rem;
+            font-size: .75rem;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: .05em;
             font-weight: 600;
         }
 
         .detail-value {
-            font-size: 0.9375rem;
+            font-size: .9375rem;
             color: var(--text-primary);
         }
 
+        /* ── State-change pill row ──────────────────────── */
         .state-change {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: .5rem;
             margin-top: 1rem;
             padding-top: 1rem;
             border-top: 1px solid var(--border-color);
+            font-size: .875rem;
         }
 
         .state-box {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-size: 0.875rem;
+            padding: .375rem .75rem;
+            border-radius: .5rem;
+            font-size: .875rem;
             font-weight: 600;
         }
 
@@ -276,6 +272,7 @@
             color: #991b1b;
         }
 
+        /* ── Empty / loading / error states ────────────── */
         .empty-state {
             background: white;
             border-radius: 1rem;
@@ -287,33 +284,61 @@
         .empty-icon {
             font-size: 4rem;
             margin-bottom: 1rem;
-            opacity: 0.5;
+            opacity: .5;
         }
 
-        .export-btn {
-            padding: 0.75rem 1.5rem;
-            background: var(--primary-color);
-            color: white;
-            border: none;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
+        .loading-state {
+            background: white;
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            color: var(--text-secondary);
         }
 
-        .export-btn:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        /* ── Skeleton shimmer ───────────────────────────── */
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
+            border-radius: .5rem;
         }
 
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        .skeleton-item {
+            background: white;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── No-results within a loaded list ────────────── */
+        .no-results {
+            background: white;
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: var(--shadow);
+            color: var(--text-secondary);
+        }
+
+        /* ── Responsive ─────────────────────────────────── */
         @media (max-width: 768px) {
             .container {
                 padding: 1rem;
+            }
+
+            .filters {
+                flex-direction: column;
             }
 
             .timeline::before {
@@ -325,42 +350,25 @@
             }
 
             .timeline-marker {
-                left: 0.375rem;
-            }
-
-            .filters {
-                flex-direction: column;
+                left: .375rem;
             }
         }
     </style>
 </head>
 <body>
-<header class="header">
-    <div class="header-content">
-        <a href="/" class="logo"><?= htmlspecialchars($site->name) ?></a>
-        <nav class="nav">
-            <a href="/member/dashboard">Dashboard</a>
-            <a href="/member/consent">Privacy Settings</a>
-            <a href="/member/logout">Logout</a>
-        </nav>
-    </div>
-</header>
+
+@include('member._header')
 
 <main class="container">
     <div class="page-header">
-        <h1 class="page-title">
-            <span>📋</span>
-            Consent History
-        </h1>
-        <p class="page-subtitle">
-            Complete audit trail of all changes to your consent preferences
-        </p>
+        <h1 class="page-title"><span>📋</span> Consent History</h1>
+        <p class="page-subtitle">Complete audit trail of all changes to your consent preferences</p>
     </div>
 
     <div class="filters">
         <div class="filter-group">
             <label class="filter-label">Filter by Action</label>
-            <select class="filter-input" id="actionFilter" onchange="filterAuditTrail()">
+            <select class="filter-input" id="actionFilter">
                 <option value="">All Actions</option>
                 <option value="granted">Granted</option>
                 <option value="revoked">Revoked</option>
@@ -370,157 +378,212 @@
         </div>
         <div class="filter-group">
             <label class="filter-label">Filter by Consent</label>
-            <select class="filter-input" id="consentFilter" onchange="filterAuditTrail()">
+            <select class="filter-input" id="consentFilter">
                 <option value="">All Consents</option>
-                <!-- Options populated dynamically -->
             </select>
         </div>
         <div class="filter-group">
-            <label class="filter-label">Date Range</label>
-            <input type="date" class="filter-input" id="dateFilter" onchange="filterAuditTrail()">
+            <label class="filter-label">Date</label>
+            <input type="date" class="filter-input" id="dateFilter">
         </div>
-        <div class="filter-group" style="display: flex; align-items: flex-end;">
-            <a href="/member/consent/download" class="export-btn">
-                📥 Export Data
-            </a>
+        <div class="filter-group" style="display:flex;align-items:flex-end;">
+            <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/member/consent/download-data"
+               class="export-btn">📥 Export Data</a>
         </div>
     </div>
 
-    <?php if (empty($auditTrail)): ?>
-        <div class="empty-state">
-            <div class="empty-icon">📋</div>
-            <h3>No Consent History</h3>
-            <p style="color: var(--text-secondary); margin-top: 0.5rem;">
-                Your consent preference changes will appear here
-            </p>
-        </div>
-    <?php else: ?>
-        <div class="timeline" id="auditTimeline">
-            <?php foreach ($auditTrail as $entry): ?>
-                <div class="timeline-item"
-                     data-action="<?= htmlspecialchars($entry['action']) ?>"
-                     data-consent="<?= htmlspecialchars($entry['consentType']['code']) ?>"
-                     data-date="<?= $entry['created_at']->format('Y-m-d') ?>">
-                    <div class="timeline-marker <?= htmlspecialchars($entry['action']) ?>"></div>
+    <!-- Skeleton shown while loading -->
+    <div id="timeline-skeleton">
+        <?php for ($i = 0; $i < 4; $i++): ?>
+            <div class="skeleton-item" style="opacity: <?= 1 - $i * 0.15 ?>; padding-left: 5rem; position: relative;">
+                <div style="position:absolute;left:1.375rem;top:1.5rem;width:1.25rem;height:1.25rem;border-radius:50%;background:#e5e7eb;border:3px solid white;"></div>
+                <div class="skeleton" style="height:.875rem;width:5rem;margin-bottom:.75rem;"></div>
+                <div class="skeleton" style="height:1.125rem;width:55%;margin-bottom:.625rem;"></div>
+                <div class="skeleton" style="height:.875rem;width:35%;"></div>
+            </div>
+        <?php endfor ?>
+    </div>
 
-                    <div class="timeline-card">
-                        <div class="card-header">
-                            <div>
-                        <span class="action-badge <?= htmlspecialchars($entry['action']) ?>">
-                            <?= htmlspecialchars($entry['action']) ?>
-                        </span>
-                                <h3 class="consent-name">
-                                    <?= htmlspecialchars($entry['consentType']['name']) ?>
-                                </h3>
-                            </div>
-                            <div style="text-align: right; font-size: 0.875rem; color: var(--text-secondary);">
-                                <?= $entry['created_at']->format('M j, Y') ?><br>
-                                <?= $entry['created_at']->format('g:i A') ?>
-                            </div>
-                        </div>
-
-                        <div class="consent-details">
-                            <div class="detail-item">
-                                <span class="detail-label">Source</span>
-                                <span class="detail-value">
-                            <?php
-                            $sourceIcons = [
-                                    'web' => '🌐',
-                                    'email' => '📧',
-                                    'api' => '⚙️',
-                                    'admin' => '👤',
-                                    'system' => '🤖'
-                            ];
-                            echo $sourceIcons[$entry['source']] ?? '';
-                            echo ' ' . ucfirst($entry['source']);
-                            ?>
-                        </span>
-                            </div>
-
-                            <?php if ($entry['ip_address']): ?>
-                                <div class="detail-item">
-                                    <span class="detail-label">IP Address</span>
-                                    <span class="detail-value"><?= htmlspecialchars($entry['ip_address']) ?></span>
-                                </div>
-                            <?php endif; ?>
-
-                            <?php if ($entry['adminUser']): ?>
-                                <div class="detail-item">
-                                    <span class="detail-label">Admin User</span>
-                                    <span class="detail-value"><?= htmlspecialchars($entry['adminUser']['email']) ?></span>
-                                </div>
-                            <?php endif; ?>
-
-                            <?php if ($entry['reason']): ?>
-                                <div class="detail-item" style="grid-column: 1 / -1;">
-                                    <span class="detail-label">Reason</span>
-                                    <span class="detail-value"><?= htmlspecialchars($entry['reason']) ?></span>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if ($entry['previous_state'] !== null): ?>
-                            <div class="state-change">
-                                <span style="color: var(--text-secondary); font-size: 0.875rem;">Status Changed:</span>
-                                <span class="state-box <?= $entry['previous_state'] ? 'granted' : 'revoked' ?>">
-                        <?= $entry['previous_state'] ? 'Granted' : 'Not Granted' ?>
-                    </span>
-                                <span style="color: var(--text-secondary);">→</span>
-                                <span class="state-box <?= $entry['new_state'] ? 'granted' : 'revoked' ?>">
-                        <?= $entry['new_state'] ? 'Granted' : 'Not Granted' ?>
-                    </span>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
+    <div id="timeline-root" style="display:none;"></div>
 </main>
 
 <script>
-    function filterAuditTrail() {
-        const actionFilter = document.getElementById('actionFilter').value;
-        const consentFilter = document.getElementById('consentFilter').value;
-        const dateFilter = document.getElementById('dateFilter').value;
+    const API_BASE = '/api/<?= $site->slug ?>';
+    const MEMBER_ID = <?= (int)$member->id ?>;
 
-        const items = document.querySelectorAll('.timeline-item');
+    /* ─── UI COMPONENTS ─────────────────────────────────────── */
 
-        items.forEach(item => {
-            let show = true;
+    /**
+     * Component: Individual Audit Entry (Timeline Item)
+     */
+    class AuditRow {
+        constructor(entry) {
+            this.e = entry;
+        }
 
-            if (actionFilter && item.dataset.action !== actionFilter) {
-                show = false;
+        render() {
+            const action = (this.e.action || 'expired').toLowerCase();
+            const name = this.e.consent_type?.name || 'Unknown Preference';
+            const dateObj = new Date(this.e.created_at.replace(/-/g, '/'));
+
+            return UI.el('div', {className: 'timeline-item'}, [
+                UI.el('div', {className: `timeline-marker ${action}`}),
+                UI.el('div', {className: 'timeline-card'}, [
+                    // Header: Action Badge, Name, and Timestamp
+                    UI.el('div', {className: 'card-header'}, [
+                        UI.el('div', {}, [
+                            UI.el('span', {className: `action-badge ${action}`}, [action.toUpperCase()]),
+                            UI.el('div', {className: 'consent-name'}, [name])
+                        ]),
+                        UI.el('div', {className: 'card-timestamp'}, [
+                            UI.el('div', {className: 'date'}, [
+                                dateObj.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
+                            ]),
+                            UI.el('div', {className: 'time'}, [
+                                dateObj.toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit'})
+                            ])
+                        ])
+                    ]),
+
+                    // Details Grid: Source, IP, Admin Info
+                    UI.el('div', {className: 'consent-details'}, this.renderDetails()),
+
+                    // State Transition: Previous vs New
+                    this.renderStateChange()
+                ])
+            ]);
+        }
+
+        renderDetails() {
+            const details = [];
+            const sourceIcons = {web: '🌐', email: '📧', api: '⚙️', admin: '👤', system: '🤖'};
+
+            if (this.e.source) {
+                details.push(this.detailItem('Source', `${sourceIcons[this.e.source] || ''} ${this.e.source}`));
             }
-
-            if (consentFilter && item.dataset.consent !== consentFilter) {
-                show = false;
+            if (this.e.ip_address) {
+                details.push(this.detailItem('IP Address', this.e.ip_address));
             }
-
-            if (dateFilter && item.dataset.date !== dateFilter) {
-                show = false;
+            if (this.e.admin_email) {
+                details.push(this.detailItem('Modified By', this.e.admin_email));
             }
+            if (this.e.reason) {
+                details.push(UI.el('div', {className: 'detail-item full-width'}, [
+                    UI.el('span', {className: 'detail-label'}, ['REASON']),
+                    UI.el('span', {className: 'detail-value'}, [this.e.reason])
+                ]));
+            }
+            return details;
+        }
 
-            item.style.display = show ? 'block' : 'none';
-        });
+        detailItem(label, value) {
+            return UI.el('div', {className: 'detail-item'}, [
+                UI.el('span', {className: 'detail-label'}, [label.toUpperCase()]),
+                UI.el('span', {className: 'detail-value'}, [value])
+            ]);
+        }
+
+        renderStateChange() {
+            if (this.e.previous_state === null || this.e.previous_state === undefined) return null;
+
+            const pState = Boolean(Number(this.e.previous_state));
+            const nState = Boolean(Number(this.e.new_state));
+
+            return UI.el('div', {className: 'state-change'}, [
+                UI.el('span', {className: 'state-label'}, ['Status Changed: ']),
+                UI.el('span', {className: `state-box ${pState ? 'granted' : 'revoked'}`}, [pState ? 'Granted' : 'Not Granted']),
+                UI.el('span', {className: 'state-arrow'}, [' → ']),
+                UI.el('span', {className: `state-box ${nState ? 'granted' : 'revoked'}`}, [nState ? 'Granted' : 'Not Granted'])
+            ]);
+        }
     }
 
-    // Populate consent filter options
-    window.addEventListener('DOMContentLoaded', () => {
-        const auditItems = document.querySelectorAll('.timeline-item');
-        const uniqueConsents = new Set();
+    /* ─── APP ORCHESTRATOR ──────────────────────────────────── */
 
-        auditItems.forEach(item => {
-            uniqueConsents.add(item.dataset.consent);
-        });
+    class HistoryApp {
+        constructor() {
+            this.container = document.getElementById('timeline-root');
+            this.skeleton = document.getElementById('timeline-skeleton');
+            this.allEntries = [];
+            this.init();
+        }
 
-        const consentFilter = document.getElementById('consentFilter');
-        uniqueConsents.forEach(consent => {
-            const option = document.createElement('option');
-            option.value = consent;
-            option.textContent = consent.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            consentFilter.appendChild(option);
-        });
+        async init() {
+            await this.loadData();
+            this.wireFilters();
+        }
+
+        async loadData() {
+            try {
+                // Using the existing API structure
+                const res = await api(`${API_BASE}/member/consent/audit-history?member_id=${MEMBER_ID}`);
+                this.allEntries = res.items || [];
+
+                // UI Transition
+                if (this.skeleton) this.skeleton.style.display = 'none';
+                this.container.style.display = 'block';
+
+                this.populateConsentFilter();
+                this.render();
+            } catch (e) {
+                console.error('History Load Error:', e);
+                if (this.skeleton) {
+                    this.skeleton.innerHTML = `<div class="error-state">Failed to load history: ${e.message}</div>`;
+                }
+            }
+        }
+
+        populateConsentFilter() {
+            const select = document.getElementById('consentFilter');
+            if (!select) return;
+
+            const seen = new Set();
+            this.allEntries.forEach(e => {
+                const c = e.consent_type;
+                if (c && !seen.has(c.code)) {
+                    seen.add(c.code);
+                    select.appendChild(UI.el('option', {value: c.code}, [c.name]));
+                }
+            });
+        }
+
+        render() {
+            const actionVal = document.getElementById('actionFilter').value;
+            const consentVal = document.getElementById('consentFilter').value;
+            const dateVal = document.getElementById('dateFilter').value;
+
+            const filtered = this.allEntries.filter(e => {
+                const matchesAction = !actionVal || e.action === actionVal;
+                const matchesConsent = !consentVal || (e.consent_type && e.consent_type.code === consentVal);
+                const matchesDate = !dateVal || e.created_at.startsWith(dateVal);
+                return matchesAction && matchesConsent && matchesDate;
+            });
+
+            if (filtered.length === 0) {
+                UI.render(this.container, UI.el('div', {className: 'empty-state'}, [
+                    UI.el('p', {}, ['No activity matches your current filters.'])
+                ]));
+                return;
+            }
+
+            // Build the timeline nodes
+            const timelineNodes = filtered.map(entry => new AuditRow(entry).render());
+
+            // Wrap in a timeline container and render
+            UI.render(this.container, UI.el('div', {className: 'timeline'}, timelineNodes));
+        }
+
+        wireFilters() {
+            ['actionFilter', 'consentFilter', 'dateFilter'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.onchange = () => this.render();
+            });
+        }
+    }
+
+    // Bootstrap
+    document.addEventListener('DOMContentLoaded', () => {
+        window.auditApp = new HistoryApp();
     });
 </script>
 </body>

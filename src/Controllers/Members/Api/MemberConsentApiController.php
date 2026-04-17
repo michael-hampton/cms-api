@@ -59,7 +59,7 @@ class MemberConsentApiController extends Controller
         }
 
         return $this->resourceResponse([
-            'consents' => $groupedConsents
+            'items' => $groupedConsents
         ]);
     }
 
@@ -81,6 +81,7 @@ class MemberConsentApiController extends Controller
 
         $member = MemberAuth::getMember();
         $consents = $request->input('consents', []);
+
         $context = ConsentActionContext::fromRequest($request, 'web');
 
         try {
@@ -150,7 +151,7 @@ class MemberConsentApiController extends Controller
 
         return $this->resourceResponse([
             'success' => true,
-            'audit_trail' => $serialized,
+            'items' => $serialized,
         ]);
     }
 }

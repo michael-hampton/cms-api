@@ -59,6 +59,7 @@ class MemberAddressApiController extends Controller
         try {
             $member = MemberAuth::getMember();
             $data = $request->validated();
+            unset($data['id']); //todo
 
             $this->addressRepository->createAddressForMember($member->id, $data, SiteContext::getId());
 
@@ -68,6 +69,7 @@ class MemberAddressApiController extends Controller
 
             return $this->jsonResponse(['message', 'Address added successfully']);
         } catch (Exception $e) {
+            echo $e->getMessage();
             return $this->jsonResponse(['message' => 'Failed to add address']);
         }
     }

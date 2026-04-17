@@ -237,6 +237,93 @@
                 justify-content: center;
             }
         }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            pointer-events: all;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .toast-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            font-size: 1.1rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
     </style>
 </head>
 <body>
@@ -258,108 +345,149 @@
 </main>
 
 <script>
-    async function loadComments() {
-        try {
-            const res = await fetch(`/api/${SITE_SLUG}/member/comments`);
-            if (res.status === 401) {
-                window.location.href = `/${SITE_SLUG}/member/login`;
-                return;
-            }
-            const json = await res.json();
-            if (!json.success) throw new Error('Failed to load');
-            renderComments(json.data.comments);
-        } catch {
-            document.getElementById('comments-root').innerHTML =
-                '<p style="color:var(--danger-color);text-align:center;">Failed to load comments. Please refresh.</p>';
-        }
-    }
+    const API_BASE = '/api/' + SITE_SLUG;
 
-    function renderComments(comments) {
-        const root = document.getElementById('comments-root');
-        if (!comments.length) {
-            root.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">💬</div>
-                <h3>No Comments Yet</h3>
-                <p>You haven't posted any comments yet. Start engaging with content!</p>
-                <a href="/" class="btn btn-secondary">Browse Content</a>
-            </div>`;
-            return;
+    /**
+     * Component: Individual Comment Card
+     */
+    class CommentCard {
+        constructor(data, manager) {
+            this.data = data;
+            this.manager = manager;
+            this.el = null; // Reference to the DOM element
         }
 
-        root.innerHTML = `<div class="comments-list">
-        ${comments.map(c => `
-            <div class="comment-card" data-comment-id="${c.id}">
-                <div class="comment-header">
-                    <div class="comment-meta">
-                        <div class="comment-page">${escHtml(c.page_title ?? 'Page')}</div>
-                        <div class="comment-date">Posted on ${formatDate(c.created_at)}</div>
-                    </div>
-                    <span class="status-badge ${escHtml(c.status.toLowerCase())}">${escHtml(c.status)}</span>
-                </div>
-                <div class="comment-content">${escHtml(c.content).replace(/\n/g, '<br>')}</div>
-                <div class="comment-actions">
-                    ${c.page_slug ? `<a href="/${escHtml(c.page_slug)}#comment-${c.id}" class="btn btn-secondary btn-sm">View on Page</a>` : ''}
-                    <button onclick="deleteComment(${c.id})" class="btn btn-danger btn-sm">Delete Comment</button>
-                </div>
-            </div>`).join('')}
-    </div>`;
-    }
+        render() {
+            const c = this.data;
+            const status = (c.status || 'pending').toLowerCase();
 
-    async function deleteComment(commentId) {
-        if (!confirm('Are you sure you want to delete this comment? This action cannot be undone.')) return;
-        try {
-            const res = await fetch(`/api/${SITE_SLUG}/member/comments/${commentId}`, {
-                method: 'DELETE',
-                headers: {'Content-Type': 'application/json'}
-            });
-            const data = await res.json();
-            if (data.success) {
-                showAlert('Comment deleted successfully', 'success');
-                const card = document.querySelector(`[data-comment-id="${commentId}"]`);
-                if (card) {
-                    card.style.transition = 'opacity .3s, transform .3s';
-                    card.style.opacity = '0';
-                    card.style.transform = 'translateX(-20px)';
+            this.el = UI.el('div', {
+                className: 'comment-card',
+                'data-comment-id': c.id
+            }, [
+                // Header: Meta Info and Status Badge
+                UI.el('div', {className: 'comment-header'}, [
+                    UI.el('div', {className: 'comment-meta'}, [
+                        UI.el('div', {className: 'comment-page'}, [c.page_title || 'Page']),
+                        UI.el('div', {className: 'comment-date'}, [`Posted on ${UI.formatDate(c.created_at)}`]),
+                    ]),
+                    UI.el('span', {className: `status-badge ${status}`}, [c.status])
+                ]),
+
+                // Content
+                UI.el('div', {className: 'comment-content'}, [
+                    // Handling line breaks cleanly
+                    ...(c.content || '').split('\n').map(line => [line, UI.el('br')]).flat()
+                ]),
+
+                // Actions
+                UI.el('div', {className: 'comment-actions'}, [
+                    c.page_slug ? UI.el('a', {
+                        href: `/${c.page_slug}#comment-${c.id}`,
+                        className: 'btn btn-secondary btn-sm'
+                    }, ['View on Page']) : null,
+
+                    UI.el('button', {
+                        className: 'btn btn-danger btn-sm',
+                        onclick: () => this.handleDelete()
+                    }, ['Delete Comment'])
+                ])
+            ]);
+
+            return this.el;
+        }
+
+        async handleDelete() {
+            if (!confirm('Are you sure you want to delete this comment?')) return;
+
+            try {
+                const success = await this.manager.deleteCommentApi(this.data.id);
+                if (success) {
+                    // Animate out
+                    this.el.style.transition = 'opacity .3s, transform .3s';
+                    this.el.style.opacity = '0';
+                    this.el.style.transform = 'translateX(-20px)';
+
                     setTimeout(() => {
-                        card.remove();
-                        if (!document.querySelectorAll('.comment-card').length) loadComments();
+                        this.el.remove();
+                        this.manager.checkEmptyState();
                     }, 300);
                 }
-            } else {
-                showAlert(data.message || 'Failed to delete comment', 'error');
+            } catch (e) {
+                UI.toast('Failed to delete comment', 'error');
             }
-        } catch {
-            showAlert('Failed to delete comment', 'error');
         }
     }
 
-    function showAlert(message, type) {
-        const c = document.getElementById('alert-container');
-        c.innerHTML = `<div class="alert alert-${type === 'success' ? 'success' : 'error'}">
-        <span>${type === 'success' ? '✓' : '✕'}</span>${escHtml(message)}</div>`;
-        setTimeout(() => {
-            c.innerHTML = '';
-        }, 5000);
-        window.scrollTo({top: 0, behavior: 'smooth'});
+    /**
+     * Orchestrator: Manages the collection of comments
+     */
+    class CommentManager {
+        constructor() {
+            this.root = document.getElementById('comments-root');
+            this.init();
+        }
+
+        async init() {
+            await this.loadComments();
+        }
+
+        async loadComments() {
+            alert(API_BASE)
+            try {
+                const res = await api(`${API_BASE}/member/comments`);
+                this.render(res.data?.comments || []);
+            } catch (e) {
+                this.root.innerHTML = `<p class="error-text">Failed to load comments. Please refresh.</p>`;
+            }
+        }
+
+        render(comments) {
+            if (!comments.length) {
+                this.renderEmptyState();
+                return;
+            }
+
+            const cards = comments.map(c => new CommentCard(c, this).render());
+            UI.render(this.root, UI.el('div', {className: 'comments-list'}, cards));
+        }
+
+        renderEmptyState() {
+            UI.render(this.root, UI.el('div', {className: 'empty-state'}, [
+                UI.el('div', {className: 'empty-state-icon'}, ['💬']),
+                UI.el('h3', {}, ['No Comments Yet']),
+                UI.el('p', {}, ["You haven't posted any comments yet. Start engaging with content!"]),
+                UI.el('a', {href: '/', className: 'btn btn-secondary'}, ['Browse Content'])
+            ]));
+        }
+
+        async deleteCommentApi(id) {
+            try {
+                const res = await api(`${API_BASE}/member/comments/${id}`, {method: 'DELETE'});
+                if (res.success) {
+                    UI.toast('Comment deleted successfully', 'success');
+                    return true;
+                }
+                UI.toast(res.message || 'Error deleting comment', 'error');
+                return false;
+            } catch (e) {
+                UI.toast('System error during deletion', 'error');
+                return false;
+            }
+        }
+
+        checkEmptyState() {
+            const remaining = this.root.querySelectorAll('.comment-card').length;
+            if (remaining === 0) {
+                this.renderEmptyState();
+            }
+        }
     }
 
-    function formatDate(str) {
-        return str ? new Date(str).toLocaleDateString('en-GB', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit'
-        }) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', loadComments);
+    // Boot
+    document.addEventListener('DOMContentLoaded', () => {
+        window.commentApp = new CommentManager();
+    });
 </script>
 </body>
 </html>

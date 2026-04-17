@@ -489,11 +489,100 @@
                 gap: 15px;
             }
         }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            pointer-events: all;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .toast-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            font-size: 1.1rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
     </style>
 </head>
 <body>
 
 @include('member._header')
+
+<div class="toast-container" id="toastContainer"></div>
 
 <div class="container">
     <div class="breadcrumb">
@@ -741,225 +830,230 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', load);
 
-    async function load() {
-        const res = await fetch('/api/' + SITE_SLUG + '/member/account-details');
-        const json = await res.json();
+    /* ─── SETTINGS ORCHESTRATOR ─────────────────────────────── */
 
-        if (!json.success) return;
+    class SettingsManager {
+        constructor() {
+            this.msgContainer = document.getElementById('messageContainer');
 
-        const {member, preferences, site_slug} = json.data;
+            this.forms = {
+                details: document.getElementById('accountForm'),
+                privacy: document.getElementById('privacyForm'),
+                prefs: document.getElementById('preferencesForm')
+            };
 
-        hydrate(member, preferences, site_slug);
-    }
+            this.init();
+        }
 
-    function hydrate(member, preferences, slug) {
+        async init() {
+            await this.loadInitialData();
+            this.wireEvents();
+        }
 
-        // links
-        document.getElementById('dashboardLink').href = `/${slug}/member/dashboard`;
-        document.getElementById('cancelLink').href = `/${slug}/member/dashboard`;
-        document.getElementById('backLink').href = `/${slug}/member/dashboard`;
-        document.getElementById('passwordLink').href = `/${slug}/member/settings`;
-        document.getElementById('verificationLink').href = `/${slug}/member/resend-verification`;
+        async loadInitialData() {
+            try {
+                const {success, data, message} = await api(`/api/${SITE_SLUG}/member/account-details`);
+                if (!success) {
+                    UI.toast(message || 'Failed to load account data', 'error');
+                    return;
+                }
 
-        // basic fields
-        setValue('first_name', member.first_name);
-        setValue('last_name', member.last_name);
-        const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim();
+                this.hydrate(data)
 
-// If display_name exists, use it, otherwise fallback
-        setValue('display_name', member.display_name || fullName);
+            } catch (e) {
+                console.error("Hydration Error:", e);
+            }
+        }
 
-// Always show fallback as placeholder
-        setText('display_name_placeholder', fullName);
-        setValue('email', member.email);
+        hydrate({member, preferences, site_slug}) {
+            // 1. Identity & Profile
+            const fullName = `${member.first_name || ''} ${member.last_name || ''}`.trim();
 
-        setText('display_name_placeholder', member.first_name + ' ' + member.last_name);
+            UI.setFields({
+                'first_name': member.first_name,
+                'last_name': member.last_name,
+                'email': member.email,
+                'display_name': member.display_name || fullName,
+                'id': `#${member.id}`
+            });
 
-        setText('id', `#${member.id}`);
+            // 2. Status & Dates
+            this.renderStatus(member);
+            UI.setBind('id', `#${member.id}`);
+            UI.setBind('created_at', UI.formatDate(member.created_at));
+            UI.setBind('last_login_at', UI.formatDate(member.last_login_at, true));
 
-        setText('created_at', formatDate(member.created_at));
-        setText('last_login_at', formatDate(member.last_login_at, true));
+            // 3. Navigation
+            this.updateNavigation(site_slug);
 
-        // badges
-        setHTML('account_status',
-            member.is_active
+            // 4. Preferences & Toggles
+            this.setPreferences(member, preferences);
+
+            // 5. Dynamic Components
+            this.renderRoles(member.roles);
+        }
+
+        renderStatus(member) {
+            const verified = !!member.email_verified_at;
+
+            UI.setBind('account_status', member.is_active
                 ? '<span class="badge success">✓ Active</span>'
-                : '<span class="badge warning">⚠ Inactive</span>'
-        );
+                : '<span class="badge warning">⚠ Inactive</span>', true);
 
-        const verified = !!member.email_verified_at;
-
-        setHTML('email_status',
-            verified
+            UI.setBind('email_status', verified
                 ? '<span class="badge success">✓ Verified</span>'
-                : '<span class="badge warning">⚠ Not Verified</span>'
-        );
+                : '<span class="badge warning">⚠ Not Verified</span>', true);
 
-        if (!verified) {
-            document.getElementById('verificationLink').style.display = 'inline-block';
+            const vLink = document.getElementById('verificationLink');
+            if (vLink) vLink.style.display = verified ? 'none' : 'inline-block';
         }
 
-        // roles
-        const roleContainer = document.querySelector('[data-bind="roles"]');
-        roleContainer.innerHTML = '';
-        member.roles.forEach(r => {
-            const span = document.createElement('span');
-            span.className = 'badge info';
-            span.textContent = r.name;
-            roleContainer.appendChild(span);
-        });
-
-        // preferences
-        setCheckbox('marketing_emails', preferences?.marketing_emails ?? true);
-        setCheckbox('special_offers', preferences?.special_offers ?? true);
-        setCheckbox('product_updates', preferences?.product_updates ?? true);
-        setCheckbox('newsletter', preferences?.newsletter ?? true);
-        setCheckbox('third_party_communications', preferences?.third_party_communications ?? false);
-
-        document.getElementById('siteNameText').innerText = `Manage how ${slug} communicates with you`;
-        setCheckbox('show_activity', member.show_activity ?? false);
-        setCheckbox('show_badges', member.show_badges ?? false);
-    }
-
-    function setValue(key, val) {
-        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.value = val || '');
-    }
-
-    function setText(key, val) {
-        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.textContent = val || '');
-    }
-
-    function setHTML(key, val) {
-        document.querySelectorAll(`[data-bind="${key}"]`).forEach(el => el.innerHTML = val);
-    }
-
-    function setCheckbox(name, val) {
-        const el = document.querySelector(`input[name="${name}"]`);
-        if (el) el.checked = !!val;
-    }
-
-    function formatDate(obj, withTime = false) {
-        if (!obj || !obj.date) return 'N/A';
-
-        const d = new Date(obj.date);
-
-        const datePart = d.toLocaleDateString('en-GB', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-
-        if (!withTime) return datePart;
-
-        const timePart = d.toLocaleTimeString('en-GB', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-        });
-
-        return `${datePart} ${timePart}`;
-    }
-
-    document.getElementById('accountForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const form = e.target;
-
-        const payload = {
-            first_name: form.first_name.value,
-            last_name: form.last_name.value,
-            display_name: form.display_name.value,
-            email: form.email.value
-        };
-
-        const res = await fetch('/api/' + SITE_SLUG + '/member/account-details', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const json = await res.json();
-
-        handleResponse(json, 'Account details updated');
-    });
-
-    document.getElementById('privacyForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const form = e.target;
-
-        const payload = {
-            show_activity: form.show_activity.checked ? 1 : 0,
-            show_badges: form.show_badges.checked ? 1 : 0
-        };
-
-        const res = await fetch('/api/' + SITE_SLUG + '/member/settings/privacy', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const json = await res.json();
-
-        handleResponse(json, 'Privacy settings updated');
-    });
-
-    document.getElementById('preferencesForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const form = e.target;
-
-        const payload = {
-            marketing_emails: form.marketing_emails.checked ? 1 : 0,
-            special_offers: form.special_offers.checked ? 1 : 0,
-            product_updates: form.product_updates.checked ? 1 : 0,
-            newsletter: form.newsletter.checked ? 1 : 0,
-            third_party_communications: form.third_party_communications.checked ? 1 : 0
-        };
-
-        const res = await fetch('/api/' + SITE_SLUG + '/member/settings/communication-preferences', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const json = await res.json();
-
-        handleResponse(json, 'Preferences saved');
-    });
-
-    function handleResponse(json, successMessage) {
-        const container = document.getElementById('messageContainer');
-
-        if (json.success) {
-            container.innerHTML = `
-            <div class="message success">
-                <span>✓</span>
-                ${successMessage}
-            </div>
-        `;
-        } else {
-            container.innerHTML = `
-            <div class="message error">
-                <span>✕</span>
-                ${json.message || 'Something went wrong'}
-            </div>
-        `;
+        setPreferences(member, prefs) {
+            UI.setChecks({
+                'marketing_emails': prefs?.marketing_emails ?? true,
+                'special_offers': prefs?.special_offers ?? true,
+                'product_updates': prefs?.product_updates ?? true,
+                'newsletter': prefs?.newsletter ?? true,
+                'show_activity': member.show_activity ?? false,
+                'show_badges': member.show_badges ?? false
+            });
         }
 
-        window.scrollTo({top: 0, behavior: 'smooth'});
+        renderRoles(roles = []) {
+            const container = document.querySelector('[data-bind="roles"]');
+            if (!container) return;
+
+            container.innerHTML = '';
+            roles.forEach(r => {
+                container.appendChild(UI.el('span', {className: 'badge info'}, [r.name]));
+            });
+        }
+
+        updateNavigation(slug) {
+            const links = ['dashboardLink', 'cancelLink', 'backLink', 'passwordLink', 'verificationLink'];
+            const base = `/${slug}/member`;
+            const paths = {
+                passwordLink: `${base}/settings`,
+                verificationLink: `${base}/resend-verification`
+            };
+
+            links.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.href = paths[id] || `${base}/dashboard`;
+            });
+        }
+
+
+        wireEvents() {
+            // Handle Account Details Form
+            this.forms.details?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleDetailsSubmit(e);
+            });
+
+            this.forms.privacy?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handlePrivacySubmit(e);
+            });
+
+            // Handle Communication Preferences Form
+            this.forms.prefs?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handlePreferencesSubmit(e);
+            });
+        }
+
+        /**
+         * Handle Privacy Settings Form (Form 2)
+         */
+        async handlePrivacySubmit(e) {
+            const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const original = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.textContent = 'Updating...';
+
+            // Map checkboxes to 1 or 0 for the database
+            const payload = {
+                show_activity: form.show_activity?.checked ? 1 : 0,
+                show_badges: form.show_badges?.checked ? 1 : 0
+            };
+
+            try {
+                const res = await api(`/api/${SITE_SLUG}/member/settings/privacy`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                UI.toast('Privacy settings updated', 'success');
+            } catch (err) {
+                UI.toast('Error saving privacy settings', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
+            }
+        }
+
+        /**
+         * Updates Name/Email/Phone
+         */
+        async handleDetailsSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+
+            const payload = {
+                first_name: form.first_name.value,
+                last_name: form.last_name.value,
+                email: form.email.value,
+                // phone: form.phone.value
+            };
+
+            try {
+                // Using the global SITE_SLUG as per original file
+                const res = await api(`/api/${SITE_SLUG}/member/account-details`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                UI.toast('Account details updated successfully', 'success');
+            } catch (err) {
+                UI.error('Failed to connect to server', 'error');
+            }
+        }
+
+        /**
+         * Updates Toggles (Marketing, Newsletter, etc)
+         */
+        async handlePreferencesSubmit(e) {
+            e.preventDefault();
+            const form = e.target;
+
+            const payload = {
+                marketing_emails: form.marketing_emails.checked ? 1 : 0,
+                special_offers: form.special_offers.checked ? 1 : 0,
+                product_updates: form.product_updates.checked ? 1 : 0,
+                newsletter: form.newsletter.checked ? 1 : 0,
+                third_party_communications: form.third_party_communications.checked ? 1 : 0
+            };
+
+            try {
+                const res = await api(`/api/${SITE_SLUG}/member/settings/communication-preferences`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                UI.toast('Communication preferences saved', 'success');
+            } catch (err) {
+                UI.error('Failed to connect to server', 'error');
+            }
+        }
     }
+
+    /* ─── BOOTSTRAP ─────────────────────────────────────────── */
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initializing the manager
+        window.settingsApp = new SettingsManager();
+    });
 </script>
 </body>
 </html>

@@ -3,6 +3,7 @@
 namespace App\Database\Seeders;
 
 use App\Models\Badge;
+use App\Models\Site;
 
 class BadgeSeeder
 {
@@ -212,13 +213,21 @@ class BadgeSeeder
             ],
         ];
 
-        //$sites = Site::all();
+        $sites = Site::all();
 
-        //foreach ($sites as $site) {
+        foreach ($sites as $site) {
             foreach ($badges as $badge) {
-                $badge['site_id'] = $siteId;
+                $badgeExists = Badge::where('site_id', $site->id)
+                    ->where('slug', $badge['slug'])
+                    ->first();
+
+                if ($badgeExists) {
+                    continue;
+                }
+
+                $badge['site_id'] = $site->id;
                 Badge::create($badge);
             }
-        //}
+        }
     }
 }

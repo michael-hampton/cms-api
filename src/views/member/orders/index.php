@@ -562,173 +562,140 @@
 
 <script>
 
-    /* ─── Toast ──────────────────────────────────────────── */
-    function showToast(message, type = 'info', duration = 5000) {
-        const icons = {success: '✓', error: '✕', info: 'ℹ'};
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span>${icons[type] || 'ℹ'}</span>
-            <span style="flex:1;">${message}</span>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            if (!toast.parentElement) return;
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
-
-    /* ─── Load orders ────────────────────────────────────── */
-    async function loadOrders() {
-        try {
-            const response = await fetch(`/api/${SITE_SLUG}/member/orders`);
-            if (!response.ok) throw new Error('Server error ' + response.status);
-            const json = await response.json();
-            if (!json.success) throw new Error(json.message || 'Failed to load orders');
-            renderOrders(json.data);
-        } catch (e) {
-            console.error(e);
-            showToast('Failed to load orders. Please refresh.', 'error');
-            document.getElementById('orders-container').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">⚠️</div>
-                    <h3>Failed to Load Orders</h3>
-                    <p>Please try refreshing the page.</p>
-                    <button class="btn btn-primary" onclick="loadOrders()">Retry</button>
-                </div>`;
-        }
-    }
-
-    function renderOrders(orders) {
-        const container = document.getElementById('orders-container');
-
-        if (!orders || orders.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">🛍️</div>
-                    <h3>No Orders Yet</h3>
-                    <p>You haven't placed any orders yet. Start shopping to see your orders here.</p>
-                    <a href="/" class="btn btn-primary">Start Shopping</a>
-                </div>`;
-            return;
+    class CancelModal {
+        constructor() {
+            this.orderId = null;
+            this._bind();
         }
 
-        container.innerHTML = orders.map(order => {
-            const statusClass = (order.status || '').toLowerCase();
-            const date = new Date(order.created_at).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
+        _bind() {
+            document.getElementById('cancelModalBackdrop').addEventListener('click', e => {
+                if (e.target.id === 'cancelModalBackdrop') this.close();
             });
-
-            return `
-            <div class="order-card">
-                <div class="order-header">
-                    <div>
-                        <div class="order-number">Order #${escHtml(order.order_number)}</div>
-                        <div class="order-date">Placed on ${date}</div>
-                    </div>
-                    <span class="status-badge ${statusClass}">${escHtml(order.status)}</span>
-                </div>
-
-                <div class="order-details">
-                    <div class="detail-item">
-                        <span class="detail-label">Total Amount</span>
-                        <span class="detail-value">${escHtml(order.currency)} ${parseFloat(order.total).toFixed(2)}</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Payment Status</span>
-                        <span class="detail-value" style="color:${order.is_paid ? 'var(--success-color)' : 'var(--warning-color)'}">
-                            ${order.is_paid ? 'Paid' : 'Pending'}
-                        </span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Items</span>
-                        <span class="detail-value">${order.items?.length ?? 0} item(s)</span>
-                    </div>
-                    <div class="detail-item">
-                        <span class="detail-label">Payment Method</span>
-                        <span class="detail-value">${escHtml(order.payment_method || 'N/A')}</span>
-                    </div>
-                </div>
-
-                <div class="order-actions">
-                    <a href="/${SITE_SLUG}/member/orders/${order.id}" class="btn btn-primary btn-sm">
-                        View Details
-                    </a>
-                    ${order.can_cancel ? `
-                    <button onclick="openCancelModal(${order.id})" class="btn btn-secondary btn-sm">
-                        Cancel Order
-                    </button>` : ''}
-                </div>
-            </div>`;
-        }).join('');
-    }
-
-    /* ─── Cancel modal ───────────────────────────────────── */
-    function openCancelModal(orderId) {
-        document.getElementById('cancelOrderId').value = orderId;
-        document.getElementById('cancelReason').value = '';
-        document.getElementById('notifyCustomer').checked = true;
-        document.getElementById('confirmCancelBtn').disabled = false;
-        document.getElementById('cancelModalBackdrop').style.display = 'flex';
-    }
-
-    function closeCancelModal() {
-        document.getElementById('cancelModalBackdrop').style.display = 'none';
-    }
-
-    function handleBackdropClick(e) {
-        if (e.target === document.getElementById('cancelModalBackdrop')) closeCancelModal();
-    }
-
-    async function confirmCancelOrder() {
-        const reason = document.getElementById('cancelReason').value;
-        const notify = document.getElementById('notifyCustomer').checked;
-        const orderId = document.getElementById('cancelOrderId').value;
-        const btn = document.getElementById('confirmCancelBtn');
-
-        if (!reason) {
-            showToast('Please select a cancellation reason.', 'error');
-            document.getElementById('cancelReason').focus();
-            return;
         }
 
-        btn.disabled = true;
-        btn.textContent = 'Cancelling…';
+        open(orderId) {
+            this.orderId = orderId;
+            document.getElementById('cancelReason').value = '';
+            document.getElementById('notifyCustomer').checked = true;
+            document.getElementById('confirmCancelBtn').disabled = false;
+            document.getElementById('confirmCancelBtn').textContent = 'Cancel Order';
+            document.getElementById('cancelModalBackdrop').style.display = 'flex';
+        }
 
-        try {
-            const response = await fetch(`/api/${SITE_SLUG}/member/orders/${orderId}/cancel`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({reason, notify_customer: notify})
-            });
-            const data = await response.json();
+        close() {
+            document.getElementById('cancelModalBackdrop').style.display = 'none';
+        }
 
-            if (data.success) {
-                closeCancelModal();
-                showToast('Order cancelled successfully.', 'success');
-                setTimeout(loadOrders, 800);
-            } else {
-                showToast(data.message || 'Failed to cancel order.', 'error');
+        async confirm() {
+            const reason = document.getElementById('cancelReason').value;
+            const notify = document.getElementById('notifyCustomer').checked;
+            const btn = document.getElementById('confirmCancelBtn');
+            if (!reason) {
+                UI.toast('Please select a cancellation reason.', 'error');
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Cancelling…';
+            try {
+                await api(`/api/${SITE_SLUG}/member/orders/${this.orderId}/cancel`, {
+                    method: 'POST',
+                    body: JSON.stringify({reason, notify_customer: notify}),
+                });
+                this.close();
+                UI.toast('Order cancelled successfully.', 'success');
+                setTimeout(() => ordersList.load(), 800);
+            } catch (e) {
+                UI.toast(e.message || 'Failed to cancel order.', 'error');
                 btn.disabled = false;
                 btn.textContent = 'Cancel Order';
             }
-        } catch {
-            showToast('An error occurred. Please try again.', 'error');
-            btn.disabled = false;
-            btn.textContent = 'Cancel Order';
         }
     }
 
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    class OrdersList {
+        constructor(modal) {
+            this.modal = modal;
+        }
+
+        async load() {
+            const container = document.getElementById('orders-container');
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/orders`);
+                this.render(container, json.data);
+            } catch (e) {
+                UI.toast('Failed to load orders. Please refresh.', 'error');
+                UI.render(container, [UI.emptyState({
+                    icon: '⚠️', title: 'Failed to Load Orders',
+                    body: 'Please try refreshing the page.',
+                    action: UI.el('button', {className: 'btn btn-primary', onclick: () => this.load()}, ['Retry']),
+                })]);
+            }
+        }
+
+        render(container, orders) {
+            if (!orders?.length) {
+                UI.render(container, [UI.emptyState({
+                    icon: '🛍️', title: 'No Orders Yet',
+                    body: "You haven't placed any orders yet.",
+                    action: UI.el('a', {href: '/', className: 'btn btn-primary'}, ['Start Shopping']),
+                })]);
+                return;
+            }
+
+            UI.render(container, orders.map(order => {
+                const date = new Date(order.created_at).toLocaleDateString('en-US',
+                    {month: 'long', day: 'numeric', year: 'numeric'});
+
+                const actions = [
+                    UI.el('a', {
+                        href: `/${SITE_SLUG}/member/orders/${order.id}`,
+                        className: 'btn btn-primary btn-sm',
+                    }, ['View Details']),
+                ];
+                //if (order.can_cancel) {
+                const cancelBtn = UI.el('button', {className: 'btn btn-secondary btn-sm'}, ['Cancel Order']);
+                cancelBtn.addEventListener('click', () => this.modal.open(order.id));
+                actions.push(cancelBtn);
+                //}
+
+                return UI.el('div', {className: 'order-card'}, [
+                    UI.el('div', {className: 'order-header'}, [
+                        UI.el('div', {}, [
+                            UI.el('div', {className: 'order-number'}, [`Order #${order.order_number}`]),
+                            UI.el('div', {className: 'order-date'}, [`Placed on ${date}`]),
+                        ]),
+                        UI.statusBadge(order.status),
+                    ]),
+                    UI.el('div', {className: 'order-details'}, [
+                        this._detail('Total Amount', `${order.currency} ${parseFloat(order.total).toFixed(2)}`),
+                        this._detail('Payment Status', order.is_paid ? 'Paid' : 'Pending',
+                            order.is_paid ? 'var(--success-color)' : 'var(--warning-color)'),
+                        this._detail('Items', `${order.items?.length ?? 0} item(s)`),
+                        this._detail('Payment Method', order.payment_method || 'N/A'),
+                    ]),
+                    UI.el('div', {className: 'order-actions'}, actions),
+                ]);
+            }));
+        }
+
+        _detail(label, value, color = null) {
+            return UI.el('div', {className: 'detail-item'}, [
+                UI.el('span', {className: 'detail-label'}, [label]),
+                UI.el('span', {className: 'detail-value', style: color ? {color} : {}}, [value]),
+            ]);
+        }
     }
 
-    document.addEventListener('DOMContentLoaded', loadOrders);
+    let ordersList;
+    document.addEventListener('DOMContentLoaded', () => {
+        const modal = new CancelModal();
+        // Expose confirm so the inline button in the PHP template can call it
+        window.confirmCancelOrder = () => modal.confirm();
+        window.closeCancelModal = () => modal.close();
+        ordersList = new OrdersList(modal);
+        ordersList.load();
+    });
 </script>
 </body>
 </html>

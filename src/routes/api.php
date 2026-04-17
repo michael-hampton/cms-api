@@ -41,6 +41,7 @@ use App\Controllers\Members\Api\MemberApiController;
 use App\Controllers\Members\Api\MemberCommentsApiController;
 use App\Controllers\Members\Api\MemberConsentApiController;
 use App\Controllers\Members\Api\MemberDashboardApiController;
+use App\Controllers\Members\Api\MemberGiftedArticlesApiController;
 use App\Controllers\Members\Api\MemberLikedPagesApiController;
 use App\Controllers\Members\Api\MemberNewslettersApiController;
 use App\Controllers\Members\Api\MemberOrdersApiController;
@@ -140,9 +141,21 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->get('/dashboard/newsletters', [MemberDashboardApiController::class, 'newsletters']);
     $router->get('/dashboard/rewards', [MemberDashboardApiController::class, 'rewards']);
     $router->get('/dashboard/subscriptions', [MemberDashboardApiController::class, 'subscriptions']);
+    $router->get('/dashboard/stats', [\App\Controllers\Members\Api\MemberStatsApiController::class, 'stats']);
 
     // Member Activity & Badges API
     $router->get('/activity', [MemberActivityApiController::class, 'index']);
+
+    $router->get('/gifted-articles', [MemberGiftedArticlesApiController::class, 'index']);
+
+// GET  /api/{site}/member/gift-modal/{pageSlug}    → page info + allowance for gift modal
+    $router->get('/gift-modal/{pageSlug}', [MemberGiftedArticlesApiController::class, 'modal']);
+
+// POST /api/{site}/gift-article/{pageSlug}         → send a gift
+    $router->post('/gift-article/{pageSlug}', [MemberGiftedArticlesApiController::class, 'gift']);
+
+// POST /api/{site}/gift/{token}/claim              → claim a gift
+    $router->post('/gift/{token}/claim', [MemberGiftedArticlesApiController::class, 'claim']);
 
 
 // Member Badge notification API (existing MemberBadgeController, already API-shaped)
@@ -179,8 +192,6 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
 
     $router->get('/wishlist', 'App\Controllers\Members\Api\MemberWishlistApiController@index');
     $router->delete('/wishlist/{id}', 'App\Controllers\Members\Api\MemberWishlistApiController@remove');
-
-    $router->get('/stats', [\App\Controllers\Members\Api\MemberStatsApiController::class, 'stats']);
 
     $router->get('/rewards', [MemberRewardsApiController::class, 'rewards']);
     $router->post('/rewards/{rewardId}/claim', [MemberRewardsApiController::class, 'claim']);

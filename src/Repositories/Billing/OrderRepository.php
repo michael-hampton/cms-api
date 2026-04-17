@@ -111,7 +111,7 @@ class OrderRepository extends Repository
     public function countForMember(int $memberId, int $siteId): int
     {
         return $this->countWhere([
-            'member_id' => $memberId,
+            'user_id' => $memberId,
             'site_id' => $siteId,
         ]);
     }

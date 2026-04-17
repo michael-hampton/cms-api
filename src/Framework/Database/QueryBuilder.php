@@ -1261,6 +1261,31 @@ class QueryBuilder
         return true;
     }
 
+    public function chunkById(int $count, callable $callback, string $column = 'id'): bool
+    {
+        $lastId = 0;
+
+        do {
+            $results = $this->where($column, '>', $lastId)
+                ->orderBy($column)
+                ->limit($count)
+                ->get();
+
+            if ($results->isEmpty()) {
+                break;
+            }
+
+            $lastId = $results->last()->{$column};
+
+            if ($callback($results) === false) {
+                return false;
+            }
+
+        } while ($results->count() === $count);
+
+        return true;
+    }
+
     public function delete(): int
     {
         $bindings = [];

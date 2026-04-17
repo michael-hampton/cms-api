@@ -442,328 +442,276 @@
 </main>
 
 <script>
-    /* ─── Toast ──────────────────────────────────────────── */
-    function showToast(message, type = 'info') {
-        const icons = {success: '✓', error: '✕', info: 'ℹ'};
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span class="toast-icon">${icons[type]}</span>
-            <span>${message}</span>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
+    class StatsSection {
+        render(progress) {
+            const s = progress.stats;
+            const cards = [
+                {icon: '🏆', value: progress.total_points.toLocaleString(), label: 'Total Points'},
+                {icon: '🎖️', value: `${progress.badges_earned} / ${progress.badges_available}`, label: 'Badges Earned'},
+                {icon: '💬', value: s.comments.toLocaleString(), label: 'Comments Posted'},
+                {icon: '📚', value: s.pages_read.toLocaleString(), label: 'Pages Read'},
+                {icon: '❤️', value: s.likes.toLocaleString(), label: 'Likes Given'},
+                {icon: '📅', value: s.member_days.toLocaleString(), label: 'Days as Member'},
+            ];
+            UI.render(document.getElementById('stats-container'), cards.map(c =>
+                UI.el('div', {className: 'stat-card'}, [
+                    UI.el('div', {className: 'stat-header'}, [
+                        UI.el('div', {className: 'stat-icon'}, [c.icon]),
+                    ]),
+                    UI.el('div', {className: 'stat-value'}, [c.value]),
+                    UI.el('div', {className: 'stat-label'}, [c.label]),
+                ])
+            ));
+        }
     }
 
-    /* ─── Init ───────────────────────────────────────────── */
-    async function initDashboard() {
-        try {
-            const response = await fetch('/api/' + SITE_SLUG + '/member/activity');
-            if (!response.ok) throw new Error('Server error ' + response.status);
-            const result = await response.json();
+    class BadgesShowcase {
+        render(memberBadges) {
+            const container = document.getElementById('badges-showcase-container');
+            if (!memberBadges?.length) {
+                container.innerHTML = '';
+                return;
+            }
 
-            if (!result.success) throw new Error(result.message || 'Failed to load activity');
-
-            const {progress, recent_activities, activity_trends, member_badges, next_badges} = result.data;
-
-            renderStats(progress);
-            renderBadges(member_badges);
-            renderNextBadges(next_badges);
-            renderActivity(recent_activities);
-
-            /* Draw chart after DOM settles so offsetWidth/offsetHeight are correct */
-            requestAnimationFrame(() => {
-                const labels = (activity_trends || []).map(d => d.date);
-                const counts = (activity_trends || []).map(d => d.count);
-                drawActivityChart(labels, counts);
+            const grid = UI.el('div', {className: 'badges-grid'});
+            memberBadges.slice(0, 8).forEach(badge => {
+                grid.appendChild(UI.el('div', {className: 'badge-item'}, [
+                    UI.el('div', {className: 'badge-icon'}, [badge.icon ?? '🏆']),
+                    UI.el('div', {className: 'badge-name'}, [badge.name]),
+                    UI.el('div', {className: 'badge-tier'}, [badge.tier]),
+                ]));
             });
 
-        } catch (error) {
-            console.error('Failed to load dashboard:', error);
-            showToast('Failed to load activity data. Please refresh.', 'error');
-            document.getElementById('stats-container').innerHTML =
-                '<p style="color:var(--danger-color);padding:1rem;">Could not load stats.</p>';
+            const link = UI.el('a', {
+                href: `/${SITE_SLUG}/member/activity/badges`,
+                style: {color: 'var(--primary-color)', textDecoration: 'none', fontWeight: '500'},
+            }, ['View All Badges →']);
+
+            UI.render(container, [
+                UI.el('div', {className: 'badges-showcase'}, [
+                    UI.el('h2', {className: 'section-title'}, ['Recent Badges']),
+                    grid,
+                    UI.el('div', {style: {textAlign: 'center', marginTop: '1.5rem'}}, [link]),
+                ]),
+            ]);
         }
     }
 
-    /* ─── Stats ──────────────────────────────────────────── */
-    function renderStats(progress) {
-        const container = document.getElementById('stats-container');
-        const s = progress.stats;
+    class NextBadges {
+        render(nextBadges) {
+            const container = document.getElementById('next-badges-container');
+            if (!nextBadges?.length) {
+                container.innerHTML = '';
+                return;
+            }
 
-        const cards = [
-            {
-                icon: '🏆',
-                bg: '#667eea20,#764ba220',
-                value: progress.total_points.toLocaleString(),
-                label: 'Total Points'
-            },
-            {
-                icon: '🎖️',
-                bg: '#10b98120,#059f6920',
-                value: `${progress.badges_earned} / ${progress.badges_available}`,
-                label: 'Badges Earned'
-            },
-            {icon: '💬', bg: '#f59e0b20,#d9770620', value: s.comments.toLocaleString(), label: 'Comments Posted'},
-            {icon: '📚', bg: '#3b82f620,#2563eb20', value: s.pages_read.toLocaleString(), label: 'Pages Read'},
-            {icon: '❤️', bg: '#ef444420,#dc262620', value: s.likes.toLocaleString(), label: 'Likes Given'},
-            {icon: '📅', bg: '#8b5cf620,#7c3aed20', value: s.member_days.toLocaleString(), label: 'Days as Member'},
-        ];
+            const items = nextBadges.map(item => {
+                const pct = Math.min(100, Math.round(item.progress.percentage));
+                const bar = UI.el('div', {className: 'progress-bar', style: {width: `${pct}%`}});
+                return UI.el('div', {className: 'progress-item'}, [
+                    UI.el('div', {className: 'progress-header'}, [
+                        UI.el('div', {className: 'progress-header-left'}, [
+                            UI.el('strong', {}, [`${item.badge.icon ?? '✨'} ${item.badge.name}`]),
+                            UI.el('span', {}, [` ${item.badge.description ?? ''}`]),
+                        ]),
+                        UI.el('span', {className: 'progress-pct'}, [`${pct}%`]),
+                    ]),
+                    UI.el('div', {className: 'progress-bar-container'}, [bar]),
+                    UI.el('div', {className: 'progress-meta'},
+                        [`${item.progress.met} of ${item.progress.total} requirements met`]),
+                ]);
+            });
 
-        container.innerHTML = cards.map(c => `
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon" style="background:linear-gradient(135deg,${c.bg});">${c.icon}</div>
-                </div>
-                <div class="stat-value">${c.value}</div>
-                <div class="stat-label">${c.label}</div>
-            </div>`).join('');
-    }
-
-    /* ─── Recent badges ──────────────────────────────────── */
-    function renderBadges(memberBadges) {
-        const container = document.getElementById('badges-showcase-container');
-        if (!memberBadges || memberBadges.length === 0) {
-            container.innerHTML = '';
-            return;
+            UI.render(container, [
+                UI.el('div', {className: 'progress-section'}, [
+                    UI.el('h2', {className: 'section-title'}, ['Next Badges to Earn']),
+                    ...items,
+                ]),
+            ]);
         }
-
-        const items = memberBadges.slice(0, 8).map(badge => `
-            <div class="badge-item">
-                <div class="badge-icon">${badge.icon || '🏆'}</div>
-                <div class="badge-name">${esc(badge.name)}</div>
-                <div class="badge-tier">${esc(badge.tier)}</div>
-            </div>`).join('');
-
-        container.innerHTML = `
-            <div class="badges-showcase">
-                <h2 class="section-title">Recent Badges</h2>
-                <div class="badges-grid">${items}</div>
-                <div style="text-align:center;margin-top:1.5rem;">
-                    <a href="/${SITE_SLUG}/member/activity/badges"
-                       style="color:var(--primary-color);text-decoration:none;font-weight:500;">
-                        View All Badges →
-                    </a>
-                </div>
-            </div>`;
     }
 
-    /* ─── Next badges progress ───────────────────────────── */
-    function renderNextBadges(nextBadges) {
-        const container = document.getElementById('next-badges-container');
-        if (!nextBadges || nextBadges.length === 0) {
-            container.innerHTML = '';
-            return;
+    class ActivityFeed {
+        render(activities) {
+            const container = document.getElementById('recent-activity-list');
+            if (!activities?.length) {
+                UI.render(container, [UI.el('p', {
+                    style: {textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'},
+                }, ['No recent activity yet.'])]);
+                return;
+            }
+
+            const icons = {comment: '💬', like: '❤️', read: '📖', share: '↗️', purchase: '🛍️'};
+            const labels = {
+                comment: 'Posted a comment', like: 'Liked a page', read: 'Read a page',
+                share: 'Shared content', purchase: 'Made a purchase'
+            };
+
+            UI.render(container, activities.map(a => {
+                const pts = a.points > 0
+                    ? UI.el('span', {className: 'activity-points'}, [`+${a.points} points`])
+                    : null;
+                return UI.el('div', {className: 'activity-item'}, [
+                    UI.el('div', {className: 'activity-icon'}, [icons[a.activity_type] ?? '✨']),
+                    UI.el('div', {className: 'activity-content'}, [
+                        UI.el('div', {className: 'activity-text'}, [labels[a.activity_type] ?? 'Activity']),
+                        UI.el('div', {className: 'activity-time'}, [UI.timeAgo(a.activity_date), pts]),
+                    ]),
+                ]);
+            }));
         }
-
-        const items = nextBadges.map(item => {
-            const pct = Math.min(100, Math.round(item.progress.percentage));
-            return `
-            <div class="progress-item">
-                <div class="progress-header">
-                    <div class="progress-header-left">
-                        <strong>${item.badge.icon || '✨'} ${esc(item.badge.name)}</strong>
-                        <span>${esc(item.badge.description || '')}</span>
-                    </div>
-                    <span class="progress-pct">${pct}%</span>
-                </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" style="width:${pct}%"></div>
-                </div>
-                <div class="progress-meta">${item.progress.met} of ${item.progress.total} requirements met</div>
-            </div>`;
-        }).join('');
-
-        container.innerHTML = `
-            <div class="progress-section">
-                <h2 class="section-title">Next Badges to Earn</h2>
-                ${items}
-            </div>`;
     }
 
-    /* ─── Activity feed ──────────────────────────────────── */
-    function renderActivity(activities) {
-        const container = document.getElementById('recent-activity-list');
+    class ActivityChart {
+        draw(labels, counts) {
+            const canvas = document.getElementById('activityChart');
+            const wrapper = canvas.parentElement;
+            const W = wrapper.offsetWidth || 800;
+            const H = wrapper.offsetHeight || 300;
+            const DPR = window.devicePixelRatio || 1;
+            canvas.width = W * DPR;
+            canvas.height = H * DPR;
+            canvas.style.width = W + 'px';
+            canvas.style.height = H + 'px';
+            const ctx = canvas.getContext('2d');
+            ctx.scale(DPR, DPR);
+            if (!labels.length) return;
 
-        if (!activities || activities.length === 0) {
-            container.innerHTML = `
-                <p style="text-align:center;color:var(--text-secondary);padding:2rem;">
-                    No recent activity yet. Start engaging to see your activity here!
-                </p>`;
-            return;
-        }
+            const pad = {top: 24, right: 24, bottom: 48, left: 48};
+            const plotW = W - pad.left - pad.right;
+            const plotH = H - pad.top - pad.bottom;
+            const maxCount = Math.max(...counts, 5);
+            const xStep = plotW / Math.max(counts.length - 1, 1);
+            const yScale = plotH / maxCount;
 
-        const icons = {comment: '💬', like: '❤️', read: '📖', share: '↗️', purchase: '🛍️'};
-        const actions = {
-            comment: 'Posted a comment',
-            like: 'Liked a page',
-            read: 'Read a page',
-            share: 'Shared content',
-            purchase: 'Made a purchase'
-        };
+            // Grid
+            ctx.strokeStyle = '#f0f0f0';
+            ctx.lineWidth = 1;
+            for (let i = 1; i <= 5; i++) {
+                const y = pad.top + plotH - (i / 5) * plotH;
+                ctx.beginPath();
+                ctx.moveTo(pad.left, y);
+                ctx.lineTo(pad.left + plotW, y);
+                ctx.stroke();
+            }
 
-        container.innerHTML = activities.map(activity => `
-            <div class="activity-item">
-                <div class="activity-icon">${icons[activity.activity_type] || '✨'}</div>
-                <div class="activity-content">
-                    <div class="activity-text">${actions[activity.activity_type] || 'Activity'}</div>
-                    <div class="activity-time">
-                        ${diffForHumans(activity.activity_date)}
-                        ${activity.points > 0 ? `<span class="activity-points">+${activity.points} points</span>` : ''}
-                    </div>
-                </div>
-            </div>`).join('');
-    }
+            // Y labels
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            for (let i = 0; i <= 5; i++) {
+                const y = pad.top + plotH - (i / 5) * plotH;
+                ctx.fillText(Math.round((i / 5) * maxCount), pad.left - 8, y);
+            }
 
-    /* ─── Chart ──────────────────────────────────────────── */
-    function drawActivityChart(labels, counts) {
-        const canvas = document.getElementById('activityChart');
-        const wrapper = canvas.parentElement;
-
-        /* Size canvas to its container */
-        const W = wrapper.offsetWidth || 800;
-        const H = wrapper.offsetHeight || 300;
-        const DPR = window.devicePixelRatio || 1;
-
-        canvas.width = W * DPR;
-        canvas.height = H * DPR;
-        canvas.style.width = W + 'px';
-        canvas.style.height = H + 'px';
-
-        const ctx = canvas.getContext('2d');
-        ctx.scale(DPR, DPR);
-
-        if (!labels.length) return;
-
-        const pad = {top: 24, right: 24, bottom: 48, left: 48};
-        const plotW = W - pad.left - pad.right;
-        const plotH = H - pad.top - pad.bottom;
-        const maxCount = Math.max(...counts, 5);
-        const xStep = plotW / Math.max(counts.length - 1, 1);
-        const yScale = plotH / maxCount;
-
-        /* Grid lines */
-        ctx.strokeStyle = '#f0f0f0';
-        ctx.lineWidth = 1;
-        for (let i = 1; i <= 5; i++) {
-            const y = pad.top + plotH - (i / 5) * plotH;
+            // Axes
+            ctx.strokeStyle = '#d1d5db';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.moveTo(pad.left, y);
-            ctx.lineTo(pad.left + plotW, y);
+            ctx.moveTo(pad.left, pad.top);
+            ctx.lineTo(pad.left, pad.top + plotH);
+            ctx.lineTo(pad.left + plotW, pad.top + plotH);
             ctx.stroke();
-        }
 
-        /* Y-axis labels */
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '11px sans-serif';
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        for (let i = 0; i <= 5; i++) {
-            const val = Math.round((i / 5) * maxCount);
-            const y = pad.top + plotH - (i / 5) * plotH;
-            ctx.fillText(val, pad.left - 8, y);
-        }
-
-        /* Axes */
-        ctx.strokeStyle = '#d1d5db';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(pad.left, pad.top);
-        ctx.lineTo(pad.left, pad.top + plotH);
-        ctx.lineTo(pad.left + plotW, pad.top + plotH);
-        ctx.stroke();
-
-        /* Gradient fill */
-        const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
-        grad.addColorStop(0, 'rgba(102,126,234,0.25)');
-        grad.addColorStop(1, 'rgba(102,126,234,0.02)');
-
-        ctx.beginPath();
-        counts.forEach((c, i) => {
-            const x = pad.left + i * xStep;
-            const y = pad.top + plotH - c * yScale;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        });
-        ctx.lineTo(pad.left + (counts.length - 1) * xStep, pad.top + plotH);
-        ctx.lineTo(pad.left, pad.top + plotH);
-        ctx.closePath();
-        ctx.fillStyle = grad;
-        ctx.fill();
-
-        /* Line */
-        ctx.beginPath();
-        ctx.strokeStyle = '#667eea';
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
-        counts.forEach((c, i) => {
-            const x = pad.left + i * xStep;
-            const y = pad.top + plotH - c * yScale;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        /* Points */
-        counts.forEach((c, i) => {
-            const x = pad.left + i * xStep;
-            const y = pad.top + plotH - c * yScale;
-
+            // Fill
+            const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
+            grad.addColorStop(0, 'rgba(102,126,234,0.25)');
+            grad.addColorStop(1, 'rgba(102,126,234,0.02)');
             ctx.beginPath();
-            ctx.arc(x, y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = '#667eea';
-            ctx.lineWidth = 2;
+            counts.forEach((c, i) => {
+                const x = pad.left + i * xStep, y = pad.top + plotH - c * yScale;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.lineTo(pad.left + (counts.length - 1) * xStep, pad.top + plotH);
+            ctx.lineTo(pad.left, pad.top + plotH);
+            ctx.closePath();
+            ctx.fillStyle = grad;
             ctx.fill();
+
+            // Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#667eea';
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            counts.forEach((c, i) => {
+                const x = pad.left + i * xStep, y = pad.top + plotH - c * yScale;
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
             ctx.stroke();
 
-            /* Value label */
-            if (c > 0) {
-                ctx.fillStyle = '#374151';
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText(c, x, y - 6);
+            // Points + labels
+            counts.forEach((c, i) => {
+                const x = pad.left + i * xStep, y = pad.top + plotH - c * yScale;
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 2;
+                ctx.fill();
+                ctx.stroke();
+                if (c > 0) {
+                    ctx.fillStyle = '#374151';
+                    ctx.font = '11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(c, x, y - 6);
+                }
+            });
+
+            // X labels
+            const step = Math.max(1, Math.ceil(labels.length / 8));
+            ctx.fillStyle = '#6b7280';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            labels.forEach((label, i) => {
+                if (i % step === 0 || i === labels.length - 1) {
+                    const x = pad.left + i * xStep;
+                    ctx.fillText(new Date(label).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}),
+                        x, pad.top + plotH + 10);
+                }
+            });
+        }
+    }
+
+    class ActivityDashboard {
+        constructor() {
+            this.stats = new StatsSection();
+            this.badges = new BadgesShowcase();
+            this.next = new NextBadges();
+            this.feed = new ActivityFeed();
+            this.chart = new ActivityChart();
+        }
+
+        async init() {
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/activity`);
+                const {progress, recent_activities, activity_trends, member_badges, next_badges} = json.data;
+
+                this.stats.render(progress);
+                this.badges.render(member_badges);
+                this.next.render(next_badges);
+                this.feed.render(recent_activities);
+
+                requestAnimationFrame(() => {
+                    this.chart.draw(
+                        (activity_trends ?? []).map(d => d.date),
+                        (activity_trends ?? []).map(d => d.count),
+                    );
+                });
+            } catch {
+                UI.toast('Failed to load activity data. Please refresh.', 'error');
+                UI.render(document.getElementById('stats-container'), [
+                    UI.el('p', {style: {color: 'var(--danger-color)', padding: '1rem'}},
+                        ['Could not load stats.']),
+                ]);
             }
-        });
-
-        /* X-axis labels — show every nth to avoid overlap */
-        const step = Math.max(1, Math.ceil(labels.length / 8));
-        ctx.fillStyle = '#6b7280';
-        ctx.font = '11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        labels.forEach((label, i) => {
-            if (i % step === 0 || i === labels.length - 1) {
-                const x = pad.left + i * xStep;
-                const d = new Date(label);
-                ctx.fillText(d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'}), x, pad.top + plotH + 10);
-            }
-        });
+        }
     }
 
-    /* ─── Helpers ────────────────────────────────────────── */
-    function diffForHumans(dateString) {
-        if (!dateString) return '';
-        const now = new Date();
-        const past = new Date((dateString.date || dateString).replace(' ', 'T'));
-        const diff = Math.floor((now - past) / 1000);
-        if (diff < 60) return 'Just now';
-        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-        if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-        return past.toLocaleDateString('en-US', {month: 'short', day: 'numeric'});
-    }
+    document.addEventListener('DOMContentLoaded', () => new ActivityDashboard().init());
 
-    function esc(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    /* ─── Boot ───────────────────────────────────────────── */
-    document.addEventListener('DOMContentLoaded', initDashboard);
 </script>
 </body>
 </html>

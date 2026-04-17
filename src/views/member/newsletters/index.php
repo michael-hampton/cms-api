@@ -1000,660 +1000,508 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-    /* ─── Config ─────────────────────────────────────────── */
-    const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
-    const SITE_ID = <?= \App\Framework\Support\SiteContext::getId() ?>;
-    const STRIPE_KEY = '<?= htmlspecialchars($_ENV['STRIPE_PUBLIC_KEY'] ?? '') ?>';
 
-    /* ─── State ──────────────────────────────────────────── */
-    let newslettersWithAccess = [];
-    let availableNewsletters = [];
-    let subscriptions = [];       // [{id, newsletter_id}]
-    let selectedNewsletters = new Set();
-
-    let stripe = null;
-    let elements = null;
-    let cardElement = null;
-    let upgradeStep = 'plans';
-    let selectedNewsletterId = null;
-    let selectedPlanId = null;
-    let selectedPlanPrice = null;
-    let selectedPlanCurrency = null;
-
-    /* ─── Toast ──────────────────────────────────────────── */
-    function showToast(message, type = 'info', duration = 5000) {
-        const icons = {success: '✓', error: '✕', info: 'ℹ'};
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span>${icons[type] || 'ℹ'}</span>
-            <span style="flex:1;">${esc(message)}</span>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            if (!toast.parentElement) return;
-            toast.style.animation = 'toastOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
-
-    /* ─── Boot ───────────────────────────────────────────── */
-    async function loadNewsletters() {
-        try {
-            const res = await fetch(`/api/${SITE}/member/newsletters`);
-            if (!res.ok) throw new Error('Server error ' + res.status);
-            const json = await res.json();
-            if (!json.success) throw new Error(json.message || 'Failed to load');
-
-            newslettersWithAccess = json.data.newsletters_with_access;
-            availableNewsletters = json.data.available_newsletters;
-            subscriptions = json.data.subscriptions;
-
-            renderGrid();
-            populateModal();
-            document.getElementById('subscribeBtn').disabled = false;
-
-        } catch (e) {
-            console.error(e);
-            showToast('Failed to load newsletters. Please refresh.', 'error');
-            document.getElementById('newsletters-grid').innerHTML = `
-                <div class="empty-state" style="grid-column:1/-1;">
-                    <div class="empty-state-icon">⚠️</div>
-                    <h3>Failed to Load</h3>
-                    <p>Please try refreshing the page.</p>
-                    <button class="btn btn-primary" style="margin-top:1.5rem;" onclick="loadNewsletters()">Retry</button>
-                </div>`;
-        }
-    }
-
-    /* ─── Render main grid ───────────────────────────────── */
-    function renderGrid() {
-        const grid = document.getElementById('newsletters-grid');
-
-        if (!newslettersWithAccess.length) {
-            grid.innerHTML = `
-                <div class="empty-state" style="grid-column:1/-1;">
-                    <div class="empty-state-icon">📧</div>
-                    <h3>No Newsletters Available</h3>
-                    <p>Check back later for newsletter options.</p>
-                </div>`;
-            return;
+    class NewsletterGrid {
+        constructor(manager) {
+            this.mgr = manager;
         }
 
-        grid.innerHTML = newslettersWithAccess.map(item => {
+        render(newsletters) {
+            const grid = document.getElementById('newsletters-grid');
+            if (!newsletters.length) {
+                UI.render(grid, [UI.emptyState({icon: '📧', title: 'No Newsletters Available'})]);
+                return;
+            }
+            UI.render(grid, newsletters.map(item => this._card(item)));
+        }
+
+        _card(item) {
             const isLocked = !item.has_access;
             const isSubscribed = item.is_subscribed;
 
-            const statusBadge = isLocked
-                ? `<span class="status-badge locked">Requires Upgrade</span>`
-                : `<span class="status-badge ${isSubscribed ? 'subscribed' : 'unsubscribed'}">
-                       ${isSubscribed ? '✓ Subscribed' : 'Not Subscribed'}
-                   </span>`;
+            const statusBadge = UI.el('span', {
+                className: `status-badge ${isLocked ? 'locked' : isSubscribed ? 'subscribed' : 'unsubscribed'}`,
+            }, [isLocked ? 'Requires Upgrade' : isSubscribed ? '✓ Subscribed' : 'Not Subscribed']);
 
-            const topRight = isLocked
-                ? `<div class="lock-badge">🔒 Locked</div>`
-                : (!isSubscribed
-                    ? `<input type="checkbox" class="newsletter-checkbox"
-                          data-newsletter-id="${item.id}" onchange="updateSelection()">`
-                    : '');
+            let topRight = null;
+            if (isLocked) {
+                topRight = UI.el('div', {className: 'lock-badge'}, ['🔒 Locked']);
+            } else if (!isSubscribed) {
+                const cb = UI.el('input', {
+                    type: 'checkbox', className: 'newsletter-checkbox',
+                    'data-newsletter-id': item.id
+                });
+                cb.addEventListener('change', () => this.mgr.updateSelection());
+                topRight = cb;
+            }
+
+            let actionBtn;
+            if (isLocked) {
+                actionBtn = UI.el('button', {className: 'btn btn-warning btn-sm btn-full'}, ['🔓 Upgrade to Access']);
+                actionBtn.addEventListener('click', () =>
+                    this.mgr.upgradeModal.show(item.access_reason, item.id, item.title));
+            } else if (isSubscribed) {
+                actionBtn = UI.el('button', {className: 'btn btn-danger btn-sm btn-full'}, ['Unsubscribe']);
+                actionBtn.addEventListener('click', () => this.mgr.quickUnsubscribe(item.id));
+            } else {
+                actionBtn = UI.el('button', {className: 'btn btn-primary btn-sm btn-full'}, ['Subscribe']);
+                actionBtn.addEventListener('click', () => this.mgr.quickSubscribe(item.id));
+            }
 
             const accessMsg = (isLocked && item.access_message)
-                ? `<div class="access-message"><p>${esc(item.access_message)}</p></div>`
-                : '';
+                ? UI.el('div', {className: 'access-message'}, [
+                    UI.el('p', {}, [item.access_message])])
+                : null;
 
-            const actionBtn = isLocked
-                ? `<button onclick="showUpgradeModal('${esc(item.access_reason)}', ${item.id}, '${esc(item.title)}')"
-                          class="btn btn-warning btn-sm btn-full">🔓 Upgrade to Access</button>`
-                : isSubscribed
-                    ? `<button onclick="quickUnsubscribe(${item.id})"
-                              class="btn btn-danger btn-sm btn-full">Unsubscribe</button>`
-                    : `<button onclick="quickSubscribe(${item.id})"
-                              class="btn btn-primary btn-sm btn-full">Subscribe</button>`;
-
-            return `
-            <div class="newsletter-card ${isSubscribed ? 'subscribed' : ''} ${isLocked ? 'locked' : ''}"
-                 data-newsletter-id="${item.id}">
-                ${topRight}
-                <div class="newsletter-header">
-                    <div class="newsletter-icon">📧</div>
-                    <div>${statusBadge}</div>
-                </div>
-                <div class="newsletter-content">
-                    <h3 class="newsletter-title">${esc(item.title)}</h3>
-                    ${item.content ? `<p class="newsletter-description">${esc(item.content)}</p>` : ''}
-                    ${accessMsg}
-                    <div class="newsletter-meta">
-                        <div class="meta-item">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                            </svg>
-                            ${esc(ucFirst(item.interval))}
-                        </div>
-                        ${item.active ? `<div class="meta-item">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12"/>
-                            </svg> Active</div>` : ''}
-                    </div>
-                </div>
-                ${actionBtn}
-            </div>`;
-        }).join('');
-    }
-
-    /* ─── Populate subscribe modal ───────────────────────── */
-    function populateModal() {
-        const list = document.getElementById('modalNewsletterList');
-        if (!availableNewsletters.length) {
-            list.innerHTML = '<p style="text-align:center;color:var(--text-secondary);">No newsletters available.</p>';
-            return;
+            return UI.el('div', {
+                className: `newsletter-card${isSubscribed ? ' subscribed' : ''}${isLocked ? ' locked' : ''}`,
+                'data-newsletter-id': item.id,
+            }, [
+                topRight,
+                UI.el('div', {className: 'newsletter-header'}, [
+                    UI.el('div', {className: 'newsletter-icon'}, ['📧']),
+                    UI.el('div', {}, [statusBadge]),
+                ]),
+                UI.el('div', {className: 'newsletter-content'}, [
+                    UI.el('h3', {className: 'newsletter-title'}, [item.title]),
+                    item.content ? UI.el('p', {className: 'newsletter-description'}, [item.content]) : null,
+                    accessMsg,
+                    UI.el('div', {className: 'newsletter-meta'}, [
+                        UI.el('div', {className: 'meta-item'}, [
+                            `${item.interval.charAt(0).toUpperCase() + item.interval.slice(1)}`]),
+                        item.active ? UI.el('div', {className: 'meta-item'}, ['✓ Active']) : null,
+                    ]),
+                ]),
+                actionBtn,
+            ]);
         }
-        list.innerHTML = availableNewsletters.map(n => {
-            const subbed = n.is_subscribed;
-            return `
-            <div class="modal-newsletter-item ${subbed ? 'already-subscribed' : ''}"
-                 data-newsletter-id="${n.id}"
-                 onclick="${!subbed ? 'toggleModalItem(this)' : ''}">
-                <input type="checkbox" class="modal-item-checkbox"
-                    data-newsletter-id="${n.id}"
-                    ${subbed ? 'disabled checked' : ''}
-                    onclick="event.stopPropagation()">
-                <div style="flex:1;">
-                    <div class="modal-item-title">
-                        ${esc(n.title)}
-                        ${subbed ? '<span class="already-label"> (Already subscribed)</span>' : ''}
-                    </div>
-                    <div class="modal-item-desc">
-                        ${esc(n.content || 'Stay updated with our latest content')}
-                        <br><strong>Frequency:</strong> ${esc(ucFirst(n.interval))}
-                    </div>
-                </div>
-            </div>`;
-        }).join('');
     }
 
-    /* ─── Selection helpers ──────────────────────────────── */
-    function updateSelection() {
-        selectedNewsletters.clear();
-        document.querySelectorAll('.newsletter-checkbox:checked').forEach(cb => {
-            selectedNewsletters.add(parseInt(cb.dataset.newsletterId));
-        });
-        const bar = document.getElementById('floatingActionBar');
-        document.getElementById('selectedCount').textContent = selectedNewsletters.size;
-        bar.classList.toggle('show', selectedNewsletters.size > 0);
-    }
+    class NewsletterManager {
+        constructor() {
+            this.newslettersWithAccess = [];
+            this.availableNewsletters = [];
+            this.subscriptions = [];
+            this.selected = new Set();
+            this.grid = new NewsletterGrid(this);
+            // UpgradeModal wired separately (Stripe dependency kept as-is)
+            this.upgradeModal = new UpgradeModal(this);
+        }
 
-    function clearSelection() {
-        document.querySelectorAll('.newsletter-checkbox').forEach(cb => cb.checked = false);
-        updateSelection();
-    }
-
-    /* ─── Subscribe / unsubscribe ────────────────────────── */
-    async function quickSubscribe(newsletterId) {
-        try {
-            const res = await fetch(`/api/${SITE}/member/newsletter/signup`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({newsletter_id: newsletterId})
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast('Successfully subscribed!', 'success');
-                setTimeout(loadNewsletters, 900);
-            } else {
-                showToast(data.message || 'Failed to subscribe.', 'error');
+        async load() {
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/newsletters`);
+                this.newslettersWithAccess = json.data.newsletters_with_access;
+                this.availableNewsletters = json.data.available_newsletters;
+                this.subscriptions = json.data.subscriptions;
+                this.grid.render(this.newslettersWithAccess);
+                this._populateModal();
+                document.getElementById('subscribeBtn').disabled = false;
+            } catch {
+                UI.toast('Failed to load newsletters. Please refresh.', 'error');
             }
-        } catch {
-            showToast('Failed to subscribe.', 'error');
-        }
-    }
-
-    async function quickUnsubscribe(newsletterId) {
-        if (!confirm('Are you sure you want to unsubscribe from this newsletter?')) return;
-
-        const sub = subscriptions.find(s => s.newsletter_id === newsletterId);
-        if (!sub) {
-            showToast('Subscription not found.', 'error');
-            return;
         }
 
-        try {
-            const res = await fetch(`/api/${SITE}/member/newsletters/unsubscribe`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({subscriber_id: sub.id})
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast('Successfully unsubscribed.', 'success');
-                setTimeout(loadNewsletters, 900);
-            } else {
-                showToast(data.message || 'Failed to unsubscribe.', 'error');
-            }
-        } catch {
-            showToast('Failed to unsubscribe.', 'error');
-        }
-    }
-
-    async function subscribeSelected() {
-        if (!selectedNewsletters.size) {
-            showToast('Please select at least one newsletter.', 'error');
-            return;
-        }
-        await bulkSubscribe(Array.from(selectedNewsletters));
-        clearSelection();
-    }
-
-    async function subscribeModalSelected() {
-        const ids = Array.from(document.querySelectorAll('.modal-item-checkbox:checked:not([disabled])'))
-            .map(cb => parseInt(cb.dataset.newsletterId));
-        if (!ids.length) {
-            showToast('Please select at least one newsletter.', 'error');
-            return;
-        }
-        await bulkSubscribe(ids);
-        closeNewsletterModal();
-    }
-
-    async function bulkSubscribe(ids) {
-        try {
-            const res = await fetch(`/api/${SITE}/member/newsletters/bulk-subscribe`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({newsletter_ids: ids})
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast(`Successfully subscribed to ${ids.length} newsletter(s).`, 'success');
-                setTimeout(loadNewsletters, 900);
-            } else {
-                showToast(data.message || 'Failed to subscribe.', 'error');
-            }
-        } catch {
-            showToast('Failed to subscribe.', 'error');
-        }
-    }
-
-    /* ─── Subscribe modal ────────────────────────────────── */
-    function openNewsletterModal() {
-        document.getElementById('newsletterModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeNewsletterModal() {
-        document.getElementById('newsletterModal').classList.remove('show');
-        document.body.style.overflow = '';
-        document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
-            cb.checked = false;
-            cb.closest('.modal-newsletter-item')?.classList.remove('selected');
-        });
-        document.getElementById('selectAllCheckbox').checked = false;
-    }
-
-    function toggleModalItem(item) {
-        const cb = item.querySelector('.modal-item-checkbox');
-        if (!cb.disabled) {
-            cb.checked = !cb.checked;
-            item.classList.toggle('selected', cb.checked);
-        }
-    }
-
-    function selectAllNewsletters(checked) {
-        document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
-            cb.checked = checked;
-            cb.closest('.modal-newsletter-item')?.classList.toggle('selected', checked);
-        });
-    }
-
-    /* ─── Upgrade modal ──────────────────────────────────── */
-    function showUpgradeModal(reason, newsletterId, newsletterTitle) {
-        selectedNewsletterId = newsletterId;
-        upgradeStep = 'plans';
-        initializeStripe();
-        document.getElementById('upgradeNewsletterTitle').textContent = newsletterTitle;
-        renderUpgradeStep('plans');
-        loadUpgradePlans(newsletterId);
-        document.getElementById('upgradeModal').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeUpgradeModal() {
-        document.getElementById('upgradeModal').classList.remove('show');
-        document.body.style.overflow = '';
-        if (cardElement) {
-            cardElement.destroy();
-            cardElement = null;
-        }
-        selectedPlanId = selectedPlanPrice = selectedPlanCurrency = null;
-        upgradeStep = 'plans';
-    }
-
-    function renderUpgradeStep(step) {
-        upgradeStep = step;
-        const body = document.getElementById('upgradeModalBody');
-
-        if (step === 'plans') {
-            body.innerHTML = `
-                <h3 style="margin-bottom:1rem;font-size:1.125rem;">Choose Your Subscription Plan</h3>
-                <div id="upgradePlansList" class="plans-grid">
-                    <div style="text-align:center;padding:2rem;color:var(--text-secondary);">Loading plans…</div>
-                </div>
-                <div style="display:flex;justify-content:flex-end;margin-top:1.5rem;">
-                    <button class="btn btn-secondary" onclick="closeUpgradeModal()">Cancel</button>
-                </div>`;
-
-        } else if (step === 'payment') {
-            body.innerHTML = `
-                <div class="selected-plan-summary" id="selectedPlanSummary"></div>
-                <div class="form-group">
-                    <label>Payment Method</label>
-                    <select id="paymentMethod" class="form-control" onchange="handlePaymentMethodChange()">
-                        <option value="">Select payment method</option>
-                        <option value="stripe">Credit / Debit Card (Stripe)</option>
-                        <option value="paypal">PayPal</option>
-                    </select>
-                </div>
-                <div id="stripeCardContainer" style="display:none;" class="form-group">
-                    <label>Card Details</label>
-                    <div id="card-element" class="stripe-card-element"></div>
-                    <span id="card-errors" class="card-error-text"></span>
-                </div>
-                <div class="form-group">
-                    <label>Voucher Code <span style="font-weight:400;color:var(--text-secondary);">(Optional)</span></label>
-                    <div class="voucher-row">
-                        <input type="text" id="voucherCode" class="form-control" placeholder="Enter voucher code">
-                        <button type="button" class="btn btn-secondary" onclick="applyVoucher()">Apply</button>
-                    </div>
-                    <div id="voucherMessage" style="display:none;" class="voucher-message"></div>
-                </div>
-                <div id="paymentError" style="display:none;" class="payment-error-box"></div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" onclick="renderUpgradeStep('plans');loadUpgradePlans(selectedNewsletterId);">← Back</button>
-                    <button type="button" class="btn btn-primary" id="submitPaymentBtn" onclick="handlePaymentSubmit()">
-                        <span id="btnText">Complete Subscription</span>
-                        <span id="btnSpinner" class="button-spinner" style="display:none;"></span>
-                    </button>
-                </div>`;
-
-        } else if (step === 'processing') {
-            body.innerHTML = `
-                <div class="state-container">
-                    <div class="spinner"></div>
-                    <p style="color:var(--text-secondary);">Processing your subscription…</p>
-                </div>`;
-
-        } else if (step === 'success') {
-            body.innerHTML = `
-                <div class="state-container">
-                    <div class="success-icon">✓</div>
-                    <h3 style="color:var(--success-color);margin-bottom:0.75rem;">Subscription Successful!</h3>
-                    <p style="color:var(--text-secondary);margin-bottom:1.5rem;">You now have access to this newsletter.</p>
-                    <button class="btn btn-primary" onclick="closeUpgradeModal();loadNewsletters();">Continue</button>
-                </div>`;
-        }
-    }
-
-    async function loadUpgradePlans(newsletterId) {
-        const list = document.getElementById('upgradePlansList');
-        if (!list) return;
-
-        try {
-            const res = await fetch(`/api/${SITE}/member/newsletters/upgrade-options`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({newsletter_id: newsletterId, site_id: SITE_ID})
-            });
-            const data = await res.json();
-
-            if (!data.success) {
-                list.innerHTML = `<div style="color:var(--danger-color);padding:1rem;">${esc(data.message)}</div>`;
+        _populateModal() {
+            const list = document.getElementById('modalNewsletterList');
+            if (!this.availableNewsletters.length) {
+                UI.render(list, [UI.el('p', {
+                    style: {textAlign: 'center', color: 'var(--text-secondary)'},
+                }, ['No newsletters available.'])]);
                 return;
             }
+            UI.render(list, this.availableNewsletters.map(n => {
+                const subbed = n.is_subscribed;
+                const cb = UI.el('input', {
+                    type: 'checkbox', className: 'modal-item-checkbox',
+                    'data-newsletter-id': n.id,
+                    ...(subbed ? {disabled: true, checked: true} : {}),
+                });
+                const item = UI.el('div', {
+                    className: `modal-newsletter-item${subbed ? ' already-subscribed' : ''}`,
+                    'data-newsletter-id': n.id,
+                }, [
+                    cb,
+                    UI.el('div', {style: {flex: '1'}}, [
+                        UI.el('div', {className: 'modal-item-title'}, [
+                            n.title,
+                            subbed ? UI.el('span', {className: 'already-label'}, [' (Already subscribed)']) : null,
+                        ]),
+                        UI.el('div', {className: 'modal-item-desc'}, [
+                            n.content || 'Stay updated with our latest content',
+                            UI.el('br'),
+                            UI.el('strong', {}, ['Frequency: ']),
+                            n.interval.charAt(0).toUpperCase() + n.interval.slice(1),
+                        ]),
+                    ]),
+                ]);
+                if (!subbed) item.addEventListener('click', () => {
+                    cb.checked = !cb.checked;
+                    item.classList.toggle('selected', cb.checked);
+                });
+                return item;
+            }));
+        }
 
-            const plans = data.data?.plans ?? data.plans ?? [];
-            if (!plans.length) {
-                list.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;">No subscription plans available.</div>';
+        updateSelection() {
+            this.selected.clear();
+            document.querySelectorAll('.newsletter-checkbox:checked').forEach(cb =>
+                this.selected.add(parseInt(cb.dataset.newsletterId)));
+            const bar = document.getElementById('floatingActionBar');
+            document.getElementById('selectedCount').textContent = this.selected.size;
+            bar.classList.toggle('show', this.selected.size > 0);
+        }
+
+        async quickSubscribe(id) {
+            try {
+                await api(`/api/${SITE_SLUG}/member/newsletter/signup`, {
+                    method: 'POST', body: JSON.stringify({newsletter_id: id}),
+                });
+                UI.toast('Successfully subscribed!', 'success');
+                setTimeout(() => this.load(), 900);
+            } catch (e) {
+                UI.toast(e.message || 'Failed to subscribe.', 'error');
+            }
+        }
+
+        async quickUnsubscribe(id) {
+            if (!confirm('Unsubscribe from this newsletter?')) return;
+            const sub = this.subscriptions.find(s => s.newsletter_id === id);
+            if (!sub) {
+                UI.toast('Subscription not found.', 'error');
                 return;
             }
-
-            list.innerHTML = plans.map(plan => `
-                <div class="plan-card ${plan.is_featured ? 'featured' : ''}">
-                    ${plan.is_featured ? '<div class="plan-badge">Most Popular</div>' : ''}
-                    <div class="plan-name">${esc(plan.name)}</div>
-                    <div class="plan-price">
-                        <span class="price">${esc(plan.currency)} ${plan.price}</span>
-                        <span class="period">/ ${esc(plan.billing_period)}</span>
-                    </div>
-                    <div class="plan-description">${esc(plan.description || '')}</div>
-                    ${plan.features?.length ? `
-                        <ul class="plan-features">
-                            ${plan.features.map(f => `<li>${esc(f)}</li>`).join('')}
-                        </ul>` : ''}
-                    <button class="btn btn-primary btn-full"
-                        onclick="selectPlan(${plan.id},'${esc(plan.name)}',${plan.price},'${esc(plan.currency)}','${esc(plan.billing_period)}')">
-                        Select Plan
-                    </button>
-                </div>`).join('');
-
-        } catch {
-            if (list) list.innerHTML = '<div style="color:var(--danger-color);padding:1rem;">Failed to load plans.</div>';
-        }
-    }
-
-    function selectPlan(planId, planName, price, currency, billingPeriod) {
-        selectedPlanId = planId;
-        selectedPlanPrice = price;
-        selectedPlanCurrency = currency;
-        renderUpgradeStep('payment');
-        document.getElementById('selectedPlanSummary').innerHTML = `
-            <h4>${esc(planName)}</h4>
-            <div class="selected-plan-price" id="finalPriceDisplay">
-                ${esc(currency)} ${price} <span style="font-size:1rem;font-weight:400;color:var(--text-secondary);">/ ${esc(billingPeriod)}</span>
-            </div>`;
-    }
-
-    function handlePaymentMethodChange() {
-        const method = document.getElementById('paymentMethod').value;
-        const container = document.getElementById('stripeCardContainer');
-        if (method === 'stripe') {
-            container.style.display = 'block';
-            setupStripeElements();
-        } else {
-            container.style.display = 'none';
-            if (cardElement) {
-                cardElement.destroy();
-                cardElement = null;
+            try {
+                await api(`/api/${SITE_SLUG}/member/newsletters/unsubscribe`, {
+                    method: 'POST', body: JSON.stringify({subscriber_id: sub.id}),
+                });
+                UI.toast('Successfully unsubscribed.', 'success');
+                setTimeout(() => this.load(), 900);
+            } catch (e) {
+                UI.toast(e.message || 'Failed to unsubscribe.', 'error');
             }
         }
-    }
 
-    function initializeStripe() {
-        if (stripe || typeof Stripe === 'undefined' || !STRIPE_KEY) return;
-        try {
-            stripe = Stripe(STRIPE_KEY);
-            elements = stripe.elements();
-        } catch {
+        async bulkSubscribe(ids) {
+            try {
+                await api(`/api/${SITE_SLUG}/member/newsletters/bulk-subscribe`, {
+                    method: 'POST', body: JSON.stringify({newsletter_ids: ids}),
+                });
+                UI.toast(`Subscribed to ${ids.length} newsletter(s).`, 'success');
+                setTimeout(() => this.load(), 900);
+            } catch (e) {
+                UI.toast(e.message || 'Failed to subscribe.', 'error');
+            }
+        }
+
+        subscribeSelected() {
+            if (!this.selected.size) {
+                UI.toast('Select at least one newsletter.', 'error');
+                return;
+            }
+            this.bulkSubscribe(Array.from(this.selected));
+            this.selected.clear();
+            document.querySelectorAll('.newsletter-checkbox').forEach(cb => cb.checked = false);
+            this.updateSelection();
+        }
+
+        subscribeModalSelected() {
+            const ids = Array.from(document.querySelectorAll('.modal-item-checkbox:checked:not([disabled])'))
+                .map(cb => parseInt(cb.dataset.newsletterId));
+            if (!ids.length) {
+                UI.toast('Select at least one newsletter.', 'error');
+                return;
+            }
+            this.bulkSubscribe(ids);
+            this._closeModal();
+        }
+
+        openModal() {
+            document.getElementById('newsletterModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        _closeModal() {
+            document.getElementById('newsletterModal').classList.remove('show');
+            document.body.style.overflow = '';
+            document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.modal-newsletter-item')?.classList.remove('selected');
+            });
+            document.getElementById('selectAllCheckbox').checked = false;
+        }
+
+        selectAll(checked) {
+            document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
+                cb.checked = checked;
+                cb.closest('.modal-newsletter-item')?.classList.toggle('selected', checked);
+            });
         }
     }
 
-    function setupStripeElements() {
-        if (!initializeStripe() && !stripe) {
-            showPaymentError('Failed to initialise payment system. Please refresh.');
-            return;
+    // UpgradeModal: keeps Stripe logic intact, replaces innerHTML blobs with UI.el
+    class UpgradeModal {
+        constructor(mgr) {
+            this.mgr = mgr;
+            this.newsletterId = null;
+            this.planId = null;
+            this.planPrice = null;
+            this.planCurrency = null;
+            this.stripe = null;
+            this.elements = null;
+            this.cardEl = null;
         }
-        if (cardElement) return;
-        try {
-            cardElement = elements.create('card', {
-                style: {
-                    base: {
-                        fontSize: '16px',
-                        color: '#32325d',
-                        fontFamily: '-apple-system,sans-serif',
-                        '::placeholder': {color: '#aab7c4'}
-                    },
-                    invalid: {color: '#ef4444', iconColor: '#ef4444'}
-                },
-                hidePostalCode: true,
-            });
-            cardElement.mount('#card-element');
-            cardElement.on('change', e => {
-                document.getElementById('card-errors').textContent = e.error?.message ?? '';
-            });
-        } catch {
-            showPaymentError('Failed to load payment form. Please refresh.');
-        }
-    }
 
-    async function applyVoucher() {
-        const code = document.getElementById('voucherCode').value.trim();
-        const msg = document.getElementById('voucherMessage');
-        if (!code) return;
-        try {
-            const res = await fetch('/api/vouchers/validate', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({voucher_code: code, plan_id: selectedPlanId})
+        show(reason, newsletterId, title) {
+            this.newsletterId = newsletterId;
+            this._initStripe();
+            UI.text(document.getElementById('upgradeNewsletterTitle'), title);
+            this._renderPlansStep();
+            this._loadPlans();
+            document.getElementById('upgradeModal').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        close() {
+            document.getElementById('upgradeModal').classList.remove('show');
+            document.body.style.overflow = '';
+            this.cardEl?.destroy();
+            this.cardEl = null;
+            this.planId = this.planPrice = this.planCurrency = null;
+        }
+
+        _initStripe() {
+            if (this.stripe || typeof Stripe === 'undefined' || !STRIPE_KEY) return;
+            try {
+                this.stripe = Stripe(STRIPE_KEY);
+                this.elements = this.stripe.elements();
+            } catch {
+            }
+        }
+
+        _renderPlansStep() {
+            const body = document.getElementById('upgradeModalBody');
+            const list = UI.el('div', {id: 'upgradePlansList', className: 'plans-grid'}, [
+                UI.el('div', {style: {textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)'}},
+                    ['Loading plans…']),
+            ]);
+            const cancelBtn = UI.el('button', {className: 'btn btn-secondary'}, ['Cancel']);
+            cancelBtn.addEventListener('click', () => this.close());
+            UI.render(body, [
+                UI.el('h3', {style: {marginBottom: '1rem', fontSize: '1.125rem'}}, ['Choose Your Subscription Plan']),
+                list,
+                UI.el('div', {style: {display: 'flex', justifyContent: 'flex-end', marginTop: '1.5rem'}}, [cancelBtn]),
+            ]);
+        }
+
+        async _loadPlans() {
+            const list = document.getElementById('upgradePlansList');
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/newsletters/upgrade-options`, {
+                    method: 'POST',
+                    body: JSON.stringify({newsletter_id: this.newsletterId, site_id: SITE_ID}),
+                });
+                const plans = json.data?.plans ?? json.plans ?? [];
+                if (!plans.length) {
+                    UI.render(list, [UI.el('div', {style: {color: 'var(--text-secondary)', padding: '1rem'}},
+                        ['No subscription plans available.'])]);
+                    return;
+                }
+                UI.render(list, plans.map(plan => {
+                    const btn = UI.el('button', {className: 'btn btn-primary btn-full'}, ['Select Plan']);
+                    btn.addEventListener('click', () =>
+                        this._selectPlan(plan.id, plan.name, plan.price, plan.currency, plan.billing_period));
+                    return UI.el('div', {className: `plan-card${plan.is_featured ? ' featured' : ''}`}, [
+                        plan.is_featured ? UI.el('div', {className: 'plan-badge'}, ['Most Popular']) : null,
+                        UI.el('div', {className: 'plan-name'}, [plan.name]),
+                        UI.el('div', {className: 'plan-price'}, [
+                            UI.el('span', {className: 'price'}, [`${plan.currency} ${plan.price}`]),
+                            UI.el('span', {className: 'period'}, [` / ${plan.billing_period}`]),
+                        ]),
+                        UI.el('div', {className: 'plan-description'}, [plan.description ?? '']),
+                        btn,
+                    ]);
+                }));
+            } catch {
+                UI.render(list, [UI.el('div', {style: {color: 'var(--danger-color)', padding: '1rem'}},
+                    ['Failed to load plans.'])]);
+            }
+        }
+
+        _selectPlan(id, name, price, currency, period) {
+            this.planId = id;
+            this.planPrice = price;
+            this.planCurrency = currency;
+            // Payment step rendered into upgradeModalBody — kept concise
+            const body = document.getElementById('upgradeModalBody');
+            const summary = UI.el('div', {className: 'selected-plan-summary'}, [
+                UI.el('h4', {}, [name]),
+                UI.el('div', {id: 'finalPriceDisplay', className: 'selected-plan-price'}, [
+                    `${currency} ${price}`,
+                    UI.el('span', {style: {fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)'}},
+                        [` / ${period}`]),
+                ]),
+            ]);
+
+            const methodSelect = UI.el('select', {id: 'paymentMethod', className: 'form-control'}, [
+                UI.el('option', {value: ''}, ['Select payment method']),
+                UI.el('option', {value: 'stripe'}, ['Credit / Debit Card (Stripe)']),
+                UI.el('option', {value: 'paypal'}, ['PayPal']),
+            ]);
+            methodSelect.addEventListener('change', () => this._onMethodChange());
+
+            const cardContainer = UI.el('div', {id: 'stripeCardContainer', style: {display: 'none'}}, [
+                UI.el('label', {}, ['Card Details']),
+                UI.el('div', {id: 'card-element', className: 'stripe-card-element'}),
+                UI.el('span', {id: 'card-errors', className: 'card-error-text'}),
+            ]);
+
+            const backBtn = UI.el('button', {className: 'btn btn-secondary'}, ['← Back']);
+            backBtn.addEventListener('click', () => {
+                this._renderPlansStep();
+                this._loadPlans();
             });
-            const data = await res.json();
-            msg.style.display = 'block';
-            if (data.success && data.valid) {
-                msg.className = 'voucher-message success';
-                msg.textContent = `✓ Voucher applied! Discount: ${selectedPlanCurrency} ${data.discount}`;
-                document.getElementById('finalPriceDisplay').innerHTML =
-                    `<span style="text-decoration:line-through;color:#9ca3af;">${selectedPlanCurrency} ${selectedPlanPrice}</span>
-                     <span style="color:var(--success-color);font-weight:700;"> ${selectedPlanCurrency} ${data.final_price}</span>`;
+            const submitBtn = UI.el('button', {
+                id: 'submitPaymentBtn',
+                className: 'btn btn-primary'
+            }, ['Complete Subscription']);
+            submitBtn.addEventListener('click', () => this._handleSubmit());
+            const errBox = UI.el('div', {id: 'paymentError', className: 'payment-error-box', style: {display: 'none'}});
+
+            UI.render(body, [summary,
+                UI.el('div', {className: 'form-group'}, [UI.el('label', {}, ['Payment Method']), methodSelect]),
+                cardContainer, errBox,
+                UI.el('div', {className: 'modal-actions'}, [backBtn, submitBtn]),
+            ]);
+        }
+
+        _onMethodChange() {
+            const method = document.getElementById('paymentMethod').value;
+            const container = document.getElementById('stripeCardContainer');
+            if (method === 'stripe') {
+                container.style.display = 'block';
+                if (!this.cardEl && this.elements) {
+                    this.cardEl = this.elements.create('card', {hidePostalCode: true});
+                    this.cardEl.mount('#card-element');
+                    this.cardEl.on('change', e => {
+                        document.getElementById('card-errors').textContent = e.error?.message ?? '';
+                    });
+                }
             } else {
-                msg.className = 'voucher-message error';
-                msg.textContent = `✗ ${data.message || 'Invalid voucher code'}`;
+                container.style.display = 'none';
+                this.cardEl?.destroy();
+                this.cardEl = null;
             }
-        } catch {
-            const msg = document.getElementById('voucherMessage');
-            msg.style.display = 'block';
-            msg.className = 'voucher-message error';
-            msg.textContent = '✗ Failed to validate voucher';
         }
-    }
 
-    async function handlePaymentSubmit() {
-        const method = document.getElementById('paymentMethod').value;
-        if (!method) {
-            showPaymentError('Please select a payment method.');
-            return;
+        async _handleSubmit() {
+            const method = document.getElementById('paymentMethod').value;
+            if (!method) {
+                this._showErr('Please select a payment method.');
+                return;
+            }
+            this._setLoading(true);
+            try {
+                if (method === 'stripe') await this._stripePayment();
+                else if (method === 'paypal') await this._paypalPayment();
+            } catch (e) {
+                this._showErr(e.message || 'Payment processing failed.');
+                this._setLoading(false);
+            }
         }
-        setPaymentLoading(true);
-        try {
-            if (method === 'stripe') await handleStripePayment();
-            else if (method === 'paypal') await handlePayPalPayment();
-        } catch (e) {
-            showPaymentError(e.message || 'Payment processing failed. Please try again.');
-            setPaymentLoading(false);
-        }
-    }
 
-    async function handleStripePayment() {
-        if (!stripe || !cardElement) throw new Error('Stripe not initialised');
-        const voucher = document.getElementById('voucherCode').value.trim();
-        const res = await fetch(`/api/${SITE}/member/newsletters/process-upgrade`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                newsletter_id: selectedNewsletterId,
-                plan_id: selectedPlanId,
-                payment_method: 'stripe',
-                voucher_code: voucher || null,
-                setup_only: true
-            })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.data?.message ?? data.message);
-
-        if (data.data?.client_secret) {
-            const {error, paymentIntent} = await stripe.confirmCardPayment(data.data.client_secret, {
-                payment_method: {card: cardElement}
+        async _stripePayment() {
+            const json = await api(`/api/${SITE_SLUG}/member/newsletters/process-upgrade`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    newsletter_id: this.newsletterId, plan_id: this.planId,
+                    payment_method: 'stripe', setup_only: true
+                }),
             });
-            if (error) throw new Error(error.message);
-            if (paymentIntent.status === 'succeeded') await confirmSubscription(data.data.subscription_id);
-        } else if (data.data?.subscription_id) {
-            renderUpgradeStep('success');
-            setPaymentLoading(false);
+            if (json.data?.client_secret) {
+                const {error, paymentIntent} = await this.stripe.confirmCardPayment(
+                    json.data.client_secret, {payment_method: {card: this.cardEl}});
+                if (error) throw new Error(error.message);
+                if (paymentIntent.status === 'succeeded') await this._confirmSub(json.data.subscription_id);
+            } else if (json.data?.subscription_id) {
+                this._renderSuccess();
+                this._setLoading(false);
+            }
+        }
+
+        async _paypalPayment() {
+            const json = await api(`/api/${SITE_SLUG}/member/newsletters/process-upgrade`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    newsletter_id: this.newsletterId, plan_id: this.planId,
+                    payment_method: 'paypal'
+                }),
+            });
+            if (json.redirect_url) window.location.href = json.redirect_url;
+            else {
+                this._renderSuccess();
+                this._setLoading(false);
+            }
+        }
+
+        async _confirmSub(subId) {
+            await api(`/api/${SITE_SLUG}/member/newsletters/confirm-upgrade`, {
+                method: 'POST', body: JSON.stringify({subscription_id: subId}),
+            });
+            this._renderSuccess();
+            this._setLoading(false);
+        }
+
+        _renderSuccess() {
+            const closeBtn = UI.el('button', {className: 'btn btn-primary'}, ['Continue']);
+            closeBtn.addEventListener('click', () => {
+                this.close();
+                this.mgr.load();
+            });
+            UI.render(document.getElementById('upgradeModalBody'), [
+                UI.el('div', {className: 'state-container'}, [
+                    UI.el('div', {className: 'success-icon'}, ['✓']),
+                    UI.el('h3', {style: {color: 'var(--success-color)', marginBottom: '0.75rem'}},
+                        ['Subscription Successful!']),
+                    UI.el('p', {style: {color: 'var(--text-secondary)', marginBottom: '1.5rem'}},
+                        ['You now have access to this newsletter.']),
+                    closeBtn,
+                ]),
+            ]);
+        }
+
+        _showErr(msg) {
+            const el = document.getElementById('paymentError');
+            if (!el) return;
+            UI.text(el, msg);
+            el.style.display = 'block';
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 5000);
+        }
+
+        _setLoading(loading) {
+            const btn = document.getElementById('submitPaymentBtn');
+            if (!btn) return;
+            btn.disabled = loading;
+            UI.text(btn, loading ? 'Processing…' : 'Complete Subscription');
         }
     }
 
-    async function handlePayPalPayment() {
-        const voucher = document.getElementById('voucherCode').value.trim();
-        const res = await fetch(`/api/${SITE}/member/newsletters/process-upgrade`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                newsletter_id: selectedNewsletterId,
-                plan_id: selectedPlanId,
-                payment_method: 'paypal',
-                voucher_code: voucher || null
-            })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message);
-        if (data.redirect_url) {
-            window.location.href = data.redirect_url;
-        } else {
-            renderUpgradeStep('success');
-            setPaymentLoading(false);
-        }
-    }
-
-    async function confirmSubscription(subscriptionId) {
-        const res = await fetch(`/api/${SITE}/member/newsletters/confirm-upgrade`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({subscription_id: subscriptionId})
-        });
-        const data = await res.json();
-        if (data.success) {
-            renderUpgradeStep('success');
-        } else {
-            throw new Error(data.message || 'Failed to confirm subscription');
-        }
-        setPaymentLoading(false);
-    }
-
-    function setPaymentLoading(loading) {
-        const btn = document.getElementById('submitPaymentBtn');
-        const text = document.getElementById('btnText');
-        const spinner = document.getElementById('btnSpinner');
-        if (!btn) return;
-        btn.disabled = loading;
-        text.style.display = loading ? 'none' : 'inline';
-        spinner.style.display = loading ? 'inline-block' : 'none';
-    }
-
-    function showPaymentError(msg) {
-        const el = document.getElementById('paymentError');
-        if (!el) return;
-        el.textContent = msg;
-        el.style.display = 'block';
-        setTimeout(() => {
-            el.style.display = 'none';
-        }, 5000);
-    }
-
-    /* ─── Misc helpers ───────────────────────────────────── */
-    function handleBackdropClick(e, modalId) {
-        if (e.target === document.getElementById(modalId)) {
-            modalId === 'upgradeModal' ? closeUpgradeModal() : closeNewsletterModal();
-        }
-    }
-
-    function ucFirst(str) {
-        if (!str) return '';
-        return String(str).charAt(0).toUpperCase() + String(str).slice(1);
-    }
-
-    function esc(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', loadNewsletters);
+    document.addEventListener('DOMContentLoaded', () => {
+        const mgr = new NewsletterManager();
+        window.openNewsletterModal = () => mgr.openModal();
+        window.closeNewsletterModal = () => mgr._closeModal();
+        window.selectAllNewsletters = checked => mgr.selectAll(checked);
+        window.subscribeSelected = () => mgr.subscribeSelected();
+        window.subscribeModalSelected = () => mgr.subscribeModalSelected();
+        window.clearSelection = () => {
+            mgr.selected.clear();
+            mgr.updateSelection();
+        };
+        window.closeUpgradeModal = () => mgr.upgradeModal.close();
+        mgr.load();
+    });
 </script>
 </body>
 </html>

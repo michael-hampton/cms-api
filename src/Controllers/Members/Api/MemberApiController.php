@@ -37,7 +37,14 @@ class MemberApiController extends Controller
         return $this->resourceResponse([
             'success' => true,
             'data' => [
-                'member' => $memberWithRelations->toArray(),
+                'member' => array_merge(
+                    $memberWithRelations->toArray(),
+                    [
+                        'created_at' => optional($member->created_at)?->format('Y-m-d H:i:s'),
+                        'email_verified_at' => optional($member->email_verified_at)?->format('Y-m-d H:i:s'),
+                        'last_login_at' => optional($member->last_login_at)?->format('Y-m-d H:i:s'),
+                    ]
+                ),
                 'preferences' => $member->communication_preferences ?? [],
                 'site_slug' => SiteContext::slug()
             ]

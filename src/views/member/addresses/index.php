@@ -199,11 +199,100 @@
             color: var(--danger-color);
             font-size: 0.875rem;
         }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            border-radius: 0.75rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            pointer-events: all;
+            animation: slideIn 0.3s ease;
+            max-width: 360px;
+        }
+
+        .toast.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+
+        .toast.error {
+            background: #fef2f2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+
+        .toast.info {
+            background: #eff6ff;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .toast-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .toast-close {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: inherit;
+            opacity: 0.6;
+            font-size: 1.1rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                opacity: 1;
+                transform: translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateX(100%);
+            }
+        }
     </style>
 </head>
 <body>
 
 @include('member._header')
+
+<div class="toast-container" id="toastContainer"></div>
 
 <main class="container">
     <div class="page-header">
@@ -299,239 +388,251 @@
 </div>
 
 <script>
-    const SITE = '<?= $site->slug ?? 'default' ?>';
-    const API_BASE = '/api/' + SITE;
-    const MEMBER_ID = <?= $member->id ?>;
+    /**
+     * Address Card Component
+     * Represents a single address item in the list
+     */
+    class AddressCard {
+        constructor(address, manager) {
+            this.address = address;
+            this.manager = manager;
+        }
 
-    let editingAddressId = null;
+        render() {
+            const addr = this.address;
+            const isDefault = !!parseInt(addr.is_default);
 
-    // Load addresses as soon as the script runs
-    document.addEventListener('DOMContentLoaded', loadAddresses);
+            return UI.el('div', {
+                className: `address-card ${isDefault ? 'default' : ''}`,
+                'data-address-id': addr.id
+            }, [
+                // Header: Label and Type Badge
+                UI.el('div', {className: 'address-header'}, [
+                    UI.el('div', {}, [
+                        UI.el('div', {className: 'address-label'}, [addr.label || 'Address']),
+                        UI.el('span', {className: 'type-badge'}, [addr.type])
+                    ]),
+                    isDefault ? UI.el('span', {className: 'default-badge'}, ['Default']) : null
+                ]),
 
-    async function loadAddresses() {
-        try {
-            const response = await fetch(`${API_BASE}/member/addresses/search?member_id=${MEMBER_ID}`);
-            const data = await response.json();
+                // Body: Address Details
+                UI.el('div', {className: 'address-details'}, [
+                    UI.el('div', {}, [addr.address_line_1]),
+                    addr.address_line_2 ? UI.el('div', {}, [addr.address_line_2]) : null,
+                    UI.el('div', {}, [`${addr.city}${addr.state ? ', ' + addr.state : ''} ${addr.postcode}`]),
+                    UI.el('div', {}, [addr.country])
+                ]),
 
-            // Ensure we handle both the 'items' key and the direct 'success' check
-            if (data.success) {
-                renderAddresses(data.items || []);
-            } else {
-                showAlert(data.message || 'Failed to load addresses', 'error');
-            }
-        } catch (error) {
-            console.error('Error loading addresses:', error);
-            showAlert('Failed to load addresses', 'error');
+                // Actions: Edit, Delete, Set Default
+                UI.el('div', {className: 'address-actions'}, [
+                    !isDefault ? UI.el('button', {
+                        className: 'btn btn-secondary btn-sm',
+                        onclick: () => this.manager.setDefault(addr.id)
+                    }, ['Set as Default']) : null,
+
+                    UI.el('button', {
+                        className: 'btn btn-secondary btn-sm',
+                        onclick: () => this.manager.modal.open(addr)
+                    }, ['Edit']),
+
+                    UI.el('button', {
+                        className: 'btn btn-danger btn-sm',
+                        onclick: () => this.manager.deleteAddress(addr.id)
+                    }, ['Delete'])
+                ])
+            ]);
         }
     }
 
-    function renderAddresses(addresses) {
-        const container = document.getElementById('addresses-container');
+    /**
+     * Address Modal Component
+     * Handles the logic for the Add/Edit form
+     */
+    class AddressModal {
+        constructor(manager) {
+            this.manager = manager;
+            this.el = document.getElementById('address-modal');
+            this.form = document.getElementById('address-form');
+            this.title = document.getElementById('modal-title');
+            this.editingId = null;
 
-        if (!addresses || addresses.length === 0) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                    <h3>No Addresses Yet</h3>
-                    <p>Add your first address to speed up checkout</p>
-                    <button onclick="openAddModal()" class="btn btn-primary">Add Address</button>
-                </div>
-            `;
-            return;
+            this.form.onsubmit = (e) => this.handleSubmit(e);
         }
 
-        const gridHtml = addresses.map(address => {
-            const isDefault = address.is_default;
-            return `
-                <div class="address-card ${isDefault ? 'default' : ''}" data-address-id="${address.id}">
-                    <div class="address-header">
-                        <div>
-                            <div class="address-label">
-                                ${escapeHtml(address.label || 'Address')}
-                            </div>
-                            <span class="type-badge">${escapeHtml(address.type)}</span>
-                        </div>
-                        ${isDefault ? '<span class="default-badge">Default</span>' : ''}
-                    </div>
-
-                    <div class="address-details">
-                        ${escapeHtml(address.address_line_1)}<br>
-                        ${address.address_line_2 ? escapeHtml(address.address_line_2) + '<br>' : ''}
-                        ${escapeHtml(address.city)}${address.state ? ', ' + escapeHtml(address.state) : ''} ${escapeHtml(address.postcode)}<br>
-                        ${escapeHtml(address.country)}
-                    </div>
-
-                    <div class="address-actions">
-                        ${!isDefault ? `
-                            <button onclick="setDefault(${address.id})" class="btn btn-secondary btn-sm">
-                                Set as Default
-                            </button>
-                        ` : ''}
-                        <button onclick="editAddress(${address.id})" class="btn btn-secondary btn-sm">
-                            Edit
-                        </button>
-                        <button onclick="deleteAddress(${address.id})" class="btn btn-danger btn-sm">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        container.innerHTML = `<div class="addresses-grid" id="addresses-grid">${gridHtml}</div>`;
-    }
-
-    /* Modal & Form Logic */
-    function openAddModal() {
-        editingAddressId = null;
-        document.getElementById('modal-title').textContent = 'Add Address';
-        document.getElementById('address-form').reset();
-        document.getElementById('address-id').value = '';
-        clearErrors();
-        document.getElementById('address-modal').classList.add('show');
-    }
-
-    async function editAddress(id) {
-        editingAddressId = id;
-        document.getElementById('modal-title').textContent = 'Edit Address';
-        try {
-            const response = await fetch(`${API_BASE}/member/addresses/search?member_id=${MEMBER_ID}`);
-            const data = await response.json();
-            const address = data.items.find(a => a.id === id);
+        open(address = null) {
+            this.clearErrors();
+            this.form.reset();
 
             if (address) {
-                document.getElementById('address-id').value = address.id;
-                document.getElementById('label').value = address.label || '';
-                document.getElementById('type').value = address.type;
-                document.getElementById('address_line_1').value = address.address_line_1;
-                document.getElementById('address_line_2').value = address.address_line_2 || '';
-                document.getElementById('city').value = address.city;
-                document.getElementById('state').value = address.state || '';
-                document.getElementById('postcode').value = address.postcode;
-                document.getElementById('country').value = address.country;
-                document.getElementById('is_default').checked = address.is_default;
-
-                clearErrors();
-                document.getElementById('address-modal').classList.add('show');
-            }
-        } catch (error) {
-            showAlert('Failed to load address details', 'error');
-        }
-    }
-
-    function closeModal() {
-        document.getElementById('address-modal').classList.remove('show');
-    }
-
-    async function handleSubmit(e) {
-        e.preventDefault();
-
-        // 1. Get all form data into a clean object
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-
-        // 2. Format specific data types
-        data.is_default = formData.get('is_default') === '1';
-        data.member_id = MEMBER_ID;
-
-        // 3. Logic for the ID:
-        // If we ARE editing, we keep the ID from the hidden input.
-        // If we ARE NOT editing (creating), we remove it so the API doesn't see an empty "id": ""
-        if (!editingAddressId) {
-            delete data.id;
-        }
-
-        clearErrors();
-
-        try {
-            const url = editingAddressId
-                ? `${API_BASE}/member/addresses/${editingAddressId}`
-                : `${API_BASE}/member/addresses`;
-
-            const method = editingAddressId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method: method,
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                showAlert(editingAddressId ? 'Address updated' : 'Address added', 'success');
-                closeModal();
-                await loadAddresses(); // Refresh the list
+                this.editingId = address.id;
+                UI.text(this.title, 'Edit Address');
+                this.fillForm(address);
             } else {
-                if (result.errors) {
-                    displayErrors(result.errors);
+                this.editingId = null;
+                UI.text(this.title, 'Add New Address');
+                document.getElementById('address-id').value = '';
+            }
+
+            this.el.classList.add('show');
+        }
+
+        close() {
+            this.el.classList.remove('show');
+        }
+
+        fillForm(data) {
+            document.getElementById('address-id').value = data.id;
+            document.getElementById('label').value = data.label || '';
+            document.getElementById('type').value = data.type;
+            document.getElementById('address_line_1').value = data.address_line_1;
+            document.getElementById('address_line_2').value = data.address_line_2 || '';
+            document.getElementById('city').value = data.city;
+            document.getElementById('state').value = data.state || '';
+            document.getElementById('postcode').value = data.postcode;
+            document.getElementById('country').value = data.country;
+            document.getElementById('is_default').checked = !!parseInt(data.is_default);
+        }
+
+        async handleSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(this.form);
+            const data = Object.fromEntries(formData.entries());
+
+            // Ensure boolean/numeric logic matches backend expectations
+            data.is_default = formData.get('is_default') ? 1 : 0;
+            data.member_id = MEMBER_ID;
+
+            this.clearErrors();
+
+            try {
+                const endpoint = this.editingId
+                    ? `${API_BASE}/member/addresses/${this.editingId}`
+                    : `${API_BASE}/member/addresses`;
+
+                const method = this.editingId ? 'PUT' : 'POST';
+
+                const result = await api(endpoint, {
+                    method,
+                    body: JSON.stringify(data)
+                });
+
+                if (result.success) {
+                    UI.toast(this.editingId ? 'Address updated' : 'Address added', 'success');
+                    this.close();
+                    this.manager.loadAddresses();
+                }
+            } catch (error) {
+                // Note: api() wrapper in app-core handles the .errors object if present
+                if (error.errors) {
+                    this.displayErrors(error.errors);
                 } else {
-                    showAlert(result.message || 'Error saving address', 'error');
+                    UI.toast(error.message || 'An unexpected error occurred', 'error');
                 }
             }
-        } catch (error) {
-            console.error('Error:', error);
-            showAlert('System error occurred', 'error');
         }
-    }
 
-    async function deleteAddress(id) {
-        if (!confirm('Are you sure?')) return;
-        try {
-            const response = await fetch(`${API_BASE}/member/addresses/${id}`, {method: 'DELETE'});
-            if (response.ok) {
-                showAlert('Deleted', 'success');
-                loadAddresses();
-            }
-        } catch (error) {
-            showAlert('Delete failed', 'error');
+        clearErrors() {
+            document.querySelectorAll('.error-text').forEach(el => UI.text(el, ''));
         }
-    }
 
-    async function setDefault(id) {
-        try {
-            const response = await fetch(`${API_BASE}/member/addresses/${id}/set-default`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({member_id: MEMBER_ID})
+        displayErrors(errors) {
+            Object.keys(errors).forEach(key => {
+                const errorEl = document.getElementById(`error-${key}`);
+                if (errorEl) UI.text(errorEl, errors[key]);
             });
-            if (response.ok) {
-                loadAddresses();
-            }
-        } catch (error) {
-            showAlert('Update failed', 'error');
         }
     }
 
-    /* Helpers */
-    function showAlert(message, type = 'success') {
-        const container = document.getElementById('alert-container');
-        container.innerHTML = `<div class="alert alert-${type}">${escapeHtml(message)}</div>`;
-        setTimeout(() => container.innerHTML = '', 5000);
+    /**
+     * Main Address Manager
+     * Orchestrates loading and the high-level view state
+     */
+    class AddressManager {
+        constructor() {
+            this.container = document.getElementById('addresses-container');
+            this.modal = new AddressModal(this);
+            this.init();
+        }
+
+        init() {
+            this.loadAddresses();
+
+            // Global function hooks for HTML inline onclicks
+            window.openAddModal = () => this.modal.open();
+            window.closeModal = () => this.modal.close();
+
+            // Close modal on background click
+            this.modal.el.addEventListener('click', (e) => {
+                if (e.target.id === 'address-modal') this.modal.close();
+            });
+        }
+
+        async loadAddresses() {
+            try {
+                const response = await api(`${API_BASE}/member/addresses/search?member_id=${MEMBER_ID}`);
+                this.render(response.items || []);
+            } catch (error) {
+                UI.toast('Failed to load addresses', 'error');
+            }
+        }
+
+        render(addresses) {
+            if (!addresses || addresses.length === 0) {
+                UI.render(this.container, UI.emptyState({
+                    icon: '📍',
+                    title: 'No Addresses Found',
+                    body: 'You haven\'t saved any addresses yet.',
+                    action: UI.el('button', {
+                        className: 'btn btn-primary',
+                        onclick: () => this.modal.open()
+                    }, ['Add Your First Address'])
+                }));
+                return;
+            }
+
+            const grid = UI.el('div', {className: 'addresses-grid'});
+            addresses.forEach(addr => {
+                const card = new AddressCard(addr, this);
+                grid.appendChild(card.render());
+            });
+
+            UI.render(this.container, grid);
+        }
+
+        async deleteAddress(id) {
+            if (!confirm('Are you sure you want to delete this address?')) return;
+
+            try {
+                await api(`${API_BASE}/member/addresses/${id}`, {method: 'DELETE'});
+                UI.toast('Address deleted successfully', 'success');
+                this.loadAddresses();
+            } catch (error) {
+                UI.toast(error.message || 'Delete failed', 'error');
+            }
+        }
+
+        async setDefault(id) {
+            try {
+                await api(`${API_BASE}/member/addresses/${id}/set-default`, {
+                    method: 'POST',
+                    body: JSON.stringify({member_id: MEMBER_ID})
+                });
+                UI.toast('Default address updated', 'success');
+                this.loadAddresses();
+            } catch (error) {
+                UI.toast('Could not update default address', 'error');
+            }
+        }
     }
 
-    function clearErrors() {
-        document.querySelectorAll('.error-text').forEach(el => el.textContent = '');
-    }
+    // Ensure the class constants from PHP are available
+    const SITE = '<?= $site->slug ?>';
+    const API_BASE = '/api/' + SITE;
+    const MEMBER_ID = <?= (int)$member->id ?>;
 
-    function displayErrors(errors) {
-        Object.keys(errors).forEach(f => {
-            if (document.getElementById(`error-${f}`)) document.getElementById(`error-${f}`).textContent = errors[f];
-        });
-    }
-
-    function escapeHtml(str) {
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-    }
-
-    // UI Event Listeners
-    document.getElementById('address-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'address-modal') closeModal();
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+        window.addressApp = new AddressManager();
     });
 </script>
 </body>

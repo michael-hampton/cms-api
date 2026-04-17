@@ -39,13 +39,15 @@ class MemberStatEngine
     private function buildCounts(int $memberId, int $siteId, Collection $activities): array
     {
         return [
-            'view_count' => $this->pageViewRepository->countForMember($memberId, $siteId),
-            'like_count' => $this->pageLikeRepository->countForMember($memberId, $siteId),
-            'comment_count' => $this->commentRepository->countForMember($memberId, $siteId),
-            'order_count' => $this->orderRepository->countForMember($memberId, $siteId),
-            'reward_claimed_count' => $this->memberRewardRepository->countClaimedForMember($memberId, $siteId),
-            'articles_gifted_count' => $this->countArticlesGifted($memberId, $siteId),
-            'articles_received_count' => $this->countArticlesReceived($memberId, $siteId),
+            'counters' => [
+                'view_count' => $this->pageViewRepository->countForMember($memberId, $siteId),
+                'like_count' => $this->pageLikeRepository->countForMember($memberId, $siteId),
+                'comment_count' => $this->commentRepository->countForMember($memberId, $siteId),
+                'order_count' => $this->orderRepository->countForMember($memberId, $siteId),
+                'reward_claimed_count' => $this->memberRewardRepository->countClaimedForMember($memberId, $siteId),
+                'articles_gifted_count' => $this->countArticlesGifted($memberId, $siteId),
+                'articles_received_count' => $this->countArticlesReceived($memberId, $siteId),
+            ],
             'summary' => $this->summary($activities),
             'scores' => $this->scores($activities),
             'behaviour' => $this->behaviour($activities),
@@ -199,8 +201,8 @@ class MemberStatEngine
         $topEntities = $activities
             ->whereNotNull('entity_id')
             ->groupBy('entity_id')
-            ->map->count()
-            ->sortDesc()
+            ->map(fn($group) => $group->count())
+            ->sortByDesc()
             ->take(5);
 
         return [

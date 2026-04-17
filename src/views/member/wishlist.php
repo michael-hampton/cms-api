@@ -503,192 +503,229 @@
 <div id="toast" class="toast"></div>
 
 <script>
-    const SITE = '<?= $site->slug ?? 'default' ?>';
-    const API_BASE = '/api/' + SITE;
+    const API_BASE = '/api/' + SITE_SLUG;
 
-    function showToast(message, type = 'success') {
-        const toast = document.getElementById('toast');
-        toast.textContent = message;
-        toast.className = `toast ${type} show`;
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
+    /* ─── UI COMPONENTS ─────────────────────────────────────── */
+
+    /**
+     * Component: Individual Wishlist Product Card
+     */
+    class WishlistItem {
+        constructor(item, manager) {
+            this.data = item;
+            this.manager = manager;
+            this.el = null;
+        }
+
+        render() {
+            const i = this.data;
+            const hasDiscount = i.discount_percentage > 0;
+            const isInStock = true; // Logic preserved from original
+
+            const cartBtnProps = {
+                className: 'add-to-cart-btn',
+                onclick: (e) => this.handleAddToCart(e)
+            };
+
+            if (!isInStock) {
+                cartBtnProps.disabled = 'disabled';
+            }
+
+            this.el = UI.el('div', {className: 'product-card', 'data-product-id': i.product_id}, [
+                // Image Wrapper
+                UI.el('div', {className: 'product-image-wrapper'}, [
+                    UI.el('img', {
+                        src: i.product_image || '/images/placeholder.jpg',
+                        alt: i.product_name,
+                        className: 'product-image'
+                    }),
+                    hasDiscount ? UI.el('span', {className: 'discount-badge'}, [`${i.discount_percentage}% OFF`]) : null,
+                    UI.el('button', {
+                        className: 'remove-wishlist-btn',
+                        title: 'Remove from wishlist',
+                        onclick: () => this.handleRemove()
+                    }, [
+                        // Inline Heart/Remove Icon
+                        UI.rawEl(`<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`)
+                    ])
+                ]),
+
+                // Product Info
+                UI.el('div', {className: 'product-info'}, [
+                    UI.el('a', {href: `/shop/details/${i.product_slug}`, className: 'product-name'}, [i.product_name]),
+
+                    UI.el('div', {className: 'product-price'}, [
+                        UI.el('span', {className: 'current-price'}, [this.manager.formatCurrency(i.price)]),
+                        hasDiscount ? UI.el('span', {className: 'original-price'}, [this.manager.formatCurrency(i.original_price)]) : null
+                    ]),
+
+                    UI.el('div', {className: `stock-status ${isInStock ? 'in-stock' : 'out-of-stock'}`}, [
+                        UI.el('span', {className: 'stock-dot'}),
+                        UI.el('span', {}, [isInStock ? 'In Stock' : 'Out of Stock'])
+                    ]),
+
+                    // Actions
+                    UI.el('div', {className: 'product-actions'}, [
+                        UI.el('button', cartBtnProps, [
+                            UI.rawEl('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>'),
+                            UI.el('span', {style: {marginLeft: '8px'}}, [isInStock ? 'Add to Cart' : 'Unavailable'])
+                        ]),
+                        UI.el('button', {
+                            className: 'view-btn',
+                            title: 'View details',
+                            onclick: () => window.location.href = `/shop/details/${i.product_slug}`
+                        }, [
+                            UI.rawEl(`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`)
+                        ])
+                    ])
+                ])
+            ]);
+
+            alert('good')
+
+            return this.el;
+        }
+
+        async handleRemove() {
+            const success = await this.manager.removeItem(this.data.product_id);
+            if (success) {
+                this.el.style.transition = 'all 0.3s ease';
+                this.el.style.opacity = '0';
+                this.el.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    this.el.remove();
+                    this.manager.updateCount();
+                }, 300);
+            }
+        }
+
+        async handleAddToCart(e) {
+            const btn = e.currentTarget;
+            const originalContent = btn.innerHTML;
+
+            btn.disabled = true;
+            btn.innerHTML = 'Adding...';
+
+            const success = await this.manager.addToCartApi(this.data.product_id);
+
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+
+            if (success) {
+                UI.toast('Added to cart!');
+            }
+        }
     }
 
-    function formatCurrency(amount) {
-        return '£' + parseFloat(amount).toFixed(2);
-    }
+    /* ─── APP ORCHESTRATOR ──────────────────────────────────── */
 
-    async function loadWishlist() {
-        try {
-            const response = await fetch(`${API_BASE}/wishlist`);
-            const data = await response.json();
+    class WishlistApp {
+        constructor() {
+            this.grid = document.getElementById('wishlist-grid');
+            this.emptyState = document.getElementById('empty-wishlist');
+            this.container = document.getElementById('wishlist-container');
+            this.countLabel = document.getElementById('items-count');
+            this.items = [];
+            this.init();
+        }
 
-            if (!data.items || data.items.length === 0) {
-                document.getElementById('empty-wishlist').style.display = 'block';
-                document.getElementById('wishlist-container').style.display = 'none';
+        async init() {
+            await this.loadWishlist();
+        }
+
+        async loadWishlist() {
+            try {
+                const res = await api(`${API_BASE}/wishlist`);
+                this.items = res.items || [];
+                this.render();
+            } catch (e) {
+                UI.toast('Failed to load wishlist', 'error');
+            }
+        }
+
+        render() {
+            if (this.items.length === 0) {
+                this.emptyState.style.display = 'block';
+                this.container.style.display = 'none';
                 return;
             }
 
-            renderWishlist(data.items);
-            document.getElementById('items-count').textContent = data.items.length;
-        } catch (error) {
-            console.error('Error loading wishlist:', error);
-            showToast('Failed to load wishlist', 'error');
-        }
-    }
+            this.emptyState.style.display = 'none';
+            this.container.style.display = 'block';
 
-    function renderWishlist(items) {
-        const grid = document.getElementById('wishlist-grid');
-        grid.innerHTML = items.map(item => {
-            const hasDiscount = item.discount_percentage > 0;
-            const isInStock = true;
+            const cards = this.items.map(item => new WishlistItem(item, this).render());
 
-            return `
-                    <div class="product-card" data-product-id="${item.product_id}">
-                        <div class="product-image-wrapper">
-                            <img src="${item.product_image || '/images/placeholder.jpg'}" alt="${item.product_name}" class="product-image">
-                            ${hasDiscount ? `<span class="discount-badge">${item.discount_percentage}% OFF</span>` : ''}
-                            <button class="remove-wishlist-btn" onclick="removeFromWishlist(${item.product_id})" title="Remove from wishlist">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <div class="product-info">
-                            <a href="/shop/details/${item.product_slug}" class="product-name">${item.product_name}</a>
-                            <div class="product-price">
-                                <span class="current-price">${formatCurrency(item.price)}</span>
-                                ${hasDiscount ? `<span class="original-price">${formatCurrency(item.original_price)}</span>` : ''}
-                            </div>
-                            <div class="stock-status ${isInStock ? 'in-stock' : 'out-of-stock'}">
-                                <span class="stock-dot"></span>
-                                <span>${isInStock ? 'In Stock' : 'Out of Stock'}</span>
-                            </div>
-                            <div class="product-actions">
-                                <button class="add-to-cart-btn" onclick="addToCart(${item.product_id})" ${!isInStock ? 'disabled' : ''}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <circle cx="9" cy="21" r="1"></circle>
-                                        <circle cx="20" cy="21" r="1"></circle>
-                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                                    </svg>
-                                    ${isInStock ? 'Add to Cart' : 'Unavailable'}
-                                </button>
-                                <button class="view-btn" onclick="window.location.href='/shop/details/${item.product_slug}'" title="View details">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-        }).join('');
-    }
-
-    async function removeFromWishlist(productId) {
-        try {
-            const response = await fetch(`${API_BASE}/wishlist/${productId}`, {
-                method: 'DELETE'
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                await loadWishlist();
-                showToast('Removed from wishlist');
-            } else {
-                showToast(data.message || 'Failed to remove item', 'error');
-            }
-        } catch (error) {
-            console.error('Error removing from wishlist:', error);
-            showToast('Failed to remove item', 'error');
-        }
-    }
-
-    async function addToCart(productId) {
-        try {
-            const response = await fetch(`${API_BASE}/cart`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    product_id: productId,
-                    quantity: 1
-                })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast('Added to cart successfully');
-            } else {
-                showToast(data.message || 'Failed to add to cart', 'error');
-            }
-        } catch (error) {
-            console.error('Error adding to cart:', error);
-            showToast('Failed to add to cart', 'error');
-        }
-    }
-
-    async function addAllToCart() {
-        const response = await fetch(`${API_BASE}/wishlist`);
-        const wishlistData = await response.json();
-
-
-        if (!wishlistData.items || wishlistData.items.length === 0) {
-            showToast('No items in wishlist', 'error');
-            return;
+            console.log('cards', cards)
+            UI.render(this.grid, cards);
+            this.updateCount();
         }
 
-        //const availableItems = wishlistData.items.filter(item => item.in_stock);
-        const availableItems = wishlistData.items;
-
-        console.log('Available items:', availableItems);
-
-        if (availableItems.length === 0) {
-            showToast('No items available to add to cart', 'error');
-            return;
+        updateCount() {
+            const count = this.grid.querySelectorAll('.product-card').length;
+            this.countLabel.textContent = count;
+            if (count === 0) this.render();
         }
 
-        let successCount = 0;
-        let failCount = 0;
-
-        for (const item of availableItems) {
+        async removeItem(productId) {
             try {
-                const response = await fetch(`${API_BASE}/cart`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        product_id: item.product_id,
-                        quantity: 1
-                    })
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    successCount++;
-                } else {
-                    failCount++;
+                const res = await api(`${API_BASE}/wishlist/${productId}`, {method: 'DELETE'});
+                if (res.success) {
+                    this.items = this.items.filter(item => item.product_id !== productId);
+                    UI.toast('Removed from wishlist', 'success');
+                    return true;
                 }
-            } catch (error) {
-                failCount++;
-                console.error('Error adding item to cart:', error);
+                throw new Error(res.message);
+            } catch (e) {
+                UI.toast(e.message || 'Error removing item', 'error');
+                return false;
             }
         }
 
-        if (successCount > 0) {
-            showToast(`Added ${successCount} item(s) to cart`);
+        async addToCartApi(productId) {
+            try {
+                const res = await api(`${API_BASE}/cart`, {
+                    method: 'POST',
+                    body: JSON.stringify({product_id: productId, quantity: 1})
+                });
+                return res.success;
+            } catch (e) {
+                return false;
+            }
         }
 
-        if (failCount > 0) {
-            showToast(`Failed to add ${failCount} item(s)`, 'error');
+        async addAllToCart() {
+            if (!this.items.length) return;
+
+            let successCount = 0;
+            const btn = document.querySelector('.btn-primary');
+            btn.disabled = true;
+
+            for (const item of this.items) {
+                const success = await this.addToCartApi(item.product_id);
+                if (success) successCount++;
+            }
+
+            btn.disabled = false;
+            if (successCount > 0) {
+                UI.toast(`Added ${successCount} items to your cart`);
+            }
+        }
+
+        formatCurrency(amount) {
+            return '£' + parseFloat(amount).toFixed(2);
         }
     }
 
-    // Initialize
-    loadWishlist();
+    /* ─── BOOTSTRAP ─────────────────────────────────────────── */
+
+    document.addEventListener('DOMContentLoaded', () => {
+        window.wishlistApp = new WishlistApp();
+    });
+
+    // Global hook for the "Add All" button in HTML
+    function addAllToCart() {
+        window.wishlistApp.addAllToCart();
+    }
 </script>
 </body>
 </html>

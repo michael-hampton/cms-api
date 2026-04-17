@@ -248,112 +248,107 @@
 </div>
 
 <script>
-    async function loadLikedPages() {
-        try {
-            const res = await fetch(`/api/${SITE_SLUG}/member/liked-pages`);
-            if (res.status === 401) {
-                window.location.href = `/${SITE_SLUG}/member/login`;
+    class LikedPages {
+        async load() {
+            const root = document.getElementById('liked-pages-root');
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/liked-pages`);
+                this.render(root, json.data.liked_pages, json.data.total_likes);
+            } catch {
+                UI.render(root, [UI.el('p', {
+                    style: {color: 'var(--danger-color)', textAlign: 'center'},
+                }, ['Failed to load liked pages. Please refresh.'])]);
+            }
+        }
+
+        render(root, pages, totalLikes) {
+            const statsBar = UI.el('div', {className: 'stats-bar'}, [
+                UI.el('div', {className: 'stat-item'}, [
+                    UI.el('span', {className: 'stat-icon'}, ['❤️']),
+                    UI.el('div', {className: 'stat-info'}, [
+                        UI.el('h3', {}, [String(totalLikes)]),
+                        UI.el('p', {}, ['Total Likes']),
+                    ]),
+                ]),
+            ]);
+
+            if (!pages.length) {
+                UI.render(root, [statsBar, UI.emptyState({
+                    icon: '💔',
+                    title: 'No Liked Pages Yet',
+                    body: 'Start exploring and like pages to build your collection.',
+                    action: UI.el('a', {href: '/', className: 'btn-primary'}, ['Explore Content']),
+                })]);
                 return;
             }
-            const json = await res.json();
-            if (!json.success) throw new Error('Failed to load');
-            renderLikedPages(json.data.liked_pages, json.data.total_likes);
-        } catch {
-            document.getElementById('liked-pages-root').innerHTML =
-                '<p style="color:var(--danger-color);text-align:center;">Failed to load liked pages. Please refresh.</p>';
-        }
-    }
 
-    function renderLikedPages(likedPages, totalLikes) {
-        const root = document.getElementById('liked-pages-root');
-
-        const statsBar = `
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <span class="stat-icon">❤️</span>
-                    <div class="stat-info"><h3>${totalLikes}</h3><p>Total Likes</p></div>
-                </div>
-            </div>`;
-
-        if (!likedPages.length) {
-            root.innerHTML = statsBar + `
-                <div class="empty-state">
-                    <div class="empty-state-icon">💔</div>
-                    <h2>No Liked Pages Yet</h2>
-                    <p>Start exploring and like pages to build your collection of favourites.</p>
-                    <a href="/" class="btn-primary">Explore Content</a>
-                </div>`;
-            return;
-        }
-
-        const cards = likedPages.map(like => {
-            const page = like.page;
-            if (!page) return '';
-            return `
-                <div class="page-card" data-page-id="${page.id}">
-                    <span class="like-badge">❤️</span>
-                    <a href="/${escHtml(page.slug)}" style="text-decoration:none;color:inherit;display:contents;">
-                        ${page.listing_image_id
-                ? `<img src="/images/${page.listing_image_id}" alt="${escHtml(page.title)}" class="page-image">`
-                : `<div class="page-image"></div>`}
-                        <div class="page-content">
-                            <h3 class="page-title-text">${escHtml(page.title)}</h3>
-                            ${page.listing_synopsis
-                ? `<p class="page-excerpt">${escHtml(page.listing_synopsis)}</p>`
-                : ''}
-                            <div class="page-meta">
-                                <span>❤️ Liked on ${formatDate(like.liked_at)}</span>
-                                <button class="unlike-btn"
-                                    onclick="unlikePage(event, ${page.id})">Unlike</button>
-                            </div>
-                        </div>
-                    </a>
-                </div>`;
-        }).join('');
-
-        root.innerHTML = statsBar + `<div class="pages-grid">${cards}</div>`;
-    }
-
-    async function unlikePage(event, pageId) {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!confirm('Remove this page from your liked pages?')) return;
-        try {
-            // Uses SITE_SLUG constant — not a hardcoded PHP string inside JS
-            const res = await fetch(`/api/${SITE_SLUG}/pages/like/${pageId}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+            const grid = UI.el('div', {className: 'pages-grid'});
+            pages.forEach(like => {
+                const page = like.page;
+                if (!page) return;
+                grid.appendChild(this._card(page, like.liked_at));
             });
-            const data = await res.json();
-            if (data.success) {
-                // Animate card out before reloading
+
+            UI.render(root, [statsBar, grid]);
+        }
+
+        _card(page, likedAt) {
+            const img = page.listing_image_id
+                ? UI.el('img', {src: `/images/${page.listing_image_id}`, alt: page.title, className: 'page-image'})
+                : UI.el('div', {className: 'page-image'});
+
+            const unlikeBtn = UI.el('button', {className: 'unlike-btn'}, ['Unlike']);
+            unlikeBtn.addEventListener('click', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                this._unlike(page.id);
+            });
+
+            const card = UI.el('div', {className: 'page-card', 'data-page-id': page.id}, [
+                UI.el('span', {className: 'like-badge'}, ['❤️']),
+                img,
+                UI.el('div', {className: 'page-content'}, [
+                    UI.el('h3', {className: 'page-title-text'}, [page.title]),
+                    page.listing_synopsis
+                        ? UI.el('p', {className: 'page-excerpt'}, [page.listing_synopsis])
+                        : null,
+                    UI.el('div', {className: 'page-meta'}, [
+                        UI.el('span', {}, [`❤️ Liked on ${UI.formatDate(likedAt)}`]),
+                        unlikeBtn,
+                    ]),
+                ]),
+            ]);
+
+            card.addEventListener('click', e => {
+                if (!e.target.closest('.unlike-btn')) window.location.href = `/${page.slug}`;
+            });
+            card.style.cursor = 'pointer';
+            return card;
+        }
+
+        async _unlike(pageId) {
+            if (!confirm('Remove this page from your liked pages?')) return;
+            try {
+                await api(`/api/${SITE_SLUG}/member/pages/like/${pageId}`, {
+                    method: 'POST',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
                 const card = document.querySelector(`[data-page-id="${pageId}"]`);
                 if (card) {
-                    card.style.transition = 'opacity .3s,transform .3s';
+                    card.style.transition = 'opacity .3s, transform .3s';
                     card.style.opacity = '0';
                     card.style.transform = 'scale(.95)';
-                    setTimeout(() => loadLikedPages(), 300);
+                    setTimeout(() => this.load(), 300);
                 } else {
-                    loadLikedPages();
+                    this.load();
                 }
-            } else {
-                alert('Failed to unlike page');
+            } catch {
+                alert('Failed to unlike page. Please try again.');
             }
-        } catch {
-            alert('An error occurred. Please try again.');
         }
     }
 
-    function formatDate(str) {
-        return str ? new Date(str).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'}) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', loadLikedPages);
+    document.addEventListener('DOMContentLoaded', () => new LikedPages().load());
 </script>
 </body>
 </html>

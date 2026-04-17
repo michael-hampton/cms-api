@@ -377,124 +377,74 @@
 </div>
 
 <script>
-    /* ─── Toast ──────────────────────────────────────────── */
-    function showToast(message, type = 'info', duration = 5000) {
-        const icons = {error: '✕', info: 'ℹ'};
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span>${icons[type] || 'ℹ'}</span>
-            <span style="flex:1;">${message}</span>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            if (!toast.parentElement) return;
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
+    class ReadingHistory {
+        async load() {
+            const root = document.getElementById('reading-history-root');
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/reading-history`);
+                this.render(root, json.data.recently_viewed, json.data.total_pages_read);
+            } catch {
+                UI.toast('Failed to load reading history. Please refresh.', 'error');
+                UI.render(root, [UI.emptyState({
+                    icon: '⚠️',
+                    title: 'Failed to Load',
+                    body: 'Please try refreshing the page.',
+                })]);
+            }
+        }
 
-    /* ─── Load ───────────────────────────────────────────── */
-    async function loadReadingHistory() {
-        try {
-            const res = await fetch(`/api/${SITE_SLUG}/member/reading-history`);
-            if (!res.ok) throw new Error('Server error ' + res.status);
-            const json = await res.json();
-            if (!json.success) throw new Error('Failed to load');
-            renderHistory(json.data.recently_viewed, json.data.total_pages_read);
-        } catch (e) {
-            console.error(e);
-            showToast('Failed to load reading history. Please refresh.', 'error');
-            document.getElementById('reading-history-root').innerHTML = `
-                <div class="empty-state">
-                    <div class="empty-state-icon">⚠️</div>
-                    <h2>Failed to Load</h2>
-                    <p>Please try refreshing the page.</p>
-                    <button class="btn-primary" style="border:none;cursor:pointer;" onclick="loadReadingHistory()">Retry</button>
-                </div>`;
+        render(root, views, totalPagesRead) {
+            const statsBar = UI.el('div', {className: 'stats-bar'}, [
+                UI.el('div', {className: 'stat-item'}, [
+                    UI.el('span', {className: 'stat-icon'}, ['📖']),
+                    UI.el('div', {className: 'stat-info'}, [
+                        UI.el('h3', {}, [String(totalPagesRead)]),
+                        UI.el('p', {}, ['Unique Pages Read']),
+                    ]),
+                ]),
+            ]);
+
+            if (!views?.length) {
+                UI.render(root, [statsBar, UI.emptyState({
+                    icon: '📚',
+                    title: 'No Reading History Yet',
+                    body: 'Start exploring content to build your reading history.',
+                    action: UI.el('a', {href: '/', className: 'btn-primary'}, ['Start Reading']),
+                })]);
+                return;
+            }
+
+            const timeline = UI.el('div', {className: 'timeline'});
+            views.forEach(view => {
+                const page = view.page;
+                if (!page) return;
+
+                const link = UI.el('a', {href: `/${page.slug}`}, [page.title]);
+                const catBadge = page.category_name
+                    ? UI.el('span', {className: 'meta-badge'}, [`📁 ${page.category_name}`])
+                    : null;
+
+                timeline.appendChild(UI.el('div', {className: 'timeline-item'}, [
+                    UI.el('div', {className: 'timeline-marker'}),
+                    UI.el('div', {className: 'timeline-content'}, [
+                        UI.el('div', {className: 'timeline-date'}, ['🕐 ', UI.timeAgo(view.viewed_at)]),
+                        UI.el('h3', {className: 'timeline-title'}, [link]),
+                        page.listing_synopsis
+                            ? UI.el('p', {className: 'timeline-excerpt'}, [page.listing_synopsis])
+                            : null,
+                        UI.el('div', {className: 'timeline-meta'}, [
+                            catBadge,
+                            UI.el('span', {className: 'meta-badge'}, [`📅 ${UI.formatDate(page.created_at)}`]),
+                        ]),
+                    ]),
+                ]));
+            });
+
+            UI.render(root, [statsBar, timeline]);
         }
     }
 
-    /* ─── Render ─────────────────────────────────────────── */
-    function renderHistory(views, totalPagesRead) {
-        const root = document.getElementById('reading-history-root');
-
-        const statsBar = `
-            <div class="stats-bar">
-                <div class="stat-item">
-                    <span class="stat-icon">📖</span>
-                    <div class="stat-info">
-                        <h3>${totalPagesRead}</h3>
-                        <p>Unique Pages Read</p>
-                    </div>
-                </div>
-            </div>`;
-
-        if (!views || views.length === 0) {
-            root.innerHTML = statsBar + `
-                <div class="empty-state">
-                    <div class="empty-state-icon">📚</div>
-                    <h2>No Reading History Yet</h2>
-                    <p>Start exploring content to build your reading history.</p>
-                    <a href="/" class="btn-primary">Start Reading</a>
-                </div>`;
-            return;
-        }
-
-        const items = views.map(view => {
-            const page = view.page;
-            if (!page) return '';
-
-            /* Category badge — restored from original */
-            const categoryBadge = page.category_name
-                ? `<span class="meta-badge">📁 ${esc(page.category_name)}</span>`
-                : '';
-
-            return `
-                <div class="timeline-item">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <div class="timeline-date"><span>🕐</span>${timeAgo(view.viewed_at)}</div>
-                        <h3 class="timeline-title">
-                            <a href="/${esc(page.slug)}">${esc(page.title)}</a>
-                        </h3>
-                        ${page.listing_synopsis ? `<p class="timeline-excerpt">${esc(page.listing_synopsis)}</p>` : ''}
-                        <div class="timeline-meta">
-                            ${categoryBadge}
-                            <span class="meta-badge">📅 ${formatDate(page.created_at)}</span>
-                        </div>
-                    </div>
-                </div>`;
-        }).filter(Boolean).join('');
-
-        root.innerHTML = statsBar + `<div class="timeline">${items}</div>`;
-    }
-
-    /* ─── Helpers ────────────────────────────────────────── */
-    function timeAgo(str) {
-        if (!str) return '';
-        const dateStr = (str.date || str).replace(' ', 'T');
-        const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-        if (diff < 60) return 'Just now';
-        if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
-        if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
-        if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
-        return formatDate(str);
-    }
-
-    function formatDate(str) {
-        if (!str) return '';
-        const d = str.date || str;
-        return new Date(d).toLocaleDateString('en-GB', {year: 'numeric', month: 'short', day: 'numeric'});
-    }
-
-    function esc(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', loadReadingHistory);
+    document.addEventListener('DOMContentLoaded', () => new ReadingHistory().load());
 </script>
 </body>
 </html>

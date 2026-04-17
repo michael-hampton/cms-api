@@ -584,319 +584,238 @@
 </main>
 
 <script>
-    /* ─── State ─────────────────────────────────────────── */
-    let earnedBadges = [];
-    let unearnedBadges = [];
-    let currentPage = 1;
     const ITEMS_PER_PAGE = 6;
 
-    /* Carousel state */
-    let currentCarouselIndex = 0;
-    let carouselInterval = null;
-    let itemsPerView = calcItemsPerView();
+    class Carousel {
+        constructor(containerId) {
+            this.container = document.getElementById(containerId);
+            this.index = 0;
+            this.timer = null;
+        }
 
-    function calcItemsPerView() {
-        return window.innerWidth < 768 ? 2 : window.innerWidth < 1024 ? 3 : 5;
+        get items() {
+            return this.container.querySelectorAll('.carousel-badge');
+        }
+
+        get perView() {
+            return window.innerWidth < 768 ? 2 : window.innerWidth < 1024 ? 3 : 5;
+        }
+
+        get totalPages() {
+            return Math.ceil(this.items.length / this.perView);
+        }
+
+        build(earned, unearned) {
+            UI.render(this.container, [
+                ...earned.map(b => this._card(b, false)),
+                ...unearned.map(b => this._card(b, true)),
+            ]);
+            this._buildDots();
+            this._apply();
+            this._autoScroll();
+            this.container.addEventListener('mouseenter', () => this._stopAuto());
+            this.container.addEventListener('mouseleave', () => this._autoScroll());
+        }
+
+        _card(b, locked) {
+            return UI.el('div', {className: `carousel-badge${locked ? ' locked' : ''}`}, [
+                UI.el('div', {className: `badge-tier-indicator ${b.tier ?? ''}`}),
+                UI.el('div', {className: 'carousel-badge-icon'}, [locked ? '🔒' : (b.icon ?? '🏆')]),
+                UI.el('div', {className: 'carousel-badge-name'}, [b.name]),
+                UI.el('div', {className: `carousel-badge-tier ${b.tier ?? ''}`}, [b.tier ?? '']),
+            ]);
+        }
+
+        _buildDots() {
+            const dots = document.getElementById('carouselDots');
+            UI.render(dots, Array.from({length: this.totalPages}, (_, i) =>
+                UI.el('button', {
+                    className: `carousel-dot${i === 0 ? ' active' : ''}`,
+                    'aria-label': `Go to page ${i + 1}`,
+                    onclick: () => this.goTo(i),
+                })
+            ));
+        }
+
+        _apply() {
+            const BADGE_WIDTH = 216;
+            this.container.style.transform = `translateX(${-this.index * BADGE_WIDTH * this.perView}px)`;
+            document.querySelectorAll('.carousel-dot').forEach((d, i) =>
+                d.classList.toggle('active', i === this.index));
+            document.getElementById('prevBtn').disabled = this.index === 0;
+            document.getElementById('nextBtn').disabled = this.index >= this.totalPages - 1;
+        }
+
+        move(dir) {
+            this.index = Math.max(0, Math.min(this.totalPages - 1, this.index + dir));
+            this._apply();
+        }
+
+        goTo(i) {
+            this.index = Math.max(0, Math.min(this.totalPages - 1, i));
+            this._apply();
+        }
+
+        _autoScroll() {
+            this._stopAuto();
+            if (this.totalPages <= 1) return;
+            this.timer = setInterval(() => {
+                this.index = (this.index + 1) % this.totalPages;
+                this._apply();
+            }, 5000);
+        }
+
+        _stopAuto() {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+
+        onResize() {
+            if (this.index >= this.totalPages) this.index = Math.max(0, this.totalPages - 1);
+            this._buildDots();
+            this._apply();
+            this._autoScroll();
+        }
     }
 
-    /* ─── Toast helper ───────────────────────────────────── */
-    function showToast(message, type = 'info') {
-        const icons = {success: '✓', error: '✕', info: 'ℹ'};
-        const container = document.getElementById('toastContainer');
-        const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerHTML = `
-            <span class="toast-icon">${icons[type]}</span>
-            <span>${message}</span>
-            <button class="toast-close" onclick="this.parentElement.remove()">×</button>`;
-        container.appendChild(toast);
-        setTimeout(() => {
-            toast.style.animation = 'slideOut 0.3s ease forwards';
-            setTimeout(() => toast.remove(), 300);
-        }, 4000);
-    }
+    class BadgeGrid {
+        constructor(gridId, tabsId, badges, earned) {
+            this.grid = document.getElementById(gridId);
+            this.tabs = document.getElementById(tabsId);
+            this.badges = badges;
+            this.earned = earned;
+            this.page = 1;
+            this.category = 'all';
+        }
 
-    /* ─── Init ───────────────────────────────────────────── */
-    async function init() {
-        try {
-            const response = await fetch('/api/' + SITE_SLUG + '/member/badges');
-            if (!response.ok) throw new Error('Server error ' + response.status);
-            const res = await response.json();
+        buildTabs(categories) {
+            const allBtn = UI.el('button', {
+                className: 'filter-tab active', 'data-cat': 'all',
+                onclick: e => this._tabClick(e)
+            }, ['All']);
+            UI.render(this.tabs, [
+                allBtn,
+                ...categories.map(cat =>
+                    UI.el('button', {
+                            className: 'filter-tab', 'data-cat': cat,
+                            onclick: e => this._tabClick(e)
+                        },
+                        [cat.charAt(0).toUpperCase() + cat.slice(1)])
+                ),
+            ]);
+        }
 
-            if (!res.success) throw new Error(res.message || 'Failed to load badges');
+        _tabClick(e) {
+            this.tabs.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            e.target.classList.add('active');
+            this.page = 1;
+            this.category = e.target.dataset.cat;
+            this.render();
+        }
 
-            earnedBadges = res.data.earned_badges || [];
-            unearnedBadges = res.data.unearned_badges || [];
+        filtered() {
+            return this.category === 'all'
+                ? this.badges
+                : this.badges.filter(b => (b.category ?? '').toLowerCase() === this.category);
+        }
 
-            renderSummary(earnedBadges.length, unearnedBadges.length);
-            renderCarousel();
-            renderFilters(res.data.categories || []);
-            renderEarned('all');
-            renderUnearned('all');
+        render() {
+            const list = this.filtered();
+            const toShow = this.earned ? list : list.slice(0, this.page * ITEMS_PER_PAGE);
 
-            if (earnedBadges.length === 0 && unearnedBadges.length === 0) {
-                document.getElementById('empty-state').style.display = 'block';
+            if (!toShow.length) {
+                UI.render(this.grid, [UI.el('div', {className: 'no-results-message'}, [
+                    UI.el('div', {className: 'no-results-icon'}, ['🔍']),
+                    UI.el('h3', {}, ['No Badges Found']),
+                    UI.el('p', {}, [this.earned
+                        ? "You haven't earned any badges in this category yet."
+                        : 'There are no badges available in this category.']),
+                ])]);
+                this._toggleShowMore(false);
+                return;
             }
-        } catch (e) {
-            console.error('Failed to load badges', e);
-            showToast('Failed to load badges. Please refresh the page.', 'error');
-            document.getElementById('badgesCarousel').innerHTML = '';
+
+            UI.render(this.grid, toShow.map(b => this._card(b)));
+
+            if (!this.earned) {
+                this._toggleShowMore(list.length > toShow.length);
+            }
+        }
+
+        _card(b) {
+            const card = UI.el('div', {className: `badge-card${this.earned ? '' : ' locked'}`}, [
+                UI.el('div', {className: `badge-tier-indicator ${b.tier ?? ''}`}),
+                UI.el('div', {className: 'badge-icon'}, [this.earned ? (b.icon ?? '🏆') : '🔒']),
+                UI.el('div', {className: `badge-tier ${b.tier ?? ''}`}, [b.tier ?? '']),
+                UI.el('div', {className: 'badge-name'}, [b.name]),
+                UI.el('div', {className: 'badge-description'}, [b.description ?? '']),
+                b.points > 0 ? UI.el('div', {className: 'badge-points'}, [`+${b.points} points`]) : null,
+                this.earned && b.earned_at
+                    ? UI.el('div', {className: 'badge-earned-date'}, [`Earned ${UI.formatDate(b.earned_at)}`])
+                    : null,
+            ]);
+            return card;
+        }
+
+        _toggleShowMore(show) {
+            const wrapper = document.getElementById('showMoreWrapper');
+            if (wrapper) wrapper.style.display = show ? 'block' : 'none';
+        }
+
+        showMore() {
+            this.page++;
+            this.render();
         }
     }
 
-    /* ─── Summary line ───────────────────────────────────── */
-    function renderSummary(earned, unearned) {
-        document.getElementById('badge-stats-summary').textContent =
-            `${earned} earned • ${earned + unearned} total available`;
-    }
+    class BadgesPage {
+        async init() {
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/badges`);
+                const {earned_badges, unearned_badges, categories} = json.data;
 
-    /* ─── Carousel ───────────────────────────────────────── */
-    function renderCarousel() {
-        const container = document.getElementById('badgesCarousel');
+                document.getElementById('badge-stats-summary').textContent =
+                    `${earned_badges.length} earned • ${earned_badges.length + unearned_badges.length} total available`;
 
-        const earnedHtml = earnedBadges.map(b => `
-            <div class="carousel-badge">
-                <div class="badge-tier-indicator ${esc(b.tier)}"></div>
-                <div class="carousel-badge-icon">${b.icon || '🏆'}</div>
-                <div class="carousel-badge-name">${esc(b.name)}</div>
-                <div class="carousel-badge-tier ${esc(b.tier)}">${esc(b.tier)}</div>
-            </div>`).join('');
+                // Carousel
+                this.carousel = new Carousel('badgesCarousel');
+                this.carousel.build(earned_badges, unearned_badges);
+                document.getElementById('prevBtn').onclick = () => this.carousel.move(-1);
+                document.getElementById('nextBtn').onclick = () => this.carousel.move(1);
+                let resizeTimer;
+                window.addEventListener('resize', () => {
+                    clearTimeout(resizeTimer);
+                    resizeTimer = setTimeout(() => this.carousel.onResize(), 150);
+                });
 
-        const unearnedHtml = unearnedBadges.map(b => `
-            <div class="carousel-badge locked">
-                <div class="badge-tier-indicator ${esc(b.tier)}"></div>
-                <div class="carousel-badge-icon">🔒</div>
-                <div class="carousel-badge-name">${esc(b.name)}</div>
-                <div class="carousel-badge-tier ${esc(b.tier)}">${esc(b.tier)}</div>
-            </div>`).join('');
+                // Earned section
+                if (earned_badges.length) {
+                    document.getElementById('earnedSection').style.display = 'block';
+                    this.earnedGrid = new BadgeGrid('earnedBadgesGrid', 'earnedFilterTabs', earned_badges, true);
+                    this.earnedGrid.buildTabs(categories ?? []);
+                    this.earnedGrid.render();
+                }
 
-        container.innerHTML = earnedHtml + unearnedHtml;
-        setupCarouselLogic();
-    }
+                // Unearned section
+                if (unearned_badges.length) {
+                    document.getElementById('unearnedSection').style.display = 'block';
+                    this.unearnedGrid = new BadgeGrid('unearnedBadgesGrid', 'unearnedFilterTabs', unearned_badges, false);
+                    this.unearnedGrid.buildTabs(categories ?? []);
+                    this.unearnedGrid.render();
+                    document.getElementById('showMoreBtn').onclick = () => this.unearnedGrid.showMore();
+                }
 
-    function setupCarouselLogic() {
-        itemsPerView = calcItemsPerView();
-        const badges = document.getElementById('badgesCarousel').querySelectorAll('.carousel-badge');
-        const totalPages = Math.ceil(badges.length / itemsPerView);
-
-        /* Build dots */
-        const dotsContainer = document.getElementById('carouselDots');
-        dotsContainer.innerHTML = '';
-        for (let i = 0; i < totalPages; i++) {
-            const dot = document.createElement('button');
-            dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
-            dot.setAttribute('aria-label', 'Go to page ' + (i + 1));
-            dot.addEventListener('click', () => goToCarouselPage(i));
-            dotsContainer.appendChild(dot);
-        }
-
-        /* Clamp index in case items changed on resize */
-        if (currentCarouselIndex >= totalPages) currentCarouselIndex = Math.max(0, totalPages - 1);
-        applyCarouselTransform(totalPages);
-        startAutoScroll(totalPages);
-    }
-
-    function applyCarouselTransform(totalPages) {
-        const BADGE_WIDTH = 216; // 200px + 16px gap
-        const carousel = document.getElementById('badgesCarousel');
-        carousel.style.transform = `translateX(${-currentCarouselIndex * BADGE_WIDTH * itemsPerView}px)`;
-
-        document.querySelectorAll('.carousel-dot').forEach((dot, i) =>
-            dot.classList.toggle('active', i === currentCarouselIndex));
-
-        document.getElementById('prevBtn').disabled = currentCarouselIndex === 0;
-        document.getElementById('nextBtn').disabled = currentCarouselIndex >= (totalPages || 1) - 1;
-    }
-
-    function moveCarousel(direction) {
-        const badges = document.getElementById('badgesCarousel').querySelectorAll('.carousel-badge');
-        const totalPages = Math.ceil(badges.length / itemsPerView);
-        currentCarouselIndex = Math.max(0, Math.min(totalPages - 1, currentCarouselIndex + direction));
-        applyCarouselTransform(totalPages);
-    }
-
-    function goToCarouselPage(index) {
-        const badges = document.getElementById('badgesCarousel').querySelectorAll('.carousel-badge');
-        const totalPages = Math.ceil(badges.length / itemsPerView);
-        currentCarouselIndex = Math.max(0, Math.min(totalPages - 1, index));
-        applyCarouselTransform(totalPages);
-    }
-
-    function startAutoScroll(totalPages) {
-        stopAutoScroll();
-        if (totalPages <= 1) return;
-        carouselInterval = setInterval(() => {
-            currentCarouselIndex = (currentCarouselIndex + 1) % totalPages;
-            applyCarouselTransform(totalPages);
-        }, 5000);
-    }
-
-    function stopAutoScroll() {
-        if (carouselInterval) {
-            clearInterval(carouselInterval);
-            carouselInterval = null;
+                if (!earned_badges.length && !unearned_badges.length) {
+                    document.getElementById('empty-state').style.display = 'block';
+                }
+            } catch (e) {
+                UI.toast('Failed to load badges. Please refresh.', 'error');
+                document.getElementById('badgesCarousel').innerHTML = '';
+            }
         }
     }
 
-    /* Pause on hover */
-    document.addEventListener('DOMContentLoaded', () => {
-        const carousel = document.getElementById('badgesCarousel');
-        carousel.addEventListener('mouseenter', stopAutoScroll);
-        carousel.addEventListener('mouseleave', () => {
-            const badges = carousel.querySelectorAll('.carousel-badge');
-            const totalPages = Math.ceil(badges.length / itemsPerView);
-            startAutoScroll(totalPages);
-        });
-    });
-
-    /* Re-initialise carousel on resize */
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(setupCarouselLogic, 150);
-    });
-
-    /* ─── Filter tabs ────────────────────────────────────── */
-    function renderFilters(categories) {
-        const earnedTabs = document.getElementById('earnedFilterTabs');
-        const unearnedTabs = document.getElementById('unearnedFilterTabs');
-
-        categories.forEach(cat => {
-            const label = cat.charAt(0).toUpperCase() + cat.slice(1);
-
-            const btn1 = document.createElement('button');
-            btn1.className = 'filter-tab';
-            btn1.dataset.cat = cat;
-            btn1.textContent = label;
-            btn1.addEventListener('click', () => filterToggle(btn1, cat, 'earned'));
-            earnedTabs.appendChild(btn1);
-
-            const btn2 = document.createElement('button');
-            btn2.className = 'filter-tab';
-            btn2.dataset.cat = cat;
-            btn2.textContent = label;
-            btn2.addEventListener('click', () => filterToggle(btn2, cat, 'unearned'));
-            unearnedTabs.appendChild(btn2);
-        });
-    }
-
-    function filterToggle(btn, cat, section) {
-        const tabsId = section === 'earned' ? 'earnedFilterTabs' : 'unearnedFilterTabs';
-        document.getElementById(tabsId).querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-        btn.classList.add('active');
-
-        if (section === 'earned') {
-            renderEarned(cat);
-        } else {
-            currentPage = 1;
-            renderUnearned(cat);
-        }
-    }
-
-    /* ─── Render earned badges ───────────────────────────── */
-    function renderEarned(category) {
-        const grid = document.getElementById('earnedBadgesGrid');
-        const section = document.getElementById('earnedSection');
-
-        if (earnedBadges.length > 0) section.style.display = 'block';
-
-        const filtered = category === 'all'
-            ? earnedBadges
-            : earnedBadges.filter(b => (b.category || '').toLowerCase() === category);
-
-        if (filtered.length === 0) {
-            grid.innerHTML = `<div class="no-results-message">
-                <div class="no-results-icon">🔍</div>
-                <h3>No Badges Found</h3>
-                <p>You haven't earned any badges in this category yet.</p>
-            </div>`;
-            return;
-        }
-
-        grid.innerHTML = filtered.map(b => `
-            <div class="badge-card">
-                <div class="badge-tier-indicator ${esc(b.tier)}"></div>
-                <div class="badge-icon">${b.icon || '🏆'}</div>
-                <div class="badge-tier ${esc(b.tier)}">${esc(b.tier)}</div>
-                <div class="badge-name">${esc(b.name)}</div>
-                <div class="badge-description">${esc(b.description || '')}</div>
-                ${b.points > 0 ? `<div class="badge-points">+${b.points} points</div>` : ''}
-                <div class="badge-earned-date">Earned ${formatEarnedDate(b.earned_at)}</div>
-            </div>`).join('');
-    }
-
-    /* ─── Render unearned badges ─────────────────────────── */
-    function renderUnearned(category) {
-        const grid = document.getElementById('unearnedBadgesGrid');
-        const section = document.getElementById('unearnedSection');
-
-        if (unearnedBadges.length > 0) section.style.display = 'block';
-
-        const filtered = category === 'all'
-            ? unearnedBadges
-            : unearnedBadges.filter(b => (b.category || '').toLowerCase() === category);
-
-        const toShow = filtered.slice(0, currentPage * ITEMS_PER_PAGE);
-
-        if (toShow.length === 0) {
-            grid.innerHTML = `<div class="no-results-message">
-                <div class="no-results-icon">🔍</div>
-                <h3>No Badges Found</h3>
-                <p>There are no badges available in this category.</p>
-            </div>`;
-            document.getElementById('showMoreWrapper').style.display = 'none';
-            return;
-        }
-
-        grid.innerHTML = toShow.map(b => `
-            <div class="badge-card locked">
-                <div class="badge-tier-indicator ${esc(b.tier)}"></div>
-                <div class="badge-icon">🔒</div>
-                <div class="badge-tier ${esc(b.tier)}">${esc(b.tier)}</div>
-                <div class="badge-name">${esc(b.name)}</div>
-                <div class="badge-description">${esc(b.description || '')}</div>
-                ${b.points > 0 ? `<div class="badge-points">+${b.points} points</div>` : ''}
-            </div>`).join('');
-
-        const wrapper = document.getElementById('showMoreWrapper');
-        const btn = document.getElementById('showMoreBtn');
-        if (filtered.length > toShow.length) {
-            wrapper.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Show More';
-        } else {
-            wrapper.style.display = 'none';
-        }
-    }
-
-    function showMoreBadges() {
-        currentPage++;
-        const activeTab = document.querySelector('#unearnedFilterTabs .filter-tab.active');
-        const cat = activeTab ? activeTab.dataset.cat : 'all';
-        renderUnearned(cat);
-    }
-
-    /* ─── Helpers ────────────────────────────────────────── */
-    function formatEarnedDate(dateStr) {
-        if (!dateStr) return 'Unknown';
-        try {
-            return new Date(dateStr).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'});
-        } catch {
-            return 'Unknown';
-        }
-    }
-
-    function esc(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    /* ─── Boot ───────────────────────────────────────────── */
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => new BadgesPage().init());
 </script>
 </body>
 </html>
