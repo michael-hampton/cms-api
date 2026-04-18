@@ -154,4 +154,9 @@ class Campaign extends Model
     {
         return $this->isActive() && !$this->hasEnded();
     }
+
+    public function segment()
+    {
+        return $this->belongsTo(Segment::class);
+    }
 }

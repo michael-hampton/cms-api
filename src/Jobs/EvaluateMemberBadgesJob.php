@@ -2,14 +2,13 @@
 
 namespace App\Jobs;
 
-use App\Models\Member;
+use App\Framework\Queue\Dispatchable;
+use App\Framework\Queue\InteractsWithQueue;
+use App\Framework\Queue\SerializesModels;
+use App\Framework\Queue\ShouldQueue;
+use App\Framework\Support\Logger;
+use App\Repositories\Members\MemberRepository;
 use App\Services\Members\BadgeService;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Async wrapper around BadgeService::checkAndAwardBadges().
@@ -25,12 +24,13 @@ use Illuminate\Support\Facades\Log;
  * afterCommit() ensures the job is only enqueued after the activity
  * write transaction has committed, preventing phantom reads.
  */
-class EvaluateMemberBadgesJob implements ShouldQueue
+class EvaluateMemberBadgesJob extends BaseJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, SerializesModels;
 
-    public int $tries = 3;
     public int $backoff = 30;
+    private BadgeService $badgeService;
+    private MemberRepository $memberRepository;
 
     public function __construct(
         public readonly int $memberId,
@@ -38,12 +38,12 @@ class EvaluateMemberBadgesJob implements ShouldQueue
     {
     }
 
-    public function handle(BadgeService $badgeService): void
+    public function handle(): void
     {
-        $member = Member::find($this->memberId);
+        $member = $this->memberRepository->find($this->memberId);
 
         if ($member === null) {
-            Log::warning('EvaluateMemberBadgesJob: member not found', [
+            Logger::warning('EvaluateMemberBadgesJob: member not found', [
                 'member_id' => $this->memberId,
             ]);
             return;
@@ -51,6 +51,6 @@ class EvaluateMemberBadgesJob implements ShouldQueue
 
         // Intentionally calling existing method unchanged.
         // Do NOT inline or refactor the logic from BadgeService here.
-        $badgeService->checkAndAwardBadges($member);
+        $this->badgeService->checkAndAwardBadges($member);
     }
 }

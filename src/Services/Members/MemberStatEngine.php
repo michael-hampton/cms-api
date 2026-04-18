@@ -5,6 +5,7 @@ namespace App\Services\Members;
 use App\Framework\Support\Collection;
 use App\Models\GiftedArticle;
 use App\Models\MemberActivity;
+use App\Models\MemberStat;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\MemberActivityAnalyticsRepository;
@@ -33,7 +34,13 @@ class MemberStatEngine
 
         $counts = $this->buildCounts($memberId, $siteId, $activities);
 
+        // Write flat counters to member_stats via the existing repository contract.
         $this->analyticsRepository->upsert($memberId, $siteId, $counts);
+
+        // Write the full nested payload to member_stats.data so the segment rule
+        // evaluator can resolve dot-notation paths like scores.activity_score,
+        // trends.7d_change, flags, etc.
+        MemberStat::updateOrCreate(['member_id' => $memberId, 'site_id' => $siteId], array_merge($counts['counters'], ['data' => $counts]));
     }
 
     private function buildCounts(int $memberId, int $siteId, Collection $activities): array
@@ -170,7 +177,7 @@ class MemberStatEngine
     private function trends(Collection $activities): array
     {
         if ($activities->isEmpty()) {
-            return ['7d_change' => '0%'];
+            return ['7d_change' => 0];
         }
 
         $daily = $activities
@@ -179,11 +186,14 @@ class MemberStatEngine
 
         $last7 = $daily->take(-7)->sum();
         $prev7 = $daily->slice(-14, 7)->sum();
+
+        // Stored as a plain integer so segment rules can use numeric comparisons
+        // (e.g. trends.7d_change < -20). Format as "%" only at the display layer.
         $change = $prev7 > 0
-            ? round((($last7 - $prev7) / $prev7) * 100)
+            ? (int)round((($last7 - $prev7) / $prev7) * 100)
             : 0;
 
-        return ['7d_change' => $change . '%'];
+        return ['7d_change' => $change];
     }
 
     // GiftedArticle has no repository yet. Two targeted count queries here are

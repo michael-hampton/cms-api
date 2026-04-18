@@ -17,6 +17,7 @@ class MemberStat extends Model
         'articles_gifted_count',
         'articles_received_count',
         'last_computed_at',
+        'data'
     ];
 
     protected $casts = [
@@ -28,5 +29,6 @@ class MemberStat extends Model
         'articles_gifted_count' => 'integer',
         'articles_received_count' => 'integer',
         'last_computed_at' => 'datetime',
+        'data' => 'array',
     ];
 }

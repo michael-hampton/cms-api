@@ -5,6 +5,7 @@ namespace App\Models;
 class CampaignExecution extends Model
 {
     public $timestamps = false;
+    protected $table = 'campaign_executions';
     protected $fillable = [
         'member_id',
         'campaign_id',

@@ -12,7 +12,7 @@ use App\Models\Model;
  * Responsibility is narrow: one write, nothing else.
  * Called by SendCampaignJob after delivery is handed off to Laravel.
  */
-final class CampaignExecutionLogger
+class CampaignExecutionLogger
 {
     public function log(int $memberId, Campaign $campaign, string $segmentKey): Model
     {

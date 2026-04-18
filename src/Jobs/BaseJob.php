@@ -71,4 +71,30 @@ abstract class BaseJob extends Job
         }
     }
 
+    protected function resolveProperty(string $property, string $type): mixed
+    {
+        try {
+            $reflection = new \ReflectionObject($this);
+            $refProperty = $reflection->getProperty($property);
+            $refProperty->setAccessible(true);
+
+            if ($refProperty->isInitialized($this)) {
+                $value = $refProperty->getValue($this);
+
+                if ($value !== null) {
+                    return $value;
+                }
+            }
+
+            $value = Container::getInstance()->resolve($type);
+            $refProperty->setValue($this, $value);
+
+            return $value;
+        } catch (\ReflectionException) {
+            // Fall back to a direct resolve if the property is missing.
+            // This keeps the helper safe for incremental adoption.
+            return Container::getInstance()->resolve($type);
+        }
+    }
+
 }

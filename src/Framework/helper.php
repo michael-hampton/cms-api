@@ -22,6 +22,42 @@ if (!function_exists('auth')) {
     }
 }
 
+if (!function_exists('data_get')) {
+    function data_get(mixed $target, string|array|null $key, mixed $default = null): mixed
+    {
+        if ($key === null) {
+            return $target;
+        }
+
+        $key = is_array($key) ? $key : explode('.', $key);
+
+        foreach ($key as $segment) {
+            if (is_array($target) && array_key_exists($segment, $target)) {
+                $target = $target[$segment];
+                continue;
+            }
+
+            if (is_object($target) && isset($target->{$segment})) {
+                $target = $target->{$segment};
+                continue;
+            }
+
+            return value($default);
+        }
+
+        return $target;
+    }
+
+    if (!function_exists('value')) {
+        function value(mixed $value, ...$args): mixed
+        {
+            return $value instanceof Closure
+                ? $value(...$args)
+                : $value;
+        }
+    }
+}
+
 if (!function_exists('member_auth')) {
     function member_auth(): MemberAuth
     {

@@ -4,6 +4,7 @@ namespace App\Services\Members\Segmentation;
 
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
+use App\Repositories\Members\CampaignRepository;
 
 /**
  * Matches active campaigns to the segments a member belongs to.
@@ -13,22 +14,20 @@ use App\Models\Campaign;
  *
  * No writes, no side effects.
  */
-final class CampaignMatcher
+class CampaignMatcher
 {
+    public function __construct(
+        private readonly CampaignRepository $campaignRepository,
+    )
+    {
+    }
+
     /**
      * @param string[] $segmentKeys e.g. ['churning', 'lurker']
      * @return Collection<Campaign>
      */
     public function match(array $segmentKeys): Collection
     {
-        if (empty($segmentKeys)) {
-            return new Collection();
-        }
-
-        return Campaign::whereHas('segment', fn($q) => $q->whereIn('key', $segmentKeys))
-            ->where('is_active', true)
-            ->with('segment')
-            ->orderByDesc('priority')
-            ->get();
+        return $this->campaignRepository->matchActiveBySegmentKeys($segmentKeys);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Models;
 
 class MemberSegment extends Model
 {
+    protected $table = 'member_segments';
     public $timestamps = false;
     protected $fillable = [
         'member_id',

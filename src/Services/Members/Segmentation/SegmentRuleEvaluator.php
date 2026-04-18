@@ -19,7 +19,7 @@ use App\Models\SegmentRule;
  *   - Each subsequent rule's `boolean` value describes how it combines
  *     with the accumulator: AND narrows, OR broadens.
  */
-final class SegmentRuleEvaluator
+class SegmentRuleEvaluator
 {
     /**
      * @param array<string, mixed> $profile Nested profile array
@@ -35,11 +35,12 @@ final class SegmentRuleEvaluator
 
         foreach ($rules as $rule) {
             $actual = data_get($profile, $rule->field);
+
             $expected = $rule->value;
-            $operator = SegmentRuleOperator::from($rule->operator instanceof SegmentRuleOperator
-                ? $rule->operator->value
-                : (string)$rule->operator
-            );
+
+            $operator = $rule->operator instanceof SegmentRuleOperator
+                ? $rule->operator
+                : SegmentRuleOperator::from((string)$rule->operator);
 
             $match = $operator->compare($actual, $expected);
 

@@ -18,19 +18,18 @@ class QueryBuilder
 {
     use HasMacros;
 
-    protected $table;
     public $wheres = [];
+    public $selects = ['*'];
+    public $eagerLoad = [];
+    protected $table;
     protected $orders = [];
     protected $groups = [];
     protected $havings = [];
     protected $limit;
     protected $offset;
     protected $joins = [];
-    public $selects = ['*'];
     protected $database;
     protected $bindings = [];
-    public $eagerLoad = [];
-
     private $reservedWords = [
         'order', 'group', 'index', 'key', 'primary', 'unique', 'foreign',
         'references', 'table', 'column', 'database', 'schema', 'select',
@@ -64,20 +63,6 @@ class QueryBuilder
         return $this;
     }
 
-    public function addSelect($columns): self
-    {
-        $columns = is_array($columns) ? $columns : func_get_args();
-
-        if ($this->selects === ['*']) {
-            $this->selects = [];
-        }
-
-        $this->selects = array_merge($this->selects, $columns);
-        return $this;
-    }
-
-    // Add to QueryBuilder.php
-
     public function countDistinct(string $column): int
     {
         $originalSelects = $this->selects;
@@ -97,772 +82,8 @@ class QueryBuilder
         return (int)($result['count'] ?? 0);
     }
 
-    public function distinct(): self
-    {
-        if (!in_array('DISTINCT', $this->selects)) {
-            array_unshift($this->selects, 'DISTINCT');
-        }
-        return $this;
-    }
+    // Add to QueryBuilder.php
 
-    // WHERE methods
-    public function where($column, $operator = null, $value = null): self
-    {
-        if ($column instanceof Closure) {
-            $subQuery = new static($this->table, $this->relationManager, $this->database); // new query builder
-            $column($subQuery); // let closure add its wheres
-            $this->wheres[] = [
-                'type' => 'Nested',
-                'query' => $subQuery,
-                'boolean' => 'AND',
-            ];
-            return $this;
-        }
-
-        if (is_array($column)) {
-            foreach ($column as $key => $val) {
-                $this->where($key, '=', $val);
-            }
-            return $this;
-        }
-
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'Basic',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function orWhere($column, $operator = null, $value = null): self
-    {
-        if ($column instanceof Closure) {
-            $subQuery = new static($this->table, $this->relationManager, $this->database);
-            $column($subQuery); // let closure add its wheres
-            $this->wheres[] = [
-                'type' => 'Nested',
-                'query' => $subQuery,
-                'boolean' => 'OR',  // Note: OR instead of AND
-            ];
-            return $this;
-        }
-
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'Basic',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'OR'
-        ];
-
-        return $this;
-    }
-
-    public function whereLike(string $column, string $value): self
-    {
-        return $this->where($column, 'LIKE', $value);
-    }
-
-    public function whereDate(string $column, $operator, $value = null): self
-    {
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'Date',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereMonth(string $column, $operator, $value = null): self
-    {
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'Month',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereYear(string $column, $operator, $value = null): self
-    {
-        if ($value === null) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'Year',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function orWhereLike(string $column, string $value): self
-    {
-        return $this->orWhere($column, 'LIKE', $value);
-    }
-
-    public function whereIn(string $column, array|Collection $values, string $boolean = 'and'): self
-    {
-        if ($values instanceof Collection) {
-            $values = $values->toArray();
-        }
-
-        // 🔑 Fix: Handle empty arrays to prevent "IN ()" syntax error
-        if (empty($values)) {
-            // If we want to match nothing, we use a condition that is always false
-            return $this->whereRaw('1=0', [], $boolean);
-        }
-
-        $placeholders = [];
-        $localBindings = [];
-        foreach ($values as $value) {
-            $uniqueId = bin2hex(random_bytes(2));
-            // Ensure index is unique even within this specific In call
-            $paramName = "in_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
-
-            $placeholders[] = ":{$paramName}";
-            $localBindings[$paramName] = $value;
-        }
-
-        $this->wheres[] = [
-            'type' => 'In',
-            'column' => $column,
-            'sql_fragment' => implode(', ', $placeholders),
-            'bindings' => $localBindings,
-            'boolean' => $boolean
-        ];
-
-        // Merge into master bindings
-        $this->bindings = array_merge($this->bindings, $localBindings);
-
-        return $this;
-    }
-
-    public function orWhereIn(string $column, array $values): self
-    {
-        return $this->whereIn($column, $values, 'or');
-    }
-
-    public function whereNotIn(string $column, array $values, string $boolean = 'and'): self
-    {
-        // 🔑 Fix: If we exclude "nothing", the condition is always true.
-        // We can just skip adding the where clause entirely.
-        if (empty($values)) {
-            return $this;
-        }
-
-        $placeholders = [];
-        $localBindings = [];
-        foreach ($values as $value) {
-            $uniqueId = bin2hex(random_bytes(2));
-            $paramName = "notin_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
-
-            $placeholders[] = ":{$paramName}";
-            $localBindings[$paramName] = $value;
-        }
-
-        $this->wheres[] = [
-            'type' => 'NotIn',
-            'column' => $column,
-            'sql_fragment' => implode(', ', $placeholders),
-            'bindings' => $localBindings,
-            'boolean' => $boolean
-        ];
-
-        $this->bindings = array_merge($this->bindings, $localBindings);
-
-        return $this;
-    }
-
-    public function whereNot(string $column, $operator = null, $value = null, string $boolean = 'AND'): self
-    {
-        if (func_num_args() === 2) {
-            $value = $operator;
-            $operator = '=';
-        }
-
-        $this->wheres[] = [
-            'type' => 'NotBasic',
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => $boolean,
-        ];
-
-        return $this;
-    }
-
-    public function whereBetween(string $column, array $values): self
-    {
-        if (count($values) !== 2) {
-            throw new InvalidArgumentException('Between method requires exactly 2 values');
-        }
-
-        $this->wheres[] = [
-            'type' => 'Between',
-            'column' => $column,
-            'values' => $values,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereNotBetween(string $column, array $values): self
-    {
-        if (count($values) !== 2) {
-            throw new InvalidArgumentException('Not between method requires exactly 2 values');
-        }
-
-        $this->wheres[] = [
-            'type' => 'NotBetween',
-            'column' => $column,
-            'values' => $values,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereNull(string $column): self
-    {
-        $this->wheres[] = [
-            'type' => 'Null',
-            'column' => $column,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereNotNull(string $column): self
-    {
-        $this->wheres[] = [
-            'type' => 'NotNull',
-            'column' => $column,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function orWhereNull(string $column): self
-    {
-        $this->wheres[] = [
-            'type' => 'Null',
-            'column' => $column,
-            'boolean' => 'OR'
-        ];
-
-        return $this;
-    }
-
-    public function orWhereNotNull(string $column): self
-    {
-        $this->wheres[] = [
-            'type' => 'NotNull',
-            'column' => $column,
-            'boolean' => 'OR'
-        ];
-
-        return $this;
-    }
-
-    public function whereExists(QueryBuilder $query): self
-    {
-        $this->wheres[] = [
-            'type' => 'Exists',
-            'query' => $query,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function whereNotExists(QueryBuilder $query): self
-    {
-        $this->wheres[] = [
-            'type' => 'NotExists',
-            'query' => $query,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    // Subquery WHERE
-    public function whereSub(string $column, string $operator, QueryBuilder $query): self
-    {
-        $this->wheres[] = [
-            'type' => 'Sub',
-            'column' => $column,
-            'operator' => $operator,
-            'query' => $query,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    // GROUP BY
-    public function groupBy(...$columns): self
-    {
-        foreach ($columns as $column) {
-            if (is_array($column)) {
-                $this->groups = array_merge($this->groups, $column);
-            } else {
-                $this->groups[] = $column;
-            }
-        }
-
-        return $this;
-    }
-
-    // HAVING
-    public function having(string $column, string $operator, $value): self
-    {
-        $this->havings[] = [
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'AND'
-        ];
-
-        return $this;
-    }
-
-    public function orHaving(string $column, string $operator, $value): self
-    {
-        $this->havings[] = [
-            'column' => $column,
-            'operator' => $operator,
-            'value' => $value,
-            'boolean' => 'OR'
-        ];
-
-        return $this;
-    }
-
-    // ORDER BY
-    public function orderBy($column, string $direction = 'asc'): self
-    {
-        if (is_array($column)) {
-            foreach ($column as $col => $dir) {
-                $this->orders[] = ['column' => $col, 'direction' => strtoupper($dir)];
-            }
-        } else {
-            $this->orders[] = ['column' => $column, 'direction' => strtoupper($direction)];
-        }
-        return $this;
-    }
-
-    public function orderByDesc(string $column): self
-    {
-        return $this->orderBy($column, 'desc');
-    }
-
-    public function orderByRaw(string $sql): self
-    {
-        $this->orders[] = ['raw' => $sql];
-        return $this;
-    }
-
-    public function latest(string $column = 'created_at'): self
-    {
-        return $this->orderBy($column, 'desc');
-    }
-
-    public function oldest(string $column = 'created_at'): self
-    {
-        return $this->orderBy($column, 'asc');
-    }
-
-    public function from(?string $alias = null)
-    {
-        $this->table = $alias
-            ? "{$this->table} as {$alias}"
-            : $this->table;
-
-        return $this;
-    }
-    // JOINS
-    public function join(string $table, $first, ?string $operator = null, ?string $second = null): self
-    {
-        return $this->addJoin('INNER', $table, $first, $operator, $second);
-    }
-
-    public function leftJoin(string $table, $first, ?string $operator = null, ?string $second = null): self
-    {
-        return $this->addJoin('LEFT', $table, $first, $operator, $second);
-    }
-
-    public function rightJoin(string $table, $first, ?string $operator = null, ?string $second = null): self
-    {
-        return $this->addJoin('RIGHT', $table, $first, $operator, $second);
-    }
-
-    public function crossJoin(string $table): self
-    {
-        $this->joins[] = [
-            'type' => 'CROSS',
-            'table' => $table
-        ];
-        return $this;
-    }
-
-    private function addJoin(string $type, string $table, $first, ?string $operator = null, ?string $second = null): self
-    {
-        // Handle two-argument form: join('posts', 'posts.user_id')
-        if ($operator === null && $second === null) {
-            $operator = '=';
-            $second = $first;
-            $first = $this->table . '.id';
-        } // Handle three-argument form: join('posts', 'users.id', 'posts.user_id')
-        elseif ($second === null) {
-            $second = $operator;
-            $operator = '=';
-        }
-
-        $this->joins[] = [
-            'type' => $type,
-            'table' => $table,
-            'first' => $first,
-            'operator' => $operator,
-            'second' => $second
-        ];
-
-        return $this;
-    }
-
-    // LIMIT and OFFSET
-    public function limit(int $limit): self
-    {
-        $this->limit = $limit;
-        return $this;
-    }
-
-    public function offset(int $offset): self
-    {
-        $this->offset = $offset;
-        return $this;
-    }
-
-    public function forPage(int $page, int $perPage = 10)
-    {
-        $page = max($page, 1); // avoid page 0 or negatives
-
-        return $this->skip(($page - 1) * $perPage)->take($perPage);
-    }
-
-    public function skip(int $offset): self
-    {
-        return $this->offset($offset);
-    }
-
-    public function take(int $limit): self
-    {
-        return $this->limit($limit);
-    }
-
-    // Pagination
-    public function paginate(int $perPage = 15, int $page = 1): array
-    {
-        $offset = ($page - 1) * $perPage;
-
-        // Get total count
-        $totalQuery = clone $this;
-        $totalQuery->selects = ['COUNT(*) as count'];
-        $totalQuery->orders = [];
-        $totalQuery->limit = null;
-        $totalQuery->offset = null;
-
-        [$countSql, $countParams] = $totalQuery->toSql();
-        $stmt = $this->database->query($countSql, $countParams);
-        $total = $stmt->fetch()['count'];
-
-        // Get paginated results
-        $this->limit($perPage)->offset($offset);
-        $data = $this->get();
-
-        return [
-            'data' => $data,
-            'pagination' => [
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => (int)$total,
-                'last_page' => (int)ceil($total / $perPage),
-                'from' => $offset + 1,
-                'to' => min($offset + $perPage, $total),
-                'total_pages' => (int)ceil($total / $perPage),
-                'has_more' => $page < (int)ceil($total / $perPage)
-            ]
-        ];
-    }
-
-    // Eager loading
-    public function with(array $relations): self
-    {
-        $this->eagerLoad = array_merge($this->eagerLoad ?? [], $relations);
-        return $this;
-    }
-
-    // Query execution methods
-    public function get(): Collection
-    {
-        [$sql, $params] = $this->toSql();
-
-        $stmt = $this->database->query($sql, $params);
-        $results = $stmt->fetchAll();
-
-        // Delegate eager loading to EagerLoader
-        if (!empty($this->eagerLoad) && !empty($results)) {
-            $modelClass = $this->getModelClassFromTable($this->table);
-            if ($modelClass) {
-                $results = $this->relationManager->loadRelationsForResults($results, $this->eagerLoad, $modelClass);
-            }
-        }
-
-        // If we have a model class associated with this table, hydrate the results
-        $modelClass = $this->getModelClassFromTable($this->table);
-
-        if ($modelClass && !empty($results)) {
-            return $this->hydrateModels($results, $modelClass);
-        }
-
-        return new Collection($results);
-    }
-
-    public function first()
-    {
-        $this->limit(1);
-        $results = $this->get();
-
-        return $results->first() ?? null;
-    }
-
-    public function count(): int
-    {
-        $originalSelects = $this->selects;
-        $originalOrders = $this->orders;
-
-        // default
-        $countSql = 'COUNT(*) as count';
-
-        // if DISTINCT + specific column
-        if (
-            in_array('DISTINCT', $this->selects, true) &&
-            count($this->selects) === 2 &&
-            $this->selects[1] !== '*'
-        ) {
-            $column = $this->selects[1];
-            $countSql = "COUNT(DISTINCT {$column}) as count";
-        }
-
-        $this->selects = [$countSql];
-        $this->orders = [];
-
-        [$sql, $params] = $this->toSql();
-
-        $stmt = $this->database->query($sql, $params);
-        $result = $stmt->fetch();
-
-        $this->selects = $originalSelects;
-        $this->orders = $originalOrders;
-
-        return (int)$result['count'];
-    }
-
-    public function exists(): bool
-    {
-        return $this->count() > 0;
-    }
-
-    // Aggregate functions
-    public function sum(string $column): float
-    {
-        return $this->aggregate('SUM', $column) ?? 0;
-    }
-
-    public function avg(string $column): float
-    {
-        return $this->aggregate('AVG', $column) ?? 0;
-    }
-
-    public function min(string $column)
-    {
-        return $this->aggregate('MIN', $column);
-    }
-
-    public function max(string $column)
-    {
-        return $this->aggregate('MAX', $column);
-    }
-
-    private function aggregate(string $function, string $column)
-    {
-        $originalSelects = $this->selects;
-        $this->selects = ["{$function}({$column}) as aggregate"];
-
-        [$sql, $params] = $this->toSql();
-        $stmt = $this->database->query($sql, $params);
-        $result = $stmt->fetch();
-
-        $this->selects = $originalSelects;
-
-        return $result['aggregate'];
-    }
-
-    public function increment(string $column, int $amount = 1, array $extra = []): int
-    {
-        $updates = array_merge($extra, [$column => $this->raw("$column + $amount")]);
-        return $this->updateQuery($updates);
-    }
-
-    public function decrement(string $column, int $amount = 1, array $extra = []): int
-    {
-        return $this->increment($column, -$amount, $extra);
-    }
-
-    /**
-     * Update records in the database with the given values.
-     *
-     * @param array $values
-     * @return int The number of affected rows.
-     */
-    public function update(array $values): int
-    {
-        return $this->updateQuery($values);
-    }
-
-    private function updateQuery(array $values): int
-    {
-        $setParts = [];
-        $bindings = [];
-        $paramCounter = 0;
-
-        foreach ($values as $col => $value) {
-            if ($value instanceof RawExpression) {
-                $setParts[] = $this->quoteColumn($col) . " = {$value->value}";
-            } else {
-
-                if (is_bool($value)) $value = (int)($value == true);
-
-                $paramKey = 'param_' . $paramCounter++;
-                $setParts[] = $this->quoteColumn($col) . " = :{$paramKey}";
-                $bindings[$paramKey] = $value;
-            }
-        }
-
-        $sql = "UPDATE " . $this->quoteTable($this->table) . " SET " . implode(', ', $setParts);
-
-        // Add WHERE conditions if any
-        if (!empty($this->wheres)) {
-            [$whereClause, $whereBindings] = $this->buildWhereClause($this->wheres, $paramCounter);
-            $sql .= $whereClause;
-            $bindings = array_merge($bindings, $whereBindings);
-        }
-
-        $stmt = $this->database->query($sql, $bindings);
-        return $stmt->rowCount();
-    }
-
-
-    /**
-     * Find by ID and return properly hydrated model
-     */
-    public function find($id, string $primaryKey = 'id')
-    {
-        return $this->where($primaryKey, $id)->first();
-    }
-
-    /**
-     * Hydrate raw results into model instances
-     */
-    private function hydrateModels(array $results, string $modelClass): Collection
-    {
-        $models = [];
-
-        foreach ($results as $data) {
-            $model = $this->hydrateModel($data, $modelClass);
-
-            $models[] = $model;
-        }
-
-        return new Collection($models);
-    }
-
-    /**
-     * Hydrate single result into model instance
-     */
-    private function hydrateModel(array $data, string $modelClass): Model
-    {
-        // Separate regular attributes from relation data
-        $attributes = [];
-        $relations = [];
-
-        $tempModel = new $modelClass();
-
-        foreach ($data as $key => $value) {
-            // If this key matches a relation that was eager loaded, it's relation data
-            if (in_array($key, $this->eagerLoad)) {
-                $relations[$key] = $value;
-            } else {
-                $attributes[$key] = $value;
-            }
-        }
-
-        // Create model with attributes
-        $model = new $modelClass($attributes);
-        $model->setExists(true);
-        $model->original = $model->attributes;
-
-        // Set relations
-        foreach ($relations as $relationName => $relationData) {
-            $model->setRelation($relationName, $relationData);
-        }
-
-        // Fire retrieved event
-        //$model->fireModelEvent('retrieved');
-
-        return $model;
-    }
-
-    // SQL Generation
-    // Fixed SQL generation with proper quoting
     public function toSql(): array
     {
         $bindings = [];
@@ -973,31 +194,15 @@ class QueryBuilder
         return [$sql, $bindings];
     }
 
-    public function havingRaw(string $sql, array $bindings = [], string $boolean = 'AND'): self
+    private function quoteTable(string $table): string
     {
-        $this->havings[] = [
-            'type' => 'Raw',
-            'sql' => $sql,
-            'bindings' => $bindings,
-            'boolean' => $boolean
-        ];
-
-        // Merge bindings into the main pool
-        foreach ($bindings as $key => $value) {
-            if (is_string($key)) {
-                $this->bindings[$key] = $value;
-            } else {
-                $this->bindings[] = $value;
-            }
+        if (in_array(strtolower($table), $this->reservedWords)) {
+            return "`{$table}`";
         }
-
-        return $this;
+        return $table;
     }
 
-    public function orHavingRaw(string $sql, array $bindings = []): self
-    {
-        return $this->havingRaw($sql, $bindings, 'OR');
-    }
+    // WHERE methods
 
     private function quoteColumn(string $column): string
     {
@@ -1032,15 +237,6 @@ class QueryBuilder
         return $column;
     }
 
-    // Helper method to quote table names if needed
-    private function quoteTable(string $table): string
-    {
-        if (in_array(strtolower($table), $this->reservedWords)) {
-            return "`{$table}`";
-        }
-        return $table;
-    }
-
     private function buildWhereClause(array $wheres, int $paramCounter = 0): array
     {
         $sql = ' WHERE ';
@@ -1061,23 +257,6 @@ class QueryBuilder
         $sql .= implode(' ', $whereStrings);
 
         return [$sql, $bindings];
-    }
-
-    private function compileWheres(array $wheres, int &$paramCounter): array
-    {
-        $sqlParts = [];
-        $bindings = [];
-
-        foreach ($wheres as $where) {
-            [$fragment, $fragBindings] = $this->compileWhere($where, $paramCounter);
-
-            $prefix = empty($sqlParts) ? '' : ' ' . $where['boolean'] . ' ';
-            $sqlParts[] = $prefix . $fragment;
-
-            $bindings = array_merge($bindings, $fragBindings);
-        }
-
-        return [implode('', $sqlParts), $bindings];
     }
 
     private function compileWhere(array $where, int &$paramCounter): array
@@ -1140,7 +319,6 @@ class QueryBuilder
 
                 // Match Basic case: return array with SQL fragment and bindings
                 return ["{$firstColumn} {$operator} {$secondColumn}", $bindings];
-
 
 
             case 'In':
@@ -1230,14 +408,860 @@ class QueryBuilder
         }
     }
 
+    private function compileWheres(array $wheres, int &$paramCounter): array
+    {
+        $sqlParts = [];
+        $bindings = [];
+
+        foreach ($wheres as $where) {
+            [$fragment, $fragBindings] = $this->compileWhere($where, $paramCounter);
+
+            $prefix = empty($sqlParts) ? '' : ' ' . $where['boolean'] . ' ';
+            $sqlParts[] = $prefix . $fragment;
+
+            $bindings = array_merge($bindings, $fragBindings);
+        }
+
+        return [implode('', $sqlParts), $bindings];
+    }
+
+    public function distinct(): self
+    {
+        if (!in_array('DISTINCT', $this->selects)) {
+            array_unshift($this->selects, 'DISTINCT');
+        }
+        return $this;
+    }
+
+    public function whereLike(string $column, string $value): self
+    {
+        return $this->where($column, 'LIKE', $value);
+    }
+
+    public function where($column, $operator = null, $value = null): self
+    {
+        if ($column instanceof Closure) {
+            $subQuery = new static($this->table, $this->relationManager, $this->database); // new query builder
+            $column($subQuery); // let closure add its wheres
+            $this->wheres[] = [
+                'type' => 'Nested',
+                'query' => $subQuery,
+                'boolean' => 'AND',
+            ];
+            return $this;
+        }
+
+        if (is_array($column)) {
+            foreach ($column as $key => $val) {
+                $this->where($key, '=', $val);
+            }
+            return $this;
+        }
+
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Basic',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereDate(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Date',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereMonth(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Month',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereYear(string $column, $operator, $value = null): self
+    {
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Year',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function orWhereLike(string $column, string $value): self
+    {
+        return $this->orWhere($column, 'LIKE', $value);
+    }
+
+    public function orWhere($column, $operator = null, $value = null): self
+    {
+        if ($column instanceof Closure) {
+            $subQuery = new static($this->table, $this->relationManager, $this->database);
+            $column($subQuery); // let closure add its wheres
+            $this->wheres[] = [
+                'type' => 'Nested',
+                'query' => $subQuery,
+                'boolean' => 'OR',  // Note: OR instead of AND
+            ];
+            return $this;
+        }
+
+        if ($value === null) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'Basic',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'OR'
+        ];
+
+        return $this;
+    }
+
+    public function orWhereIn(string $column, array $values): self
+    {
+        return $this->whereIn($column, $values, 'or');
+    }
+
+    public function whereIn(string $column, array|Collection $values, string $boolean = 'and'): self
+    {
+        if ($values instanceof Collection) {
+            $values = $values->toArray();
+        }
+
+        // 🔑 Fix: Handle empty arrays to prevent "IN ()" syntax error
+        if (empty($values)) {
+            // If we want to match nothing, we use a condition that is always false
+            return $this->whereRaw('1=0', [], $boolean);
+        }
+
+        $placeholders = [];
+        $localBindings = [];
+        foreach ($values as $value) {
+            $uniqueId = bin2hex(random_bytes(2));
+            // Ensure index is unique even within this specific In call
+            $paramName = "in_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
+
+            $placeholders[] = ":{$paramName}";
+            $localBindings[$paramName] = $value;
+        }
+
+        $this->wheres[] = [
+            'type' => 'In',
+            'column' => $column,
+            'sql_fragment' => implode(', ', $placeholders),
+            'bindings' => $localBindings,
+            'boolean' => $boolean
+        ];
+
+        // Merge into master bindings
+        $this->bindings = array_merge($this->bindings, $localBindings);
+
+        return $this;
+    }
+
+    public function whereRaw(string $sql, array $bindings = [], string $boolean = 'and'): self
+    {
+        $this->wheres[] = [
+            'type' => 'Raw',
+            'sql' => $sql,
+            'bindings' => $bindings,
+            'boolean' => $boolean
+        ];
+
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                // Preserve named parameters exactly as they appear in SQL
+                $this->bindings[$key] = $value;
+            } else {
+                $this->bindings[] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    public function whereNotIn(string $column, array $values, string $boolean = 'and'): self
+    {
+        // 🔑 Fix: If we exclude "nothing", the condition is always true.
+        // We can just skip adding the where clause entirely.
+        if (empty($values)) {
+            return $this;
+        }
+
+        $placeholders = [];
+        $localBindings = [];
+        foreach ($values as $value) {
+            $uniqueId = bin2hex(random_bytes(2));
+            $paramName = "notin_" . $uniqueId . "_" . count($this->bindings) . count($localBindings);
+
+            $placeholders[] = ":{$paramName}";
+            $localBindings[$paramName] = $value;
+        }
+
+        $this->wheres[] = [
+            'type' => 'NotIn',
+            'column' => $column,
+            'sql_fragment' => implode(', ', $placeholders),
+            'bindings' => $localBindings,
+            'boolean' => $boolean
+        ];
+
+        $this->bindings = array_merge($this->bindings, $localBindings);
+
+        return $this;
+    }
+
+    public function whereNot(string $column, $operator = null, $value = null, string $boolean = 'AND'): self
+    {
+        if (func_num_args() === 2) {
+            $value = $operator;
+            $operator = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'NotBasic',
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => $boolean,
+        ];
+
+        return $this;
+    }
+
+    public function whereBetween(string $column, array $values): self
+    {
+        if (count($values) !== 2) {
+            throw new InvalidArgumentException('Between method requires exactly 2 values');
+        }
+
+        $this->wheres[] = [
+            'type' => 'Between',
+            'column' => $column,
+            'values' => $values,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereNotBetween(string $column, array $values): self
+    {
+        if (count($values) !== 2) {
+            throw new InvalidArgumentException('Not between method requires exactly 2 values');
+        }
+
+        $this->wheres[] = [
+            'type' => 'NotBetween',
+            'column' => $column,
+            'values' => $values,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    // Subquery WHERE
+
+    public function whereNull(string $column): self
+    {
+        $this->wheres[] = [
+            'type' => 'Null',
+            'column' => $column,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    // GROUP BY
+
+    public function whereNotNull(string $column): self
+    {
+        $this->wheres[] = [
+            'type' => 'NotNull',
+            'column' => $column,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    // HAVING
+
+    public function orWhereNull(string $column): self
+    {
+        $this->wheres[] = [
+            'type' => 'Null',
+            'column' => $column,
+            'boolean' => 'OR'
+        ];
+
+        return $this;
+    }
+
+    public function orWhereNotNull(string $column): self
+    {
+        $this->wheres[] = [
+            'type' => 'NotNull',
+            'column' => $column,
+            'boolean' => 'OR'
+        ];
+
+        return $this;
+    }
+
+    // ORDER BY
+
+    public function whereExists(QueryBuilder $query): self
+    {
+        $this->wheres[] = [
+            'type' => 'Exists',
+            'query' => $query,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereNotExists(QueryBuilder $query): self
+    {
+        $this->wheres[] = [
+            'type' => 'NotExists',
+            'query' => $query,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function whereSub(string $column, string $operator, QueryBuilder $query): self
+    {
+        $this->wheres[] = [
+            'type' => 'Sub',
+            'column' => $column,
+            'operator' => $operator,
+            'query' => $query,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function groupBy(...$columns): self
+    {
+        foreach ($columns as $column) {
+            if (is_array($column)) {
+                $this->groups = array_merge($this->groups, $column);
+            } else {
+                $this->groups[] = $column;
+            }
+        }
+
+        return $this;
+    }
+
+    public function having(string $column, string $operator, $value): self
+    {
+        $this->havings[] = [
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'AND'
+        ];
+
+        return $this;
+    }
+
+    public function orHaving(string $column, string $operator, $value): self
+    {
+        $this->havings[] = [
+            'column' => $column,
+            'operator' => $operator,
+            'value' => $value,
+            'boolean' => 'OR'
+        ];
+
+        return $this;
+    }
+
+    // JOINS
+
+    public function orderByDesc(string $column): self
+    {
+        return $this->orderBy($column, 'desc');
+    }
+
+    public function orderBy($column, string $direction = 'asc'): self
+    {
+        if (is_array($column)) {
+            foreach ($column as $col => $dir) {
+                $this->orders[] = ['column' => $col, 'direction' => strtoupper($dir)];
+            }
+        } else {
+            $this->orders[] = ['column' => $column, 'direction' => strtoupper($direction)];
+        }
+        return $this;
+    }
+
+    public function orderByRaw(string $sql): self
+    {
+        $this->orders[] = ['raw' => $sql];
+        return $this;
+    }
+
+    public function latest(string $column = 'created_at'): self
+    {
+        return $this->orderBy($column, 'desc');
+    }
+
+    public function oldest(string $column = 'created_at'): self
+    {
+        return $this->orderBy($column, 'asc');
+    }
+
+    // LIMIT and OFFSET
+
+    public function from(?string $alias = null)
+    {
+        $this->table = $alias
+            ? "{$this->table} as {$alias}"
+            : $this->table;
+
+        return $this;
+    }
+
+    public function join(string $table, $first, ?string $operator = null, ?string $second = null): self
+    {
+        return $this->addJoin('INNER', $table, $first, $operator, $second);
+    }
+
+    private function addJoin(string $type, string $table, $first, ?string $operator = null, ?string $second = null): self
+    {
+        // Handle two-argument form: join('posts', 'posts.user_id')
+        if ($operator === null && $second === null) {
+            $operator = '=';
+            $second = $first;
+            $first = $this->table . '.id';
+        } // Handle three-argument form: join('posts', 'users.id', 'posts.user_id')
+        elseif ($second === null) {
+            $second = $operator;
+            $operator = '=';
+        }
+
+        $this->joins[] = [
+            'type' => $type,
+            'table' => $table,
+            'first' => $first,
+            'operator' => $operator,
+            'second' => $second
+        ];
+
+        return $this;
+    }
+
+    public function leftJoin(string $table, $first, ?string $operator = null, ?string $second = null): self
+    {
+        return $this->addJoin('LEFT', $table, $first, $operator, $second);
+    }
+
+    public function rightJoin(string $table, $first, ?string $operator = null, ?string $second = null): self
+    {
+        return $this->addJoin('RIGHT', $table, $first, $operator, $second);
+    }
+
+    // Pagination
+
+    public function crossJoin(string $table): self
+    {
+        $this->joins[] = [
+            'type' => 'CROSS',
+            'table' => $table
+        ];
+        return $this;
+    }
+
+    // Eager loading
+
+    public function forPage(int $page, int $perPage = 10)
+    {
+        $page = max($page, 1); // avoid page 0 or negatives
+
+        return $this->skip(($page - 1) * $perPage)->take($perPage);
+    }
+
+    // Query execution methods
+
+    public function take(int $limit): self
+    {
+        return $this->limit($limit);
+    }
+
+    public function limit(int $limit): self
+    {
+        $this->limit = $limit;
+        return $this;
+    }
+
+    public function skip(int $offset): self
+    {
+        return $this->offset($offset);
+    }
+
+    public function offset(int $offset): self
+    {
+        $this->offset = $offset;
+        return $this;
+    }
+
+    // Aggregate functions
+
+    public function paginate(int $perPage = 15, int $page = 1): array
+    {
+        $offset = ($page - 1) * $perPage;
+
+        // Get total count
+        $totalQuery = clone $this;
+        $totalQuery->selects = ['COUNT(*) as count'];
+        $totalQuery->orders = [];
+        $totalQuery->limit = null;
+        $totalQuery->offset = null;
+
+        [$countSql, $countParams] = $totalQuery->toSql();
+        $stmt = $this->database->query($countSql, $countParams);
+        $total = $stmt->fetch()['count'];
+
+        // Get paginated results
+        $this->limit($perPage)->offset($offset);
+        $data = $this->get();
+
+        return [
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => (int)$total,
+                'last_page' => (int)ceil($total / $perPage),
+                'from' => $offset + 1,
+                'to' => min($offset + $perPage, $total),
+                'total_pages' => (int)ceil($total / $perPage),
+                'has_more' => $page < (int)ceil($total / $perPage)
+            ]
+        ];
+    }
+
+    public function get(): Collection
+    {
+        [$sql, $params] = $this->toSql();
+
+        $stmt = $this->database->query($sql, $params);
+        $results = $stmt->fetchAll();
+
+        // Delegate eager loading to EagerLoader
+        if (!empty($this->eagerLoad) && !empty($results)) {
+            $modelClass = $this->getModelClassFromTable($this->table);
+            if ($modelClass) {
+                $results = $this->relationManager->loadRelationsForResults($results, $this->eagerLoad, $modelClass);
+            }
+        }
+
+        // If we have a model class associated with this table, hydrate the results
+        $modelClass = $this->getModelClassFromTable($this->table);
+
+        if ($modelClass && !empty($results)) {
+            return $this->hydrateModels($results, $modelClass);
+        }
+
+        return new Collection($results);
+    }
+
     private function getModelClassFromTable(string $table): ?string
     {
         return ModelRegistry::getModelForTable($table);
     }
 
+    /**
+     * Hydrate raw results into model instances
+     */
+    private function hydrateModels(array $results, string $modelClass): Collection
+    {
+        $models = [];
+
+        foreach ($results as $data) {
+            $model = $this->hydrateModel($data, $modelClass);
+
+            $models[] = $model;
+        }
+
+        return new Collection($models);
+    }
+
+    /**
+     * Hydrate single result into model instance
+     */
+    private function hydrateModel(array $data, string $modelClass): Model
+    {
+        // Separate regular attributes from relation data
+        $attributes = [];
+        $relations = [];
+
+        $tempModel = new $modelClass();
+
+        foreach ($data as $key => $value) {
+            // If this key matches a relation that was eager loaded, it's relation data
+            if (in_array($key, $this->eagerLoad)) {
+                $relations[$key] = $value;
+            } else {
+                $attributes[$key] = $value;
+            }
+        }
+
+        // Create model with attributes
+        $model = new $modelClass($attributes);
+        $model->setExists(true);
+        $model->original = $model->attributes;
+
+        // Set relations
+        foreach ($relations as $relationName => $relationData) {
+            $model->setRelation($relationName, $relationData);
+        }
+
+        // Fire retrieved event
+        //$model->fireModelEvent('retrieved');
+
+        return $model;
+    }
+
+    public function with(array|string $relations): self
+    {
+        if (is_string($relations)) {
+            $relations = [$relations];
+        }
+
+        $this->eagerLoad = array_merge($this->eagerLoad ?? [], $relations);
+        return $this;
+    }
+
+    public function exists(): bool
+    {
+        return $this->count() > 0;
+    }
+
+    public function count(): int
+    {
+        $originalSelects = $this->selects;
+        $originalOrders = $this->orders;
+
+        // default
+        $countSql = 'COUNT(*) as count';
+
+        // if DISTINCT + specific column
+        if (
+            in_array('DISTINCT', $this->selects, true) &&
+            count($this->selects) === 2 &&
+            $this->selects[1] !== '*'
+        ) {
+            $column = $this->selects[1];
+            $countSql = "COUNT(DISTINCT {$column}) as count";
+        }
+
+        $this->selects = [$countSql];
+        $this->orders = [];
+
+        [$sql, $params] = $this->toSql();
+
+        $stmt = $this->database->query($sql, $params);
+        $result = $stmt->fetch();
+
+        $this->selects = $originalSelects;
+        $this->orders = $originalOrders;
+
+        return (int)$result['count'];
+    }
+
+    public function sum(string $column): float
+    {
+        return $this->aggregate('SUM', $column) ?? 0;
+    }
+
+    private function aggregate(string $function, string $column)
+    {
+        $originalSelects = $this->selects;
+        $this->selects = ["{$function}({$column}) as aggregate"];
+
+        [$sql, $params] = $this->toSql();
+        $stmt = $this->database->query($sql, $params);
+        $result = $stmt->fetch();
+
+        $this->selects = $originalSelects;
+
+        return $result['aggregate'];
+    }
+
+    public function avg(string $column): float
+    {
+        return $this->aggregate('AVG', $column) ?? 0;
+    }
+
+    public function min(string $column)
+    {
+        return $this->aggregate('MIN', $column);
+    }
+
+    // SQL Generation
+    // Fixed SQL generation with proper quoting
+
+    public function max(string $column)
+    {
+        return $this->aggregate('MAX', $column);
+    }
+
+    public function decrement(string $column, int $amount = 1, array $extra = []): int
+    {
+        return $this->increment($column, -$amount, $extra);
+    }
+
+    public function increment(string $column, int $amount = 1, array $extra = []): int
+    {
+        $updates = array_merge($extra, [$column => $this->raw("$column + $amount")]);
+        return $this->updateQuery($updates);
+    }
+
     function raw(string $expression): RawExpression
     {
         return new RawExpression($expression);
+    }
+
+    // Helper method to quote table names if needed
+
+    private function updateQuery(array $values): int
+    {
+        $setParts = [];
+        $bindings = [];
+        $paramCounter = 0;
+
+        foreach ($values as $col => $value) {
+            if ($value instanceof RawExpression) {
+                $setParts[] = $this->quoteColumn($col) . " = {$value->value}";
+            } else {
+
+                if (is_bool($value)) $value = (int)($value == true);
+
+                $paramKey = 'param_' . $paramCounter++;
+                $setParts[] = $this->quoteColumn($col) . " = :{$paramKey}";
+                $bindings[$paramKey] = $value;
+            }
+        }
+
+        $sql = "UPDATE " . $this->quoteTable($this->table) . " SET " . implode(', ', $setParts);
+
+        // Add WHERE conditions if any
+        if (!empty($this->wheres)) {
+            [$whereClause, $whereBindings] = $this->buildWhereClause($this->wheres, $paramCounter);
+            $sql .= $whereClause;
+            $bindings = array_merge($bindings, $whereBindings);
+        }
+
+        $stmt = $this->database->query($sql, $bindings);
+        return $stmt->rowCount();
+    }
+
+    /**
+     * Update records in the database with the given values.
+     *
+     * @param array $values
+     * @return int The number of affected rows.
+     */
+    public function update(array $values): int
+    {
+        return $this->updateQuery($values);
+    }
+
+    /**
+     * Find by ID and return properly hydrated model
+     */
+    public function find($id, string $primaryKey = 'id')
+    {
+        return $this->where($primaryKey, $id)->first();
+    }
+
+    public function first()
+    {
+        $this->limit(1);
+        $results = $this->get();
+
+        return $results->first() ?? null;
+    }
+
+    public function orHavingRaw(string $sql, array $bindings = []): self
+    {
+        return $this->havingRaw($sql, $bindings, 'OR');
+    }
+
+    public function havingRaw(string $sql, array $bindings = [], string $boolean = 'AND'): self
+    {
+        $this->havings[] = [
+            'type' => 'Raw',
+            'sql' => $sql,
+            'bindings' => $bindings,
+            'boolean' => $boolean
+        ];
+
+        // Merge bindings into the main pool
+        foreach ($bindings as $key => $value) {
+            if (is_string($key)) {
+                $this->bindings[$key] = $value;
+            } else {
+                $this->bindings[] = $value;
+            }
+        }
+
+        return $this;
     }
 
     public function chunk(int $count, callable $callback): bool
@@ -1383,11 +1407,6 @@ class QueryBuilder
         return $this;
     }
 
-    public function getTable(): string
-    {
-        return $this->table;
-    }
-
     public function pluck(string $column, ?string $key = null): array
     {
         // If column has a dot, alias it so PDO result keeps that name
@@ -1424,7 +1443,6 @@ class QueryBuilder
         return array_column($results, $column);
     }
 
-
     public function value(string $column)
     {
         $this->selects = [$column];
@@ -1435,27 +1453,6 @@ class QueryBuilder
         $result = $stmt->fetch();
 
         return $result ? $result[$column] : null;
-    }
-
-    public function whereRaw(string $sql, array $bindings = [], string $boolean = 'and'): self
-    {
-        $this->wheres[] = [
-            'type' => 'Raw',
-            'sql' => $sql,
-            'bindings' => $bindings,
-            'boolean' => $boolean
-        ];
-
-        foreach ($bindings as $key => $value) {
-            if (is_string($key)) {
-                // Preserve named parameters exactly as they appear in SQL
-                $this->bindings[$key] = $value;
-            } else {
-                $this->bindings[] = $value;
-            }
-        }
-
-        return $this;
     }
 
     public function orWhereRaw(string $sql, array $bindings = []): self
@@ -1505,193 +1502,6 @@ class QueryBuilder
     }
 
 
-    /**
-     * Add constraints for existence of related models
-     */
-    public function whereHas(string $relation, ?callable $callback = null): self
-    {
-        return $this->has($relation, '>=', 1, 'and', $callback);
-    }
-
-    /**
-     * Add constraints for non-existence of related models
-     */
-    public function whereDoesntHave(string $relation, ?callable $callback = null): self
-    {
-        return $this->has($relation, '<', 1, 'and', $callback);
-    }
-
-    public function orWhereDoesntHave(string $relation, ?callable $callback = null): self
-    {
-        return $this->has($relation, '<', 1, 'or', $callback);
-    }
-
-    /**
-     * Add an "or" constraint for existence of related models.
-     *
-     * @param string $relation
-     * @param callable|null $callback
-     * @return $this
-     */
-    public function orWhereHas(string $relation, ?callable $callback = null): self
-    {
-        return $this->has($relation, '>=', 1, 'or', $callback);
-    }
-
-    /**
-     * Add constraints based on related model count
-     */
-    public function has(string $relation, string $operator = '>=', int $count = 1, string $boolean = 'and', ?callable $callback = null): self
-    {
-        // 1. Handle Nested Relationships (e.g., 'productOffer.product')
-        if (str_contains($relation, '.')) {
-            return $this->hasNested($relation, $operator, $count, $boolean, $callback);
-        }
-
-        $modelClass = $this->getModelClassFromTable($this->table);
-        if (!$modelClass) {
-            throw new \Exception("No model class found for table: {$this->table}");
-        }
-
-        $tempModel = new $modelClass();
-        if (!method_exists($tempModel, $relation)) {
-            throw new BadMethodCallException("Relationship {$relation} does not exist on {$modelClass}");
-        }
-
-        $analyzer = new RelationshipAnalyzer();
-        $relationData = $analyzer->analyzeRelationshipMethod($tempModel, $relation);
-
-        $this->addHasConstraintToMainQuery($relationData, $operator, $count, $boolean, $callback);
-
-        return $this;
-    }
-
-    /**
-     * Resolve nested relationship existence checks
-     */
-    protected function hasNested(string $relations, string $operator, int $count, string $boolean, ?callable $callback): self
-    {
-        $relations = explode('.', $relations);
-        $firstRelation = array_shift($relations);
-
-        // We wrap the remaining relations in a closure to pass down the chain
-        return $this->has($firstRelation, '>=', 1, $boolean, function ($query) use ($relations, $operator, $count, $callback) {
-            $remainingPath = implode('.', $relations);
-
-            if (empty($remainingPath)) {
-                // We reached the end of the chain, apply the final user callback
-                if ($callback) $callback($query);
-            } else {
-                // Keep drilling down
-                $query->has($remainingPath, $operator, $count, 'and', $callback);
-            }
-        });
-    }
-
-    /**
-     * Build count subquery for main query
-     */
-    protected function buildCountSubqueryForMainQuery(array $relationData, ?callable $callback): string
-    {
-        $relatedModel = $relationData['related'];
-        $relatedInstance = new $relatedModel();
-        $relatedTable = $relatedInstance->getTable();
-
-        switch ($relationData['type']) {
-            case 'hasMany':
-            case 'hasOne':
-                $foreignKey = $relationData['foreign_key'];
-                $localKey = $relationData['local_key'];
-
-                $subquery = "SELECT COUNT(*) FROM {$relatedTable} WHERE {$relatedTable}.{$foreignKey} = {$this->table}.{$localKey}";
-
-                if ($callback) {
-                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
-                    $callback($tempQuery);
-
-                    [$sql, $bindings] = $tempQuery->toSql();
-                    if (strpos($sql, 'WHERE') !== false) {
-                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
-                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
-                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
-                        $subquery .= " AND " . trim($whereClause);
-                    }
-                }
-
-                return $subquery;
-
-            case 'belongsTo':
-                $foreignKey = $relationData['foreign_key'];
-                $ownerKey = $relationData['owner_key'];
-
-                $subquery = "SELECT COUNT(*) FROM {$relatedTable} WHERE {$relatedTable}.{$ownerKey} = {$this->table}.{$foreignKey}";
-
-                if ($callback) {
-                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
-                    $callback($tempQuery);
-
-                    [$sql, $bindings] = $tempQuery->toSql();
-                    if (strpos($sql, 'WHERE') !== false) {
-                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
-                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
-                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
-                        $subquery .= " AND " . trim($whereClause);
-                    }
-                }
-
-                return $subquery;
-
-            case 'belongsToMany':
-                $pivotTable = $relationData['pivot_table'];
-                $foreignKey = $relationData['foreign_key'];
-                $relatedKey = $relationData['related_key'];
-
-                $subquery = "SELECT COUNT(*) FROM {$relatedTable} 
-                        INNER JOIN {$pivotTable} ON {$relatedTable}.id = {$pivotTable}.{$relatedKey} 
-                        WHERE {$pivotTable}.{$foreignKey} = {$this->table}.id";
-
-                if ($callback) {
-                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
-                    $callback($tempQuery);
-
-                    [$sql, $bindings] = $tempQuery->toSql();
-                    if (strpos($sql, 'WHERE') !== false) {
-                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
-                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
-                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
-                        $subquery .= " AND " . trim($whereClause);
-                    }
-                }
-
-                return $subquery;
-
-            default:
-                throw new BadMethodCallException("Unknown relation type: {$relationData['type']}");
-        }
-    }
-
-    /**
-     * Add has constraint to main query
-     */
-    protected function addHasConstraintToMainQuery(array $relationData, string $operator, int $count, string $boolean, ?callable $callback): void
-    {
-        $subqueryData = $this->buildSubqueryWithBindings($relationData, $callback);
-
-        $sql = $subqueryData['sql'];
-        $subBindings = $subqueryData['bindings'];
-
-        // 🔑 If operator is '<' and count is 1, it's a "DoesntHave", use NOT EXISTS
-        $existsVerb = ($operator === '<' && $count === 1) ? 'NOT EXISTS' : 'EXISTS';
-        $constraint = "{$existsVerb} ({$sql})";
-
-        $this->whereRaw($constraint, $subBindings, $boolean);
-    }
-
-
-    /**
-     * Add withCount subquery to main query
-     */
-    // In QueryBuilder, update the addWithCountToMainQuery method:
 
     protected function addWithCountToMainQuery(string $relation, ?callable $callback): void
     {
@@ -1810,6 +1620,11 @@ class QueryBuilder
         return ['sql' => $subquery, 'bindings' => $bindings];
     }
 
+    public function getTable(): string
+    {
+        return $this->table;
+    }
+
     /**
      * Build conditions from query while preserving boolean (AND/OR) logic and bindings
      */
@@ -1918,6 +1733,123 @@ class QueryBuilder
         return $conditions;
     }
 
+    public function addSelect($columns): self
+    {
+        $columns = is_array($columns) ? $columns : func_get_args();
+
+        if ($this->selects === ['*']) {
+            $this->selects = [];
+        }
+
+        $this->selects = array_merge($this->selects, $columns);
+        return $this;
+    }
+
+    /**
+     * Add constraints for existence of related models
+     */
+    public function whereHas(string $relation, ?callable $callback = null): self
+    {
+        return $this->has($relation, '>=', 1, 'and', $callback);
+    }
+
+    /**
+     * Add constraints based on related model count
+     */
+    public function has(string $relation, string $operator = '>=', int $count = 1, string $boolean = 'and', ?callable $callback = null): self
+    {
+        // 1. Handle Nested Relationships (e.g., 'productOffer.product')
+        if (str_contains($relation, '.')) {
+            return $this->hasNested($relation, $operator, $count, $boolean, $callback);
+        }
+
+        $modelClass = $this->getModelClassFromTable($this->table);
+        if (!$modelClass) {
+            throw new \Exception("No model class found for table: {$this->table}");
+        }
+
+        $tempModel = new $modelClass();
+        if (!method_exists($tempModel, $relation)) {
+            throw new BadMethodCallException("Relationship {$relation} does not exist on {$modelClass}");
+        }
+
+        $analyzer = new RelationshipAnalyzer();
+        $relationData = $analyzer->analyzeRelationshipMethod($tempModel, $relation);
+
+        $this->addHasConstraintToMainQuery($relationData, $operator, $count, $boolean, $callback);
+
+        return $this;
+    }
+
+    /**
+     * Resolve nested relationship existence checks
+     */
+    protected function hasNested(string $relations, string $operator, int $count, string $boolean, ?callable $callback): self
+    {
+        $relations = explode('.', $relations);
+        $firstRelation = array_shift($relations);
+
+        // We wrap the remaining relations in a closure to pass down the chain
+        return $this->has($firstRelation, '>=', 1, $boolean, function ($query) use ($relations, $operator, $count, $callback) {
+            $remainingPath = implode('.', $relations);
+
+            if (empty($remainingPath)) {
+                // We reached the end of the chain, apply the final user callback
+                if ($callback) $callback($query);
+            } else {
+                // Keep drilling down
+                $query->has($remainingPath, $operator, $count, 'and', $callback);
+            }
+        });
+    }
+
+    /**
+     * Add has constraint to main query
+     */
+    protected function addHasConstraintToMainQuery(array $relationData, string $operator, int $count, string $boolean, ?callable $callback): void
+    {
+        $subqueryData = $this->buildSubqueryWithBindings($relationData, $callback);
+
+        $sql = $subqueryData['sql'];
+        $subBindings = $subqueryData['bindings'];
+
+        // 🔑 If operator is '<' and count is 1, it's a "DoesntHave", use NOT EXISTS
+        $existsVerb = ($operator === '<' && $count === 1) ? 'NOT EXISTS' : 'EXISTS';
+        $constraint = "{$existsVerb} ({$sql})";
+
+        $this->whereRaw($constraint, $subBindings, $boolean);
+    }
+
+    /**
+     * Add constraints for non-existence of related models
+     */
+    public function whereDoesntHave(string $relation, ?callable $callback = null): self
+    {
+        return $this->has($relation, '<', 1, 'and', $callback);
+    }
+
+
+    /**
+     * Add withCount subquery to main query
+     */
+    // In QueryBuilder, update the addWithCountToMainQuery method:
+    public function orWhereDoesntHave(string $relation, ?callable $callback = null): self
+    {
+        return $this->has($relation, '<', 1, 'or', $callback);
+    }
+
+    /**
+     * Add an "or" constraint for existence of related models.
+     *
+     * @param string $relation
+     * @param callable|null $callback
+     * @return $this
+     */
+    public function orWhereHas(string $relation, ?callable $callback = null): self
+    {
+        return $this->has($relation, '>=', 1, 'or', $callback);
+    }
+
     public function whereColumn(string $first, string $operatorOrSecond, ?string $second = null): self
     {
         if ($second === null) {
@@ -1965,7 +1897,6 @@ class QueryBuilder
 
         return $this;
     }
-
 
     public function selectRaw(string $expression): self
     {
@@ -2042,6 +1973,88 @@ class QueryBuilder
         $statement->execute($bindings);
 
         return $statement->rowCount(); // returns inserted rows (ignored rows not counted)
+    }
+
+    /**
+     * Build count subquery for main query
+     */
+    protected function buildCountSubqueryForMainQuery(array $relationData, ?callable $callback): string
+    {
+        $relatedModel = $relationData['related'];
+        $relatedInstance = new $relatedModel();
+        $relatedTable = $relatedInstance->getTable();
+
+        switch ($relationData['type']) {
+            case 'hasMany':
+            case 'hasOne':
+                $foreignKey = $relationData['foreign_key'];
+                $localKey = $relationData['local_key'];
+
+                $subquery = "SELECT COUNT(*) FROM {$relatedTable} WHERE {$relatedTable}.{$foreignKey} = {$this->table}.{$localKey}";
+
+                if ($callback) {
+                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
+                    $callback($tempQuery);
+
+                    [$sql, $bindings] = $tempQuery->toSql();
+                    if (strpos($sql, 'WHERE') !== false) {
+                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
+                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
+                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
+                        $subquery .= " AND " . trim($whereClause);
+                    }
+                }
+
+                return $subquery;
+
+            case 'belongsTo':
+                $foreignKey = $relationData['foreign_key'];
+                $ownerKey = $relationData['owner_key'];
+
+                $subquery = "SELECT COUNT(*) FROM {$relatedTable} WHERE {$relatedTable}.{$ownerKey} = {$this->table}.{$foreignKey}";
+
+                if ($callback) {
+                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
+                    $callback($tempQuery);
+
+                    [$sql, $bindings] = $tempQuery->toSql();
+                    if (strpos($sql, 'WHERE') !== false) {
+                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
+                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
+                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
+                        $subquery .= " AND " . trim($whereClause);
+                    }
+                }
+
+                return $subquery;
+
+            case 'belongsToMany':
+                $pivotTable = $relationData['pivot_table'];
+                $foreignKey = $relationData['foreign_key'];
+                $relatedKey = $relationData['related_key'];
+
+                $subquery = "SELECT COUNT(*) FROM {$relatedTable} 
+                        INNER JOIN {$pivotTable} ON {$relatedTable}.id = {$pivotTable}.{$relatedKey} 
+                        WHERE {$pivotTable}.{$foreignKey} = {$this->table}.id";
+
+                if ($callback) {
+                    $tempQuery = new QueryBuilder($relatedTable, $this->relationManager, $this->database);
+                    $callback($tempQuery);
+
+                    [$sql, $bindings] = $tempQuery->toSql();
+                    if (strpos($sql, 'WHERE') !== false) {
+                        $whereClause = substr($sql, strpos($sql, 'WHERE') + 5);
+                        $whereClause = preg_replace('/ORDER BY.*$/i', '', $whereClause);
+                        $whereClause = preg_replace('/LIMIT.*$/i', '', $whereClause);
+                        $subquery .= " AND " . trim($whereClause);
+                    }
+                }
+
+                return $subquery;
+
+            default:
+                throw new BadMethodCallException("Unknown relation type: {$relationData['type']}");
+        }
     }
 
 }

@@ -3,7 +3,7 @@
 namespace App\Services\Members\Segmentation;
 
 use App\Models\Campaign;
-use App\Models\CampaignExecution;
+use App\Repositories\Members\CampaignExecutionRepository;
 
 /**
  * Determines whether a campaign is eligible to be sent to a member,
@@ -11,8 +11,14 @@ use App\Models\CampaignExecution;
  *
  * No writes — purely a read-only guard.
  */
-final class CampaignCooldownChecker
+class CampaignCooldownChecker
 {
+    public function __construct(
+        private readonly CampaignExecutionRepository $campaignExecutionRepository,
+    )
+    {
+    }
+
     /**
      * Returns true when the campaign MAY be sent (not within cooldown).
      * Returns false when a recent execution blocks delivery.
@@ -25,9 +31,6 @@ final class CampaignCooldownChecker
 
         $threshold = now_datetime()->subHours($campaign->cooldown_hours);
 
-        return !CampaignExecution::where('member_id', $memberId)
-            ->where('campaign_id', $campaign->id)
-            ->where('sent_at', '>=', $threshold)
-            ->exists();
+        return !$this->campaignExecutionRepository->hasRecentExecution($memberId, $campaign->id, $threshold);
     }
 }

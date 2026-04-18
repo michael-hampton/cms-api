@@ -2,18 +2,18 @@
 
 namespace App\Jobs;
 
-use App\Models\Member;
-use App\Models\MemberProfileSnapshot;
-use App\Services\Campaigns\CampaignCooldownChecker;
-use App\Services\Campaigns\CampaignMatcher;
-use App\Services\Segmentation\MemberSegmentResolver;
-use App\Services\Segmentation\SegmentPersister;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use App\Framework\Queue\Dispatchable;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\InteractsWithQueue;
+use App\Framework\Queue\SerializesModels;
+use App\Framework\Queue\ShouldQueue;
+use App\Framework\Support\Logger;
+use App\Repositories\Members\MemberRepository;
+use App\Repositories\Members\MemberSegmentationProfileRepository;
+use App\Services\Members\Segmentation\CampaignCooldownChecker;
+use App\Services\Members\Segmentation\CampaignMatcher;
+use App\Services\Members\Segmentation\MemberSegmentResolver;
+use App\Services\Members\Segmentation\SegmentPersister;
 
 /**
  * Orchestrates the full segmentation pipeline for a single member.
@@ -31,14 +31,19 @@ use Illuminate\Support\Facades\Log;
  * Hard cap: MAX_CAMPAIGNS_PER_RUN prevents a member from receiving
  * a flood of campaigns in a single segmentation pass.
  */
-class ProcessMemberSegmentationJob implements ShouldQueue
+class ProcessMemberSegmentationJob extends BaseJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, SerializesModels;
 
     private const MAX_CAMPAIGNS_PER_RUN = 3;
-
-    public int $tries = 3;
     public int $backoff = 60;
+    private MemberSegmentResolver $resolver;
+    private SegmentPersister $persister;
+    private CampaignMatcher $matcher;
+    private CampaignCooldownChecker $cooldown;
+    private MemberRepository $memberRepository;
+    private MemberSegmentationProfileRepository $profileRepository;
+    private Dispatcher $dispatcher;
 
     public function __construct(
         public readonly int $memberId,
@@ -47,46 +52,37 @@ class ProcessMemberSegmentationJob implements ShouldQueue
     {
     }
 
-    public function handle(
-        MemberSegmentResolver   $resolver,
-        SegmentPersister        $persister,
-        CampaignMatcher         $matcher,
-        CampaignCooldownChecker $cooldown,
-    ): void
+    public function handle(): void
     {
-        $member = Member::find($this->memberId);
+        $member = $this->memberRepository->find($this->memberId);
 
         if ($member === null) {
-            Log::warning('ProcessMemberSegmentationJob: member not found', [
+            Logger::warning('ProcessMemberSegmentationJob: member not found', [
                 'member_id' => $this->memberId,
                 'site_id' => $this->siteId,
             ]);
             return;
         }
 
-        $snapshot = MemberProfileSnapshot::where('member_id', $this->memberId)
-            ->where('site_id', $this->siteId)
-            ->latest('built_at')
-            ->first();
+        $profile = $this->profileRepository->getLatestProfile($this->memberId, $this->siteId);
 
-        if ($snapshot === null) {
-            Log::info('ProcessMemberSegmentationJob: no profile snapshot found, skipping', [
+        if ($profile === null) {
+            Logger::info('ProcessMemberSegmentationJob: no segmentation profile found, skipping', [
                 'member_id' => $this->memberId,
                 'site_id' => $this->siteId,
             ]);
             return;
         }
 
-        $profile = $snapshot->data;
-        $segments = $resolver->resolve($profile);
+        $segments = $this->resolver->resolve($profile);
 
-        $persister->persist($this->memberId, $this->siteId, $segments);
+        $this->persister->persist($this->memberId, $this->siteId, $segments);
 
         if (empty($segments)) {
             return;
         }
 
-        $campaigns = $matcher->match($segments);
+        $campaigns = $this->matcher->match($segments);
         $dispatched = 0;
 
         foreach ($campaigns as $campaign) {
@@ -94,12 +90,20 @@ class ProcessMemberSegmentationJob implements ShouldQueue
                 break;
             }
 
-            if (!$cooldown->isEligible($this->memberId, $campaign)) {
+            if (!$this->cooldown->isEligible($this->memberId, $campaign)) {
                 continue;
             }
 
-            SendCampaignJob::dispatch($this->memberId, $campaign->id, $campaign->segment->key);
-            $dispatched++;
+            try {
+                SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key)->handle();
+                $this->dispatcher->dispatch(SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key))->dispatch();
+                $dispatched++;
+            } catch (\Exception $exception) {
+                echo $exception->getMessage();
+                die;
+            }
+
+
         }
     }
 }

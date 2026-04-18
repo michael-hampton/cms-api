@@ -4,6 +4,7 @@ namespace App\Services\Members\Segmentation;
 
 use App\Framework\Support\Collection;
 use App\Models\Segment;
+use App\Repositories\Members\SegmentRepository;
 
 /**
  * Resolves which segments a member profile belongs to.
@@ -13,10 +14,11 @@ use App\Models\Segment;
  *
  * Returns segment keys only — no side effects.
  */
-final class MemberSegmentResolver
+class MemberSegmentResolver
 {
     public function __construct(
         private readonly SegmentRuleEvaluator $evaluator,
+        private readonly SegmentRepository $segmentRepository,
     )
     {
     }
@@ -28,9 +30,7 @@ final class MemberSegmentResolver
     public function resolve(array $profile): array
     {
         /** @var Collection<Segment> $segments */
-        $segments = Segment::with(['rules' => fn($q) => $q->orderBy('sort_order')])
-            ->where('is_active', true)
-            ->get();
+        $segments = $this->segmentRepository->getActiveWithRules();
 
         $matched = [];
 

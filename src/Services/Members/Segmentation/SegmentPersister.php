@@ -2,8 +2,8 @@
 
 namespace App\Services\Members\Segmentation;
 
-use App\Models\MemberSegment;
-use App\Models\Segment;
+use App\Repositories\Members\MemberSegmentRepository;
+use App\Repositories\Members\SegmentRepository;
 
 /**
  * Persists resolved segment assignments for a member.
@@ -15,8 +15,15 @@ use App\Models\Segment;
  * This is idempotent: running it twice with the same segments produces
  * the same state.
  */
-final class SegmentPersister
+class SegmentPersister
 {
+    public function __construct(
+        private readonly SegmentRepository       $segmentRepository,
+        private readonly MemberSegmentRepository $memberSegmentRepository,
+    )
+    {
+    }
+
     /**
      * @param string[] $segmentKeys e.g. ['churning', 'lurker']
      */
@@ -28,35 +35,25 @@ final class SegmentPersister
 
         $now = now_datetime();
 
-        $segmentIds = Segment::whereIn('key', $segmentKeys)
-            ->where('is_active', true)
-            ->pluck('id', 'key');
+        $segmentIds = $this->segmentRepository->getActiveIdsByKeys($segmentKeys);
 
         foreach ($segmentKeys as $key) {
             $segmentId = $segmentIds->get($key);
 
-            if ($segmentId === null) {
+            if (!is_int($segmentId) && !(is_string($segmentId) && ctype_digit($segmentId))) {
                 // Segment key came from resolver but was deactivated between the two
                 // queries — safe to skip, the segment is no longer active.
                 continue;
             }
 
-            $existing = MemberSegment::where('member_id', $memberId)
-                ->where('site_id', $siteId)
-                ->where('segment_id', $segmentId)
-                ->first();
+            $segmentId = (int)$segmentId;
+
+            $existing = $this->memberSegmentRepository->findForMemberSiteSegment($memberId, $siteId, $segmentId);
 
             if ($existing !== null) {
-                $existing->last_seen_at = $now;
-                $existing->save();
+                $this->memberSegmentRepository->touchLastSeen($existing, $now);
             } else {
-                MemberSegment::create([
-                    'member_id' => $memberId,
-                    'site_id' => $siteId,
-                    'segment_id' => $segmentId,
-                    'assigned_at' => $now,
-                    'last_seen_at' => $now,
-                ]);
+                $this->memberSegmentRepository->createAssignment($memberId, $siteId, $segmentId, $now);
             }
         }
     }

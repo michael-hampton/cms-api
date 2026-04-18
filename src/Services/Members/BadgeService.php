@@ -7,7 +7,9 @@ use App\Enums\BadgeCriteriaType;
 use App\Events\Badges\BadgeEarnedEvent;
 use App\Events\Badges\PointsAwardedEvent;
 use App\Framework\Database\Database;
+use App\Framework\Queue\Dispatcher;
 use App\Framework\Support\SiteContext;
+use App\Jobs\EvaluateMemberBadgesJob;
 use App\Models\Badge;
 use App\Models\Member;
 use App\Models\MemberActivity;
@@ -20,6 +22,7 @@ class BadgeService
     public function __construct(
         private readonly BadgeRepository $badgeRepository,
         private readonly Database $database,
+        private readonly ?Dispatcher $dispatcher = null,
     )
     {
     }
@@ -213,7 +216,10 @@ class BadgeService
                 );
             }
 
-            $this->checkAndAwardBadges($member);
+            $this->database->afterCommit(function () use ($member) {
+                $dispatcher = $this->dispatcher ?? app(Dispatcher::class);
+                $dispatcher->dispatch(EvaluateMemberBadgesJob::for($member->id))->dispatch();
+            });
 
             return $activity;
         });

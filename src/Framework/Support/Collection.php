@@ -970,4 +970,31 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return new static($result);
     }
 
+    public function data_get(string|array|null $key, mixed $default = null): mixed
+    {
+        if ($key === null) {
+            return $this->items;
+        }
+
+        $key = is_array($key) ? $key : explode('.', $key);
+
+        $target = $this->items;
+
+        foreach ($key as $segment) {
+            if (is_array($target) && array_key_exists($segment, $target)) {
+                $target = $target[$segment];
+                continue;
+            }
+
+            if (is_object($target) && isset($target->{$segment})) {
+                $target = $target->{$segment};
+                continue;
+            }
+
+            return $default;
+        }
+
+        return $target;
+    }
+
 }

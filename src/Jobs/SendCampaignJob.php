@@ -2,15 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Framework\Queue\Dispatchable;
+use App\Framework\Queue\InteractsWithQueue;
+use App\Framework\Queue\SerializesModels;
+use App\Framework\Queue\ShouldQueue;
+use App\Framework\Support\Logger;
 use App\Models\Campaign;
 use App\Models\Member;
-use App\Services\Campaigns\CampaignExecutionLogger;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use App\Services\Members\Segmentation\CampaignExecutionLogger;
 
 /**
  * Sends a single campaign to a single member via Laravel's notification system,
@@ -31,12 +30,12 @@ use Illuminate\Support\Facades\Log;
  *   can retry. The execution log is written AFTER successful delivery to avoid
  *   consuming the cooldown window on a failed send.
  */
-class SendCampaignJob implements ShouldQueue
+class SendCampaignJob extends BaseJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, SerializesModels;
 
-    public int $tries = 3;
     public int $backoff = 120;
+    private CampaignExecutionLogger $logger;
 
     public function __construct(
         public readonly int    $memberId,
@@ -46,12 +45,12 @@ class SendCampaignJob implements ShouldQueue
     {
     }
 
-    public function handle(CampaignExecutionLogger $logger): void
+    public function handle(): void
     {
         $member = Member::find($this->memberId);
 
         if ($member === null) {
-            Log::warning('SendCampaignJob: member not found', [
+            Logger::warning('SendCampaignJob: member not found', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
             ]);
@@ -61,7 +60,7 @@ class SendCampaignJob implements ShouldQueue
         $campaign = Campaign::find($this->campaignId);
 
         if ($campaign === null || !$campaign->is_active) {
-            Log::info('SendCampaignJob: campaign not found or inactive, skipping', [
+            Logger::info('SendCampaignJob: campaign not found or inactive, skipping', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
             ]);
@@ -71,7 +70,7 @@ class SendCampaignJob implements ShouldQueue
         $notificationClass = $campaign->template;
 
         if (!class_exists($notificationClass)) {
-            Log::error('SendCampaignJob: notification class does not exist', [
+            Logger::error('SendCampaignJob: notification class does not exist', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
                 'template' => $notificationClass,
@@ -81,8 +80,8 @@ class SendCampaignJob implements ShouldQueue
             return;
         }
 
-        $member->notify(new $notificationClass($campaign));
+        //$member->notify(new $notificationClass($campaign));
 
-        $logger->log($this->memberId, $campaign, $this->segmentKey);
+        //$this->logger->log($this->memberId, $campaign, $this->segmentKey);
     }
 }

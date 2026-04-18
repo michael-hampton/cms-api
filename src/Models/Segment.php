@@ -5,6 +5,8 @@ namespace App\Models;
 
 class Segment extends Model
 {
+    protected $table = 'segments';
+
     protected $fillable = [
         'key',
         'name',

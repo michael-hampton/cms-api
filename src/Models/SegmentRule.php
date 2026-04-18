@@ -5,6 +5,7 @@ namespace App\Models;
 
 class SegmentRule extends Model
 {
+    protected $table = 'segment_rules';
     protected $fillable = [
         'segment_id',
         'field',
