@@ -25,6 +25,7 @@ use App\Events\Members\MemberAddressImported;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Events\Members\OrderCreatedByMember;
 use App\Events\Members\PageLikedByMember;
+use App\Events\Members\PageUnlikedByMember;
 use App\Events\Members\PageViewedByMember;
 use App\Events\Members\RewardClaimedByMember;
 use App\Events\OpenCollab\ContractPublishedEvent;
@@ -516,5 +517,6 @@ class ApiApplication
         $eventDispatcher->listen(CommentPostedByMember::class, [RecordMemberEngagementMetric::class, 'handleComment']);
         $eventDispatcher->listen(RewardClaimedByMember::class, [RecordMemberEngagementMetric::class, 'handleRewardClaimed']);
         $eventDispatcher->listen(OrderCreatedByMember::class, [RecordMemberEngagementMetric::class, 'handleOrderCreated']);
+        $eventDispatcher->listen(PageUnlikedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageUnlike']);
     }
 }

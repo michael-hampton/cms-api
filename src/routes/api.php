@@ -35,6 +35,7 @@ use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
+use App\Controllers\Members\Api\BadgeAdminApiController;
 use App\Controllers\Members\Api\MemberActivityApiController;
 use App\Controllers\Members\Api\MemberAddressApiController;
 use App\Controllers\Members\Api\MemberApiController;
@@ -47,6 +48,8 @@ use App\Controllers\Members\Api\MemberNewslettersApiController;
 use App\Controllers\Members\Api\MemberOrdersApiController;
 use App\Controllers\Members\Api\MemberReadingHistoryApiController;
 use App\Controllers\Members\Api\MemberRewardsApiController;
+use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPaymentsApiController;
+use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPlansApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
@@ -133,6 +136,12 @@ $router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowC
 
 $router->post('/api/{site}/member/auth/login', [\App\Controllers\MemberAuthController::class, 'apiLogin']);
 
+$router->get('/api/{site}/admin/badges', [BadgeAdminApiController::class, 'index']);
+$router->get('/api/{site}/admin/badges/{id}', [BadgeAdminApiController::class, 'show']);
+$router->post('/api/{site}/admin/badges', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'destroy']);
+
 $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
     $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
     $router->get('/dashboard/overview', [MemberDashboardApiController::class, 'overview']);
@@ -217,7 +226,21 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
 // Member Reading History API
     $router->get('/reading-history', [MemberReadingHistoryApiController::class, 'index']);
 
+    $router->get('/subscription-plans',
+        [MemberSubscriptionPlansApiController::class, 'index']);
 
+    $router->get('/subscription-plans/{slug}',
+        [MemberSubscriptionPlansApiController::class, 'show']);
+
+    $router->post('/subscription-plans/{slug}/subscribe',
+        [MemberSubscriptionPlansApiController::class, 'subscribe']);
+
+    $router->post('/subscription-plans/{slug}/validate-voucher',
+        [MemberSubscriptionPlansApiController::class, 'validateVoucher']);
+
+// ----- Subscription Payments -----
+    $router->get('/subscription-payments',
+        [MemberSubscriptionPaymentsApiController::class, 'index']);
 });
 
 // Guest: accept an invitation and register

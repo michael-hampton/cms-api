@@ -826,4 +826,19 @@ abstract class FunctionalTestCase extends TestCase
         return true;
     }
 
+    protected function decodeJson(\App\Framework\Http\Response $response)
+    {
+        return json_decode($response->getContent(), true);
+    }
+
+    protected function createSite()
+    {
+        $name = substr(str_shuffle('abcdefghijklmnopqrstuvwxyz'), 0, 10);
+
+        return Site::create([
+            'name' => $name,
+            'slug' => strtolower($name),
+        ]);
+    }
+
 }

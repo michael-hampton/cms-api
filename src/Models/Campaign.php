@@ -30,6 +30,11 @@ class Campaign extends Model
         'updated_at',
         'created_by',
         'updated_by',
+        'segment_id',
+        'channel',
+        'template',
+        'cooldown_hours',
+        'priority',
     ];
 
     protected $casts = [
@@ -39,7 +44,10 @@ class Campaign extends Model
         'end_date' => 'datetime',
         'tracking_params' => 'array',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'channel' => 'string',
+        'cooldown_hours' => 'integer',
+        'priority' => 'integer',
     ];
 
     public static function findBySlug(string $slug, int $siteId): ?self

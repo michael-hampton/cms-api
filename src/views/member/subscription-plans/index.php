@@ -1,10 +1,7 @@
 <?php
-// views/member/subscription-plans/index.php
 /**
  * @var \App\Models\Site $site
- * @var \App\Framework\Support\Collection $plans
  * @var \App\Models\Member|null $member
- * @var \App\Models\Subscription|null $currentSubscription
  */
 ?>
 <!DOCTYPE html>
@@ -12,472 +9,669 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Subscription Plans - <?= htmlspecialchars($site->name) ?></title>
+    <title>Plans — <?= htmlspecialchars($site->name) ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap"
+          rel="stylesheet">
     <style>
-        * {
+        *, *::before, *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        :root {
+            /* Updated to match your Light Theme palette */
+            --paper: #fcfaf7; /* Main page background */
+            --paper-2: #ffffff; /* Pure white for cards */
+            --paper-3: #f5f2ee; /* Soft grey-beige for inputs/headers */
+            --ink: #1a1c20; /* Deep charcoal for text */
+            --ink-2: #2e3136;
+            --ink-3: #626770; /* Muted text */
+            --accent: #9b6f3b; /* Deep gold/bronze */
+            --accent-2: #c1440e; /* Terracotta accent */
+            --gold: #b89a4a;
+            --text: #1a1c20;
+            --text-dim: #626770;
+            --border: rgba(0, 0, 0, 0.08);
+            --radius: 10px;
+            --display: 'Bebas Neue', Impact, sans-serif;
+            --serif: 'Lora', Georgia, serif;
+            --sans: 'DM Sans', system-ui, sans-serif;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.08);
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #2c3e50;
-            line-height: 1.6;
+            font-family: var(--sans);
+            background: var(--paper);
+            color: var(--text);
             min-height: 100vh;
-            padding: 20px;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header {
+        /* ── Hero ── */
+        .hero {
+            background: var(--ink);
+            padding: 80px 24px 88px;
             text-align: center;
-            padding: 60px 40px;
-            background: white;
-            border-radius: 24px;
-            margin-bottom: 48px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
         }
 
-        .header h1 {
-            font-size: 52px;
-            margin-bottom: 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-weight: 800;
-            letter-spacing: -1px;
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                    -45deg,
+                    transparent,
+                    transparent 40px,
+                    rgba(255, 255, 255, .015) 40px,
+                    rgba(255, 255, 255, .015) 41px
+            );
         }
 
-        .header p {
-            font-size: 20px;
-            color: #64748b;
-            font-weight: 500;
-        }
-
-        .current-plan-alert {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            padding: 24px 32px;
-            border-radius: 16px;
-            margin-bottom: 32px;
-            text-align: center;
-            font-size: 18px;
+        .hero-eyebrow {
+            font-family: var(--sans);
+            font-size: 11px;
             font-weight: 600;
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+            letter-spacing: .2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 16px;
         }
 
+        .hero-title {
+            font-family: var(--display);
+            font-size: clamp(56px, 10vw, 110px);
+            letter-spacing: .02em;
+            color: #ffffff;
+            line-height: .95;
+            position: relative;
+        }
+
+        .hero-title em {
+            font-family: var(--serif);
+            font-style: italic;
+            color: var(--accent);
+            font-size: .75em;
+        }
+
+        .hero-sub {
+            font-family: var(--serif);
+            font-style: italic;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 20px;
+        }
+
+        /* ── Current plan banner ── */
+        .current-banner {
+            background: var(--gold);
+            color: white;
+            text-align: center;
+            padding: 13px 24px;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: .04em;
+            display: none;
+        }
+
+        .current-banner.visible {
+            display: block;
+        }
+
+        /* ── Main ── */
+        .shell {
+            max-width: 1160px;
+            margin: 0 auto;
+            padding: 56px 24px 80px;
+        }
+
+        /* ── Plans grid ── */
         .plans-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 32px;
-            margin-bottom: 48px;
+            gap: 24px;
         }
 
+        /* ── Plan card ── */
         .plan-card {
-            background: white;
-            border-radius: 24px;
-            padding: 44px 36px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            background: var(--paper-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 40px 36px 36px;
+            display: flex;
+            flex-direction: column;
             position: relative;
-            border: 3px solid transparent;
+            transition: all .3s cubic-bezier(.34, 1.56, .64, 1);
+            opacity: 0;
+            transform: translateY(16px);
+            box-shadow: var(--shadow);
         }
 
+        .plan-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
         .plan-card:hover {
-            transform: translateY(-12px) scale(1.02);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-            border-color: #667eea;
+            border-color: var(--accent);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-6px) !important;
         }
 
+        /* Featured Plan Card */
         .plan-card.featured {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-            transform: scale(1.05);
-            box-shadow: 0 20px 50px rgba(102, 126, 234, 0.4);
+            border-color: var(--ink);
+            background: var(--ink);
+            color: #ffffff;
         }
 
         .plan-card.featured:hover {
-            transform: translateY(-12px) scale(1.08);
-            box-shadow: 0 25px 60px rgba(102, 126, 234, 0.5);
+            border-color: var(--accent);
         }
 
-        .featured-badge {
+        .featured-tag {
             position: absolute;
-            top: -16px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            top: -1px;
+            right: 24px;
+            background: var(--accent);
             color: white;
-            padding: 8px 24px;
-            border-radius: 24px;
-            font-size: 14px;
-            font-weight: 800;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .14em;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 6px 20px rgba(251, 191, 36, 0.5);
+            padding: 5px 14px;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .current-tag {
+            display: inline-block;
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            padding: 3px 10px;
+            border-radius: 4px;
+            margin-bottom: 14px;
         }
 
         .plan-name {
-            font-size: 32px;
-            font-weight: 800;
-            margin-bottom: 12px;
-            color: inherit;
-            letter-spacing: -0.5px;
+            font-family: var(--display);
+            font-size: 42px;
+            letter-spacing: .04em;
+            line-height: 1;
+            margin-bottom: 4px;
+            color: var(--text);
         }
 
-        .trial-badge {
-            display: inline-block;
-            background: linear-gradient(135deg, #fbbf24, #f59e0b);
-            color: white;
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
+        .plan-card.featured .plan-name {
+            color: #ffffff;
+        }
+
+        .plan-trial {
+            font-size: 11px;
             font-weight: 700;
-            margin-left: 12px;
-            letter-spacing: 0.3px;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 14px;
         }
 
-        .plan-card.featured .trial-badge {
-            background: rgba(255, 255, 255, 0.25);
-            backdrop-filter: blur(10px);
-        }
-
-        .plan-description {
-            color: #64748b;
-            margin-bottom: 32px;
-            min-height: 60px;
+        .plan-desc {
+            font-family: var(--serif);
+            font-style: italic;
             font-size: 16px;
+            color: var(--text-dim);
+            margin-bottom: 32px;
             line-height: 1.6;
-        }
-
-        .plan-card.featured .plan-description {
-            color: rgba(255, 255, 255, 0.9);
-        }
-
-        .plan-price {
-            font-size: 56px;
-            font-weight: 800;
-            color: #1e293b;
-            margin-bottom: 8px;
-            letter-spacing: -2px;
-            display: flex;
-            align-items: baseline;
-            justify-content: center;
-            gap: 4px;
-        }
-
-        .plan-card.featured .plan-price {
-            color: white;
-        }
-
-        .plan-price .currency {
-            font-size: 28px;
-            opacity: 0.7;
-        }
-
-        .plan-period {
-            color: #64748b;
-            margin-bottom: 32px;
-            font-size: 18px;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        .plan-card.featured .plan-period {
-            color: rgba(255, 255, 255, 0.85);
-        }
-
-        .plan-features {
-            list-style: none;
-            margin-bottom: 32px;
-            padding: 24px 0;
-            border-top: 2px solid #f1f5f9;
-            border-bottom: 2px solid #f1f5f9;
-        }
-
-        .plan-card.featured .plan-features {
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .plan-features li {
-            padding: 12px 0;
-            color: #334155;
-            font-size: 16px;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .plan-card.featured .plan-features li {
-            color: rgba(255, 255, 255, 0.95);
-        }
-
-        .plan-features li:before {
-            content: "✓";
-            color: #10b981;
-            font-weight: bold;
-            font-size: 20px;
             flex-shrink: 0;
         }
 
-        .plan-card.featured .plan-features li:before {
-            color: #4ade80;
+        .plan-card.featured .plan-desc {
+            color: rgba(255, 255, 255, 0.6);
         }
 
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 18px 32px;
-            border: none;
-            border-radius: 14px;
-            font-size: 18px;
-            font-weight: 700;
-            cursor: pointer;
-            text-align: center;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            letter-spacing: 0.3px;
+        .plan-price-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            margin-bottom: 4px;
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
-        }
-
-        .btn-primary.featured {
-            background: white;
-            color: #667eea;
-        }
-
-        .btn-primary.featured:hover {
-            background: #f8fafc;
-            box-shadow: 0 10px 30px rgba(255, 255, 255, 0.4);
-        }
-
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #64748b;
-            cursor: not-allowed;
-        }
-
-        .current-plan-badge {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            display: inline-block;
-            letter-spacing: 0.5px;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-        }
-
-        .btn:disabled,
-        .btn.loading {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .btn.loading {
-            position: relative;
-            color: transparent;
-        }
-
-        .btn.loading::after {
-            content: "";
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            top: 50%;
-            left: 50%;
-            margin-left: -12px;
-            margin-top: -12px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 80px 40px;
-            background: white;
-            border-radius: 24px;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-        }
-
-        .empty-state-icon {
-            font-size: 80px;
-            margin-bottom: 24px;
-            opacity: 0.4;
-        }
-
-        .empty-state p {
+        .plan-currency {
             font-size: 20px;
-            color: #64748b;
-            font-weight: 500;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+
+        .plan-amount {
+            font-family: var(--display);
+            font-size: 64px;
+            letter-spacing: -.01em;
+            line-height: 1;
+            color: var(--ink);
+        }
+
+        .plan-card.featured .plan-amount {
+            color: #ffffff;
+        }
+
+        .plan-card.featured .plan-currency {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .plan-period {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 32px;
+        }
+
+        .plan-card.featured .plan-period {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Features */
+        .plan-features {
+            list-style: none;
+            border-top: 1px solid var(--border);
+            padding-top: 24px;
+            margin-bottom: 32px;
+            flex: 1;
+        }
+
+        .plan-card.featured .plan-features {
+            border-color: rgba(255, 255, 255, .1);
+        }
+        .plan-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 14px;
+            color: var(--ink);
+        }
+
+        .plan-card.featured .plan-features li {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .plan-features li::before {
+            content: '→';
+            color: var(--accent);
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+
+        /* ── Voucher form ── */
+        .voucher-form {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .voucher-input {
+            flex: 1;
+            background: var(--paper-3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            font-size: 13px;
+            font-family: var(--sans);
+            color: var(--ink);
+            outline: none;
+        }
+
+        .plan-card.featured .voucher-input {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .voucher-input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn-voucher {
+            background: var(--paper-3);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--text-dim);
+        }
+
+        .plan-card.featured .btn-voucher {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: transparent;
+            color: #ffffff;
+        }
+
+        .voucher-msg {
+            font-size: 12px;
+            min-height: 18px;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .voucher-msg.ok {
+            color: var(--ok);
+        }
+
+        .voucher-msg.fail {
+            color: var(--fail);
+        }
+
+        /* ── Subscribe button ── */
+        .btn-subscribe {
+            width: 100%;
+            padding: 18px 24px;
+            border: none;
+            border-radius: var(--radius);
+            font-family: var(--display);
+            font-size: 24px;
+            letter-spacing: .06em;
+            cursor: pointer;
+            background: var(--accent);
+            color: white;
+            transition: all .2s;
+        }
+
+        .btn-subscribe:hover:not(:disabled) {
+            background: var(--accent-2);
+            transform: translateY(-1px);
+        }
+
+        .plan-card.featured .btn-subscribe {
+            background: #ffffff;
+            color: var(--ink);
+        }
+
+        .plan-card.featured .btn-subscribe:hover:not(:disabled) {
+            background: var(--paper-3);
+        }
+
+        .btn-disabled-label {
+            width: 100%;
+            padding: 18px 24px;
+            border-radius: var(--radius);
+            font-family: var(--display);
+            font-size: 24px;
+            background: var(--paper-3);
+            color: var(--text-dim);
+            text-align: center;
+        }
+
+        .plan-card.featured .btn-disabled-label {
+            background: rgba(255, 255, 255, .1);
+            color: rgba(255, 255, 255, .3);
+        }
+
+        /* ── Skeleton ── */
+        .skel {
+            background: linear-gradient(90deg, var(--paper-3) 25%, var(--border) 50%, var(--paper-3) 75%);
+            background-size: 600px 100%;
+            animation: shimmer 1.4s infinite linear;
+            border-radius: 4px;
         }
 
         @media (max-width: 768px) {
             .plans-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns:1fr;
             }
 
-            .header h1 {
-                font-size: 38px;
-            }
-
-            .plan-card.featured {
-                transform: scale(1);
-            }
-
-            .plan-price {
-                font-size: 48px;
+            .hero-title {
+                font-size: 72px;
             }
         }
-    </style>
+    </style
 </head>
 <body>
-<div class="container">
-    <div class="header">
-        <h1>🚀 Choose Your Plan</h1>
-        <p>Select the perfect plan and get started in seconds</p>
-    </div>
 
-    <?php if ($currentSubscription): ?>
-        <div class="current-plan-alert">
-            ✓ Current Plan: <?= htmlspecialchars($currentSubscription->plan_name) ?>
-        </div>
-    <?php endif; ?>
+@include('member._header')
 
-    <div class="plans-grid">
-        <?php foreach ($plans as $plan): ?>
-            <div class="plan-card <?= $plan->is_featured ? 'featured' : '' ?>">
-                <?php if ($plan->is_featured): ?>
-                    <div class="featured-badge">⭐ Most Popular</div>
-                <?php endif; ?>
-
-                <?php if ($currentSubscription && $currentSubscription->plan_id === $plan->id): ?>
-                    <div class="current-plan-badge">✓ Your Plan</div>
-                <?php endif; ?>
-
-                <div class="plan-name">
-                    <?= htmlspecialchars($plan->name) ?>
-                    <?php if ($plan->trial_days > 0): ?>
-                        <span class="trial-badge">🎉 <?= $plan->trial_days ?>d Trial</span>
-                    <?php endif; ?>
-                </div>
-
-                <div class="plan-description">
-                    <?= htmlspecialchars($plan->description ?? 'Get access to all premium features') ?>
-                </div>
-
-                <div class="plan-price">
-                    <span class="currency"><?= htmlspecialchars($plan->currency) ?></span>
-                    <span><?= number_format($plan->price, 2) ?></span>
-                </div>
-
-                <div class="plan-period">
-                    per <?= htmlspecialchars($plan->getBillingPeriodLabel()) ?>
-                </div>
-
-                <?php if ($plan->features): ?>
-                    <ul class="plan-features">
-                        <?php foreach ($plan->features as $feature): ?>
-                            <li><?= htmlspecialchars($feature) ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
-
-                <?php if ($currentSubscription && $currentSubscription->plan_id === $plan->id): ?>
-                    <button class="btn btn-secondary" disabled>
-                        Current Plan
-                    </button>
-                <?php elseif ($currentSubscription): ?>
-                    <button class="btn btn-secondary" disabled>
-                        Already Subscribed
-                    </button>
-                <?php else: ?>
-                    <button
-                            class="btn btn-primary <?= $plan->is_featured ? 'featured' : '' ?>"
-                            onclick="subscribeToPlan('<?= htmlspecialchars($plan->slug) ?>', this)">
-                        Subscribe Now
-                    </button>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
-    </div>
-
-    <?php if (!$plans->count()): ?>
-        <div class="empty-state">
-            <div class="empty-state-icon">📦</div>
-            <p>No subscription plans available at this time.</p>
-        </div>
-    <?php endif; ?>
+<div class="hero">
+    <p class="hero-eyebrow"><?= htmlspecialchars($site->name) ?> — Membership</p>
+    <h1 class="hero-title">Choose<br><em>your plan</em></h1>
+    <p class="hero-sub">Unlock everything in seconds.</p>
 </div>
 
+<div class="current-banner" id="currentBanner"></div>
+
+<main class="shell" id="plansApp"
+      data-api-url="/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscription-plans"
+      data-site-slug="<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug()) ?>">
+    <div class="plans-grid" id="plansGrid">
+        <!-- Skeleton placeholders -->
+        <?php for ($i = 0; $i < 3; $i++): ?>
+            <div class="plan-card">
+                <div class="skel" style="width:60%;height:36px;margin-bottom:16px"></div>
+                <div class="skel" style="width:90%;height:14px;margin-bottom:8px"></div>
+                <div class="skel" style="width:70%;height:14px;margin-bottom:28px"></div>
+                <div class="skel" style="width:50%;height:56px;margin-bottom:28px"></div>
+                <div class="skel" style="width:100%;height:48px"></div>
+            </div>
+        <?php endfor; ?>
+    </div>
+</main>
+
 <script>
-    function subscribeToPlan(slug, button) {
-        if (!button) return;
+    /**
+     * PlansPage — drives the Subscription Plans listing view.
+     * All DOM construction goes through app-core UI helpers.
+     */
+    class PlansPage {
+        /** @param {HTMLElement} root  The #plansApp shell element */
+        constructor(root) {
+            this.root = root;
+            this.apiUrl = root.dataset.apiUrl;
+            this.siteSlug = root.dataset.siteSlug;
 
-        button.disabled = true;
-        button.classList.add('loading');
-        const originalText = button.textContent;
+            this.plansGrid = document.getElementById('plansGrid');
+            this.currentBanner = document.getElementById('currentBanner');
 
-        fetch('/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscription-plans/' + slug + '/subscribe', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+            /** Voucher state keyed by plan slug */
+            this.vouchers = {};
+        }
+
+        async init() {
+            try {
+                const res = await api(this.apiUrl);
+                this.renderBanner(res.data.currentSubscription);
+                this.renderPlans(res.data.plans, res.data.currentSubscription);
+            } catch (err) {
+                UI.toast(err.message || 'Failed to load plans', 'error');
+                UI.render(this.plansGrid, [
+                    UI.emptyState({icon: '⚠️', title: 'Unable to load plans', body: 'Please refresh the page.'}),
+                ]);
             }
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    button.textContent = '✓ Subscribed!';
-                    button.classList.remove('loading');
-                    button.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+        }
 
-                    setTimeout(() => {
-                        window.location.href = '/<?= \App\Framework\Support\SiteContext::slug() ?>/member/subscriptions';
-                    }, 1200);
-                } else {
-                    alert(data.message || 'Failed to subscribe. Please try again.');
-                    button.disabled = false;
-                    button.classList.remove('loading');
-                    button.textContent = originalText;
-                }
-            })
-            .catch(error => {
-                console.error('Subscription error:', error);
-                alert('An error occurred. Please try again.');
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.textContent = originalText;
+        // ── Banner ─────────────────────────────────────────────────────────────
+
+        renderBanner(currentSub) {
+            if (!currentSub) return;
+            UI.text(this.currentBanner, `✓ You are currently on the ${currentSub.plan_name} plan`);
+            this.currentBanner.classList.add('visible');
+        }
+
+        // ── Plans grid ─────────────────────────────────────────────────────────
+
+        renderPlans(plans, currentSub) {
+            if (!plans || !plans.length) {
+                UI.render(this.plansGrid, [
+                    UI.emptyState({icon: '📦', title: 'No plans available', body: 'Check back soon.'}),
+                ]);
+                return;
+            }
+
+            UI.render(this.plansGrid, plans.map((plan, i) => {
+                const card = this.planCard(plan, currentSub);
+                setTimeout(() => card.classList.add('visible'), i * 90);
+                return card;
+            }));
+        }
+
+        planCard(plan, currentSub) {
+            const isCurrent = currentSub && currentSub.plan_id === plan.id;
+            const hasActiveSub = !!currentSub;
+
+            const card = UI.el('div', {
+                className: `plan-card ${plan.is_featured ? 'featured' : ''}`,
+                'data-slug': plan.slug,
             });
+
+            // Featured tag
+            if (plan.is_featured) {
+                card.appendChild(UI.el('div', {className: 'featured-tag'}, ['Most Popular']));
+            }
+
+            // Current plan tag
+            if (isCurrent) {
+                card.appendChild(UI.el('div', {className: 'current-tag'}, ['✓ Your Plan']));
+            }
+
+            // Name + trial
+            card.appendChild(UI.el('div', {className: 'plan-name'}, [plan.name]));
+            if (plan.trial_days > 0) {
+                card.appendChild(UI.el('div', {className: 'plan-trial'}, [`🎉 ${plan.trial_days}-day free trial`]));
+            }
+
+            // Description
+            card.appendChild(UI.el('div', {className: 'plan-desc'}, [
+                plan.description || 'Get access to all premium features.',
+            ]));
+
+            // Price
+            const priceWrap = UI.el('div', {className: 'plan-price-wrap'}, [
+                UI.el('span', {className: 'plan-currency'}, [plan.currency]),
+                UI.el('span', {className: 'plan-amount'}, [Number(plan.price).toFixed(2)]),
+            ]);
+            card.appendChild(priceWrap);
+            card.appendChild(UI.el('div', {className: 'plan-period'}, [
+                `per ${plan.billing_period_label ?? plan.billing_period ?? 'period'}`,
+            ]));
+
+            // Features
+            if (plan.features && plan.features.length) {
+                const ul = UI.el('ul', {className: 'plan-features'});
+                plan.features.forEach(f => ul.appendChild(UI.el('li', {}, [f])));
+                card.appendChild(ul);
+            }
+
+            // CTA area
+            if (isCurrent) {
+                card.appendChild(UI.el('div', {className: 'btn-disabled-label'}, ['Current Plan']));
+            } else if (hasActiveSub) {
+                card.appendChild(UI.el('div', {className: 'btn-disabled-label'}, ['Already Subscribed']));
+            } else {
+                // Voucher form
+                const voucherInput = UI.el('input', {
+                    className: 'voucher-input',
+                    type: 'text',
+                    placeholder: 'Voucher code (optional)',
+                    'data-plan-slug': plan.slug,
+                });
+                const applyBtn = UI.el('button', {
+                    className: 'btn-voucher',
+                    onclick: () => this.applyVoucher(plan, voucherInput, voucherMsg, priceEl),
+                }, ['Apply']);
+
+                const voucherMsg = UI.el('div', {className: 'voucher-msg'});
+
+                const voucherForm = UI.el('div', {className: 'voucher-form'}, [voucherInput, applyBtn]);
+                card.appendChild(voucherForm);
+                card.appendChild(voucherMsg);
+
+                // Discounted price display (hidden until voucher applied)
+                const priceEl = UI.el('div', {
+                    className: 'voucher-msg ok',
+                    style: 'display:none;margin-bottom:10px',
+                });
+                card.appendChild(priceEl);
+
+                // Subscribe button
+                const subscribeBtn = UI.el('button', {
+                    className: `btn-subscribe`,
+                    onclick: () => this.subscribe(plan, subscribeBtn, voucherInput),
+                }, ['Subscribe Now']);
+                card.appendChild(subscribeBtn);
+            }
+
+            return card;
+        }
+
+        // ── Voucher ────────────────────────────────────────────────────────────
+
+        async applyVoucher(plan, input, msgEl, priceEl) {
+            const code = input.value.trim();
+            UI.text(msgEl, '');
+            msgEl.className = 'voucher-msg';
+            priceEl.style.display = 'none';
+
+            if (!code) {
+                UI.text(msgEl, 'Enter a voucher code first.');
+                msgEl.classList.add('fail');
+                return;
+            }
+
+            try {
+                const data = await api(`${this.apiUrl}/${plan.slug}/validate-voucher`, {
+                    method: 'POST',
+                    body: JSON.stringify({voucher_code: code}),
+                });
+
+                this.vouchers[plan.slug] = {code, discount: data.discount};
+                UI.text(msgEl, `✓ ${data.message}`);
+                msgEl.classList.add('ok');
+
+                UI.text(priceEl, `Final price: ${plan.currency} ${Number(data.final_price).toFixed(2)} (save ${Number(data.discount).toFixed(2)})`);
+                priceEl.style.display = 'block';
+            } catch (err) {
+                delete this.vouchers[plan.slug];
+                UI.text(msgEl, err.message || 'Invalid voucher code.');
+                msgEl.classList.add('fail');
+            }
+        }
+
+        // ── Subscribe ──────────────────────────────────────────────────────────
+
+        async subscribe(plan, btn, voucherInput) {
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            const voucher = this.vouchers[plan.slug];
+            const payload = {voucher_code: voucher?.code ?? null};
+
+            try {
+                await api(`${this.apiUrl}/${plan.slug}/subscribe`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                });
+
+                btn.classList.remove('loading');
+                btn.classList.add('success-state');
+                UI.text(btn, '✓ Subscribed!');
+
+                setTimeout(() => {
+                    window.location.href = `/${this.siteSlug}/member/subscriptions`;
+                }, 1200);
+            } catch (err) {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                UI.toast(err.message || 'Failed to subscribe. Please try again.', 'error');
+            }
+        }
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const root = document.getElementById('plansApp');
+        if (root) new PlansPage(root).init();
+    });
 </script>
 </body>
 </html>

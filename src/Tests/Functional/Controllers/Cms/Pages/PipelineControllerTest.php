@@ -583,16 +583,6 @@ class PipelineControllerTest extends FunctionalTestCase
         $this->assertNotContains($page2->id, $draftPageIds);
     }
 
-    private function createSite()
-    {
-        return \App\Models\Site::create([
-            'name' => 'Test Site ' . uniqid(),
-            'slug' => 'test-site-' . uniqid(),
-            'is_active' => true,
-            'is_default' => false,
-        ]);
-    }
-
     public function testMetricsFiltersBySite(): void
     {
         // Arrange

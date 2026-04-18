@@ -1205,17 +1205,6 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('errors', $data);
     }
 
-
-    private function createSite()
-    {
-        return Site::create([
-            'name' => 'Test Site 2',
-            'slug' => 'test-site-2',
-            'is_active' => true,
-            'is_default' => false,
-        ]);
-    }
-
     public function testBulkDeletePages()
     {
         $page1 = $this->createPage();

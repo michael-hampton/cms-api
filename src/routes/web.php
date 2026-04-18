@@ -391,6 +391,7 @@ $router->post('/{siteSlug}/member/hub/polls/vote', [MemberHubApiController::clas
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 
+$router->get('/{site}/admin/badges', [\App\Controllers\Admin\BadgeController::class, 'index']);
 
 $router->get('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'index']);
 $router->get('/{site}/admin/subscription-plans/create', [AdminSubscriptionPlansController::class, 'create']);

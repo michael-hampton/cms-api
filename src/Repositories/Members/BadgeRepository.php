@@ -2,16 +2,56 @@
 
 namespace App\Repositories\Members;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Badge;
 use App\Models\Member;
 use App\Models\MemberActivity;
 use App\Models\MemberBadge;
 use App\Models\MemberPoint;
+use App\Models\Model;
 use App\Models\Order;
+use App\Repositories\Repository;
 
-class BadgeRepository
+class BadgeRepository extends Repository
 {
+    // -------------------------------------------------------------------------
+    // Admin CRUD (delegates to base Repository methods)
+    // -------------------------------------------------------------------------
+
+    public function paginate(int $perPage = 20, int $page = 1, ?int $siteId = null): array
+    {
+        return Badge::orderBy('name')
+            ->when(!empty($siteId), function ($query) use ($siteId) {
+                return $query->where('site_id', $siteId);
+            })
+            ->paginate($perPage);
+    }
+
+    public function findForSite(int $id, int $siteId): ?Badge
+    {
+        return Badge::where('id', $id)
+            ->where('site_id', $siteId)
+            ->first();
+    }
+
+    public function existsByNameForSite(string $name, int $siteId, ?int $excludeId = null): bool
+    {
+        $query = Badge::query()
+            ->where('site_id', $siteId)
+            ->where(Database::raw('LOWER(name)'), strtolower($name));
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
+    // -------------------------------------------------------------------------
+    // Existing engine methods (unchanged)
+    // -------------------------------------------------------------------------
+
     public function getActiveBadgesForSite(int $siteId): Collection
     {
         return Badge::where('site_id', $siteId)
@@ -26,17 +66,17 @@ class BadgeRepository
             ->first();
     }
 
-    public function createMemberActivity(array $data): MemberActivity
+    public function createMemberActivity(array $data): Model
     {
         return MemberActivity::create($data);
     }
 
-    public function createMemberPoint(array $data): MemberPoint
+    public function createMemberPoint(array $data): Model
     {
         return MemberPoint::create($data);
     }
 
-    public function createMemberBadge(array $data): MemberBadge
+    public function createMemberBadge(array $data): Model
     {
         return MemberBadge::create($data);
     }
@@ -100,5 +140,10 @@ class BadgeRepository
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get();
+    }
+
+    protected function getModelClass(): string
+    {
+        return Badge::class;
     }
 }

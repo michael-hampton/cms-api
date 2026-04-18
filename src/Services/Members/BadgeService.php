@@ -19,10 +19,164 @@ class BadgeService
 {
     public function __construct(
         private readonly BadgeRepository $badgeRepository,
-        private readonly Database $database
+        private readonly Database $database,
     )
     {
     }
+
+    // =========================================================================
+    // Admin CRUD
+    // =========================================================================
+
+    /**
+     * List all badges for a site (paginated).
+     */
+    public function listForSite(int $siteId, int $page, int $perPage = 20): mixed
+    {
+        return $this->badgeRepository->paginate($perPage, $page, $siteId);
+    }
+
+    /**
+     * Fetch a single badge, scoped to the site.
+     *
+     * @throws \InvalidArgumentException if not found
+     */
+    public function findForSite(int $id, int $siteId): Badge
+    {
+        $badge = $this->badgeRepository->findForSite($id, $siteId);
+
+        if ($badge === null) {
+            throw new \InvalidArgumentException("Badge #{$id} not found.");
+        }
+
+        return $badge;
+    }
+
+    /**
+     * Create a new badge for the site.
+     *
+     * @throws \InvalidArgumentException on validation failure or duplicate name
+     */
+    public function createBadge(array $payload, int $siteId): Badge
+    {
+        $this->validateCriteria($payload['criteria'] ?? []);
+
+        if ($this->badgeRepository->existsByNameForSite($payload['name'], $siteId)) {
+            throw new \InvalidArgumentException(
+                "A badge named \"{$payload['name']}\" already exists for this site."
+            );
+        }
+
+        return $this->database->transaction(function () use ($payload, $siteId) {
+            return $this->badgeRepository->create([
+                'site_id' => $siteId,
+                'name' => trim($payload['name']),
+                'description' => $payload['description'] ?? null,
+                'icon' => $payload['icon'] ?? null,
+                'criteria' => $payload['criteria'],
+                'points' => $payload['points'] ?? 0,
+                'is_active' => $payload['is_active'] ?? true,
+                'slug' => $payload['slug'],
+                'category' => $payload['category']
+            ]);
+        });
+    }
+
+    /**
+     * Update an existing badge.
+     *
+     * @throws \InvalidArgumentException on validation failure, not found, or duplicate name
+     */
+    public function updateBadge(int $id, array $payload, int $siteId): Badge
+    {
+        $badge = $this->findForSite($id, $siteId);
+
+        if (isset($payload['criteria'])) {
+            $this->validateCriteria($payload['criteria']);
+        }
+
+        if (
+            isset($payload['name'])
+            && $this->badgeRepository->existsByNameForSite($payload['name'], $siteId, $id)
+        ) {
+            throw new \InvalidArgumentException(
+                "A badge named \"{$payload['name']}\" already exists for this site."
+            );
+        }
+
+        return $this->database->transaction(function () use ($badge, $payload) {
+            $this->badgeRepository->update($badge->id, array_filter([
+                'name' => isset($payload['name']) ? trim($payload['name']) : null,
+                'description' => $payload['description'] ?? null,
+                'icon' => $payload['icon'] ?? null,
+                'criteria' => $payload['criteria'] ?? null,
+                'points' => $payload['points'] ?? null,
+                'is_active' => $payload['is_active'] ?? null,
+            ], fn($v) => $v !== null));
+
+            return $this->badgeRepository->find($badge->id);
+        });
+    }
+
+    /**
+     * Delete a badge.
+     *
+     * @throws \InvalidArgumentException if not found
+     */
+    public function deleteBadge(int $id, int $siteId): void
+    {
+        $badge = $this->findForSite($id, $siteId);
+
+        $this->database->transaction(function () use ($badge) {
+            $this->badgeRepository->delete($badge->id);
+        });
+    }
+
+    // =========================================================================
+    // Criteria validation
+    // =========================================================================
+
+    /**
+     * @throws \InvalidArgumentException if any rule is structurally invalid
+     */
+    private function validateCriteria(array $criteria): void
+    {
+        if (empty($criteria)) {
+            throw new \InvalidArgumentException('At least one criterion is required.');
+        }
+
+        foreach ($criteria as $index => $rule) {
+            $position = $index + 1;
+
+            if (empty($rule['type'])) {
+                throw new \InvalidArgumentException("Criterion #{$position}: type is required.");
+            }
+            if (BadgeCriteriaType::tryFrom($rule['type']) === null) {
+                throw new \InvalidArgumentException(
+                    "Criterion #{$position}: \"{$rule['type']}\" is not a valid type."
+                );
+            }
+
+            if (empty($rule['operator'])) {
+                throw new \InvalidArgumentException("Criterion #{$position}: operator is required.");
+            }
+            if (BadgeCriteriaOperator::tryFrom($rule['operator']) === null) {
+                throw new \InvalidArgumentException(
+                    "Criterion #{$position}: \"{$rule['operator']}\" is not a valid operator."
+                );
+            }
+
+            if (!isset($rule['value']) || !is_numeric($rule['value'])) {
+                throw new \InvalidArgumentException(
+                    "Criterion #{$position}: value must be a numeric."
+                );
+            }
+        }
+    }
+
+    // =========================================================================
+    // Existing engine methods (unchanged)
+    // =========================================================================
 
     public function trackActivity(
         Member  $member,
@@ -45,7 +199,7 @@ class BadgeService
                 'entity_id' => $entityId,
                 'metadata' => $metadata,
                 'points' => $points,
-                'activity_date' => now_datetime()
+                'activity_date' => now_datetime(),
             ]);
 
             if ($points > 0) {
@@ -82,7 +236,7 @@ class BadgeService
             'reason' => $reason,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
-            'awarded_at' => $timestamp
+            'awarded_at' => $timestamp,
         ]);
 
         event(new PointsAwardedEvent($member, $memberPoint));
@@ -102,8 +256,7 @@ class BadgeService
             }
 
             if ($badge->checkCriteria($member)) {
-                $memberBadge = $this->awardBadge($member, $badge);
-                $newBadges[] = $memberBadge;
+                $newBadges[] = $this->awardBadge($member, $badge);
             }
         }
 
@@ -120,7 +273,7 @@ class BadgeService
                 'badge_id' => $badge->id,
                 'earned_at' => $now,
                 'criteria_met' => $badge->criteria,
-                'is_visible' => true
+                'is_visible' => true,
             ]);
 
             if ($badge->points > 0) {
@@ -151,11 +304,11 @@ class BadgeService
 
         $trends = [];
         for ($i = 0; $i < $days; $i++) {
-            $date = now_datetime()->modify("-" . ($days - $i - 1) . " days")->format('Y-m-d');
+            $date = now_datetime()->modify('-' . ($days - $i - 1) . ' days')->format('Y-m-d');
             $trends[$date] = [
                 'date' => $date,
                 'count' => $activities->get($date)?->count() ?? 0,
-                'points' => $activities->get($date)?->sum('points') ?? 0
+                'points' => $activities->get($date)?->sum('points') ?? 0,
             ];
         }
 
@@ -180,7 +333,7 @@ class BadgeService
             if ($progress['percentage'] > 0) {
                 $nextBadges[] = [
                     'badge' => $badge,
-                    'progress' => $progress
+                    'progress' => $progress,
                 ];
             }
         }
@@ -192,7 +345,7 @@ class BadgeService
             'total_points' => $member->totalPoints,
             'badges_earned' => $earnedBadges->count(),
             'badges_available' => $availableBadges->count(),
-            'next_badges' => array_slice($nextBadges, 0, 5)
+            'next_badges' => array_slice($nextBadges, 0, 5),
         ];
     }
 
@@ -220,7 +373,7 @@ class BadgeService
                 'current' => $current,
                 'target' => $target,
                 'met' => $met,
-                'percentage' => $target > 0 ? min(100, ($current / $target) * 100) : 0
+                'percentage' => $target > 0 ? min(100, ($current / $target) * 100) : 0,
             ];
         }
 
@@ -228,11 +381,11 @@ class BadgeService
             'percentage' => $totalCriteria > 0 ? ($metCriteria / $totalCriteria) * 100 : 0,
             'met' => $metCriteria,
             'total' => $totalCriteria,
-            'details' => $details
+            'details' => $details,
         ];
     }
 
-    private function getCurrentValue(Member $member, BadgeCriteriaType $type)
+    private function getCurrentValue(Member $member, BadgeCriteriaType $type): mixed
     {
         return match ($type) {
             BadgeCriteriaType::COMMENTS_COUNT => $this->badgeRepository->getCommentsCount($member),
