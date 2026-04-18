@@ -8,6 +8,27 @@ use App\Repositories\Repository;
 
 class CampaignRepository extends Repository
 {
+    public function paginateForSite(int $siteId, int $perPage = 20, int $page = 1): array
+    {
+        return Campaign::with('segment')
+            ->where('site_id', $siteId)
+            ->orderBy('name')
+            ->paginate($perPage, $page);
+    }
+
+    public function existsBySlugForSite(string $slug, int $siteId, ?int $excludeId = null): bool
+    {
+        $query = Campaign::query()
+            ->where('site_id', $siteId)
+            ->where('slug', trim($slug));
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
     /**
      * @param string[] $segmentKeys
      * @return Collection<Campaign>

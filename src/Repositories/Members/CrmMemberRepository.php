@@ -55,7 +55,7 @@ class CrmMemberRepository extends Repository
         ];
     }
 
-    public function findForSite(int $memberId, int $siteId): ?Member
+    public function findForSite(int $memberId, int $siteId, array $relations = []): ?Member
     {
         return Member::where('id', $siteId === 0 ? $memberId : $memberId)
             ->where('site_id', $siteId)

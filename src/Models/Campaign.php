@@ -32,6 +32,7 @@ class Campaign extends Model
         'updated_by',
         'segment_id',
         'channel',
+        'fallback_channels',
         'template',
         'cooldown_hours',
         'priority',
@@ -48,6 +49,7 @@ class Campaign extends Model
         'channel' => 'string',
         'cooldown_hours' => 'integer',
         'priority' => 'integer',
+        'fallback_channels' => 'array',
     ];
 
     public static function findBySlug(string $slug, int $siteId): ?self
@@ -158,5 +160,10 @@ class Campaign extends Model
     public function segment()
     {
         return $this->belongsTo(Segment::class);
+    }
+
+    public function executions()
+    {
+        return $this->hasMany(CampaignExecution::class);
     }
 }

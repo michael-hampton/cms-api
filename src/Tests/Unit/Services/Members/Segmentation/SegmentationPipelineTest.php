@@ -96,7 +96,6 @@ class SegmentationPipelineTest extends TestCase
             ->times(3)
             ->with(Mockery::on(fn($job) => $job instanceof SendCampaignJob))
             ->andReturn($pending);
-        $pending->shouldReceive('dispatch')->times(3);
 
         $this->runJob(5, 3);
         $this->addToAssertionCount(1);

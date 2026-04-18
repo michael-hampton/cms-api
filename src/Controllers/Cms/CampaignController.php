@@ -72,8 +72,8 @@ class CampaignController extends Controller
     public function create(CreateCampaignRequest $request): JsonResponse
     {
         try {
-            $campaign = $this->campaignRepository->create(
-                array_merge($request->validated(), ['site_id' => SiteContext::getId()])
+            $campaign = $this->campaignService->create(
+                $request->validated(), SiteContext::getId()
             );
 
             return $this->jsonResponse([
@@ -91,13 +91,8 @@ class CampaignController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-            $campaign = $this->campaignRepository->find($id);
 
-            if (!$campaign || $campaign->site_id !== $siteId) {
-                return $this->errorResponse('Campaign not found', 404);
-            }
-
-            $updated = $this->campaignRepository->update($id, $request->validated());
+            $updated = $this->campaignService->update($id, $request->validated(), $siteId);
 
             return $this->successResponse('Campaign updated successfully', [
                 'campaign' => CampaignResource::make($updated)->toArray(),
@@ -117,13 +112,7 @@ class CampaignController extends Controller
                 return $this->errorResponse($check['reason'], 400);
             }
 
-            $campaign = $this->campaignRepository->find($id);
-
-            if (!$campaign || $campaign->site_id !== $request->getSiteId()) {
-                return $this->errorResponse('Campaign not found', 404);
-            }
-
-            $this->campaignRepository->delete($id);
+            $this->campaignService->delete($id, SiteContext::getId());
 
             return $this->successResponse('Campaign deleted successfully');
         } catch (\Exception $e) {

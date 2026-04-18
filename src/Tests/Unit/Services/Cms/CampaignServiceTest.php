@@ -6,8 +6,10 @@ use App\DTO\Campaigns\SignupContext;
 use App\Framework\Database\Database;
 use App\Models\Campaign;
 use App\Models\Newsletter;
+use App\Models\Segment;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
+use App\Repositories\Members\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Cms\CampaignService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -19,6 +21,7 @@ class CampaignServiceTest extends FunctionalTestCase
     private CampaignRepository $campaignRepository;
     private NewsletterRepository $newsletterRepository;
     private CampaignSignupRepository $campaignSignupRepository;
+    private SegmentRepository $segmentRepository;
     private Database $databaseMock;
 
     protected function setUp(): void
@@ -28,12 +31,14 @@ class CampaignServiceTest extends FunctionalTestCase
         $this->campaignRepository = Mockery::mock(CampaignRepository::class);
         $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
         $this->campaignSignupRepository = Mockery::mock(CampaignSignupRepository::class);
+        $this->segmentRepository = Mockery::mock(SegmentRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
 
         $this->service = new CampaignService(
             $this->campaignRepository,
             $this->newsletterRepository,
             $this->campaignSignupRepository,
+            $this->segmentRepository,
             $this->databaseMock
         );
     }
@@ -315,5 +320,63 @@ class CampaignServiceTest extends FunctionalTestCase
 
         $result = $this->service->trackCampaignSignup($campaignId, 42, 'foo@example.com');
         $this->assertFalse($result['success']);
+    }
+
+    public function test_create_persists_campaign_fields(): void
+    {
+        $payload = $this->payload();
+        $campaign = $this->makeCampaign(3);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->with('win-back', 10)->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+        $this->databaseMock->allows('transaction')->andReturnUsing(fn(callable $callback) => $callback());
+        $this->campaignRepository->expects('create')
+            ->withArgs(fn(array $data) => $data['segment_id'] === 5 && $data['cooldown_hours'] === 24 && $data['priority'] === 90)
+            ->andReturn($campaign);
+
+        $result = $this->service->createForSite($payload, 10);
+
+        $this->assertSame($campaign, $result);
+    }
+
+    public function test_create_throws_when_segment_missing(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(null);
+
+        $this->service->createForSite($this->payload(), 10);
+    }
+
+    public function test_update_throws_when_campaign_missing(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->campaignRepository->allows('findForSite')->with(88, 10)->andReturn(null);
+
+        $this->service->updateForSite(88, ['priority' => 1], 10);
+    }
+
+    private function payload(): array
+    {
+        return [
+            'name' => 'Win Back',
+            'slug' => 'win-back',
+            'segment_id' => 5,
+            'channel' => 'email',
+            'fallback_channels' => ['push'],
+            'template' => 'App\\Mail\\Campaigns\\WeMissYouMail',
+            'cooldown_hours' => 24,
+            'priority' => 90,
+        ];
+    }
+
+    private function makeCampaign(int $id): Campaign
+    {
+        $campaign = Mockery::mock(Campaign::class)->makePartial();
+        $campaign->id = $id;
+        $campaign->name = 'Win Back';
+        return $campaign;
     }
 }

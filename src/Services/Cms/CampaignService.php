@@ -10,6 +10,7 @@ use App\Models\Campaign;
 use App\Models\Model;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
+use App\Repositories\Members\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 
 class CampaignService
@@ -18,6 +19,7 @@ class CampaignService
         private readonly CampaignRepository   $campaignRepository,
         private readonly NewsletterRepository $newsletterRepository,
         private CampaignSignupRepository      $campaignSignupRepository,
+        private readonly SegmentRepository $segmentRepository,
         private Database                      $database
     )
     {
@@ -241,6 +243,92 @@ class CampaignService
             CampaignStatus::ACTIVE,
             true
         );
+    }
+
+    public function create(array $payload, int $siteId): Campaign
+    {
+        $payload = $this->normalizePayload($payload, $siteId, isUpdate: false);
+
+        if ($this->campaignRepository->existsBySlugForSite($payload['slug'], $siteId)) {
+            throw new \InvalidArgumentException("Campaign slug \"{$payload['slug']}\" already exists.");
+        }
+
+        $this->assertSegmentExists($payload['segment_id']);
+
+        return $this->database->transaction(fn() => $this->campaignRepository->create($payload)
+        );
+    }
+
+    public function update(int $id, array $payload, int $siteId): Campaign
+    {
+        $campaign = $this->campaignRepository->findForSite($id, $siteId);
+
+        if (
+            isset($payload['slug']) &&
+            $this->campaignRepository->existsBySlugForSite($payload['slug'], $siteId, $campaign->id)
+        ) {
+            throw new \InvalidArgumentException("Campaign slug \"{$payload['slug']}\" already exists.");
+        }
+
+        if (array_key_exists('segment_id', $payload)) {
+            $this->assertSegmentExists($payload['segment_id']);
+        }
+
+        $payload = $this->normalizePayload($payload, $siteId, isUpdate: true);
+
+        return $this->database->transaction(function () use ($campaign, $payload, $siteId) {
+            $this->campaignRepository->update($campaign->id, $payload);
+
+            return $this->campaignRepository->findForSite($campaign->id, $siteId);
+        });
+    }
+
+    private function normalizePayload(array $payload, int $siteId, bool $isUpdate): array
+    {
+        $normalized = [
+            'site_id' => $siteId,
+            'name' => isset($payload['name']) ? trim($payload['name']) : null,
+            'slug' => isset($payload['slug']) ? trim($payload['slug']) : null,
+            'description' => $payload['description'] ?? null,
+            'is_active' => $payload['is_active'] ?? ($isUpdate ? null : true),
+            'start_date' => $payload['start_date'] ?? null,
+            'end_date' => $payload['end_date'] ?? null,
+            'segment_id' => $payload['segment_id'] ?? null,
+            'channel' => $payload['channel'] ?? null,
+            'purpose' => $payload['purpose'] ?? ($isUpdate ? null : 'marketing'),
+            'fallback_channels' => $payload['fallback_channels'] ?? ($isUpdate ? null : []),
+            'template' => $payload['template'] ?? null,
+            'cooldown_hours' => $payload['cooldown_hours'] ?? ($isUpdate ? null : 48),
+            'priority' => $payload['priority'] ?? ($isUpdate ? null : 0),
+        ];
+
+        // Payload first, normalized overrides
+        $data = array_merge($payload, $normalized);
+
+        return $isUpdate
+            ? array_filter($data, fn($value) => $value !== null)
+            : $data;
+    }
+
+
+    public function delete(int $id, int $siteId): void
+    {
+        $campaign = $this->campaignRepository->findForSite($id, $siteId);
+
+        $this->database->transaction(function () use ($campaign) {
+            $this->campaignRepository->delete($campaign->id);
+        });
+    }
+
+    private function assertSegmentExists(?int $segmentId): void
+    {
+        if ($segmentId === null) {
+            return;
+        }
+
+        if ($this->segmentRepository->find($segmentId) === null) {
+            throw new \InvalidArgumentException("Segment #{$segmentId} not found.");
+        }
     }
 
     private function updateCampaignStatus(

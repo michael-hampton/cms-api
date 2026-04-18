@@ -8,6 +8,28 @@ use App\Models\ConsentType;
 
 class ConsentTypeRepository
 {
+    public function paginateAdmin(int $perPage = 20, int $page = 1): array
+    {
+        return ConsentType::orderBy('name')->paginate($perPage, $page);
+    }
+
+    public function find(int $id): ?ConsentType
+    {
+        return ConsentType::find($id);
+    }
+
+    public function existsByCode(string $code, ?int $excludeId = null): bool
+    {
+        $query = ConsentType::query()
+            ->where('code', trim($code));
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
     public function findActiveByCode(string $code): ?ConsentType
     {
         $consentType = ConsentType::where('code', $code)
@@ -57,5 +79,31 @@ class ConsentTypeRepository
 
         return $query->with(['consentType', 'adminUser'])
             ->get();
+    }
+
+    public function create(array $data): ConsentType
+    {
+        return ConsentType::create($data);
+    }
+
+    public function update(int $id, array $data): ?ConsentType
+    {
+        $consentType = $this->find($id);
+
+        if ($consentType === null) {
+            return null;
+        }
+
+        $consentType->fill($data);
+        $consentType->save();
+
+        return $consentType;
+    }
+
+    public function delete(int $id): bool
+    {
+        $consentType = $this->find($id);
+
+        return $consentType ? $consentType->delete() : false;
     }
 }

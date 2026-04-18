@@ -769,7 +769,7 @@ abstract class Model
         return $result;
     }
 
-    public static function with(array $relations): QueryBuilder
+    public static function with(string|array $relations): QueryBuilder
     {
         $instance = new static();
         return $instance->newQuery()->with($relations);

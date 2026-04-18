@@ -142,6 +142,18 @@ $router->post('/api/{site}/admin/badges', [\App\Controllers\Members\Api\BadgeAdm
 $router->put('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'update']);
 $router->delete('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'destroy']);
 
+$router->get('/api/{site}/admin/consent-types', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'index']);
+$router->get('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'show']);
+$router->post('/api/{site}/admin/consent-types', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'destroy']);
+
+$router->get('/api/{site}/admin/segments', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'index']);
+$router->get('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'show']);
+$router->post('/api/{site}/admin/segments', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'destroy']);
+
 $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
     $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
     $router->get('/dashboard/overview', [MemberDashboardApiController::class, 'overview']);

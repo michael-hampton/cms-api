@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Enums\Member\CampaignChannel;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Queue\Dispatchable;
 use App\Framework\Queue\InteractsWithQueue;
 use App\Framework\Queue\SerializesModels;
@@ -9,33 +11,47 @@ use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
 use App\Models\Campaign;
 use App\Models\Member;
+use App\Repositories\Members\CampaignRepository;
+use App\Repositories\Members\MemberRepository;
+use App\Services\Members\Segmentation\CampaignConsentChecker;
 use App\Services\Members\Segmentation\CampaignExecutionLogger;
+use App\Services\Members\Segmentation\CampaignNotification;
+use App\Services\Members\Segmentation\ChannelResolver;
 
 /**
- * Sends a single campaign to a single member via Laravel's notification system,
- * then records the execution in the audit log.
+ * Delivers a single campaign to a single member.
  *
- * Responsibility:
- *   - Resolve the campaign and member
- *   - Instantiate and send the correct notification class based on channel
- *   - Log the send via CampaignExecutionLogger
+ * Flow:
+ *   1. Load member + campaign (guard clauses on missing / inactive)
+ *   2. Resolve ordered channel list (primary + fallbacks)
+ *   3. For each channel: check consent via CampaignConsentChecker
+ *   4. First consented channel: instantiate Mailable, wrap in CampaignNotification,
+ *      dispatch through framework NotificationDispatcher
+ *   5. Log execution + return
+ *   6. If no channel passes consent: skip silently (log info)
  *
- * Notification class convention:
- *   The template string on Campaign is used as a fully-qualified notification
- *   class name, e.g. App\Notifications\WeMissYouNotification.
- *   This keeps campaign routing data-driven with no hardcoded channel logic here.
+ * Template convention:
+ *   campaign.template holds a fully-qualified Mailable class name,
+ *   e.g. App\Mail\Campaigns\WeMissYouMail.
+ *   The Mailable receives ($member, $campaign) in its constructor.
  *
  * Failure handling:
- *   Non-delivery (notification throws) is logged and re-thrown so the queue
- *   can retry. The execution log is written AFTER successful delivery to avoid
- *   consuming the cooldown window on a failed send.
+ *   - Missing class → permanent fail (no retry benefit)
+ *   - Dispatch exception → logged + re-thrown for queue retry
+ *   - No consented channel → silent skip, no retry
  */
 class SendCampaignJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, SerializesModels;
 
     public int $backoff = 120;
+
+    private ChannelResolver $channelResolver;
+    private CampaignConsentChecker $consentChecker;
+    private NotificationDispatcher $dispatcher;
     private CampaignExecutionLogger $logger;
+    private MemberRepository $memberRepository;
+    private CampaignRepository $campaignRepository;
 
     public function __construct(
         public readonly int    $memberId,
@@ -47,7 +63,7 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
     public function handle(): void
     {
-        $member = Member::find($this->memberId);
+        $member = $this->memberRepository->find($this->memberId);
 
         if ($member === null) {
             Logger::warning('SendCampaignJob: member not found', [
@@ -57,7 +73,7 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             return;
         }
 
-        $campaign = Campaign::find($this->campaignId);
+        $campaign = $this->campaignRepository->find($this->campaignId, ['segment']);
 
         if ($campaign === null || !$campaign->is_active) {
             Logger::info('SendCampaignJob: campaign not found or inactive, skipping', [
@@ -67,21 +83,74 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             return;
         }
 
-        $notificationClass = $campaign->template;
+        $mailableClass = $campaign->template;
 
-        if (!class_exists($notificationClass)) {
-            Logger::error('SendCampaignJob: notification class does not exist', [
+        if (!class_exists($mailableClass)) {
+            Logger::error('SendCampaignJob: mailable class does not exist', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
-                'template' => $notificationClass,
+                'template' => $mailableClass,
             ]);
-            // Fail permanently — retrying won't fix a missing class.
-            $this->fail(new \RuntimeException("Notification class [{$notificationClass}] does not exist."));
+            $this->fail(new \RuntimeException("Mailable class [{$mailableClass}] does not exist."));
             return;
         }
 
-        //$member->notify(new $notificationClass($campaign));
+        $channels = $this->channelResolver->resolveChannels($campaign);
 
-        //$this->logger->log($this->memberId, $campaign, $this->segmentKey);
+        foreach ($channels as $channel) {
+            if (!$this->consentChecker->canSend($member, $campaign->purpose, $channel)) {
+                Logger::info('SendCampaignJob: consent blocked on channel, trying fallback', [
+                    'member_id' => $this->memberId,
+                    'campaign_id' => $this->campaignId,
+                    'channel' => $channel->value,
+                ]);
+                continue;
+            }
+
+            $this->sendViaChannel($member, $campaign, $channel, $mailableClass, $this->dispatcher, $this->logger);
+            return;
+        }
+
+        Logger::info('SendCampaignJob: no consented channel available, skipping', [
+            'member_id' => $this->memberId,
+            'campaign_id' => $this->campaignId,
+            'purpose' => $campaign->purpose->value,
+        ]);
+    }
+
+    private function sendViaChannel(
+        Member                  $member,
+        Campaign                $campaign,
+        CampaignChannel         $channel,
+        string                  $mailableClass,
+        NotificationDispatcher  $dispatcher,
+        CampaignExecutionLogger $logger,
+    ): void
+    {
+        $mailable = new $mailableClass($member, $campaign);
+
+        $notification = new CampaignNotification(
+            mailable: $mailable,
+            recipientEmailAddress: $member->email,
+            recipientUserIdValue: $member->id,
+        );
+
+        $succeeded = $dispatcher->dispatch($notification);
+
+        if ($succeeded > 0) {
+            $logger->log($this->memberId, $campaign, $this->segmentKey);
+
+            Logger::info('SendCampaignJob: campaign delivered', [
+                'member_id' => $this->memberId,
+                'campaign_id' => $this->campaignId,
+                'channel' => $channel->value,
+            ]);
+        } else {
+            Logger::warning('SendCampaignJob: dispatcher reported zero successful channels', [
+                'member_id' => $this->memberId,
+                'campaign_id' => $this->campaignId,
+                'channel' => $channel->value,
+            ]);
+        }
     }
 }

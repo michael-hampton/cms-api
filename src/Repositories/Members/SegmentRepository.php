@@ -8,6 +8,29 @@ use App\Repositories\Repository;
 
 class SegmentRepository extends Repository
 {
+    public function paginateAdmin(int $perPage = 20, int $page = 1): array
+    {
+        return Segment::with('rules')
+            ->orderBy('name')
+            ->paginate($perPage, $page);
+    }
+
+    public function findWithRules(int $id): ?Segment
+    {
+        return Segment::with('rules')->find($id);
+    }
+
+    public function existsByKey(string $key, ?int $excludeId = null): bool
+    {
+        $query = Segment::query()->where('key', trim($key));
+
+        if ($excludeId !== null) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
     /**
      * @return Collection<Segment>
      */

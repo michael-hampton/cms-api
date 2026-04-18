@@ -61,8 +61,6 @@ class BadgeServiceTrackActivityTest extends TestCase
             ->with(Mockery::on(fn($job) => $job instanceof EvaluateMemberBadgesJob && $job->memberId === 1))
             ->andReturn($pendingDispatch);
 
-        $pendingDispatch->shouldReceive('dispatch')->once();
-
         // points = 0 so awardPoints is NOT called — keeps test focused
         $this->service->trackActivity(
             member: $member,
@@ -106,7 +104,6 @@ class BadgeServiceTrackActivityTest extends TestCase
         // Asserting it is NEVER called proves we are fully async.
         $this->badgeRepository->shouldNotReceive('getActiveBadgesForSite');
         $this->dispatcher->shouldReceive('dispatch')->once()->andReturn($pendingDispatch);
-        $pendingDispatch->shouldReceive('dispatch')->once();
 
         $this->service->trackActivity(
             member: $member,
@@ -147,7 +144,6 @@ class BadgeServiceTrackActivityTest extends TestCase
             ->andReturn($activity);
 
         $this->dispatcher->shouldReceive('dispatch')->once()->andReturn($pendingDispatch);
-        $pendingDispatch->shouldReceive('dispatch')->once();
 
         $result = $this->service->trackActivity(
             member: $member,

@@ -218,7 +218,7 @@ class BadgeService
 
             $this->database->afterCommit(function () use ($member) {
                 $dispatcher = $this->dispatcher ?? app(Dispatcher::class);
-                $dispatcher->dispatch(EvaluateMemberBadgesJob::for($member->id))->dispatch();
+                $dispatcher->dispatch(EvaluateMemberBadgesJob::for($member->id));
             });
 
             return $activity;

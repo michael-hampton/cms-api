@@ -28,13 +28,6 @@ class BadgeRepository extends Repository
             ->paginate($perPage);
     }
 
-    public function findForSite(int $id, int $siteId): ?Badge
-    {
-        return Badge::where('id', $id)
-            ->where('site_id', $siteId)
-            ->first();
-    }
-
     public function existsByNameForSite(string $name, int $siteId, ?int $excludeId = null): bool
     {
         $query = Badge::query()

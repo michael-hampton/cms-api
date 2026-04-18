@@ -58,6 +58,15 @@ abstract class Repository
         return $this->model::find($id);
     }
 
+    public function findForSite(int $id, int $siteId, array $relations = []): ?Model
+    {
+        if (!empty($relations) && is_array($relations) && count($relations) > 0) {
+            return $this->model::with($relations)->find($id);
+        }
+
+        return $this->model::where('site_id', $siteId)->where('id', $id)->first();
+    }
+
     public function findWithTrashed(int $id): ?Model
     {
         return $this->model::withTrashed()->find($id);

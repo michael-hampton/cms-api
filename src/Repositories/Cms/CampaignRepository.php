@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Cms;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
 use App\Models\CampaignSignup;
@@ -23,6 +24,15 @@ class CampaignRepository extends Repository
         return $campaigns->filter(function ($campaign) {
             return $campaign->isActive();
         });
+    }
+
+    public function paginate(int $perPage = 20, int $page = 1, ?int $siteId = null): array
+    {
+        return Campaign::orderBy('name')
+            ->when(!empty($siteId), function ($query) use ($siteId) {
+                return $query->where('site_id', $siteId);
+            })
+            ->paginate($perPage);
     }
 
     public function getActiveCampaignsWithNewsletter(int $siteId): Collection
@@ -116,7 +126,7 @@ class CampaignRepository extends Repository
             ],
             [
                 'site_id' => $siteId,
-                'signup_count' => DB::raw('signup_count + 1'),
+                'signup_count' => Database::raw('signup_count + 1'),
                 'updated_at' => now(),
                 'created_at' => now(),
             ]
@@ -152,6 +162,16 @@ class CampaignRepository extends Repository
             'paused' => (clone $base)->where('status', 'paused')->count(),
             'ended' => (clone $base)->where('status', 'ended')->count(),
         ];
+    }
+
+    public function existsBySlugForSite(mixed $slug, int $siteId, ?int $id = null)
+    {
+        return Campaign::where('slug', $slug)
+            ->where('site_id', $siteId)
+            ->when(!empty($id), function ($query) use ($id) {
+                return $query->where('id', '!=', $id);
+            })
+            ->first();
     }
 
 

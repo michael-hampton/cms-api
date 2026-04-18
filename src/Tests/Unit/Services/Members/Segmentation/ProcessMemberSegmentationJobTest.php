@@ -116,7 +116,6 @@ class ProcessMemberSegmentationJobTest extends TestCase
             ->once()
             ->with(Mockery::on(fn($job) => $job instanceof SendCampaignJob && $job->campaignId === 5))
             ->andReturn($this->pendingDispatch);
-        $this->pendingDispatch->shouldReceive('dispatch')->once();
 
         $this->runJob(memberId: 1, siteId: 10);
         $this->addToAssertionCount(1);
@@ -172,7 +171,6 @@ class ProcessMemberSegmentationJobTest extends TestCase
         $this->matcher->shouldReceive('match')->andReturn($campaigns);
         $this->cooldown->shouldReceive('isEligible')->andReturn(true);
         $this->dispatcher->shouldReceive('dispatch')->times(3)->andReturn($this->pendingDispatch);
-        $this->pendingDispatch->shouldReceive('dispatch')->times(3);
 
         $this->runJob(memberId: 1, siteId: 10);
         $this->addToAssertionCount(1);

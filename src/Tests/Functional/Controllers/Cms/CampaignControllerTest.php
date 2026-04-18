@@ -113,6 +113,7 @@ class CampaignControllerTest extends FunctionalTestCase
         ]);
 
         $response = $this->getForSite('/api/campaigns');
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertResponseStatus(200, $response);

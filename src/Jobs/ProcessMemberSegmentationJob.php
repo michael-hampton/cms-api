@@ -95,12 +95,14 @@ class ProcessMemberSegmentationJob extends BaseJob implements ShouldQueue
             }
 
             try {
-                SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key)->handle();
-                $this->dispatcher->dispatch(SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key))->dispatch();
+                $this->dispatcher->dispatch(SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key));
                 $dispatched++;
             } catch (\Exception $exception) {
-                echo $exception->getMessage();
-                die;
+                Logger::error('ProcessMemberSegmentationJob: failed to dispatch SendCampaignJob', [
+                    'member_id' => $this->memberId,
+                    'campaign_id' => $campaign->id,
+                    'error' => $exception->getMessage(),
+                ]);
             }
 
 
