@@ -3,8 +3,8 @@
 namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Models\Campaign;
-use App\Repositories\Members\CampaignExecutionRepository;
-use App\Services\Members\Segmentation\CampaignCooldownChecker;
+use App\Repositories\MemberInsights\CampaignExecutionRepository;
+use App\Services\MemberInsights\Campaigns\CampaignCooldownChecker;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;

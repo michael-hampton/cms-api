@@ -10,7 +10,7 @@ use App\Models\Segment;
 use App\Models\SegmentRule;
 use App\Requests\Members\StoreSegmentRequest;
 use App\Requests\Members\UpdateSegmentRequest;
-use App\Services\Members\SegmentAdminService;
+use App\Services\MemberInsights\SegmentAdminService;
 
 class SegmentAdminApiController extends Controller
 {

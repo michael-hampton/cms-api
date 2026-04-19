@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Services\Members\Segmentation;
 use App\Enums\Member\SegmentRuleBoolean;
 use App\Enums\Member\SegmentRuleOperator;
 use App\Framework\Support\Collection;
-use App\Services\Members\Segmentation\SegmentRuleEvaluator;
+use App\Services\MemberInsights\Segmentation\SegmentRuleEvaluator;
 use PHPUnit\Framework\TestCase;
 
 class SegmentRuleEvaluatorTest extends TestCase

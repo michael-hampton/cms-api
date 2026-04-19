@@ -16,7 +16,7 @@ use App\Repositories\Newsletters\NewsletterSnapshotRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\Cms\Pages\BlockParserService;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 use DateTimeImmutable;
 
 class NewsletterSendService

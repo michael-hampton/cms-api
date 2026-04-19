@@ -9,7 +9,7 @@ use App\Models\Newsletter;
 use App\Models\Segment;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
-use App\Repositories\Members\SegmentRepository;
+use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Cms\CampaignService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;

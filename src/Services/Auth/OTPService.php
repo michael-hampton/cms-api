@@ -3,7 +3,7 @@
 namespace App\Services\Auth;
 
 use App\Repositories\Auth\OTPRepository;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 
 /**
  * OTPService

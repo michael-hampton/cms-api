@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Framework\Support\Collection;
 use App\Models\Segment;
-use App\Repositories\Members\SegmentRepository;
-use App\Services\Members\Segmentation\MemberSegmentResolver;
-use App\Services\Members\Segmentation\SegmentRuleEvaluator;
+use App\Repositories\MemberInsights\SegmentRepository;
+use App\Services\MemberInsights\Segmentation\MemberSegmentResolver;
+use App\Services\MemberInsights\Segmentation\SegmentRuleEvaluator;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;

@@ -5,8 +5,8 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
+use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\BadgeRepository;
-use App\Repositories\Members\MemberActivityRepository;
 use App\Services\Members\BadgeService;
 
 class MemberActivityController extends Controller

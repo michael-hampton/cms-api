@@ -5,7 +5,7 @@ namespace App\Tests\Unit\Services\Auth;
 use App\Models\OTPVerification;
 use App\Repositories\Auth\OTPRepository;
 use App\Services\Auth\OTPService;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 
 class OTPServiceTest extends FunctionalTestCase

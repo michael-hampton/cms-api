@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Framework\Mail\Mailable;
-use App\Services\Members\Segmentation\CampaignNotification;
+use App\Services\MemberInsights\Campaigns\CampaignNotification;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

@@ -403,6 +403,8 @@ class Database
             return $stmt;
 
         } catch (PDOException $e) {
+            echo $e->getMessage();
+            die('no');
             Logger::error('Database query failed', [
                 'sql' => $sql,
                 'params' => $params,

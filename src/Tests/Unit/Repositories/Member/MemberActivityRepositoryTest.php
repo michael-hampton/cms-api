@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories\Member;
 
 use App\Models\MemberActivity;
-use App\Repositories\Members\MemberActivityRepository;
+use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 

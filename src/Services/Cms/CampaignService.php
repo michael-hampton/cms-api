@@ -10,7 +10,7 @@ use App\Models\Campaign;
 use App\Models\Model;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
-use App\Repositories\Members\SegmentRepository;
+use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 
 class CampaignService

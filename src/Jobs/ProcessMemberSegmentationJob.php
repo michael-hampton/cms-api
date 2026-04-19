@@ -8,12 +8,12 @@ use App\Framework\Queue\InteractsWithQueue;
 use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
+use App\Repositories\MemberInsights\MemberSegmentationProfileRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Repositories\Members\MemberSegmentationProfileRepository;
-use App\Services\Members\Segmentation\CampaignCooldownChecker;
-use App\Services\Members\Segmentation\CampaignMatcher;
-use App\Services\Members\Segmentation\MemberSegmentResolver;
-use App\Services\Members\Segmentation\SegmentPersister;
+use App\Services\MemberInsights\Campaigns\CampaignCooldownChecker;
+use App\Services\MemberInsights\Campaigns\CampaignMatcher;
+use App\Services\MemberInsights\Segmentation\MemberSegmentResolver;
+use App\Services\MemberInsights\Segmentation\SegmentPersister;
 
 /**
  * Orchestrates the full segmentation pipeline for a single member.
@@ -95,7 +95,7 @@ class ProcessMemberSegmentationJob extends BaseJob implements ShouldQueue
             }
 
             try {
-                $this->dispatcher->dispatch(SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key));
+                $this->dispatcher->dispatch(SendCampaignJob::for($this->memberId, $campaign->id, $campaign->segment->key))->dispatchNow();
                 $dispatched++;
             } catch (\Exception $exception) {
                 Logger::error('ProcessMemberSegmentationJob: failed to dispatch SendCampaignJob', [

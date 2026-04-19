@@ -36,6 +36,11 @@ class Campaign extends Model
         'template',
         'cooldown_hours',
         'priority',
+        'force_channel',
+        'push_body',
+        'push_icon',
+        'push_url',
+        'purpose'
     ];
 
     protected $casts = [
@@ -165,5 +170,20 @@ class Campaign extends Model
     public function executions()
     {
         return $this->hasMany(CampaignExecution::class);
+    }
+
+    public function variants()
+    {
+        return $this->hasMany(CampaignVariant::class);
+    }
+
+    public function deliveries()
+    {
+        return $this->hasMany(CampaignDelivery::class);
+    }
+
+    public function events()
+    {
+        return $this->hasMany(CampaignEvent::class);
     }
 }

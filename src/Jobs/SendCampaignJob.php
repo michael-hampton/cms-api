@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\Member\CampaignChannel;
+use App\Enums\Member\CampaignPurpose;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Queue\Dispatchable;
 use App\Framework\Queue\InteractsWithQueue;
@@ -11,34 +12,33 @@ use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
 use App\Models\Campaign;
 use App\Models\Member;
-use App\Repositories\Members\CampaignRepository;
+use App\Repositories\Cms\CampaignRepository;
+use App\Repositories\MemberInsights\CampaignDeliveryRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Members\Segmentation\CampaignConsentChecker;
-use App\Services\Members\Segmentation\CampaignExecutionLogger;
-use App\Services\Members\Segmentation\CampaignNotification;
-use App\Services\Members\Segmentation\ChannelResolver;
+use App\Services\MemberInsights\Campaigns\CampaignConsentChecker;
+use App\Services\MemberInsights\Campaigns\CampaignExecutionLogger;
+use App\Services\MemberInsights\Campaigns\CampaignNotification;
+use App\Services\MemberInsights\Campaigns\CampaignVariantAssigner;
+use App\Services\MemberInsights\InAppNotificationDispatcher;
+use App\Services\MemberInsights\Segmentation\SmartChannelResolver;
 
 /**
  * Delivers a single campaign to a single member.
  *
+ * Extended for Tickets 11–15 + Web Push:
+ *   - T11: records a CampaignDelivery row with tracking token after send
+ *   - T14: resolves A/B variant; uses variant's blocks if available
+ *   - T15: delegates to SmartChannelResolver (behaviour-driven ordering)
+ *   - WebPush: dispatches via WebPushNotificationDispatcher when channel=push
+ *
  * Flow:
  *   1. Load member + campaign (guard clauses on missing / inactive)
- *   2. Resolve ordered channel list (primary + fallbacks)
- *   3. For each channel: check consent via CampaignConsentChecker
- *   4. First consented channel: instantiate Mailable, wrap in CampaignNotification,
- *      dispatch through framework NotificationDispatcher
- *   5. Log execution + return
- *   6. If no channel passes consent: skip silently (log info)
- *
- * Template convention:
- *   campaign.template holds a fully-qualified Mailable class name,
- *   e.g. App\Mail\Campaigns\WeMissYouMail.
- *   The Mailable receives ($member, $campaign) in its constructor.
- *
- * Failure handling:
- *   - Missing class → permanent fail (no retry benefit)
- *   - Dispatch exception → logged + re-thrown for queue retry
- *   - No consented channel → silent skip, no retry
+ *   2. Assign A/B variant (T14)
+ *   3. Resolve ordered channel list via SmartChannelResolver (T15)
+ *   4. For each channel: check consent
+ *   5. First consented channel → send via channel dispatcher
+ *   6. Record CampaignDelivery for analytics (T11)
+ *   7. Log execution + return
  */
 class SendCampaignJob extends BaseJob implements ShouldQueue
 {
@@ -46,17 +46,21 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
     public int $backoff = 120;
 
-    private ChannelResolver $channelResolver;
+    private SmartChannelResolver $channelResolver;
     private CampaignConsentChecker $consentChecker;
     private NotificationDispatcher $dispatcher;
     private CampaignExecutionLogger $logger;
     private MemberRepository $memberRepository;
     private CampaignRepository $campaignRepository;
+    private CampaignVariantAssigner $variantAssigner;
+    private CampaignDeliveryRepository $deliveryRepository;
+    private InAppNotificationDispatcher $webPushDispatcher;
 
     public function __construct(
         public readonly int    $memberId,
         public readonly int    $campaignId,
         public readonly string $segmentKey,
+        public readonly string $audienceKey = 'all_users', // T12 snapshot
     )
     {
     }
@@ -83,6 +87,16 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             return;
         }
 
+        // ── T14: A/B variant assignment ────────────────────────────────────
+        $variant = $this->variantAssigner->assignVariant($this->memberId, $this->campaignId);
+        $variantId = $variant?->id;
+
+        // Use variant blocks if available, otherwise use campaign blocks.
+        $mailableBlocks = ($variant !== null && !empty($variant->blocks))
+            ? $variant->blocks
+            : null; // null = use campaign's own template
+
+        // ── Resolve mailable class ─────────────────────────────────────────
         $mailableClass = $campaign->template;
 
         if (!class_exists($mailableClass)) {
@@ -95,10 +109,11 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             return;
         }
 
-        $channels = $this->channelResolver->resolveChannels($campaign);
+        // ── T15: Behaviour-driven channel ordering ─────────────────────────
+        $channels = $this->channelResolver->resolveChannels($this->memberId, $campaign);
 
         foreach ($channels as $channel) {
-            if (!$this->consentChecker->canSend($member, $campaign->purpose, $channel)) {
+            if (!$this->consentChecker->canSend($member, CampaignPurpose::tryFrom($campaign->purpose), $channel)) {
                 Logger::info('SendCampaignJob: consent blocked on channel, trying fallback', [
                     'member_id' => $this->memberId,
                     'campaign_id' => $this->campaignId,
@@ -107,8 +122,20 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
                 continue;
             }
 
-            $this->sendViaChannel($member, $campaign, $channel, $mailableClass, $this->dispatcher, $this->logger);
-            return;
+            $sent = $this->sendViaChannel($member, $campaign, $channel, $mailableClass, $variantId);
+
+            if ($sent) {
+                // ── T11/T12: Record delivery for analytics ─────────────────
+                $this->deliveryRepository->record(
+                    memberId: $this->memberId,
+                    campaignId: $this->campaignId,
+                    channel: $channel->value,
+                    audienceKey: $this->audienceKey,
+                    variantId: $variantId,
+                );
+
+                $this->logger->log($this->memberId, $campaign, $this->segmentKey);
+            }
         }
 
         Logger::info('SendCampaignJob: no consented channel available, skipping', [
@@ -118,15 +145,31 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
         ]);
     }
 
+    // -------------------------------------------------------------------------
+
     private function sendViaChannel(
-        Member                  $member,
-        Campaign                $campaign,
-        CampaignChannel         $channel,
-        string                  $mailableClass,
-        NotificationDispatcher  $dispatcher,
-        CampaignExecutionLogger $logger,
-    ): void
+        Member          $member,
+        Campaign        $campaign,
+        CampaignChannel $channel,
+        string          $mailableClass,
+        ?int            $variantId,
+    ): bool
     {
+        // Web push channel — delegate to dedicated dispatcher.
+        if ($channel === CampaignChannel::PUSH) {
+            $dispatched = $this->webPushDispatcher->dispatch($member, $campaign);
+
+            if (!$dispatched) {
+                Logger::info('SendCampaignJob: web push had no subscription, trying fallback', [
+                    'member_id' => $this->memberId,
+                    'campaign_id' => $this->campaignId,
+                ]);
+            }
+
+            return $dispatched;
+        }
+
+        // Email / notification channels — existing mailable path.
         $mailable = new $mailableClass($member, $campaign);
 
         $notification = new CampaignNotification(
@@ -135,22 +178,23 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             recipientUserIdValue: $member->id,
         );
 
-        $succeeded = $dispatcher->dispatch($notification);
+        $succeeded = $this->dispatcher->dispatch($notification);
 
         if ($succeeded > 0) {
-            $logger->log($this->memberId, $campaign, $this->segmentKey);
-
             Logger::info('SendCampaignJob: campaign delivered', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
                 'channel' => $channel->value,
+                'variant_id' => $variantId,
             ]);
-        } else {
-            Logger::warning('SendCampaignJob: dispatcher reported zero successful channels', [
-                'member_id' => $this->memberId,
-                'campaign_id' => $this->campaignId,
-                'channel' => $channel->value,
-            ]);
+            return true;
         }
+
+        Logger::warning('SendCampaignJob: dispatcher reported zero successful channels', [
+            'member_id' => $this->memberId,
+            'campaign_id' => $this->campaignId,
+            'channel' => $channel->value,
+        ]);
+        return false;
     }
 }

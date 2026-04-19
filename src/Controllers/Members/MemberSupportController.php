@@ -8,7 +8,7 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\SupportTicket;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 
 class MemberSupportController extends Controller
 {

@@ -8,7 +8,7 @@ use App\Models\NewsletterSend;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 
 class NewsletterDispatcher
 {

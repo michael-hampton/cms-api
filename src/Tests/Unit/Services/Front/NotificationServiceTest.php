@@ -6,7 +6,7 @@ use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Repositories\Members\GiftedArticleRepository;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Services\Members\NotificationService;
+use App\Services\MemberInsights\NotificationService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

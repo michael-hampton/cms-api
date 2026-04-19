@@ -65,6 +65,7 @@ use App\Framework\Http\Router;
 use App\Framework\Middleware\SessionMiddleware;
 use App\Framework\Middleware\SiteDetectionMiddleware;
 use App\Framework\Notifications\Channels\EmailChannel;
+use App\Framework\Notifications\Channels\InAppNotificationChannel;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Queue\DatabaseQueueDriver;
 use App\Framework\Queue\NullQueueDriver;
@@ -271,7 +272,8 @@ class ApiApplication
             ->needs('$channels')
             ->give(function ($app) {
                 return [
-                    $app->make(EmailChannel::class)
+                    $app->make(EmailChannel::class),
+                    $app->make(InAppNotificationChannel::class)
                 ];
             });
 

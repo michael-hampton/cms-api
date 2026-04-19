@@ -6,7 +6,7 @@ use App\Framework\Console\Command;
 use App\Framework\Console\ReportsCommandResult;
 use App\Models\Member;
 use App\Models\Site;
-use App\Services\Members\MemberStatEngine;
+use App\Services\MemberInsights\MemberStatEngine;
 
 class BuildMemberStats extends Command
 {

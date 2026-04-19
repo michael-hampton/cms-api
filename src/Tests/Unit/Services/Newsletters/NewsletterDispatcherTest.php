@@ -11,7 +11,7 @@ use App\Models\Subscriber;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
 use App\Repositories\Subscriptions\SubscriberRepository;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 use App\Services\Newsletter\NewsletterDispatcher;
 use Mockery;
 use PHPUnit\Framework\TestCase;

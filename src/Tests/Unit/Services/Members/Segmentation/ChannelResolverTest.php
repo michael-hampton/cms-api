@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Enums\Member\CampaignChannel;
 use App\Models\Campaign;
-use App\Services\Members\Segmentation\ChannelResolver;
+use App\Services\MemberInsights\Segmentation\ChannelResolver;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

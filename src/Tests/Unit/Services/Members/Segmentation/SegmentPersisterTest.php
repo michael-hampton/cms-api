@@ -3,9 +3,9 @@
 namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Models\MemberSegment;
-use App\Repositories\Members\MemberSegmentRepository;
-use App\Repositories\Members\SegmentRepository;
-use App\Services\Members\Segmentation\SegmentPersister;
+use App\Repositories\MemberInsights\MemberSegmentRepository;
+use App\Repositories\MemberInsights\SegmentRepository;
+use App\Services\MemberInsights\Segmentation\SegmentPersister;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;

@@ -18,6 +18,8 @@ class QueryBuilder
 {
     use HasMacros;
 
+    private string $paramPrefix;
+    private int $paramCounter = 0;
     public $wheres = [];
     public $selects = ['*'];
     public $eagerLoad = [];
@@ -46,6 +48,7 @@ class QueryBuilder
     {
         $this->table = $table;
         $this->database = $database ?: Database::getInstance();
+        $this->paramPrefix = spl_object_id($this);
     }
 
     // SELECT methods
@@ -87,7 +90,6 @@ class QueryBuilder
     public function toSql(): array
     {
         $bindings = [];
-        $paramCounter = 0;
 
         // SELECT with proper column quoting
         $selectClause = 'SELECT ';
@@ -153,7 +155,7 @@ class QueryBuilder
                     // Note: Bindings were already merged in havingRaw()
                     // and will be handled by the database query call
                 } else {
-                    $paramKey = 'param_' . $paramCounter++;
+                    $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                     $quotedColumn = $this->quoteColumn($having['column']);
                     $havingString = "{$quotedColumn} {$having['operator']} :{$paramKey}";
                     $bindings[$paramKey] = $having['value'];
@@ -265,19 +267,19 @@ class QueryBuilder
 
         switch ($where['type']) {
             case 'Date':
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 // Wrap the column in the DATE() function
                 return ["DATE({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
             case 'Month':
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 return ["MONTH({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
 
             case 'Year':
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 return ["YEAR({$quotedColumn}) {$where['operator']} :{$paramKey}", $bindings];
@@ -308,7 +310,7 @@ class QueryBuilder
                 // For raw SQL, just return as-is with bindings
                 return [$where['sql'], $where['bindings'] ?? []];
             case 'Basic':
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 return ["{$quotedColumn} {$where['operator']} :{$paramKey}", $bindings];
@@ -335,7 +337,7 @@ class QueryBuilder
                 // Fallback for older code using 'values'
                 $placeholders = [];
                 foreach (($where['values'] ?? []) as $value) {
-                    $paramKey = 'param_' . $paramCounter++;
+                    $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                     $placeholders[] = ':' . $paramKey;
                     $bindings[$paramKey] = $value;
                 }
@@ -354,7 +356,7 @@ class QueryBuilder
 
                 $placeholders = [];
                 foreach (($where['values'] ?? []) as $value) {
-                    $paramKey = 'param_' . $paramCounter++;
+                    $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                     $placeholders[] = ':' . $paramKey;
                     $bindings[$paramKey] = $value;
                 }
@@ -362,16 +364,16 @@ class QueryBuilder
 
             case 'Between':
                 $quotedColumn = $this->quoteColumn($where['column']);
-                $paramKey1 = 'param_' . $paramCounter++;
-                $paramKey2 = 'param_' . $paramCounter++;
+                $paramKey1 = $this->paramPrefix . '_param_' . $this->paramCounter++;
+                $paramKey2 = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $bindings[$paramKey1] = $where['values'][0];
                 $bindings[$paramKey2] = $where['values'][1];
                 return ["{$quotedColumn} BETWEEN :{$paramKey1} AND :{$paramKey2}", $bindings];
 
             case 'NotBetween':
                 $quotedColumn = $this->quoteColumn($where['column']);
-                $paramKey1 = 'param_' . $paramCounter++;
-                $paramKey2 = 'param_' . $paramCounter++;
+                $paramKey1 = $this->paramPrefix . '_param_' . $this->paramCounter++;
+                $paramKey2 = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $bindings[$paramKey1] = $where['values'][0];
                 $bindings[$paramKey2] = $where['values'][1];
                 return ["{$quotedColumn} NOT BETWEEN :{$paramKey1} AND :{$paramKey2}", $bindings];
@@ -397,7 +399,7 @@ class QueryBuilder
                 [$subSql, $subBindings] = $where['query']->toSql();
                 return ["{$quotedColumn} {$where['operator']} ({$subSql})", $subBindings];
             case 'JsonContains':
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $quotedColumn = $this->quoteColumn($where['column']);
                 $bindings[$paramKey] = $where['value'];
                 return ["JSON_CONTAINS ({$quotedColumn}, :{$paramKey})", $bindings];
@@ -567,8 +569,27 @@ class QueryBuilder
         return $this->whereIn($column, $values, 'or');
     }
 
-    public function whereIn(string $column, array|Collection $values, string $boolean = 'and'): self
+    public function whereIn(string $column, array|Collection|callable $values, string $boolean = 'and'): self
     {
+        if (is_callable($values)) {
+            $subQuery = new self($this->table, $this->relationManager);
+
+            $values($subQuery);
+
+            [$sql, $bindings] = $subQuery->toSql();
+
+            $this->wheres[] = [
+                'type' => 'In',
+                'column' => $column,
+                'sql_fragment' => "({$sql})",
+                'bindings' => $bindings, // <- important change
+                'boolean' => $boolean,
+            ];
+
+            return $this;
+        }
+
+
         if ($values instanceof Collection) {
             $values = $values->toArray();
         }
@@ -602,6 +623,17 @@ class QueryBuilder
         $this->bindings = array_merge($this->bindings, $localBindings);
 
         return $this;
+    }
+
+    public function table(string $table): self
+    {
+        $this->table = $table;
+        return $this;
+    }
+
+    public function bindings(): array
+    {
+        return $this->bindings;
     }
 
     public function whereRaw(string $sql, array $bindings = [], string $boolean = 'and'): self
@@ -1192,7 +1224,7 @@ class QueryBuilder
 
                 if (is_bool($value)) $value = (int)($value == true);
 
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $setParts[] = $this->quoteColumn($col) . " = :{$paramKey}";
                 $bindings[$paramKey] = $value;
             }
@@ -1348,7 +1380,7 @@ class QueryBuilder
             $rowPlaceholders = [];
 
             foreach ($columns as $column) {
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $rowPlaceholders[] = ":{$paramKey}";
                 $bindings[$paramKey] = $row[$column];
             }
@@ -1383,7 +1415,7 @@ class QueryBuilder
         foreach ($records as $record) {
             $placeholders = [];
             foreach ($columns as $column) {
-                $paramKey = 'param_' . $paramCounter++;
+                $paramKey = $this->paramPrefix . '_param_' . $this->paramCounter++;
                 $placeholders[] = ":{$paramKey}";
                 $bindings[$paramKey] = $record[$column] ?? null;
             }

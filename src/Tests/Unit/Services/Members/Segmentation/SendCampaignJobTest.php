@@ -10,17 +10,17 @@ use App\Jobs\SendCampaignJob;
 use App\Mail\Campaigns\WeMissYouMail;
 use App\Models\Campaign;
 use App\Models\Member;
-use App\Repositories\Members\CampaignRepository;
+use App\Repositories\MemberInsights\CampaignRepository;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Members\Segmentation\CampaignConsentChecker;
-use App\Services\Members\Segmentation\CampaignExecutionLogger;
-use App\Services\Members\Segmentation\CampaignNotification;
-use App\Services\Members\Segmentation\ChannelResolver;
+use App\Services\MemberInsights\Campaigns\CampaignConsentChecker;
+use App\Services\MemberInsights\Campaigns\CampaignExecutionLogger;
+use App\Services\MemberInsights\Campaigns\CampaignNotification;
+use App\Services\MemberInsights\Segmentation\ChannelResolver;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
-use PHPUnit\Framework\TestCase;
 
-class SendCampaignJobTest extends TestCase
+class SendCampaignJobTest extends FunctionalTestCase
 {
     private ChannelResolver|MockInterface $channelResolver;
     private CampaignConsentChecker|MockInterface $consentChecker;
@@ -275,6 +275,8 @@ class SendCampaignJobTest extends TestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->channelResolver = Mockery::mock(ChannelResolver::class);
         $this->consentChecker = Mockery::mock(CampaignConsentChecker::class);
         $this->dispatcher = Mockery::mock(NotificationDispatcher::class);

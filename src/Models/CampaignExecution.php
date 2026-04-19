@@ -11,9 +11,11 @@ class CampaignExecution extends Model
         'campaign_id',
         'segment_key',
         'sent_at',
+        'is_marketing'
     ];
     protected $casts = [
         'sent_at' => 'datetime',
+        'is_marketing' => 'boolean',
     ];
 
     public function member()

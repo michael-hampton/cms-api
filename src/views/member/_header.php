@@ -8,7 +8,7 @@
 // At the top of _header.php, add:
 use App\Repositories\Members\GiftedArticleRepository;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Services\Members\NotificationService;
+use App\Services\MemberInsights\NotificationService;
 
 $notificationService = new NotificationService(
         new RewardsRepository(

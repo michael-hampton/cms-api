@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Services\Members\Segmentation;
 
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
-use App\Repositories\Members\CampaignRepository;
-use App\Services\Members\Segmentation\CampaignMatcher;
+use App\Repositories\MemberInsights\CampaignRepository;
+use App\Services\MemberInsights\Campaigns\CampaignMatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;

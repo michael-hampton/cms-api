@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Framework\Http\Request;
 use App\Repositories\EventSignupRepository;
-use App\Services\Members\EmailService;
+use App\Services\MemberInsights\EmailService;
 
 class EventController extends Controller
 {

@@ -4,9 +4,9 @@ namespace App\Tests\Unit\Services\Members;
 
 use App\Framework\Database\Database;
 use App\Models\Segment;
-use App\Repositories\Members\SegmentRepository;
-use App\Repositories\Members\SegmentRuleRepository;
-use App\Services\Members\SegmentAdminService;
+use App\Repositories\MemberInsights\SegmentRepository;
+use App\Repositories\MemberInsights\SegmentRuleRepository;
+use App\Services\MemberInsights\SegmentAdminService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
