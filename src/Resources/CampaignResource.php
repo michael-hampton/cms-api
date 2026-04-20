@@ -34,8 +34,19 @@ class CampaignResource extends JsonResource
             // Computed domain state — derived here so controllers stay thin
             'is_currently_active' => $this->getAttribute('is_active') === true,
             'has_ended' => $this->getAttribute('end_date') > now_datetime(),
-            'subscriber_count' => $campaignRepository->getSubscriberCount($this->getAttribute('id'))
+            'subscriber_count' => $campaignRepository->getSubscriberCount($this->getAttribute('id')),
             //'is_valid_for_signup'  => $this->resource->isValidForSignup(),
+            'priority' => $this->getAttribute('priority'),
+            'cooldown_hours' => $this->getAttribute('cooldown_hours'),
+            'fallback_channels' => $this->getAttribute('fallback_channels'),
+            'force_channel' => $this->getAttribute('force_channel'),
+            'purpose' => $this->getAttribute('purpose'),
+            'channel' => $this->getAttribute('channel'),
+            'segment_id' => $this->getAttribute('segment_id'),
+            'push_body' => $this->getAttribute('push_body'),
+            'push_icon' => $this->getAttribute('push_icon'),
+            'template' => $this->getAttribute('template'),
+            'push_url' => $this->getAttribute('push_url'),
         ];
     }
 }

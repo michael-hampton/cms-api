@@ -174,6 +174,11 @@ class CampaignRepository extends Repository
             ->first();
     }
 
+    public function paginateForSite(?int $siteId, int $perPage, int $page)
+    {
+        return Campaign::where('site_id', $siteId)->paginate($perPage, $page);
+    }
+
 
     protected function getModelClass(): string
     {

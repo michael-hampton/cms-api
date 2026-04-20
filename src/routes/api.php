@@ -35,6 +35,7 @@ use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
 use App\Controllers\MemberController;
+use App\Controllers\MemberInsights\CampaignAnalyticsApiController;
 use App\Controllers\Members\Api\BadgeAdminApiController;
 use App\Controllers\Members\Api\MemberActivityApiController;
 use App\Controllers\Members\Api\MemberAddressApiController;
@@ -629,6 +630,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/campaigns/{id}/pause', [CampaignController::class, 'pause']);
         $router->post('/campaigns/{id}/resume', [CampaignController::class, 'resume']);
         $router->post('/campaigns/{id}/clone', [CampaignController::class, 'clone']);
+
+        $router->get('/campaign-analytics/campaigns', [CampaignAnalyticsApiController::class, 'campaigns']);
+        $router->get('/campaign-analytics/campaigns/{id}/summary', [CampaignAnalyticsApiController::class, 'summary']);
+        $router->get('/campaign-analytics/campaigns/{id}/audiences', [CampaignAnalyticsApiController::class, 'audiences']);
+        $router->get('/campaign-analytics/campaigns/{id}/blocks', [CampaignAnalyticsApiController::class, 'blocks']);
+        $router->get('/campaign-analytics/campaigns/{id}/variants', [CampaignAnalyticsApiController::class, 'variants']);
+        $router->get('/campaign-analytics/audiences', [CampaignAnalyticsApiController::class, 'audienceList']);
 
         // Payment routes
         $router->get('/orders/{id}/payments', [OrderController::class, 'payments']);

@@ -16,16 +16,40 @@ use App\Repositories\Repository;
 class BadgeRepository extends Repository
 {
     // -------------------------------------------------------------------------
-    // Admin CRUD (delegates to base Repository methods)
+    // Admin CRUD
     // -------------------------------------------------------------------------
 
-    public function paginate(int $perPage = 20, int $page = 1, ?int $siteId = null): array
+    /**
+     * @param int $perPage
+     * @param int $page
+     * @param int|null $siteId
+     * @param array{search?:string,sort_by?:string,sort_order?:string} $filters
+     */
+    public function paginate(int $perPage = 20, int $page = 1, ?int $siteId = null, array $filters = []): array
     {
-        return Badge::orderBy('name')
-            ->when(!empty($siteId), function ($query) use ($siteId) {
-                return $query->where('site_id', $siteId);
-            })
-            ->paginate($perPage);
+        $query = Badge::query()
+            ->when(!empty($siteId), fn($q) => $q->where('site_id', $siteId));
+
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('slug', 'LIKE', '%' . $search . '%')
+                    ->orWhere('category', 'LIKE', '%' . $search . '%');
+            });
+        }
+
+        $sortBy = $filters['sort_by'] ?? 'name';
+        $sortOrder = $filters['sort_order'] ?? 'asc';
+
+        $allowedSorts = ['name', 'points', 'created_at', 'category'];
+        if (!in_array($sortBy, $allowedSorts, true)) {
+            $sortBy = 'name';
+        }
+
+        $query->orderBy($sortBy, $sortOrder === 'desc' ? 'desc' : 'asc');
+
+        return $query->paginate($perPage, $page);
     }
 
     public function existsByNameForSite(string $name, int $siteId, ?int $excludeId = null): bool

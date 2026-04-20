@@ -34,9 +34,9 @@ class BadgeService
     /**
      * List all badges for a site (paginated).
      */
-    public function listForSite(int $siteId, int $page, int $perPage = 20): mixed
+    public function listForSite(int $siteId, int $page, int $perPage = 20, array $filters = []): mixed
     {
-        return $this->badgeRepository->paginate($perPage, $page, $siteId);
+        return $this->badgeRepository->paginate($perPage, $page, $siteId, $filters);
     }
 
     /**

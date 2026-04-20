@@ -33,7 +33,19 @@ class BadgeAdminApiController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $badges = $this->badgeService->listForSite(SiteContext::getId(), $request->get('page', 1));
+        // FIX: collect search/sort filters and pass them through
+        $filters = array_filter([
+            'search' => $request->get('search'),
+            'sort_by' => $request->get('sort_by', 'name'),
+            'sort_order' => $request->get('sort_order', 'asc'),
+        ], fn($v) => $v !== null && $v !== '');
+
+        $badges = $this->badgeService->listForSite(
+            SiteContext::getId(),
+            (int)$request->get('page', 1),
+            20,
+            $filters,
+        );
 
         return $this->resourceResponse([
             'data' => $badges['data']->map(fn(Badge $b) => $this->formatBadge($b))->toArray(),
@@ -59,7 +71,7 @@ class BadgeAdminApiController extends Controller
             'created_at' => $badge->created_at,
             'updated_at' => $badge->updated_at,
             'slug' => $badge->slug,
-            'category' => $badge->category
+            'category' => $badge->category,
         ];
     }
 
@@ -67,7 +79,6 @@ class BadgeAdminApiController extends Controller
     {
         try {
             $badge = $this->badgeService->findForSite($id, SiteContext::getId());
-
             return $this->resourceResponse($this->formatBadge($badge));
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 404);
@@ -78,7 +89,6 @@ class BadgeAdminApiController extends Controller
     {
         try {
             $badge = $this->badgeService->createBadge($request->validated(), SiteContext::getId());
-
             return $this->resourceResponse($this->formatBadge($badge), 201);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
@@ -91,7 +101,6 @@ class BadgeAdminApiController extends Controller
     {
         try {
             $badge = $this->badgeService->updateBadge($id, $request->validated(), SiteContext::getId());
-
             return $this->resourceResponse($this->formatBadge($badge));
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
@@ -104,7 +113,6 @@ class BadgeAdminApiController extends Controller
     {
         try {
             $this->badgeService->deleteBadge($id, SiteContext::getId());
-
             return $this->jsonResponse(['message' => 'Badge deleted.']);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 404);
