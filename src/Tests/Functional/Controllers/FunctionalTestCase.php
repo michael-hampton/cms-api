@@ -28,6 +28,8 @@ abstract class FunctionalTestCase extends TestCase
     protected ?User $authenticatedUser = null;
     protected ?string $authToken = null;
     private int $currentUserId;
+    protected mixed $authenticatedMemberUser;
+    private string $memberAuthToken;
 
     protected function setUp(): void
     {
@@ -101,6 +103,12 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function actingAsMember(Member $member): void
     {
+        $this->authenticatedMemberUser = $member;
+        MemberAuth::login($member);
+
+        // Generate a test token (you may need to adjust based on your token generation logic)
+        $this->memberAuthToken = $this->generateTestTokenForMember($member);
+
         Session::put('member_id', $member->id);
         Session::put('member_authenticated', true);
     }
@@ -174,6 +182,26 @@ abstract class FunctionalTestCase extends TestCase
         return $rawToken;
     }
 
+    protected function generateTestTokenForMember(Member $user): string
+    {
+        // Option 1: Use your actual token generation logic
+        // return $user->createToken('test-token');
+
+        // Option 2: Create a simple test token
+        // You'll need a tokens table or similar mechanism
+        $rawToken = bin2hex(random_bytes(32));
+        $hashedToken = hash('sha256', $rawToken);
+
+        // Store token in database (adjust based on your auth implementation)
+        $this->database->query(
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
+             VALUES (?, ?, ?, ?, NOW(), ?)",
+            ['App\\Models\\Member', $user->id, 'test-token', $hashedToken, $this->siteId]
+        );
+
+        return $rawToken;
+    }
+
     /**
      * Clear authentication
      */
@@ -188,11 +216,13 @@ abstract class FunctionalTestCase extends TestCase
     /**
      * Get default headers including auth token if set
      */
-    protected function getDefaultHeaders(array $additionalHeaders = []): array
+    protected function getDefaultHeaders(array $additionalHeaders = [], bool $forMember = false): array
     {
         $headers = $additionalHeaders;
 
-        if ($this->authToken) {
+        if ($forMember === true && !empty($this->memberAuthToken)) {
+            $headers['Authorization'] = 'Bearer ' . $this->memberAuthToken;
+        } elseif ($this->authToken) {
             $headers['Authorization'] = 'Bearer ' . $this->authToken;
         }
 
@@ -366,9 +396,9 @@ abstract class FunctionalTestCase extends TestCase
     }
 
 
-    protected function getForSite(string $uri, array $headers = []): Response
+    protected function getForSite(string $uri, array $headers = [], bool $forMember = false): Response
     {
-        return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+        return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
     }
 
     protected function getForSiteUnauthenticated(string $uri, array $headers = []): Response
@@ -376,7 +406,7 @@ abstract class FunctionalTestCase extends TestCase
         return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
     }
 
-    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false): Response
+    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false, bool $forMember = false): Response
     {
         if (!empty($files)) {
             $_FILES = $files;
@@ -386,7 +416,7 @@ abstract class FunctionalTestCase extends TestCase
             $_ENV['APP_ENV'] = 'production';
         }
 
-        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
 
         $response = new TestResponse(
             $response->getContent(),
@@ -416,12 +446,12 @@ abstract class FunctionalTestCase extends TestCase
         );
     }
 
-    protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = [], bool $forMember = false): Response
     {
         if (!empty($files)) {
             $_FILES = $files;
         }
-        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers), $files);
+        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
 
         return new TestResponse(
             $response->getContent(),
@@ -444,9 +474,9 @@ abstract class FunctionalTestCase extends TestCase
         );
     }
 
-    protected function deleteForSite(string $uri, array $headers = []): Response
+    protected function deleteForSite(string $uri, array $headers = [], bool $forMember = false): Response
     {
-        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers));
+        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
 
         return new TestResponse(
             $response->getContent(),

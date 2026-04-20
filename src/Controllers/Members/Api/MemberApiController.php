@@ -93,7 +93,7 @@ class MemberApiController extends Controller
                 }
             }
 
-            return $this->resourceResponse(['success' => true, 'data' => $updatedMember]);
+            return $this->resourceResponse(['success' => true, 'data' => $updatedMember->toArray()]);
 
         } catch (\InvalidArgumentException $e) {
             return $this->back();

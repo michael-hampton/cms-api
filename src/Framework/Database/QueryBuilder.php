@@ -1240,10 +1240,6 @@ class QueryBuilder
             $bindings = array_merge($bindings, $whereBindings);
         }
 
-        echo $sql;
-        print_r($bindings);
-        die;
-
         $stmt = $this->database->query($sql, $bindings);
         return $stmt->rowCount();
     }

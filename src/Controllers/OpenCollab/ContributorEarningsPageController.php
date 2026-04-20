@@ -39,8 +39,6 @@ class ContributorEarningsPageController extends Controller
     {
         $userId = Auth::id();
 
-        die('here');
-
         $totalEarnings = $this->earningsService->totalEarningsForContributor($userId);
         $breakdown = $this->earningsService->earningsBreakdownForContributor($userId);
         $availableBalance = $this->payoutService->availableBalance($userId);

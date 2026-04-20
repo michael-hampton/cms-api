@@ -31,7 +31,7 @@ class MemberCommentsApiController extends Controller
 
         $member = MemberAuth::getMember();
 
-        $comments = $this->commentRepository
+        $comments = $this->commentRepository->query()
             ->where('email', $member->email)
             ->orderBy('created_at', 'desc')
             ->get();

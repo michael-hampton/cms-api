@@ -5,6 +5,7 @@ namespace App\Controllers\Members\Api;
 use App\Controllers\Controller;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Address;
@@ -68,6 +69,8 @@ class MemberAddressApiController extends Controller
             }
 
             return $this->jsonResponse(['message', 'Address added successfully']);
+        } catch (ValidationException $validationException) {
+            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (Exception $e) {
             echo $e->getMessage();
             return $this->jsonResponse(['message' => 'Failed to add address']);
@@ -114,7 +117,7 @@ class MemberAddressApiController extends Controller
             $address = $this->addressRepository->find($id);
 
             if (!$address || $address->member_id !== $member->id) {
-                return $this->jsonResponse(['message' => 'Address not found']);
+                return $this->jsonResponse(['message' => 'Address not found'], 401);
             }
 
             $address->delete();
