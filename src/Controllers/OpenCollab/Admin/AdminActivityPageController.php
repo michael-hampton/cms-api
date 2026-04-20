@@ -27,8 +27,6 @@ class AdminActivityPageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         $events = $this->activityRepository->forSite(SiteContext::getId(), 100);
 
         return $this->view('open-collab.admin.activity.index', [
@@ -39,14 +37,5 @@ class AdminActivityPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::user();
-        if (!$user || !in_array($user->role ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

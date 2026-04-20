@@ -18,8 +18,6 @@ class AdminContractPageController extends Controller
 
     public function index()
     {
-        $this->requireAdmin();
-
         return $this->view('open-collab.admin.contracts.index', [
             'pageTitle' => 'Contributor Contracts',
             'activeNav' => 'contracts',
@@ -27,14 +25,5 @@ class AdminContractPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

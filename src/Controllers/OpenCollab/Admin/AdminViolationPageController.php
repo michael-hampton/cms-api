@@ -30,8 +30,6 @@ class AdminViolationPageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         return $this->view('open-collab.admin.violations.index', [
             'pageTitle' => 'Violations',
             'activeNav' => 'violations',
@@ -46,8 +44,6 @@ class AdminViolationPageController extends Controller
      */
     public function contributor(int $id)
     {
-        $this->requireAdmin();
-
         $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
 
         if (!$contributor) {
@@ -72,14 +68,5 @@ class AdminViolationPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

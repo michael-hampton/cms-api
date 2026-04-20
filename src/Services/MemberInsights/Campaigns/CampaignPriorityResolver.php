@@ -2,6 +2,7 @@
 
 namespace App\Services\MemberInsights\Campaigns;
 
+use App\Framework\Support\Collection;
 use App\Models\Campaign;
 
 /**
@@ -40,19 +41,11 @@ final class CampaignPriorityResolver
      * @param Campaign[] $campaigns
      * @return Campaign[]
      */
-    public function rank(array $campaigns): array
+    public function rank(Collection $campaigns): Collection
     {
-        usort($campaigns, function (Campaign $a, Campaign $b): int {
-            $priorityDiff = ($b->priority ?? 0) <=> ($a->priority ?? 0);
-
-            if ($priorityDiff !== 0) {
-                return $priorityDiff;
-            }
-
-            // Tie-break: most recently created wins.
-            return ($b->id ?? 0) <=> ($a->id ?? 0);
-        });
-
-        return $campaigns;
+        return $campaigns
+            ->sortByDesc(fn(Campaign $c) => $c->priority ?? 0)
+            ->sortByDesc(fn(Campaign $c) => $c->id ?? 0)
+            ->values();
     }
 }

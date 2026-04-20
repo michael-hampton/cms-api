@@ -7,15 +7,14 @@
 
 // At the top of _header.php, add:
 use App\Repositories\Members\GiftedArticleRepository;
+use App\Repositories\Members\NotificationRepository;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Services\MemberInsights\NotificationService;
+use App\Services\Members\NotificationService;
 
 $notificationService = new NotificationService(
-        new RewardsRepository(
-                new \App\Repositories\Rewards\RewardDefinitionRepository(new \App\Repositories\Rewards\RewardAuditLogRepository()),
-                new \App\Repositories\Rewards\RewardAuditLogRepository()
-        ),
-        new GiftedArticleRepository()
+        app(RewardsRepository::class),
+        app(GiftedArticleRepository::class),
+        app(NotificationRepository::class)
 );
 
 $notifications = $notificationService->getNotifications($member, $site->id);

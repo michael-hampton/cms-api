@@ -27,8 +27,6 @@ class AdminPaymentTermsPageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         $terms = $this->paymentTermsService->forSite(SiteContext::getId());
 
         return $this->view('open-collab.admin.payment-terms.index', [
@@ -39,14 +37,5 @@ class AdminPaymentTermsPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

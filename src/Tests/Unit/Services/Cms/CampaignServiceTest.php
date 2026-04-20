@@ -334,7 +334,7 @@ class CampaignServiceTest extends FunctionalTestCase
             ->withArgs(fn(array $data) => $data['segment_id'] === 5 && $data['cooldown_hours'] === 24 && $data['priority'] === 90)
             ->andReturn($campaign);
 
-        $result = $this->service->createForSite($payload, 10);
+        $result = $this->service->create($payload, 10);
 
         $this->assertSame($campaign, $result);
     }
@@ -346,16 +346,17 @@ class CampaignServiceTest extends FunctionalTestCase
         $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
         $this->segmentRepository->allows('find')->with(5)->andReturn(null);
 
-        $this->service->createForSite($this->payload(), 10);
+        $this->service->create($this->payload(), 10);
     }
 
-    public function test_update_throws_when_campaign_missing(): void
+    public function test_create_throws_when_invalid_template(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        $this->campaignRepository->allows('findForSite')->with(88, 10)->andReturn(null);
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class));
 
-        $this->service->updateForSite(88, ['priority' => 1], 10);
+        $this->service->create(array_merge($this->payload(), ['template' => 'bac']), 10);
     }
 
     private function payload(): array

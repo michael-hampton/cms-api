@@ -29,8 +29,6 @@ class ContributorDisputePageController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
-
         $userId = Auth::id();
 
         $disputes = $this->disputeRepository->forContributor($userId);
@@ -63,13 +61,5 @@ class ContributorDisputePageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAuth(): void
-    {
-        if (!Auth::check()) {
-            header('Location: /login?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
-            exit;
-        }
     }
 }

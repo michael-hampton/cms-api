@@ -8,11 +8,30 @@ use App\Repositories\Repository;
 
 class SegmentRepository extends Repository
 {
-    public function paginateAdmin(int $perPage = 20, int $page = 1): array
+    public function paginateAdmin(
+        int     $perPage = 20,
+        int     $page = 1,
+        ?string $search = null,
+        string  $sortBy = 'name',
+        string  $sortOrder = 'asc',
+    ): array
     {
-        return Segment::with('rules')
-            ->orderBy('name')
-            ->paginate($perPage, $page);
+        $allowedSort = ['name', 'created_at'];
+        $sortBy = in_array($sortBy, $allowedSort, true) ? $sortBy : 'name';
+        $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
+
+        $query = Segment::with('rules');
+
+        if (!empty($search)) {
+            $term = '%' . $search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'LIKE', $term)
+                    ->orWhere('key', 'LIKE', $term)
+                    ->orWhere('description', 'LIKE', $term);
+            });
+        }
+
+        return $query->orderBy($sortBy, $sortOrder)->paginate($perPage, $page);
     }
 
     public function findWithRules(int $id): ?Segment

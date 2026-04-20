@@ -1,38 +1,51 @@
 <?php
 
-namespace App\Services\MemberInsights;
+namespace App\Services\Members;
 
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Repositories\Members\GiftedArticleRepository;
+use App\Repositories\Members\NotificationRepository;
 use App\Repositories\Rewards\RewardsRepository;
 
 class NotificationService
 {
     public function __construct(
         private readonly RewardsRepository       $rewardsRepository,
-        private readonly GiftedArticleRepository $giftedArticleRepository
+        private readonly GiftedArticleRepository $giftedArticleRepository,
+        private readonly NotificationRepository  $notificationRepository,
     )
     {
     }
 
-    /**
-     * Get total notification count
-     */
     public function getNotificationCount(Member $member, int $siteId): int
     {
         $notifications = $this->getNotifications($member, $siteId);
         return array_sum(array_column($notifications, 'count'));
     }
 
-    /**
-     * Get all notifications for a member
-     */
     public function getNotifications(Member $member, int $siteId): array
     {
         $notifications = [];
 
-        // Unclaimed rewards
+        // ── Persisted DB notifications ────────────────────────────────────
+        $dbNotifications = $this->notificationRepository->findUnreadForMember($member->id);
+
+        foreach ($dbNotifications as $dbNotification) {
+            $notifications[] = [
+                'type' => 'db_notification',
+                'icon' => '🔔',
+                'title' => $dbNotification->title,
+                'message' => $dbNotification->body ?? '',
+                'count' => 1,
+                'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/dashboard',
+                'priority' => 'medium',
+                'color' => 'info',
+                'id' => $dbNotification->id,
+            ];
+        }
+
+        // ── Unclaimed rewards ─────────────────────────────────────────────
         $unclaimedRewards = $this->rewardsRepository->getMemberRewards($member->id, $siteId, 'pending');
         if ($unclaimedRewards->count() > 0) {
             $notifications[] = [
@@ -43,11 +56,11 @@ class NotificationService
                 'count' => $unclaimedRewards->count(),
                 'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/rewards',
                 'priority' => 'high',
-                'color' => 'success'
+                'color' => 'success',
             ];
         }
 
-        // Pending gifted articles
+        // ── Pending gifted articles ───────────────────────────────────────
         $pendingGifts = $this->giftedArticleRepository->getPendingGiftsForMember($member->id, $member->email);
         if ($pendingGifts && $pendingGifts->count() > 0) {
             $notifications[] = [
@@ -58,11 +71,11 @@ class NotificationService
                 'count' => $pendingGifts->count(),
                 'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/gifted-articles',
                 'priority' => 'high',
-                'color' => 'info'
+                'color' => 'info',
             ];
         }
 
-        // Expiring rewards (within 7 days)
+        // ── Expiring rewards ─────────────────────────────────────────────
         $expiringRewards = $this->getExpiringRewards($member->id, $siteId);
         if ($expiringRewards->count() > 0) {
             $notifications[] = [
@@ -73,11 +86,11 @@ class NotificationService
                 'count' => $expiringRewards->count(),
                 'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/rewards',
                 'priority' => 'medium',
-                'color' => 'warning'
+                'color' => 'warning',
             ];
         }
 
-        // Newly earned badges (from session)
+        // ── Transient: newly earned badges (session-only, no DB equivalent)
         if (isset($_SESSION['new_badges_earned']) && $_SESSION['new_badges_earned'] > 0) {
             $notifications[] = [
                 'type' => 'badge',
@@ -87,11 +100,11 @@ class NotificationService
                 'count' => $_SESSION['new_badges_earned'],
                 'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/activity/badges',
                 'priority' => 'high',
-                'color' => 'success'
+                'color' => 'success',
             ];
         }
 
-        // Email verification reminder
+        // ── Email verification reminder ───────────────────────────────────
         if (!$member->isEmailVerified()) {
             $notifications[] = [
                 'type' => 'verification',
@@ -101,20 +114,21 @@ class NotificationService
                 'count' => 1,
                 'url' => '/' . \App\Framework\Support\SiteContext::slug() . '/member/dashboard',
                 'priority' => 'high',
-                'color' => 'warning'
+                'color' => 'warning',
             ];
         }
 
         return $notifications;
     }
 
-    /**
-     * Get rewards expiring within days
-     */
+    public function markAllReadForMember(int $memberId): void
+    {
+        $this->notificationRepository->markAsRead($memberId);
+    }
+
     private function getExpiringRewards(int $memberId, int $siteId, int $days = 7): Collection
     {
         $rewards = $this->rewardsRepository->getMemberRewards($memberId, $siteId, 'pending');
-
         $expiringDate = now_datetime()->modify("+{$days} days");
 
         return $rewards->filter(function ($reward) use ($expiringDate) {
@@ -124,18 +138,12 @@ class NotificationService
         });
     }
 
-    /**
-     * Mark notification as seen (store in session)
-     */
     public function markAsSeen(string $type): void
     {
         $key = "notification_seen_{$type}";
         $_SESSION[$key] = time();
     }
 
-    /**
-     * Check if notification was recently seen
-     */
     public function wasRecentlySeen(string $type, int $seconds = 3600): bool
     {
         $key = "notification_seen_{$type}";

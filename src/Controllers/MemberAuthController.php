@@ -251,6 +251,7 @@ class MemberAuthController extends Controller
         }
 
         $member = MemberAuth::getMember();
+
         $token = $this->authenticationService->createMemberToken($member, SiteContext::getId());
 
         return $this->resourceResponse([

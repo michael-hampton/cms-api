@@ -10,6 +10,7 @@ use App\Framework\Queue\InteractsWithQueue;
 use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
+use App\Mail\Campaigns\BaseCampaignMail;
 use App\Models\Campaign;
 use App\Models\Member;
 use App\Repositories\Cms\CampaignRepository;
@@ -25,20 +26,29 @@ use App\Services\MemberInsights\Segmentation\SmartChannelResolver;
 /**
  * Delivers a single campaign to a single member.
  *
- * Extended for Tickets 11–15 + Web Push:
- *   - T11: records a CampaignDelivery row with tracking token after send
- *   - T14: resolves A/B variant; uses variant's blocks if available
- *   - T15: delegates to SmartChannelResolver (behaviour-driven ordering)
- *   - WebPush: dispatches via WebPushNotificationDispatcher when channel=push
+ * Extended for T11–T15 + Web Push:
  *
- * Flow:
- *   1. Load member + campaign (guard clauses on missing / inactive)
- *   2. Assign A/B variant (T14)
- *   3. Resolve ordered channel list via SmartChannelResolver (T15)
- *   4. For each channel: check consent
- *   5. First consented channel → send via channel dispatcher
- *   6. Record CampaignDelivery for analytics (T11)
- *   7. Log execution + return
+ *   T11  — Records CampaignDelivery after a successful send.
+ *          Sets deliveryToken on the mailable so BaseCampaignMail can inject
+ *          the open pixel and rewrite links for CampaignTrackingController.
+ *
+ *   T12  — audienceKey (resolved upstream by ProcessMemberSegmentationJob)
+ *          is stored on CampaignDelivery for audience-level analytics.
+ *
+ *   T14  — CampaignVariantAssigner assigns a deterministic A/B variant.
+ *          Variant blocks override campaign blocks when present.
+ *          variant_id is stored on CampaignDelivery.
+ *
+ *   T15  — SmartChannelResolver re-orders channels by past engagement.
+ *
+ *   Push — WebPushNotificationDispatcher handles CampaignChannel::PUSH.
+ *
+ * Tracking flow:
+ *   1. CampaignDelivery row is written (token generated in repository).
+ *   2. Token is set on the mailable via $mailable->deliveryToken.
+ *   3. BaseCampaignMail::injectTracking() rewrites the rendered HTML to
+ *      embed the pixel and wrap links — so every open/click hits
+ *      CampaignTrackingController which writes to campaign_events.
  */
 class SendCampaignJob extends BaseJob implements ShouldQueue
 {
@@ -46,21 +56,21 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
     public int $backoff = 120;
 
-    private SmartChannelResolver $channelResolver;
-    private CampaignConsentChecker $consentChecker;
-    private NotificationDispatcher $dispatcher;
-    private CampaignExecutionLogger $logger;
-    private MemberRepository $memberRepository;
-    private CampaignRepository $campaignRepository;
-    private CampaignVariantAssigner $variantAssigner;
-    private CampaignDeliveryRepository $deliveryRepository;
-    private InAppNotificationDispatcher $webPushDispatcher;
+    protected SmartChannelResolver $channelResolver;
+    protected CampaignConsentChecker $consentChecker;
+    protected NotificationDispatcher $notificationDispatcher;
+    protected CampaignExecutionLogger $executionLogger;
+    protected MemberRepository $memberRepository;
+    protected CampaignRepository $campaignRepository;
+    protected CampaignVariantAssigner $variantAssigner;
+    protected CampaignDeliveryRepository $deliveryRepository;
+    protected InAppNotificationDispatcher $webPushDispatcher;
 
     public function __construct(
         public readonly int    $memberId,
         public readonly int    $campaignId,
         public readonly string $segmentKey,
-        public readonly string $audienceKey = 'all_users', // T12 snapshot
+        public readonly string $audienceKey = 'all_users',
     )
     {
     }
@@ -80,24 +90,22 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
         $campaign = $this->campaignRepository->find($this->campaignId, ['segment']);
 
         if ($campaign === null || !$campaign->is_active) {
-            Logger::info('SendCampaignJob: campaign not found or inactive, skipping', [
+            Logger::info('SendCampaignJob: campaign not found or inactive', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
             ]);
             return;
         }
 
-        // ── T14: A/B variant assignment ────────────────────────────────────
+        // ── T14: variant assignment ───────────────────────────────────────
         $variant = $this->variantAssigner->assignVariant($this->memberId, $this->campaignId);
         $variantId = $variant?->id;
 
-        // Use variant blocks if available, otherwise use campaign blocks.
-        $mailableBlocks = ($variant !== null && !empty($variant->blocks))
-            ? $variant->blocks
-            : null; // null = use campaign's own template
-
-        // ── Resolve mailable class ─────────────────────────────────────────
-        $mailableClass = $campaign->template;
+        // ── Resolve mailable class ────────────────────────────────────────
+        // Variant may supply its own template; fall back to campaign template.
+        $mailableClass = ($variant !== null && !empty($variant->template))
+            ? $variant->template
+            : $campaign->template;
 
         if (!class_exists($mailableClass)) {
             Logger::error('SendCampaignJob: mailable class does not exist', [
@@ -105,16 +113,16 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
                 'campaign_id' => $this->campaignId,
                 'template' => $mailableClass,
             ]);
-            $this->fail(new \RuntimeException("Mailable class [{$mailableClass}] does not exist."));
+            $this->fail(new \RuntimeException("Mailable [{$mailableClass}] does not exist."));
             return;
         }
 
-        // ── T15: Behaviour-driven channel ordering ─────────────────────────
+        // ── T15: behaviour-driven channel ordering ─────────────────────────
         $channels = $this->channelResolver->resolveChannels($this->memberId, $campaign);
 
         foreach ($channels as $channel) {
             if (!$this->consentChecker->canSend($member, CampaignPurpose::tryFrom($campaign->purpose), $channel)) {
-                Logger::info('SendCampaignJob: consent blocked on channel, trying fallback', [
+                Logger::info('SendCampaignJob: consent blocked, trying fallback', [
                     'member_id' => $this->memberId,
                     'campaign_id' => $this->campaignId,
                     'channel' => $channel->value,
@@ -122,30 +130,23 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
                 continue;
             }
 
-            $sent = $this->sendViaChannel($member, $campaign, $channel, $mailableClass, $variantId);
+            $sent = $this->sendViaChannel(
+                $member, $campaign, $channel, $mailableClass, $variantId
+            );
 
             if ($sent) {
-                // ── T11/T12: Record delivery for analytics ─────────────────
-                $this->deliveryRepository->record(
-                    memberId: $this->memberId,
-                    campaignId: $this->campaignId,
-                    channel: $channel->value,
-                    audienceKey: $this->audienceKey,
-                    variantId: $variantId,
-                );
-
-                $this->logger->log($this->memberId, $campaign, $this->segmentKey);
+                $this->executionLogger->log($this->memberId, $campaign, $this->segmentKey);
+                return;
             }
         }
 
-        Logger::info('SendCampaignJob: no consented channel available, skipping', [
+        Logger::info('SendCampaignJob: no consented channel available', [
             'member_id' => $this->memberId,
             'campaign_id' => $this->campaignId,
-            'purpose' => $campaign->purpose->value,
         ]);
     }
 
-    // -------------------------------------------------------------------------
+    // ── Private ───────────────────────────────────────────────────────────
 
     private function sendViaChannel(
         Member          $member,
@@ -155,22 +156,41 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
         ?int            $variantId,
     ): bool
     {
-        // Web push channel — delegate to dedicated dispatcher.
         if ($channel === CampaignChannel::PUSH) {
             $dispatched = $this->webPushDispatcher->dispatch($member, $campaign);
 
-            if (!$dispatched) {
-                Logger::info('SendCampaignJob: web push had no subscription, trying fallback', [
-                    'member_id' => $this->memberId,
-                    'campaign_id' => $this->campaignId,
-                ]);
+            if ($dispatched) {
+                // Record delivery for push — no tracking pixel, but we still
+                // need the analytics row.
+                $this->deliveryRepository->record(
+                    memberId: $this->memberId,
+                    campaignId: $this->campaignId,
+                    channel: $channel->value,
+                    audienceKey: $this->audienceKey,
+                    variantId: $variantId,
+                );
             }
 
             return $dispatched;
         }
 
-        // Email / notification channels — existing mailable path.
+        // ── Email / notification path ─────────────────────────────────────
+        /** @var BaseCampaignMail $mailable */
         $mailable = new $mailableClass($member, $campaign);
+
+        // ── T11: Write delivery row FIRST so the token exists ─────────────
+        // The token is generated inside record() and returned on the model.
+        $delivery = $this->deliveryRepository->record(
+            memberId: $this->memberId,
+            campaignId: $this->campaignId,
+            channel: $channel->value,
+            audienceKey: $this->audienceKey,
+            variantId: $variantId,
+        );
+
+        // Attach token to the mailable so BaseCampaignMail::injectTracking()
+        // can embed the pixel and rewrite links in the rendered HTML.
+        $mailable->deliveryToken = $delivery->token;
 
         $notification = new CampaignNotification(
             mailable: $mailable,
@@ -178,23 +198,29 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             recipientUserIdValue: $member->id,
         );
 
-        $succeeded = $this->dispatcher->dispatch($notification);
+        $succeeded = $this->notificationDispatcher->dispatch($notification);
 
         if ($succeeded > 0) {
-            Logger::info('SendCampaignJob: campaign delivered', [
+            Logger::info('SendCampaignJob: delivered', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
                 'channel' => $channel->value,
                 'variant_id' => $variantId,
+                'delivery_id' => $delivery->id,
             ]);
             return true;
         }
 
-        Logger::warning('SendCampaignJob: dispatcher reported zero successful channels', [
+        // Dispatch failed — delete the delivery row so the analytics count
+        // doesn't record a "delivered" message that was never actually sent.
+        $this->deliveryRepository->delete($delivery->id);
+
+        Logger::warning('SendCampaignJob: dispatcher reported zero successes', [
             'member_id' => $this->memberId,
             'campaign_id' => $this->campaignId,
             'channel' => $channel->value,
         ]);
+
         return false;
     }
 }

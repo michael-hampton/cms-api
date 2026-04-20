@@ -25,8 +25,6 @@ class AdminPayoutPageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         return $this->view('open-collab.admin.payouts.index', [
             'pageTitle' => 'Payout Management',
             'activeNav' => 'payouts',
@@ -34,14 +32,5 @@ class AdminPayoutPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

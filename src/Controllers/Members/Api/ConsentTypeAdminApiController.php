@@ -22,7 +22,14 @@ class ConsentTypeAdminApiController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $result = $this->service->list((int)$request->get('page', 1));
+        $result = $this->service->list(
+            page: (int)$request->get('page', 1),
+            perPage: (int)$request->get('per_page', 20),
+            search: $request->get('search') ?: null,
+            category: $request->get('category') ?: null,
+            sortBy: $request->get('sort_by', 'name'),
+            sortOrder: $request->get('sort_order', 'asc'),
+        );
 
         return $this->resourceResponse([
             'data' => $result['data']->map(fn(ConsentType $type) => $this->format($type))->toArray(),

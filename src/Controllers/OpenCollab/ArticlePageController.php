@@ -76,12 +76,20 @@ class ArticlePageController extends Controller
     }
 
     /**
+     * Returns the first ~300 characters of the content stripped of HTML.
+     * The controller — not the view — is responsible for this truncation.
+     */
+    private function previewContent(string $content): string
+    {
+        $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return mb_substr($plain, 0, 300) . '…';
+    }
+
+    /**
      * GET /articles/create
      */
     public function create()
     {
-        $this->requireAuth();
-
         return $this->view('open-collab.articles.editor', [
             'page' => null,
             'site' => SiteContext::slug(),
@@ -91,13 +99,13 @@ class ArticlePageController extends Controller
         ]);
     }
 
+    // ── Helpers ──────────────────────────────────────────────
+
     /**
      * GET /articles/{id}/edit
      */
     public function edit(int $id)
     {
-        $this->requireAuth();
-
         $userId = Auth::id();
         $page = $this->pageRepository->find($id);
 
@@ -125,8 +133,6 @@ class ArticlePageController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
-
         $articles = $this->pageRepository->getContributorPages(
             Auth::id(),
             SiteContext::getId(),
@@ -137,29 +143,5 @@ class ArticlePageController extends Controller
             'site' => SiteContext::slug(),
             'currentUser' => Auth::user(),
         ]);
-    }
-
-    // ── Helpers ──────────────────────────────────────────────
-
-    /**
-     * Returns the first ~300 characters of the content stripped of HTML.
-     * The controller — not the view — is responsible for this truncation.
-     */
-    private function previewContent(string $content): string
-    {
-        $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return mb_substr($plain, 0, 300) . '…';
-    }
-
-    /**
-     * Redirect unauthenticated users to login, preserving intent.
-     */
-    private function requireAuth(): void
-    {
-        if (!Auth::check()) {
-            $intendedUrl = urlencode($_SERVER['REQUEST_URI'] ?? '/');
-            header('Location: /login?redirect=' . $intendedUrl);
-            exit;
-        }
     }
 }

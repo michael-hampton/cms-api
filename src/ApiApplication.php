@@ -162,6 +162,8 @@ use App\Services\Newsletter\Renderers\TeamBlockRenderer;
 use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
 use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
 use App\Services\Newsletter\Renderers\TextBlockRenderer;
+use App\Services\OpenCollab\Policies\ContributorPolicy;
+use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\Shared\NativeSessionStore;
 use App\Services\Shared\RequestContext;
 use App\Services\Shared\SessionStore;
@@ -206,6 +208,7 @@ class ApiApplication
         $this->registerMiddleware();
 
         $this->container->instance(Router::class, $this->router);
+        $this->container->bind(ContributorPolicy::class, ContributorPolicyService::class);
         $this->container->bind(\DateTimeInterface::class, Date::class);
         $this->container->bind(RequestContext::class, WebRequestContext::class);
         $this->container->bind(SessionStore::class, NativeSessionStore::class);

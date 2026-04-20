@@ -16,11 +16,12 @@ use App\Services\MemberInsights\Campaigns\CampaignCooldownChecker;
 use App\Services\MemberInsights\Campaigns\CampaignMatcher;
 use App\Services\MemberInsights\Segmentation\MemberSegmentResolver;
 use App\Services\MemberInsights\Segmentation\SegmentPersister;
+use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
 
-class ProcessMemberSegmentationJobTest extends TestCase
+class ProcessMemberSegmentationJobTest extends FunctionalTestCase
 {
     private MemberSegmentResolver|MockInterface $resolver;
     private SegmentPersister|MockInterface $persister;

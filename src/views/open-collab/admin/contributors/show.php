@@ -102,7 +102,7 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                     </dd>
                     <dt style="color:var(--slate);font-weight:500;">Joined</dt>
                     <dd style="color:var(--navy);">
-                        <?= !empty($contributor['created_at']) ? date('d M Y', strtotime($contributor['created_at'])) : '–' ?>
+                        <?= !empty($contributor['created_at']) ? $contributor['created_at'] : '–' ?>
                     </dd>
                     <dt style="color:var(--slate);font-weight:500;">Is contributor</dt>
                     <dd><?= ($contributor['is_contributor'] ?? false) ? '<span class="oc-badge oc-badge--published">Yes</span>' : '<span class="oc-badge oc-badge--draft">No</span>' ?></dd>
@@ -170,11 +170,11 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                         ?>
                         <tr>
                             <td style="font-size:.78rem;color:var(--slate);">
-                                <?= $inv->created_at ? date('d M Y', strtotime($inv->created_at)) : '–' ?>
+                                <?= $inv->created_at ? $inv->created_at->format('d M Y') : '–' ?>
                             </td>
                             <td><span class="oc-badge <?= $statusBadge ?>"><?= ucfirst($status) ?></span></td>
                             <td style="font-size:.78rem;color:var(--slate);">
-                                <?= $inv->expires_at ? date('d M Y', strtotime($inv->expires_at)) : '–' ?>
+                                <?= $inv->expires_at ? $inv->expires_at->format('d M Y') : '–' ?>
                             </td>
                             <td style="text-align:right;">
                                 <?php if ($status === 'pending'): ?>

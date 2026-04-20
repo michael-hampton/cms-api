@@ -32,8 +32,6 @@ class AdminContributorPageController extends Controller
      */
     public function index(Request $request)
     {
-        $this->requireAdmin();
-
         $query = $request->get('q');
         $results = $this->contributorRepository->searchForSite(SiteContext::getId(), $query, 25);
 
@@ -58,8 +56,6 @@ class AdminContributorPageController extends Controller
      */
     public function show(int $id)
     {
-        $this->requireAdmin();
-
         $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
 
         if (!$contributor) {
@@ -69,12 +65,9 @@ class AdminContributorPageController extends Controller
 
         $values = is_array($contributor) ? $contributor : $contributor->toArray();
 
-        // Load invitation history for this contributor's email
-        $invitations = collect([]);
-        if (!empty($values['email'])) {
-            $invitations = $this->invitationRepository->getAllForSite(SiteContext::getId())
-                ->filter(fn($inv) => $inv->email === $values['email']);
-        }
+        $invitations = !empty($values['email'])
+            ? $this->invitationRepository->getAllForEmail($values['email'], SiteContext::getId())
+            : collect([]);
 
         return $this->view('open-collab.admin.contributors.show', [
             'contributor' => $values,
@@ -88,14 +81,5 @@ class AdminContributorPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

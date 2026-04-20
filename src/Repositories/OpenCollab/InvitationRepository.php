@@ -114,6 +114,18 @@ class InvitationRepository extends Repository
             ->first();
     }
 
+    /**
+     * Returns all invitations for a specific email on a site, ordered newest first.
+     * More efficient than loading all site invitations and filtering in PHP.
+     */
+    public function getAllForEmail(string $email, int $siteId): \App\Framework\Support\Collection
+    {
+        return Invitation::where('email', $email)
+            ->where('site_id', $siteId)
+            ->orderBy('id', 'desc')
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return Invitation::class;

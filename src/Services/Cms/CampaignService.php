@@ -6,7 +6,20 @@ use App\DTO\Campaigns\CampaignResolutionResult;
 use App\DTO\Campaigns\SignupContext;
 use App\Enums\Campaigns\CampaignStatus;
 use App\Framework\Database\Database;
+use App\Mail\Campaigns\CompleteYourProfileMail;
+use App\Mail\Campaigns\ConvertToActionMail;
+use App\Mail\Campaigns\CreateMoreContentMail;
+use App\Mail\Campaigns\EarlyAccessMail;
+use App\Mail\Campaigns\NudgeToCommentMail;
+use App\Mail\Campaigns\RecommendedProductsMail;
+use App\Mail\Campaigns\RewardEngagementMail;
+use App\Mail\Campaigns\SoftReengagementMail;
+use App\Mail\Campaigns\StartEngagingMail;
+use App\Mail\Campaigns\VipRewardsMail;
+use App\Mail\Campaigns\WelcomeSeriesMail;
+use App\Mail\Campaigns\WeMissYouMail;
 use App\Models\Campaign;
+use App\Models\CampaignVariant;
 use App\Models\Model;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
@@ -255,6 +268,10 @@ class CampaignService
 
         $this->assertSegmentExists($payload['segment_id']);
 
+        if (isset($payload['template'])) {
+            $this->assertMailableExists($payload['template']);
+        }
+
         return $this->database->transaction(fn() => $this->campaignRepository->create($payload)
         );
     }
@@ -270,6 +287,10 @@ class CampaignService
             throw new \InvalidArgumentException("Campaign slug \"{$payload['slug']}\" already exists.");
         }
 
+        if (isset($payload['template'])) {
+            $this->assertMailableExists($payload['template']);
+        }
+
         if (array_key_exists('segment_id', $payload)) {
             $this->assertSegmentExists($payload['segment_id']);
         }
@@ -281,6 +302,159 @@ class CampaignService
 
             return $this->campaignRepository->findForSite($campaign->id, $siteId);
         });
+    }
+
+
+    public function delete(int $id, int $siteId): void
+    {
+        $campaign = $this->campaignRepository->findForSite($id, $siteId);
+
+        $this->database->transaction(function () use ($campaign) {
+            $this->campaignRepository->delete($campaign->id);
+        });
+    }
+
+    /**
+     * Replace the full variant set for a campaign atomically.
+     *
+     * $variants format:
+     * [
+     *   ['key' => 'A', 'weight' => 60, 'template' => null],  // uses campaign template
+     *   ['key' => 'B', 'weight' => 40, 'template' => 'App\\Mail\\Campaigns\\SoftReengagementMail'],
+     * ]
+     *
+     * Passing an empty array removes all variants (disables A/B testing).
+     *
+     * @throws \InvalidArgumentException on weight sum != 100 or duplicate keys
+     */
+    public function setVariants(int $campaignId, int $siteId, array $variants): array
+    {
+        $this->findForSite($campaignId, $siteId); // assert ownership
+        $this->validateVariants($variants);
+
+        return $this->database->transaction(function () use ($campaignId, $variants) {
+            // Delete existing variants for this campaign.
+            CampaignVariant::where('campaign_id', $campaignId)->delete();
+
+            if (empty($variants)) {
+                return [];
+            }
+
+            $created = [];
+            foreach ($variants as $v) {
+                $row = CampaignVariant::create([
+                    'campaign_id' => $campaignId,
+                    'key' => strtoupper(trim($v['key'])),
+                    'weight' => (int)$v['weight'],
+                    'template' => isset($v['template']) ? trim($v['template']) : null,
+                    'blocks' => $v['blocks'] ?? null,
+                ]);
+                $created[] = $row;
+            }
+
+            return $created;
+        });
+    }
+
+    /**
+     * Retrieve the current variants for a campaign.
+     *
+     * @return CampaignVariant[]
+     */
+    public function getVariants(int $campaignId, int $siteId): array
+    {
+        $this->findForSite($campaignId, $siteId);
+
+        return CampaignVariant::where('campaign_id', $campaignId)
+            ->orderBy('key')
+            ->get()
+            ->toArray();
+    }
+
+    public function availableMailables(): array
+    {
+        return [
+            WelcomeSeriesMail::class => 'Welcome Series',
+            CompleteYourProfileMail::class => 'Complete Your Profile',
+            StartEngagingMail::class => 'Start Engaging',
+            NudgeToCommentMail::class => 'Nudge to Comment',
+            CreateMoreContentMail::class => 'Create More Content',
+            EarlyAccessMail::class => 'Early Access',
+            RewardEngagementMail::class => 'Reward Engagement',
+            VipRewardsMail::class => 'VIP Rewards',
+            RecommendedProductsMail::class => 'Recommended Products',
+            ConvertToActionMail::class => 'Convert to Action',
+            SoftReengagementMail::class => 'Soft Re-engagement',
+            WeMissYouMail::class => 'We Miss You',
+        ];
+    }
+
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
+
+    private function findForSite(int $campaignId, int $siteId): Campaign
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if ($campaign === null || $campaign->site_id !== $siteId) {
+            throw new \InvalidArgumentException("Campaign [{$campaignId}] not found.");
+        }
+
+        return $campaign;
+    }
+
+    private function assertSegmentExists(?int $segmentId): void
+    {
+        if ($segmentId === null) {
+            return;
+        }
+
+        if ($this->segmentRepository->find($segmentId) === null) {
+            throw new \InvalidArgumentException("Segment #{$segmentId} not found.");
+        }
+    }
+
+    private function assertMailableExists(string $class): void
+    {
+        if (!class_exists($class)) {
+            throw new \InvalidArgumentException(
+                "Mailable class [{$class}] does not exist. "
+                . "Register it in CampaignAdminService::availableMailables() first."
+            );
+        }
+    }
+
+    private function validateVariants(array $variants): void
+    {
+        if (empty($variants)) {
+            return;
+        }
+
+        $totalWeight = array_sum(array_column($variants, 'weight'));
+
+        if ($totalWeight !== 100) {
+            throw new \InvalidArgumentException(
+                "Variant weights must sum to 100. Got {$totalWeight}."
+            );
+        }
+
+        $keys = array_map(fn($v) => strtoupper(trim($v['key'] ?? '')), $variants);
+        if (count($keys) !== count(array_unique($keys))) {
+            throw new \InvalidArgumentException('Variant keys must be unique (A, B, C …).');
+        }
+
+        foreach ($variants as $i => $v) {
+            if (empty($v['key'])) {
+                throw new \InvalidArgumentException("Variant #{$i}: key is required.");
+            }
+            if (!isset($v['weight']) || (int)$v['weight'] <= 0) {
+                throw new \InvalidArgumentException("Variant #{$i}: weight must be a positive integer.");
+            }
+            if (!empty($v['template'])) {
+                $this->assertMailableExists($v['template']);
+            }
+        }
     }
 
     private function normalizePayload(array $payload, int $siteId, bool $isUpdate): array
@@ -308,27 +482,6 @@ class CampaignService
         return $isUpdate
             ? array_filter($data, fn($value) => $value !== null)
             : $data;
-    }
-
-
-    public function delete(int $id, int $siteId): void
-    {
-        $campaign = $this->campaignRepository->findForSite($id, $siteId);
-
-        $this->database->transaction(function () use ($campaign) {
-            $this->campaignRepository->delete($campaign->id);
-        });
-    }
-
-    private function assertSegmentExists(?int $segmentId): void
-    {
-        if ($segmentId === null) {
-            return;
-        }
-
-        if ($this->segmentRepository->find($segmentId) === null) {
-            throw new \InvalidArgumentException("Segment #{$segmentId} not found.");
-        }
     }
 
     private function updateCampaignStatus(

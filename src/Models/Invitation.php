@@ -38,12 +38,14 @@ class Invitation extends Model
         'used_at',
         'revoked_at',
         'revoked_by',
+        'created_at'
     ];
 
     protected $casts = [
         'expires_at' => 'datetime',
         'used_at' => 'datetime',
         'accepted_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public function isValid(): bool

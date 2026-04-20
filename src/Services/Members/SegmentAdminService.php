@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\MemberInsights;
+namespace App\Services\Members;
 
 use App\Enums\Member\SegmentRuleBoolean;
 use App\Enums\Member\SegmentRuleOperator;
@@ -19,9 +19,15 @@ class SegmentAdminService
     {
     }
 
-    public function list(int $page = 1, int $perPage = 20): array
+    public function list(
+        int     $page = 1,
+        int     $perPage = 20,
+        ?string $search = null,
+        string  $sortBy = 'name',
+        string  $sortOrder = 'asc',
+    ): array
     {
-        return $this->segmentRepository->paginateAdmin($perPage, $page);
+        return $this->segmentRepository->paginateAdmin($perPage, $page, $search, $sortBy, $sortOrder);
     }
 
     public function create(array $payload): Segment

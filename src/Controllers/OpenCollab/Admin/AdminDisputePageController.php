@@ -25,8 +25,6 @@ class AdminDisputePageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         return $this->view('open-collab.admin.disputes.index', [
             'pageTitle' => 'Earnings Disputes',
             'activeNav' => 'disputes',
@@ -34,14 +32,5 @@ class AdminDisputePageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

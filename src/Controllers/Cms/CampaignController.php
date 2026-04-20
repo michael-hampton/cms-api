@@ -3,6 +3,7 @@
 namespace App\Controllers\Cms;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -195,5 +196,80 @@ class CampaignController extends Controller
             $this->logger->error('Failed to resume campaign', ['id' => $id, 'error' => $e->getMessage()]);
             return $this->errorResponse('Failed to resume campaign: ' . $e->getMessage(), 500);
         }
+    }
+
+    // ── Variants (T14) ────────────────────────────────────────────────────
+
+    /**
+     * GET /admin/api/campaigns/{id}/variants
+     */
+    public function getVariants(int $id): JsonResponse
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $variants = $this->campaignService->getVariants($id, SiteContext::getId());
+            return $this->jsonResponse(['variants' => $variants]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse(['error' => $e->getMessage()], 404);
+        }
+    }
+
+    /**
+     * PUT /admin/api/campaigns/{id}/variants
+     *
+     * Replaces the full variant set atomically.
+     *
+     * Request body:
+     * {
+     *   "variants": [
+     *     { "key": "A", "weight": 60 },
+     *     { "key": "B", "weight": 40, "template": "App\\Mail\\Campaigns\\SoftReengagementMail" }
+     *   ]
+     * }
+     *
+     * Pass variants: [] to disable A/B testing for this campaign.
+     */
+    public function setVariants(int $id, Request $request): JsonResponse
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $variants = $request->input('variants', []);
+
+        try {
+            $created = $this->campaignService->setVariants($id, SiteContext::getId(), $variants);
+            return $this->jsonResponse([
+                'message' => empty($variants) ? 'A/B testing disabled.' : 'Variants updated.',
+                'variants' => array_map(fn($v) => $v->toArray(), $created),
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            $status = str_contains($e->getMessage(), 'not found') ? 404 : 422;
+            return $this->jsonResponse(['error' => $e->getMessage()], $status);
+        }
+    }
+
+    // ── Mailables dropdown ────────────────────────────────────────────────
+
+    /**
+     * GET /admin/api/campaigns/mailables
+     *
+     * Returns registered mailable classes for the template dropdown.
+     */
+    public function mailables(): JsonResponse
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+        }
+
+        $items = [];
+        foreach ($this->campaignService->availableMailables() as $class => $label) {
+            $items[] = ['class' => $class, 'label' => $label];
+        }
+
+        return $this->jsonResponse(['mailables' => $items]);
     }
 }

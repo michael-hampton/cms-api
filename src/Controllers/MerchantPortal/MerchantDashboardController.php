@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Controllers\Product;
+namespace App\Controllers\MerchantPortal;
 
 use App\Controllers\Controller;
 use App\Framework\Http\Response;

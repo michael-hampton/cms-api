@@ -1010,6 +1010,7 @@ class QueryBuilder
 
         // Get paginated results
         $this->limit($perPage)->offset($offset);
+
         $data = $this->get();
 
         return [
@@ -1238,6 +1239,10 @@ class QueryBuilder
             $sql .= $whereClause;
             $bindings = array_merge($bindings, $whereBindings);
         }
+
+        echo $sql;
+        print_r($bindings);
+        die;
 
         $stmt = $this->database->query($sql, $bindings);
         return $stmt->rowCount();

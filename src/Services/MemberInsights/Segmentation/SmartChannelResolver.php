@@ -29,7 +29,7 @@ use App\Repositories\MemberInsights\CampaignEventRepository;
  *   If $campaign->force_channel is set, that channel is always placed first
  *   regardless of behaviour (e.g. transactional emails that must use email).
  */
-final class SmartChannelResolver
+class SmartChannelResolver
 {
     public function __construct(
         private readonly ChannelResolver            $staticResolver,

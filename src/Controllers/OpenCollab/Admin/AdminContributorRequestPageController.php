@@ -26,8 +26,6 @@ class AdminContributorRequestPageController extends Controller
      */
     public function index()
     {
-        $this->requireAdmin();
-
         return $this->view('open-collab.admin.contributor-requests.index', [
             'pageTitle' => 'Access Requests',
             'activeNav' => 'contributors',
@@ -38,14 +36,5 @@ class AdminContributorRequestPageController extends Controller
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAdmin(): void
-    {
-        $user = Auth::getUser();
-        if (!$user || !in_array($user['role'] ?? '', ['admin', 'agent'], true)) {
-            header('Location: /login');
-            exit;
-        }
     }
 }

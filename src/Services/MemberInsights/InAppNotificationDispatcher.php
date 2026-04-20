@@ -8,7 +8,7 @@ use App\Models\Campaign;
 use App\Models\Member;
 use App\Notifications\CampaignNotification;
 
-final class InAppNotificationDispatcher
+class InAppNotificationDispatcher
 {
     public function __construct(
         private readonly NotificationDispatcher $dispatcher,

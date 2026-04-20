@@ -83,6 +83,7 @@ final class CampaignAnalyticsService
     public function byAudience(int $campaignId): array
     {
         $deliveriesByAudience = $this->deliveryRepository->countByCampaignAndAudience($campaignId);
+
         $totalDeliveries = array_sum($deliveriesByAudience);
 
         $result = [];

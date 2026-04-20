@@ -371,15 +371,25 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
             return array_sum($this->items);
         }
 
-        // Case 2: callable → map then sum
-        if (is_callable($key)) {
-            return array_sum(
-                array_map($key, $this->items)
-            );
+        // Case 2: string key → treat as property/array access
+        if (is_string($key)) {
+            return array_sum(array_map(function ($item) use ($key) {
+                if (is_array($item)) {
+                    return $item[$key] ?? 0;
+                }
+
+                if (is_object($item)) {
+                    return $item->{$key} ?? 0;
+                }
+
+                return 0;
+            }, $this->items));
         }
 
-        // Case 3: string key → pluck then sum
-        return $this->pluck($key)->sum();
+        // Case 3: actual callable
+        return array_sum(
+            array_map($key, $this->items)
+        );
     }
 
     public function avg(?string $key = null)

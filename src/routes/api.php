@@ -632,10 +632,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/campaigns/{id}/clone', [CampaignController::class, 'clone']);
 
         $router->get('/campaign-analytics/campaigns', [CampaignAnalyticsApiController::class, 'campaigns']);
-        $router->get('/campaign-analytics/campaigns/{id}/summary', [CampaignAnalyticsApiController::class, 'summary']);
-        $router->get('/campaign-analytics/campaigns/{id}/audiences', [CampaignAnalyticsApiController::class, 'audiences']);
-        $router->get('/campaign-analytics/campaigns/{id}/blocks', [CampaignAnalyticsApiController::class, 'blocks']);
-        $router->get('/campaign-analytics/campaigns/{id}/variants', [CampaignAnalyticsApiController::class, 'variants']);
+        $router->get('/campaign-analytics/campaigns/{campaignId}/summary', [CampaignAnalyticsApiController::class, 'summary']);
+        $router->get('/campaign-analytics/campaigns/{campaignId}/audiences', [CampaignAnalyticsApiController::class, 'audiences']);
+        $router->get('/campaign-analytics/campaigns/{campaignId}/blocks', [CampaignAnalyticsApiController::class, 'blocks']);
+        $router->get('/campaign-analytics/campaigns/{campaignId}/variants', [CampaignAnalyticsApiController::class, 'variants']);
         $router->get('/campaign-analytics/audiences', [CampaignAnalyticsApiController::class, 'audienceList']);
 
         // Payment routes

@@ -107,8 +107,7 @@ class EloquentTokenRepository
 
         try {
             $result = Database::getInstance()->query(
-                "SHOW COLUMNS FROM `personal_access_tokens` LIKE ?",
-                ['user_id']
+                "SHOW COLUMNS FROM `personal_access_tokens` LIKE 'user_id'"
             );
 
             $hasUserIdColumn = $result->rowCount() > 0;

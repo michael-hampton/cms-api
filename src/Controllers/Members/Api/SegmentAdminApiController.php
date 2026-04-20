@@ -10,7 +10,7 @@ use App\Models\Segment;
 use App\Models\SegmentRule;
 use App\Requests\Members\StoreSegmentRequest;
 use App\Requests\Members\UpdateSegmentRequest;
-use App\Services\MemberInsights\SegmentAdminService;
+use App\Services\Members\SegmentAdminService;
 
 class SegmentAdminApiController extends Controller
 {
@@ -23,7 +23,13 @@ class SegmentAdminApiController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $result = $this->service->list((int)$request->get('page', 1));
+        $result = $this->service->list(
+            page: (int)$request->get('page', 1),
+            perPage: (int)$request->get('per_page', 20),
+            search: $request->get('search') ?: null,
+            sortBy: $request->get('sort_by', 'name'),
+            sortOrder: $request->get('sort_order', 'asc'),
+        );
 
         return $this->resourceResponse([
             'data' => $result['data']->map(fn(Segment $segment) => $this->format($segment))->toArray(),

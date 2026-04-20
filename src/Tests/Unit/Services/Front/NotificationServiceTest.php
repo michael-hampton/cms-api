@@ -5,8 +5,9 @@ namespace App\Tests\Unit\Services\Front;
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Repositories\Members\GiftedArticleRepository;
+use App\Repositories\Members\NotificationRepository;
 use App\Repositories\Rewards\RewardsRepository;
-use App\Services\MemberInsights\NotificationService;
+use App\Services\Members\NotificationService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -16,6 +17,7 @@ class NotificationServiceTest extends TestCase
     private RewardsRepository $rewardsRepo;
     private GiftedArticleRepository $giftsRepo;
     private Member $member;
+    private NotificationRepository $notificationRepository;
 
     public function testGetNotificationsWithUnclaimedRewards(): void
     {
@@ -148,12 +150,18 @@ class NotificationServiceTest extends TestCase
 
         $this->rewardsRepo = Mockery::mock(RewardsRepository::class);
         $this->giftsRepo = Mockery::mock(GiftedArticleRepository::class);
-        $this->service = new NotificationService($this->rewardsRepo, $this->giftsRepo);
+        $this->notificationRepository = Mockery::mock(NotificationRepository::class);
+
+        $this->service = new NotificationService($this->rewardsRepo, $this->giftsRepo, $this->notificationRepository);
 
         $this->member = Mockery::mock(Member::class)->makePartial();
         $this->member->id = 1;
         $this->member->email = 'test@example.com';
         //$this->member->shouldReceive('isEmailVerified')->andReturn(true);
+
+        $this->notificationRepository->shouldReceive('findUnreadForMember')
+            ->andReturn(collect())
+            ->byDefault();
     }
 
     protected function tearDown(): void

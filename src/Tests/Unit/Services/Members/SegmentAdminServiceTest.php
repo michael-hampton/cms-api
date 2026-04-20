@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 use App\Models\Segment;
 use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\MemberInsights\SegmentRuleRepository;
-use App\Services\MemberInsights\SegmentAdminService;
+use App\Services\Members\SegmentAdminService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 

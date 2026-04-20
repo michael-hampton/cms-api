@@ -27,8 +27,6 @@ class OnboardingPageController extends Controller
      */
     public function show()
     {
-        $this->requireAuth();
-
         $userId = Auth::id();
         $site = Site::find(SiteContext::getId());
 
@@ -57,14 +55,6 @@ class OnboardingPageController extends Controller
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'currentUser' => Auth::user(),
         ]);
-    }
-
-    private function requireAuth(): void
-    {
-        if (!Auth::check()) {
-            header('Location: /login?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
-            exit;
-        }
     }
 
     private function serverError(string $msg)

@@ -2,6 +2,7 @@
 
 namespace App\Repositories\MemberInsights;
 
+use App\Enums\Member\CampaignPurpose;
 use App\Models\CampaignExecution;
 use App\Repositories\Repository;
 
@@ -15,6 +16,14 @@ class CampaignExecutionRepository extends Repository
             ->exists();
     }
 
+    public function countMarketingExecutionsSince(int $memberId, \DateTimeInterface $since): int
+    {
+        return $this->model
+            ->newQuery()
+            ->where('member_id', $memberId)
+            ->where('sent_at', '>=', $since->format('Y-m-d H:i:s'))
+            ->count();
+    }
     protected function getModelClass(): string
     {
         return CampaignExecution::class;

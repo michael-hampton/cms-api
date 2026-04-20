@@ -37,19 +37,9 @@ class PayoutPageController extends Controller
      */
     public function index()
     {
-        $this->requireAuth();
-
         return $this->view('open-collab.payouts.index', [
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),
         ]);
-    }
-
-    private function requireAuth(): void
-    {
-        if (!Auth::check()) {
-            header('Location: /login?redirect=' . urlencode($_SERVER['REQUEST_URI'] ?? '/'));
-            exit;
-        }
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Controllers\MemberInsights;
 
 use App\Controllers\Controller;
+use App\Enums\Member\CampaignChannel;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -64,7 +65,7 @@ class CampaignAnalyticsApiController extends Controller
                 'id' => $campaign->id,
                 'name' => $campaign->name,
                 'is_active' => (bool)$campaign->is_active,
-                'channel' => $campaign->channel instanceof \App\Enums\Member\CampaignChannel
+                'channel' => $campaign->channel instanceof CampaignChannel
                     ? $campaign->channel->value
                     : (string)$campaign->channel,
                 'priority' => $campaign->priority ?? 0,
@@ -75,7 +76,7 @@ class CampaignAnalyticsApiController extends Controller
             ];
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'data' => $items,
             'meta' => [
                 'current_page' => $paginated['current_page'] ?? $page,
@@ -95,22 +96,21 @@ class CampaignAnalyticsApiController extends Controller
         if (!$this->auth->check()) {
             return $this->jsonResponse(['error' => 'Unauthorized'], 401);
         }
-
         $campaign = $this->campaignRepository->find($campaignId);
 
         if (!$campaign || $campaign->site_id !== SiteContext::getId()) {
-            return $this->jsonResponse(['error' => 'Campaign not found'], 404);
+            return $this->resourceResponse(['error' => 'Campaign not found'], 404);
         }
 
         $days = 30;
         $summary = $this->analyticsService->summarise($campaignId);
         $series = $this->analyticsService->getDailyEngagement($campaignId, $days);
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'campaign' => [
                 'id' => $campaign->id,
                 'name' => $campaign->name,
-                'channel' => $campaign->channel instanceof \App\Enums\Member\CampaignChannel
+                'channel' => $campaign->channel instanceof CampaignChannel
                     ? $campaign->channel->value
                     : (string)$campaign->channel,
                 'priority' => $campaign->priority ?? 0,
@@ -181,7 +181,7 @@ class CampaignAnalyticsApiController extends Controller
 
         usort($result, fn($a, $b) => $b['deliveries'] <=> $a['deliveries']);
 
-        return $this->jsonResponse(['audiences' => $result]);
+        return $this->resourceResponse(['audiences' => $result]);
     }
 
     // =========================================================================
@@ -200,7 +200,7 @@ class CampaignAnalyticsApiController extends Controller
             return $this->jsonResponse(['error' => 'Campaign not found'], 404);
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'blocks' => $this->analyticsService->rankedBlocks($campaignId),
         ]);
     }
@@ -212,13 +212,13 @@ class CampaignAnalyticsApiController extends Controller
     public function variants(int $campaignId): JsonResponse
     {
         if (!$this->auth->check()) {
-            return $this->jsonResponse(['error' => 'Unauthorized'], 401);
+            return $this->resourceResponse(['error' => 'Unauthorized'], 401);
         }
 
         $campaign = $this->campaignRepository->find($campaignId);
 
         if (!$campaign || $campaign->site_id !== SiteContext::getId()) {
-            return $this->jsonResponse(['error' => 'Campaign not found'], 404);
+            return $this->resourceResponse(['error' => 'Campaign not found'], 404);
         }
 
         $variants = \App\Models\CampaignVariant::where('campaign_id', $campaignId)
@@ -255,7 +255,7 @@ class CampaignAnalyticsApiController extends Controller
             ];
         }
 
-        return $this->jsonResponse(['variants' => $result]);
+        return $this->resourceResponse(['variants' => $result]);
     }
 
     public function audienceList(): JsonResponse
@@ -269,6 +269,6 @@ class CampaignAnalyticsApiController extends Controller
             $items[] = ['key' => $key, 'label' => $label];
         }
 
-        return $this->jsonResponse(['audiences' => $items]);
+        return $this->resourceResponse(['audiences' => $items]);
     }
 }

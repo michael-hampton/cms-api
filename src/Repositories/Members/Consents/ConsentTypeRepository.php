@@ -8,9 +8,35 @@ use App\Models\ConsentType;
 
 class ConsentTypeRepository
 {
-    public function paginateAdmin(int $perPage = 20, int $page = 1): array
+    public function paginateAdmin(
+        int     $perPage = 20,
+        int     $page = 1,
+        ?string $search = null,
+        ?string $category = null,
+        string  $sortBy = 'name',
+        string  $sortOrder = 'asc',
+    ): array
     {
-        return ConsentType::orderBy('name')->paginate($perPage, $page);
+        $allowedSort = ['name', 'category', 'created_at'];
+        $sortBy = in_array($sortBy, $allowedSort, true) ? $sortBy : 'name';
+        $sortOrder = strtolower($sortOrder) === 'desc' ? 'desc' : 'asc';
+
+        $query = ConsentType::query();
+
+        if (!empty($search)) {
+            $term = '%' . $search . '%';
+            $query->where(function ($q) use ($term) {
+                $q->where('name', 'LIKE', $term)
+                    ->orWhere('code', 'LIKE', $term)
+                    ->orWhere('description', 'LIKE', $term);
+            });
+        }
+
+        if (!empty($category)) {
+            $query->where('category', $category);
+        }
+
+        return $query->orderBy($sortBy, $sortOrder)->paginate($perPage, $page);
     }
 
     public function find(int $id): ?ConsentType

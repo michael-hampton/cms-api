@@ -43,7 +43,7 @@ class CampaignVariantRepository extends Repository
  *   slot 0-49  → A
  *   slot 50-99 → B
  */
-final class CampaignVariantAssigner
+class CampaignVariantAssigner
 {
     public function __construct(
         private readonly CampaignVariantRepository $variantRepository,

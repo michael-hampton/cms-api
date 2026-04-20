@@ -15,9 +15,16 @@ class ConsentTypeAdminService
     {
     }
 
-    public function list(int $page = 1, int $perPage = 20): array
+    public function list(
+        int     $page = 1,
+        int     $perPage = 20,
+        ?string $search = null,
+        ?string $category = null,
+        string  $sortBy = 'name',
+        string  $sortOrder = 'asc',
+    ): array
     {
-        return $this->repository->paginateAdmin($perPage, $page);
+        return $this->repository->paginateAdmin($perPage, $page, $search, $category, $sortBy, $sortOrder);
     }
 
     public function create(array $payload): ConsentType

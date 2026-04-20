@@ -43,15 +43,15 @@ class Database
     {
     }
 
-    public function initialize(array $config = []): void
+    public static function runTransaction(callable $callback): mixed
     {
-        $this->config = $this->normalizeConfig(
-            !empty($config) ? $config : $this->getConfigFromFile()
-        );
+        $instance = static::getInstance();
 
-        $this->enableQueryLog = Config::get('database.log_queries', false);
+        if (!$instance) {
+            throw new \RuntimeException('Database instance not initialized');
+        }
 
-        $this->connect();
+        return $instance->transaction($callback);
     }
 
     public static function getInstance(array $config = []): self
@@ -68,226 +68,27 @@ class Database
     // Transaction lifecycle hooks
     // -------------------------------------------------------------------------
 
-    /**
-     * Register a callback to run just before the outermost transaction commits.
-     *
-     * If called inside a nested savepoint the callback is still deferred to the
-     * outermost commit, matching the afterCommit semantics.
-     *
-     * If no transaction is active the callback is invoked immediately.
-     */
-    public function beforeCommit(callable $callback): void
+    public function initialize(array $config = []): void
     {
-        if ($this->transactionLevel === 0) {
-            // No active transaction — run immediately.
-            $callback($this);
-            return;
-        }
+        $this->config = $this->normalizeConfig(
+            !empty($config) ? $config : $this->getConfigFromFile()
+        );
 
-        $this->beforeCommitCallbacks[] = $callback;
+        $this->enableQueryLog = Config::get('database.log_queries', false);
+
+        $this->connect();
     }
 
-    /**
-     * Register a callback to run after the outermost transaction successfully
-     * commits.  Callbacks are deferred regardless of nesting depth — they only
-     * fire when transactionLevel returns to 0 after a real COMMIT.
-     *
-     * If no transaction is active the callback is invoked immediately.
-     */
-    public function afterCommit(callable $callback): void
+    private function normalizeConfig(array $config): array
     {
-        if ($this->transactionLevel === 0) {
-            // No active transaction — run immediately.
-            $callback($this);
-            return;
+        if (PHP_SAPI === 'cli' && !empty($config['host_cli'])) {
+            $config['host'] = $config['host_cli'];
         }
-
-        $this->afterCommitCallbacks[] = $callback;
+        return $config;
     }
 
     // -------------------------------------------------------------------------
     // Core transaction methods
-    // -------------------------------------------------------------------------
-
-    public function beginTransaction(): bool
-    {
-        try {
-            if ($this->transactionLevel === 0) {
-                $result = $this->connection->beginTransaction();
-                Logger::debug('Database transaction started');
-            } else {
-                $this->connection->exec("SAVEPOINT trans{$this->transactionLevel}");
-                $result = true;
-                Logger::debug('Database savepoint created', ['level' => $this->transactionLevel]);
-            }
-
-            $this->transactionLevel++;
-            return $result;
-
-        } catch (Exception $e) {
-            Logger::error('Failed to begin transaction', ['error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    public function commit(): bool
-    {
-        try {
-            $this->transactionLevel--;
-
-            if ($this->transactionLevel === 0) {
-                // About to commit the outermost transaction — run beforeCommit hooks first.
-                $this->runBeforeCommitCallbacks();
-
-                $result = $this->connection->commit();
-                Logger::debug('Database transaction committed');
-
-                // Transaction is now committed — run afterCommit hooks.
-                $this->runAfterCommitCallbacks();
-
-                return $result;
-            }
-
-            if ($this->transactionLevel > 0) {
-                $this->connection->exec("RELEASE SAVEPOINT trans{$this->transactionLevel}");
-                Logger::debug('Database savepoint released', ['level' => $this->transactionLevel]);
-                // Savepoint release does NOT fire before/afterCommit callbacks.
-                // They stay queued until the outermost commit.
-                return true;
-            }
-
-            throw new Exception("Cannot commit transaction - no active transaction");
-
-        } catch (Exception $e) {
-            Logger::error('Failed to commit transaction', ['error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    public function rollBack(): bool
-    {
-        try {
-            if ($this->transactionLevel === 0) {
-                throw new Exception("Cannot rollback transaction - no active transaction");
-            }
-
-            $this->transactionLevel--;
-
-            if ($this->transactionLevel === 0) {
-                // Full rollback — discard all pending hooks.
-                $this->discardPendingCallbacks();
-
-                $result = $this->connection->rollBack();
-                Logger::debug('Database transaction rolled back');
-                return $result;
-            }
-
-            $this->connection->exec("ROLLBACK TO SAVEPOINT trans{$this->transactionLevel}");
-            Logger::debug('Database rolled back to savepoint', ['level' => $this->transactionLevel]);
-            return true;
-
-        } catch (Exception $e) {
-            Logger::error('Failed to rollback transaction', ['error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    /**
-     * Execute a callback inside a transaction.
-     * beforeCommit callbacks registered inside the closure will run just before
-     * the real COMMIT.  afterCommit callbacks run after the COMMIT succeeds.
-     *
-     * @param callable $callback
-     * @return mixed The result of the callback.
-     * @throws Exception on failure (rolls back and discards pending hooks).
-     */
-    public function transaction(callable $callback): mixed
-    {
-        $this->beginTransaction();
-        try {
-            $result = $callback($this);
-            $this->commit();
-            return $result;
-        } catch (Exception $e) {
-            $this->rollBack();
-            Logger::error('Transaction failed and rolled back', ['error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Hook runners
-    // -------------------------------------------------------------------------
-
-    private function runBeforeCommitCallbacks(): void
-    {
-        $callbacks = $this->beforeCommitCallbacks;
-        $this->beforeCommitCallbacks = [];
-
-        foreach ($callbacks as $callback) {
-            try {
-                $callback($this);
-            } catch (\Throwable $e) {
-                Logger::error('beforeCommit callback threw — rolling back', [
-                    'error' => $e->getMessage(),
-                ]);
-                // Re-throw so the outer transaction() call rolls back.
-                throw $e;
-            }
-        }
-    }
-
-    private function runAfterCommitCallbacks(): void
-    {
-        $callbacks = $this->afterCommitCallbacks;
-        $this->afterCommitCallbacks = [];
-
-        foreach ($callbacks as $callback) {
-            try {
-                $callback($this);
-            } catch (\Throwable $e) {
-                // afterCommit is post-commit — we cannot roll back.
-                // Log and continue so remaining callbacks still run.
-                Logger::error('afterCommit callback threw (transaction already committed)', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-    }
-
-    private function discardPendingCallbacks(): void
-    {
-        $discardedBefore = count($this->beforeCommitCallbacks);
-        $discardedAfter = count($this->afterCommitCallbacks);
-
-        $this->beforeCommitCallbacks = [];
-        $this->afterCommitCallbacks = [];
-
-        if ($discardedBefore > 0 || $discardedAfter > 0) {
-            Logger::debug('Pending transaction callbacks discarded on rollback', [
-                'before_commit' => $discardedBefore,
-                'after_commit' => $discardedAfter,
-            ]);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Static helpers
-    // -------------------------------------------------------------------------
-
-    public static function runTransaction(callable $callback): mixed
-    {
-        $instance = static::getInstance();
-
-        if (!$instance) {
-            throw new \RuntimeException('Database instance not initialized');
-        }
-
-        return $instance->transaction($callback);
-    }
-
-    // -------------------------------------------------------------------------
-    // Connection
     // -------------------------------------------------------------------------
 
     private function getConfigFromFile(): array
@@ -347,18 +148,295 @@ class Database
         };
     }
 
+    /**
+     * Execute a callback inside a transaction.
+     * beforeCommit callbacks registered inside the closure will run just before
+     * the real COMMIT.  afterCommit callbacks run after the COMMIT succeeds.
+     *
+     * @param callable $callback
+     * @return mixed The result of the callback.
+     * @throws Exception on failure (rolls back and discards pending hooks).
+     */
+    public function transaction(callable $callback): mixed
+    {
+        $this->beginTransaction();
+        try {
+            $result = $callback($this);
+            $this->commit();
+            return $result;
+        } catch (Exception $e) {
+            $this->rollBack();
+            Logger::error('Transaction failed and rolled back', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Hook runners
+    // -------------------------------------------------------------------------
+
+    public function beginTransaction(): bool
+    {
+        try {
+            if ($this->transactionLevel === 0) {
+                $result = $this->connection->beginTransaction();
+                Logger::debug('Database transaction started');
+            } else {
+                $this->connection->exec("SAVEPOINT trans{$this->transactionLevel}");
+                $result = true;
+                Logger::debug('Database savepoint created', ['level' => $this->transactionLevel]);
+            }
+
+            $this->transactionLevel++;
+            return $result;
+
+        } catch (Exception $e) {
+            Logger::error('Failed to begin transaction', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    public function exec(string $sql, array $params = []): int
+    {
+        if (empty($params)) {
+            return $this->connection->exec($sql);
+        }
+
+        $stmt = $this->connection->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->rowCount();
+    }
+
+    public function prepare(string $sql): PDOStatement
+    {
+        try {
+            return $this->connection->prepare($sql);
+        } catch (Exception $e) {
+            Logger::error('Failed to prepare statement', ['sql' => $sql, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Static helpers
+    // -------------------------------------------------------------------------
+
+    public function execute(PDOStatement $stmt, array $params = []): PDOStatement
+    {
+        try {
+            $start = microtime(true);
+            $stmt->execute($params);
+            $this->logQuery($stmt->queryString, $params, round((microtime(true) - $start) * 1000, 2));
+            return $stmt;
+        } catch (Exception $e) {
+            Logger::error('Statement execution failed', ['sql' => $stmt->queryString, 'error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Connection
+    // -------------------------------------------------------------------------
+
+    private function logQuery(string $sql, array $params, float $executionTime): void
+    {
+        if ($this->enableQueryLog) {
+            $this->queryLog[] = [
+                'sql' => $sql,
+                'params' => $params,
+                'execution_time' => $executionTime,
+                'timestamp' => microtime(true),
+            ];
+        }
+
+        if (Config::get('app.debug', false)) {
+            Logger::debug('Database query executed', [
+                'sql' => $sql,
+                'params' => $params,
+                'execution_time' => $executionTime . 'ms',
+            ]);
+        }
+    }
+
+    public function commit(): bool
+    {
+        try {
+            $this->transactionLevel--;
+
+            if ($this->transactionLevel === 0) {
+                // About to commit the outermost transaction — run beforeCommit hooks first.
+                $this->runBeforeCommitCallbacks();
+
+                $result = $this->connection->commit();
+                Logger::debug('Database transaction committed');
+
+                // Transaction is now committed — run afterCommit hooks.
+                $this->runAfterCommitCallbacks();
+
+                return $result;
+            }
+
+            if ($this->transactionLevel > 0) {
+                $this->connection->exec("RELEASE SAVEPOINT trans{$this->transactionLevel}");
+                Logger::debug('Database savepoint released', ['level' => $this->transactionLevel]);
+                // Savepoint release does NOT fire before/afterCommit callbacks.
+                // They stay queued until the outermost commit.
+                return true;
+            }
+
+            throw new Exception("Cannot commit transaction - no active transaction");
+
+        } catch (Exception $e) {
+            Logger::error('Failed to commit transaction', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    private function runBeforeCommitCallbacks(): void
+    {
+        $callbacks = $this->beforeCommitCallbacks;
+        $this->beforeCommitCallbacks = [];
+
+        foreach ($callbacks as $callback) {
+            try {
+                $callback($this);
+            } catch (\Throwable $e) {
+                Logger::error('beforeCommit callback threw — rolling back', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Re-throw so the outer transaction() call rolls back.
+                throw $e;
+            }
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Query execution
     // -------------------------------------------------------------------------
+
+    private function runAfterCommitCallbacks(): void
+    {
+        $callbacks = $this->afterCommitCallbacks;
+        $this->afterCommitCallbacks = [];
+
+        foreach ($callbacks as $callback) {
+            try {
+                $callback($this);
+            } catch (\Throwable $e) {
+                // afterCommit is post-commit — we cannot roll back.
+                // Log and continue so remaining callbacks still run.
+                Logger::error('afterCommit callback threw (transaction already committed)', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    public function rollBack(): bool
+    {
+        try {
+            if ($this->transactionLevel === 0) {
+                throw new Exception("Cannot rollback transaction - no active transaction");
+            }
+
+            $this->transactionLevel--;
+
+            if ($this->transactionLevel === 0) {
+                // Full rollback — discard all pending hooks.
+                $this->discardPendingCallbacks();
+
+                $result = $this->connection->rollBack();
+                Logger::debug('Database transaction rolled back');
+                return $result;
+            }
+
+            $this->connection->exec("ROLLBACK TO SAVEPOINT trans{$this->transactionLevel}");
+            Logger::debug('Database rolled back to savepoint', ['level' => $this->transactionLevel]);
+            return true;
+
+        } catch (Exception $e) {
+            Logger::error('Failed to rollback transaction', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+    }
+
+    private function discardPendingCallbacks(): void
+    {
+        $discardedBefore = count($this->beforeCommitCallbacks);
+        $discardedAfter = count($this->afterCommitCallbacks);
+
+        $this->beforeCommitCallbacks = [];
+        $this->afterCommitCallbacks = [];
+
+        if ($discardedBefore > 0 || $discardedAfter > 0) {
+            Logger::debug('Pending transaction callbacks discarded on rollback', [
+                'before_commit' => $discardedBefore,
+                'after_commit' => $discardedAfter,
+            ]);
+        }
+    }
 
     public static function raw($value): RawExpression
     {
         return new RawExpression($value);
     }
 
+    /**
+     * Begin a fluent query against a database table.
+     */
+    public static function table(string $table): QueryBuilder
+    {
+        $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
+        return new QueryBuilder($table, $eagerLoader, self::getInstance());
+    }
+
+    /**
+     * Register a callback to run just before the outermost transaction commits.
+     *
+     * If called inside a nested savepoint the callback is still deferred to the
+     * outermost commit, matching the afterCommit semantics.
+     *
+     * If no transaction is active the callback is invoked immediately.
+     */
+    public function beforeCommit(callable $callback): void
+    {
+        if ($this->transactionLevel === 0) {
+            // No active transaction — run immediately.
+            $callback($this);
+            return;
+        }
+
+        $this->beforeCommitCallbacks[] = $callback;
+    }
+
+    /**
+     * Register a callback to run after the outermost transaction successfully
+     * commits.  Callbacks are deferred regardless of nesting depth — they only
+     * fire when transactionLevel returns to 0 after a real COMMIT.
+     *
+     * If no transaction is active the callback is invoked immediately.
+     */
+    public function afterCommit(callable $callback): void
+    {
+        if ($this->transactionLevel === 0) {
+            // No active transaction — run immediately.
+            $callback($this);
+            return;
+        }
+
+        $this->afterCommitCallbacks[] = $callback;
+    }
+
     public function getConnection(): PDO
     {
         return $this->connection;
+    }
+
+    public function fetchOne(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): ?array
+    {
+        $stmt = $this->query($sql, $params);
+        $row = $stmt->fetch($fetchMode);
+        return $row !== false ? $row : null;
     }
 
     public function query(string $sql, array $params = []): PDOStatement
@@ -402,7 +480,9 @@ class Database
 
             return $stmt;
 
-        } catch (PDOException $e) {
+        } catch (\PDOException $e) {
+            echo $sql;
+            print_r($params);
             echo $e->getMessage();
             die('no');
             Logger::error('Database query failed', [
@@ -411,14 +491,18 @@ class Database
                 'error' => $e->getMessage(),
             ]);
             throw new Exception("Query failed: " . $e->getMessage());
+        } catch (\Exception $exception) {
+            echo $sql;
+            print_r($params);
+            // echo $exception->getMessage();
+            die('here');
         }
     }
 
-    public function fetchOne(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): ?array
+    public function fetch(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): array
     {
         $stmt = $this->query($sql, $params);
-        $row = $stmt->fetch($fetchMode);
-        return $row !== false ? $row : null;
+        return $stmt->fetchAll($fetchMode);
     }
 
     public function insert(string $table, array $data): int
@@ -473,8 +557,12 @@ class Database
 
             Logger::debug('Records updated', ['table' => $table, 'affected_rows' => $affectedRows]);
             return $affectedRows;
+        } catch (PDOException $PDOException) {
+            die('no');
+            dd($PDOException->getMessage());
 
         } catch (Exception $e) {
+            die('hete6');
             Logger::error('Update operation failed', ['table' => $table, 'error' => $e->getMessage()]);
             throw $e;
         }
@@ -497,16 +585,9 @@ class Database
         }
     }
 
-    public function exec(string $sql, array $params = []): int
-    {
-        if (empty($params)) {
-            return $this->connection->exec($sql);
-        }
-
-        $stmt = $this->connection->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->rowCount();
-    }
+    // -------------------------------------------------------------------------
+    // Query log
+    // -------------------------------------------------------------------------
 
     public function find(string $table, mixed $id, string $primaryKey = 'id'): ?array
     {
@@ -522,12 +603,6 @@ class Database
         return $stmt->fetchAll();
     }
 
-    public function fetch(string $sql, array $params = [], int $fetchMode = PDO::FETCH_ASSOC): array
-    {
-        $stmt = $this->query($sql, $params);
-        return $stmt->fetchAll($fetchMode);
-    }
-
     public function cursor(string $sql, array $params = []): \Generator
     {
         $stmt = $this->query($sql, $params);
@@ -535,33 +610,6 @@ class Database
             yield $row;
         }
     }
-
-    public function prepare(string $sql): PDOStatement
-    {
-        try {
-            return $this->connection->prepare($sql);
-        } catch (Exception $e) {
-            Logger::error('Failed to prepare statement', ['sql' => $sql, 'error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    public function execute(PDOStatement $stmt, array $params = []): PDOStatement
-    {
-        try {
-            $start = microtime(true);
-            $stmt->execute($params);
-            $this->logQuery($stmt->queryString, $params, round((microtime(true) - $start) * 1000, 2));
-            return $stmt;
-        } catch (Exception $e) {
-            Logger::error('Statement execution failed', ['sql' => $stmt->queryString, 'error' => $e->getMessage()]);
-            throw $e;
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Query log
-    // -------------------------------------------------------------------------
 
     public function enableQueryLog(): void
     {
@@ -583,26 +631,6 @@ class Database
         $this->queryLog = [];
     }
 
-    private function logQuery(string $sql, array $params, float $executionTime): void
-    {
-        if ($this->enableQueryLog) {
-            $this->queryLog[] = [
-                'sql' => $sql,
-                'params' => $params,
-                'execution_time' => $executionTime,
-                'timestamp' => microtime(true),
-            ];
-        }
-
-        if (Config::get('app.debug', false)) {
-            Logger::debug('Database query executed', [
-                'sql' => $sql,
-                'params' => $params,
-                'execution_time' => $executionTime . 'ms',
-            ]);
-        }
-    }
-
     public function getConnectionInfo(): array
     {
         return [
@@ -615,23 +643,6 @@ class Database
             'pending_before_commit_callbacks' => count($this->beforeCommitCallbacks),
             'pending_after_commit_callbacks' => count($this->afterCommitCallbacks),
         ];
-    }
-
-    private function normalizeConfig(array $config): array
-    {
-        if (PHP_SAPI === 'cli' && !empty($config['host_cli'])) {
-            $config['host'] = $config['host_cli'];
-        }
-        return $config;
-    }
-
-    /**
-     * Begin a fluent query against a database table.
-     */
-    public static function table(string $table): QueryBuilder
-    {
-        $eagerLoader = Container::getInstance()->resolve(EagerLoader::class);
-        return new QueryBuilder($table, $eagerLoader, self::getInstance());
     }
 
     public function close(): void

@@ -52,19 +52,32 @@ use App\Controllers\Members\Subscriptions\MemberSubscriptionPlansController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionsController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionUpgradeController;
 use App\Controllers\Members\Subscriptions\SingleContentAccessController;
+use App\Controllers\MerchantPortal\MerchantDashboardController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Newsletter\NewsletterWebController;
 use App\Controllers\Offers\BundleListController;
 use App\Controllers\Offers\DealsController;
 use App\Controllers\Offers\OfferListController;
 use App\Controllers\Offers\ProductOfferController;
+use App\Controllers\OpenCollab\Admin\AdminActivityPageController;
+use App\Controllers\OpenCollab\Admin\AdminArticlePageController;
+use App\Controllers\OpenCollab\Admin\AdminContractPageController;
+use App\Controllers\OpenCollab\Admin\AdminContributorPageController;
+use App\Controllers\OpenCollab\Admin\AdminContributorRequestPageController;
+use App\Controllers\OpenCollab\Admin\AdminDisputePageController;
+use App\Controllers\OpenCollab\Admin\AdminGuidelinesPageController;
+use App\Controllers\OpenCollab\Admin\AdminPaymentTermsPageController;
+use App\Controllers\OpenCollab\Admin\AdminPayoutPageController;
+use App\Controllers\OpenCollab\Admin\AdminScheduledPayoutsPageController;
+use App\Controllers\OpenCollab\Admin\AdminViolationPageController;
 use App\Controllers\OpenCollab\ArticlePageController;
 use App\Controllers\OpenCollab\ContributorAccountPageController;
+use App\Controllers\OpenCollab\ContributorDisputePageController;
+use App\Controllers\OpenCollab\ContributorEarningsPageController;
 use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
 use App\Controllers\OpenCollab\OnboardingPageController;
 use App\Controllers\OpenCollab\PayoutPageController;
-use App\Controllers\Product\MerchantDashboardController;
 use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\ProductDetailController;
@@ -79,6 +92,8 @@ use App\Controllers\Subscription\SubscriptionModalController;
 use App\Framework\Middleware\AuthenticateCrmPortal;
 use App\Framework\Middleware\AuthenticateMerchantPortal;
 use App\Framework\Middleware\CheckPageMemberAccess;
+use App\Framework\Middleware\RequireAdminRole;
+use App\Framework\Middleware\RequireContributorAuth;
 use App\Framework\Middleware\RequireMemberAuth;
 
 /*
@@ -113,7 +128,7 @@ $router->post('/crm/login/{portal}', [App\Controllers\Auth\PortalLoginController
 $router->post('/crm/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
 
 $router->get('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'showLoginForm'], null, []);
-$router->post('/merchant/login', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
+$router->post('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
 $router->post('/merchant/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
 
 // crm
@@ -550,74 +565,54 @@ $router->get('/go/{type}/{id}', [AdvertTrackingController::class, 'handle'])
         // 'throttle:60,1',  // Uncomment and tune — prevents click flooding
     ]);
 
-$router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show'])->name('onboarding');
-$router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index'])->name('settings');
-$router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index'])->name('dashboard');
-$router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
-$router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);
-$router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
-$router->get('/{site}/open-collab/admin/invitations', [InvitationPageController::class, 'index'])->name('admin.invitations');
+$router->group(['middleware' => [RequireAdminRole::class]], function ($router) {
+    $router->get('/{site}/open-collab/admin/articles/pending',
+        [AdminArticlePageController::class, 'pending']);
+    $router->get('/{site}/open-collab/admin/contracts',
+        [AdminContractPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/guidelines',
+        [AdminGuidelinesPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/contributors',
+        [AdminContributorPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/contributors/{id}',
+        [AdminContributorPageController::class, 'show']);
+    $router->get('/{site}/open-collab/admin/contributors/{id}/violations',
+        [AdminViolationPageController::class, 'contributor']);
+    $router->get('/{site}/open-collab/admin/violations',
+        [AdminViolationPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/contributor-requests',
+        [AdminContributorRequestPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/disputes',
+        [AdminDisputePageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/payment-terms',
+        [AdminPaymentTermsPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/payouts',
+        [AdminPayoutPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/payouts/scheduled',
+        [AdminScheduledPayoutsPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/invitations',
+        [InvitationPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/activity',
+        [AdminActivityPageController::class, 'index']);
+});
+
+$router->group(['middleware' => [RequireContributorAuth::class]], function ($router) {
+    $router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show']);
+    $router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index']);
+    $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index']);
+    $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings']);
+    $router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
+    $router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);
+    $router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
+    $router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
+    $router->get('/{site}/open-collab/earnings', [ContributorEarningsPageController::class, 'index']);
+    $router->get('/{site}/open-collab/disputes', [ContributorDisputePageController::class, 'index']);
+});
+
 // Guest-accessible Web route
 $router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageController::class, 'showAcceptForm'])
     ->name('invitations.accept');
-$router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings'])->name('contributor.earnings');
 $router->get('/{site}/open-collab/login', [\App\Controllers\OpenCollab\ContributorLoginPageController::class, 'login'])->name('contributor.login');
-$router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
-$router->get('/{site}/open-collab/admin/articles/pending',
-    [\App\Controllers\OpenCollab\Admin\AdminArticlePageController::class, 'pending'])
-    ->name('admin.articles.pending');
-
-$router->get('/{site}/open-collab/admin/contracts',
-    [\App\Controllers\OpenCollab\Admin\AdminContractPageController::class, 'index'])
-    ->name('admin.contracts');
-
-$router->get('/{site}/open-collab/admin/guidelines',
-    [\App\Controllers\OpenCollab\Admin\AdminGuidelinesPageController::class, 'index'])
-    ->name('admin.guidelines');
-
-$router->get('/{site}/open-collab/admin/contributors',
-    [\App\Controllers\OpenCollab\Admin\AdminContributorPageController::class, 'index'])
-    ->name('admin.contributors');
-
-$router->get('/{site}/open-collab/admin/violations',
-    [\App\Controllers\OpenCollab\Admin\AdminViolationPageController::class, 'index'])
-    ->name('admin.violations');
-
-$router->get('/{site}/open-collab/admin/contributors/{id}/violations',
-    [\App\Controllers\OpenCollab\Admin\AdminViolationPageController::class, 'contributor'])
-    ->name('admin.violations');
-
-$router->get('/{site}/open-collab/admin/contributors/{id}',
-    [\App\Controllers\OpenCollab\Admin\AdminContributorPageController::class, 'show'])
-    ->name('admin.contributors.show');
-
-$router->get('/{site}/open-collab/admin/contributor-requests',
-    [\App\Controllers\OpenCollab\Admin\AdminContributorRequestPageController::class, 'index'])
-    ->name('admin.violations');
-
-$router->get('/{site}/open-collab/admin/disputes',
-    [\App\Controllers\OpenCollab\Admin\AdminDisputePageController::class, 'index'])
-    ->name('admin.disputes');
-
-$router->get('/{site}/open-collab/disputes',
-    [\App\Controllers\OpenCollab\ContributorDisputePageController::class, 'index'])
-    ->name('admin.disputes');
-
-$router->get('/{site}/open-collab/admin/payment-terms',
-    [\App\Controllers\OpenCollab\Admin\AdminPaymentTermsPageController::class, 'index'])
-    ->name('admin.payment-terms');
-
-$router->get('/{site}/open-collab/admin/payouts',
-    [\App\Controllers\OpenCollab\Admin\AdminPayoutPageController::class, 'index'])
-    ->name('admin.payouts');
-
-$router->get('/{site}/open-collab/admin/payouts/scheduled',
-    [\App\Controllers\OpenCollab\Admin\AdminScheduledPayoutsPageController::class, 'index'])
-    ->name('admin.scheduled');
-
-$router->get('/{site}/open-collab/earnings',
-    [\App\Controllers\OpenCollab\ContributorEarningsPageController::class, 'index'])
-    ->name('admin.earnings');
 
 $router->get('/{site}/open-collab/request-access',
     [\App\Controllers\OpenCollab\ContributorRequestPageController::class, 'show'])
