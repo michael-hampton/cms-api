@@ -5,11 +5,10 @@ namespace App\Controllers\Members;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
-use App\Services\Shopping\WishlistService;
 
 class MemberWishlistController extends Controller
 {
-    public function __construct(private WishlistService $wishlistService)
+    public function __construct()
     {
         parent::__construct();
     }
@@ -19,7 +18,6 @@ class MemberWishlistController extends Controller
         $member = MemberAuth::getMember();
 
         return $this->view('member.wishlist', [
-            'items' => $this->wishlistService->getItems(),
             'member' => $member,
             'site' => SiteContext::get()
         ]);

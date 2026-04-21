@@ -13,11 +13,13 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
     // Or check in database if they have any consent records
     if (!$hasResponded) {
-
-        $consentCount = \App\Models\MemberConsent::where('member_id', $memberId)->where('site_id', \App\Framework\Support\SiteContext::getId())->count();
+        $consentCount = \App\Models\MemberConsent::where('member_id', $memberId)
+                ->where('site_id', \App\Framework\Support\SiteContext::getId())
+                ->count();
         $shouldShowBanner = $consentCount === 0;
     }
 }
+
 ?>
 
 <?php if ($shouldShowBanner): ?>
@@ -181,11 +183,6 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
             transform: translateX(20px);
         }
 
-        .toggle-switch-small input:disabled + .toggle-slider-small {
-            cursor: not-allowed;
-            opacity: 0.5;
-        }
-
         .banner-actions {
             display: flex;
             gap: 1rem;
@@ -218,18 +215,9 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
             border: 2px solid #667eea;
         }
 
-        .btn-customize:hover {
-            background: #f9fafb;
-        }
-
         .btn-reject {
             background: #f3f4f6;
             color: #6b7280;
-        }
-
-        .btn-reject:hover {
-            background: #e5e7eb;
-            color: #1f2937;
         }
 
         .banner-footer {
@@ -249,10 +237,6 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
             margin-left: 1.5rem;
         }
 
-        .banner-links a:hover {
-            text-decoration: underline;
-        }
-
         .customize-panel {
             max-height: 0;
             overflow: hidden;
@@ -260,7 +244,7 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
         }
 
         .customize-panel.show {
-            max-height: 600px;
+            max-height: 1000px; /* Increased to accommodate the save button */
         }
 
         @media (max-width: 768px) {
@@ -289,9 +273,41 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                 text-align: center;
             }
         }
+
+        /* Customize button hover */
+        .btn-customize:hover {
+            background: #f9fafb;
+            color: #4f46e5;
+        }
+
+        /* Reject button hover */
+        .btn-reject:hover {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-banner:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* Disabled state for the actual checkbox input */
+        .toggle-switch-small input:disabled + .toggle-slider-small {
+            background-color: #e5e7eb;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Grey out the whole option if it's disabled */
+        .consent-option:has(input:disabled) {
+            opacity: 0.7;
+            background: #f3f4f6;
+            border-color: #d1d5db;
+            cursor: not-allowed;
+        }
     </style>
 
-    <!-- Consent Banner -->
     <div class="consent-banner-overlay" id="consentOverlay"></div>
     <div class="consent-banner" id="consentBanner">
         <div class="consent-banner-content">
@@ -307,10 +323,14 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                 </div>
             </div>
 
-            <!-- Customize Panel -->
             <div class="customize-panel" id="customizePanel">
                 <div class="consent-options" id="consentOptions">
-                    <!-- Options will be dynamically inserted here -->
+                </div>
+                <div style="margin-bottom: 1.5rem; text-align: right;">
+                    <button onclick="ConsentBanner.saveCustom()" class="btn-banner btn-accept"
+                            style="padding: 0.6rem 1.2rem; font-size: 0.875rem;">
+                        Save My Selection
+                    </button>
                 </div>
             </div>
 
@@ -327,9 +347,7 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
             </div>
 
             <div class="banner-footer">
-            <span>
-                By continuing to browse, you agree to our use of essential cookies.
-            </span>
+                <span>By continuing to browse, you agree to our use of essential cookies.</span>
                 <div class="banner-links">
                     <a href="/privacy-policy" target="_blank">Privacy Policy</a>
                     <a href="/cookie-policy" target="_blank">Cookie Policy</a>
@@ -342,15 +360,17 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
         const ConsentBanner = {
             shown: false,
             customizing: false,
-            consents: {},
             siteName: '<?= $site->slug ?? '' ?>',
 
             init() {
-                // Show immediately since PHP already checked if needed
+                // PHP logic already determined we need to show this.
                 setTimeout(() => this.show(), 500);
             },
 
             async show() {
+                // Guard: Don't show if already processed in this page session
+                if (this.shown) return;
+
                 await this.loadConsentTypes();
 
                 const overlay = document.getElementById('consentOverlay');
@@ -358,7 +378,6 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
                 overlay.classList.add('show');
                 banner.classList.add('show');
-                this.shown = true;
             },
 
             hide() {
@@ -367,7 +386,7 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
 
                 overlay.classList.remove('show');
                 banner.classList.remove('show');
-                this.shown = false;
+                // We keep this.shown state true so it doesn't pop up again
             },
 
             async loadConsentTypes() {
@@ -380,14 +399,13 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                     }
                 } catch (error) {
                     console.error('Error loading consent types:', error);
-                    // Fallback: render some basic options
                     this.renderFallbackOptions();
                 }
             },
 
             renderOptions(consentTypes) {
                 const container = document.getElementById('consentOptions');
-
+                // GDPR: Toggles are UNCHECKED by default
                 const html = consentTypes.map(type => `
                 <div class="consent-option">
                     <div class="option-header">
@@ -396,7 +414,6 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                             <input
                                 type="checkbox"
                                 data-consent-code="${this.escapeHtml(type.code)}"
-                                onchange="ConsentBanner.updateConsent('${this.escapeHtml(type.code)}', this.checked)"
                             >
                             <span class="toggle-slider-small"></span>
                         </label>
@@ -426,10 +443,6 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                 this.renderOptions(fallbackTypes);
             },
 
-            updateConsent(code, granted) {
-                this.consents[code] = granted;
-            },
-
             toggleCustomize() {
                 this.customizing = !this.customizing;
                 const panel = document.getElementById('customizePanel');
@@ -447,19 +460,18 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
             async acceptAll() {
                 const checkboxes = document.querySelectorAll('#consentOptions input[type="checkbox"]');
                 const consentsToGrant = Array.from(checkboxes).map(cb => cb.dataset.consentCode);
-
                 await this.saveConsents(consentsToGrant);
             },
 
             async rejectAll() {
+                // Sends an empty array to comply with GDPR "Reject Optional"
                 await this.saveConsents([]);
             },
 
             async saveCustom() {
-                const consentsToGrant = Object.entries(this.consents)
-                    .filter(([code, granted]) => granted)
-                    .map(([code]) => code);
-
+                // Pull directly from the DOM to see what the user actually checked
+                const checkedBoxes = document.querySelectorAll('#consentOptions input[type="checkbox"]:checked');
+                const consentsToGrant = Array.from(checkedBoxes).map(cb => cb.dataset.consentCode);
                 await this.saveConsents(consentsToGrant);
             },
 
@@ -471,23 +483,20 @@ if (\App\Framework\Authorization\MemberAuth::check()) {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                         },
-                        body: JSON.stringify({
-                            consents: consentCodes
-                        })
+                        body: JSON.stringify({consents: consentCodes})
                     });
 
                     const data = await response.json();
 
                     if (data.success) {
+                        this.shown = true; // Mark as completed for this session
                         this.hide();
-                        // Reload page to ensure session is updated
-                        setTimeout(() => window.location.reload(), 300);
+                        // No window.location.reload() needed; server session is updated via POST.
                     } else {
-                        alert('Failed to save consent preferences. Please try again.');
+                        alert('Failed to save consent preferences.');
                     }
                 } catch (error) {
                     console.error('Error saving consents:', error);
-                    alert('Failed to save consent preferences. Please try again.');
                 }
             },
 

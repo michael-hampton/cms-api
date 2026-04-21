@@ -518,7 +518,8 @@
 
         planCard(plan, currentSub) {
             const isCurrent = currentSub && currentSub.plan_id === plan.id;
-            const hasActiveSub = !!currentSub;
+            const hasActiveSub = isCurrent;
+            console.log(currentSub.plan_id, plan.id, hasActiveSub, isCurrent)
 
             const card = UI.el('div', {
                 className: `plan-card ${plan.is_featured ? 'featured' : ''}`,

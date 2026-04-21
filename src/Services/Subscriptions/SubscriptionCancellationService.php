@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
@@ -115,7 +116,7 @@ class SubscriptionCancellationService
                 throw new Exception('Subscription not found');
             }
 
-            if ($subscription->status !== 'cancelled') {
+            if ($subscription->status !== SubscriptionStatus::CANCELLED->value && !$subscription->isCancellationScheduled()) {
                 throw new Exception('Can only reactivate cancelled subscriptions');
             }
 
@@ -216,5 +217,10 @@ class SubscriptionCancellationService
                 $grant['expires_at'] ?? null
             );
         }
+    }
+
+    private function clearCancellationFields()
+    {
+
     }
 }

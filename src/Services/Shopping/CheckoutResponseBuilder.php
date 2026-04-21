@@ -10,7 +10,7 @@ class CheckoutResponseBuilder
     public function buildCheckoutResponse(
         Order $order,
         array $subscriptions,
-        array $paymentResult,
+        array $paymentResult = [],
         bool  $hasRemovedItems = false
     ): array
     {
@@ -18,8 +18,8 @@ class CheckoutResponseBuilder
 
         $response = [
             'success' => true,
-            'client_secret' => $paymentResult['client_secret'],
-            'payment_intent_id' => $paymentResult['payment_intent_id'],
+            'client_secret' => $paymentResult['client_secret'] ?? null,
+            'payment_intent_id' => $paymentResult['payment_intent_id'] ?? null,
             'order_id' => $order->id,
             'order_number' => $order->order_number,
             'requires_shipping' => $this->hasAnyPrintDelivery($subscriptions),

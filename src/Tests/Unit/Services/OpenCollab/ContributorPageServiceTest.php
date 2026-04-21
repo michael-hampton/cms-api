@@ -83,7 +83,7 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->authorRepository->shouldReceive('create')
             ->once()
             ->withArgs(function (array $data): bool {
-                return $data['status'] === 'guest'
+                return $data['is_guest'] === true
                     && str_starts_with($data['slug'], 'guest-')
                     && $data['email'] === 'new@example.com';
             })

@@ -32,21 +32,10 @@ class MemberConsentController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $consents = $this->queryService->getMemberConsents($member);
-
-        $groupedConsents = [];
-        foreach ($consents as $consent) {
-            $category = $consent['consent_type']['category'];
-            if (!isset($groupedConsents[$category])) {
-                $groupedConsents[$category] = [];
-            }
-            $groupedConsents[$category][] = $consent;
-        }
 
         return $this->view('member/consent/index', [
             'member' => $member,
             'site' => SiteContext::get(),
-            'consents' => $groupedConsents
         ]);
     }
 

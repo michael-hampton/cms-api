@@ -4,8 +4,6 @@ namespace App\Controllers\Members\Subscriptions;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
-use App\Framework\Http\Request;
-use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionCancellationService;
@@ -26,26 +24,15 @@ class MemberSubscriptionPlansController extends Controller
 
     public function index()
     {
-        $siteId = SiteContext::getId();
-
-        $plans = $this->planService->getActivePlansForSite($siteId);
-
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
-        $currentSubscription = null;
-
-        if ($member) {
-            $currentSubscription = $member->activeSubscription;
-        }
 
         return $this->view('member/subscription-plans/index', [
             'site' => SiteContext::get(),
-            'plans' => $plans,
             'member' => $member,
-            'currentSubscription' => $currentSubscription
         ]);
     }
 
-    public function show(string $slug)
+    /*public function show(string $slug)
     {
         $siteId = SiteContext::getId();
         $plan = $this->planService->getPlanBySlug($slug, $siteId);
@@ -284,5 +271,5 @@ class MemberSubscriptionPlansController extends Controller
             'success' => false,
             'message' => $validation->message
         ], 400);
-    }
+    }*/
 }

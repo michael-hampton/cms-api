@@ -29,16 +29,9 @@ class MemberActivityController extends Controller
         $member = MemberAuth::getMember();
         $member->load(['badges', 'points']);
 
-        $progress = $this->badgeService->getMemberProgress($member);
-        $recentActivities = $this->activityRepository->getMemberActivities($member->id, 20);
-        $activityTrends = $this->badgeService->getActivityTrends($member, 30);
-
         return $this->view('member/activity/dashboard', [
             'member' => $member,
             'site' => SiteContext::get(),
-            'progress' => $progress,
-            'recent_activities' => $recentActivities,
-            'activity_trends' => $activityTrends
         ]);
     }
 

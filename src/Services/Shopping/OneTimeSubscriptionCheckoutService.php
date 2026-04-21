@@ -141,24 +141,27 @@ class OneTimeSubscriptionCheckoutService
             }
         );
 
-        // Phase 2: external payment call (OUTSIDE transaction)
-        try {
-            $paymentResult = $this->paymentIntentService->createForOrder(
-                $order,
-                $subscriptions,
-                $member,
-                $siteId
-            );
+        if (!empty($data['one_time_subscription'])) {
+            // Phase 2: external payment call (OUTSIDE transaction)
+            try {
 
-            if (!$paymentResult['success']) {
+                $paymentResult = $this->paymentIntentService->createForOrder(
+                    $order,
+                    $subscriptions,
+                    $member,
+                    $siteId
+                );
+
+                if (!$paymentResult['success']) {
+                    $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
+                    throw new CheckoutException('Payment processing failed');
+                }
+            } catch (CheckoutException $e) {
+                throw $e;
+            } catch (\Exception $e) {
                 $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
-                throw new CheckoutException('Payment processing failed');
+                throw $e;
             }
-        } catch (CheckoutException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
-            throw $e;
         }
 
         // Phase 3: activate subscriptions + confirm stock.
@@ -195,13 +198,16 @@ class OneTimeSubscriptionCheckoutService
             }
         });
 
-        $this->orderDraftService->attachPaymentIntent($order, $paymentResult);
+        if (!empty($paymentResult)) {
+            $this->orderDraftService->attachPaymentIntent($order, $paymentResult);
+        }
+
         $this->cartService->clear();
 
         return $this->responseBuilder->buildCheckoutResponse(
             $order,
             $subscriptions,
-            $paymentResult,
+            $paymentResult ?? [],
             !empty($eligibility->removed)
         );
     }
@@ -209,6 +215,14 @@ class OneTimeSubscriptionCheckoutService
     // =========================================================================
     // Private helpers
     // =========================================================================
+
+    private function getSubscriptionItems(): array
+    {
+        return array_values(array_filter(
+            $this->cartService->getItems(),
+            fn($item) => !empty($item['subscription_plan_id'])
+        ));
+    }
 
     private function validateAttachEstimatesAndReserveStock(array $subscriptionItems): array
     {
@@ -305,24 +319,6 @@ class OneTimeSubscriptionCheckoutService
         return [$itemsWithEstimates, $stockReservations];
     }
 
-    /**
-     * @param array<array{reservationId: int, issue: IssueDelivery, quantity: int}> $stockReservations
-     */
-    private function handlePaymentFailure(object $order, array $subscriptions, array $stockReservations): void
-    {
-        $this->database->transaction(function () use ($order, $subscriptions, $stockReservations) {
-            $order->update(['payment_status' => PaymentStatus::FAILED->value]);
-
-            foreach ($subscriptions as $subData) {
-                $subData['subscription']->update(['status' => SubscriptionStatus::CANCELLED->value]);
-            }
-
-            foreach ($stockReservations as $reservation) {
-                $this->fulfilSubscriptionAction->release($reservation['issue'], $reservation['quantity']);
-            }
-        });
-    }
-
     private function calculateBaseSubtotalCents(array $items): int
     {
         $totalCents = 0;
@@ -339,11 +335,21 @@ class OneTimeSubscriptionCheckoutService
         return $totalCents;
     }
 
-    private function getSubscriptionItems(): array
+    /**
+     * @param array<array{reservationId: int, issue: IssueDelivery, quantity: int}> $stockReservations
+     */
+    private function handlePaymentFailure(object $order, array $subscriptions, array $stockReservations): void
     {
-        return array_values(array_filter(
-            $this->cartService->getItems(),
-            fn($item) => !empty($item['subscription_plan_id'])
-        ));
+        $this->database->transaction(function () use ($order, $subscriptions, $stockReservations) {
+            $order->update(['payment_status' => PaymentStatus::FAILED->value]);
+
+            foreach ($subscriptions as $subData) {
+                $subData['subscription']->update(['status' => SubscriptionStatus::CANCELLED->value]);
+            }
+
+            foreach ($stockReservations as $reservation) {
+                $this->fulfilSubscriptionAction->release($reservation['issue'], $reservation['quantity']);
+            }
+        });
     }
 }

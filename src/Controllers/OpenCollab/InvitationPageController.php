@@ -29,18 +29,33 @@ class InvitationPageController extends Controller
     {
         $invitation = $this->invitationRepository->findByToken($token);
 
-        // Determine token state for the view
         if (!$invitation) {
-            $tokenState = 'invalid';
-        } else {
-            $status = $invitation->resolveStatus();
-            $tokenState = $status->value; // 'pending' | 'used' | 'expired' | 'revoked'
+            return $this->view('open-collab.invitations.accept', [
+                'token' => $token,
+                'tokenState' => 'invalid',
+                'invitation' => null,
+                'site' => SiteContext::slug(),
+            ]);
+        }
+
+        $status = $invitation->resolveStatus();
+        $tokenState = $status->value; // 'pending' | 'used' | 'expired' | 'revoked'
+
+        // Only a pending invitation may proceed to the acceptance form.
+        // Expired, used, and revoked tokens all render an appropriate error state.
+        if ($tokenState !== 'pending') {
+            return $this->view('open-collab.invitations.accept', [
+                'token' => $token,
+                'tokenState' => $tokenState,
+                'invitation' => null,
+                'site' => SiteContext::slug(),
+            ]);
         }
 
         return $this->view('open-collab.invitations.accept', [
             'token' => $token,
-            'tokenState' => $tokenState,
-            'invitation' => $tokenState === 'pending' ? $invitation : null,
+            'tokenState' => 'pending',
+            'invitation' => $invitation,
             'site' => SiteContext::slug(),
         ]);
     }

@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
-use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
@@ -228,6 +227,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $mockSubscription = m::mock(Subscription::class)->makePartial();
         $mockSubscription->id = $subscriptionId;
         $mockSubscription->status = 'active'; // Already active
+
+        $mockSubscription->shouldReceive('isCancellationScheduled')->andReturn(false);
 
         $this->databaseMock->shouldReceive('transaction')
             ->once()
@@ -844,5 +845,38 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame($mockSubscription, $result['subscription']);
+    }
+
+    public function test_reactivate_subscription_allows_scheduled_cancellation(): void
+    {
+        $subscriptionId = 1;
+        $mockPlan = m::mock(SubscriptionPlan::class)->makePartial();
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->status = 'active';
+        $subscription->plan = $mockPlan;
+        $subscription->shouldReceive('isCancellationScheduled')->andReturn(true);
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository->shouldReceive('find')
+            ->twice()
+            ->with($subscriptionId)
+            ->andReturn($subscription);
+
+        // should NOT throw
+        $this->stripeProcessor->shouldReceive('reactivateSubscription')
+            ->never();
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $result = $this->service->reactivateSubscription($subscriptionId);
+
+        $this->assertTrue($result['success']);
     }
 }

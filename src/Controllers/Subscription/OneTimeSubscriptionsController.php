@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Currency\CurrencyResolver;
@@ -219,7 +220,7 @@ class OneTimeSubscriptionsController extends Controller
         $subscriptionIds = $request->input('subscription_ids');
         $subscriptionId = $request->input('subscription_id');
 
-        if (!$paymentIntentId || !$orderId) {
+        if (!$paymentIntentId && !$orderId) {
             return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Missing required parameters'
@@ -237,15 +238,36 @@ class OneTimeSubscriptionsController extends Controller
             $subscriptionIds = [$subscriptionId];
         }
 
-        $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
-            $paymentIntentId,
-            $orderId,
-            $siteId,
-            $subscriptionIds
-        );
+        $result['success'] = true;
+
+        if (!empty($paymentIntentId)) {
+            $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
+                $paymentIntentId,
+                $orderId,
+                $siteId,
+                $subscriptionIds
+            );
+        }
+
+
+        $member = MemberAuth::getMember();
+        $stripeCustomerId = $member->stripe_customer_id;
 
         if ($result['success']) {
             foreach ($subscriptionIds as $subId) {
+
+                $subscription = Subscription::with('plan')->where('id', $subId)->first();
+
+                if (empty($paymentIntentId)) {
+                    $stripeSubscription = $this->stripeProcessor->createStripeSubscription(
+                        $stripeCustomerId,
+                        $subscription->plan,
+                        $subscription,
+                        false);
+
+                    $subscription->update(['payment_subscription_id' => $stripeSubscription->id]);
+                }
+
                 $this->subscriptionService->activateSubscription($subId, $orderId);
             }
 

@@ -156,7 +156,7 @@ class MemberAddressApiController extends Controller
             return $this->jsonResponse(['success' => false], 401);
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
         $address = Address::where('member_id', $member->id)
             ->where('site_id', SiteContext::getId())
             ->where('is_default', true)

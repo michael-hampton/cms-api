@@ -30,7 +30,8 @@ class Author extends Model
         'education',
         'awards',
         'seniority_date',
-        'is_active'
+        'is_active',
+        'is_guest'
     ];
 
     protected $casts = [

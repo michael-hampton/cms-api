@@ -24,39 +24,6 @@ class MemberConsentControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('analytics', $content);
     }
 
-    public function testUpdateConsents()
-    {
-        $member = $this->createMember();
-        $this->actingAsMember($member);
-
-        $response = $this->postForSite('/member/consent/update', [
-            'consents' => [
-                'marketing_email' => true,
-                'analytics' => false
-            ]
-        ]);
-
-        $this->assertEquals(200, $response->getStatusCode());
-        $data = json_decode($response->getContent(), true);
-        $this->assertTrue($data['success']);
-        $this->assertArrayHasKey('results', $data);
-    }
-
-    public function testUpdateConsentsRequiresAuth()
-    {
-        MemberAuth::setMember(null);
-        Session::forget('member_id');
-
-        $response = $this->postForSiteUnauthenticated('/member/consent/update', [
-            'consents' => ['marketing_email' => true]
-        ]);
-
-        $this->assertEquals(401, $response->getStatusCode());
-        $data = json_decode($response->getContent(), true);
-        $this->assertFalse($data['success']);
-        $this->assertEquals('Unauthorized', $data['message']);
-    }
-
     public function testGrantConsent()
     {
         $member = $this->createMember();

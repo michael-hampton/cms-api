@@ -23,11 +23,9 @@ class MemberAddressController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $addresses = $this->addressRepository->getAddressesForMember($member->id);
 
         return $this->view('member/addresses/index', [
             'member' => $member,
-            'addresses' => $addresses,
             'site' => SiteContext::get()
         ]);
     }

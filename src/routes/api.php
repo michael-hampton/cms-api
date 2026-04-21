@@ -51,6 +51,7 @@ use App\Controllers\Members\Api\MemberReadingHistoryApiController;
 use App\Controllers\Members\Api\MemberRewardsApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPaymentsApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPlansApiController;
+use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionsApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
@@ -250,6 +251,30 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
 
     $router->post('/subscription-plans/{slug}/validate-voucher',
         [MemberSubscriptionPlansApiController::class, 'validateVoucher']);
+
+    $router->get('/subscriptions/overview',
+        [MemberSubscriptionsApiController::class, 'overview']);
+
+    $router->post('/subscriptions/{subscriptionId}/cancel',
+        [MemberSubscriptionsApiController::class, 'cancel']);
+
+    $router->post('/subscriptions/{subscriptionId}/reactivate',
+        [MemberSubscriptionsApiController::class, 'reactivate']);
+
+    $router->post('/subscriptions/{subscriptionId}/auto-renew',
+        [MemberSubscriptionsApiController::class, 'autoRenew']);
+
+    $router->post('/subscriptions/{subscriptionId}/pause-delivery',
+        [MemberSubscriptionsApiController::class, 'pauseDelivery']);
+
+    $router->post('/subscriptions/{subscriptionId}/resume-delivery',
+        [MemberSubscriptionsApiController::class, 'resumeDelivery']);
+
+    $router->post('/subscriptions/{subscriptionId}/update-billing-date',
+        [MemberSubscriptionsApiController::class, 'updateBillingDate']);
+
+    $router->post('/subscriptions/{subscriptionId}/preview-billing-change',
+        [MemberSubscriptionsApiController::class, 'previewBillingDateChange']);
 
 // ----- Subscription Payments -----
     $router->get('/subscription-payments',

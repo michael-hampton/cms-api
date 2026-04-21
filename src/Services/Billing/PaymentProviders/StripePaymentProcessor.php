@@ -190,13 +190,13 @@ class StripePaymentProcessor
         return $customer->id;
     }
 
-    private function createStripeSubscription(
+    public function createStripeSubscription(
         string           $customerId,
         SubscriptionPlan $plan,
-        Subscription     $subscription
+        Subscription $subscription,
+        bool         $fromPaymentIntentFlow = false
     ): \Stripe\Subscription
     {
-        // Get or create price object
         $priceId = $this->getOrCreatePrice($plan);
 
         $subscriptionData = [
@@ -204,15 +204,17 @@ class StripePaymentProcessor
             'items' => [
                 ['price' => $priceId]
             ],
+
             'metadata' => [
                 'subscription_id' => $subscription->id,
                 'plan_id' => $plan->id,
                 'member_id' => $subscription->member_id
             ],
-            'expand' => ['latest_invoice.payment_intent']
+
+            'expand' => ['latest_invoice.payment_intent'],
+            'collection_method' => 'charge_automatically',
         ];
 
-        // Add trial period if applicable
         if ($plan->trial_days > 0) {
             $subscriptionData['trial_period_days'] = $plan->trial_days;
         }
@@ -1456,13 +1458,15 @@ class StripePaymentProcessor
      */
     public function updateBillingCycleAnchor(
         string $stripeSubscriptionId,
-        int    $dayOfMonth,
-        bool   $prorate = true
+        int  $dayOfMonth,
+        bool $prorate = true
     ): array
     {
         try {
-            // Get current subscription
-            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId);
+            // Get current subscription (expand schedule just in case)
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId, [
+                'expand' => ['schedule']
+            ]);
 
             if ($subscription->status === 'canceled') {
                 return [
@@ -1471,48 +1475,44 @@ class StripePaymentProcessor
                 ];
             }
 
-            // Calculate the target date
+            // Calculate next target billing date
             $now = new \DateTime();
 
-            // Determine the next occurrence of the desired day
             $targetDate = new \DateTime();
             $targetDate->setDate(
-                $targetDate->format('Y'),
-                $targetDate->format('m'),
+                (int)$targetDate->format('Y'),
+                (int)$targetDate->format('m'),
                 min($dayOfMonth, (int)$targetDate->format('t'))
             );
 
-            // If the target day has passed this month, move to next month
             if ($targetDate <= $now) {
                 $targetDate->modify('+1 month');
                 $targetDate->setDate(
-                    $targetDate->format('Y'),
-                    $targetDate->format('m'),
+                    (int)$targetDate->format('Y'),
+                    (int)$targetDate->format('m'),
                     min($dayOfMonth, (int)$targetDate->format('t'))
                 );
             }
 
-            // Check if subscription already has a schedule
+            // Get or create schedule (ONLY valid approach)
             $schedule = null;
 
-            // Option 1: Check if subscription has a schedule ID
-            if (isset($subscription->schedule) && $subscription->schedule) {
-                // Subscription is already on a schedule, retrieve it
-                $scheduleId = is_string($subscription->schedule) ? $subscription->schedule : $subscription->schedule->id;
-                $schedule = $this->stripe->subscriptionSchedules->retrieve($scheduleId);
-            } else {
-                // Option 2: Search for schedules attached to this subscription
-                $existingSchedules = $this->stripe->subscriptionSchedules->all([
-                    'subscription' => $stripeSubscriptionId,
-                    'limit' => 1
-                ]);
+            if (!empty($subscription->schedule)) {
+                $scheduleId = is_string($subscription->schedule)
+                    ? $subscription->schedule
+                    : $subscription->schedule->id;
 
-                if (!empty($existingSchedules->data)) {
-                    $schedule = $existingSchedules->data[0];
-                }
+                $schedule = $this->stripe->subscriptionSchedules->retrieve($scheduleId);
             }
 
-            // Get subscription items for the schedule
+            // Create schedule if it doesn't exist
+            if (!$schedule) {
+                $schedule = $this->stripe->subscriptionSchedules->create([
+                    'from_subscription' => $stripeSubscriptionId,
+                ]);
+            }
+
+            // Build subscription items snapshot
             $items = [];
             foreach ($subscription->items->data as $item) {
                 $items[] = [
@@ -1521,37 +1521,33 @@ class StripePaymentProcessor
                 ];
             }
 
-            // If no schedule exists, create one
-            if (!$schedule) {
-                $schedule = $this->stripe->subscriptionSchedules->create([
-                    'from_subscription' => $stripeSubscriptionId,
-                ]);
-            }
-
-
-            // Update the schedule to change the billing cycle anchor
-            $updatedSchedule = $this->stripe->subscriptionSchedules->update($schedule->id, [
-                'end_behavior' => 'release',
-                'phases' => [
-                    [
-                        'items' => $items,
-                        'start_date' => (int)$subscription->items->data[0]->current_period_start,
-                        'end_date' => (int)$targetDate->getTimestamp(),
-                        'proration_behavior' => $prorate ? 'create_prorations' : 'none',
+            // Update schedule with new phases
+            $updatedSchedule = $this->stripe->subscriptionSchedules->update(
+                $schedule->id,
+                [
+                    'end_behavior' => 'release',
+                    'phases' => [
+                        [
+                            'items' => $items,
+                            'start_date' => (int)$subscription->current_period_start,
+                            'end_date' => $targetDate->getTimestamp(),
+                            'proration_behavior' => $prorate ? 'create_prorations' : 'none',
+                        ],
+                        [
+                            'items' => $items,
+                            'proration_behavior' => $prorate ? 'create_prorations' : 'none',
+                        ],
                     ],
-                    [
-                        'items' => $items,
-                        'proration_behavior' => $prorate ? 'create_prorations' : 'none',
-                    ],
-                ],
-            ]);
+                ]
+            );
 
-            // Release the schedule to apply changes
+            // Release schedule so it applies immediately
             $releasedSchedule = $this->stripe->subscriptionSchedules->release($updatedSchedule->id);
 
             return [
                 'success' => true,
                 'subscription' => $releasedSchedule->subscription,
+                'schedule_id' => $releasedSchedule->id,
                 'new_billing_date' => $targetDate->format('Y-m-d'),
                 'message' => 'Billing date updated successfully'
             ];

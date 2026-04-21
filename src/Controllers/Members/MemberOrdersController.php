@@ -22,12 +22,10 @@ class MemberOrdersController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $orders = $this->orderRepository->getByUser($member->id);
 
         return $this->view('member/orders/index', [
             'member' => $member,
             'site' => SiteContext::get(),
-            'orders' => $orders
         ]);
     }
 

@@ -173,7 +173,7 @@ class ContributorPageService
                     'email' => $user->email,
                     'slug' => $this->generateGuestSlug($user->name ?? $user->email),
                     'site_id' => $siteId,
-                    'status' => 'guest',
+                    'is_guest' => true,
                     'bio' => '',
                     'is_active' => true,
                     'created_at' => date('Y-m-d H:i:s'),

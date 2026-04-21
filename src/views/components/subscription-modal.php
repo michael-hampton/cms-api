@@ -496,6 +496,7 @@ $apiBase = '/api/' . $site;
         box-shadow: 0 25px 60px rgba(0, 0, 0, .22);
         animation: subSlideUp .35s cubic-bezier(.34, 1.56, .64, 1);
     }
+
     @keyframes subSlideUp {
         from {
             opacity: 0;
@@ -525,6 +526,7 @@ $apiBase = '/api/' . $site;
         z-index: 10;
         transition: transform .2s, background .2s;
     }
+
     .sub-modal-container .sub-modal-close.btn:hover {
         background: var(--sub-border) !important;
         transform: rotate(90deg);
@@ -537,12 +539,14 @@ $apiBase = '/api/' . $site;
         justify-content: center;
         margin-bottom: 2rem;
     }
+
     .sub-progress-step {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: .375rem;
     }
+
     .sub-progress-circle {
         width: 40px;
         height: 40px;
@@ -629,6 +633,7 @@ $apiBase = '/api/' . $site;
         grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
         gap: 1.25rem;
     }
+
     .sub-plan {
         position: relative;
         background: var(--sub-bg);
@@ -1160,6 +1165,7 @@ $apiBase = '/api/' . $site;
         const SUB_IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
         const MODAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;
         const MODAL_STORAGE_KEY = 'sub_modal_last_' + SITE;
+        const onetime = false;
 
         /*
          * Globals required by cart-utils.js and saved-cards.js.
@@ -1570,7 +1576,7 @@ $apiBase = '/api/' . $site;
             }
 
             // Build the payload — merge address fields when it's a print plan
-            const data = {isOneTimeSubscription: true, global_renewal_consent: '1'};
+            const data = {isOneTimeSubscription: true, global_renewal_consent: '1', one_time_subscription: onetime};
 
             if (window.currentMember) data.member_id = window.currentMember.id;
 
@@ -1596,7 +1602,7 @@ $apiBase = '/api/' . $site;
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         plan_id: subSelectedPlan.id,
-                        delivery_type: subSelectedPlan.deliveryType,
+                        delivery_type: subSelectedPlan.deliveryType
                     }),
                 });
                 const cartResult = await cartRes.json();
@@ -1630,28 +1636,33 @@ $apiBase = '/api/' . $site;
 
                 // 3. Confirm via Stripe
                 const member = window.currentMember;
-                const paymentResult = window.selectedCardId
-                    ? await subStripe.confirmCardPayment(subClientSecret, {payment_method: window.selectedCardId})
-                    : await subStripe.confirmCardPayment(subClientSecret, {
-                        payment_method: {
-                            card: subCardElement,
-                            billing_details: {
-                                name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
-                                email: member?.email ?? '',
+
+                if (onetime) {
+                    const paymentResult = window.selectedCardId
+                        ? await subStripe.confirmCardPayment(subClientSecret, {payment_method: window.selectedCardId})
+                        : await subStripe.confirmCardPayment(subClientSecret, {
+                            payment_method: {
+                                card: subCardElement,
+                                billing_details: {
+                                    name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
+                                    email: member?.email ?? '',
+                                },
                             },
-                        },
-                        setup_future_usage: 'off_session',
-                    });
+                            setup_future_usage: 'off_session',
+                        });
 
-                if (paymentResult.error) {
-                    if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
-                    });
-                    subShowCardError(paymentResult.error.message);
-                    return;
-                }
+                    if (paymentResult.error) {
+                        if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
+                        });
+                        subShowCardError(paymentResult.error.message);
+                        return;
+                    }
 
-                if (paymentResult.paymentIntent.status === 'succeeded') {
-                    await subConfirmPayment(paymentResult.paymentIntent.id);
+                    if (paymentResult.paymentIntent.status === 'succeeded') {
+                        await subConfirmPayment(paymentResult.paymentIntent.id ?? null);
+                    }
+                } else {
+                    subConfirmPayment(null)
                 }
 
             } catch (err) {

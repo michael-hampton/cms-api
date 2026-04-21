@@ -128,6 +128,11 @@ class Subscription extends Model
         return $this->status === SubscriptionStatus::CANCELLED->value;
     }
 
+    public function isCancellationScheduled(): bool
+    {
+        return $this->cancelled_at !== null && $this->cancelled_at > new \DateTime();
+    }
+
     public function isExpired(): bool
     {
         return $this->status === SubscriptionStatus::EXPIRED->value ||

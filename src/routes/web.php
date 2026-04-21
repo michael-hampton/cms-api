@@ -286,12 +286,12 @@ $router->get('/{site}/member/consent/download-data', 'App\Controllers\Members\Me
 
 // Consent API endpoints (JSON)
 
-$router->post('/{site}/member/consent/grant/{consentCode}', 'App\Controllers\Members\MemberConsentController@grant');
-$router->post('/{site}/member/consent/revoke/{consentCode}', 'App\Controllers\Members\MemberConsentController@revoke');
-$router->post('/{site}/member/consent/withdrawal-request', 'App\Controllers\Members\MemberConsentController@createWithdrawalRequest');
-$router->post('/{site}/member/consent/accept-banner', 'App\Controllers\Members\MemberConsentController@acceptBanner');
-$router->get('/{site}/member/consent/check/{consentCode}', 'App\Controllers\Members\MemberConsentController@checkConsent');
-$router->get('/api/{siteName}/consent/types/optional', 'App\Controllers\Members\MemberConsentController@getOptionalConsentTypes');
+$router->post('/{site}/member/consent/grant/{consentCode}', [MemberConsentController::class, 'grant']);
+$router->post('/{site}/member/consent/revoke/{consentCode}', [MemberConsentController::class, 'revoke']);
+$router->post('/{site}/member/consent/withdrawal-request', [MemberConsentController::class, 'createWithdrawalRequest']);
+$router->post('/{site}/member/consent/accept-banner', [MemberConsentController::class, 'acceptBanner']);
+$router->get('/{site}/member/consent/check/{consentCode}', [MemberConsentController::class, 'checkConsent']);
+$router->get('/api/{siteName}/consent/types/optional', [MemberConsentController::class, 'getOptionalConsentTypes']);
 
 
 $router->get('/cart', [CartController::class, 'page']);
