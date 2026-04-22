@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Services\Billing\Preorder\Validators;
+namespace App\Tests\Unit\Services\Subscriptions\Validators;
 
 use App\Enums\Subscriptions\BillingPeriod;
 use App\Enums\Subscriptions\SubscriptionType;

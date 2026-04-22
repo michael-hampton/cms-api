@@ -12,12 +12,13 @@ class OneTimePlanValidator
 {
     public function validatePlanForSubscription(
         ?SubscriptionPlan $plan,
-        string            $deliveryType
+        string $deliveryType,
+        bool   $allowRecurringSubscriptions = false
     ): void
     {
-//        if (!$plan || !$plan->isOneTime()) {
-//            throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
-//        }
+        if (!$plan || !$plan->isOneTime()) {
+            throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
+        }
 
         $this->validateDeliveryType($plan, $deliveryType);
     }

@@ -96,7 +96,7 @@ class OneTimeSubscriptionService
         ) {
             $plan = $this->planRepository->find($planId);
 
-            $this->validator->validatePlanForSubscription($plan, $deliveryType);
+            $this->validator->validatePlanForSubscription($plan, $deliveryType, true);
             $billingPeriod = $this->validator->validateBillingPeriod($plan->billing_period);
 
             $startDate = $this->dateCalculator->normalizeStartDate($selectedStartDate);
