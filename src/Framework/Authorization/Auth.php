@@ -60,8 +60,6 @@ class Auth
 
     public static function logout(): void
     {
-        die('here');
-
         $user = self::$user;
         self::$user = null;
 
