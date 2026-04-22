@@ -37,6 +37,7 @@ $cartProductItems = array_filter($items ?? [], fn($i) => empty($i['subscription_
 $isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
 $isSubscription = !empty($cartSubscriptionItems);
 $isOneTimeCart = $isOneTimeCart ?? false;
+$isMixedSubscriptionCart = $isMixedSubscriptionCart ?? false;
 $site = SiteContext::slug();
 $apiBase = '/api/' . $site;
 ?>
@@ -326,6 +327,15 @@ $apiBase = '/api/' . $site;
     </div>
 <?php endif; ?>
 
+<?php if ($isMixedSubscriptionCart): ?>
+    <div class="alert alert-error" style="margin-bottom: 1.5rem;">
+        <strong>Your cart contains both one-time and recurring subscriptions.</strong>
+        These cannot be purchased together. Please
+        <a href="/cart" style="color:inherit;font-weight:600;text-decoration:underline;">return to your cart</a>
+        and complete them as separate orders.
+    </div>
+<?php endif; ?>
+
 <!-- ── Guest login prompt ───────────────────────────────────────── -->
 <?php if (!MemberAuth::check()): ?>
     <div class="login-prompt">
@@ -481,6 +491,7 @@ $apiBase = '/api/' . $site;
     const CHECKOUT_MODE = <?= json_encode($checkoutMode) ?>;
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
     const isMixedCart = <?= json_encode($isMixedCart) ?>;
+    const IS_MIXED_SUBSCRIPTION_CART = <?= json_encode($isMixedSubscriptionCart) ?>;
     const IS_SUBSCRIPTION_CART = <?= json_encode($isSubscription) ?>;
     const IS_ONE_TIME_CART = <?= json_encode($isOneTimeCart) ?>;
 
@@ -650,6 +661,11 @@ $apiBase = '/api/' . $site;
     document.getElementById('place-order-btn').addEventListener('click', async function () {
         if (isMixedCart) {
             showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
+            return;
+        }
+
+        if (IS_MIXED_SUBSCRIPTION_CART) {
+            showAlert('Your cart contains both one-time and recurring subscriptions. Please return to your cart and complete them as separate orders.', 'error');
             return;
         }
 
@@ -914,7 +930,7 @@ $apiBase = '/api/' . $site;
     handleCountryChange('US');
     <?php endif; ?>
 
-    if (isMixedCart) {
+    if (isMixedCart || IS_MIXED_SUBSCRIPTION_CART) {
         <?php if ($checkoutMode === 'steps'): ?>
         const mixedBtn = document.getElementById('continue-to-payment-btn');
         <?php else: ?>
@@ -922,7 +938,9 @@ $apiBase = '/api/' . $site;
         <?php endif; ?>
         if (mixedBtn) {
             mixedBtn.disabled = true;
-            mixedBtn.title = 'Remove subscription or physical items from your cart to continue';
+            mixedBtn.title = isMixedCart
+                ? 'Remove subscription or physical items from your cart to continue'
+                : 'Remove one-time or recurring subscriptions from your cart to continue';
         }
     }
 </script>

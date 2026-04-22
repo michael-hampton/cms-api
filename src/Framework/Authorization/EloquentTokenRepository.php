@@ -3,6 +3,7 @@
 namespace App\Framework\Authorization;
 
 use App\Framework\Database\Database;
+use App\Models\Model;
 use DateTime;
 
 class EloquentTokenRepository
@@ -74,6 +75,14 @@ class EloquentTokenRepository
             ->where('tokenable_id', $tokenableId)
             ->where('site_id', $siteId)
             ->delete();
+    }
+
+    public function getTokenForUser(string $tokenableType, int $tokenableId, int $siteId): Model
+    {
+        return \App\Models\PersonalAccessToken::where('tokenable_type', $tokenableType)
+            ->where('tokenable_id', $tokenableId)
+            ->where('site_id', $siteId)
+            ->first();
     }
 
     public function updateLastUsed(int $tokenId): void

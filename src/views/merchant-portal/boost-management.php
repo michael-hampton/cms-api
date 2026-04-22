@@ -1,6 +1,6 @@
 <?php
 $apiBase = '/api/boosts';
-$merchantId = 1; // Replace with auth context
+$merchantId = $merchant->id ?? 1;
 $boostContexts = ['listing', 'deals', 'recommendations'];
 $boostTypes = ['product', 'offer'];
 $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
@@ -10,6 +10,7 @@ $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="api-token" content="<?= htmlspecialchars($apiToken ?? '', ENT_QUOTES) ?>">
     <title>Boost Manager</title>
     <style>
         :root {
@@ -1501,7 +1502,7 @@ $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
 
 <script>
     const API = '<?= $apiBase ?>';
-    const MERCHANT = <?= $merchantId ?>;
+    const MERCHANT = <?= (int)($merchant->id ?? $merchantId ?? 1) ?>;
     let currentPage = 1;
     let searchTimer = null;
     let targetSearchTimer = null;
@@ -1541,10 +1542,19 @@ $boostStatuses = ['pending', 'active', 'paused', 'expired', 'cancelled'];
         targetSearchTimer = setTimeout(runTargetSearch, 250);
     }
 
+    const API_TOKEN = document.querySelector('meta[name="api-token"]')?.content ?? '';
+    const SITE_ID_BOOST = <?= (int)($siteId ?? 1) ?>;
+
     async function apiFetch(url, opts = {}) {
         return fetch(url, {
             ...opts,
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json', ...(opts.headers || {})},
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer ' + API_TOKEN,
+                'X-Site-Id': String(SITE_ID_BOOST),
+                ...(opts.headers || {}),
+            },
         });
     }
 

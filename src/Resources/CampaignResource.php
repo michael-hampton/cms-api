@@ -3,6 +3,7 @@
 namespace App\Resources;
 
 use App\Framework\Resource\JsonResource;
+use App\Models\CampaignVariant;
 use App\Repositories\Cms\CampaignRepository;
 
 class CampaignResource extends JsonResource
@@ -10,6 +11,10 @@ class CampaignResource extends JsonResource
     public function toArray(): array
     {
         $campaignRepository = app(CampaignRepository::class);
+
+        $variants = CampaignVariant::where('campaign_id', $this->getAttribute('id'))
+            ->orderBy('key')
+            ->get();
 
         return [
             'id' => $this->getAttribute('id'),
@@ -47,6 +52,15 @@ class CampaignResource extends JsonResource
             'push_icon' => $this->getAttribute('push_icon'),
             'template' => $this->getAttribute('template'),
             'push_url' => $this->getAttribute('push_url'),
+            // A/B variants — included so the frontend @Input needs no extra API call
+            'variants' => $variants->map(fn($v) => [
+                'id' => $v->id,
+                'key' => $v->key,
+                'weight' => $v->weight,
+                'subject_line' => $v->subject_line ?? null,
+                'template' => $v->template ?? null,
+            ])->values()->all(),
+            'variant_stats' => [],
         ];
     }
 }

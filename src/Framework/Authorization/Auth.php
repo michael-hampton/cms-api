@@ -60,6 +60,8 @@ class Auth
 
     public static function logout(): void
     {
+        die('here');
+
         $user = self::$user;
         self::$user = null;
 
@@ -119,7 +121,7 @@ class Auth
                 $user['id'],
                 $user['name'],
                 $user['email'],
-                Session::get('user_role', 'user')
+                $user['role']
             );
             self::$user->exists = true;
             return self::$user;

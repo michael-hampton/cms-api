@@ -368,17 +368,16 @@ class BoostController extends Controller
     {
         $query = trim($request->input('q', ''));
 
-        if (strlen($query) < 1) {
-            return JsonResponse::json(['data' => []]);
-        }
-
         $products = Product::whereHas('merchants', fn($q) => $q->where('merchant_id', $merchantId)
         )
             ->where('is_active', true)
             ->where('stock_quantity', '>', 0)
-            ->where(fn($q) => $q->where('name', 'LIKE', "%{$query}%")
-                ->orWhere('slug', 'LIKE', "%{$query}%")
-            )
+            ->when(!empty($query), function ($sql) use ($query) {
+                $sql->where(fn($q) => $q->where('name', 'LIKE', "%{$query}%")
+                    ->orWhere('slug', 'LIKE', "%{$query}%")
+                );
+            })
+
             ->with(['brand'])
             ->limit(15)
             ->get()

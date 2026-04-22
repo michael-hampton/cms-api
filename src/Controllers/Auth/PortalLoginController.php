@@ -4,12 +4,15 @@ namespace App\Controllers\Auth;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\AuthenticationService;
+use App\Framework\Authorization\LoginRequest;
 use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 
 class PortalLoginController extends Controller
 {
-    public function __construct()
+    public function __construct(private readonly AuthenticationService $authenticationService,
+    )
     {
         parent::__construct();
     }
@@ -55,12 +58,22 @@ class PortalLoginController extends Controller
             return $this->redirect("/{$portal}/login");
         }
 
-        $success = Auth::attempt([
-            'email' => $email,
-            'password' => $password,
+        $loginRequest = new LoginRequest(
+            $email,
+            $password,
+            8 //todo
+        );
+
+        $response = $this->authenticationService->login($loginRequest);
+
+        Auth::login([
+            'id' => $response->userId,
+            'name' => $response->userName,
+            'email' => $response->userEmail,
+            'role' => $response->role,
         ]);
 
-        if (!$success) {
+        if (!$response) {
             Session::flash('login_error', 'Invalid email or password.');
             return $this->redirect("/{$portal}/login");
         }
@@ -70,11 +83,12 @@ class PortalLoginController extends Controller
         // Role check — CRM requires admin|agent, merchant portal requires admin|merchant
         $allowed = match ($portal) {
             'crm' => in_array($user->role ?? '', ['admin', 'agent']),
-            'merchant' => in_array($user->role ?? '', ['admin', 'merchant']),
+            'merchant' => in_array($user->role ?? '', ['admin', 'merchant', 'user']),
             default => false,
         };
 
         if (!$allowed) {
+            die('no');
             Auth::logout();
             Session::flash('login_error', 'You do not have access to this portal.');
             return $this->redirect("/{$portal}/login");
@@ -83,6 +97,8 @@ class PortalLoginController extends Controller
         // Redirect to originally-intended URL, or portal home
         $intended = Session::get('intended_url');
         Session::forget('intended_url');
+
+        Session::put('auth_token', $response->accessToken);
 
         return $this->redirect($intended ?: $this->portalHome($portal));
     }

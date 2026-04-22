@@ -117,6 +117,28 @@ class AuthenticationService
         return $plainTextToken;
     }
 
+    public function createToken(User $user, int $siteId): string
+    {
+        //$token = $this->tokenRepository->getTokenForUser(User::class, $user->id, $siteId);
+
+        //$this->tokenRepository->revokeTokensFor(User::class, $user->id, $siteId);
+
+        $plainTextToken = $this->tokenGenerator->generate();
+
+        $token = new PersonalAccessToken(
+            User::class,
+            $user->id,
+            $siteId,
+            'auth_token',
+            $plainTextToken,
+            ['*']
+        );
+
+        $this->tokenRepository->create($token);
+
+        return $plainTextToken;
+    }
+
     public function getUserId(): ?int
     {
         // Use the framework's global helper to get the authenticated user's ID

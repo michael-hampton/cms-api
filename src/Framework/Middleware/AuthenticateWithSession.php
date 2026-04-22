@@ -37,6 +37,7 @@ class AuthenticateWithSession implements MiddlewareInterface
 
         // Optional: role gate — portals require at least role 'agent' or 'admin'
         $user = Auth::user();
+
         if (!in_array($user->role ?? '', ['admin', 'agent', 'merchant'])) {
             if ($request->wantsJson()) {
                 return Response::json([
@@ -44,6 +45,7 @@ class AuthenticateWithSession implements MiddlewareInterface
                     'message' => 'Forbidden.',
                 ], 403);
             }
+
             Auth::logout();
             return Response::redirect($this->loginPath . '?error=forbidden');
         }

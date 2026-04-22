@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\MemberInsights\Campaigns;
+namespace App\Repositories\MemberInsights;
 
 use App\Models\CampaignVariant;
 use App\Repositories\Repository;
@@ -18,6 +18,11 @@ class CampaignVariantRepository extends Repository
         return CampaignVariant::where('campaign_id', $campaignId)
             ->orderBy('key')
             ->get();
+    }
+
+    public function deleteForCampaign(int $campaignId): void
+    {
+        CampaignVariant::where('campaign_id', $campaignId)->delete();
     }
 
     protected function getModelClass(): string

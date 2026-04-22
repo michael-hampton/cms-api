@@ -238,9 +238,19 @@ class CartController extends Controller
         }, $items);
 
         $subscriptionItems = array_filter($items, fn($i) => !empty($i['subscription_plan_id']));
-        $isOneTimeCart = !empty($subscriptionItems) && collect($subscriptionItems)->every(
-                fn($item) => $this->subscriptionPlanRepository->find($item['subscription_plan_id'])?->isOneTime()
-            );
+
+        $hasOneTimeSubscriptions = !empty(array_filter(
+            $subscriptionItems,
+            fn($i) => $this->subscriptionPlanRepository->find($i['subscription_plan_id'])?->isOneTime()
+        ));
+
+        $hasRecurringSubscriptions = !empty(array_filter(
+            $subscriptionItems,
+            fn($i) => !$this->subscriptionPlanRepository->find($i['subscription_plan_id'])?->isOneTime()
+        ));
+
+        $isOneTimeCart = !empty($subscriptionItems) && $hasOneTimeSubscriptions && !$hasRecurringSubscriptions;
+        $isMixedSubscriptionCart = $hasOneTimeSubscriptions && $hasRecurringSubscriptions;
 
         $subtotal = collect($items)->sum('subtotal');
 
@@ -269,6 +279,7 @@ class CartController extends Controller
             'currency' => $currencyCode,
             'currencySymbol' => $currencySymbol,
             'isOneTimeCart' => $isOneTimeCart,
+            'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
         ];
 
         return $this->view('checkout/index', $cartData);

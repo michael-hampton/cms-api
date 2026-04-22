@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Controllers\MerchantPortal;
 
 use App\Controllers\Controller;
+use App\Framework\Authorization\Auth;
 use App\Framework\Http\Response;
+use App\Framework\Session\Session;
 use App\Models\Merchant;
+use App\Models\Site;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\MerchantBoostStatRepository;
 use App\Repositories\Billing\OrderRepository;
@@ -42,15 +45,20 @@ class MerchantDashboardController extends Controller
 
     public function index(): Response
     {
+        $user = Auth::getUser();
+
         // Resolved via the authenticated guard — no static Merchant::find() call.
-        $merchant = Merchant::find(1);
+        $merchant = Merchant::find($user['merchant_id']);
+
+        $site = Site::find(8);
+        $siteSlug = $site->slug;
 
         $stats = $this->statsService->forMerchant($merchant);
         $analytics = $this->analyticsService->forMerchant($merchant, days: 30);
 
         $boostResult = $this->boostRepository->getAllWithFilters([
             'merchant_id' => $merchant->id,
-            'status' => 'active',
+            //'status' => 'active',
             'per_page' => 5,
         ]);
 
@@ -59,6 +67,7 @@ class MerchantDashboardController extends Controller
         $recentOrders = $this->orderRepository->getRecentForMerchant($merchant->id);
         $topProducts = $this->productRepository->topByRevenueForMerchant($merchant->id, limit: 4);
         $products = $this->productRepository->getProductsByMerchant($merchant->id);
+
         $offers = $this->offerRepository->search(['merchant_id' => $merchant->id]);
         $shipments = $this->shipmentRepository->getByMerchantId($merchant->id);
         $vouchers = $this->voucherRepository->getByMerchant($merchant->id);
@@ -73,6 +82,7 @@ class MerchantDashboardController extends Controller
 
         $recentReviews = $this->reviewRepository->recentForMerchant($merchant->id, limit: 10);
         $reviewStats = $this->reviewRepository->statsForMerchant($merchant->id);
+        $apiToken = Session::get('auth_token');
 
         return $this->view('merchant-portal/dashboard', compact(
             'merchant',
@@ -92,6 +102,9 @@ class MerchantDashboardController extends Controller
             'commissionRates',
             'recentReviews',
             'reviewStats',
+            'apiToken',
+            'siteSlug',
+            'site'
         ));
     }
 }

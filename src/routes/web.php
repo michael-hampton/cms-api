@@ -130,6 +130,8 @@ $router->post('/crm/logout', [App\Controllers\Auth\PortalLoginController::class,
 $router->get('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'showLoginForm'], null, []);
 $router->post('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
 $router->post('/merchant/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
+$router->get('/merchant/register', [\App\Controllers\MerchantPortal\MerchantPortalRegistrationController::class, 'showRegistrationForm']);
+$router->post('/merchant/register', [\App\Controllers\MerchantPortal\MerchantPortalRegistrationController::class, 'register']);
 
 // crm
 $router->group(['middleware' => [AuthenticateCrmPortal::class]], function ($router) {

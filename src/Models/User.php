@@ -12,7 +12,8 @@ class User extends Model
         'is_active',
         'site_id',
         'avatar',
-        'is_contributor'
+        'is_contributor',
+        'merchant_id'
     ];
 
     protected $hidden = [

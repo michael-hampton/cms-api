@@ -71,4 +71,13 @@ class Boost extends Model
     {
         return $this->hasMany(BoostEvent::class);
     }
+
+    public function product()
+    {
+        if ($this->boostable_type !== 'product') {
+            return null;
+        }
+
+        return Product::where('id', $this->boostable_id)->first();
+    }
 }

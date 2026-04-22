@@ -10,6 +10,8 @@ class CampaignVariant extends Model
         'key',
         'weight',
         'blocks',
+        'subject_line',
+        'template'
     ];
 
     protected $casts = [

@@ -9,6 +9,7 @@ use App\Models\Newsletter;
 use App\Models\Segment;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
+use App\Repositories\MemberInsights\CampaignVariantRepository;
 use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Cms\CampaignService;
@@ -22,6 +23,7 @@ class CampaignServiceTest extends FunctionalTestCase
     private NewsletterRepository $newsletterRepository;
     private CampaignSignupRepository $campaignSignupRepository;
     private SegmentRepository $segmentRepository;
+    private CampaignVariantRepository $campaignVariantRepository;
     private Database $databaseMock;
 
     protected function setUp(): void
@@ -32,6 +34,7 @@ class CampaignServiceTest extends FunctionalTestCase
         $this->newsletterRepository = Mockery::mock(NewsletterRepository::class);
         $this->campaignSignupRepository = Mockery::mock(CampaignSignupRepository::class);
         $this->segmentRepository = Mockery::mock(SegmentRepository::class);
+        $this->campaignVariantRepository = Mockery::mock(CampaignVariantRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
 
         $this->service = new CampaignService(
@@ -39,6 +42,7 @@ class CampaignServiceTest extends FunctionalTestCase
             $this->newsletterRepository,
             $this->campaignSignupRepository,
             $this->segmentRepository,
+            $this->campaignVariantRepository,
             $this->databaseMock
         );
     }
@@ -57,7 +61,7 @@ class CampaignServiceTest extends FunctionalTestCase
             'end_date' => date('Y-m-d H:i:s', strtotime('+1 day'))
         ]);
 
-        $this->campaignRepository->shouldReceive('findBySlug')
+        $this->campaignRepository->shouldReceive('findValidForSignup')
             ->with('test-campaign', $this->siteId)
             ->once()
             ->andReturn($campaign);
@@ -111,10 +115,10 @@ class CampaignServiceTest extends FunctionalTestCase
             'is_active' => false
         ]);
 
-        $this->campaignRepository->shouldReceive('findBySlug')
+        $this->campaignRepository->shouldReceive('findValidForSignup')
             ->with('inactive', $this->siteId)
             ->once()
-            ->andReturn($campaign);
+            ->andReturn(null);
 
         $result = $this->service->getCampaignForSignup('inactive', $this->siteId);
 
@@ -142,7 +146,7 @@ class CampaignServiceTest extends FunctionalTestCase
             'is_active' => true
         ]);
 
-        $this->campaignRepository->shouldReceive('findBySlug')
+        $this->campaignRepository->shouldReceive('findValidForSignup')
             ->with('test-campaign', $this->siteId)
             ->once()
             ->andReturn($campaign);
@@ -330,13 +334,138 @@ class CampaignServiceTest extends FunctionalTestCase
         $this->campaignRepository->allows('existsBySlugForSite')->with('win-back', 10)->andReturn(false);
         $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
         $this->databaseMock->allows('transaction')->andReturnUsing(fn(callable $callback) => $callback());
+
+        $this->campaignVariantRepository->expects('deleteForCampaign')->with(3)->once();
+
         $this->campaignRepository->expects('create')
-            ->withArgs(fn(array $data) => $data['segment_id'] === 5 && $data['cooldown_hours'] === 24 && $data['priority'] === 90)
+            ->withArgs(fn(array $data) => $data['segment_id'] === 5 &&
+                $data['cooldown_hours'] === 24 &&
+                $data['priority'] === 90 &&
+                !array_key_exists('variants', $data)  // variants must be stripped from campaign row
+            )
             ->andReturn($campaign);
 
         $result = $this->service->create($payload, 10);
 
         $this->assertSame($campaign, $result);
+    }
+
+    public function test_create_persists_variants_in_same_transaction(): void
+    {
+        $payload = array_merge($this->payload(), [
+            'variants' => [
+                ['key' => 'A', 'weight' => 60, 'subject_line' => 'Hello A', 'template' => null],
+                ['key' => 'B', 'weight' => 40, 'subject_line' => null, 'template' => null],
+            ],
+        ]);
+
+        $campaign = $this->makeCampaign(3);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+
+        $this->databaseMock->allows('transaction')->andReturnUsing(function (callable $callback) {
+            return $callback();
+        });
+
+        $this->campaignVariantRepository->expects('deleteForCampaign')->with(3)->once();
+        $this->campaignVariantRepository->expects('create')->twice()->andReturn(Mockery::mock(\App\Models\CampaignVariant::class));
+
+        $this->campaignRepository->expects('create')
+            ->withArgs(fn(array $data) => !array_key_exists('variants', $data))
+            ->andReturn($campaign);
+
+        $result = $this->service->create($payload, 10);
+
+        $this->assertSame($campaign, $result);
+    }
+
+    public function test_create_throws_when_variant_weights_dont_sum_to_100(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/weights must sum to 100/i');
+
+        $payload = array_merge($this->payload(), [
+            'variants' => [
+                ['key' => 'A', 'weight' => 60],
+                ['key' => 'B', 'weight' => 30], // 90 total, not 100
+            ],
+        ]);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+
+        $this->service->create($payload, 10);
+    }
+
+    public function test_create_throws_when_variant_keys_are_duplicate(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/unique/i');
+
+        $payload = array_merge($this->payload(), [
+            'variants' => [
+                ['key' => 'A', 'weight' => 50],
+                ['key' => 'A', 'weight' => 50], // duplicate
+            ],
+        ]);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+
+        $this->service->create($payload, 10);
+    }
+
+    public function test_update_replaces_variants_when_provided(): void
+    {
+        $campaign = $this->makeCampaign(3);
+        $campaign->site_id = 10;
+
+        $updatedCampaign = $this->makeCampaign(3);
+
+        $this->campaignRepository->shouldReceive('findForSite')
+            ->with(3, 10)
+            ->andReturnValues([$campaign, $updatedCampaign]);
+
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->campaignRepository->allows('update')->with(3, Mockery::any());
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+
+        $this->databaseMock->allows('transaction')->andReturnUsing(function (callable $callback) {
+            return $callback();
+        });
+
+        $this->campaignVariantRepository->expects('deleteForCampaign')->with(3)->once();
+        $this->campaignVariantRepository->expects('create')->twice()->andReturn(Mockery::mock(\App\Models\CampaignVariant::class));
+
+        $result = $this->service->update(3, array_merge($this->payload(), [
+            'variants' => [
+                ['key' => 'A', 'weight' => 70],
+                ['key' => 'B', 'weight' => 30],
+            ],
+        ]), 10);
+
+        $this->assertSame($updatedCampaign, $result);
+    }
+
+    public function test_update_leaves_variants_untouched_when_not_provided(): void
+    {
+        $campaign = $this->makeCampaign(3);
+        $campaign->site_id = 10;
+        $updatedCampaign = $this->makeCampaign(3);
+
+        $this->campaignRepository->allows('findForSite')->andReturn($campaign, $updatedCampaign);
+        $this->campaignRepository->allows('existsBySlugForSite')->andReturn(false);
+        $this->campaignRepository->allows('update');
+        $this->segmentRepository->allows('find')->with(5)->andReturn(Mockery::mock(Segment::class)->makePartial());
+
+        $this->databaseMock->allows('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+
+        $this->campaignVariantRepository->shouldNotReceive('deleteForCampaign');
+
+        $result = $this->service->update(3, $this->payload(), 10);
+
+        $this->assertNotNull($result);
     }
 
     public function test_create_throws_when_segment_missing(): void

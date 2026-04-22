@@ -112,6 +112,7 @@ class Date extends \DateTime
     public static function parseDate(string $value): ?\DateTimeImmutable
     {
         $formats = [
+            'Y-m-d',
             'Y-m-d H:i:s',
             'Y-m-d\TH:i',
         ];

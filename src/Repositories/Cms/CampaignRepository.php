@@ -5,6 +5,8 @@ namespace App\Repositories\Cms;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
+use App\Models\CampaignDelivery;
+use App\Models\CampaignEvent;
 use App\Models\CampaignSignup;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -179,6 +181,99 @@ class CampaignRepository extends Repository
         return Campaign::where('site_id', $siteId)->paginate($perPage, $page);
     }
 
+    /**
+     * Aggregate CampaignDelivery + CampaignEvent counts per variant key.
+     *
+     * Intentionally avoids a JOIN so neither table needs to know about the
+     * other's schema — we resolve variant keys via the in-memory collection.
+     */
+    private function aggregateStats(int $campaignId, Collection $variants): array
+    {
+        // Map variant_id → key for lookup
+        $keyById = $variants->pluck('key', 'id')->toArray();
+        $variantIds = array_keys($keyById);
+
+        // Delivery counts per variant
+        $deliveryCounts = CampaignDelivery::where('campaign_id', $campaignId)
+            ->whereIn('variant_id', $variantIds)
+            ->selectRaw('variant_id, COUNT(*) as total')
+            ->groupBy('variant_id')
+            ->get()
+            ->pluck('total', 'variant_id')
+            ->toArray();
+
+        // Open counts per variant (event_type = 'open')
+        $openCounts = CampaignEvent::whereIn('delivery_id', function ($q) use ($campaignId, $variantIds) {
+            $q->select('id')
+                ->from('campaign_deliveries')
+                ->where('campaign_id', $campaignId)
+                ->whereIn('variant_id', $variantIds);
+        })
+            ->where('event_type', 'open')
+            ->selectRaw('
+                (SELECT variant_id FROM campaign_deliveries WHERE id = campaign_events.delivery_id LIMIT 1) as variant_id,
+                COUNT(*) as total
+            ')
+            ->groupBy('variant_id')
+            ->pluck('total', 'variant_id')
+            ->toArray();
+
+        // Click counts per variant (event_type = 'click')
+        $clickCounts = CampaignEvent::whereIn('delivery_id', function ($q) use ($campaignId, $variantIds) {
+            $q->select('id')
+                ->from('campaign_deliveries')
+                ->where('campaign_id', $campaignId)
+                ->whereIn('variant_id', $variantIds);
+        })
+            ->where('event_type', 'click')
+            ->selectRaw('
+                (SELECT variant_id FROM campaign_deliveries WHERE id = campaign_events.delivery_id LIMIT 1) as variant_id,
+                COUNT(*) as total
+            ')
+            ->groupBy('variant_id')
+            ->pluck('total', 'variant_id')
+            ->toArray();
+
+        $stats = [];
+        foreach ($variants as $variant) {
+            $id = $variant->id;
+            $deliveries = (int)($deliveryCounts[$id] ?? 0);
+            $opens = (int)($openCounts[$id] ?? 0);
+            $clicks = (int)($clickCounts[$id] ?? 0);
+
+            $stats[] = [
+                'key' => $keyById[$id],
+                'deliveries' => $deliveries,
+                'opens' => $opens,
+                'clicks' => $clicks,
+                'open_rate' => $deliveries > 0 ? round(($opens / $deliveries) * 100, 2) : 0,
+                'click_rate' => $deliveries > 0 ? round(($clicks / $deliveries) * 100, 2) : 0,
+            ];
+        }
+
+        return $stats;
+    }
+
+
+    public function findBySlug(string $slug, ?int $siteId = null): ?Model
+    {
+        $query = Campaign::where('slug', $slug);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        } else {
+            $this->applySiteFilter($query);
+        }
+
+        return $query->first();
+    }
+
+    public function findValidForSignup(string $slug, int $siteId): ?Campaign
+    {
+        $campaign = $this->findBySlug($slug, $siteId);
+
+        return ($campaign && $campaign instanceof Campaign && $campaign->isValidForSignup()) ? $campaign : null;
+    }
 
     protected function getModelClass(): string
     {

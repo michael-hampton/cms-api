@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Cms;
 
+use App\Models\Model;
 use App\Models\User;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
@@ -42,13 +43,13 @@ class UserRepository extends Repository implements UserRepositoryInterface
         return !empty($user) ? new User($user) : null;
     }
 
-    public function create(array $data): User
+    public function create(array $data): Model
     {
         if (isset($data['password'])) {
             $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
         }
 
-        return $this->create($data);
+        return parent::create($data);
     }
 
     protected function getModelClass(): string

@@ -23,17 +23,19 @@ use App\Models\CampaignVariant;
 use App\Models\Model;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\Cms\CampaignSignupRepository;
+use App\Repositories\MemberInsights\CampaignVariantRepository;
 use App\Repositories\MemberInsights\SegmentRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 
 class CampaignService
 {
     public function __construct(
-        private readonly CampaignRepository   $campaignRepository,
-        private readonly NewsletterRepository $newsletterRepository,
-        private CampaignSignupRepository      $campaignSignupRepository,
-        private readonly SegmentRepository $segmentRepository,
-        private Database                      $database
+        private readonly CampaignRepository        $campaignRepository,
+        private readonly NewsletterRepository      $newsletterRepository,
+        private readonly CampaignSignupRepository  $campaignSignupRepository,
+        private readonly SegmentRepository         $segmentRepository,
+        private readonly CampaignVariantRepository $variantRepository,
+        private readonly Database                  $database
     )
     {
     }
@@ -101,10 +103,7 @@ class CampaignService
             return null;
         }
 
-        $campaign = $this->campaignRepository->findBySlug($campaignSlug, $siteId);
-
-        return ($campaign && $campaign->isValidForSignup()) ? $campaign : null;
-
+        return $this->campaignRepository->findValidForSignup($campaignSlug, $siteId);
     }
 
     public function validateCampaign(Campaign $campaign): array
@@ -260,6 +259,9 @@ class CampaignService
 
     public function create(array $payload, int $siteId): Campaign
     {
+        $variants = $payload['variants'] ?? [];
+        unset($payload['variants']);
+
         $payload = $this->normalizePayload($payload, $siteId, isUpdate: false);
 
         if ($this->campaignRepository->existsBySlugForSite($payload['slug'], $siteId)) {
@@ -272,12 +274,22 @@ class CampaignService
             $this->assertMailableExists($payload['template']);
         }
 
-        return $this->database->transaction(fn() => $this->campaignRepository->create($payload)
-        );
+        $this->validateVariants($variants);
+
+        return $this->database->transaction(function () use ($payload, $variants): Campaign {
+            $campaign = $this->campaignRepository->create($payload);
+            $this->persistVariants($campaign->id, $variants);
+            return $campaign;
+        });
     }
 
     public function update(int $id, array $payload, int $siteId): Campaign
     {
+        // variants key is optional on update — omitting it leaves variants untouched
+        $variantsProvided = array_key_exists('variants', $payload);
+        $variants = $payload['variants'] ?? null;
+        unset($payload['variants']);
+
         $campaign = $this->campaignRepository->findForSite($id, $siteId);
 
         if (
@@ -295,13 +307,40 @@ class CampaignService
             $this->assertSegmentExists($payload['segment_id']);
         }
 
+        if ($variantsProvided) {
+            $this->validateVariants($variants);
+        }
+
         $payload = $this->normalizePayload($payload, $siteId, isUpdate: true);
 
-        return $this->database->transaction(function () use ($campaign, $payload, $siteId) {
+        return $this->database->transaction(function () use ($campaign, $payload, $siteId, $variantsProvided, $variants): Campaign {
             $this->campaignRepository->update($campaign->id, $payload);
+
+            if ($variantsProvided) {
+                $this->persistVariants($campaign->id, $variants);
+            }
 
             return $this->campaignRepository->findForSite($campaign->id, $siteId);
         });
+    }
+
+    /**
+     * Delete and recreate variants for a campaign within an open transaction.
+     */
+    private function persistVariants(int $campaignId, array $variants): void
+    {
+        $this->variantRepository->deleteForCampaign($campaignId);
+
+        foreach ($variants as $v) {
+            $this->variantRepository->create([
+                'campaign_id' => $campaignId,
+                'key' => strtoupper(trim($v['key'])),
+                'weight' => (int)$v['weight'],
+                'subject_line' => isset($v['subject_line']) ? trim($v['subject_line']) : null,
+                'template' => isset($v['template']) ? trim($v['template']) : null,
+                'blocks' => $v['blocks'] ?? null,
+            ]);
+        }
     }
 
 
@@ -329,12 +368,11 @@ class CampaignService
      */
     public function setVariants(int $campaignId, int $siteId, array $variants): array
     {
-        $this->findForSite($campaignId, $siteId); // assert ownership
+        $this->assertCampaignOwnership($campaignId, $siteId);
         $this->validateVariants($variants);
 
-        return $this->database->transaction(function () use ($campaignId, $variants) {
-            // Delete existing variants for this campaign.
-            CampaignVariant::where('campaign_id', $campaignId)->delete();
+        return $this->database->transaction(function () use ($campaignId, $variants): array {
+            $this->variantRepository->deleteForCampaign($campaignId);
 
             if (empty($variants)) {
                 return [];
@@ -342,14 +380,14 @@ class CampaignService
 
             $created = [];
             foreach ($variants as $v) {
-                $row = CampaignVariant::create([
+                $created[] = $this->variantRepository->create([
                     'campaign_id' => $campaignId,
                     'key' => strtoupper(trim($v['key'])),
                     'weight' => (int)$v['weight'],
+                    'subject_line' => isset($v['subject_line']) ? trim($v['subject_line']) : null,
                     'template' => isset($v['template']) ? trim($v['template']) : null,
                     'blocks' => $v['blocks'] ?? null,
                 ]);
-                $created[] = $row;
             }
 
             return $created;
@@ -365,9 +403,7 @@ class CampaignService
     {
         $this->findForSite($campaignId, $siteId);
 
-        return CampaignVariant::where('campaign_id', $campaignId)
-            ->orderBy('key')
-            ->get()
+        return $this->variantRepository->findForCampaign($campaignId)
             ->toArray();
     }
 
@@ -432,7 +468,6 @@ class CampaignService
         }
 
         $totalWeight = array_sum(array_column($variants, 'weight'));
-
         if ($totalWeight !== 100) {
             throw new \InvalidArgumentException(
                 "Variant weights must sum to 100. Got {$totalWeight}."
@@ -441,18 +476,20 @@ class CampaignService
 
         $keys = array_map(fn($v) => strtoupper(trim($v['key'] ?? '')), $variants);
         if (count($keys) !== count(array_unique($keys))) {
-            throw new \InvalidArgumentException('Variant keys must be unique (A, B, C …).');
+            throw new \InvalidArgumentException('Variant keys must be unique (A, B, C…).');
         }
 
+        $allowedKeys = ['A', 'B', 'C', 'D', 'E'];
         foreach ($variants as $i => $v) {
-            if (empty($v['key'])) {
-                throw new \InvalidArgumentException("Variant #{$i}: key is required.");
+            if (empty($v['key']) || !in_array(strtoupper(trim($v['key'])), $allowedKeys, true)) {
+                throw new \InvalidArgumentException(
+                    "Variant #{$i}: key must be one of A–E, got \"{$v['key']}\"."
+                );
             }
             if (!isset($v['weight']) || (int)$v['weight'] <= 0) {
-                throw new \InvalidArgumentException("Variant #{$i}: weight must be a positive integer.");
-            }
-            if (!empty($v['template'])) {
-                $this->assertMailableExists($v['template']);
+                throw new \InvalidArgumentException(
+                    "Variant #{$i}: weight must be a positive integer."
+                );
             }
         }
     }
@@ -507,5 +544,38 @@ class CampaignService
             'campaign' => $updated,
             'message' => ucfirst($status->value) . ' campaign successfully'
         ];
+    }
+
+    /**
+     * Return variants with their aggregated delivery/event stats.
+     *
+     * Stats shape per variant:
+     *   key, deliveries, opens, clicks, open_rate (%), click_rate (%)
+     */
+    public function getVariantsWithStats(int $campaignId, int $siteId): array
+    {
+        $this->assertCampaignOwnership($campaignId, $siteId);
+
+        $variants = $this->variantRepository->findForCampaign($campaignId);
+
+        if ($variants->isEmpty()) {
+            return ['variants' => [], 'stats' => []];
+        }
+
+        $stats = $this->aggregateStats($campaignId, $variants);
+
+        return [
+            'variants' => $variants->toArray(),
+            'stats' => $stats,
+        ];
+    }
+
+    private function assertCampaignOwnership(int $campaignId, int $siteId): void
+    {
+        $campaign = $this->campaignRepository->find($campaignId);
+
+        if ($campaign === null || $campaign->site_id !== $siteId) {
+            throw new \InvalidArgumentException("Campaign [{$campaignId}] not found.");
+        }
     }
 }

@@ -84,10 +84,12 @@ class ProductOfferController extends Controller
                 $offer->load(['regionSets']);
             }
 
+            $offer->load('product');
+
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Offer created successfully',
-                'offer' => $offer->toArray(),
+                'offer' => OfferResource::make($offer)->toArray()
             ], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
