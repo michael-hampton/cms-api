@@ -174,7 +174,7 @@ class OneTimeSubscriptionService
             // Enforce state transition: only PENDING can become ACTIVE via
             // this method.  TRIALING subscriptions are activated by the
             // TrialConversionService after the first real charge succeeds.
-            if ($subscription->status !== SubscriptionStatus::PENDING->value) {
+            if (!in_array($subscription->status, [SubscriptionStatus::PENDING->value, SubscriptionStatus::ACTIVE->value])) {
                 throw new \InvalidArgumentException(
                     "Cannot activate subscription with status: {$subscription->status}"
                 );

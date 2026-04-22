@@ -114,7 +114,8 @@ class StripePaymentProcessor
                         'billing_period' => $plan->billing_period,
                         'stripe_subscription_id' => $stripeSubscription->id,
                         'stripe_customer_id' => $customerId
-                    ]
+                    ],
+                    'order_id' => $data['order_id']
                 ]
             );
 

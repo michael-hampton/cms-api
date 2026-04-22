@@ -237,6 +237,11 @@ class CartController extends Controller
             ]);
         }, $items);
 
+        $subscriptionItems = array_filter($items, fn($i) => !empty($i['subscription_plan_id']));
+        $isOneTimeCart = !empty($subscriptionItems) && collect($subscriptionItems)->every(
+                fn($item) => $this->subscriptionPlanRepository->find($item['subscription_plan_id'])?->isOneTime()
+            );
+
         $subtotal = collect($items)->sum('subtotal');
 
         $shipping = $this->cartService->requiresShipping()
@@ -262,7 +267,8 @@ class CartController extends Controller
             'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
             'checkoutMode' => 'steps',
             'currency' => $currencyCode,
-            'currencySymbol' => $currencySymbol
+            'currencySymbol' => $currencySymbol,
+            'isOneTimeCart' => $isOneTimeCart,
         ];
 
         return $this->view('checkout/index', $cartData);

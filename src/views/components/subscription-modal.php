@@ -102,7 +102,8 @@ $apiBase = '/api/' . $site;
                          data-plan-currency="<?= htmlspecialchars($plan->currency) ?>"
                          data-plan-period="<?= htmlspecialchars($plan->billing_period) ?>"
                          data-plan-trial="<?= (int)($plan->trial_days ?? 0) ?>"
-                         data-plan-delivery-type="<?= htmlspecialchars($deliveryType) ?>">
+                         data-plan-delivery-type="<?= htmlspecialchars($deliveryType) ?>"
+                         data-plan-one-time="<?= $plan->isOneTime() ? '1' : '0' ?>">
 
                         <?php if ($plan->is_featured): ?>
                             <div class="sub-plan-badge">⭐ Most Popular</div>
@@ -1156,16 +1157,14 @@ $apiBase = '/api/' . $site;
 @js('cart-utils.js')
 
 <script>
+    /* ── Constants ──────────────────────────────────────────────── */
+    const SITE = <?= json_encode(\App\Framework\Support\SiteContext::slug()) ?>;
+    const SUB_STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
+    const SUB_IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
+    const MODAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const MODAL_STORAGE_KEY = 'sub_modal_last_' + SITE;
     (function () {
         'use strict';
-
-        /* ── Constants ──────────────────────────────────────────────── */
-        const SITE = <?= json_encode($site) ?>;
-        const SUB_STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
-        const SUB_IS_LOGGED_IN = <?= $isLoggedIn ? 'true' : 'false' ?>;
-        const MODAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-        const MODAL_STORAGE_KEY = 'sub_modal_last_' + SITE;
-        const onetime = false;
 
         /*
          * Globals required by cart-utils.js and saved-cards.js.
@@ -1363,7 +1362,7 @@ $apiBase = '/api/' . $site;
             const errors = form.querySelectorAll('.form-error');
             errors.forEach(e => (e.textContent = ''));
 
-            const required = selectedAddressId
+            const required = typeof selectedAddressId !== 'undefined' && selectedAddressId
                 ? ['first_name', 'last_name', 'email']
                 : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
 
@@ -1422,6 +1421,7 @@ $apiBase = '/api/' . $site;
                 period: planEl.dataset.planPeriod,
                 trial: parseInt(planEl.dataset.planTrial, 10) || 0,
                 deliveryType: planEl.dataset.planDeliveryType,
+                isOneTime: planEl.dataset.planOneTime === '1',
             };
             window.PLAN_CURRENCY = subSelectedPlan.currency;
             window.INITIAL_SUBTOTAL = subSelectedPlan.price;
@@ -1575,16 +1575,19 @@ $apiBase = '/api/' . $site;
                 return;
             }
 
-            // Build the payload — merge address fields when it's a print plan
-            const data = {isOneTimeSubscription: true, global_renewal_consent: '1', one_time_subscription: onetime};
+            // Build the shared checkout payload.
+            const data = {
+                isOneTimeSubscription: true,
+                global_renewal_consent: '1',
+                one_time_subscription: subSelectedPlan.isOneTime,
+            };
 
             if (window.currentMember) data.member_id = window.currentMember.id;
 
             if (subNeedsAddress()) {
                 const addressForm = document.getElementById('sub-address-form');
                 if (addressForm) {
-                    const addressData = Object.fromEntries(new FormData(addressForm));
-                    Object.assign(data, addressData);
+                    Object.assign(data, Object.fromEntries(new FormData(addressForm)));
                 }
             }
 
@@ -1595,14 +1598,16 @@ $apiBase = '/api/' . $site;
             }
 
             subSetLoading(true);
+            let cartItemId = null;
+
             try {
-                // 1. Add plan to cart
+                // ── Step 1: add plan to cart ──────────────────────────────────────
                 const cartRes = await fetch(window.API_BASE + '/cart/subscription', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         plan_id: subSelectedPlan.id,
-                        delivery_type: subSelectedPlan.deliveryType
+                        delivery_type: subSelectedPlan.deliveryType,
                     }),
                 });
                 const cartResult = await cartRes.json();
@@ -1610,19 +1615,18 @@ $apiBase = '/api/' . $site;
                     subShowCardError(cartResult.message || 'Could not add plan to cart. Please try again.');
                     return;
                 }
-                const cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
+                cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
 
-                // 2. Create checkout intent
-                const res = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
+                // ── Step 2: create checkout (order + subscriptions) ───────────────
+                const checkoutRes = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(data),
                 });
-                const result = await res.json();
+                const result = await checkoutRes.json();
 
                 if (!result.success) {
-                    if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
-                    });
+                    await subRollbackCart(cartItemId);
                     subShowCardError(result.message || 'Checkout failed. Please try again.');
                     return;
                 }
@@ -1634,12 +1638,14 @@ $apiBase = '/api/' . $site;
                 subSubscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
                 subOrderId = result.data?.order_id ?? null;
 
-                // 3. Confirm via Stripe
                 const member = window.currentMember;
 
-                if (onetime) {
+                // ── Step 3a: ONE-TIME flow — charge now via PaymentIntent ─────────
+                if (subSelectedPlan.isOneTime) {
                     const paymentResult = window.selectedCardId
-                        ? await subStripe.confirmCardPayment(subClientSecret, {payment_method: window.selectedCardId})
+                        ? await subStripe.confirmCardPayment(subClientSecret, {
+                            payment_method: window.selectedCardId,
+                        })
                         : await subStripe.confirmCardPayment(subClientSecret, {
                             payment_method: {
                                 card: subCardElement,
@@ -1652,18 +1658,58 @@ $apiBase = '/api/' . $site;
                         });
 
                     if (paymentResult.error) {
-                        if (cartItemId) await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'}).catch(() => {
-                        });
+                        await subRollbackCart(cartItemId);
                         subShowCardError(paymentResult.error.message);
                         return;
                     }
 
-                    if (paymentResult.paymentIntent.status === 'succeeded') {
-                        await subConfirmPayment(paymentResult.paymentIntent.id ?? null);
+                    if (paymentResult.paymentIntent?.status === 'succeeded') {
+                        await subConfirmPayment(paymentResult.paymentIntent.id, null);
                     }
-                } else {
-                    subConfirmPayment(null)
+
+                    return; // done for one-time flow
                 }
+
+                // ── Step 3b: RECURRING flow — tokenise card, let Stripe bill ─────
+                //
+                // We do NOT confirm a PaymentIntent here. Instead we collect the
+                // payment method ID (new card token OR saved card ID) and pass it to
+                // the backend so it can:
+                //   - create/update the Stripe customer
+                //   - attach the card and set it as default
+                //   - call stripe.subscriptions.create() (which handles billing)
+                //   - record the payment and activate the subscription
+                //
+                let paymentMethodId = null;
+
+                if (window.selectedCardId) {
+                    // User chose a saved card — its ID is already a Stripe PM id.
+                    paymentMethodId = window.selectedCardId;
+                } else {
+                    // User entered a new card — tokenise it via Stripe.js.
+                    if (!subStripe || !subCardElement) {
+                        subShowCardError('Payment form not ready. Please refresh and try again.');
+                        return;
+                    }
+
+                    const {paymentMethod, error} = await subStripe.createPaymentMethod({
+                        type: 'card',
+                        card: subCardElement,
+                        billing_details: {
+                            name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
+                            email: member?.email ?? '',
+                        },
+                    });
+
+                    if (error) {
+                        subShowCardError(error.message);
+                        return;
+                    }
+
+                    paymentMethodId = paymentMethod.id;
+                }
+
+                await subConfirmPayment(null, paymentMethodId);
 
             } catch (err) {
                 console.error('Modal payment error:', err);
@@ -1673,21 +1719,46 @@ $apiBase = '/api/' . $site;
             }
         }
 
-        async function subConfirmPayment(intentId) {
-            const body = {payment_intent_id: intentId, order_id: subOrderId};
-            Array.isArray(subSubscriptionId)
-                ? (body.subscription_ids = subSubscriptionId)
-                : (body.subscription_id = subSubscriptionId);
+        async function subConfirmPayment(intentId, paymentMethodId) {
+            const body = {
+                order_id: subOrderId,
+            };
 
-            const res = await fetch(window.API_BASE + '/subscriptions/onetime/confirm-payment', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
-            });
+            // Only include the fields that are actually set — the backend uses
+            // !empty() guards to distinguish the two flows, so sending null values
+            // would bypass those guards incorrectly.
+            if (intentId) body.payment_intent_id = intentId;
+            if (paymentMethodId) body.payment_method_id = paymentMethodId;
+
+            if (Array.isArray(subSubscriptionId)) {
+                body.subscription_ids = subSubscriptionId;
+            } else {
+                body.subscription_id = subSubscriptionId;
+            }
+
+            const res = await fetch(
+                window.API_BASE + '/subscriptions/onetime/confirm-payment',
+                {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(body),
+                }
+            );
             const result = await res.json();
 
             if (result.success) {
                 subGoToStep(5);
             } else {
                 subShowCardError(result.message || 'Payment confirmation failed.');
+            }
+        }
+
+        async function subRollbackCart(cartItemId) {
+            if (!cartItemId) return;
+            try {
+                await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'});
+            } catch (_) {
+                // intentionally ignored
             }
         }
 

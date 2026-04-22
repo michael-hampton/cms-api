@@ -9,6 +9,7 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Subscription;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Currency\CurrencyResolver;
@@ -27,6 +28,8 @@ class OneTimeSubscriptionsController extends Controller
         private readonly SubscriptionBundleRepository       $bundleRepository,
         private readonly ReviewService                      $reviewService,
         private readonly CurrencyResolver                   $currencyResolver,
+        private readonly OrderRepository $orderRepository,
+
     )
     {
         parent::__construct();
@@ -214,8 +217,9 @@ class OneTimeSubscriptionsController extends Controller
     public function confirmPayment(Request $request)
     {
         $paymentIntentId = $request->input('payment_intent_id');
-        $orderId = $request->input('order_id');
+        $orderId = (int)$request->input('order_id');
         $siteId = SiteContext::getId();
+        $paymentMethodId = $request->input('payment_method_id'); // new for recurring flow
 
         $subscriptionIds = $request->input('subscription_ids');
         $subscriptionId = $request->input('subscription_id');
@@ -223,14 +227,14 @@ class OneTimeSubscriptionsController extends Controller
         if (!$paymentIntentId && !$orderId) {
             return $this->jsonResponse([
                 'success' => false,
-                'message' => 'Missing required parameters'
+                'message' => 'Missing required parameters',
             ], 400);
         }
 
         if (empty($subscriptionIds) && empty($subscriptionId)) {
             return $this->jsonResponse([
                 'success' => false,
-                'message' => 'Missing subscription information'
+                'message' => 'Missing subscription information',
             ], 400);
         }
 
@@ -238,8 +242,8 @@ class OneTimeSubscriptionsController extends Controller
             $subscriptionIds = [$subscriptionId];
         }
 
-        $result['success'] = true;
-
+        // ── One-time payment flow (paymentIntentId present) ───────────────────
+        // Stripe already charged the card; verify the intent and record payment.
         if (!empty($paymentIntentId)) {
             $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
                 $paymentIntentId,
@@ -247,37 +251,91 @@ class OneTimeSubscriptionsController extends Controller
                 $siteId,
                 $subscriptionIds
             );
-        }
 
-
-        $member = MemberAuth::getMember();
-        $stripeCustomerId = $member->stripe_customer_id;
-
-        if ($result['success']) {
-            foreach ($subscriptionIds as $subId) {
-
-                $subscription = Subscription::with('plan')->where('id', $subId)->first();
-
-                if (empty($paymentIntentId)) {
-                    $stripeSubscription = $this->stripeProcessor->createStripeSubscription(
-                        $stripeCustomerId,
-                        $subscription->plan,
-                        $subscription,
-                        false);
-
-                    $subscription->update(['payment_subscription_id' => $stripeSubscription->id]);
-                }
-
-                $this->subscriptionService->activateSubscription($subId, $orderId);
+            if (!$result['success']) {
+                return $this->jsonResponse($result, 400);
             }
 
-            \App\Models\Order::where('id', $orderId)->update([
-                'status' => 'completed',
-                'payment_status' => 'paid'
-            ]);
+            foreach ($subscriptionIds as $subId) {
+                $this->subscriptionService->activateSubscription((int)$subId, $orderId);
+            }
+
+            return $this->jsonResponse($result);
         }
 
-        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
+        // ── Recurring subscription flow (no paymentIntentId) ─────────────────
+        // Stripe manages future billing. We need to:
+        //   1. Ensure the customer exists and the card is attached.
+        //   2. Create the Stripe subscription (which sets up automatic billing).
+        //   3. Record the payment and activate the local subscription.
+        //
+        // processSubscriptionPayment() handles steps 1–3 in full, using the same
+        // path as the standard recurring checkout. We call it once per
+        // subscription in the list (bundles may contain multiple).
+
+        $member = MemberAuth::getMember();
+
+        if (!$member) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Authentication required',
+            ], 401);
+        }
+
+        $overallSuccess = true;
+
+        foreach ($subscriptionIds as $subId) {
+            $subscription = Subscription::with('plan')->find((int)$subId);
+
+            if (!$subscription || !$subscription->plan) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => "Subscription {$subId} not found",
+                ], 404);
+            }
+
+            // processSubscriptionPayment handles:
+            //   - getOrCreateCustomer  (creates Stripe customer + saves stripe_customer_id)
+            //   - payment method attachment + set as default
+            //   - createStripeSubscription
+            //   - payment record creation
+            //   - subscription status update to active when Stripe confirms
+            $paymentData = [];
+            if (!empty($paymentMethodId)) {
+                $paymentData['payment_method_id'] = $paymentMethodId;
+            }
+
+            $paymentData['order_id'] = $orderId;
+
+            $paymentResult = $this->stripeProcessor->processSubscriptionPayment(
+                $subscription,
+                $subscription->plan,
+                $paymentData
+            );
+
+            if (!$paymentResult['success']) {
+                return $this->jsonResponse($paymentResult, 400);
+            }
+
+            // Persist the Stripe subscription ID so webhooks can locate this
+            // subscription later (cancellations, renewals, etc.).
+            $subscription->update([
+                'payment_subscription_id' => $paymentResult['subscription_id'],
+            ]);
+
+            // Transition local status: PENDING → ACTIVE.
+            // processSubscriptionPayment already set active on the Stripe side;
+            // activateSubscription handles the DB transition + order linkage.
+            $this->subscriptionService->activateSubscription((int)$subId, $orderId);
+        }
+
+        // Mark the order complete through the repository (no raw static calls).
+        $this->orderRepository->update($orderId, [
+            'status' => 'completed',
+            'payment_status' => 'paid'
+        ]);
+
+        return $this->jsonResponse(['success' => true]);
     }
 
     public function showMultiple(Request $request)

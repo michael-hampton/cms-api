@@ -15,9 +15,9 @@ class OneTimePlanValidator
         string            $deliveryType
     ): void
     {
-        if (!$plan || !$plan->isOneTime()) {
-            throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
-        }
+//        if (!$plan || !$plan->isOneTime()) {
+//            throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
+//        }
 
         $this->validateDeliveryType($plan, $deliveryType);
     }

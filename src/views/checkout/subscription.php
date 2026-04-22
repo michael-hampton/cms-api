@@ -360,6 +360,11 @@ $planPrice = (float)$plan->price;
     const STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
     const SITE = <?= json_encode($site) ?>;
 
+    // Determines which payment path to take (mirrors the modal's `onetime` flag).
+    // true  → charge now via PaymentIntent (one-time subscription)
+    // false → tokenise card only, let Stripe handle billing (recurring subscription)
+    const IS_ONE_TIME = <?= json_encode($plan->isOneTime()) ?>;
+
     // saved-cards.js reads these globals
     window.isLoggedIn = true; // subscription page requires auth
     window.currentMember = <?= json_encode(['id' => $member->id, 'email' => $member->email]) ?>;
@@ -373,13 +378,6 @@ $planPrice = (float)$plan->price;
     /*
      * Restore the correct card UI when the user switches back to "card" after
      * having selected another payment method (e.g. PayPal → Card).
-     *
-     * payment-method-selector.js calls window.onPaymentMethodChange(method)
-     * on every selection. Without this hook, #saved-cards-section stays hidden
-     * and only the Stripe element reappears.
-     *
-     * Fix: if cards were already fetched, re-run displaySavedCards() to restore
-     * the saved-cards list and hide #new-card-section.
      */
     window.onPaymentMethodChange = function (method) {
         if (method !== 'card') return;
@@ -395,20 +393,19 @@ $planPrice = (float)$plan->price;
 
 <script>
     let stripe = null;
-    let elements = null;
     let cardElement = null;
     let clientSecret = null;
     let subscriptionId = null;
     let orderId = null;
+
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
 
     // ── Stripe init ───────────────────────────────────────────────────────
     async function initStripe() {
         if (!STRIPE_KEY) return;
         stripe = Stripe(STRIPE_KEY);
-        elements = stripe.elements();
 
-        cardElement = elements.create('card', {
+        cardElement = stripe.elements().create('card', {
             hidePostalCode: true,
             style: {
                 base: {
@@ -419,10 +416,6 @@ $planPrice = (float)$plan->price;
             },
         });
 
-        // Only mount immediately if #new-card-section is visible (i.e. no
-        // saved cards have been loaded yet). If saved-cards.js later calls
-        // showNewCardForm(), the element will already be mounted because
-        // cardElement.mount() is idempotent once called.
         cardElement.on('change', e => {
             const err = document.getElementById('card-errors');
             if (err) err.textContent = e.error ? e.error.message : '';
@@ -440,6 +433,7 @@ $planPrice = (float)$plan->price;
         const btn = document.getElementById('subscribe-btn');
         const overlay = document.getElementById('loading-overlay');
         btn.disabled = on;
+
         if (on) {
             btn.classList.add('processing');
             btn.textContent = 'Processing…';
@@ -451,7 +445,7 @@ $planPrice = (float)$plan->price;
         }
     }
 
-    // ── Validate required fields ──────────────────────────────────────────
+    // ── Field validation ──────────────────────────────────────────────────
     function validateFields() {
         document.querySelectorAll('.form-error').forEach(el => el.textContent = '');
         const data = Object.fromEntries(new FormData(document.getElementById('subscription-form')));
@@ -460,7 +454,6 @@ $planPrice = (float)$plan->price;
         if (requiresShipping === true && !selectedAddressId) {
             required.push('address', 'city', 'postal_code', 'country');
         }
-
 
         let hasErrors = false;
         for (const field of required) {
@@ -473,7 +466,7 @@ $planPrice = (float)$plan->price;
         return !hasErrors;
     }
 
-    // ── Place order ───────────────────────────────────────────────────────
+    // ── Subscribe button ──────────────────────────────────────────────────
     document.getElementById('subscribe-btn').addEventListener('click', async () => {
         const data = Object.fromEntries(new FormData(document.getElementById('subscription-form')));
 
@@ -508,7 +501,7 @@ $planPrice = (float)$plan->price;
 
         // US renewal consent
         const usBlock = document.getElementById('us-renewal-consent-block');
-        if (usBlock && usBlock?.style.display !== 'none') {
+        if (usBlock && usBlock.style.display !== 'none') {
             const usCb = document.getElementById('us-renewal-consent');
             if (usCb && !usCb.checked) {
                 usBlock.classList.add('consent-error');
@@ -536,8 +529,9 @@ $planPrice = (float)$plan->price;
         }
     });
 
-    // ── Checkout flow — mirrors checkout/index.php handleStripeCheckout ───
+    // ── Main checkout orchestrator ────────────────────────────────────────
     async function processSubscription(data) {
+        // Step 1: create order + subscription records on the backend.
         const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -554,10 +548,21 @@ $planPrice = (float)$plan->price;
         clientSecret = contexts
             ? contexts[Object.keys(contexts)[0]].client_secret
             : (result.data?.client_secret ?? null);
-
         subscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
         orderId = result.data?.order_id ?? null;
 
+        if (IS_ONE_TIME) {
+            await processOneTimePayment(data);
+        } else {
+            await processRecurringPayment(data);
+        }
+    }
+
+    // ── One-time flow: confirm PaymentIntent, backend records payment ─────
+    //
+    // clientSecret comes from the PaymentIntent created during checkout.
+    // Stripe charges the card now; the backend verifies and records it.
+    async function processOneTimePayment(data) {
         const paymentResult = window.selectedCardId
             ? await stripe.confirmCardPayment(clientSecret, {
                 payment_method: window.selectedCardId,
@@ -574,25 +579,75 @@ $planPrice = (float)$plan->price;
                 setup_future_usage: 'off_session',
             });
 
-        const {error, paymentIntent} = paymentResult;
-
-        if (error) {
+        if (paymentResult.error) {
             const cardErrors = document.getElementById('card-errors');
-            if (cardErrors) cardErrors.textContent = error.message;
-            showAlert(error.message, 'error');
+            if (cardErrors) cardErrors.textContent = paymentResult.error.message;
+            showAlert(paymentResult.error.message, 'error');
             return;
         }
 
-        if (paymentIntent.status === 'succeeded') {
-            await confirmPayment(paymentIntent.id);
+        if (paymentResult.paymentIntent?.status === 'succeeded') {
+            await confirmPayment(paymentResult.paymentIntent.id, null);
         }
     }
 
-    async function confirmPayment(intentId) {
-        const body = {payment_intent_id: intentId, order_id: orderId};
-        Array.isArray(subscriptionId)
-            ? (body.subscription_ids = subscriptionId)
-            : (body.subscription_id = subscriptionId);
+    // ── Recurring flow: tokenise card, backend creates Stripe subscription ─
+    //
+    // No PaymentIntent is confirmed here. We collect the payment method ID
+    // (new card token or saved card) and send it to the backend so it can:
+    //   - create/update the Stripe customer
+    //   - attach the card and set it as the default payment method
+    //   - call stripe.subscriptions.create() (Stripe handles all future billing)
+    //   - record the payment and activate the local subscription
+    async function processRecurringPayment(data) {
+        let paymentMethodId = null;
+
+        if (window.selectedCardId) {
+            // Saved card — already a Stripe PaymentMethod ID.
+            paymentMethodId = window.selectedCardId;
+        } else {
+            // New card — tokenise via Stripe.js without charging.
+            const {paymentMethod, error} = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+                billing_details: {
+                    name: `${data.first_name} ${data.last_name}`,
+                    email: data.email,
+                    phone: data.phone ?? undefined,
+                },
+            });
+
+            if (error) {
+                const cardErrors = document.getElementById('card-errors');
+                if (cardErrors) cardErrors.textContent = error.message;
+                showAlert(error.message, 'error');
+                return;
+            }
+
+            paymentMethodId = paymentMethod.id;
+        }
+
+        await confirmPayment(null, paymentMethodId);
+    }
+
+    // ── Confirm with backend ──────────────────────────────────────────────
+    //
+    // intentId       — present for one-time flow, null for recurring
+    // paymentMethodId — present for recurring flow, null for one-time
+    //
+    // Only the relevant key is sent so the backend's !empty() guards work
+    // cleanly without receiving explicit null values.
+    async function confirmPayment(intentId, paymentMethodId) {
+        const body = {order_id: orderId};
+
+        if (intentId) body.payment_intent_id = intentId;
+        if (paymentMethodId) body.payment_method_id = paymentMethodId;
+
+        if (Array.isArray(subscriptionId)) {
+            body.subscription_ids = subscriptionId;
+        } else {
+            body.subscription_id = subscriptionId;
+        }
 
         const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
             method: 'POST',

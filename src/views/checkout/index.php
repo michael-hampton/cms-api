@@ -36,7 +36,7 @@ $cartSubscriptionItems = array_filter($items ?? [], fn($i) => !empty($i['subscri
 $cartProductItems = array_filter($items ?? [], fn($i) => empty($i['subscription_plan_id']));
 $isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
 $isSubscription = !empty($cartSubscriptionItems);
-
+$isOneTimeCart = $isOneTimeCart ?? false;
 $site = SiteContext::slug();
 $apiBase = '/api/' . $site;
 ?>
@@ -481,6 +481,8 @@ $apiBase = '/api/' . $site;
     const CHECKOUT_MODE = <?= json_encode($checkoutMode) ?>;
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
     const isMixedCart = <?= json_encode($isMixedCart) ?>;
+    const IS_SUBSCRIPTION_CART = <?= json_encode($isSubscription) ?>;
+    const IS_ONE_TIME_CART = <?= json_encode($isOneTimeCart) ?>;
 
     let isLoggedIn = false;
     let currentMember = null;
@@ -493,11 +495,12 @@ $apiBase = '/api/' . $site;
 
 
     function checkCartForSubscription() {
-        isOneTimeSubscription = new URLSearchParams(window.location.search).get('type') === 'subscription';
-        if (!isOneTimeSubscription) {
-            const block = document.getElementById('global-renewal-consent-block');
-            if (block) block.style.display = 'none';
-        }
+        // Driven by PHP-resolved cart composition — not the URL.
+        isOneTimeSubscription = IS_SUBSCRIPTION_CART;
+
+        // Auto-renewal consent is only relevant for subscription carts.
+        const block = document.getElementById('global-renewal-consent-block');
+        if (block) block.style.display = IS_SUBSCRIPTION_CART ? '' : 'none';
     }
 
     // ── Shipping validation ───────────────────────────────────────────────
@@ -711,61 +714,139 @@ $apiBase = '/api/' . $site;
 
         setProcessingState(true);
         try {
-            isOneTimeSubscription
-                ? await handleStripeCheckout(data)
-                : await handleRegularCheckout(data);
+            if (!IS_SUBSCRIPTION_CART) {
+                // Physical products — PaymentIntent confirmed on the frontend.
+                await handleRegularCheckout(data);
+            } else if (IS_ONE_TIME_CART) {
+                // One-time subscriptions — PaymentIntent created by the service
+                // (one_time_subscription: true triggers Phase 2 in the service),
+                // confirmed here, backend records payment.
+                await handleOneTimeSubscriptionCheckout(data);
+            } else {
+                // Recurring subscriptions — service skips PaymentIntent (no
+                // one_time_subscription flag sent), frontend tokenises card only,
+                // backend creates Stripe subscription and manages all future billing.
+                await handleRecurringSubscriptionCheckout(data);
+            }
         } finally {
             setProcessingState(false);
         }
     });
 
     // ── Stripe checkout ───────────────────────────────────────────────────
-    async function handleStripeCheckout(data) {
+    async function handleOneTimeSubscriptionCheckout(data) {
         const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({...data, isOneTimeSubscription: true}),
+            body: JSON.stringify({...data, isOneTimeSubscription: true, one_time_subscription: true}),
         });
         const result = await res.json();
+
         if (!result.success) {
             showAlert(result.message || 'Checkout failed', 'error');
             return;
         }
 
         const contexts = result.data.stripe_contexts;
-        clientSecret = contexts ? contexts[Object.keys(contexts)[0]].client_secret : result.data.client_secret;
+        clientSecret = contexts
+            ? contexts[Object.keys(contexts)[0]].client_secret
+            : result.data.client_secret;
         subscriptionId = result.data.subscription_ids || result.data.subscription_id;
         orderId = result.data.order_id;
 
         const paymentResult = window.selectedCardId
-            ? await stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
+            ? await stripe.confirmCardPayment(clientSecret, {
+                payment_method: window.selectedCardId,
+            })
             : await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {card: cardElement,
+                payment_method: {
+                    card: cardElement,
                     billing_details: {
                         name: `${data.first_name} ${data.last_name}`,
                         email: data.email,
-                        phone: data.phone
-                    }
+                        phone: data.phone,
+                    },
                 },
                 setup_future_usage: 'off_session',
             });
 
         const {error, paymentIntent} = paymentResult;
+
         if (error) {
             document.getElementById('card-errors').textContent = error.message;
             showAlert(error.message, 'error');
             return;
         }
-        if (paymentIntent.status === 'succeeded') await confirmPayment(paymentIntent.id);
+
+        if (paymentIntent?.status === 'succeeded') {
+            await confirmPayment(paymentIntent.id, null);
+        }
     }
 
-    async function confirmPayment(intentId) {
-        const body = {payment_intent_id: intentId, order_id: orderId};
-        Array.isArray(subscriptionId) ? (body.subscription_ids = subscriptionId) : (body.subscription_id = subscriptionId);
-        const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    async function handleRecurringSubscriptionCheckout(data) {
+        const res = await fetch(`${API_BASE}/subscriptions/onetime/checkout`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({...data, isOneTimeSubscription: true}),
+            // NOTE: one_time_subscription is intentionally omitted here.
+            // Its absence tells OneTimeSubscriptionCheckoutService to skip
+            // Phase 2 (PaymentIntent creation).
         });
         const result = await res.json();
+
+        if (!result.success) {
+            showAlert(result.message || 'Checkout failed', 'error');
+            return;
+        }
+
+        subscriptionId = result.data.subscription_ids || result.data.subscription_id;
+        orderId = result.data.order_id;
+
+        // Tokenise card without charging — saved card or new card via Stripe.js.
+        let paymentMethodId = null;
+
+        if (window.selectedCardId) {
+            paymentMethodId = window.selectedCardId;
+        } else {
+            const {paymentMethod, error} = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+                billing_details: {
+                    name: `${data.first_name} ${data.last_name}`,
+                    email: data.email,
+                    phone: data.phone,
+                },
+            });
+
+            if (error) {
+                document.getElementById('card-errors').textContent = error.message;
+                showAlert(error.message, 'error');
+                return;
+            }
+
+            paymentMethodId = paymentMethod.id;
+        }
+
+        await confirmPayment(null, paymentMethodId);
+    }
+
+    async function confirmPayment(intentId, paymentMethodId) {
+        const body = {order_id: orderId};
+
+        if (intentId) body.payment_intent_id = intentId;
+        if (paymentMethodId) body.payment_method_id = paymentMethodId;
+
+        Array.isArray(subscriptionId)
+            ? (body.subscription_ids = subscriptionId)
+            : (body.subscription_id = subscriptionId);
+
+        const res = await fetch(`${API_BASE}/subscriptions/onetime/confirm-payment`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        const result = await res.json();
+
         if (result.success) {
             const ids = Array.isArray(subscriptionId) ? subscriptionId : [subscriptionId];
             window.location.href = `/subscription-confirmation?ids=${ids.join(',')}`;
