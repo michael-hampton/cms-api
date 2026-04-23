@@ -451,12 +451,20 @@ $apiBase = '/api/' . $site;
 @include('checkout/components/loading-overlay', ['message' => 'Processing your order...', 'id' => 'loading-overlay'])
 
 <script>
-    const API_BASE = <?= json_encode($apiBase ?? '') ?>;
-    const PLAN_CURRENCY = <?= json_encode($currency ?? '$') ?>;
-    const TAX_RATE = <?= json_encode((float)($tax_rate ?? 0)) ?>;
-    const INITIAL_SUBTOTAL = <?= json_encode((float)($subtotal ?? 0)) ?>;
-    const INITIAL_SHIPPING = <?= json_encode((float)($shipping ?? 0)) ?>;
-    const SUBSCRIPTION_CART_SNAPSHOT = <?= json_encode($subscriptionCartSnapshot) ?>;
+    const CHECKOUT_BOOTSTRAP = <?= json_encode([
+            'apiBase' => $apiBase ?? '',
+            'planCurrency' => $currency ?? '$',
+            'taxRate' => (float)($tax_rate ?? 0),
+            'initialSubtotal' => (float)($subtotal ?? 0),
+            'initialShipping' => (float)($shipping ?? 0),
+            'subscriptionCartSnapshot' => $subscriptionCartSnapshot,
+    ]) ?>;
+    const API_BASE = CHECKOUT_BOOTSTRAP.apiBase;
+    const PLAN_CURRENCY = CHECKOUT_BOOTSTRAP.planCurrency;
+    const TAX_RATE = CHECKOUT_BOOTSTRAP.taxRate;
+    const INITIAL_SUBTOTAL = CHECKOUT_BOOTSTRAP.initialSubtotal;
+    const INITIAL_SHIPPING = CHECKOUT_BOOTSTRAP.initialShipping;
+    const SUBSCRIPTION_CART_SNAPSHOT = CHECKOUT_BOOTSTRAP.subscriptionCartSnapshot;
 </script>
 
 @js('cart-utils.js')
@@ -487,14 +495,16 @@ $apiBase = '/api/' . $site;
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
-    const SITE = <?= json_encode($site) ?>;
-    const STRIPE_KEY = <?= json_encode($_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key')) ?>;
-    const CHECKOUT_MODE = <?= json_encode($checkoutMode) ?>;
-    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
-    const isMixedCart = <?= json_encode($isMixedCart) ?>;
-    const IS_MIXED_SUBSCRIPTION_CART = <?= json_encode($isMixedSubscriptionCart) ?>;
-    const IS_SUBSCRIPTION_CART = <?= json_encode($isSubscription) ?>;
-    const IS_ONE_TIME_CART = <?= json_encode($isOneTimeCart) ?>;
+    const CHECKOUT_CONFIG = <?= json_encode([
+            'site' => $site,
+            'stripeKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
+            'checkoutMode' => $checkoutMode,
+            'requiresShipping' => $requiresShipping ?? true,
+            'isMixedCart' => $isMixedCart,
+            'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
+            'isSubscriptionCart' => $isSubscription,
+            'isOneTimeCart' => $isOneTimeCart,
+    ]) ?>;
 
     let isLoggedIn = false;
     let currentMember = null;
@@ -549,25 +559,7 @@ $apiBase = '/api/' . $site;
             return paymentMethod;
         }
 
-        async confirmRegularPayment(clientSecret, billingDetails) {
-            const paymentResult = window.selectedCardId
-                ? await this.stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
-                : await this.stripe.confirmCardPayment(clientSecret, {
-                    payment_method: {
-                        card: this.cardElement,
-                        billing_details: billingDetails,
-                    },
-                    setup_future_usage: 'off_session',
-                });
-
-            if (paymentResult.error) {
-                throw new Error(paymentResult.error.message);
-            }
-
-            return paymentResult.paymentIntent;
-        }
-
-        async confirmOneTimePayment(clientSecret, billingDetails) {
+        async confirmPayment(clientSecret, billingDetails) {
             const paymentResult = window.selectedCardId
                 ? await this.stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
                 : await this.stripe.confirmCardPayment(clientSecret, {
@@ -684,14 +676,15 @@ $apiBase = '/api/' . $site;
     }
 
     class CheckoutManager {
-        constructor({stripeService, apiService, cartFlowService}) {
+        constructor({stripeService, apiService, cartFlowService, config}) {
             this.stripe = stripeService;
             this.api = apiService;
             this.cartFlow = cartFlowService;
+            this.config = config;
             this.state = 'idle';
             this.currentStep = 2;
             this.completedSubscriptionIds = [];
-            this.isSubscriptionCheckout = IS_SUBSCRIPTION_CART;
+            this.pendingOneTimeStorageKey = 'checkout.pendingOneTime';
         }
 
         async init() {
@@ -716,12 +709,12 @@ $apiBase = '/api/' . $site;
 
         syncSubscriptionUi() {
             const block = document.getElementById('global-renewal-consent-block');
-            if (block) block.style.display = this.isSubscriptionCheckout ? '' : 'none';
+            if (block) block.style.display = this.config.isSubscriptionCart ? '' : 'none';
         }
 
         validateShippingFields() {
             document.querySelectorAll('.form-error').forEach((el) => el.textContent = '');
-            if (!requiresShipping) return true;
+            if (!this.config.requiresShipping) return true;
 
             const data = Object.fromEntries(new FormData(document.getElementById('checkout-form')));
             const required = selectedAddressId
@@ -740,8 +733,8 @@ $apiBase = '/api/' . $site;
             return !hasErrors;
         }
 
-        <?php if ($checkoutMode === 'steps'): ?>
         goToStep(step) {
+            if (this.config.checkoutMode !== 'steps') return;
             if (step === this.currentStep) return;
 
             document.getElementById('step-2-section').style.display = step === 2 ? 'block' : 'none';
@@ -774,7 +767,7 @@ $apiBase = '/api/' . $site;
         }
 
         advanceToPayment() {
-            if (isMixedCart) {
+            if (this.config.isMixedCart) {
                 showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
                 return;
             }
@@ -787,13 +780,6 @@ $apiBase = '/api/' . $site;
 
             this.goToStep(3);
         }
-        <?php else: ?>
-        goToStep() {
-        }
-
-        advanceToPayment() {
-        }
-        <?php endif; ?>
 
         setState(state) {
             this.state = state;
@@ -804,9 +790,12 @@ $apiBase = '/api/' . $site;
 
             if (state !== 'idle') {
                 btn.classList.add('processing');
-                btn.textContent = state === 'processing_one_time'
-                    ? 'Confirming Payment…'
-                    : 'Processing…';
+                const labels = {
+                    processing: 'Processing…',
+                    processing_recurring: 'Setting Up Subscriptions…',
+                    processing_one_time: 'Confirming One-Time Payment…',
+                };
+                btn.textContent = labels[state] ?? 'Processing…';
                 overlay.classList.add('show');
             } else {
                 btn.classList.remove('processing');
@@ -843,7 +832,7 @@ $apiBase = '/api/' . $site;
 
             const globalConsentBlock = document.getElementById('global-renewal-consent-block');
             const globalConsentCb = document.getElementById('global-renewal-consent');
-            if (globalConsentCb && !globalConsentCb.checked && this.isSubscriptionCheckout) {
+            if (globalConsentCb && !globalConsentCb.checked && this.config.isSubscriptionCart) {
                 globalConsentBlock?.classList.add('consent-error');
                 globalConsentBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
                 throw new Error('Please confirm the subscription terms before placing your order.');
@@ -852,7 +841,7 @@ $apiBase = '/api/' . $site;
             data.global_renewal_consent = '1';
 
             const usConsentBlock = document.getElementById('us-renewal-consent-block');
-            if (usConsentBlock && usConsentBlock.style.display !== 'none' && this.isSubscriptionCheckout) {
+            if (usConsentBlock && usConsentBlock.style.display !== 'none' && this.config.isSubscriptionCart) {
                 const usConsentCb = document.getElementById('us-renewal-consent');
                 if (!usConsentCb?.checked) {
                     usConsentBlock.classList.add('consent-error');
@@ -868,11 +857,9 @@ $apiBase = '/api/' . $site;
                 ['address', 'address2', 'city', 'state', 'postal_code', 'country'].forEach((key) => delete data[key]);
             }
 
-            <?php if ($checkoutMode !== 'steps'): ?>
-            if (requiresShipping && !this.validateShippingFields()) {
+            if (this.config.checkoutMode !== 'steps' && this.config.requiresShipping && !this.validateShippingFields()) {
                 throw new Error('Please fill in all required fields.');
             }
-            <?php endif; ?>
 
             if (includeVoucher && appliedVoucher) {
                 data.voucher_code = appliedVoucher.code;
@@ -886,6 +873,17 @@ $apiBase = '/api/' . $site;
 
         normalizeSubscriptionIds(result) {
             return Array.isArray(result) ? result : (result ? [result] : []);
+        }
+
+        storePendingOneTimeState(items) {
+            sessionStorage.setItem(this.pendingOneTimeStorageKey, JSON.stringify({
+                items,
+                completedSubscriptionIds: this.completedSubscriptionIds,
+            }));
+        }
+
+        clearPendingOneTimeState() {
+            sessionStorage.removeItem(this.pendingOneTimeStorageKey);
         }
 
         async confirmSubscriptionCheckout({orderId, subscriptionIds, paymentIntentId = null, paymentMethodId = null}) {
@@ -917,7 +915,7 @@ $apiBase = '/api/' . $site;
 
             const contexts = result.stripe_contexts;
             const clientSecret = contexts ? contexts[Object.keys(contexts)[0]].client_secret : result.client_secret;
-            const paymentIntent = await this.stripe.confirmRegularPayment(clientSecret, this.getBillingDetails(data));
+            const paymentIntent = await this.stripe.confirmPayment(clientSecret, this.getBillingDetails(data));
 
             if (paymentIntent.status === 'succeeded') {
                 const confirmResult = await this.api.confirmRegularCheckout({
@@ -968,7 +966,7 @@ $apiBase = '/api/' . $site;
             const subscriptionIds = this.normalizeSubscriptionIds(
                 result.data.subscription_ids || result.data.subscription_id
             );
-            const paymentIntent = await this.stripe.confirmOneTimePayment(clientSecret, this.getBillingDetails(data));
+            const paymentIntent = await this.stripe.confirmPayment(clientSecret, this.getBillingDetails(data));
 
             if (paymentIntent?.status === 'succeeded') {
                 await this.confirmSubscriptionCheckout({
@@ -990,32 +988,35 @@ $apiBase = '/api/' . $site;
                 await this.cartFlow.replaceCart(oneTimeItems);
                 await this.handleOneTimeFlow(this.buildPayload({includeVoucher: false}));
             } catch (error) {
+                this.storePendingOneTimeState(oneTimeItems);
                 await this.cartFlow.replaceCart(oneTimeItems);
                 throw new Error(`Recurring subscriptions were created successfully, but the one-time payment still needs to be completed. ${error.message}`);
             }
 
+            this.clearPendingOneTimeState();
             window.location.href = `/subscription-confirmation?ids=${this.completedSubscriptionIds.join(',')}`;
         }
 
         async handleSubscriptionCheckout() {
-            if (IS_MIXED_SUBSCRIPTION_CART) {
+            if (this.config.isMixedSubscriptionCart) {
                 await this.handleMixedSubscriptionFlow();
                 return;
             }
 
-            if (IS_ONE_TIME_CART) {
+            if (this.config.isOneTimeCart) {
                 await this.handleOneTimeFlow(this.buildPayload());
             } else {
                 await this.handleRecurringFlow(this.buildPayload());
             }
 
+            this.clearPendingOneTimeState();
             window.location.href = `/subscription-confirmation?ids=${this.completedSubscriptionIds.join(',')}`;
         }
 
         applyCheckoutRestrictions() {
-            if (!isMixedCart) return;
+            if (!this.config.isMixedCart) return;
 
-            const button = CHECKOUT_MODE === 'steps'
+            const button = this.config.checkoutMode === 'steps'
                 ? document.getElementById('continue-to-payment-btn')
                 : document.getElementById('place-order-btn');
 
@@ -1026,7 +1027,7 @@ $apiBase = '/api/' . $site;
         }
 
         async process() {
-            if (isMixedCart) {
+            if (this.config.isMixedCart) {
                 showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
                 return;
             }
@@ -1034,7 +1035,7 @@ $apiBase = '/api/' . $site;
             try {
                 this.setState('processing');
 
-                if (IS_SUBSCRIPTION_CART) {
+                if (this.config.isSubscriptionCart) {
                     await this.handleSubscriptionCheckout();
                 } else {
                     await this.handleRegularCheckout(this.buildPayload());
@@ -1051,10 +1052,12 @@ $apiBase = '/api/' . $site;
         }
     }
 
+    const apiService = new ApiService(API_BASE);
     window.checkoutManager = new CheckoutManager({
-        stripeService: new StripeService(STRIPE_KEY),
-        apiService: new ApiService(API_BASE),
-        cartFlowService: new CartFlowService(new ApiService(API_BASE), SUBSCRIPTION_CART_SNAPSHOT),
+        stripeService: new StripeService(CHECKOUT_CONFIG.stripeKey),
+        apiService,
+        cartFlowService: new CartFlowService(apiService, SUBSCRIPTION_CART_SNAPSHOT),
+        config: CHECKOUT_CONFIG,
     });
 
     checkLoginStatus();
