@@ -562,7 +562,7 @@ class CampaignService
             return ['variants' => [], 'stats' => []];
         }
 
-        $stats = $this->aggregateStats($campaignId, $variants);
+        $stats = $this->campaignRepository->aggregateStats($campaignId, $variants);
 
         return [
             'variants' => $variants->toArray(),

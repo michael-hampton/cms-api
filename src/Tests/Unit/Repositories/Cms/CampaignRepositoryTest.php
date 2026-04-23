@@ -180,6 +180,94 @@ class CampaignRepositoryTest extends RepositoryTestCase
         $this->assertEquals(3, $count);
     }
 
+    public function test_aggregate_stats_returns_correct_counts(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Stats Campaign',
+            'slug' => 'stats-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+        ]);
+
+        $variantA = \App\Models\CampaignVariant::create([
+            'campaign_id' => $campaign->id,
+            'key' => 'A',
+            'weight' => 60,
+        ]);
+        $variantB = \App\Models\CampaignVariant::create([
+            'campaign_id' => $campaign->id,
+            'key' => 'B',
+            'weight' => 40,
+        ]);
+
+        $member = $this->createMember();
+
+        \App\Models\CampaignDelivery::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'channel' => 'email', 'token' => uniqid()]);
+        \App\Models\CampaignDelivery::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'channel' => 'email', 'token' => uniqid()]);
+        \App\Models\CampaignDelivery::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'channel' => 'email', 'token' => uniqid()]);
+        \App\Models\CampaignDelivery::create(['campaign_id' => $campaign->id, 'variant_id' => $variantB->id, 'member_id' => $member->id, 'channel' => 'email', 'token' => uniqid()]);
+
+        \App\Models\CampaignEvent::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'event_type' => 'open']);
+        \App\Models\CampaignEvent::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'event_type' => 'open']);
+        \App\Models\CampaignEvent::create(['campaign_id' => $campaign->id, 'variant_id' => $variantA->id, 'member_id' => $member->id, 'event_type' => 'click']);
+        \App\Models\CampaignEvent::create(['campaign_id' => $campaign->id, 'variant_id' => $variantB->id, 'member_id' => $member->id, 'event_type' => 'open']);
+
+        $variants = \App\Framework\Support\Collection::make([$variantA, $variantB]);
+        $stats = $this->repository->aggregateStats($campaign->id, $variants);
+
+        $byKey = array_column($stats, null, 'key');
+
+        $this->assertArrayHasKey('A', $byKey);
+        $this->assertArrayHasKey('B', $byKey);
+
+        $a = $byKey['A'];
+        $this->assertEquals(3, $a['deliveries']);
+        $this->assertEquals(2, $a['opens']);
+        $this->assertEquals(1, $a['clicks']);
+        $this->assertEquals(66.67, $a['open_rate']);
+        $this->assertEquals(33.33, $a['click_rate']);
+
+        $b = $byKey['B'];
+        $this->assertEquals(1, $b['deliveries']);
+        $this->assertEquals(1, $b['opens']);
+        $this->assertEquals(0, $b['clicks']);
+        $this->assertEquals(100, $b['open_rate']);
+        $this->assertEquals(0, $b['click_rate']);
+    }
+
+    public function test_aggregate_stats_returns_zeros_for_campaign_with_no_events(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $campaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Empty Campaign',
+            'slug' => 'empty-campaign',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+        ]);
+
+        $variant = \App\Models\CampaignVariant::create([
+            'campaign_id' => $campaign->id,
+            'key' => 'A',
+            'weight' => 100,
+        ]);
+
+        $variants = \App\Framework\Support\Collection::make([$variant]);
+        $stats = $this->repository->aggregateStats($campaign->id, $variants);
+
+        $this->assertCount(1, $stats);
+        $this->assertEquals('A', $stats[0]['key']);
+        $this->assertEquals(0, $stats[0]['deliveries']);
+        $this->assertEquals(0, $stats[0]['opens']);
+        $this->assertEquals(0, $stats[0]['clicks']);
+        $this->assertEquals(0, $stats[0]['open_rate']);
+        $this->assertEquals(0, $stats[0]['click_rate']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

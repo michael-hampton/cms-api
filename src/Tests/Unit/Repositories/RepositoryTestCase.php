@@ -40,6 +40,8 @@ abstract class RepositoryTestCase extends FunctionalTestCase
 
         // Create a default site for repository tests
         $this->createTestSite();
+
+        $this->actingAs();
     }
 
     /**

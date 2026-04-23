@@ -467,6 +467,7 @@
         try {
             const res = await fetch(`/api/${SITE}/${window.currentMember.id}/addresses?type=shipping`);
             const data = await res.json();
+            console.log('data', data)
             if (data.items?.length) displaySavedAddresses(data.items);
         } catch (e) {
             console.error(e);

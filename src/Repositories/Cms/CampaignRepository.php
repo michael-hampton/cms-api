@@ -187,7 +187,7 @@ class CampaignRepository extends Repository
      * Intentionally avoids a JOIN so neither table needs to know about the
      * other's schema — we resolve variant keys via the in-memory collection.
      */
-    private function aggregateStats(int $campaignId, Collection $variants): array
+    public function aggregateStats(int $campaignId, Collection $variants): array
     {
         // Map variant_id → key for lookup
         $keyById = $variants->pluck('key', 'id')->toArray();
@@ -202,35 +202,23 @@ class CampaignRepository extends Repository
             ->pluck('total', 'variant_id')
             ->toArray();
 
-        // Open counts per variant (event_type = 'open')
-        $openCounts = CampaignEvent::whereIn('delivery_id', function ($q) use ($campaignId, $variantIds) {
-            $q->select('id')
-                ->from('campaign_deliveries')
-                ->where('campaign_id', $campaignId)
-                ->whereIn('variant_id', $variantIds);
-        })
+        // Open counts per variant — variant_id is on campaign_events directly
+        $openCounts = CampaignEvent::where('campaign_id', $campaignId)
+            ->whereIn('variant_id', $variantIds)
             ->where('event_type', 'open')
-            ->selectRaw('
-                (SELECT variant_id FROM campaign_deliveries WHERE id = campaign_events.delivery_id LIMIT 1) as variant_id,
-                COUNT(*) as total
-            ')
+            ->selectRaw('variant_id, COUNT(*) as total')
             ->groupBy('variant_id')
+            ->get()
             ->pluck('total', 'variant_id')
             ->toArray();
 
-        // Click counts per variant (event_type = 'click')
-        $clickCounts = CampaignEvent::whereIn('delivery_id', function ($q) use ($campaignId, $variantIds) {
-            $q->select('id')
-                ->from('campaign_deliveries')
-                ->where('campaign_id', $campaignId)
-                ->whereIn('variant_id', $variantIds);
-        })
+        // Click counts per variant
+        $clickCounts = CampaignEvent::where('campaign_id', $campaignId)
+            ->whereIn('variant_id', $variantIds)
             ->where('event_type', 'click')
-            ->selectRaw('
-                (SELECT variant_id FROM campaign_deliveries WHERE id = campaign_events.delivery_id LIMIT 1) as variant_id,
-                COUNT(*) as total
-            ')
+            ->selectRaw('variant_id, COUNT(*) as total')
             ->groupBy('variant_id')
+            ->get()
             ->pluck('total', 'variant_id')
             ->toArray();
 

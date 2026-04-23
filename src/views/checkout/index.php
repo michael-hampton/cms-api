@@ -53,7 +53,6 @@ $subscriptionCartSnapshot = array_values(array_map(function ($item) {
 }, $cartSubscriptionItems));
 $site = SiteContext::slug();
 $apiBase = '/api/' . $site;
-
 ?>
 @endsection
 
@@ -510,6 +509,8 @@ $apiBase = '/api/' . $site;
     let currentMember = null;
     let selectedAddressId = null;
     let appliedVoucher = <?= json_encode($appliedVoucher) ?>;
+    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
+    const SITE = <?= json_encode($site) ?>;
 
     class StripeService {
         constructor(stripeKey) {

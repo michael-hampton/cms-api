@@ -487,4 +487,9 @@ class SubscriptionRepository extends Repository
             'last_page' => max(1, (int)ceil($total / $perPage)),
         ];
     }
+
+    public function findSubscriptionByStripeId(string $stripeSubscriptionId): ?Subscription
+    {
+        return Subscription::where('payment_subscription_id', $stripeSubscriptionId)->first();
+    }
 }

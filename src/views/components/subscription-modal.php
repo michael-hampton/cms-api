@@ -1486,6 +1486,8 @@ $apiBase = '/api/' . $site;
                 if (!planElement) return;
                 this.readPlanData(planElement);
                 this.goToStep(this.nextStep(1));
+
+                alert(this.selectedPlan.id + ' ' + this.selectedPlan.isOneTime)
             }
 
             updatePaymentSummary() {

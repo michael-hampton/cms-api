@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Billing;
 
+use App\Enums\PaymentStatus;
 use App\Framework\Support\Collection;
 use App\Models\Payment;
 use App\Repositories\Repository;
@@ -123,6 +124,60 @@ class PaymentRepository extends Repository
         // Replace with however your repository accesses its base query builder,
         // e.g. Campaign::query() or $this->model->newQuery()
         return $engine->search($this->query(), $criteria);
+    }
+
+    public function recordInvoicePaymentFailed(
+        int     $subscriptionId,
+        string  $stripeInvoiceId,
+        ?string $stripePaymentIntentId,
+        int     $amountCents,
+        string  $currency,
+        ?string $failureReason,
+        ?string $failureCode,
+    ): Payment
+    {
+        return Payment::updateOrCreate(
+            [
+                'transaction_id' => $stripeInvoiceId],
+            [
+                'subscription_id' => $subscriptionId,
+                'payment_intent_id' => $stripePaymentIntentId,
+                'amount' => $amountCents,
+                'currency' => strtoupper($currency),
+                'status' => PaymentStatus::FAILED->value,
+                'error_message' => $failureReason,
+                //'failure_code'              => $failureCode, //todo needs column
+                'paid_at' => null,
+                'payment_method' => 'stripe',
+                'payment_provider' => 'stripe',
+            ]
+        );
+    }
+
+    public function recordInvoicePaymentSucceeded(
+        int                $subscriptionId,
+        string             $stripeInvoiceId,
+        ?string            $stripePaymentIntentId,
+        int                $amountCents,
+        string             $currency,
+        \DateTimeImmutable $paidAt,
+    ): Payment
+    {
+        return Payment::updateOrCreate(
+            ['transaction_id' => $stripeInvoiceId],
+            [
+                'subscription_id' => $subscriptionId,
+                'payment_intent_id' => $stripePaymentIntentId,
+                'amount' => $amountCents,
+                'currency' => strtoupper($currency),
+                'status' => PaymentStatus::COMPLETED->value,
+                'error_message' => null,
+                //'failure_code'              => null,
+                'paid_at' => $paidAt->format('Y-m-d H:i:s'),
+                'payment_method' => 'stripe',
+                'payment_provider' => 'stripe',
+            ]
+        );
     }
 
     protected function getModelClass(): string

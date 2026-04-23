@@ -16,6 +16,12 @@ class CampaignResource extends JsonResource
             ->orderBy('key')
             ->get();
 
+        // Populate variant stats from the repository so the frontend @Input
+        // never needs a separate API call for the variants tab.
+        $variantStats = $variants->isNotEmpty()
+            ? $campaignRepository->aggregateStats($this->getAttribute('id'), $variants)
+            : [];
+
         return [
             'id' => $this->getAttribute('id'),
             'site_id' => $this->getAttribute('site_id'),
@@ -35,12 +41,9 @@ class CampaignResource extends JsonResource
             'updated_by' => $this->getAttribute('updated_by'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
-
-            // Computed domain state — derived here so controllers stay thin
             'is_currently_active' => $this->getAttribute('is_active') === true,
             'has_ended' => $this->getAttribute('end_date') > now_datetime(),
             'subscriber_count' => $campaignRepository->getSubscriberCount($this->getAttribute('id')),
-            //'is_valid_for_signup'  => $this->resource->isValidForSignup(),
             'priority' => $this->getAttribute('priority'),
             'cooldown_hours' => $this->getAttribute('cooldown_hours'),
             'fallback_channels' => $this->getAttribute('fallback_channels'),
@@ -52,7 +55,6 @@ class CampaignResource extends JsonResource
             'push_icon' => $this->getAttribute('push_icon'),
             'template' => $this->getAttribute('template'),
             'push_url' => $this->getAttribute('push_url'),
-            // A/B variants — included so the frontend @Input needs no extra API call
             'variants' => $variants->map(fn($v) => [
                 'id' => $v->id,
                 'key' => $v->key,
@@ -60,7 +62,7 @@ class CampaignResource extends JsonResource
                 'subject_line' => $v->subject_line ?? null,
                 'template' => $v->template ?? null,
             ])->values()->all(),
-            'variant_stats' => [],
+            'variant_stats' => $variantStats,
         ];
     }
 }

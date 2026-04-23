@@ -326,7 +326,7 @@ class OneTimeSubscriptionsController extends Controller
             // Transition local status: PENDING → ACTIVE.
             // processSubscriptionPayment already set active on the Stripe side;
             // activateSubscription handles the DB transition + order linkage.
-            $this->subscriptionService->activateSubscription((int)$subId, $orderId);
+            //$this->subscriptionService->activateSubscription((int)$subId, $orderId);
         }
 
         // Mark the order complete through the repository (no raw static calls).

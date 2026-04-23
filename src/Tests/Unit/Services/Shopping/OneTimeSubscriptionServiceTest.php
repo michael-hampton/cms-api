@@ -55,6 +55,23 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             $this->dateCalculator,
             $this->pricingCalculator
         );
+
+        // Default expectations to avoid NoMatchingExpectationException
+        $this->validator->shouldReceive('validatePlanForSubscription')
+            ->with(m::type(SubscriptionPlan::class), m::any(), m::any())
+            ->byDefault();
+
+        $this->validator->shouldReceive('validateBillingPeriod')
+            ->andReturn(BillingPeriod::MONTHLY)
+            ->byDefault();
+
+        $this->pricingCalculator->shouldReceive('validateDiscount')->byDefault();
+        $this->pricingCalculator->shouldReceive('calculateFinalPrice')
+            ->andReturn(Money::fromDecimal(10.0, 'USD'))
+            ->byDefault();
+
+        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn(new \DateTimeImmutable())->byDefault();
+        $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable())->byDefault();
     }
 
     protected function tearDown(): void
@@ -113,7 +130,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn($plan);
 
         $this->validator->shouldReceive('validatePlanForSubscription')
-            ->with($plan, SubscriptionType::DIGITAL->value)
+            ->with($plan, SubscriptionType::DIGITAL->value, m::any())
             ->once();
 
         $this->validator->shouldReceive('validateBillingPeriod')
@@ -216,6 +233,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
     public function testCreateOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->billing_period = 'monthly';
 
         $this->planRepository->shouldReceive('find')
             ->with(1)
@@ -223,7 +241,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn($plan);
 
         $this->validator->shouldReceive('validatePlanForSubscription')
-            ->with($plan, SubscriptionType::DIGITAL->value)
+            ->with($plan, SubscriptionType::DIGITAL->value, m::any())
             ->andThrow(new InvalidDeliveryTypeException('Digital delivery not available'));
 
         $this->databaseMock->shouldReceive('transaction')

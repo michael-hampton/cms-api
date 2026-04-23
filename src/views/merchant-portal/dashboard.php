@@ -3341,6 +3341,8 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                                 </div>
                                 <div class="voucher-right">
                                     <div>
+                                        <div class="voucher-name"
+                                             style="font-weight:600; font-size:13px;"><?= $voucher->name ?></div>
                                         <div class="voucher-code"><?= htmlspecialchars($voucher->code) ?></div>
                                         <div class="voucher-meta"><?= $expMeta ?> · <?= $usageMeta ?></div>
                                     </div>
@@ -3364,6 +3366,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                                         <?php else: ?>
                                             <button class="btn btn-sm btn-ghost edit-voucher-btn"
                                                     data-id="<?= $voucher->id ?>"
+                                                    data-name="<?= $voucher->name ?>"
                                                     data-code="<?= htmlspecialchars($voucher->code, ENT_QUOTES) ?>"
                                                     data-type="<?= $voucher->discount_type ?? 'percentage' ?>"
                                                     data-value="<?= $voucher->value ?? '' ?>"
@@ -3878,6 +3881,11 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="voucher-modal-id">
+                    <div class="form-group">
+                        <label class="form-label">Voucher Name</label>
+                        <input type="text" id="voucher-modal-name" class="form-control"
+                               placeholder="e.g. Summer Sale 20%">
+                    </div>
                     <div class="form-row">
                         <div class="form-group"><label class="form-label">Voucher Code</label><input type="text"
                                                                                                      id="voucher-modal-code"
@@ -4573,8 +4581,9 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                 #updateOfferRow(id, body) {
                     const btn = document.querySelector(`.edit-offer-btn[data-id="${id}"]`);
                     if (!btn) return;
-                    const row = btn.closest('[data-status]');
+                    const row = btn.closest('.offer-list-item');  // was: closest('[data-status]')
                     if (!row) return;
+
                     // Update status badge
                     if (body.status) {
                         row.dataset.status = body.status;
@@ -4585,11 +4594,29 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                             badge.textContent = body.status.charAt(0).toUpperCase() + body.status.slice(1);
                         }
                     }
+
                     // Update price display
-                    const priceEl = row.querySelector('.offer-price, [class*="price"]');
+                    const priceEl = row.querySelector('.offer-sale');  // was: '.offer-price, [class*="price"]'
                     if (priceEl && body.sale_price) {
                         priceEl.textContent = `£${parseFloat(body.sale_price).toFixed(2)}`;
                     }
+
+                    // Update date range display
+                    const datesEl = row.querySelector('.offer-dates');
+                    if (datesEl) {
+                        const start = body.start_date
+                            ? new Date(body.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})
+                            : '';
+                        const end = body.end_date
+                            ? new Date(body.end_date).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                            })
+                            : '';
+                        datesEl.textContent = start && end ? `${start} – ${end}` : 'Ongoing · No expiry set';
+                    }
+
                     // Keep data attributes in sync
                     btn.dataset.salePrice = body.sale_price ?? btn.dataset.salePrice;
                     btn.dataset.originalPrice = body.original_price ?? btn.dataset.originalPrice;
@@ -4948,6 +4975,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                         if (el) el.value = val ?? '';
                     };
                     set('voucher-modal-id', data?.id || '');
+                    set('voucher-modal-name', data?.name || '');
                     set('voucher-modal-code', data?.code || '');
                     set('voucher-modal-value', data?.value || '');
                     set('voucher-modal-limit', data?.limit || '');
@@ -4974,7 +5002,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                 async save() {
                     const id = document.getElementById('voucher-modal-id')?.value;
                     const body = {
-                        name: 'test', //todo
+                        name: document.getElementById('voucher-modal-name')?.value || '',
                         code: document.getElementById('voucher-modal-code')?.value,
                         type: document.getElementById('voucher-modal-type')?.value,
                         value: parseFloat(document.getElementById('voucher-modal-value')?.value) || 0,
@@ -4984,6 +5012,11 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                         is_stackable: document.getElementById('voucher-modal-stackable')?.checked || false,
                         merchant_id: MERCHANT_ID
                     };
+
+                    if (!body.name) {
+                        this.#notif.error('Voucher name is required.');
+                        return;
+                    }
 
                     this.#setLoading('voucher-modal-save', true);
                     try {
@@ -5032,14 +5065,42 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                     if (!editBtn) return;
                     const card = editBtn.closest('.voucher-card');
                     if (!card) return;
-                    // Update displayed value
+
+                    // Update discount display
                     const pctEl = card.querySelector('.voucher-pct');
                     if (pctEl) {
                         pctEl.textContent = body.type === 'percentage'
                             ? `${body.value}%`
                             : `£${parseFloat(body.value).toFixed(0)}`;
                     }
+
+                    // Update left panel background colour
+                    const leftEl = card.querySelector('.voucher-left');
+                    if (leftEl) leftEl.style.background = body.type === 'fixed' ? 'var(--blue)' : 'var(--ink)';
+
+                    // Update meta line
+                    const metaEl = card.querySelector('.voucher-meta');
+                    if (metaEl) {
+                        const expMeta = body.expires_at
+                            ? `Expires ${new Date(body.expires_at).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                            })}`
+                            : 'No expiry';
+                        const timesUsed = parseInt(editBtn.dataset.timesUsed ?? 0);
+                        const usageMeta = body.usage_limit
+                            ? `Used ${timesUsed}/${body.usage_limit}`
+                            : 'Unlimited uses';
+                        metaEl.textContent = `${expMeta} · ${usageMeta}`;
+                    }
+
+                    const nameEl = card.querySelector('.voucher-name');
+                    if (nameEl) nameEl.textContent = body.name;
+
                     // Keep data attributes in sync
+                    editBtn.dataset.name = body.name;
+                    editBtn.dataset.code = body.code;
                     editBtn.dataset.value = body.value;
                     editBtn.dataset.limit = body.usage_limit ?? '';
                     editBtn.dataset.min = body.minimum_order_value ?? '';
@@ -5057,11 +5118,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                     const value = parseFloat(voucher.value) || 0;
                     const bgColor = type === 'fixed' ? 'var(--blue)' : 'var(--ink)';
                     const discountDisplay = type === 'percentage' ? `${value}%` : `£${value.toFixed(0)}`;
-                    const expMeta = voucher.expires_at ? `Expires ${new Date(voucher.expires_at).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                    })}` : 'No expiry';
+                    const expMeta = voucher.expires_at ? `Expires ${this.#formatDate(voucher.expires_at)}` : 'No expiry';
                     const usageMeta = voucher.usage_limit ? `Used 0/${voucher.usage_limit}` : 'Unlimited uses';
 
                     const card = document.createElement('div');
@@ -5075,6 +5132,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                         </div>
                         <div class="voucher-right">
                             <div>
+                                <div class="voucher-name" style="font-weight:600; font-size:13px;">${this.esc(voucher.name)}</div>
                                 <div class="voucher-code">${this.esc(voucher.code)}</div>
                                 <div class="voucher-meta">${expMeta} · ${usageMeta}</div>
                             </div>
@@ -5083,11 +5141,13 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                                 <button class="btn btn-sm btn-secondary" onclick="copyCode('${this.esc(voucher.code)}')">Copy</button>
                                 <button class="btn btn-sm btn-ghost edit-voucher-btn"
                                     data-id="${voucher.id ?? ''}"
+                                    data-name="${this.esc(voucher.name ?? '')}"
                                     data-code="${this.esc(voucher.code)}"
                                     data-type="${type}"
                                     data-value="${value}"
                                     data-limit="${voucher.usage_limit ?? ''}"
                                     data-min="${voucher.minimum_order_value ?? ''}"
+                                    data-name="${this.esc(voucher.name ?? '')}"
                                     data-expires="${voucher.expires_at ?? ''}"
                                     data-stackable="${voucher.is_stackable ? '1' : '0'}">Edit</button>
                             </div>
@@ -5097,9 +5157,18 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                     // Keep stat cards in sync
                     const activeCount = list.querySelectorAll('.voucher-card[data-status="active"]').length;
                     const totalCount = list.querySelectorAll('.voucher-card').length;
-                    document.querySelector('#panel-vouchers .stat-card.green .stat-value')?.let?.(el => el.textContent = activeCount);
-                    document.querySelector('#panel-vouchers .stat-card.amber .stat-value')?.let?.(el => el.textContent = totalCount);
+                    const activeStatEl = document.querySelector('#panel-vouchers .stat-card.green .stat-value');
+                    if (activeStatEl) activeStatEl.textContent = activeCount;
+                    const totalStatEl = document.querySelector('#panel-vouchers .stat-card.amber .stat-value');
+                    if (totalStatEl) totalStatEl.textContent = totalCount;
                 }
+
+                #formatDate = (str) => {
+                    if (!str) return null;
+                    const [y, m, d] = str.split('T')[0].split('-');
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    return `${d} ${months[parseInt(m, 10) - 1]} ${y}`;
+                };
 
                 copyCode(code) {
                     navigator.clipboard?.writeText(code).catch(() => {
@@ -5364,6 +5433,7 @@ $pendingReviewCount = ($reviewStats['pending_response'] ?? 0);
                             const d = voucherBtn.dataset;
                             this.voucher.openModal({
                                 id: d.id, code: d.code, type: d.type,
+                                name: d.name,
                                 value: d.value, limit: d.limit, min: d.min,
                                 expires: d.expires, stackable: d.stackable === '1',
                             });

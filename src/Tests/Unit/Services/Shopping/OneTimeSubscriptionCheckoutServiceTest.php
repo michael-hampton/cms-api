@@ -100,6 +100,12 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->fulfilSubscriptionAction->shouldReceive('reserve')->andReturn(1)->byDefault();
         $this->fulfilSubscriptionAction->shouldReceive('confirm')->andReturn(null)->byDefault();
         $this->fulfilSubscriptionAction->shouldReceive('release')->andReturn(null)->byDefault();
+
+        $this->cartService->shouldReceive('clear')->byDefault();
+
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->andReturn(['success' => true])
+            ->byDefault();
     }
 
     public function test_throws_when_cart_has_no_subscriptions(): void
@@ -111,7 +117,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_throws_when_cart_is_empty(): void
@@ -121,7 +127,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_throws_when_member_not_authenticated(): void
@@ -137,7 +143,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Please login to purchase a subscription');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_throws_when_all_items_removed_by_eligibility(): void
@@ -159,7 +165,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('All items were invalid and removed from the cart.');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_fails_when_no_subscription_in_cart(): void
@@ -173,7 +179,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_creates_subscriptions_in_transaction(): void
@@ -210,7 +216,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -228,7 +234,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $transactionCallOrder = [];
 
-        // Phase 1: creation transaction
         $this->database->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) use (&$transactionCallOrder) {
@@ -266,7 +271,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
 
-        // ADDED: Phase 4 activation transaction runs after Stripe, also outside creation transaction
+        // ADDED: Phase 3 activation transaction runs after Stripe, also outside creation transaction
         $this->database->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) use (&$transactionCallOrder) {
@@ -278,9 +283,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
+            ->with(
+                Mockery::type(Order::class),
+                Mockery::type('array'),
+                Mockery::on(fn($arg) => ($arg['payment_intent_id'] ?? '') === 'pi_test_123'),
+                Mockery::any()
+            )
             ->andReturn(['success' => true]);
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         // CHANGED: activation_transaction added to expected order — proves both Stripe
         // and activation are outside the creation transaction
@@ -340,7 +351,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Payment processing failed');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_applies_voucher_only_once(): void
@@ -385,7 +396,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout(['voucher_code' => 'SAVE10'], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true, 'voucher_code' => 'SAVE10'], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -422,7 +433,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->andReturn(['success' => true, 'multiple_subscriptions' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['multiple_subscriptions']);
     }
@@ -453,9 +464,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
+            ->with(
+                Mockery::type(Order::class),
+                Mockery::type('array'),
+                Mockery::on(fn($arg) => ($arg['payment_intent_id'] ?? '') === 'pi_123'),
+                Mockery::any()
+            )
             ->andReturn(['success' => true, 'requires_shipping' => false]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
         $this->assertFalse($result['requires_shipping']);
@@ -487,9 +504,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
+            ->with(
+                Mockery::type(Order::class),
+                Mockery::type('array'),
+                Mockery::on(fn($arg) => ($arg['payment_intent_id'] ?? '') === 'pi_123'),
+                Mockery::any()
+            )
             ->andReturn(['success' => true, 'requires_shipping' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
         $this->assertTrue($result['requires_shipping']);
@@ -552,7 +575,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->with($order, $subs, $paymentResult, false)
             ->andReturn(['success' => true, 'order_id' => 789]);
 
-        $result = $this->service->processCheckout($inputData, $siteId);
+        $result = $this->service->processCheckout(array_merge($inputData, ['one_time_subscription' => true]), $siteId);
 
         $this->assertTrue($result['success']);
     }
@@ -602,7 +625,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Payment processing failed');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     protected function tearDown(): void
@@ -670,22 +693,21 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ]);
     }
 
-    private function setupSuccessfulPayment(): void
+    private function setupSuccessfulPayment(?string $intentId = 'pi_test_123'): void
     {
         $this->paymentIntentService->shouldReceive('createForOrder')
-            ->once()
             ->andReturn([
                 'success' => true,
                 'client_secret' => 'pi_test_secret',
-                'payment_intent_id' => 'pi_test_123',
+                'payment_intent_id' => $intentId,
                 'customer_id' => 'cus_test123'
-            ]);
+            ])->byDefault();
 
-        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->byDefault();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
-            ->once()
-            ->andReturn(['success' => true]);
+            ->andReturn(['success' => true])
+            ->byDefault();
     }
 
     public function testProcessCheckoutFailsWithNoSubscriptions(): void
@@ -697,7 +719,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     // CHANGED: service now throws CheckoutException instead of returning ['success' => false]
@@ -710,7 +732,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function testProcessCheckoutFailsWhenNotAuthenticated(): void
@@ -728,7 +750,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Please login to purchase a subscription');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     private function setupCartClear(): void
@@ -769,7 +791,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('No subscription in cart');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_returns_error_when_not_authenticated(): void
@@ -782,7 +804,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Please login to purchase a subscription');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_resolves_discounts(): void
@@ -828,12 +850,12 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
-            ->with(Mockery::any(), [], $member, 1, $resolvedDiscounts)
+            ->with(Mockery::any(), Mockery::any(), $member, 1, Mockery::type(ResolvedDiscounts::class))
             ->andReturn($subscriptions);
 
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
-            ->with($subscriptions, $member, 1, [], $resolvedDiscounts, false)
+            ->with($subscriptions, $member, 1, Mockery::any(), Mockery::type(ResolvedDiscounts::class), false)
             ->andReturn($order);
 
         $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
@@ -842,7 +864,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -888,7 +910,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -932,7 +954,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Payment processing failed');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_handles_payment_exception(): void
@@ -982,7 +1004,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Payment service error');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_attaches_payment_intent_after_success(): void
@@ -1022,7 +1044,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1062,7 +1084,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1107,7 +1129,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->with($order, $subscriptions, $paymentResult, false)
             ->andReturn($expectedResponse);
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertEquals($expectedResponse, $result);
     }
@@ -1156,7 +1178,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Subscription plan not found');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_throws_when_plan_availability_policy_blocks_purchase(): void
@@ -1195,7 +1217,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Subscription not available: Plan is sold out');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_throws_when_print_subscription_has_no_next_issue(): void
@@ -1229,7 +1251,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('No issues scheduled for Test Magazine');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_throws_when_print_issue_out_of_stock_and_not_preorder(): void
@@ -1271,7 +1293,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('out of stock');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_throws_when_preorder_has_no_expected_ship_date(): void
@@ -1314,7 +1336,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Pre-order requires expected ship date');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_process_checkout_builds_voucher_context_when_voucher_code_provided(): void
@@ -1383,9 +1405,15 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
+            ->with(
+                Mockery::type(Order::class),
+                Mockery::type('array'),
+                Mockery::on(fn($arg) => ($arg['payment_intent_id'] ?? '') === 'pi_123'),
+                Mockery::any()
+            )
             ->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout(['voucher_code' => 'SAVE20', 'voucher_id' => null], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true, 'voucher_code' => 'SAVE20', 'voucher_id' => null], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1420,7 +1448,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1459,7 +1487,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1520,7 +1548,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1554,7 +1582,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setupSuccessfulPayment();
         $this->setupCartClear();
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1597,7 +1625,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage('Payment processing failed');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_release_is_called_on_payment_exception_for_print_subscription(): void
@@ -1634,7 +1662,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Payment gateway timeout');
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_reserve_is_not_called_for_digital_subscription(): void
@@ -1665,7 +1693,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->fulfilSubscriptionAction->shouldNotReceive('reserve');
         // ────────────────────────────────────────────────────────────────────
 
-        $result = $this->service->processCheckout([], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1719,7 +1747,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->expectException(CheckoutException::class);
         $this->expectExceptionMessage("Issue #1 out of stock. Available: 2, Requested: 5");
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
     public function test_no_release_called_when_no_print_subscriptions_on_payment_failure(): void
@@ -1755,7 +1783,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->expectException(CheckoutException::class);
 
-        $this->service->processCheckout([], 1);
+        $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
 
