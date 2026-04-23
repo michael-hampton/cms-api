@@ -1187,628 +1187,660 @@ $apiBase = '/api/' . $site;
         window.selectedCardId = null;
         window.requiresShipping = true;
 
+        class ModalStripeService {
+            constructor(stripeKey) {
+                this.stripeKey = stripeKey;
+                this.stripe = null;
+                this.cardElement = null;
+                this.cardMounted = false;
+            }
 
-        /* ── Stripe ─────────────────────────────────────────────────── */
-        let subStripe = null;
-        let subCardElement = null;
-        let subCardMounted = false;
+            init() {
+                if (typeof Stripe === 'undefined' || !this.stripeKey) return;
 
-        if (typeof Stripe !== 'undefined' && SUB_STRIPE_KEY) {
-            subStripe = Stripe(SUB_STRIPE_KEY);
-            subCardElement = subStripe.elements().create('card', {
-                hidePostalCode: true,
-                style: {
-                    base: {
-                        fontSize: '15px', color: '#0f172a',
-                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                        '::placeholder': {color: '#94a3b8'},
+                this.stripe = Stripe(this.stripeKey);
+                this.cardElement = this.stripe.elements().create('card', {
+                    hidePostalCode: true,
+                    style: {
+                        base: {
+                            fontSize: '15px',
+                            color: '#0f172a',
+                            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                            '::placeholder': {color: '#94a3b8'},
+                        },
+                        invalid: {color: '#ef4444', iconColor: '#ef4444'},
                     },
-                    invalid: {color: '#ef4444', iconColor: '#ef4444'},
-                },
-            });
-        }
-
-        function subMountCard() {
-            if (subCardMounted || !subCardElement) return;
-            const el = document.getElementById('card-element');
-            if (!el) return;
-            subCardElement.mount('#card-element');
-            subCardElement.on('change', e => {
-                const err = document.getElementById('card-errors');
-                if (err) err.textContent = e.error ? e.error.message : '';
-            });
-            subCardMounted = true;
-        }
-
-        /* ── Modal state ────────────────────────────────────────────── */
-        let subSelectedPlan = null;
-        let subClientSecret = null;
-        let subSubscriptionId = null;
-        let subOrderId = null;
-
-        /*
-         * Step routing map.
-         *
-         * For DIGITAL plans the address step (3) is skipped.
-         * subNextStep(current) / subPrevStep(current) resolve the correct
-         * step number respecting whether the user is logged-in and whether
-         * the plan requires an address.
-         */
-        const STEP_COUNT = 5; // 1 Plan | 2 Account | 3 Address | 4 Payment | 5 Done
-
-        function subNeedsAccount() {
-            return !window.isLoggedIn;
-        }
-
-        function subNeedsAddress() {
-            return subSelectedPlan && subSelectedPlan.deliveryType === 'print';
-        }
-
-        /**
-         * Returns the next logical step number from `current`, skipping
-         * steps that don't apply to the current plan / auth state.
-         */
-        function subNextStep(current) {
-            let next = current + 1;
-            if (next === 2 && !subNeedsAccount()) next++;  // skip Account
-            if (next === 3 && !subNeedsAddress()) next++;  // skip Address
-            return Math.min(next, STEP_COUNT);
-        }
-
-        function subPrevStep(current) {
-            let prev = current - 1;
-            if (prev === 3 && !subNeedsAddress()) prev--;  // skip Address
-            if (prev === 2 && !subNeedsAccount()) prev--;  // skip Account
-            return Math.max(prev, 1);
-        }
-
-        /* ── Open / close ───────────────────────────────────────────── */
-        function showSubscriptionModal(planSlug, planId, isManual) {
-            const modal = document.getElementById('subscriptionModal');
-            if (!modal) return;
-            modal.classList.add('show');
-            document.body.style.overflow = 'hidden';
-
-            checkLoginStatus();
-
-            if (planSlug && planId) {
-                const planEl = document.querySelector(`.sub-plan[data-plan-slug="${planSlug}"]`);
-                if (planEl) {
-                    subReadPlanData(planEl);
-                    subGoToStep(subNextStep(1)); // skip Plan step when plan pre-selected
-                } else {
-                    subGoToStep(1);
-                }
-            } else {
-                subGoToStep(1);
+                });
             }
 
-            if (!isManual) {
-                // Mark as shown on server (for logged-in users)
-                fetch('/' + SITE + '/api/subscription-modal/mark-shown', {
+            mountCard() {
+                if (this.cardMounted || !this.cardElement) return;
+                const element = document.getElementById('card-element');
+                if (!element) return;
+
+                this.cardElement.mount('#card-element');
+                this.cardElement.on('change', (event) => {
+                    const errorElement = document.getElementById('card-errors');
+                    if (errorElement) errorElement.textContent = event.error ? event.error.message : '';
+                });
+                this.cardMounted = true;
+            }
+
+            async createPaymentMethod(billingDetails) {
+                if (window.selectedCardId) return {id: window.selectedCardId};
+                if (!this.stripe || !this.cardElement) {
+                    throw new Error('Payment form not ready. Please refresh and try again.');
+                }
+
+                const {paymentMethod, error} = await this.stripe.createPaymentMethod({
+                    type: 'card',
+                    card: this.cardElement,
+                    billing_details: billingDetails,
+                });
+
+                if (error) throw new Error(error.message);
+                return paymentMethod;
+            }
+
+            async confirmOneTimePayment(clientSecret, billingDetails) {
+                if (!this.stripe) {
+                    throw new Error('Payment form not ready. Please refresh and try again.');
+                }
+
+                const result = window.selectedCardId
+                    ? await this.stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
+                    : await this.stripe.confirmCardPayment(clientSecret, {
+                        payment_method: {
+                            card: this.cardElement,
+                            billing_details: billingDetails,
+                        },
+                        setup_future_usage: 'off_session',
+                    });
+
+                if (result.error) throw new Error(result.error.message);
+                return result.paymentIntent;
+            }
+        }
+
+        class ModalApiService {
+            constructor(apiBase, site) {
+                this.apiBase = apiBase;
+                this.site = site;
+            }
+
+            async request(url, options = {}) {
+                const response = await fetch(url, options);
+                return response.json();
+            }
+
+            async register(payload) {
+                return this.request('/' + this.site + '/member/register', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'}
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
                 });
-                subTrackModalShown();
-            }
-        }
-
-        function closeSubscriptionModal() {
-            const modal = document.getElementById('subscriptionModal');
-            if (!modal) return;
-            modal.classList.remove('show');
-            document.body.style.overflow = '';
-        }
-
-        /* ── Step navigation ────────────────────────────────────────── */
-        function subGoToStep(step) {
-            for (let i = 1; i <= STEP_COUNT; i++) {
-                const el = document.getElementById(`sub-step-${i}`);
-                const prog = document.getElementById(`sub-prog-${i}`);
-                if (el) el.style.display = 'none';
-                if (prog) {
-                    prog.classList.remove('active', 'completed', 'skipped');
-                    if (i < step) {
-                        // Mark skipped steps (address for digital plans)
-                        if (i === 3 && !subNeedsAddress()) {
-                            prog.classList.add('skipped');
-                        } else if (i === 2 && !subNeedsAccount()) {
-                            prog.classList.add('skipped');
-                        } else {
-                            prog.classList.add('completed');
-                        }
-                    }
-                }
             }
 
-            const active = document.getElementById(`sub-step-${step}`);
-            const prog = document.getElementById(`sub-prog-${step}`);
-            if (active) active.style.display = 'block';
-            if (prog) prog.classList.add('active');
-
-            if (step === 4) {
-                setTimeout(subMountCard, 50);
-                subUpdatePaymentSummary();
-                if (window.isLoggedIn && typeof window.loadSavedCards === 'function') {
-                    window.loadSavedCards();
-                }
-            }
-        }
-
-        /** Advance to the next logical step. */
-        function subAdvance() {
-            const current = subCurrentStep();
-            subGoToStep(subNextStep(current));
-        }
-
-        /** Go back to the previous logical step. */
-        function subGoBack() {
-            const current = subCurrentStep();
-            subGoToStep(subPrevStep(current));
-        }
-
-        /** Returns the currently visible step number. */
-        function subCurrentStep() {
-            for (let i = 1; i <= STEP_COUNT; i++) {
-                const el = document.getElementById(`sub-step-${i}`);
-                if (el && el.style.display !== 'none') return i;
-            }
-            return 1;
-        }
-
-        /* ── Address step validation & advance ──────────────────────── */
-        function subAdvanceFromAddress() {
-            const form = document.getElementById('sub-address-form');
-            const errors = form.querySelectorAll('.form-error');
-            errors.forEach(e => (e.textContent = ''));
-
-            const required = typeof selectedAddressId !== 'undefined' && selectedAddressId
-                ? ['first_name', 'last_name', 'email']
-                : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
-
-            const data = Object.fromEntries(new FormData(form));
-            let hasErrors = false;
-
-            console.log(required, data)
-
-            for (const field of required) {
-                if (!data[field]?.trim()) {
-                    const el = form.querySelector(`#error-${field}`);
-                    if (el) el.textContent = 'This field is required';
-                    hasErrors = true;
-                }
-            }
-
-            if (hasErrors) return;
-
-            // US consent check — only required if US is selected
-            const country = data.country;
-            const usBlock = document.getElementById('us-renewal-consent-block');
-            const usCb = document.getElementById('sub-us-renewal-consent');
-            if (country === 'US' && usCb && !usCb.checked) {
-                if (usBlock) usBlock.classList.add('consent-error');
-                return;
-            }
-            if (usBlock) usBlock.classList.remove('consent-error');
-
-            subGoToStep(subNextStep(3));
-        }
-
-        /* ── Country change — show/hide US consent in address step ──── */
-        function handleSubCountryChange(code) {
-            const usBlock = document.getElementById('us-renewal-consent-block');
-            if (!usBlock) return;
-            // The auto-renewal-consent partial hides the US block by default;
-            // we override display here only for the address step's instance.
-            if (code === 'US') {
-                usBlock.style.display = 'block';
-                usBlock.classList.remove('consent-error');
-            } else {
-                usBlock.style.display = 'none';
-                const cb = document.getElementById('sub-us-renewal-consent');
-                if (cb) cb.checked = false;
-            }
-        }
-
-        /* ── Plan selection ─────────────────────────────────────────── */
-        function subReadPlanData(planEl) {
-            subSelectedPlan = {
-                id: parseInt(planEl.dataset.planId, 10),
-                slug: planEl.dataset.planSlug,
-                name: planEl.dataset.planName,
-                price: parseFloat(planEl.dataset.planPrice),
-                currency: planEl.dataset.planCurrency,
-                period: planEl.dataset.planPeriod,
-                trial: parseInt(planEl.dataset.planTrial, 10) || 0,
-                deliveryType: planEl.dataset.planDeliveryType,
-                isOneTime: planEl.dataset.planOneTime === '1',
-            };
-            window.PLAN_CURRENCY = subSelectedPlan.currency;
-            window.INITIAL_SUBTOTAL = subSelectedPlan.price;
-        }
-
-        function selectPlan(slug) {
-            const planEl = document.querySelector(`[data-plan-slug="${slug}"]`);
-            if (!planEl) return;
-            subReadPlanData(planEl);
-            subGoToStep(subNextStep(1));
-        }
-
-        function subUpdatePaymentSummary() {
-            if (!subSelectedPlan) return;
-            const p = subSelectedPlan;
-            const periodLabel = p.period === 'month' ? 'monthly' : 'yearly';
-            const discount = window.appliedVoucher ? parseFloat(window.appliedVoucher.discount) : 0;
-            const discRow = document.getElementById('sub-discount-summary-row');
-
-            document.getElementById('sub-summary-plan-name').textContent = p.name;
-            document.getElementById('sub-summary-billing').textContent = 'Billed ' + periodLabel;
-
-            if (discount > 0 && discRow) {
-                discRow.style.display = 'flex';
-                document.getElementById('sub-summary-discount').textContent =
-                    '-' + p.currency + discount.toFixed(2);
-            } else if (discRow) {
-                discRow.style.display = 'none';
-            }
-
-            const total = p.trial > 0 ? 0 : Math.max(0, p.price - discount);
-            document.getElementById('sub-summary-total').textContent = p.trial > 0
-                ? 'FREE (then ' + p.currency + p.price.toFixed(2) + '/' + (p.period === 'month' ? 'mo' : 'yr') + ')'
-                : p.currency + total.toFixed(2);
-        }
-
-        /* ── Payment method change hook ─────────────────────────────── */
-        window.onPaymentMethodChange = function (method) {
-            const cardSection = document.getElementById('sub-card-payment-section');
-            const paypalSection = document.getElementById('sub-paypal-payment-section');
-            if (cardSection) cardSection.style.display = method === 'card' ? 'block' : 'none';
-            if (paypalSection) paypalSection.style.display = method === 'paypal' ? 'block' : 'none';
-
-            if (method === 'card') {
-                if (window.savedCards && window.savedCards.length > 0
-                    && typeof window.displaySavedCards === 'function') {
-                    window.displaySavedCards();
-                } else {
-                    subMountCard();
-                }
-            }
-        };
-
-        /* ── Auth: register ─────────────────────────────────────────── */
-        document.getElementById('sub-register-form')?.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(this));
-            const errEl = document.getElementById('sub-register-error');
-            errEl.textContent = '';
-
-            if (data.password !== data.password_confirmation) {
-                errEl.textContent = 'Passwords do not match.';
-                return;
-            }
-            if (data.password.length < 8) {
-                errEl.textContent = 'Password must be at least 8 characters.';
-                return;
-            }
-            if (!data.terms) {
-                errEl.textContent = 'You must agree to the Terms to continue.';
-                return;
-            }
-
-            subSetLoading(true);
-            try {
-                const res = await fetch('/' + SITE + '/member/register', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
+            async login(payload) {
+                return this.request('/' + this.site + '/member/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
                 });
-                const result = await res.json();
-                if (result.success) {
-                    window.currentMember = result.member;
-                    window.isLoggedIn = true;
-                    subGoToStep(subNextStep(2));
-                } else {
-                    errEl.textContent = result.message || 'Registration failed.';
-                }
-            } catch (_) {
-                errEl.textContent = 'An error occurred. Please try again.';
-            } finally {
-                subSetLoading(false);
             }
-        });
 
-        /* ── Auth: login ────────────────────────────────────────────── */
-        document.getElementById('sub-login-form')?.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const data = Object.fromEntries(new FormData(this));
-            const errEl = document.getElementById('sub-login-error');
-            errEl.textContent = '';
-
-            subSetLoading(true);
-            try {
-                const res = await fetch('/' + SITE + '/member/login', {
-                    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data),
+            async markShown() {
+                return this.request('/' + this.site + '/api/subscription-modal/mark-shown', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
                 });
-                const result = await res.json();
-                if (result.success) {
-                    window.currentMember = result.member;
-                    window.isLoggedIn = true;
-                    subGoToStep(subNextStep(2));
-                } else {
-                    errEl.textContent = result.message || 'Login failed.';
-                }
-            } catch (_) {
-                errEl.textContent = 'An error occurred. Please try again.';
-            } finally {
-                subSetLoading(false);
-            }
-        });
-
-        /* ── Auth tab toggle ────────────────────────────────────────── */
-        document.querySelectorAll('.sub-auth-tab').forEach(tab => {
-            tab.addEventListener('click', function () {
-                document.querySelectorAll('.sub-auth-tab').forEach(t => {
-                    t.classList.remove('active');
-                    t.setAttribute('aria-selected', 'false');
-                });
-                this.classList.add('active');
-                this.setAttribute('aria-selected', 'true');
-                const target = this.dataset.tab;
-                document.getElementById('sub-register-form').style.display = target === 'register' ? 'block' : 'none';
-                document.getElementById('sub-login-form').style.display = target === 'login' ? 'block' : 'none';
-            });
-        });
-
-        /* ── Process payment ────────────────────────────────────────── */
-        async function subProcessPayment() {
-            const globalCb = document.getElementById('sub-global-renewal-consent');
-            const globalBlock = document.getElementById('global-renewal-consent-block');
-
-            if (globalCb && !globalCb.checked) {
-                globalBlock?.classList.add('consent-error');
-                subShowCardError('Please confirm the subscription terms to continue.');
-                globalBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
-                return;
-            }
-            globalBlock?.classList.remove('consent-error');
-
-            if (!subSelectedPlan) {
-                subShowCardError('No plan selected. Please go back and choose a plan.');
-                return;
             }
 
-            // Build the shared checkout payload.
-            const data = {
-                isOneTimeSubscription: true,
-                global_renewal_consent: '1',
-                one_time_subscription: subSelectedPlan.isOneTime,
-            };
-
-            if (window.currentMember) data.member_id = window.currentMember.id;
-
-            if (subNeedsAddress()) {
-                const addressForm = document.getElementById('sub-address-form');
-                if (addressForm) {
-                    Object.assign(data, Object.fromEntries(new FormData(addressForm)));
-                }
-            }
-
-            if (window.appliedVoucher) {
-                data.voucher_code = window.appliedVoucher.code;
-                data.voucher_id = window.appliedVoucher.voucher_id;
-                data.discount_amount = window.appliedVoucher.discount;
-            }
-
-            subSetLoading(true);
-            let cartItemId = null;
-
-            try {
-                // ── Step 1: add plan to cart ──────────────────────────────────────
-                const cartRes = await fetch(window.API_BASE + '/cart/subscription', {
+            async addPlanToCart(plan) {
+                return this.request(this.apiBase + '/cart/subscription', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        plan_id: subSelectedPlan.id,
-                        delivery_type: subSelectedPlan.deliveryType,
+                        plan_id: plan.id,
+                        delivery_type: plan.deliveryType,
                     }),
                 });
-                const cartResult = await cartRes.json();
-                if (!cartResult.success) {
-                    subShowCardError(cartResult.message || 'Could not add plan to cart. Please try again.');
-                    return;
-                }
-                cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
+            }
 
-                // ── Step 2: create checkout (order + subscriptions) ───────────────
-                const checkoutRes = await fetch(window.API_BASE + '/subscriptions/onetime/checkout', {
+            async createSubscriptionCheckout(payload) {
+                return this.request(this.apiBase + '/subscriptions/onetime/checkout', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data),
+                    body: JSON.stringify(payload),
                 });
-                const result = await checkoutRes.json();
+            }
 
-                if (!result.success) {
-                    await subRollbackCart(cartItemId);
-                    subShowCardError(result.message || 'Checkout failed. Please try again.');
+            async confirmSubscriptionPayment(payload) {
+                return this.request(this.apiBase + '/subscriptions/onetime/confirm-payment', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                });
+            }
+
+            async rollbackCartItem(cartItemId) {
+                if (!cartItemId) return;
+                try {
+                    await fetch(this.apiBase + '/cart/' + cartItemId, {method: 'DELETE'});
+                } catch (_) {
+                    // intentionally ignored
+                }
+            }
+        }
+
+        class SubscriptionModalManager {
+            constructor({stripeService, apiService}) {
+                this.stripe = stripeService;
+                this.api = apiService;
+                this.selectedPlan = null;
+                this.clientSecret = null;
+                this.subscriptionId = null;
+                this.orderId = null;
+                this.stepCount = 5;
+            }
+
+            init() {
+                this.stripe.init();
+                this.bindEvents();
+                window.onPaymentMethodChange = (method) => this.handlePaymentMethodChange(method);
+            }
+
+            bindEvents() {
+                document.querySelector('.sub-modal-overlay')?.addEventListener('click', () => this.close());
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape') this.close();
+                });
+
+                document.getElementById('sub-register-form')?.addEventListener('submit', (event) => this.handleRegister(event));
+                document.getElementById('sub-login-form')?.addEventListener('submit', (event) => this.handleLogin(event));
+
+                document.querySelectorAll('.sub-auth-tab').forEach((tab) => {
+                    tab.addEventListener('click', () => this.switchAuthTab(tab.dataset.tab));
+                });
+            }
+
+            needsAccount() {
+                return !window.isLoggedIn;
+            }
+
+            needsAddress() {
+                return this.selectedPlan && this.selectedPlan.deliveryType === 'print';
+            }
+
+            nextStep(current) {
+                let next = current + 1;
+                if (next === 2 && !this.needsAccount()) next++;
+                if (next === 3 && !this.needsAddress()) next++;
+                return Math.min(next, this.stepCount);
+            }
+
+            prevStep(current) {
+                let previous = current - 1;
+                if (previous === 3 && !this.needsAddress()) previous--;
+                if (previous === 2 && !this.needsAccount()) previous--;
+                return Math.max(previous, 1);
+            }
+
+            currentStep() {
+                for (let i = 1; i <= this.stepCount; i++) {
+                    const element = document.getElementById(`sub-step-${i}`);
+                    if (element && element.style.display !== 'none') return i;
+                }
+                return 1;
+            }
+
+            show(planSlug, planId, isManual) {
+                const modal = document.getElementById('subscriptionModal');
+                if (!modal) return;
+
+                modal.classList.add('show');
+                document.body.style.overflow = 'hidden';
+                checkLoginStatus();
+
+                if (planSlug && planId) {
+                    const planElement = document.querySelector(`.sub-plan[data-plan-slug="${planSlug}"]`);
+                    if (planElement) {
+                        this.readPlanData(planElement);
+                        this.goToStep(this.nextStep(1));
+                    } else {
+                        this.goToStep(1);
+                    }
+                } else {
+                    this.goToStep(1);
+                }
+
+                if (!isManual) {
+                    this.api.markShown();
+                    this.trackModalShown();
+                }
+            }
+
+            close() {
+                const modal = document.getElementById('subscriptionModal');
+                if (!modal) return;
+                modal.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+
+            goToStep(step) {
+                for (let i = 1; i <= this.stepCount; i++) {
+                    const section = document.getElementById(`sub-step-${i}`);
+                    const progress = document.getElementById(`sub-prog-${i}`);
+                    if (section) section.style.display = 'none';
+                    if (progress) {
+                        progress.classList.remove('active', 'completed', 'skipped');
+                        if (i < step) {
+                            if (i === 3 && !this.needsAddress()) {
+                                progress.classList.add('skipped');
+                            } else if (i === 2 && !this.needsAccount()) {
+                                progress.classList.add('skipped');
+                            } else {
+                                progress.classList.add('completed');
+                            }
+                        }
+                    }
+                }
+
+                const active = document.getElementById(`sub-step-${step}`);
+                const progress = document.getElementById(`sub-prog-${step}`);
+                if (active) active.style.display = 'block';
+                if (progress) progress.classList.add('active');
+
+                if (step === 4) {
+                    setTimeout(() => this.stripe.mountCard(), 50);
+                    this.updatePaymentSummary();
+                    if (window.isLoggedIn && typeof window.loadSavedCards === 'function') {
+                        window.loadSavedCards();
+                    }
+                }
+            }
+
+            goBack() {
+                this.goToStep(this.prevStep(this.currentStep()));
+            }
+
+            readPlanData(planElement) {
+                this.selectedPlan = {
+                    id: parseInt(planElement.dataset.planId, 10),
+                    slug: planElement.dataset.planSlug,
+                    name: planElement.dataset.planName,
+                    price: parseFloat(planElement.dataset.planPrice),
+                    currency: planElement.dataset.planCurrency,
+                    period: planElement.dataset.planPeriod,
+                    trial: parseInt(planElement.dataset.planTrial, 10) || 0,
+                    deliveryType: planElement.dataset.planDeliveryType,
+                    isOneTime: planElement.dataset.planOneTime === '1',
+                };
+
+                window.PLAN_CURRENCY = this.selectedPlan.currency;
+                window.INITIAL_SUBTOTAL = this.selectedPlan.price;
+            }
+
+            selectPlan(slug) {
+                const planElement = document.querySelector(`[data-plan-slug="${slug}"]`);
+                if (!planElement) return;
+                this.readPlanData(planElement);
+                this.goToStep(this.nextStep(1));
+            }
+
+            updatePaymentSummary() {
+                if (!this.selectedPlan) return;
+                const plan = this.selectedPlan;
+                const periodLabel = plan.period === 'month' ? 'monthly' : 'yearly';
+                const discount = window.appliedVoucher ? parseFloat(window.appliedVoucher.discount) : 0;
+                const discountRow = document.getElementById('sub-discount-summary-row');
+
+                document.getElementById('sub-summary-plan-name').textContent = plan.name;
+                document.getElementById('sub-summary-billing').textContent = 'Billed ' + periodLabel;
+
+                if (discount > 0 && discountRow) {
+                    discountRow.style.display = 'flex';
+                    document.getElementById('sub-summary-discount').textContent = '-' + plan.currency + discount.toFixed(2);
+                } else if (discountRow) {
+                    discountRow.style.display = 'none';
+                }
+
+                const total = plan.trial > 0 ? 0 : Math.max(0, plan.price - discount);
+                document.getElementById('sub-summary-total').textContent = plan.trial > 0
+                    ? 'FREE (then ' + plan.currency + plan.price.toFixed(2) + '/' + (plan.period === 'month' ? 'mo' : 'yr') + ')'
+                    : plan.currency + total.toFixed(2);
+            }
+
+            handlePaymentMethodChange(method) {
+                const cardSection = document.getElementById('sub-card-payment-section');
+                const paypalSection = document.getElementById('sub-paypal-payment-section');
+                if (cardSection) cardSection.style.display = method === 'card' ? 'block' : 'none';
+                if (paypalSection) paypalSection.style.display = method === 'paypal' ? 'block' : 'none';
+
+                if (method === 'card') {
+                    if (window.savedCards && window.savedCards.length > 0
+                        && typeof window.displaySavedCards === 'function') {
+                        window.displaySavedCards();
+                    } else {
+                        this.stripe.mountCard();
+                    }
+                }
+            }
+
+            setLoading(isLoading, message = 'Processing...') {
+                const overlay = document.getElementById('sub-loading');
+                const button = document.getElementById('sub-pay-btn');
+                const nextButton = document.getElementById('sub-address-next-btn');
+                const loadingText = overlay?.querySelector('p');
+
+                if (loadingText) loadingText.textContent = message;
+                if (overlay) overlay.classList.toggle('show', isLoading);
+                if (button) button.disabled = isLoading;
+                if (nextButton) nextButton.disabled = isLoading;
+            }
+
+            setCardError(message) {
+                const element = document.getElementById('card-errors');
+                if (element) element.textContent = message;
+            }
+
+            setFormError(id, message) {
+                const element = document.getElementById(id);
+                if (element) element.textContent = message;
+            }
+
+            clearFormError(id) {
+                this.setFormError(id, '');
+            }
+
+            switchAuthTab(target) {
+                document.querySelectorAll('.sub-auth-tab').forEach((tab) => {
+                    tab.classList.remove('active');
+                    tab.setAttribute('aria-selected', 'false');
+                });
+
+                const activeTab = document.querySelector(`.sub-auth-tab[data-tab="${target}"]`);
+                activeTab?.classList.add('active');
+                activeTab?.setAttribute('aria-selected', 'true');
+
+                document.getElementById('sub-register-form').style.display = target === 'register' ? 'block' : 'none';
+                document.getElementById('sub-login-form').style.display = target === 'login' ? 'block' : 'none';
+            }
+
+            async handleRegister(event) {
+                event.preventDefault();
+                const data = Object.fromEntries(new FormData(event.currentTarget));
+                this.clearFormError('sub-register-error');
+
+                if (data.password !== data.password_confirmation) {
+                    this.setFormError('sub-register-error', 'Passwords do not match.');
+                    return;
+                }
+                if (data.password.length < 8) {
+                    this.setFormError('sub-register-error', 'Password must be at least 8 characters.');
+                    return;
+                }
+                if (!data.terms) {
+                    this.setFormError('sub-register-error', 'You must agree to the Terms to continue.');
                     return;
                 }
 
-                const contexts = result.data?.stripe_contexts;
-                subClientSecret = contexts
-                    ? contexts[Object.keys(contexts)[0]].client_secret
-                    : (result.data?.client_secret ?? null);
-                subSubscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
-                subOrderId = result.data?.order_id ?? null;
-
-                const member = window.currentMember;
-
-                // ── Step 3a: ONE-TIME flow — charge now via PaymentIntent ─────────
-                if (subSelectedPlan.isOneTime) {
-                    const paymentResult = window.selectedCardId
-                        ? await subStripe.confirmCardPayment(subClientSecret, {
-                            payment_method: window.selectedCardId,
-                        })
-                        : await subStripe.confirmCardPayment(subClientSecret, {
-                            payment_method: {
-                                card: subCardElement,
-                                billing_details: {
-                                    name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
-                                    email: member?.email ?? '',
-                                },
-                            },
-                            setup_future_usage: 'off_session',
-                        });
-
-                    if (paymentResult.error) {
-                        await subRollbackCart(cartItemId);
-                        subShowCardError(paymentResult.error.message);
-                        return;
+                this.setLoading(true, 'Creating your account...');
+                try {
+                    const result = await this.api.register(data);
+                    if (result.success) {
+                        window.currentMember = result.member;
+                        window.isLoggedIn = true;
+                        this.goToStep(this.nextStep(2));
+                    } else {
+                        this.setFormError('sub-register-error', result.message || 'Registration failed.');
                     }
+                } catch (_) {
+                    this.setFormError('sub-register-error', 'An error occurred. Please try again.');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
 
-                    if (paymentResult.paymentIntent?.status === 'succeeded') {
-                        await subConfirmPayment(paymentResult.paymentIntent.id, null);
+            async handleLogin(event) {
+                event.preventDefault();
+                const data = Object.fromEntries(new FormData(event.currentTarget));
+                this.clearFormError('sub-login-error');
+
+                this.setLoading(true, 'Signing you in...');
+                try {
+                    const result = await this.api.login(data);
+                    if (result.success) {
+                        window.currentMember = result.member;
+                        window.isLoggedIn = true;
+                        this.goToStep(this.nextStep(2));
+                    } else {
+                        this.setFormError('sub-login-error', result.message || 'Login failed.');
                     }
+                } catch (_) {
+                    this.setFormError('sub-login-error', 'An error occurred. Please try again.');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
 
-                    return; // done for one-time flow
+            validateAddressForm() {
+                const form = document.getElementById('sub-address-form');
+                const errors = form.querySelectorAll('.form-error');
+                errors.forEach((element) => {
+                    element.textContent = '';
+                });
+
+                const required = typeof selectedAddressId !== 'undefined' && selectedAddressId
+                    ? ['first_name', 'last_name', 'email']
+                    : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
+
+                const data = Object.fromEntries(new FormData(form));
+                let hasErrors = false;
+
+                for (const field of required) {
+                    if (!data[field]?.trim()) {
+                        const errorElement = form.querySelector(`#error-${field}`);
+                        if (errorElement) errorElement.textContent = 'This field is required';
+                        hasErrors = true;
+                    }
                 }
 
-                // ── Step 3b: RECURRING flow — tokenise card, let Stripe bill ─────
-                //
-                // We do NOT confirm a PaymentIntent here. Instead we collect the
-                // payment method ID (new card token OR saved card ID) and pass it to
-                // the backend so it can:
-                //   - create/update the Stripe customer
-                //   - attach the card and set it as default
-                //   - call stripe.subscriptions.create() (which handles billing)
-                //   - record the payment and activate the subscription
-                //
-                let paymentMethodId = null;
+                if (hasErrors) return false;
 
-                if (window.selectedCardId) {
-                    // User chose a saved card — its ID is already a Stripe PM id.
-                    paymentMethodId = window.selectedCardId;
+                const usBlock = document.getElementById('us-renewal-consent-block');
+                const usConsent = document.getElementById('sub-us-renewal-consent');
+                if (data.country === 'US' && usConsent && !usConsent.checked) {
+                    usBlock?.classList.add('consent-error');
+                    return false;
+                }
+
+                usBlock?.classList.remove('consent-error');
+                return true;
+            }
+
+            advanceFromAddress() {
+                if (!this.validateAddressForm()) return;
+                this.setLoading(true, 'Preparing payment step...');
+                setTimeout(() => {
+                    this.goToStep(this.nextStep(3));
+                    this.setLoading(false);
+                }, 150);
+            }
+
+            handleCountryChange(code) {
+                const usBlock = document.getElementById('us-renewal-consent-block');
+                if (!usBlock) return;
+
+                if (code === 'US') {
+                    usBlock.style.display = 'block';
+                    usBlock.classList.remove('consent-error');
                 } else {
-                    // User entered a new card — tokenise it via Stripe.js.
-                    if (!subStripe || !subCardElement) {
-                        subShowCardError('Payment form not ready. Please refresh and try again.');
+                    usBlock.style.display = 'none';
+                    const checkbox = document.getElementById('sub-us-renewal-consent');
+                    if (checkbox) checkbox.checked = false;
+                }
+            }
+
+            getBillingDetails() {
+                const member = window.currentMember;
+                return {
+                    name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
+                    email: member?.email ?? '',
+                };
+            }
+
+            buildCheckoutPayload() {
+                const globalConsent = document.getElementById('sub-global-renewal-consent');
+                const globalBlock = document.getElementById('global-renewal-consent-block');
+
+                if (globalConsent && !globalConsent.checked) {
+                    globalBlock?.classList.add('consent-error');
+                    globalBlock?.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    throw new Error('Please confirm the subscription terms to continue.');
+                }
+                globalBlock?.classList.remove('consent-error');
+
+                if (!this.selectedPlan) {
+                    throw new Error('No plan selected. Please go back and choose a plan.');
+                }
+
+                const data = {
+                    isOneTimeSubscription: true,
+                    global_renewal_consent: '1',
+                    one_time_subscription: this.selectedPlan.isOneTime,
+                };
+
+                if (window.currentMember) data.member_id = window.currentMember.id;
+
+                if (this.needsAddress()) {
+                    const addressForm = document.getElementById('sub-address-form');
+                    if (addressForm) Object.assign(data, Object.fromEntries(new FormData(addressForm)));
+                }
+
+                if (window.appliedVoucher) {
+                    data.voucher_code = window.appliedVoucher.code;
+                    data.voucher_id = window.appliedVoucher.voucher_id;
+                    data.discount_amount = window.appliedVoucher.discount;
+                }
+
+                return data;
+            }
+
+            normalizeSubscriptionIds(value) {
+                return Array.isArray(value) ? value : [value];
+            }
+
+            async confirmPayment(intentId, paymentMethodId) {
+                const payload = {order_id: this.orderId};
+                if (intentId) payload.payment_intent_id = intentId;
+                if (paymentMethodId) payload.payment_method_id = paymentMethodId;
+
+                const subscriptionIds = this.normalizeSubscriptionIds(this.subscriptionId);
+                if (subscriptionIds.length === 1) {
+                    payload.subscription_id = subscriptionIds[0];
+                } else {
+                    payload.subscription_ids = subscriptionIds;
+                }
+
+                const result = await this.api.confirmSubscriptionPayment(payload);
+                if (!result.success) {
+                    throw new Error(result.message || 'Payment confirmation failed.');
+                }
+
+                this.goToStep(5);
+            }
+
+            async processPayment() {
+                this.setCardError('');
+
+                let cartItemId = null;
+
+                try {
+                    const checkoutData = this.buildCheckoutPayload();
+
+                    this.setLoading(true, 'Adding plan to cart...');
+                    const cartResult = await this.api.addPlanToCart(this.selectedPlan);
+                    if (!cartResult.success) {
+                        throw new Error(cartResult.message || 'Could not add plan to cart. Please try again.');
+                    }
+                    cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
+
+                    this.setLoading(true, 'Creating your subscription...');
+                    const result = await this.api.createSubscriptionCheckout(checkoutData);
+                    if (!result.success) {
+                        await this.api.rollbackCartItem(cartItemId);
+                        throw new Error(result.message || 'Checkout failed. Please try again.');
+                    }
+
+                    const contexts = result.data?.stripe_contexts;
+                    this.clientSecret = contexts
+                        ? contexts[Object.keys(contexts)[0]].client_secret
+                        : (result.data?.client_secret ?? null);
+                    this.subscriptionId = result.data?.subscription_ids ?? result.data?.subscription_id ?? null;
+                    this.orderId = result.data?.order_id ?? null;
+
+                    if (this.selectedPlan.isOneTime) {
+                        this.setLoading(true, 'Confirming your payment...');
+                        const paymentIntent = await this.stripe.confirmOneTimePayment(
+                            this.clientSecret,
+                            this.getBillingDetails()
+                        );
+
+                        if (paymentIntent?.status === 'succeeded') {
+                            this.setLoading(true, 'Finalising your subscription...');
+                            await this.confirmPayment(paymentIntent.id, null);
+                        }
                         return;
                     }
 
-                    const {paymentMethod, error} = await subStripe.createPaymentMethod({
-                        type: 'card',
-                        card: subCardElement,
-                        billing_details: {
-                            name: member ? (member.first_name + ' ' + member.last_name).trim() : '',
-                            email: member?.email ?? '',
-                        },
-                    });
-
-                    if (error) {
-                        subShowCardError(error.message);
-                        return;
-                    }
-
-                    paymentMethodId = paymentMethod.id;
+                    this.setLoading(true, 'Saving your payment method...');
+                    const paymentMethod = await this.stripe.createPaymentMethod(this.getBillingDetails());
+                    this.setLoading(true, 'Activating your subscription...');
+                    await this.confirmPayment(null, paymentMethod.id);
+                } catch (error) {
+                    console.error('Modal payment error:', error);
+                    this.setCardError(error.message || 'An unexpected error occurred. Please try again.');
+                } finally {
+                    this.setLoading(false);
                 }
+            }
 
-                await subConfirmPayment(null, paymentMethodId);
+            shouldShow() {
+                const last = localStorage.getItem(MODAL_STORAGE_KEY);
+                return !last || (Date.now() - parseInt(last, 10)) >= MODAL_COOLDOWN_MS;
+            }
 
-            } catch (err) {
-                console.error('Modal payment error:', err);
-                subShowCardError('An unexpected error occurred. Please try again.');
-            } finally {
-                subSetLoading(false);
+            trackModalShown() {
+                if (!SUB_IS_LOGGED_IN) localStorage.setItem(MODAL_STORAGE_KEY, String(Date.now()));
             }
         }
 
-        async function subConfirmPayment(intentId, paymentMethodId) {
-            const body = {
-                order_id: subOrderId,
-            };
-
-            // Only include the fields that are actually set — the backend uses
-            // !empty() guards to distinguish the two flows, so sending null values
-            // would bypass those guards incorrectly.
-            if (intentId) body.payment_intent_id = intentId;
-            if (paymentMethodId) body.payment_method_id = paymentMethodId;
-
-            if (Array.isArray(subSubscriptionId)) {
-                body.subscription_ids = subSubscriptionId;
-            } else {
-                body.subscription_id = subSubscriptionId;
-            }
-
-            const res = await fetch(
-                window.API_BASE + '/subscriptions/onetime/confirm-payment',
-                {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(body),
-                }
-            );
-            const result = await res.json();
-
-            if (result.success) {
-                subGoToStep(5);
-            } else {
-                subShowCardError(result.message || 'Payment confirmation failed.');
-            }
-        }
-
-        async function subRollbackCart(cartItemId) {
-            if (!cartItemId) return;
-            try {
-                await fetch(window.API_BASE + '/cart/' + cartItemId, {method: 'DELETE'});
-            } catch (_) {
-                // intentionally ignored
-            }
-        }
-
-        /* ── Helpers ────────────────────────────────────────────────── */
-        function subSetLoading(on) {
-            const overlay = document.getElementById('sub-loading');
-            const btn = document.getElementById('sub-pay-btn');
-            if (overlay) overlay.classList.toggle('show', on);
-            if (btn) btn.disabled = on;
-        }
-
-        function subShowCardError(msg) {
-            const el = document.getElementById('card-errors');
-            if (el) el.textContent = msg;
-        }
-
-        /* ── Cooldown tracking ──────────────────────────────────────── */
-        function subShouldShow() {
-            const last = localStorage.getItem(MODAL_STORAGE_KEY);
-            return !last || (Date.now() - parseInt(last, 10)) >= MODAL_COOLDOWN_MS;
-        }
-
-        function subTrackModalShown() {
-            if (!SUB_IS_LOGGED_IN) localStorage.setItem(MODAL_STORAGE_KEY, String(Date.now()));
-        }
-
-        /* ── Event listeners ────────────────────────────────────────── */
-        document.querySelector('.sub-modal-overlay')?.addEventListener('click', closeSubscriptionModal);
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeSubscriptionModal();
+        window.subscriptionModalManager = new SubscriptionModalManager({
+            stripeService: new ModalStripeService(SUB_STRIPE_KEY),
+            apiService: new ModalApiService(window.API_BASE, SITE),
         });
+        window.subscriptionModalManager.init();
 
-        /* ── Auto-show ──────────────────────────────────────────────── */
         <?php if ($subscriptionModalData['show_modal'] ?? false): ?>
         setTimeout(() => {
-            if (SUB_IS_LOGGED_IN || subShouldShow()) showSubscriptionModal(null, null, false);
+            if (SUB_IS_LOGGED_IN || window.subscriptionModalManager.shouldShow()) {
+                window.subscriptionModalManager.show(null, null, false);
+            }
         }, 3000);
         <?php endif; ?>
 
-        /* ── Public API ─────────────────────────────────────────────── */
-        window.showSubscriptionModal = showSubscriptionModal;
-        window.closeSubscriptionModal = closeSubscriptionModal;
-        window.subGoToStep = subGoToStep;
-        window.subGoBack = subGoBack;
-        window.selectPlan = selectPlan;
-        window.subProcessPayment = subProcessPayment;
-        window.subAdvanceFromAddress = subAdvanceFromAddress;
-        window.handleSubCountryChange = handleSubCountryChange;
-        window.showSubscriptionModalWithPlan = (slug, id) => showSubscriptionModal(slug, id, true);
-        window.openSubscriptionModal = () => showSubscriptionModal(null, null, true);
+        window.showSubscriptionModal = (planSlug, planId, isManual) =>
+            window.subscriptionModalManager.show(planSlug, planId, isManual);
+        window.closeSubscriptionModal = () => window.subscriptionModalManager.close();
+        window.subGoToStep = (step) => window.subscriptionModalManager.goToStep(step);
+        window.subGoBack = () => window.subscriptionModalManager.goBack();
+        window.selectPlan = (slug) => window.subscriptionModalManager.selectPlan(slug);
+        window.subProcessPayment = () => window.subscriptionModalManager.processPayment();
+        window.subAdvanceFromAddress = () => window.subscriptionModalManager.advanceFromAddress();
+        window.handleSubCountryChange = (code) => window.subscriptionModalManager.handleCountryChange(code);
+        window.showSubscriptionModalWithPlan = (slug, id) => window.subscriptionModalManager.show(slug, id, true);
+        window.openSubscriptionModal = () => window.subscriptionModalManager.show(null, null, true);
 
     })();
 </script>

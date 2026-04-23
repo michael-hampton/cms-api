@@ -16,7 +16,11 @@ class OneTimePlanValidator
         bool   $allowRecurringSubscriptions = false
     ): void
     {
-        if (!$plan || !$plan->isOneTime()) {
+        if (!$plan) {
+            throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
+        }
+
+        if (!$allowRecurringSubscriptions && !$plan->isOneTime()) {
             throw new InvalidSubscriptionPlanException('Invalid one-time subscription plan');
         }
 
