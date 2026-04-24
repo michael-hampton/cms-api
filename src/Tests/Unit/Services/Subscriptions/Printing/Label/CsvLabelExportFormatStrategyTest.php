@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Subscriptions\Printing\Label;
+namespace App\Tests\Unit\Services\Subscriptions\Printing\Label;
 
 use App\Models\PrintFulfillment;
 use App\Services\Subscriptions\Printing\Label\CsvLabelExportFormatStrategy;

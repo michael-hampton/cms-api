@@ -41,9 +41,12 @@ use App\Events\Stock\StockAllocated;
 use App\Events\Stock\StockLow;
 use App\Events\Stock\StockReleased;
 use App\Events\Subscriptions\AllFulfilmentsCreated;
+use App\Events\Subscriptions\InvoicePaymentFailed;
+use App\Events\Subscriptions\InvoicePaymentSucceeded;
 use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Events\Subscriptions\LabelRunFailed;
 use App\Events\Subscriptions\LabelRunGenerated;
+use App\Events\Subscriptions\SubscriptionCancelledByStripe;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -107,6 +110,9 @@ use App\Listeners\Subscriptions\AllFulfilmentsCreatedListener;
 use App\Listeners\Subscriptions\IssueDeliveryDispatchedListener;
 use App\Listeners\Subscriptions\LabelRunFailedListener;
 use App\Listeners\Subscriptions\LabelRunGeneratedListener;
+use App\Listeners\Subscriptions\OnInvoicePaymentFailed;
+use App\Listeners\Subscriptions\OnInvoicePaymentSucceeded;
+use App\Listeners\Subscriptions\OnSubscriptionCancelledByStripe;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -523,5 +529,9 @@ class ApiApplication
         $eventDispatcher->listen(RewardClaimedByMember::class, [RecordMemberEngagementMetric::class, 'handleRewardClaimed']);
         $eventDispatcher->listen(OrderCreatedByMember::class, [RecordMemberEngagementMetric::class, 'handleOrderCreated']);
         $eventDispatcher->listen(PageUnlikedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageUnlike']);
+
+        $eventDispatcher->listen(InvoicePaymentSucceeded::class, [OnInvoicePaymentSucceeded::class, 'handle']);
+        $eventDispatcher->listen(InvoicePaymentFailed::class, [OnInvoicePaymentFailed::class, 'handle']);
+        $eventDispatcher->listen(SubscriptionCancelledByStripe::class, [OnSubscriptionCancelledByStripe::class, 'handle']);
     }
 }
