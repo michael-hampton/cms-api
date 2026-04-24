@@ -55,15 +55,13 @@ class NewsletterRecommendationsController extends Controller
             siteId: SiteContext::getId(),
         );
 
-        return [];
-
-//        return $this->resourceResponse([
-//            'data' => array_map(fn($result) => [
-//                'newsletter_id' => $result->newsletter->id,
-//                'title' => $result->newsletter->title,
-//                'reason' => $result->reason,
-//                'score' => $result->score,
-//            ], $recommendations),
-//        ]);
+        return $this->resourceResponse([
+            'data' => array_map(fn($result) => [
+                'newsletter_id' => $result->newsletter->id,
+                'title' => $result->newsletter->title,
+                'reason' => $result->reason,
+                'score' => $result->score,
+            ], $recommendations),
+        ]);
     }
 }
