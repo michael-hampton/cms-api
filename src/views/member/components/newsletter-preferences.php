@@ -4,7 +4,7 @@
 $memberEmail = $member->email;
 $siteId = \App\Framework\Support\SiteContext::getId();
 
-$subscriberRepo = new \App\Repositories\Subscriptions\SubscriberRepository();
+$subscriberRepo = new \App\Repositories\Newsletters\SubscriberRepository();
 $subscriptionRepo = new \App\Repositories\Subscriptions\SubscriptionRepository();
 
 $newsletters = $subscriberRepo->getAllNewslettersForMember($memberEmail, $siteId);

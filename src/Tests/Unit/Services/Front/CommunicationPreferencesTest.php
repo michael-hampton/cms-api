@@ -4,8 +4,8 @@ namespace App\Tests\Unit\Services\Front;
 
 use App\Models\Member;
 use App\Repositories\Members\MemberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;

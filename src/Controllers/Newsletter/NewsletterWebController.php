@@ -16,7 +16,7 @@ use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendPageViewRepository;
 use App\Repositories\Newsletters\NewsletterSendRepository;
 use App\Repositories\Newsletters\NewsletterSnapshotRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Newsletter\NewsletterArchiveService;
 use App\Services\Newsletter\NewsletterPageBuilderService;

@@ -9,7 +9,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Address;
 use App\Repositories\Members\MemberEngagementMetricRepository;
 use App\Repositories\Members\MemberStatRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class MemberStatsApiController extends Controller

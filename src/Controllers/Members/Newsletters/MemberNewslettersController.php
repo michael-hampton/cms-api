@@ -6,7 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Services\Newsletter\NewsletterAccessService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 

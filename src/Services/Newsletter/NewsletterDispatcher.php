@@ -6,8 +6,8 @@ use App\Framework\Support\Logger;
 use App\Models\Newsletter;
 use App\Models\NewsletterSend;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Services\MemberInsights\EmailService;
 
 class NewsletterDispatcher

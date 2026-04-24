@@ -10,7 +10,7 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Mail\Newsletters\NewsletterSignupConfirmationWithTracking;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Services\Newsletter\NewsletterAccessService;
 use App\Services\Newsletter\NewsletterSignupService;
 use App\Services\Subscriptions\SubscriptionCheckoutService;

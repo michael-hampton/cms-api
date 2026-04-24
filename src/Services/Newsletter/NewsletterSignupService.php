@@ -4,7 +4,7 @@ namespace App\Services\Newsletter;
 
 use App\Framework\Support\SiteContext;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 
 class NewsletterSignupService
 {

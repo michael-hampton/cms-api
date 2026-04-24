@@ -3,7 +3,7 @@
 namespace App\Tests\Unit\Repositories\Newsletter;
 
 use App\Models\Subscriber;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 

@@ -7,8 +7,8 @@ use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\MemberSubscriptionPreference;
 use App\Repositories\Members\MemberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class MemberSubscriptionService

@@ -6,8 +6,8 @@ use App\Enums\Newsletters\CommunicationChannel;
 use App\Framework\Support\Logger;
 use App\Models\Newsletter;
 use App\Repositories\Members\MemberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\MemberSubscriptionPreferenceRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 
 class NewsletterRecipientResolver

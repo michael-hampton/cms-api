@@ -17,7 +17,7 @@ use App\Repositories\Members\MemberRepository;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Members\BadgeService;

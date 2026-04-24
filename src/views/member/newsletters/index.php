@@ -102,17 +102,6 @@
             }
         }
 
-        @keyframes toastOut {
-            from {
-                opacity: 1;
-                transform: translateX(0);
-            }
-            to {
-                opacity: 0;
-                transform: translateX(100%);
-            }
-        }
-
         /* ── Layout ────────────────────────────────────── */
         .container {
             max-width: 1200px;
@@ -140,13 +129,36 @@
             align-items: center;
             gap: 0.5rem;
         }
-
         .section-title::before {
             content: '';
             width: 4px;
             height: 1.5rem;
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             border-radius: 2px;
+        }
+
+        /* ── Recommended section ───────────────────────── */
+        #recommendations-section {
+            margin-bottom: 3rem;
+            display: none; /* hidden until recommendations load */
+        }
+
+        #recommendations-section.visible {
+            display: block;
+        }
+
+        .recommendation-reason {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8125rem;
+            color: var(--primary-color);
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            padding: 0.4rem 0.75rem;
+            background: #eff6ff;
+            border-radius: 0.4rem;
+            width: fit-content;
         }
 
         /* ── Buttons ───────────────────────────────────── */
@@ -246,6 +258,7 @@
             box-shadow: var(--shadow-lg);
             transform: translateY(-2px);
         }
+
         .newsletter-card.subscribed {
             border-color: var(--success-color);
             background: linear-gradient(to bottom, #f0fdf4, white);
@@ -253,6 +266,11 @@
 
         .newsletter-card.locked {
             opacity: 0.75;
+        }
+
+        .newsletter-card.recommended {
+            border-color: var(--primary-color);
+            background: linear-gradient(to bottom, #eff6ff, white);
         }
 
         .newsletter-header {
@@ -294,6 +312,11 @@
         .status-badge.locked {
             background: #fee2e2;
             color: #991b1b;
+        }
+
+        .status-badge.recommended {
+            background: #dbeafe;
+            color: #1e40af;
         }
 
         .lock-badge {
@@ -360,6 +383,7 @@
             padding-top: 0.875rem;
             border-top: 1px solid var(--border-color);
         }
+
         .meta-item {
             display: flex;
             align-items: center;
@@ -441,7 +465,7 @@
             box-shadow: var(--shadow);
         }
 
-        /* ── Newsletter modal (subscribe) ──────────────── */
+        /* ── Newsletter modal ──────────────────────────── */
         .modal-backdrop {
             position: fixed;
             inset: 0;
@@ -456,7 +480,6 @@
         .modal-backdrop.show {
             display: flex;
         }
-
         .modal-box {
             background: white;
             border-radius: 1rem;
@@ -525,7 +548,6 @@
         .modal-body {
             padding: 1.75rem 2rem;
         }
-
         .modal-footer {
             padding: 1.25rem 2rem;
             border-top: 1px solid var(--border-color);
@@ -558,7 +580,6 @@
             flex-direction: column;
             gap: 0.875rem;
         }
-
         .modal-newsletter-item {
             border: 2px solid var(--border-color);
             border-radius: 0.75rem;
@@ -629,6 +650,7 @@
             gap: 1.25rem;
             margin-top: 1rem;
         }
+
         .plan-card {
             border: 2px solid var(--border-color);
             border-radius: 0.75rem;
@@ -646,6 +668,7 @@
             border-color: var(--primary-color);
             background: #f5f7ff;
         }
+
         .plan-badge {
             position: absolute;
             top: -12px;
@@ -726,14 +749,6 @@
             color: var(--primary-color);
         }
 
-        .upgrade-step {
-            display: none;
-        }
-
-        .upgrade-step.active {
-            display: block;
-        }
-
         .form-group {
             margin-bottom: 1.25rem;
         }
@@ -759,34 +774,6 @@
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .voucher-row {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .voucher-row .form-control {
-            flex: 1;
-        }
-
-        .voucher-message {
-            padding: 0.75rem 1rem;
-            border-radius: 0.5rem;
-            margin-top: 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .voucher-message.success {
-            background: #ecfdf5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-        }
-
-        .voucher-message.error {
-            background: #fef2f2;
-            color: #991b1b;
-            border: 1px solid #fecaca;
         }
 
         .stripe-card-element {
@@ -828,11 +815,11 @@
             margin-top: 1.5rem;
         }
 
-        /* Processing / success states */
         .state-container {
             text-align: center;
             padding: 3rem 1rem;
         }
+
         .spinner {
             border: 3px solid var(--border-color);
             border-top-color: var(--primary-color);
@@ -848,6 +835,7 @@
                 transform: rotate(360deg);
             }
         }
+
         .success-icon {
             width: 72px;
             height: 72px;
@@ -926,10 +914,15 @@
         </div>
     </div>
 
-    <h2 class="section-title"><span>📬</span> All Available Newsletters</h2>
+    <!-- ── Recommended for You (lazy-loaded, hidden until populated) ─── -->
+    <section id="recommendations-section" aria-label="Recommended newsletters">
+        <h2 class="section-title"><span>✨</span> Recommended for You</h2>
+        <div id="recommendations-grid" class="newsletters-grid"></div>
+    </section>
 
+    <!-- ── All Available Newsletters ────────────────────────────────── -->
+    <h2 class="section-title"><span>📬</span> All Available Newsletters</h2>
     <div id="newsletters-grid" class="newsletters-grid">
-        <!-- Skeleton placeholders while loading -->
         <?php for ($i = 0; $i < 3; $i++): ?>
             <div class="skeleton-card">
                 <div style="display:flex;justify-content:space-between;margin-bottom:1rem;">
@@ -992,14 +985,63 @@
             </div>
             <p class="modal-subtitle">Choose a plan to unlock <strong id="upgradeNewsletterTitle"></strong></p>
         </div>
-        <div class="modal-body" id="upgradeModalBody">
-            <!-- Steps injected here -->
-        </div>
+        <div class="modal-body" id="upgradeModalBody"></div>
     </div>
 </div>
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
+
+    // ── Recommendation section ────────────────────────────────────────────
+
+    class RecommendationsSection {
+        constructor(manager) {
+            this.mgr = manager;
+            this.section = document.getElementById('recommendations-section');
+            this.grid = document.getElementById('recommendations-grid');
+        }
+
+        async load() {
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/newsletters/recommendations`);
+                const items = json.data ?? [];
+
+                if (!items.length) {
+                    // Section stays hidden — no empty state shown here.
+                    return;
+                }
+
+                UI.render(this.grid, items.map(item => this._card(item)));
+                this.section.classList.add('visible');
+            } catch {
+                // Silent failure — recommendations are non-critical.
+                // The All Newsletters section still loads independently.
+            }
+        }
+
+        _card(item) {
+            const reasonEl = UI.el('div', {className: 'recommendation-reason'}, [
+                '✦ ', item.reason,
+            ]);
+
+            const subscribeBtn = UI.el('button', {className: 'btn btn-primary btn-sm btn-full'}, ['Subscribe']);
+            subscribeBtn.addEventListener('click', () => this.mgr.quickSubscribe(item.newsletter_id));
+
+            return UI.el('div', {className: 'newsletter-card recommended'}, [
+                UI.el('div', {className: 'newsletter-header'}, [
+                    UI.el('div', {className: 'newsletter-icon'}, ['📧']),
+                    UI.el('span', {className: 'status-badge recommended'}, ['Recommended']),
+                ]),
+                UI.el('div', {className: 'newsletter-content'}, [
+                    UI.el('h3', {className: 'newsletter-title'}, [item.title]),
+                    reasonEl,
+                ]),
+                subscribeBtn,
+            ]);
+        }
+    }
+
+    // ── Newsletter grid ───────────────────────────────────────────────────
 
     class NewsletterGrid {
         constructor(manager) {
@@ -1028,8 +1070,9 @@
                 topRight = UI.el('div', {className: 'lock-badge'}, ['🔒 Locked']);
             } else if (!isSubscribed) {
                 const cb = UI.el('input', {
-                    type: 'checkbox', className: 'newsletter-checkbox',
-                    'data-newsletter-id': item.id
+                    type: 'checkbox',
+                    className: 'newsletter-checkbox',
+                    'data-newsletter-id': item.id,
                 });
                 cb.addEventListener('change', () => this.mgr.updateSelection());
                 topRight = cb;
@@ -1049,8 +1092,7 @@
             }
 
             const accessMsg = (isLocked && item.access_message)
-                ? UI.el('div', {className: 'access-message'}, [
-                    UI.el('p', {}, [item.access_message])])
+                ? UI.el('div', {className: 'access-message'}, [UI.el('p', {}, [item.access_message])])
                 : null;
 
             return UI.el('div', {
@@ -1068,7 +1110,8 @@
                     accessMsg,
                     UI.el('div', {className: 'newsletter-meta'}, [
                         UI.el('div', {className: 'meta-item'}, [
-                            `${item.interval.charAt(0).toUpperCase() + item.interval.slice(1)}`]),
+                            `${item.interval.charAt(0).toUpperCase() + item.interval.slice(1)}`,
+                        ]),
                         item.active ? UI.el('div', {className: 'meta-item'}, ['✓ Active']) : null,
                     ]),
                 ]),
@@ -1077,6 +1120,8 @@
         }
     }
 
+    // ── NewsletterManager ─────────────────────────────────────────────────
+
     class NewsletterManager {
         constructor() {
             this.newslettersWithAccess = [];
@@ -1084,11 +1129,19 @@
             this.subscriptions = [];
             this.selected = new Set();
             this.grid = new NewsletterGrid(this);
-            // UpgradeModal wired separately (Stripe dependency kept as-is)
+            this.recommendations = new RecommendationsSection(this);
             this.upgradeModal = new UpgradeModal(this);
         }
 
         async load() {
+            // Fire both requests concurrently — they are independent.
+            await Promise.all([
+                this._loadNewsletters(),
+                this.recommendations.load(),
+            ]);
+        }
+
+        async _loadNewsletters() {
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/newsletters`);
                 this.newslettersWithAccess = json.data.newsletters_with_access;
@@ -1105,15 +1158,15 @@
         _populateModal() {
             const list = document.getElementById('modalNewsletterList');
             if (!this.availableNewsletters.length) {
-                UI.render(list, [UI.el('p', {
-                    style: {textAlign: 'center', color: 'var(--text-secondary)'},
-                }, ['No newsletters available.'])]);
+                UI.render(list, [UI.el('p', {style: {textAlign: 'center', color: 'var(--text-secondary)'}},
+                    ['No newsletters available.'])]);
                 return;
             }
             UI.render(list, this.availableNewsletters.map(n => {
                 const subbed = n.is_subscribed;
                 const cb = UI.el('input', {
-                    type: 'checkbox', className: 'modal-item-checkbox',
+                    type: 'checkbox',
+                    className: 'modal-item-checkbox',
                     'data-newsletter-id': n.id,
                     ...(subbed ? {disabled: true, checked: true} : {}),
                 });
@@ -1155,9 +1208,12 @@
         async quickSubscribe(id) {
             try {
                 await api(`/api/${SITE_SLUG}/member/newsletter/signup`, {
-                    method: 'POST', body: JSON.stringify({newsletter_id: id}),
+                    method: 'POST',
+                    body: JSON.stringify({newsletter_id: id}),
                 });
                 UI.toast('Successfully subscribed!', 'success');
+                // Reload both sections — a new subscription changes
+                // both the list state and the recommendation set.
                 setTimeout(() => this.load(), 900);
             } catch (e) {
                 UI.toast(e.message || 'Failed to subscribe.', 'error');
@@ -1173,7 +1229,8 @@
             }
             try {
                 await api(`/api/${SITE_SLUG}/member/newsletters/unsubscribe`, {
-                    method: 'POST', body: JSON.stringify({subscriber_id: sub.id}),
+                    method: 'POST',
+                    body: JSON.stringify({subscriber_id: sub.id}),
                 });
                 UI.toast('Successfully unsubscribed.', 'success');
                 setTimeout(() => this.load(), 900);
@@ -1185,7 +1242,8 @@
         async bulkSubscribe(ids) {
             try {
                 await api(`/api/${SITE_SLUG}/member/newsletters/bulk-subscribe`, {
-                    method: 'POST', body: JSON.stringify({newsletter_ids: ids}),
+                    method: 'POST',
+                    body: JSON.stringify({newsletter_ids: ids}),
                 });
                 UI.toast(`Subscribed to ${ids.length} newsletter(s).`, 'success');
                 setTimeout(() => this.load(), 900);
@@ -1239,17 +1297,14 @@
         }
     }
 
-    // UpgradeModal: keeps Stripe logic intact, replaces innerHTML blobs with UI.el
+    // ── UpgradeModal (unchanged logic, included for completeness) ─────────
+
     class UpgradeModal {
         constructor(mgr) {
             this.mgr = mgr;
             this.newsletterId = null;
-            this.planId = null;
-            this.planPrice = null;
-            this.planCurrency = null;
-            this.stripe = null;
-            this.elements = null;
-            this.cardEl = null;
+            this.planId = this.planPrice = this.planCurrency = null;
+            this.stripe = this.elements = this.cardEl = null;
         }
 
         show(reason, newsletterId, title) {
@@ -1282,8 +1337,13 @@
         _renderPlansStep() {
             const body = document.getElementById('upgradeModalBody');
             const list = UI.el('div', {id: 'upgradePlansList', className: 'plans-grid'}, [
-                UI.el('div', {style: {textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)'}},
-                    ['Loading plans…']),
+                UI.el('div', {
+                    style: {
+                        textAlign: 'center',
+                        padding: '2rem',
+                        color: 'var(--text-secondary)'
+                    }
+                }, ['Loading plans…']),
             ]);
             const cancelBtn = UI.el('button', {className: 'btn btn-secondary'}, ['Cancel']);
             cancelBtn.addEventListener('click', () => this.close());
@@ -1303,8 +1363,12 @@
                 });
                 const plans = json.data?.plans ?? json.plans ?? [];
                 if (!plans.length) {
-                    UI.render(list, [UI.el('div', {style: {color: 'var(--text-secondary)', padding: '1rem'}},
-                        ['No subscription plans available.'])]);
+                    UI.render(list, [UI.el('div', {
+                        style: {
+                            color: 'var(--text-secondary)',
+                            padding: '1rem'
+                        }
+                    }, ['No plans available.'])]);
                     return;
                 }
                 UI.render(list, plans.map(plan => {
@@ -1323,8 +1387,12 @@
                     ]);
                 }));
             } catch {
-                UI.render(list, [UI.el('div', {style: {color: 'var(--danger-color)', padding: '1rem'}},
-                    ['Failed to load plans.'])]);
+                UI.render(list, [UI.el('div', {
+                    style: {
+                        color: 'var(--danger-color)',
+                        padding: '1rem'
+                    }
+                }, ['Failed to load plans.'])]);
             }
         }
 
@@ -1332,30 +1400,31 @@
             this.planId = id;
             this.planPrice = price;
             this.planCurrency = currency;
-            // Payment step rendered into upgradeModalBody — kept concise
             const body = document.getElementById('upgradeModalBody');
             const summary = UI.el('div', {className: 'selected-plan-summary'}, [
                 UI.el('h4', {}, [name]),
                 UI.el('div', {id: 'finalPriceDisplay', className: 'selected-plan-price'}, [
                     `${currency} ${price}`,
-                    UI.el('span', {style: {fontSize: '1rem', fontWeight: '400', color: 'var(--text-secondary)'}},
-                        [` / ${period}`]),
+                    UI.el('span', {
+                        style: {
+                            fontSize: '1rem',
+                            fontWeight: '400',
+                            color: 'var(--text-secondary)'
+                        }
+                    }, [` / ${period}`]),
                 ]),
             ]);
-
             const methodSelect = UI.el('select', {id: 'paymentMethod', className: 'form-control'}, [
                 UI.el('option', {value: ''}, ['Select payment method']),
                 UI.el('option', {value: 'stripe'}, ['Credit / Debit Card (Stripe)']),
                 UI.el('option', {value: 'paypal'}, ['PayPal']),
             ]);
             methodSelect.addEventListener('change', () => this._onMethodChange());
-
             const cardContainer = UI.el('div', {id: 'stripeCardContainer', style: {display: 'none'}}, [
                 UI.el('label', {}, ['Card Details']),
                 UI.el('div', {id: 'card-element', className: 'stripe-card-element'}),
                 UI.el('span', {id: 'card-errors', className: 'card-error-text'}),
             ]);
-
             const backBtn = UI.el('button', {className: 'btn btn-secondary'}, ['← Back']);
             backBtn.addEventListener('click', () => {
                 this._renderPlansStep();
@@ -1367,7 +1436,6 @@
             }, ['Complete Subscription']);
             submitBtn.addEventListener('click', () => this._handleSubmit());
             const errBox = UI.el('div', {id: 'paymentError', className: 'payment-error-box', style: {display: 'none'}});
-
             UI.render(body, [summary,
                 UI.el('div', {className: 'form-group'}, [UI.el('label', {}, ['Payment Method']), methodSelect]),
                 cardContainer, errBox,
@@ -1414,8 +1482,10 @@
             const json = await api(`/api/${SITE_SLUG}/member/newsletters/process-upgrade`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    newsletter_id: this.newsletterId, plan_id: this.planId,
-                    payment_method: 'stripe', setup_only: true
+                    newsletter_id: this.newsletterId,
+                    plan_id: this.planId,
+                    payment_method: 'stripe',
+                    setup_only: true
                 }),
             });
             if (json.data?.client_secret) {
@@ -1433,7 +1503,8 @@
             const json = await api(`/api/${SITE_SLUG}/member/newsletters/process-upgrade`, {
                 method: 'POST',
                 body: JSON.stringify({
-                    newsletter_id: this.newsletterId, plan_id: this.planId,
+                    newsletter_id: this.newsletterId,
+                    plan_id: this.planId,
                     payment_method: 'paypal'
                 }),
             });
@@ -1461,10 +1532,18 @@
             UI.render(document.getElementById('upgradeModalBody'), [
                 UI.el('div', {className: 'state-container'}, [
                     UI.el('div', {className: 'success-icon'}, ['✓']),
-                    UI.el('h3', {style: {color: 'var(--success-color)', marginBottom: '0.75rem'}},
-                        ['Subscription Successful!']),
-                    UI.el('p', {style: {color: 'var(--text-secondary)', marginBottom: '1.5rem'}},
-                        ['You now have access to this newsletter.']),
+                    UI.el('h3', {
+                        style: {
+                            color: 'var(--success-color)',
+                            marginBottom: '0.75rem'
+                        }
+                    }, ['Subscription Successful!']),
+                    UI.el('p', {
+                        style: {
+                            color: 'var(--text-secondary)',
+                            marginBottom: '1.5rem'
+                        }
+                    }, ['You now have access to this newsletter.']),
                     closeBtn,
                 ]),
             ]);
@@ -1488,8 +1567,11 @@
         }
     }
 
+    // ── Bootstrap ─────────────────────────────────────────────────────────
+
     document.addEventListener('DOMContentLoaded', () => {
         const mgr = new NewsletterManager();
+
         window.openNewsletterModal = () => mgr.openModal();
         window.closeNewsletterModal = () => mgr._closeModal();
         window.selectAllNewsletters = checked => mgr.selectAll(checked);
@@ -1500,6 +1582,7 @@
             mgr.updateSelection();
         };
         window.closeUpgradeModal = () => mgr.upgradeModal.close();
+
         mgr.load();
     });
 </script>

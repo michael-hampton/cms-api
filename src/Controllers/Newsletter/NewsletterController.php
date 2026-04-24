@@ -19,7 +19,7 @@ use App\Models\MemberRole;
 use App\Models\Newsletter;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Repositories\Newsletters\NewsletterSendRecipientRepository;
-use App\Repositories\Subscriptions\SubscriberRepository;
+use App\Repositories\Newsletters\SubscriberRepository;
 use App\Requests\Newsletter\CreateNewsletterRequest;
 use App\Requests\Newsletter\UpdateNewsletterRequest;
 use App\Resources\NewsletterResource;
