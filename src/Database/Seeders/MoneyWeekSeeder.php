@@ -217,7 +217,7 @@ class MoneyWeekSeeder extends Seeder
         }
     }
 
-    private function getHomepageBlocks(array $articles = [], $str): array
+    private function getHomepageBlocks(): array
     {
         return [
             // Block 1: Hero - REQUIRED

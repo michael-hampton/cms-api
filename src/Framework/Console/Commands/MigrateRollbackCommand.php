@@ -10,7 +10,7 @@ use Exception;
 class MigrateRollbackCommand extends Command
 {
     protected $signature = 'migrate:rollback {--steps=1}';
-    protected $description = 'Rollback database migrations';
+    public $description = 'Rollback database migrations';
 
     public function handle(): int
     {

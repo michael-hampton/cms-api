@@ -105,7 +105,7 @@ class CampaignRepositoryTest extends RepositoryTestCase
         $targetSite = $this->createSite();
 
         $original = Campaign::create([
-            'site_id' => $this->siteId,
+            'site_id' => $targetSite->id,
             'name' => 'Original Campaign',
             'slug' => 'original',
             'description' => 'Test description',

@@ -297,9 +297,9 @@ class BadgeAdminServiceTest extends FunctionalTestCase
     {
         $paginator = [];
 
-        $this->repository->expects('paginate')->with(10, 20)->andReturn($paginator);
+        $this->repository->expects('paginate')->with(10, 1, 1, [])->andReturn($paginator);
 
-        $result = $this->service->listForSite(10);
+        $result = $this->service->listForSite($this->siteId, 1, 10);
 
         $this->assertSame($paginator, $result);
     }

@@ -2,6 +2,8 @@
 
 namespace App\Framework\Support;
 
+use App\Models\Model;
+
 trait Serializable
 {
     /**

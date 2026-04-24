@@ -77,6 +77,7 @@ final class NewsletterRelationshipBuilder
         }
 
         $categoryEdges = $this->buildCategoryEdges($newsletters, $siteId);
+
         $coSubscriptionEdges = $this->buildCoSubscriptionEdges($newsletters, $siteId);
 
         $this->logger->info('NewsletterRelationshipBuilder: build complete', [

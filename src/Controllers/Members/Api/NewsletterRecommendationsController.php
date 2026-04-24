@@ -8,6 +8,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Services\MemberInsights\Newsletters\Recommendations\NewsletterRecommendationService;
 use App\Services\MemberInsights\Newsletters\Suppression\NewsletterSuppressionService;
 
@@ -42,25 +43,27 @@ class NewsletterRecommendationsController extends Controller
         parent::__construct();
     }
 
-    public function __invoke(Request $request, int $siteId): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
 
-        $suppression = $this->suppressionService->buildSuppressionSet($member, $siteId);
+        $suppression = $this->suppressionService->buildSuppressionSet($member, SiteContext::getId());
 
         $recommendations = $this->recommendationService->recommend(
             member: $member,
             suppression: $suppression,
-            siteId: $siteId,
+            siteId: SiteContext::getId(),
         );
 
-        return $this->resourceResponse([
-            'data' => array_map(fn($result) => [
-                'newsletter_id' => $result->newsletter->id,
-                'title' => $result->newsletter->title,
-                'reason' => $result->reason,
-                'score' => $result->score,
-            ], $recommendations),
-        ]);
+        return [];
+
+//        return $this->resourceResponse([
+//            'data' => array_map(fn($result) => [
+//                'newsletter_id' => $result->newsletter->id,
+//                'title' => $result->newsletter->title,
+//                'reason' => $result->reason,
+//                'score' => $result->score,
+//            ], $recommendations),
+//        ]);
     }
 }

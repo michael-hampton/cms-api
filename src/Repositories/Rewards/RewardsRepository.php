@@ -196,8 +196,8 @@ class RewardsRepository extends Repository implements TrackableRepository
     public function trackClick(
         int     $rewardId,
         ?int    $memberId,
-        int     $siteId,
-        string  $action,
+        ?int   $siteId = null,
+        string $action = '',
         ?string $ipAddress = null,
         ?string $userAgent = null,
         array   $metadata = []  // ADD THIS
@@ -361,7 +361,7 @@ class RewardsRepository extends Repository implements TrackableRepository
         int    $surfaceId,
     ): bool
     {
-        return RewardClick::where('reward_id', $entityId)
+        return RewardClick::where('member_reward_id', $entityId)
             ->where('member_id', $memberId)
             ->where('action', $action)
             ->where('surface_type', $surfaceType)

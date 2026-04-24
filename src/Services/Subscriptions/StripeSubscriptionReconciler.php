@@ -48,12 +48,16 @@ class StripeSubscriptionReconciler
         'incomplete_expired' => SubscriptionStatus::CANCELLED,
         'unpaid' => SubscriptionStatus::PAST_DUE,
     ];
+    private StripeClient $stripe;
 
     public function __construct(
-        private readonly StripeClient $stripe,
         private readonly Logger       $logger,
+        ?StripeClient $stripe = null
     )
     {
+        $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
+
+        $this->stripe = empty($stripe) ? new StripeClient($secretKey) : $stripe;
     }
 
     /**
@@ -72,10 +76,15 @@ class StripeSubscriptionReconciler
     {
         $stripeId = $subscription->payment_subscription_id;
 
+        if (empty($stripeId)) {
+            return [];
+        }
+
         try {
             $stripeSubscription = $this->stripe->subscriptions->retrieve($stripeId, [
                 'expand' => ['latest_invoice'],
             ]);
+
         } catch (ApiErrorException $e) {
             $this->logger->error('Reconciler: Stripe API error', [
                 'subscription_id' => $subscription->id,
@@ -87,6 +96,7 @@ class StripeSubscriptionReconciler
         }
 
         $desired = $this->buildDesiredState($stripeSubscription);
+
         $changes = $this->diff($subscription, $desired);
 
         if (empty($changes)) {
@@ -94,6 +104,7 @@ class StripeSubscriptionReconciler
         }
 
         $updatePayload = array_map(fn($change) => $change['to'], $changes);
+
         $subscription->update($updatePayload);
 
         $this->logger->info('Reconciler: subscription updated', [

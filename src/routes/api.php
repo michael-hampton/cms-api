@@ -231,6 +231,7 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->get('/newsletters', [MemberNewslettersApiController::class, 'index']);
     $router->post('/newsletters/unsubscribe', [MemberNewslettersApiController::class, 'unsubscribe']);
     $router->post('/newsletter/signup', [MemberNewslettersApiController::class, 'subscribe']);
+    $router->get('/newsletters/recommendations', [\App\Controllers\Members\Api\NewsletterRecommendationsController::class, '__invoke']);
     $router->post('/newsletters/bulk-subscribe', [MemberNewslettersApiController::class, 'bulkSubscribe']);
 // In the member newsletters section
     $router->post('/newsletters/upgrade-options', [MemberNewslettersApiController::class, 'getUpgradeOptions']);
@@ -676,6 +677,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/payment-methods/{id}', [PaymentMethodController::class, 'destroy']);
 
         $router->get('/email-themes', [EmailThemeController::class, 'index']);
+        $router->get('/email-themes/preview/{id}', [EmailThemeController::class, 'preview']);
         $router->get('/email-themes/active', [EmailThemeController::class, 'getActive']);
         $router->post('/email-themes', [EmailThemeController::class, 'store']);
         $router->get('/email-themes/{id}', [EmailThemeController::class, 'show']);

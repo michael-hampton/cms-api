@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-  "content-hash": "f038fb3d8eceba7cdebc15e878dc66ec",
+  "content-hash": "12bf79a21eecb1f81602b53c39590d4e",
   "packages": [
     {
       "name": "dompdf/dompdf",
@@ -2831,8 +2831,61 @@
           "time": "2026-01-25T14:56:51+00:00"
         },
         {
+          "name": "phpstan/phpstan",
+          "version": "2.1.51",
+          "dist": {
+            "type": "zip",
+            "url": "https://api.github.com/repos/phpstan/phpstan/zipball/dc3b523c45e714c70de2ac5113b958223b55dc59",
+            "reference": "dc3b523c45e714c70de2ac5113b958223b55dc59",
+            "shasum": ""
+          },
+          "require": {
+            "php": "^7.4|^8.0"
+          },
+          "conflict": {
+            "phpstan/phpstan-shim": "*"
+          },
+          "bin": [
+            "phpstan",
+            "phpstan.phar"
+          ],
+          "type": "library",
+          "autoload": {
+            "files": [
+              "bootstrap.php"
+            ]
+          },
+          "notification-url": "https://packagist.org/downloads/",
+          "license": [
+            "MIT"
+          ],
+          "description": "PHPStan - PHP Static Analysis Tool",
+          "keywords": [
+            "dev",
+            "static analysis"
+          ],
+          "support": {
+            "docs": "https://phpstan.org/user-guide/getting-started",
+            "forum": "https://github.com/phpstan/phpstan/discussions",
+            "issues": "https://github.com/phpstan/phpstan/issues",
+            "security": "https://github.com/phpstan/phpstan/security/policy",
+            "source": "https://github.com/phpstan/phpstan-src"
+          },
+          "funding": [
+            {
+              "url": "https://github.com/ondrejmirtes",
+              "type": "github"
+            },
+            {
+              "url": "https://github.com/phpstan",
+              "type": "github"
+            }
+          ],
+          "time": "2026-04-21T18:22:01+00:00"
+        },
+      {
             "name": "phpunit/php-code-coverage",
-          "version": "12.5.5",
+        "version": "12.5.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/php-code-coverage.git",
@@ -2916,7 +2969,7 @@
                     "type": "tidelift"
                 }
             ],
-          "time": "2026-04-13T04:53:32+00:00"
+        "time": "2026-04-13T04:53:32+00:00"
         },
         {
             "name": "phpunit/php-file-iterator",

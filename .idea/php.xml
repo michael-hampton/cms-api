@@ -97,14 +97,16 @@
       <path value="$PROJECT_DIR$/src/vendor/dompdf/dompdf" />
       <path value="$PROJECT_DIR$/src/vendor/thecodingmachine/safe" />
       <path value="$PROJECT_DIR$/src/vendor/daverandom/libdns" />
+      <path value="$PROJECT_DIR$/src/vendor/phpstan/phpstan" />
     </include_path>
   </component>
-  <component name="PhpProjectSharedConfiguration" php_language_level="8.4">
+  <component name="PhpProjectSharedConfiguration" php_language_level="8.5">
     <option name="suggestChangeDefaultLanguageLevel" value="false" />
   </component>
   <component name="PhpStan">
     <PhpStan_settings>
       <phpstan_by_interpreter asDefaultInterpreter="true" interpreter_id="5c4c960d-7f65-4c87-a043-ea89b8087cb7" timeout="60000" />
+      <PhpStanConfiguration tool_path="$PROJECT_DIR$/src/vendor/bin/phpstan" />
     </PhpStan_settings>
   </component>
   <component name="PhpStanOptionsConfiguration">

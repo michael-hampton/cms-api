@@ -18,6 +18,7 @@ use App\Requests\CreateEmailThemeRequest;
 use App\Requests\UpdateEmailThemeRequest;
 use App\Resources\EmailThemeResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Cms\EmailThemePreviewService;
 use App\Services\Cms\EmailThemeService;
 use Exception;
 
@@ -25,6 +26,7 @@ class EmailThemeController extends Controller
 {
     public function __construct(
         private EmailThemeService             $emailThemeService,
+        private EmailThemePreviewService $emailThemePreviewService,
         private readonly EmailThemeRepository $emailThemeRepository
     )
     {
@@ -40,7 +42,6 @@ class EmailThemeController extends Controller
             $collection = new PaginatedResourceCollection($result, EmailThemeResource::class);
 
             return $this->resourceResponse($collection->toArray());
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -57,21 +58,16 @@ class EmailThemeController extends Controller
             $theme = $this->emailThemeService->createTheme($data, $siteId, $logoFile);
 
             return $this->jsonResponse([
-                'theme' => EmailThemeResource::make($theme)->toArray()
+                'theme' => EmailThemeResource::make($theme)->toArray(),
             ], 201);
-
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
-    public function show($id, string $site): JsonResponse
+    public function show(int|string $id, string $site): JsonResponse
     {
         try {
             if (is_numeric($id)) {
@@ -86,9 +82,8 @@ class EmailThemeController extends Controller
             }
 
             return $this->jsonResponse([
-                'theme' => EmailThemeResource::make($theme)->toArray()
+                'theme' => EmailThemeResource::make($theme)->toArray(),
             ]);
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -103,15 +98,10 @@ class EmailThemeController extends Controller
             $theme = $this->emailThemeService->updateTheme($id, $data, $logoFile);
 
             return $this->jsonResponse([
-                'theme' => EmailThemeResource::make($theme)->toArray()
+                'theme' => EmailThemeResource::make($theme)->toArray(),
             ]);
-
         } catch (ValidationException $e) {
-            return $this->errorResponse(
-                'Validation failed',
-                422,
-                $e->getErrors()
-            );
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -127,7 +117,6 @@ class EmailThemeController extends Controller
             }
 
             return $this->successResponse('Email theme deleted successfully');
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 404);
         }
@@ -140,9 +129,8 @@ class EmailThemeController extends Controller
             $themes = $this->emailThemeService->getActiveThemes($siteId);
 
             return $this->jsonResponse([
-                'themes' => EmailThemeResource::collection($themes)->toArray()
+                'themes' => EmailThemeResource::collection($themes)->toArray(),
             ]);
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -159,7 +147,6 @@ class EmailThemeController extends Controller
             }
 
             return $this->successResponse('Default theme updated successfully');
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -172,9 +159,8 @@ class EmailThemeController extends Controller
             $themes = $this->emailThemeService->getAlternativeThemes($id, $siteId);
 
             return $this->jsonResponse([
-                'themes' => EmailThemeResource::collection($themes)->toArray()
+                'themes' => EmailThemeResource::collection($themes)->toArray(),
             ]);
-
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -187,22 +173,17 @@ class EmailThemeController extends Controller
             $newName = $data['name'] ?? null;
 
             $cloneEmailTheme = Container::getInstance()->make(CloneEmailTheme::class);
-
             $results = $cloneEmailTheme->handle($id, $newName);
 
             return $this->jsonResponse($results, 201);
-
         } catch (Exception $e) {
-            if (strpos($e->getMessage(), 'not found') !== false) {
-                return $this->jsonResponse([
-                    'success' => false,
-                    'message' => $e->getMessage()
-                ], 404);
+            if (str_contains($e->getMessage(), 'not found')) {
+                return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 404);
             }
 
             return $this->jsonResponse([
                 'success' => false,
-                'message' => 'Failed to duplicate email theme: ' . $e->getMessage()
+                'message' => 'Failed to duplicate email theme: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -211,26 +192,70 @@ class EmailThemeController extends Controller
     {
         try {
             $data = $request->validated();
-
             $bulkDeleteEmailTheme = Container::getInstance()->make(BulkDeleteEmailTheme::class);
-
             $result = $bulkDeleteEmailTheme->handle($data['ids']);
 
             return $this->resourceResponse([
-                'message' => "Bulk delete completed. Deleted: " . count($result['deleted']) . ", Failed: " . count($result['failed']),
-                'result' => $result
+                'message' => 'Bulk delete completed. Deleted: ' . count($result['deleted']) . ', Failed: ' . count($result['failed']),
+                'result' => $result,
             ], 200);
-
         } catch (ValidationException $e) {
-            return $this->resourceResponse([
-                'error' => 'Validation failed',
-                'errors' => $e->getErrors()
-            ], 422);
-
+            return $this->resourceResponse(['error' => 'Validation failed', 'errors' => $e->getErrors()], 422);
         } catch (Exception $e) {
-            return $this->resourceResponse([
-                'error' => 'Bulk delete failed: ' . $e->getMessage()
-            ], 500);
+            return $this->resourceResponse(['error' => 'Bulk delete failed: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Preview endpoints
+    // -------------------------------------------------------------------------
+
+    /**
+     * Render a live preview from an existing saved theme.
+     *
+     * GET /cms/{site}/email-themes/{id}/preview?sample=default|minimal|promotion
+     */
+    public function preview(int $id, Request $request): JsonResponse
+    {
+        try {
+            $theme = $this->emailThemeService->getThemeById($id);
+
+            if (!$theme) {
+                return $this->errorResponse('Email theme not found', 404);
+            }
+
+            $sampleType = $request->query('sample', 'default');
+            $html = $this->emailThemePreviewService->renderFromModel($theme, $sampleType);
+
+            return $this->jsonResponse(['html' => $html]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Render a live preview from raw (unsaved) editor data.
+     *
+     * POST /cms/{site}/email-themes/preview
+     *
+     * Body: { theme: {...}, sample: 'default'|'minimal'|'promotion' }
+     */
+    public function previewFromData(Request $request, string $site): JsonResponse
+    {
+        try {
+            $body = $request->all();
+            $themeData = $body['theme'] ?? [];
+            $sampleType = $body['sample'] ?? 'default';
+
+            if (empty($themeData)) {
+                return $this->errorResponse('Theme data is required', 422);
+            }
+
+            $html = $this->emailThemePreviewService->renderFromData($themeData, $sampleType);
+
+            return $this->jsonResponse(['html' => $html]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 }

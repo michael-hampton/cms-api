@@ -9,7 +9,7 @@ final class SubscriptionPaused
     public function __construct(
         public readonly Subscription $subscription,
         public readonly ?string      $pausedUntil = null,
-        public readonly int          $memberId,
+        public readonly ?int $memberId = null,
     )
     {
     }

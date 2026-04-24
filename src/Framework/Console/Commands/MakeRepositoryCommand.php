@@ -7,7 +7,7 @@ use App\Framework\Console\Command;
 class MakeRepositoryCommand extends Command
 {
     protected $signature = 'make:repository {name}';
-    protected $description = 'Create a new repository';
+    public $description = 'Create a new repository';
 
     public function handle(): int
     {

@@ -83,7 +83,17 @@ class BelongsToHandler extends RelationshipHandler
 
         foreach ($results as &$result) {
             $foreignKeyValue = $this->extractValue($result, $relationData['foreign_key']);
-            $this->setValue($result, $relation, $relatedLookup[$foreignKeyValue] ?? null);
+
+            if (!is_int($foreignKeyValue) && !is_string($foreignKeyValue)) {
+                $this->setValue($result, $relation, null);
+                continue;
+            }
+
+            $this->setValue(
+                $result,
+                $relation,
+                $relatedLookup[$foreignKeyValue] ?? null
+            );
         }
 
         return $results;

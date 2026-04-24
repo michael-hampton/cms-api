@@ -7,7 +7,7 @@ use App\Framework\Console\Command;
 class MakeControllerCommand extends Command
 {
     protected $signature = 'make:controller {name}';
-    protected $description = 'Create a new controller';
+    public $description = 'Create a new controller';
 
     public function handle(): int
     {

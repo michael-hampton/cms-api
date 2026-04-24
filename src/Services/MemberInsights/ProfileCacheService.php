@@ -2,7 +2,8 @@
 
 namespace App\Services\MemberInsights;
 
-use App\Repositories\Members\MemberSegmentationProfileRepository;
+
+use App\Repositories\MemberInsights\MemberSegmentationProfileRepository;
 
 /**
  * Ticket 16 — Performance: Profile Caching.

@@ -127,8 +127,8 @@ class StripeSubscriptionReconcilerTest extends TestCase
         $this->logger = Mockery::mock(Logger::class);
 
         $this->reconciler = new StripeSubscriptionReconciler(
-            $this->stripe,
-            $this->logger
+            $this->logger,
+            $this->stripe
         );
     }
 }

@@ -6,7 +6,7 @@ use App\Framework\Database\Database;
 
 trait RelationshipBuilder
 {
-    private function hasOne(
+    protected function hasOne(
         string $related,
         ?string $foreignKey = null,
         ?string $localKey = null,
@@ -32,7 +32,7 @@ trait RelationshipBuilder
 
     }
 
-    private function hasMany(
+    protected function hasMany(
         string $related,
         ?string $foreignKey = null,
         ?string $localKey = null,
@@ -56,7 +56,7 @@ trait RelationshipBuilder
         return $handler->loadForSingleModel($this, $relationData);
     }
 
-    private function belongsTo(
+    protected function belongsTo(
         string $related,
         ?string $foreignKey = null,
         ?string $ownerKey = null,
@@ -80,7 +80,7 @@ trait RelationshipBuilder
         return $handler->loadForSingleModel($this, $relationData);
     }
 
-    private function belongsToMany(
+    protected function belongsToMany(
         string  $related,
         ?string $table = null,
         ?string $foreignPivotKey = null,

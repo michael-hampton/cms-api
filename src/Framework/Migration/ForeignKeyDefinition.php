@@ -14,7 +14,9 @@ class ForeignKeyDefinition
     public function __construct(string $column, string $table)
     {
         $this->column = $column;
-        $this->name = 'fk_' . $table . '_' . $column;    }
+        $this->name = 'fk_' . $table . '_' . $column;
+        $this->on = $table;
+    }
 
     public function references(string $column): self
     {

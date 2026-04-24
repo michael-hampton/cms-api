@@ -7,7 +7,7 @@ use App\Framework\Console\Command;
 class MakeModelCommand extends Command
 {
     protected $signature = 'make:model {name}';
-    protected $description = 'Create a new model';
+    public $description = 'Create a new model';
 
     public function handle(): int
     {

@@ -26,7 +26,7 @@ class ExpireBoostsJob extends BaseJob
 
         foreach ($expiredBoosts as $boost) {
             try {
-                $this->boostService->expireBoost($boost->id, $now);
+                $this->boostService->expireBoost($boost->id);
             } catch (\Exception $e) {
                 Logger::error('Failed to expire boost', [
                     'boost_id' => $boost->id,

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Unit\Repositories\Member;
+namespace App\Tests\Unit\Repositories\Members;
 
 use App\Models\MemberActivity;
 use App\Repositories\MemberInsights\MemberActivityRepository;

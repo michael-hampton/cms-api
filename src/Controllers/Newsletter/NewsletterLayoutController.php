@@ -87,7 +87,7 @@ class NewsletterLayoutController extends Controller
                 newName: $data['name'],
                 newSlug: $data['slug'],
                 clonedBy: $data['cloned_by'] ?? Auth::id(),
-                siteId: (int)$data['site_id'] ?? SiteContext::getId(),
+                siteId: (int)$data['site_id'] ?: SiteContext::getId(),
             );
 
             return $this->jsonResponse(NewsletterLayoutResource::make($cloned)->toArray(), 201);

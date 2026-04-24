@@ -17,7 +17,7 @@ class Number
     /**
      * Convert a number to its percentage equivalent
      */
-    public static function percentage(float $number, int $precision = 0, int $maxPrecision = null): string
+    public static function percentage(float $number, int $precision = 0, ?int $maxPrecision = null): string
     {
         $percentage = $number * 100;
 

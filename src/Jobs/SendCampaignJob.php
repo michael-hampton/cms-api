@@ -15,11 +15,11 @@ use App\Models\Campaign;
 use App\Models\Member;
 use App\Repositories\Cms\CampaignRepository;
 use App\Repositories\MemberInsights\CampaignDeliveryRepository;
+use App\Repositories\MemberInsights\CampaignVariantAssigner;
 use App\Repositories\Members\MemberRepository;
 use App\Services\MemberInsights\Campaigns\CampaignConsentChecker;
 use App\Services\MemberInsights\Campaigns\CampaignExecutionLogger;
 use App\Services\MemberInsights\Campaigns\CampaignNotification;
-use App\Services\MemberInsights\Campaigns\CampaignVariantAssigner;
 use App\Services\MemberInsights\InAppNotificationDispatcher;
 use App\Services\MemberInsights\Segmentation\SmartChannelResolver;
 

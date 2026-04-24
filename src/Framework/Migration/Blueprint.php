@@ -9,6 +9,7 @@ class Blueprint
     private $indexes = [];
     private $foreignKeys = [];
     private $mode = 'create';
+    private array $commands = [];
 
     public function __construct(string $table, string $mode = 'create')
     {
@@ -256,6 +257,10 @@ class Blueprint
                 ];
             }
 
+            if ($foreign = $column->getForeign()) {
+                $this->foreignKeys[] = $foreign;
+            }
+
             $columnDefinitions[] = "    " . $column->toSql();
         }
 
@@ -290,6 +295,15 @@ class Blueprint
         $sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
         return $sql;
+    }
+
+    private function guessTable(string $column): string
+    {
+        if (!str_ends_with($column, '_id')) {
+            return $column . 's';
+        }
+
+        return substr($column, 0, -3) . 's';
     }
 
     private function createIndexName(string $type, array $columns): string

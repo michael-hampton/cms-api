@@ -18,6 +18,8 @@ class Column
     protected bool $useCurrentOnUpdate = false;
     private ?string $comment = null;
     private bool $index = false;
+    protected ForeignKeyDefinition $foreign;
+
     public function __construct(string $type, string $name, array $parameters = [])
     {
         $this->type = $type;
@@ -35,6 +37,23 @@ class Column
     {
         $this->useCurrentOnUpdate = true;
         return $this;
+    }
+
+    public function constrained(?string $table = null, string $references = 'id'): ForeignKeyDefinition
+    {
+        if ($table === null) {
+            $table = str_ends_with($this->name, '_id')
+                ? substr($this->name, 0, -3) . 's'
+                : $this->name . 's';
+        }
+
+        $foreign = new ForeignKeyDefinition($this->name, $table);
+
+        $foreign->references($references);
+
+        $this->foreign = $foreign;
+
+        return $foreign;
     }
 
     public function nullable(): self
@@ -215,5 +234,10 @@ class Column
     public function getName(): string
     {
         return $this->name;
+    }
+
+    public function getForeign(): ?ForeignKeyDefinition
+    {
+        return $this->foreign ?? null;
     }
 }

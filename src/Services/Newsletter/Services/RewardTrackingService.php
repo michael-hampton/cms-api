@@ -25,6 +25,8 @@ class RewardTrackingService
                 $reward->id,
                 $dealId,
                 $advertContext,
+                '',
+                '',
                 $reward->site_id
             );
         } catch (\Exception $e) {

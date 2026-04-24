@@ -30,7 +30,7 @@ class ExpireBoostsJobTest extends FunctionalTestCase
 
         $service->shouldReceive('expireBoost')
             ->once()
-            ->with(1, $now);
+            ->with(1);
 
         $container = Container::getInstance();
         $container->instance(BoostRepository::class, $repository);

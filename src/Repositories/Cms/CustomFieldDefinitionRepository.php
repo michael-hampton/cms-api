@@ -6,8 +6,8 @@ use App\Framework\Support\Collection;
 use App\Models\CustomFieldDefinition;
 use App\Models\Model;
 use App\Models\Site;
-use App\Repositories\Exception;
 use App\Repositories\Repository;
+use Exception;
 
 class CustomFieldDefinitionRepository extends Repository
 {
@@ -59,7 +59,7 @@ class CustomFieldDefinitionRepository extends Repository
         return $this->create($data);
     }
 
-    public function getByType(string $type): array
+    public function getByType(string $type): Collection
     {
         return $this->where('type', $type)
             ->where('is_active', 1)
@@ -73,7 +73,7 @@ class CustomFieldDefinitionRepository extends Repository
         return CustomFieldDefinition::byGroup($group)->active()->ordered()->get();
     }
 
-    public function searchFields(string $query, int $limit = 10): array
+    public function searchFields(string $query, int $limit = 10): Collection
     {
         return $this->where('name', 'LIKE', "%{$query}%")
             ->orWhere('key', 'LIKE', "%{$query}%")

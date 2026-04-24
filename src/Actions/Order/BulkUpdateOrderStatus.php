@@ -19,9 +19,9 @@ class BulkUpdateOrderStatus
         $this->database = $database ?? Database::getInstance();
     }
 
-    public function handle(array $orderIds, string $status, ?int $userId = null): array
+    public function handle(array $orderIds, string $status, ?int $userId = null, array $data = []): array
     {
-        return $this->database->transaction(function () use ($orderIds, $status, $userId) {
+        return $this->database->transaction(function () use ($orderIds, $status, $userId, $data) {
             $updated = [];
             $failed = [];
 

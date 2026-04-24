@@ -14,7 +14,7 @@ class BulkDeclineRewards
     {
     }
 
-    public function handle(array $rewardIds, string $reason = null): array
+    public function handle(array $rewardIds, ?string $reason = null): array
     {
         return $this->database->transaction(function () use ($rewardIds, $reason) {
             $updated = [];

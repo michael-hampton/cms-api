@@ -74,7 +74,7 @@ class SearchController extends Controller
                 })
             ]);
         } catch (\Exception $e) {
-            return response()->json([
+            return $this->jsonResponse([
                 'success' => false,
                 'message' => 'Failed to search categories'
             ], 500);

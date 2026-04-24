@@ -12,7 +12,7 @@ class ImageUpload extends FileUpload
         $this->setAllowedExtensions(['jpg', 'jpeg', 'png', 'gif', 'webp']);
     }
 
-    public function resize(int $width, int $height = null, string $directory = 'thumbnails'): ?string
+    public function resize(int $width, ?int $height = null, string $directory = 'thumbnails'): ?string
     {
         $originalPath = $this->store();
         if (!$originalPath) {

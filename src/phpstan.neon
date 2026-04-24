@@ -1,0 +1,27 @@
+parameters:
+    level: 5
+
+    parallel:
+        maximumNumberOfProcesses: 1
+
+    paths:
+        - .
+
+    excludePaths:
+        - vendor
+        - storage
+        - Tests
+        - views
+
+    ignoreErrors:
+        - message: '#Unsafe usage of new static\(\)#'
+
+        - message: '#return type has no value type specified in iterable type.*#'
+
+        - message: '#Access to an undefined property .*#'
+
+        - message: '#expects int, int\|null given#'
+
+        - message: '#Property .* is never written, only read#'
+          paths:
+              - app/Jobs/*

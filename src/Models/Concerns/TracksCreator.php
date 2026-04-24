@@ -2,6 +2,8 @@
 
 namespace App\Models\Concerns;
 
+use App\Models\User;
+
 trait TracksCreator
 {
     protected static function bootTracksCreator(): void

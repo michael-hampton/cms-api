@@ -27,9 +27,4 @@ class MemberDashboardController extends Controller
             'site' => SiteContext::get(),
         ]);
     }
-
-    private function getNewsletterCount(string $email, int $siteId): int
-    {
-        return $this->subscriberRepository->getNewslettersForMember($email, $siteId)->count();
-    }
 }

@@ -6,6 +6,7 @@ use App\Events\Orders\OrderCreatedEvent;
 use App\Exceptions\Members\AccountAlreadyActivatedException;
 use App\Framework\Mail\MailManager;
 use App\Framework\Support\Logger;
+use App\Mail\Members\AccountActivationMail;
 use App\Models\Member;
 use App\Services\Members\MemberActivationService;
 

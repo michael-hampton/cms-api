@@ -9,7 +9,7 @@ use App\Framework\Schedule\Scheduler;
 class ScheduleRunCommand extends Command
 {
     protected $signature = 'schedule:run';
-    protected $description = 'Run the scheduled commands';
+    public $description = 'Run the scheduled commands';
 
     public function handle(): int
     {
