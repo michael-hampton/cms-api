@@ -2,10 +2,12 @@
 
 namespace App\Framework\Mail;
 
+use App\Framework\Container;
 use App\Framework\Support\Config;
 use App\Framework\Support\SiteContext;
 use App\Framework\Support\View;
 use App\Models\EmailTheme;
+use App\Services\Newsletter\EmailTemplateService;
 
 abstract class Mailable
 {
@@ -23,6 +25,8 @@ abstract class Mailable
     public ?string $textView = null;
     public ?EmailTheme $theme = null;
     public ?string $themeSlug = null;
+    public ?int $templateId = null;
+    public ?string $templateSlug = null;
     protected ?int $siteId = null;
 
     public function __construct()
@@ -166,6 +170,10 @@ abstract class Mailable
     {
         $this->loadTheme();
 
+        if ($this->templateId !== null || $this->templateSlug !== null) {
+            return $this->renderTemplate();
+        }
+
         if ($this->markdown) {
             return $this->renderMarkdown();
         }
@@ -175,6 +183,37 @@ abstract class Mailable
         }
 
         return '';
+    }
+
+    public function template(int|string $template, array $data = []): self
+    {
+        if (is_int($template) || ctype_digit((string)$template)) {
+            $this->templateId = (int)$template;
+            $this->templateSlug = null;
+        } else {
+            $this->templateSlug = (string)$template;
+            $this->templateId = null;
+        }
+
+        $this->viewData = array_merge($this->viewData, $data);
+
+        return $this;
+    }
+
+    protected function renderTemplate(): string
+    {
+        /** @var EmailTemplateService $service */
+        $service = Container::getInstance()->make(EmailTemplateService::class);
+
+        $template = $this->templateId !== null
+            ? $service->getById($this->templateId)
+            : $service->getBySlug((string)$this->templateSlug, (int)$this->siteId);
+
+        if ($template === null) {
+            return '';
+        }
+
+        return $service->render($template->id, $this->viewData, $this->theme);
     }
 
     protected function renderMarkdown(): string

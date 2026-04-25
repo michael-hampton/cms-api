@@ -7,6 +7,7 @@ use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\BriefSearchConfiguration;
 use App\Search\Configurations\CampaignSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
+use App\Search\Configurations\EmailTemplateSearchConfiguration;
 use App\Search\Configurations\EmailThemeSearchConfiguration;
 use App\Search\Configurations\GiftPromotionSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
@@ -57,6 +58,7 @@ class SearchConfigurationFactory
         'page_grid' => PageGridSearchConfiguration::class,
         'refund' => EmailThemeSearchConfiguration::class,
         'email-theme' => EmailThemeSearchConfiguration::class,
+        'email-template' => EmailTemplateSearchConfiguration::class,
         'pipeline' => PipelineSearchConfiguration::class,
         'brief' => BriefSearchConfiguration::class,
         'merchant' => MerchantSearchConfiguration::class,

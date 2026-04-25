@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Cms;
+namespace App\Services\Newsletter;
 
 use App\Framework\Support\Config;
 use App\Models\EmailTheme;
@@ -150,12 +150,12 @@ MD,
     {
         $map = [];
         foreach ($collection as $item) {
-            $key = $item['asset_key'] ?? $item->asset_key;
+            $key = $item->asset_key;
             $map[$key] = [
-                'url' => $item['asset_url'] ?? $item->asset_url ?? '',
-                'alt' => $item['alt_text'] ?? $item->alt_text ?? '',
-                'width' => $item['width'] ?? $item->width ?? null,
-                'height' => $item['height'] ?? $item->height ?? null,
+                'url' => $item->asset_url ?? '',
+                'alt' => $item->alt_text ?? '',
+                'width' => $item->width ?? null,
+                'height' => $item->height ?? null,
             ];
         }
         return $map;

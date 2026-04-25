@@ -2,8 +2,12 @@
 
 namespace App\Tests\Unit\Mail;
 
+use App\Framework\Container;
 use App\Framework\Mail\Mailable;
+use App\Models\EmailTemplate;
+use App\Services\Newsletter\EmailTemplateService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use Mockery;
 
 class MailableTest extends FunctionalTestCase
 {
@@ -189,6 +193,22 @@ class MailableTest extends FunctionalTestCase
 
         $this->assertFalse($this->mailable->isViewPath('**bold**'));
         $this->assertFalse($this->mailable->isViewPath('@button(text, url)'));
+    }
+
+    public function testTemplateRenderingUsesEmailTemplateService(): void
+    {
+        $service = Mockery::mock(EmailTemplateService::class);
+        $service->shouldReceive('getById')->with(12)->once()->andReturn(new EmailTemplate(['id' => 12]));
+        $service->shouldReceive('render')
+            ->with(12, ['name' => 'John'], null)
+            ->once()
+            ->andReturn('<html>template</html>');
+
+        Container::getInstance()->instance(EmailTemplateService::class, $service);
+
+        $html = $this->mailable->template(12, ['name' => 'John'])->render();
+
+        $this->assertSame('<html>template</html>', $html);
     }
 }
 

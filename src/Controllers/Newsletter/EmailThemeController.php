@@ -1,7 +1,7 @@
 <?php
 // src/Controllers/EmailThemeController.php
 
-namespace App\Controllers\Cms;
+namespace App\Controllers\Newsletter;
 
 use App\Actions\EmailTheme\BulkDeleteEmailTheme;
 use App\Actions\EmailTheme\CloneEmailTheme;
@@ -12,14 +12,14 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Models\Site;
-use App\Repositories\Cms\EmailThemeRepository;
+use App\Repositories\Newsletters\EmailThemeRepository;
 use App\Requests\BulkDeleteRequest;
-use App\Requests\CreateEmailThemeRequest;
-use App\Requests\UpdateEmailThemeRequest;
+use App\Requests\Newsletter\CreateEmailThemeRequest;
+use App\Requests\Newsletter\UpdateEmailThemeRequest;
 use App\Resources\EmailThemeResource;
 use App\Search\SearchCriteriaParser;
-use App\Services\Cms\EmailThemePreviewService;
-use App\Services\Cms\EmailThemeService;
+use App\Services\Newsletter\EmailThemePreviewService;
+use App\Services\Newsletter\EmailThemeService;
 use Exception;
 
 class EmailThemeController extends Controller
@@ -227,7 +227,7 @@ class EmailThemeController extends Controller
             $sampleType = $request->query('sample', 'default');
             $html = $this->emailThemePreviewService->renderFromModel($theme, $sampleType);
 
-            return $this->jsonResponse(['html' => $html]);
+            return $this->resourceResponse(['html' => $html]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -240,7 +240,7 @@ class EmailThemeController extends Controller
      *
      * Body: { theme: {...}, sample: 'default'|'minimal'|'promotion' }
      */
-    public function previewFromData(Request $request, string $site): JsonResponse
+    public function previewFromData(Request $request): JsonResponse
     {
         try {
             $body = $request->all();
@@ -253,7 +253,7 @@ class EmailThemeController extends Controller
 
             $html = $this->emailThemePreviewService->renderFromData($themeData, $sampleType);
 
-            return $this->jsonResponse(['html' => $html]);
+            return $this->resourceResponse(['html' => $html]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

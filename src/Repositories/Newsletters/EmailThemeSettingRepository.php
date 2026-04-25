@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repositories\Cms;
+namespace App\Repositories\Newsletters;
 
 use App\Models\EmailThemeSetting;
 use App\Repositories\Repository;

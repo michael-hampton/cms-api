@@ -14,7 +14,6 @@ use App\Controllers\Cms\Briefs\BriefPresetController;
 use App\Controllers\Cms\CampaignController;
 use App\Controllers\Cms\CategoryController;
 use App\Controllers\Cms\CustomFieldDefinitionController;
-use App\Controllers\Cms\EmailThemeController;
 use App\Controllers\Cms\ImageController;
 use App\Controllers\Cms\MenuItemController;
 use App\Controllers\Cms\PageController;
@@ -56,6 +55,8 @@ use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
 use App\Controllers\MenuController;
+use App\Controllers\Newsletter\EmailTemplateController;
+use App\Controllers\Newsletter\EmailThemeController;
 use App\Controllers\Newsletter\NewsletterBrandingController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Newsletter\NewsletterIssueController;
@@ -678,6 +679,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->get('/email-themes', [EmailThemeController::class, 'index']);
         $router->get('/email-themes/preview/{id}', [EmailThemeController::class, 'preview']);
+        $router->post('/email-themes/preview', [EmailThemeController::class, 'previewFromData']);
         $router->get('/email-themes/active', [EmailThemeController::class, 'getActive']);
         $router->post('/email-themes', [EmailThemeController::class, 'store']);
         $router->get('/email-themes/{id}', [EmailThemeController::class, 'show']);
@@ -687,6 +689,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/email-themes/{id}/alternatives', [EmailThemeController::class, 'alternatives']);
         $router->post('/email-themes/{id}/duplicate', [EmailThemeController::class, 'duplicate']);
         $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);;
+
+        $router->get('/email-templates', [EmailTemplateController::class, 'index']);
+        $router->post('/email-templates', [EmailTemplateController::class, 'store']);
+        $router->post('/email-templates/preview', [EmailTemplateController::class, 'previewFromData']);
+        $router->get('/email-templates/{id}/preview', [EmailTemplateController::class, 'preview']);
+        $router->get('/email-templates/{id}', [EmailTemplateController::class, 'show']);
+        $router->put('/email-templates/{id}', [EmailTemplateController::class, 'update']);
+        $router->delete('/email-templates/{id}', [EmailTemplateController::class, 'destroy']);
+        $router->post('/email-templates/{id}/duplicate', [EmailTemplateController::class, 'duplicate']);
 
         $router->get('/payments', [PaymentController::class, 'index']);
         $router->get('/payments/by-transaction', [PaymentController::class, 'byTransaction']);

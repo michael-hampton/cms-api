@@ -1,7 +1,7 @@
 <?php
 // src/Requests/UpdateEmailThemeRequest.php
 
-namespace App\Requests;
+namespace App\Requests\Newsletter;
 
 use App\Framework\Http\FormRequest;
 

@@ -3,7 +3,9 @@
 namespace App\Tests\Unit\Search;
 
 use App\Search\Configurations\AuthorSearchConfiguration;
+use App\Search\Configurations\BrandSearchConfiguration;
 use App\Search\Configurations\CategorySearchConfiguration;
+use App\Search\Configurations\EmailTemplateSearchConfiguration;
 use App\Search\Configurations\ImageSearchConfiguration;
 use App\Search\Configurations\OrderSearchConfiguration;
 use App\Search\Configurations\PageGridSearchConfiguration;
@@ -14,7 +16,6 @@ use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
 use App\Search\Configurations\VoucherSearchConfiguration;
-use App\Search\Configurations\WorkflowRunSearchConfiguration;
 use App\Search\SearchConfigurationFactory;
 use PHPUnit\Framework\TestCase;
 
@@ -77,7 +78,7 @@ class SearchConfigurationFactoryTest extends TestCase
     public function testFactoryCreatesBrandConfiguration()
     {
         $config = SearchConfigurationFactory::create('brand');
-        $this->assertInstanceOf(WorkflowRunSearchConfiguration::class, $config);
+        $this->assertInstanceOf(BrandSearchConfiguration::class, $config);
     }
 
     public function testFactoryCreatesRegionSetConfiguration()
@@ -96,6 +97,12 @@ class SearchConfigurationFactoryTest extends TestCase
     {
         $config = SearchConfigurationFactory::create('page_grid');
         $this->assertInstanceOf(PageGridSearchConfiguration::class, $config);
+    }
+
+    public function testFactoryCreatesEmailTemplateConfiguration()
+    {
+        $config = SearchConfigurationFactory::create('email-template');
+        $this->assertInstanceOf(EmailTemplateSearchConfiguration::class, $config);
     }
 
     public function testFactoryThrowsExceptionForUnknownType()
@@ -137,6 +144,7 @@ class SearchConfigurationFactoryTest extends TestCase
             'region_set',
             'territory',
             'page_grid',
+            'email-template',
         ];
 
         foreach ($types as $type) {

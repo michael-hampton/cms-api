@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Cms;
+namespace App\Services\Newsletter;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
@@ -9,10 +9,11 @@ use App\Models\EmailTheme;
 use App\Models\EmailThemeColor;
 use App\Models\EmailThemeFont;
 use App\Repositories\Cms\EmailThemeAssetRepository;
-use App\Repositories\Cms\EmailThemeRepository;
-use App\Repositories\Cms\EmailThemeSettingRepository;
+use App\Repositories\Newsletters\EmailThemeRepository;
+use App\Repositories\Newsletters\EmailThemeSettingRepository;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
+use App\Services\Cms\ImageUploadService;
 
 class EmailThemeService
 {

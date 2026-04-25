@@ -1,7 +1,7 @@
 <?php
 // src/Repositories/EmailThemeRepository.php
 
-namespace App\Repositories\Cms;
+namespace App\Repositories\Newsletters;
 
 use App\Framework\Support\Collection;
 use App\Models\EmailTheme;

@@ -47,9 +47,9 @@ class EmailThemeResource extends JsonResource
 
         return $fonts->keyBy('font_key')->map(function ($font) {
             return [
-                'family' => $font['font_family'],
-                'size' => $font['font_size'],
-                'weight' => $font['font_weight']
+                'family' => $this->getAttribute('font_family'),
+                'size' => $this->getAttribute('font_size'),
+                'weight' => $this->getAttribute('font_weight')
             ];
         });
 
