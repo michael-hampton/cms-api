@@ -153,6 +153,7 @@ class EmailTemplateRenderer
 
         // Delegate to newsletter block pipeline
         $newsletterType = $this->blockRegistry->getNewsletterType($type);
+
         if ($newsletterType === null) {
             return null;
         }
@@ -164,6 +165,7 @@ class EmailTemplateRenderer
 
         try {
             $blockData = $this->blockDataFactory->create($newsletterType, $normalisedData);
+
             $rendered = $this->rendererRegistry->render($newsletterType, $blockData, $context);
 
             return $rendered->wasRendered ? $rendered->html : null;
@@ -400,6 +402,7 @@ HTML;
         $this->adResolver->warmCache($siteId, $context->member);
 
         $visibleBlocks = array_values(array_filter($blocks, fn($b) => ($b['visible'] ?? true) === true));
+
         $bodyHtml = $this->renderBlocks($visibleBlocks, $runtimeData, $siteId, $theme, $context);
 
         return $this->wrapInChrome($bodyHtml, $theme, 'Preview');

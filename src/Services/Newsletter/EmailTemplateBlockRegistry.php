@@ -44,6 +44,11 @@ class EmailTemplateBlockRegistry
         'product_card',
         'order_summary',
         'ad_slot',
+        'heading', 'text', 'image', 'quote', 'cta', 'divider',
+        'banner', 'product', 'stats', 'testimonial', 'list', 'table',
+        'info', 'person', 'hero', 'section', 'product-comparison',
+        'schema', 'award', 'note', 'buying-guide', 'contact-form',
+        'deal', 'offer', 'reward', 'gallery'
     ];
 
     /**
@@ -52,6 +57,21 @@ class EmailTemplateBlockRegistry
      */
     private const NEWSLETTER_TYPE_MAP = [
         'text' => 'text',
+        'heading' => 'heading',
+        'banner' => 'banner',
+        'hero' => 'hero',
+        'buying-guide' => 'buying-guide',
+        'person' => 'person',
+        'section' => 'section',
+        'product-comparison' => 'product-comparison',
+        'deal' => 'deal',
+        'cta' => 'cta',
+        'offer' => 'offer',
+        'gallery' => 'gallery',
+        'info' => 'info',
+        'award' => 'award',
+        'table' => 'table',
+        'note' => 'note',
         'image' => 'image',
         'button' => 'cta',
         'divider' => 'divider',
@@ -93,12 +113,12 @@ class EmailTemplateBlockRegistry
     public function normaliseBlockData(string $templateType, array $data): ?array
     {
         return match ($templateType) {
-            'text' => $this->normaliseTextBlock($data),
+            //'text' => $this->normaliseTextBlock($data),
             'image' => $this->normaliseImageBlock($data),
             'button' => $this->normaliseButtonBlock($data),
             'divider' => $this->normaliseDividerBlock($data),
             'product_card' => $this->normaliseProductCardBlock($data),
-            default => null,
+            default => $data,
         };
     }
 

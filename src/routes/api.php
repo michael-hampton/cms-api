@@ -690,6 +690,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/email-themes/{id}/duplicate', [EmailThemeController::class, 'duplicate']);
         $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);;
 
+        $router->get('/email-templates/{id}/versions', [EmailTemplateController::class, 'index']);
+        $router->get('/email-templates/{id}/versions/{id}', [EmailTemplateController::class, 'index']);
+        $router->post('/email-templates/{id}/versions/{id}/restore', [EmailTemplateController::class, 'index']);
+
         $router->get('/email-templates', [EmailTemplateController::class, 'index']);
         $router->post('/email-templates', [EmailTemplateController::class, 'store']);
         $router->post('/email-templates/preview', [EmailTemplateController::class, 'previewFromData']);
@@ -1138,10 +1142,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/vouchers/bulk-status', [VoucherController::class, 'bulkUpdateStatus']);
         $router->post('/vouchers/bulk-delete', [VoucherController::class, 'bulkDelete']);
 
-         $router->post('/newsletter/signup', NewsletterController::class, 'signup');
-         $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');
-         $router->post('/newsletter/unsubscribe', NewsletterController::class, 'unsubscribe');
-         $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
+        $router->post('/newsletter/signup', NewsletterController::class, 'signup');
+        $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');
+        $router->post('/newsletter/unsubscribe', NewsletterController::class, 'unsubscribe');
+        $router->get('/newsletter/subscribers', NewsletterController::class, 'getSubscribers');
 
         $router->get('/newsletters', [NewsletterController::class, 'index']);
         $router->post('/newsletters', [NewsletterController::class, 'create']);
