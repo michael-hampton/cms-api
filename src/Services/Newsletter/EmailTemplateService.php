@@ -52,12 +52,12 @@ class EmailTemplateService
         return $this->repository->getAllBySite($siteId, $category);
     }
 
-    public function getById(int $id): ?EmailTemplate
+    public function getById(int $id): ?NewsletterLayout
     {
         return $this->repository->find($id);
     }
 
-    public function getBySlug(string $slug, int $siteId): ?EmailTemplate
+    public function getBySlug(string $slug, int $siteId): ?NewsletterLayout
     {
         return $this->repository->findBySlug($slug, $siteId);
     }
@@ -197,7 +197,7 @@ class EmailTemplateService
             'blocks' => $layoutDefinition['email_template']['blocks'] ?? [],
             'use_default_theme' => $template->use_default_theme ?? true,
             'theme_id' => $template->theme_id,
-            'is_active' => $template->is_active,
+            'is_active' => $template->is_active ?? false,
         ];
     }
 

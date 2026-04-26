@@ -690,9 +690,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/email-themes/{id}/duplicate', [EmailThemeController::class, 'duplicate']);
         $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);;
 
-        $router->get('/email-templates/{id}/versions', [EmailTemplateController::class, 'index']);
+        $router->get('/email-templates/{id}/versions', [EmailTemplateController::class, 'versions']);
         $router->get('/email-templates/{id}/versions/{id}', [EmailTemplateController::class, 'index']);
-        $router->post('/email-templates/{id}/versions/{id}/restore', [EmailTemplateController::class, 'index']);
+        $router->post('/email-templates/{id}/versions/{id}/restore', [EmailTemplateController::class, 'restoreVersion']);
 
         $router->get('/email-templates', [EmailTemplateController::class, 'index']);
         $router->post('/email-templates', [EmailTemplateController::class, 'store']);

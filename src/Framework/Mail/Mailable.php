@@ -25,6 +25,7 @@ abstract class Mailable
     public ?string $textView = null;
     public ?EmailTheme $theme = null;
     public ?string $themeSlug = null;
+    public ?int $themeId = null;
     public ?int $templateId = null;
     public ?string $templateSlug = null;
     protected ?int $siteId = null;
@@ -40,28 +41,6 @@ abstract class Mailable
     }
 
     abstract public function build(): self;
-
-    protected function loadTheme(): void
-    {
-        if ($this->theme !== null) {
-            return;
-        }
-
-        if ($this->themeSlug !== null) {
-            $this->theme = EmailTheme::bySlug($this->themeSlug)
-                ->bySite($this->siteId)
-                ->active()
-                ->first();
-        }
-
-        // Fallback to default theme for site
-        if ($this->theme === null) {
-            $this->theme = EmailTheme::default()
-                ->where('site_id', $this->siteId)
-                ->where('is_active', true)
-                ->first();
-        }
-    }
 
     public function theme(string $slug): self
     {
@@ -185,19 +164,33 @@ abstract class Mailable
         return '';
     }
 
-    public function template(int|string $template, array $data = []): self
+    protected function loadTheme(): void
     {
-        if (is_int($template) || ctype_digit((string)$template)) {
-            $this->templateId = (int)$template;
-            $this->templateSlug = null;
-        } else {
-            $this->templateSlug = (string)$template;
-            $this->templateId = null;
+        if ($this->theme !== null) {
+            return;
         }
 
-        $this->viewData = array_merge($this->viewData, $data);
+        if (!empty($this->themeId)) {
+            $this->theme = EmailTheme::find($this->themeId)
+                ->bySite($this->siteId)
+                ->active()
+                ->first();
+        }
 
-        return $this;
+        if ($this->themeSlug !== null) {
+            $this->theme = EmailTheme::bySlug($this->themeSlug)
+                ->bySite($this->siteId)
+                ->active()
+                ->first();
+        }
+
+        // Fallback to default theme for site
+        if ($this->theme === null) {
+            $this->theme = EmailTheme::default()
+                ->where('site_id', $this->siteId)
+                ->where('is_active', true)
+                ->first();
+        }
     }
 
     protected function renderTemplate(): string
@@ -208,6 +201,11 @@ abstract class Mailable
         $template = $this->templateId !== null
             ? $service->getById($this->templateId)
             : $service->getBySlug((string)$this->templateSlug, (int)$this->siteId);
+
+        if (!empty($template->theme)) {
+            $this->themeId = $template->theme;
+            $this->loadTheme();
+        }
 
         if ($template === null) {
             return '';
@@ -470,5 +468,20 @@ HTML;
 </body>
 </html>
 HTML;
+    }
+
+    public function template(int|string $template, array $data = []): self
+    {
+        if (is_int($template) || ctype_digit((string)$template)) {
+            $this->templateId = (int)$template;
+            $this->templateSlug = null;
+        } else {
+            $this->templateSlug = (string)$template;
+            $this->templateId = null;
+        }
+
+        $this->viewData = array_merge($this->viewData, $data);
+
+        return $this;
     }
 }

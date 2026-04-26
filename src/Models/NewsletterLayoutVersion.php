@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Newsletters\LayoutVersionState;
+use App\Models\Concerns\TracksCreator;
 
 /**
  * @property int $id
@@ -15,6 +16,8 @@ use App\Enums\Newsletters\LayoutVersionState;
  */
 class NewsletterLayoutVersion extends Model
 {
+    use TracksCreator;
+
     protected $table = 'newsletter_layout_versions';
 
     public $timestamps = false;
@@ -28,17 +31,26 @@ class NewsletterLayoutVersion extends Model
         'created_at',
         'name',
         'category',
-        'description'
+        'description',
+        'created_by',
+        'updated_by'
     ];
 
     protected $casts = [
         'layout_definition_json' => 'array',
         'version_number' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function state(): LayoutVersionState
     {
         return LayoutVersionState::from($this->state);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by', 'id');
     }
 
     public function isPublished(): bool

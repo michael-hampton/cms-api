@@ -10,7 +10,7 @@ use App\Framework\Queue\InteractsWithQueue;
 use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
-use App\Mail\Campaigns\BaseCampaignMail;
+use App\Mail\Campaigns\DefaultMail;
 use App\Models\Campaign;
 use App\Models\Member;
 use App\Repositories\Cms\CampaignRepository;
@@ -103,17 +103,17 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
         // ── Resolve mailable class ────────────────────────────────────────
         // Variant may supply its own template; fall back to campaign template.
-        $mailableClass = ($variant !== null && !empty($variant->template))
+        $template = ($variant !== null && !empty($variant->template))
             ? $variant->template
             : $campaign->template;
 
-        if (!class_exists($mailableClass)) {
+        if (!ctype_digit($template) && !class_exists($template)) {
             Logger::error('SendCampaignJob: mailable class does not exist', [
                 'member_id' => $this->memberId,
                 'campaign_id' => $this->campaignId,
-                'template' => $mailableClass,
+                'template' => $template,
             ]);
-            $this->fail(new \RuntimeException("Mailable [{$mailableClass}] does not exist."));
+            $this->fail(new \RuntimeException("Mailable [{$template}] does not exist."));
             return;
         }
 
@@ -122,6 +122,7 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
         foreach ($channels as $channel) {
             if (!$this->consentChecker->canSend($member, CampaignPurpose::tryFrom($campaign->purpose), $channel)) {
+                echo 'no';
                 Logger::info('SendCampaignJob: consent blocked, trying fallback', [
                     'member_id' => $this->memberId,
                     'campaign_id' => $this->campaignId,
@@ -131,12 +132,12 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             }
 
             $sent = $this->sendViaChannel(
-                $member, $campaign, $channel, $mailableClass, $variantId
+                $member, $campaign, $channel, $template, $variantId
             );
 
             if ($sent) {
                 $this->executionLogger->log($this->memberId, $campaign, $this->segmentKey);
-                return;
+                //return;
             }
         }
 
@@ -152,8 +153,8 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
         Member          $member,
         Campaign        $campaign,
         CampaignChannel $channel,
-        string          $mailableClass,
-        ?int            $variantId,
+        string $template,
+        ?int   $variantId = null,
     ): bool
     {
         if ($channel === CampaignChannel::PUSH) {
@@ -174,9 +175,7 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
             return $dispatched;
         }
 
-        // ── Email / notification path ─────────────────────────────────────
-        /** @var BaseCampaignMail $mailable */
-        $mailable = new $mailableClass($member, $campaign);
+        $mailable = ctype_digit($template) ? new DefaultMail($member, $campaign) : new $template($member, $campaign);
 
         // ── T11: Write delivery row FIRST so the token exists ─────────────
         // The token is generated inside record() and returned on the model.

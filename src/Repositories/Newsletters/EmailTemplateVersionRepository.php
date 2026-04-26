@@ -21,7 +21,8 @@ class EmailTemplateVersionRepository extends Repository
      */
     public function allForTemplate(int $templateId): Collection
     {
-        return EmailTemplateVersion::where('email_template_id', $templateId)
+        return NewsletterLayoutVersion::where('layout_id', $templateId)
+            ->with(['creator'])
             ->orderBy('version_number', 'desc')
             ->get();
     }

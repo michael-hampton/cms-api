@@ -181,9 +181,8 @@ class EmailTemplateController extends Controller
 
             $versions = $this->service->getVersions($id);
 
-            return $this->resourceResponse([
-                'items' => EmailTemplateVersionResource::collection($versions)->toArray(),
-            ]);
+            return $this->resourceResponse(EmailTemplateVersionResource::collection($versions)->toArray()
+            );
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

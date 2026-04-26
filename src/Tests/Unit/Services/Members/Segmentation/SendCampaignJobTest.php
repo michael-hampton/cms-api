@@ -381,6 +381,50 @@ class SendCampaignJobTest extends FunctionalTestCase
         Container::getInstance()->instance(InAppNotificationDispatcher::class, $this->webPushDispatcher);
     }
 
+    public function test_dispatches_notification_uses_template(): void
+    {
+        $member = $this->makeMember(1);
+        $campaign = $this->makeCampaign();
+        $campaign->template = 1;
+
+        $this->memberRepository->shouldReceive('find')->with(1)->andReturn($member);
+        $this->campaignRepository->shouldReceive('find')->with(1, ['segment'])->andReturn($campaign);
+
+        $this->variantAssigner->shouldReceive('assignVariant')->once()->andReturnNull();
+
+        $this->channelResolver
+            ->shouldReceive('resolveChannels')
+            ->once()
+            ->with(1, $campaign)
+            ->andReturn([CampaignChannel::EMAIL]);
+
+        $this->consentChecker
+            ->shouldReceive('canSend')
+            ->once()
+            ->with($member, CampaignPurpose::MARKETING, CampaignChannel::EMAIL)
+            ->andReturn(true);
+
+        $this->dispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::type(CampaignNotification::class))
+            ->andReturn(1);
+
+        $this->deliveryRepository
+            ->shouldReceive('record')
+            ->once()
+            ->with(1, 1, 'email', 'all_users', null)
+            ->andReturn($this->makeDelivery());
+
+        $this->logger
+            ->shouldReceive('log')
+            ->once()
+            ->with(1, $campaign, 'churning');
+
+        $this->runJob();
+        $this->addToAssertionCount(1);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

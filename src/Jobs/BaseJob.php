@@ -52,7 +52,7 @@ abstract class BaseJob extends Job
             }
 
             try {
-                $property->setAccessible(true);
+                //$property->setAccessible(true);
 
                 if ($property->isInitialized($this)) {
                     $currentValue = $property->getValue($this);
