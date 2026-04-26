@@ -3,9 +3,9 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\Logger;
-use App\Models\EmailTemplate;
 use App\Models\EmailTheme;
 use App\Models\Newsletter;
+use App\Models\NewsletterLayout;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\Layout\LayoutBlockVariableResolver;
 use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
@@ -48,7 +48,7 @@ class EmailTemplateRenderer
      * Render a saved template with a live runtime data map.
      */
     public function render(
-        EmailTemplate $template,
+        NewsletterLayout $template,
         array         $runtimeData = [],
         ?EmailTheme   $themeOverride = null,
     ): string

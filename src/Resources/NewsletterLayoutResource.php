@@ -16,8 +16,8 @@ class NewsletterLayoutResource extends JsonResource
             'is_system_layout' => $this->getAttribute('is_system_layout') ?? true,
             'site_id' => $this->getAttribute('site_id'),
             'created_by' => $this->getAttribute('created_by'),
-            'created_at' => $this->getAttribute('created_at'),
-            'updated_at' => $this->getAttribute('updated_at'),
+            'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
+            'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
         ];
     }
 }

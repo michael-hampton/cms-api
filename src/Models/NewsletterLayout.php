@@ -17,6 +17,7 @@ use App\Enums\Newsletters\LayoutVersionState;
  */
 class NewsletterLayout extends Model
 {
+    const TYPE_EMAIL_TEMPLATE = 'email_template';
     protected $table = 'newsletter_layouts';
 
     protected $fillable = [
@@ -25,12 +26,20 @@ class NewsletterLayout extends Model
         'layout_definition_json',
         'is_system_layout',
         'created_by',
-        'site_id'
+        'site_id',
+        'description',
+        'category',
+        'type',
+        'theme_id',
+        'use_default_theme'
     ];
 
     protected $casts = [
         'layout_definition_json' => 'array',
         'is_system_layout' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'use_default_theme' => 'boolean'
     ];
 
     public function versions(): \App\Framework\Support\Collection
@@ -63,5 +72,33 @@ class NewsletterLayout extends Model
     public function isOwnedBySite(int $siteId): bool
     {
         return $this->site_id === $siteId;
+    }
+
+    private function etField(string $key, mixed $default = null): mixed
+    {
+        return $this->layout_definition_json['email_template'][$key] ?? $default;
+    }
+
+    /**
+     * Flat block array used by the email template rendering pipeline.
+     * Only meaningful when type = 'email_template'.
+     */
+    public function getBlocksAttribute(): array
+    {
+        return $this->etField('blocks', []);
+    }
+
+    /**
+     * Return only visible blocks.
+     * Mirrors the old EmailTemplate::getVisibleBlocks() method.
+     */
+    public function getVisibleBlocks(): array
+    {
+        return array_values(
+            array_filter(
+                $this->blocks,
+                fn($b) => ($b['visible'] ?? true) === true,
+            )
+        );
     }
 }

@@ -16,7 +16,7 @@ class EmailTemplateResource extends JsonResource
             'slug' => $this->getAttribute('slug'),
             'description' => $this->getAttribute('description'),
             'category' => $this->getAttribute('category'),
-            'blocks' => $this->getAttribute('blocks') ?? [],
+            'blocks' => $this->getAttribute('layout_definition_json')['email_template']['blocks'] ?? [],
             'is_active' => (bool)$this->getAttribute('is_active'),
             'thumbnail_url' => $this->getAttribute('thumbnail_url'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),

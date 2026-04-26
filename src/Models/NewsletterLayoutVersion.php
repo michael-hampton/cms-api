@@ -26,6 +26,9 @@ class NewsletterLayoutVersion extends Model
         'migration_script_reference',
         'state',
         'created_at',
+        'name',
+        'category',
+        'description'
     ];
 
     protected $casts = [
