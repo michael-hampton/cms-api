@@ -45,8 +45,8 @@ class EmailTemplateServiceTest extends FunctionalTestCase
             ->with(Mockery::on(function (array $data): bool {
                 return $data['slug'] === 'welcome-email'
                     && $data['site_id'] === 1
-                    && $data['layout_definition_json']['email_template']['blocks'][0]['type'] === 'text'
-                    && $data['layout_definition_json']['email_template']['blocks'][0]['visible'] === true;
+                    && $data['layout_definition_json']['blocks'][0]['type'] === 'text'
+                    && $data['layout_definition_json']['blocks'][0]['visible'] === true;
             }))
             ->andReturn(new NewsletterLayout(['id' => 10]));
 
@@ -230,7 +230,7 @@ class EmailTemplateServiceTest extends FunctionalTestCase
             'slug' => 'original',
             'description' => 'Desc',
             'category' => 'transactional',
-            'layout_definition_json' => ['email_template' => ['blocks' => [['type' => 'text', 'data' => ['content' => 'Hi'], 'visible' => true]]]],
+            'layout_definition_json' => ['blocks' => [['type' => 'text', 'data' => ['content' => 'Hi'], 'visible' => true]]],
         ]);
 
         $this->db->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
@@ -260,7 +260,7 @@ class EmailTemplateServiceTest extends FunctionalTestCase
             'site_id' => 1,
             'theme_id' => null,
             'name' => 'Order Template',
-            'layout_definition_json' => ['email_template' => ['blocks' => [['type' => 'text', 'data' => ['content' => 'Hi {{ user.first_name }}']]]]],
+            'layout_definition_json' => ['blocks' => [['type' => 'text', 'data' => ['content' => 'Hi {{ user.first_name }}']]]],
         ]);
 
         $this->repository->shouldReceive('find')->with(9)->once()->andReturn($template);

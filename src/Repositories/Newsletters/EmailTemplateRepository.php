@@ -31,20 +31,6 @@ class EmailTemplateRepository extends Repository
         parent::__construct();
     }
 
-    protected function getModelClass(): string
-    {
-        return NewsletterLayout::class;
-    }
-
-    // ── Base query scope ──────────────────────────────────────────────────────
-
-    public function query(): QueryBuilder
-    {
-        return NewsletterLayout::where('type', NewsletterLayout::TYPE_EMAIL_TEMPLATE);
-    }
-
-    // ── Read ──────────────────────────────────────────────────────────────────
-
     public function search(SearchCriteria $criteria): PaginatedResult
     {
         $config = SearchConfigurationFactory::create('newsletter_layout');
@@ -55,6 +41,19 @@ class EmailTemplateRepository extends Repository
             $criteria,
         );
     }
+
+    // ── Base query scope ──────────────────────────────────────────────────────
+
+    public function getActiveBySite(int $siteId, ?string $category = null): Collection
+    {
+        $results = $this->getAllBySite($siteId, $category);
+
+        return $results->filter(
+            fn(NewsletterLayout $l) => $l->is_active
+        )->values();
+    }
+
+    // ── Read ──────────────────────────────────────────────────────────────────
 
     public function getAllBySite(int $siteId, ?string $category = null): Collection
     {
@@ -76,18 +75,9 @@ class EmailTemplateRepository extends Repository
         return $results;
     }
 
-    public function getActiveBySite(int $siteId, ?string $category = null): Collection
+    public function query(): QueryBuilder
     {
-        $results = $this->getAllBySite($siteId, $category);
-
-        return $results->filter(
-            fn(NewsletterLayout $l) => $l->is_active
-        )->values();
-    }
-
-    public function find(int $id, array $relations = []): ?NewsletterLayout
-    {
-        return $this->query()->where('id', $id)->first();
+        return NewsletterLayout::where('type', NewsletterLayout::TYPE_EMAIL_TEMPLATE);
     }
 
     public function findBySlug(string $slug, ?int $siteId = null): ?NewsletterLayout
@@ -111,8 +101,6 @@ class EmailTemplateRepository extends Repository
         return $q->exists();
     }
 
-    // ── Write ─────────────────────────────────────────────────────────────────
-
     /**
      * Create a new email template layout row.
      * Caller passes a flat email-template payload; this method encodes it into
@@ -130,6 +118,25 @@ class EmailTemplateRepository extends Repository
             'layout_definition_json' => $this->buildDefinition($data),
         ]);
     }
+
+    /**
+     * Build a layout_definition_json payload from a flat email template data array.
+     */
+    private function buildDefinition(array $data): array
+    {
+        return [
+            'schema_version' => 1,
+            'regions' => [],
+            'category' => $data['category'] ?? 'transactional',
+            'use_default_theme' => (bool)($data['use_default_theme'] ?? true),
+            'theme_id' => $data['theme_id'] ?? null,
+            'description' => $data['description'] ?? null,
+            'is_active' => (bool)($data['is_active'] ?? true),
+            'blocks' => $data['blocks'] ?? [],
+        ];
+    }
+
+    // ── Write ─────────────────────────────────────────────────────────────────
 
     /**
      * Update an existing email template layout row.
@@ -172,6 +179,11 @@ class EmailTemplateRepository extends Repository
         return $layout->fresh();
     }
 
+    public function find(int $id, array $relations = []): ?NewsletterLayout
+    {
+        return $this->query()->where('id', $id)->first();
+    }
+
     // ── Version delegation ────────────────────────────────────────────────────
 
     /**
@@ -210,22 +222,8 @@ class EmailTemplateRepository extends Repository
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /**
-     * Build a layout_definition_json payload from a flat email template data array.
-     */
-    private function buildDefinition(array $data): array
+    protected function getModelClass(): string
     {
-        return [
-            'schema_version' => 1,
-            'regions' => [],
-            'email_template' => [
-                'category' => $data['category'] ?? 'transactional',
-                'use_default_theme' => (bool)($data['use_default_theme'] ?? true),
-                'theme_id' => $data['theme_id'] ?? null,
-                'description' => $data['description'] ?? null,
-                'is_active' => (bool)($data['is_active'] ?? true),
-                'blocks' => $data['blocks'] ?? [],
-            ],
-        ];
+        return NewsletterLayout::class;
     }
 }

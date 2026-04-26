@@ -108,11 +108,9 @@ class EmailTemplateService
 
         if (isset($data['blocks'])) {
             $data['layout_definition_json'] = [
-                'email_template' => [
-                    'blocks' => $this->sanitiseBlocks($data['blocks'] ?? []),
-                    'description' => $data['description'],
-                    'category' => $data['category']
-                ]
+                'blocks' => $this->sanitiseBlocks($data['blocks'] ?? []),
+                'description' => $data['description'],
+                'category' => $data['category']
             ];
         }
 
@@ -194,7 +192,7 @@ class EmailTemplateService
             'slug' => $template->slug,
             'description' => $template->description ?? '',
             'category' => $template->category ?? '',
-            'blocks' => $layoutDefinition['email_template']['blocks'] ?? [],
+            'blocks' => $layoutDefinition['blocks'] ?? [],
             'use_default_theme' => $template->use_default_theme ?? true,
             'theme_id' => $template->theme_id,
             'is_active' => $template->is_active ?? false,
@@ -233,9 +231,7 @@ class EmailTemplateService
                 'description' => $source->description,
                 'category' => $source->category,
                 'layout_definition_json' => [
-                    'email_template' => [
-                        'blocks' => $source->blocks ?? []
-                    ]
+                    'blocks' => $source->blocks ?? []
                 ],
                 'use_default_theme' => $source->use_default_theme ?? true,
                 'is_active' => false, // duplicates start inactive
@@ -257,11 +253,9 @@ class EmailTemplateService
             $data['slug'] = $this->ensureUniqueSlug($data['slug'], $siteId);
             $data['site_id'] = $siteId;
             $data['layout_definition_json'] = [
-                'email_template' => [
-                    'blocks' => $this->sanitiseBlocks($data['blocks'] ?? []),
-                    'description' => $data['description'],
-                    'category' => $data['category']
-                ]
+                'blocks' => $this->sanitiseBlocks($data['blocks'] ?? []),
+                'description' => $data['description'],
+                'category' => $data['category']
             ];
             $data['type'] = 'email_template';
 

@@ -76,7 +76,7 @@ class NewsletterLayout extends Model
 
     private function etField(string $key, mixed $default = null): mixed
     {
-        return $this->layout_definition_json['email_template'][$key] ?? $default;
+        return $this->layout_definition_json[$key] ?? $default;
     }
 
     /**
