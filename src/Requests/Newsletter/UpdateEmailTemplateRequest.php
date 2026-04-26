@@ -15,7 +15,7 @@ class UpdateEmailTemplateRequest extends FormRequest
             'category' => ['nullable', 'in:transactional,marketing,system'],
             'theme_id' => ['nullable', 'integer', 'exists:email_themes,id'],
             'blocks' => ['nullable', 'array'],
-            'blocks.*.type' => ['required_with:blocks', 'string', 'in:text,image,button,divider,spacer,single_column,two_column,product_card,order_summary,ad_slot'],
+            'blocks.*.type' => ['required_with:blocks', 'string'],
             'blocks.*.data' => ['required_with:blocks', 'array'],
             'blocks.*.visible' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],

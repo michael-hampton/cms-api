@@ -2,7 +2,6 @@
 
 namespace App\Services\Newsletter;
 
-use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
 use App\Models\EmailTemplate;
 use App\Models\EmailTheme;
@@ -15,34 +14,27 @@ use App\Services\Newsletter\Services\BlockDataFactory;
 /**
  * Renders an EmailTemplate's block array to a complete email HTML document.
  *
- * Rendering flow (matches ticket spec):
- *   Template blocks (JSON)
- *   → Inject runtime data variables ({{ variable }} interpolation)
- *   → Inject brand/theme config
- *   → Resolve ad_slot blocks via AdResolver
- *   → Render each visible block via BlockDataFactory + EmailBlockRendererRegistry
- *   → Wrap in the email chrome (doctype, header, footer)
- *   → Output HTML
+ * This class is now a thin adapter over the shared newsletter rendering
+ * pipeline (BlockDataFactory + EmailBlockRendererRegistry + LayoutBlockVariableResolver).
+ * All per-block rendering logic lives in those collaborators, not here.
  *
  * Responsibilities:
  *   - Visible block filtering
- *   - Variable interpolation ({{ variable }} → resolved value)
- *   - Ad slot resolution (missing ad → block removed cleanly, no spacing residue)
- *   - Structural block rendering (spacer, single_column, two_column, order_summary)
- *   - Delegating content blocks to the newsletter renderer pipeline
- *   - Theme application (colors, fonts, settings, logo)
+ *   - Native block rendering (spacer, order_summary, ad_slot)
+ *   - Delegating all other blocks to the shared newsletter renderer pipeline
+ *   - Theme application and email chrome wrapping
  *
  * Does NOT:
- *   - Persist anything
- *   - Send emails
- *   - Know about recipients
+ *   - Contain its own type registry (EmailTemplateBlockRegistry is deleted)
+ *   - Duplicate BlockDataFactory's normalisation logic
+ *   - Duplicate LayoutBlockVariableResolver's interpolation logic
+ *   - Persist anything or send emails
  */
 class EmailTemplateRenderer
 {
     public function __construct(
         private readonly BlockDataFactory            $blockDataFactory,
         private readonly EmailBlockRendererRegistry  $rendererRegistry,
-        private readonly EmailTemplateBlockRegistry  $blockRegistry,
         private readonly AdResolver                  $adResolver,
         private readonly LayoutBlockVariableResolver $variableResolver,
         private readonly Logger                      $logger,
@@ -50,14 +42,10 @@ class EmailTemplateRenderer
     {
     }
 
-    // ── Public API ────────────────────────────────────────────
+    // ── Public API ────────────────────────────────────────────────────────────
 
     /**
      * Render a saved template with a live runtime data map.
-     *
-     * @param EmailTemplate $template
-     * @param array<string, mixed> $runtimeData Flat dot-notation map, e.g. ['user.first_name' => 'Sarah']
-     * @param EmailTheme|null $themeOverride If null, the template's own theme is used (loaded by caller).
      */
     public function render(
         EmailTemplate $template,
@@ -66,15 +54,72 @@ class EmailTemplateRenderer
     ): string
     {
         $theme = $themeOverride ?? $template->theme;
-
         $context = $this->buildRenderContext($template->site_id, $runtimeData);
+
         $this->adResolver->warmCache($template->site_id, $context->member);
 
-        $blocks = $template->getVisibleBlocks();
-        $bodyHtml = $this->renderBlocks($blocks, $runtimeData, $template->site_id, $theme, $context);
+        $bodyHtml = $this->renderBlocks(
+            $template->getVisibleBlocks(),
+            $runtimeData,
+            $template->site_id,
+            $theme,
+            $context,
+        );
 
         return $this->wrapInChrome($bodyHtml, $theme, $template->name);
     }
+
+    /**
+     * Render from raw (unsaved) editor blocks for live preview.
+     */
+    public function renderPreview(
+        array       $blocks,
+        array       $runtimeData,
+        int         $siteId,
+        ?EmailTheme $theme = null,
+    ): string
+    {
+        $context = $this->buildRenderContext($siteId, $runtimeData);
+        $this->adResolver->warmCache($siteId, $context->member);
+
+        $visible = array_values(array_filter($blocks, fn($b) => ($b['visible'] ?? true) === true));
+        $bodyHtml = $this->renderBlocks($visible, $runtimeData, $siteId, $theme, $context);
+
+        return $this->wrapInChrome($bodyHtml, $theme, 'Preview');
+    }
+
+    /**
+     * Extract all {{ variable }} tokens from a block list (used by the frontend
+     * to show unresolved token counts).
+     *
+     * @return string[]
+     */
+    public function extractTokens(array $blocks): array
+    {
+        $pattern = '/\{\{\s*([\w.]+)\s*\}\}/';
+        $tokens = [];
+
+        $walk = static function (mixed $value) use (&$walk, &$tokens, $pattern): void {
+            if (is_string($value)) {
+                preg_match_all($pattern, $value, $matches);
+                foreach ($matches[1] as $token) {
+                    $tokens[$token] = true;
+                }
+            } elseif (is_array($value)) {
+                foreach ($value as $v) {
+                    $walk($v);
+                }
+            }
+        };
+
+        foreach ($blocks as $block) {
+            $walk($block['data'] ?? []);
+        }
+
+        return array_keys($tokens);
+    }
+
+    // ── Internal rendering ────────────────────────────────────────────────────
 
     private function buildRenderContext(int $siteId, array $runtimeData): NewsletterRenderContext
     {
@@ -105,35 +150,41 @@ class EmailTemplateRenderer
         NewsletterRenderContext $context,
     ): string
     {
-        $parts = [];
         $variables = array_merge(
             $this->variableResolver->buildVariableMap($context),
             $runtimeData,
         );
 
+        $parts = [];
+
         foreach ($blocks as $block) {
             $type = $block['type'] ?? '';
             $data = $block['data'] ?? [];
 
+            // Resolve {{ variable }} placeholders before hydration.
             $data = $this->variableResolver->resolveBlock($data, $variables);
 
-            $html = $this->renderBlock($type, $data, $siteId, $theme, $context);
+            $html = $this->renderSingleBlock($type, $data, $siteId, $theme, $context);
 
             if ($html !== null && $html !== '') {
                 $parts[] = $html;
             }
-            // null/'' = block cleanly removed (ad_slot with no ad, hidden block, etc.)
         }
 
         return implode("\n", $parts);
     }
 
-    // ── Block rendering ───────────────────────────────────────
-
     /**
-     * Render a single block. Returns null to signal "remove this block entirely".
+     * Dispatch a single block to the appropriate renderer.
+     *
+     * Native structural blocks (spacer, two_column, order_summary, ad_slot) are
+     * handled inline here. Everything else goes through the shared newsletter
+     * pipeline — BlockDataFactory → EmailBlockRendererRegistry — exactly as the
+     * newsletter slot renderer does.
+     *
+     * Returns null to signal "omit this block entirely" (e.g. ad with no fill).
      */
-    private function renderBlock(
+    private function renderSingleBlock(
         string                  $type,
         array                   $data,
         int                     $siteId,
@@ -141,35 +192,34 @@ class EmailTemplateRenderer
         NewsletterRenderContext $context,
     ): ?string
     {
-        if (!$this->blockRegistry->isValid($type)) {
+        // ── Native structural blocks ──────────────────────────────────────────
+        if ($this->isNative($type)) {
+            return match ($type) {
+                'spacer' => $this->renderSpacer($data),
+                'single_column',
+                'two_column' => null,   // transparent structural wrappers
+                'order_summary' => $this->renderOrderSummary($data),
+                'ad_slot' => $this->renderAdSlot($data, $siteId, $context),
+                default => null,
+            };
+        }
+
+        // ── Skip unknown types ────────────────────────────────────────────────
+        if (!$this->rendererRegistry->has($type) && $this->normaliseType($type) === null) {
             $this->logger->warning('EmailTemplateRenderer: unknown block type, skipped', ['type' => $type]);
             return null;
         }
 
-        // Native blocks handled directly (no newsletter renderer)
-        if ($this->blockRegistry->isNative($type)) {
-            return $this->renderNativeBlock($type, $data, $siteId, $theme, $context);
-        }
-
-        // Delegate to newsletter block pipeline
-        $newsletterType = $this->blockRegistry->getNewsletterType($type);
-
-        if ($newsletterType === null) {
-            return null;
-        }
-
-        $normalisedData = $this->blockRegistry->normaliseBlockData($type, $data);
-        if ($normalisedData === null) {
-            return null;
-        }
+        // ── Shared newsletter pipeline ────────────────────────────────────────
+        // Normalise template-specific type aliases (e.g. 'button' → 'cta').
+        $pipelineType = $this->normaliseType($type) ?? $type;
+        $pipelineData = $this->normaliseData($type, $data);
 
         try {
-            $blockData = $this->blockDataFactory->create($newsletterType, $normalisedData);
-
-            $rendered = $this->rendererRegistry->render($newsletterType, $blockData, $context);
+            $blockData = $this->blockDataFactory->create($pipelineType, $pipelineData);
+            $rendered = $this->rendererRegistry->render($pipelineType, $blockData, $context);
 
             return $rendered->wasRendered ? $rendered->html : null;
-
         } catch (\Throwable $e) {
             $this->logger->error('EmailTemplateRenderer: block render failed', [
                 'type' => $type,
@@ -179,25 +229,71 @@ class EmailTemplateRenderer
         }
     }
 
-    private function renderNativeBlock(
-        string                  $type,
-        array                   $data,
-        int                     $siteId,
-        ?EmailTheme             $theme,
-        NewsletterRenderContext $context,
-    ): ?string
+    // ── Type alias resolution ─────────────────────────────────────────────────
+
+    /**
+     * Block types that are handled natively (no newsletter pipeline).
+     */
+    private function isNative(string $type): bool
+    {
+        return in_array($type, [
+            'spacer', 'single_column', 'two_column', 'order_summary', 'ad_slot',
+        ], true);
+    }
+
+    /**
+     * Map email-template-editor type aliases → newsletter pipeline type names.
+     *
+     * The email template editor uses a handful of simplified aliases that differ
+     * from the canonical newsletter block types. All other types pass through
+     * unchanged (the registry handles them directly).
+     *
+     * Returns null when the type is already canonical or unknown.
+     */
+    private function normaliseType(string $type): ?string
     {
         return match ($type) {
-            'spacer' => $this->renderSpacer($data),
-            'single_column' => null, // structural wrapper — transparent
-            'two_column' => null, // structural wrapper — transparent
-            'order_summary' => $this->renderOrderSummary($data),
-            'ad_slot' => $this->renderAdSlot($data, $siteId, $context),
+            'button' => 'cta',
+            'product_card' => 'product',
             default => null,
         };
     }
 
-    // ── Native block renderers ────────────────────────────────
+    /**
+     * Translate the raw data shape for aliased types.
+     *
+     * Only the aliased types (button → cta, product_card → product) need
+     * translation. All canonical types pass their data through as-is because
+     * their DTO fromArray() methods already handle the full field set.
+     */
+    private function normaliseData(string $type, array $data): array
+    {
+        return match ($type) {
+            'button' => [
+                'text' => $data['label'] ?? 'Click here',
+                'url' => $data['url'] ?? '#',
+                'ctaStyle' => $data['style'] ?? 'primary',
+                'size' => 'medium',
+                'alignment' => $data['align'] ?? 'center',
+                'noFollow' => false,
+                'sponsored' => false,
+                'openInNewTab' => false,
+            ],
+            'product_card' => [
+                'name' => $data['name'] ?? '',
+                'description' => $data['description'] ?? null,
+                'price' => (float)preg_replace('/[^0-9.]/', '', $data['price'] ?? '0'),
+                'salePrice' => null,
+                'currency' => '$',
+                'link' => $data['url'] ?? null,
+                'linkText' => 'View Product',
+                'image' => !empty($data['image_url']) ? ['src' => $data['image_url']] : null,
+            ],
+            default => $data,
+        };
+    }
+
+    // ── Native block renderers ────────────────────────────────────────────────
 
     private function renderSpacer(array $data): string
     {
@@ -205,7 +301,7 @@ class EmailTemplateRenderer
         return sprintf(
             '<div style="height:%dpx;line-height:%dpx;font-size:1px;">&nbsp;</div>',
             $height,
-            $height
+            $height,
         );
     }
 
@@ -238,9 +334,7 @@ class EmailTemplateRenderer
             $html .= '</table>';
         }
 
-        $html .= '</td></tr>';
-        $html .= '</table>';
-
+        $html .= '</td></tr></table>';
         return $html;
     }
 
@@ -252,63 +346,55 @@ class EmailTemplateRenderer
         $adBlock = $this->adResolver->resolveBlock($placement, $siteId, $context->member);
 
         if ($adBlock !== null) {
-            return $this->renderSharedBlock(
-                $adBlock['type'] ?? '',
-                $adBlock['data'] ?? [],
-                $context,
-            );
+            try {
+                $adType = $adBlock['type'] ?? '';
+                $adData = $adBlock['data'] ?? [];
+                $blockData = $this->blockDataFactory->create($adType, $adData);
+                $rendered = $this->rendererRegistry->render($adType, $blockData, $context);
+                return $rendered->wasRendered ? $rendered->html : null;
+            } catch (\Throwable $e) {
+                $this->logger->error('EmailTemplateRenderer: ad block render failed', ['error' => $e->getMessage()]);
+                return null;
+            }
         }
 
-        // No ad available
         if ($fallback === 'placeholder') {
             return '<div style="border:2px dashed #e9ecef;padding:16px;text-align:center;color:#aaa;font-size:12px;margin:16px 0;">Ad slot — ' . htmlspecialchars($placement) . '</div>';
         }
 
-        // 'hide' — return null so no spacing artifact remains
-        return null;
+        return null; // 'hide' — no spacing residue
     }
 
-    private function renderSharedBlock(string $type, array $data, NewsletterRenderContext $context): ?string
-    {
-        if ($type === '') {
-            return null;
-        }
-
-        $blockData = $this->blockDataFactory->create($type, $data);
-        $rendered = $this->rendererRegistry->render($type, $blockData, $context);
-
-        return $rendered->wasRendered ? $rendered->html : null;
-    }
+    // ── Email chrome ──────────────────────────────────────────────────────────
 
     private function wrapInChrome(string $bodyHtml, ?EmailTheme $theme, string $subject): string
     {
-        $appName = Config::get('app.name', 'Application');
-        $appUrl = Config::get('app.url', 'http://localhost');
+        $appName = \App\Framework\Support\Config::get('app.name', 'Application');
+        $appUrl = \App\Framework\Support\Config::get('app.url', 'http://localhost');
         $year = date('Y');
 
-        // ── Theme values ──────────────────────────────────────
         $primary = $theme ? $theme->getColor('primary', '#667eea') : '#667eea';
         $secondary = $theme ? $theme->getColor('secondary', '#764ba2') : '#764ba2';
         $bgColor = $theme ? $theme->getColor('background', '#f6f6f6') : '#f6f6f6';
         $cardBg = $theme ? $theme->getColor('card_background', '#ffffff') : '#ffffff';
         $textColor = $theme ? $theme->getColor('text', '#333333') : '#333333';
-        $textLightColor = $theme ? $theme->getColor('text_light', '#6c757d') : '#6c757d';
+        $textLight = $theme ? $theme->getColor('text_light', '#6c757d') : '#6c757d';
         $borderColor = $theme ? $theme->getColor('border', '#e9ecef') : '#e9ecef';
 
-        $bodyFontData = $theme ? $theme->getFont('body') : null;
-        $fontFamily = $bodyFontData['family'] ?? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-        $fontSize = $bodyFontData['size'] ?? '15px';
+        $bodyFont = $theme ? $theme->getFont('body') : null;
+        $fontFamily = $bodyFont['family'] ?? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+        $fontSize = $bodyFont['size'] ?? '15px';
 
         $maxWidth = $theme ? (int)$theme->getSetting('max_width', 600) : 600;
         $padding = $theme ? (int)$theme->getSetting('padding', 20) : 20;
         $borderRadius = $theme ? (int)$theme->getSetting('border_radius', 8) : 8;
         $showFooter = $theme ? (bool)$theme->getSetting('show_footer', true) : true;
         $showSocial = $theme ? (bool)$theme->getSetting('show_social_links', true) : true;
-        $headerGradient = $theme
+        $headerGrad = $theme
             ? $theme->getSetting('header_gradient', "linear-gradient(135deg, {$primary} 0%, {$secondary} 100%)")
             : "linear-gradient(135deg, {$primary} 0%, {$secondary} 100%)";
 
-        // ── Logo ──────────────────────────────────────────────
+        // Logo
         $logo = $theme ? $theme->getAsset('logo') : null;
         $logoHtml = '';
         if ($logo && !empty($logo['url'])) {
@@ -318,7 +404,7 @@ class EmailTemplateRenderer
             $logoHtml = '<img src="' . htmlspecialchars($logo['url'], ENT_QUOTES) . '" alt="' . $alt . '"' . $w . $h . ' style="max-height:50px;display:block;margin:0 auto 10px;">';
         }
 
-        // ── Footer ────────────────────────────────────────────
+        // Footer
         $footerHtml = '';
         if ($showFooter) {
             $socialHtml = '';
@@ -334,8 +420,8 @@ HTML;
             $footerHtml = <<<HTML
 <tr>
   <td style="background:{$cardBg};padding:{$padding}px 30px;text-align:center;border-top:1px solid {$borderColor};">
-    <p style="margin:0 0 4px;font-size:12px;color:{$textLightColor};">&copy; {$year} {$appName}. All rights reserved.</p>
-    <p style="margin:0;font-size:12px;color:{$textLightColor};"><a href="{$appUrl}" style="color:{$primary};text-decoration:none;">{$appUrl}</a></p>
+    <p style="margin:0 0 4px;font-size:12px;color:{$textLight};">&copy; {$year} {$appName}. All rights reserved.</p>
+    <p style="margin:0;font-size:12px;color:{$textLight};"><a href="{$appUrl}" style="color:{$primary};text-decoration:none;">{$appUrl}</a></p>
     {$socialHtml}
   </td>
 </tr>
@@ -356,24 +442,18 @@ HTML;
   <tr>
     <td align="center">
       <table width="{$maxWidth}" cellpadding="0" cellspacing="0" style="max-width:{$maxWidth}px;width:100%;background-color:{$cardBg};border-radius:{$borderRadius}px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-
-        <!-- Header -->
         <tr>
-          <td style="background:{$headerGradient};padding:32px 30px;text-align:center;">
+          <td style="background:{$headerGrad};padding:32px 30px;text-align:center;">
             {$logoHtml}
             <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;">{$appName}</h1>
           </td>
         </tr>
-
-        <!-- Body -->
         <tr>
           <td style="padding:{$padding}px 30px;">
             {$bodyHtml}
           </td>
         </tr>
-
         {$footerHtml}
-
       </table>
     </td>
   </tr>
@@ -381,63 +461,5 @@ HTML;
 </body>
 </html>
 HTML;
-    }
-
-    /**
-     * Render from raw block data (unsaved editor state) for live preview.
-     *
-     * @param array $blocks Raw block array [{type, data, visible}]
-     * @param array $runtimeData Variable map (from PreviewDataFactory)
-     * @param int $siteId
-     * @param EmailTheme|null $theme
-     */
-    public function renderPreview(
-        array       $blocks,
-        array       $runtimeData,
-        int         $siteId,
-        ?EmailTheme $theme = null,
-    ): string
-    {
-        $context = $this->buildRenderContext($siteId, $runtimeData);
-        $this->adResolver->warmCache($siteId, $context->member);
-
-        $visibleBlocks = array_values(array_filter($blocks, fn($b) => ($b['visible'] ?? true) === true));
-
-        $bodyHtml = $this->renderBlocks($visibleBlocks, $runtimeData, $siteId, $theme, $context);
-
-        return $this->wrapInChrome($bodyHtml, $theme, 'Preview');
-    }
-
-    // ── Email chrome ──────────────────────────────────────────
-
-    /**
-     * Extract all {{ variable }} tokens from a block list.
-     * Used by the frontend to show unresolved token counts.
-     *
-     * @return string[]  De-duplicated token names, e.g. ['user.first_name', 'order.total']
-     */
-    public function extractTokens(array $blocks): array
-    {
-        $pattern = '/\{\{\s*([\w.]+)\s*\}\}/';
-        $tokens = [];
-
-        $walk = static function (mixed $value) use (&$walk, &$tokens, $pattern): void {
-            if (is_string($value)) {
-                preg_match_all($pattern, $value, $matches);
-                foreach ($matches[1] as $token) {
-                    $tokens[$token] = true;
-                }
-            } elseif (is_array($value)) {
-                foreach ($value as $v) {
-                    $walk($v);
-                }
-            }
-        };
-
-        foreach ($blocks as $block) {
-            $walk($block['data'] ?? []);
-        }
-
-        return array_keys($tokens);
     }
 }

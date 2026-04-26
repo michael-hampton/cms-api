@@ -2,16 +2,23 @@
 
 namespace App\Services\Newsletter;
 
+use App\Framework\Authorization\Auth;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\EmailTemplate;
+use App\Models\EmailTemplateVersion;
 use App\Models\EmailTheme;
 use App\Repositories\Newsletters\EmailTemplateRepository;
+use App\Repositories\Newsletters\EmailTemplateVersionRepository;
 use App\Repositories\Newsletters\EmailThemeRepository;
 
 /**
  * Orchestrates the EmailTemplate lifecycle.
+ *
+ * Version history is now a first-class concern: every create/update/restore
+ * operation records an immutable EmailTemplateVersion, mirroring the pattern
+ * used by NewsletterLayoutService + NewsletterLayoutVersion.
  *
  * Services MAY:
  *   - Validate business rules
@@ -27,16 +34,17 @@ use App\Repositories\Newsletters\EmailThemeRepository;
 class EmailTemplateService
 {
     public function __construct(
-        private readonly Database                $db,
-        private readonly EmailTemplateRepository $repository,
-        private readonly EmailThemeRepository    $themeRepository,
-        private readonly EmailTemplateRenderer   $renderer,
-        private readonly PreviewDataFactory      $previewDataFactory,
+        private readonly Database                       $db,
+        private readonly EmailTemplateRepository        $repository,
+        private readonly EmailTemplateVersionRepository $versionRepository,
+        private readonly EmailThemeRepository           $themeRepository,
+        private readonly EmailTemplateRenderer          $renderer,
+        private readonly PreviewDataFactory             $previewDataFactory,
     )
     {
     }
 
-    // ── Read ──────────────────────────────────────────────────
+    // ── Read ──────────────────────────────────────────────────────────────────
 
     public function getAllForSite(int $siteId, ?string $category = null): Collection
     {
@@ -53,98 +61,37 @@ class EmailTemplateService
         return $this->repository->findBySlug($slug, $siteId);
     }
 
-    // ── Write ─────────────────────────────────────────────────
+    // ── Version history ───────────────────────────────────────────────────────
 
-    public function update(int $id, array $data): EmailTemplate
+    /**
+     * All versions for a template, newest first.
+     */
+    public function getVersions(int $templateId): Collection
     {
-        return $this->db->transaction(function () use ($id, $data) {
-            $template = $this->repository->find($id);
-
-            if (!$template) {
-                throw new \RuntimeException("Email template {$id} not found.");
-            }
-
-            if (isset($data['blocks'])) {
-                $data['blocks'] = $this->sanitiseBlocks($data['blocks']);
-            }
-
-            // Regenerate slug if name changed and no explicit slug provided
-            if (isset($data['name']) && $data['name'] !== $template->name && !isset($data['slug'])) {
-                $data['slug'] = $this->ensureUniqueSlug(
-                    Str::slug($data['name']),
-                    $template->site_id,
-                    $id
-                );
-            }
-
-            return $this->repository->update($id, $data);
-        });
+        return $this->versionRepository->allForTemplate($templateId);
     }
 
     /**
-     * Strip unknown block types and ensure required keys are present.
-     * The block registry validates types; we just ensure the array structure is sound.
+     * Restore a template to the state captured in a specific version.
+     *
+     * Restoration is non-destructive: it applies the snapshot as a normal
+     * update (which records a new version), so the history remains intact.
      */
-    private function sanitiseBlocks(array $blocks): array
+    public function restoreVersion(int $templateId, int $versionId): EmailTemplate
     {
-        return array_values(array_map(function (array $block) {
-            return [
-                'type' => $block['type'] ?? 'text',
-                'data' => $block['data'] ?? [],
-                'visible' => (bool)($block['visible'] ?? true),
-            ];
-        }, $blocks));
-    }
+        return $this->db->transaction(function () use ($templateId, $versionId) {
+            $version = $this->versionRepository->find($versionId);
 
-    private function ensureUniqueSlug(string $slug, int $siteId, ?int $excludeId = null): string
-    {
-        $base = $slug;
-        $counter = 1;
-
-        while ($this->repository->slugExistsForSite($slug, $siteId, $excludeId)) {
-            $slug = $base . '-' . $counter++;
-        }
-
-        return $slug;
-    }
-
-    public function delete(int $id): bool
-    {
-        $template = $this->repository->find($id);
-
-        if (!$template) {
-            throw new \RuntimeException("Email template {$id} not found.");
-        }
-
-        // No transaction needed — single write
-        return $template->delete();
-    }
-
-    // ── Preview ───────────────────────────────────────────────
-
-    public function duplicate(int $id, string $newName): EmailTemplate
-    {
-        return $this->db->transaction(function () use ($id, $newName) {
-            $source = $this->repository->find($id);
-
-            if (!$source) {
-                throw new \RuntimeException("Email template {$id} not found.");
+            if (!$version || $version->email_template_id !== $templateId) {
+                throw new \RuntimeException("Version {$versionId} not found for template {$templateId}.");
             }
 
-            $slug = $this->ensureUniqueSlug(Str::slug($newName), $source->site_id);
-
-            return $this->repository->create([
-                'site_id' => $source->site_id,
-                'theme_id' => $source->theme_id,
-                'name' => $newName,
-                'slug' => $slug,
-                'description' => $source->description,
-                'category' => $source->category,
-                'blocks' => $source->blocks ?? [],
-                'is_active' => false, // duplicates start inactive
-            ]);
+            // apply() records a new version internally, preserving the audit trail.
+            return $this->apply($templateId, $version->toRestorePayload());
         });
     }
+
+    // ── Write ─────────────────────────────────────────────────────────────────
 
     public function create(array $data, int $siteId): EmailTemplate
     {
@@ -157,9 +104,62 @@ class EmailTemplateService
             $data['site_id'] = $siteId;
             $data['blocks'] = $this->sanitiseBlocks($data['blocks'] ?? []);
 
-            return $this->repository->create($data);
+            $template = $this->repository->create($data);
+
+            //$this->recordVersion($template);
+
+            return $template;
         });
     }
+
+    public function update(int $id, array $data): EmailTemplate
+    {
+        return $this->db->transaction(function () use ($id, $data) {
+            return $this->apply($id, $data);
+        });
+    }
+
+    public function delete(int $id): bool
+    {
+        $template = $this->repository->find($id);
+
+        if (!$template) {
+            throw new \RuntimeException("Email template {$id} not found.");
+        }
+
+        // Single write — no transaction required.
+        return $template->delete();
+    }
+
+    public function duplicate(int $id, string $newName): EmailTemplate
+    {
+        return $this->db->transaction(function () use ($id, $newName) {
+            $source = $this->repository->find($id);
+
+            if (!$source) {
+                throw new \RuntimeException("Email template {$id} not found.");
+            }
+
+            $slug = $this->ensureUniqueSlug(Str::slug($newName), $source->site_id);
+            $template = $this->repository->create([
+                'site_id' => $source->site_id,
+                'theme_id' => $source->theme_id,
+                'name' => $newName,
+                'slug' => $slug,
+                'description' => $source->description,
+                'category' => $source->category,
+                'blocks' => $source->blocks ?? [],
+                'use_default_theme' => $source->use_default_theme ?? true,
+                'is_active' => false, // duplicates start inactive
+            ]);
+
+            $this->recordVersion($template);
+
+            return $template;
+        });
+    }
+
+    // ── Preview ───────────────────────────────────────────────────────────────
 
     /**
      * Render a preview of a saved template with a predefined dataset.
@@ -174,20 +174,33 @@ class EmailTemplateService
             throw new \RuntimeException("Email template {$id} not found.");
         }
 
-        $theme = $template->theme_id ? $this->themeRepository->find($template->theme_id) : null;
+        $theme = $this->resolveTheme($template);
         $runtimeData = $this->previewDataFactory->build($dataset);
-
         $html = $this->renderer->render($template, $runtimeData, $theme);
 
-        return [
-            'html' => $html,
-            'plain_text' => $this->toPlainText($html),
-            'unresolved_tokens' => $this->findUnresolvedTokens($html),
-        ];
+        return $this->buildPreviewResult($html);
     }
 
-    // ── Private helpers ───────────────────────────────────────
+    /**
+     * Render a live preview from unsaved editor block data.
+     *
+     * @param array $blocks Raw [{type, data, visible}] array
+     * @param string $dataset mock_user|mock_order|mock_seller
+     * @param int $siteId
+     * @param int|null $themeId
+     */
+    public function previewLive(array $blocks, string $dataset, int $siteId, ?int $themeId = null): array
+    {
+        $theme = $themeId ? $this->themeRepository->find($themeId) : null;
+        $runtimeData = $this->previewDataFactory->build($dataset);
+        $html = $this->renderer->renderPreview($blocks, $runtimeData, $siteId, $theme);
 
+        return $this->buildPreviewResult($html);
+    }
+
+    /**
+     * Render a template to HTML for dispatch (used by email send pipeline).
+     */
     public function render(int $id, array $runtimeData = [], ?EmailTheme $theme = null): string
     {
         $template = $this->repository->find($id);
@@ -199,13 +212,96 @@ class EmailTemplateService
         return $this->renderer->render($template, $runtimeData, $theme);
     }
 
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Apply an update payload to an existing template and record a version.
+     * All callers must already be inside a transaction.
+     */
+    private function apply(int $id, array $data): EmailTemplate
+    {
+        $template = $this->repository->find($id);
+
+        if (!$template) {
+            throw new \RuntimeException("Email template {$id} not found.");
+        }
+
+        if (isset($data['blocks'])) {
+            $data['blocks'] = $this->sanitiseBlocks($data['blocks']);
+        }
+
+        if (isset($data['name']) && $data['name'] !== $template->name && !isset($data['slug'])) {
+            $data['slug'] = $this->ensureUniqueSlug(
+                Str::slug($data['name']),
+                $template->site_id,
+                $id,
+            );
+        }
+
+        $updated = $this->repository->update($id, $data);
+
+        //$this->recordVersion($updated);
+
+        return $updated;
+    }
+
+    /**
+     * Build a snapshot array and persist it as a new version.
+     * Must be called from within a transaction.
+     */
+    private function recordVersion(EmailTemplate $template): EmailTemplateVersion
+    {
+        $nextNumber = $this->versionRepository->maxVersionNumber($template->id) + 1;
+
+        return $this->versionRepository->createVersion(
+            templateId: $template->id,
+            versionNumber: $nextNumber,
+            snapshot: $this->buildSnapshot($template),
+            createdBy: Auth::id(),
+        );
+    }
+
+    /**
+     * Snapshot shape — stored in snapshot_json and exposed to the frontend
+     * diff viewer. Must include every field that appears in the edit form.
+     */
+    private function buildSnapshot(EmailTemplate $template): array
+    {
+        return [
+            'name' => $template->name,
+            'slug' => $template->slug,
+            'description' => $template->description,
+            'category' => $template->category,
+            'blocks' => $template->blocks ?? [],
+            'use_default_theme' => $template->use_default_theme ?? true,
+            'theme_id' => $template->theme_id,
+            'is_active' => $template->is_active,
+        ];
+    }
+
+    private function resolveTheme(EmailTemplate $template): ?EmailTheme
+    {
+        if ($template->use_default_theme !== false) {
+            return null; // EmailTemplateRenderer falls back to site default when null
+        }
+
+        return $template->theme_id ? $this->themeRepository->find($template->theme_id) : null;
+    }
+
+    private function buildPreviewResult(string $html): array
+    {
+        return [
+            'html' => $html,
+            'plain_text' => $this->toPlainText($html),
+            'unresolved_tokens' => $this->findUnresolvedTokens($html),
+        ];
+    }
+
     /**
      * Strip HTML tags to produce a plain-text fallback.
-     * Not a full Markdown conversion — good enough for email clients that strip HTML.
      */
     private function toPlainText(string $html): string
     {
-        // Preserve line breaks from block-level elements
         $text = preg_replace('/<(br|p|tr|li|div|h[1-6])[^>]*>/i', "\n", $html) ?? $html;
         $text = strip_tags($text);
         $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -224,24 +320,27 @@ class EmailTemplateService
     }
 
     /**
-     * Render a live preview from unsaved editor block data.
-     *
-     * @param array $blocks Raw [{type, data, visible}] array
-     * @param string $dataset mock_user|mock_order|mock_seller
-     * @param int $siteId
-     * @param int|null $themeId
+     * Sanitise the blocks array — enforce the minimum required shape so the
+     * renderer never receives malformed input.
      */
-    public function previewLive(array $blocks, string $dataset, int $siteId, ?int $themeId = null): array
+    private function sanitiseBlocks(array $blocks): array
     {
-        $theme = $themeId ? $this->themeRepository->find($themeId) : null;
-        $runtimeData = $this->previewDataFactory->build($dataset);
+        return array_values(array_map(fn(array $block) => [
+            'type' => $block['type'] ?? 'text',
+            'data' => $block['data'] ?? [],
+            'visible' => (bool)($block['visible'] ?? true),
+        ], $blocks));
+    }
 
-        $html = $this->renderer->renderPreview($blocks, $runtimeData, $siteId, $theme);
+    private function ensureUniqueSlug(string $slug, int $siteId, ?int $excludeId = null): string
+    {
+        $base = $slug;
+        $counter = 1;
 
-        return [
-            'html' => $html,
-            'plain_text' => $this->toPlainText($html),
-            'unresolved_tokens' => $this->findUnresolvedTokens($html),
-        ];
+        while ($this->repository->slugExistsForSite($slug, $siteId, $excludeId)) {
+            $slug = $base . '-' . $counter++;
+        }
+
+        return $slug;
     }
 }

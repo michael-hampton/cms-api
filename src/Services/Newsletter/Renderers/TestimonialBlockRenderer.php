@@ -27,44 +27,61 @@ class TestimonialBlockRenderer implements EmailBlockRenderer
             return RenderedBlock::skipped();
         }
 
-        $baseWrapperStyle = 'margin: 30px 0;';
-        $wrapperStyle = $blockData->style->mergeIntoCss($baseWrapperStyle);
+        if (empty($blockData->testimonials)) {
+            return RenderedBlock::skipped();
+        }
 
-        $baseCardStyle = 'background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;';
-        $cardStyle = $blockData->style->mergeIntoCss($baseCardStyle);
-
-        $baseTextStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0; font-style: italic;';
-        $textStyle = $blockData->style->mergeIntoCss($baseTextStyle);
+        $wrapperStyle = $blockData->style->mergeIntoCss('margin: 30px 0;');
+        $cardStyle = $blockData->style->mergeIntoCss(
+            'background-color: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 20px;'
+        );
+        $textStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0; font-style: italic;';
 
         $html = [];
         $html[] = "<div style=\"{$wrapperStyle}\">";
-        $html[] = '<h3 style="color: #333; margin: 0 0 20px 0; font-size: 24px; text-align: center;">What Our Clients Say</h3>';
+
+        if ($blockData->title) {
+            $title = Str::sanitize($blockData->title);
+            $html[] = "<h3 style=\"color: #333; margin: 0 0 20px 0; font-size: 24px; text-align: center;\">{$title}</h3>";
+        }
+
+        if ($blockData->subtitle) {
+            $subtitle = Str::sanitize($blockData->subtitle);
+            $html[] = "<p style=\"color: #666; text-align: center; margin: 0 0 20px 0;\">{$subtitle}</p>";
+        }
 
         foreach ($blockData->testimonials as $testimonial) {
-            $text = Str::sanitize($testimonial['text'] ?? '');
-            $author = Str::sanitize($testimonial['author'] ?? '');
-            $role = Str::sanitize($testimonial['role'] ?? '');
-            $rating = (int)($testimonial['rating'] ?? 5);
-            $imageSrc = isset($testimonial['image']['src']) ? Str::sanitize($testimonial['image']['src']) : null;
+            // Map frontend field names to display roles
+            $text = Str::sanitize($testimonial['strapline'] ?? '');
+            $author = Str::sanitize($testimonial['productName'] ?? '');
+            $role = Str::sanitize($testimonial['subcategory'] ?? '');
+            $rating = (int)($testimonial['rating'] ?? 0);
+            $isWinner = (bool)($testimonial['winner'] ?? false);
 
-            $stars = Rating::generateStars($rating);
+            $stars = $rating > 0 ? Rating::generateStars($rating) : '';
 
             $html[] = "<div style=\"{$cardStyle}\">";
-            $html[] = "<div style=\"color: #ffc107; margin-bottom: 10px; font-size: 18px;\">{$stars}</div>";
-            $html[] = "<p style=\"{$textStyle}\">\"{$text}\"</p>";
-            $html[] = '<div style="display: table; width: 100%;">';
 
-            if ($imageSrc) {
-                $html[] = '<div style="display: table-cell; vertical-align: middle; width: 50px; padding-right: 15px;">'
-                    . "<img src=\"{$imageSrc}\" alt=\"{$author}\" style=\"width: 50px; height: 50px; border-radius: 50%; object-fit: cover;\">"
-                    . '</div>';
+            if ($isWinner) {
+                $html[] = '<div style="color: #e6a817; font-weight: bold; margin-bottom: 8px;">🏆 Winner</div>';
             }
 
+            if ($stars) {
+                $html[] = "<div style=\"color: #ffc107; margin-bottom: 10px; font-size: 18px;\">{$stars}</div>";
+            }
+
+            if ($text) {
+                $html[] = "<p style=\"{$textStyle}\">\"{$text}\"</p>";
+            }
+
+            $html[] = '<div style="display: table; width: 100%;">';
             $html[] = '<div style="display: table-cell; vertical-align: middle;">';
             $html[] = "<p style=\"margin: 0; color: #333; font-weight: bold; font-size: 16px;\">{$author}</p>";
+
             if ($role) {
                 $html[] = "<p style=\"margin: 0; color: #666; font-size: 14px;\">{$role}</p>";
             }
+
             $html[] = '</div></div></div>';
         }
 
