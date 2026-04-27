@@ -156,7 +156,33 @@
             <div class="oc-header__spacer"></div>
 
             <div class="oc-header__actions">
+
+                <!-- 🔔 Notification Bell -->
+                <div class="oc-notifications" id="oc-notifications">
+                    <button class="oc-notifications__btn" id="notification-btn" aria-label="Notifications">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                            <path d="M10 2a4 4 0 00-4 4v2.586L5.293 10.293A1 1 0 006 12h8a1 1 0 00.707-1.707L14 8.586V6a4 4 0 00-4-4z"/>
+                            <path d="M7 14a3 3 0 006 0H7z"/>
+                        </svg>
+
+                        <span class="oc-notifications__badge" id="notification-count" hidden>0</span>
+                    </button>
+
+                    <!-- Dropdown -->
+                    <div class="oc-notifications__dropdown" id="notification-dropdown">
+                        <div class="oc-notifications__header">
+                            <span>Notifications</span>
+                            <button id="mark-all-read" class="oc-link">Mark all as read</button>
+                        </div>
+
+                        <div id="notification-list" class="oc-notifications__list">
+                            <div class="oc-notifications__empty">No notifications</div>
+                        </div>
+                    </div>
+                </div>
+
                 <?php if (!empty($headerActions)): echo $headerActions; endif; ?>
+
             </div>
         </header>
 
@@ -223,7 +249,147 @@
     const mq = window.matchMedia('(max-width: 900px)');
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (mq.matches) toggleBtn.style.display = 'grid';
-    mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
+    const wrapper = document.getElementById('oc-notifications');
+    const btn = document.getElementById('notification-btn');
+    const dropdown = document.getElementById('notification-dropdown');
+
+    (function () {
+        const API_BASE = '/api/<?= $site ?>/open-collab/notifications';
+
+        const btn = document.getElementById('notification-btn');
+        const dropdown = document.getElementById('notification-dropdown');
+        const list = document.getElementById('notification-list');
+        const badge = document.getElementById('notification-count');
+
+        function openDropdown() {
+            wrapper.classList.add('open');
+            loadNotifications();
+        }
+
+        function closeDropdown() {
+            wrapper.classList.remove('open');
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target)) {
+                closeDropdown();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDropdown();
+            }
+        });
+
+        function toggleDropdown() {
+            wrapper.classList.contains('open') ? closeDropdown() : openDropdown();
+        }
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleDropdown();
+        });
+        mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
+
+        if (!btn) return; // guard for pages without header
+
+        btn.addEventListener('click', () => {
+            dropdown.hidden = !dropdown.hidden;
+
+            if (!dropdown.hidden) {
+                loadNotifications();
+            }
+        });
+
+        function loadUnreadCount() {
+            fetch(API_BASE + '/unread-count', {headers: authHeaders()})
+                .then(r => r.json())
+                .then(data => {
+                    if (data.count > 0) {
+                        badge.hidden = false;
+                        badge.innerText = data.count;
+                    } else {
+                        badge.hidden = true;
+                    }
+                });
+        }
+
+        function loadNotifications() {
+            fetch(API_BASE, {headers: authHeaders()})
+                .then(r => r.json())
+                .then(data => renderNotifications(data.data || []));
+        }
+
+        function renderNotifications(items) {
+            if (!items.length) {
+                list.innerHTML = '<div class="oc-notifications__empty">No notifications</div>';
+                return;
+            }
+
+            list.innerHTML = items.map(n => `
+        <div class="oc-notification ${n.read ? '' : 'unread'}" data-id="${n.id}">
+            <div class="oc-notification__title">${n.title}</div>
+            <div class="oc-notification__message">${n.message}</div>
+
+            ${n.action_url ? `<a href="${n.action_url}" class="oc-notification__link">View</a>` : ''}
+        </div>
+    `).join('');
+        }
+
+        list.addEventListener('click', e => {
+            const el = e.target.closest('.oc-notification');
+            if (!el) return;
+
+            const id = el.dataset.id;
+
+            fetch(API_BASE + '/read', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({notification_id: id})
+            });
+
+            el.classList.remove('unread');
+            loadUnreadCount();
+        });
+
+        document.getElementById('mark-all-read')?.addEventListener('click', () => {
+            fetch(API_BASE + '/read-all', {
+                method: 'POST',
+                headers: authHeaders()
+            }).then(() => {
+                document.querySelectorAll('.oc-notification').forEach(n => n.classList.remove('unread'));
+                loadUnreadCount();
+            });
+        });
+
+        function authHeaders() {
+            return {
+                'Authorization': 'Bearer ' + localStorage.getItem('token'),
+                'Content-Type': 'application/json'
+            };
+        }
+
+        function formatTitle(n) {
+            switch (n.type) {
+                case 'article_approved':
+                    return 'Article approved';
+                case 'article_rejected':
+                    return 'Article rejected';
+                case 'payout_processed':
+                    return 'Payout processed';
+                default:
+                    return 'Notification';
+            }
+        }
+
+        function formatMessage(n) {
+            return JSON.stringify(n.data);
+        }
+
+        loadUnreadCount();
+        setInterval(loadUnreadCount, 30000);
+    })();
 </script>
 
 @yield('scripts')

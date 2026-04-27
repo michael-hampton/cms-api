@@ -132,4 +132,9 @@ class ConsentTypeRepository
 
         return $consentType ? $consentType->delete() : false;
     }
+
+    public function findByScope(string $scope)
+    {
+        return ConsentType::where('scope', $scope)->get();
+    }
 }

@@ -10,9 +10,11 @@ use App\Models\Page;
  */
 class ArticleApprovedEvent
 {
+
     public function __construct(
         public readonly Page $page,
         public readonly int  $adminId,
+        public readonly int $userId
     )
     {
     }

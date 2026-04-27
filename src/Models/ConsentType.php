@@ -14,7 +14,8 @@ class ConsentType extends Model
         'required',
         'retention_days',
         'data_purposes',
-        'is_active'
+        'is_active',
+        'scope'
     ];
 
     protected $casts = [

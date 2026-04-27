@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Enums\OpenCollab\DisputeStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\EarningsDispute;
 use App\Models\EarningsLedger;
@@ -24,7 +25,7 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
     private MockInterface $databaseMock;
     private UserRepositoryInterface $userRepository;
     private NotificationDispatcher $notificationDispatcher;
-
+    private EventDispatcher $eventDispatcher;
     // ── raise() ───────────────────────────────────────────────────────────────
 
     public function test_raise_creates_open_dispute_when_ledger_entry_belongs_to_user(): void
@@ -359,16 +360,19 @@ class EarningsDisputeServiceTest extends FunctionalTestCase
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
         $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
+        $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
 
         $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
         $this->userRepository->shouldReceive('find')->byDefault();
+        $this->eventDispatcher->shouldReceive('dispatch')->byDefault();
 
         $this->service = new EarningsDisputeService(
             $this->disputeRepository,
             $this->ledgerRepository,
             $this->userRepository,
             $this->databaseMock,
-            $this->notificationDispatcher
+            $this->notificationDispatcher,
+            $this->eventDispatcher
         );
     }
 

@@ -89,7 +89,7 @@ class AdminContractController extends Controller
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        event(new ContractPublishedEvent($contract, $siteId));
+        event(new ContractPublishedEvent($contract, $siteId, 1)); //todo needs more work
 
         return $this->jsonResponse([
             'contract' => $this->formatContract($contract),

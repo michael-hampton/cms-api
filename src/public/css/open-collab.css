@@ -1383,3 +1383,79 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+.oc-notifications {
+    position: relative;
+}
+
+.oc-notifications__btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.oc-notifications__badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: red;
+    color: white;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 999px;
+}
+
+.oc-notifications__dropdown {
+    position: absolute;
+    right: 0;
+    top: 36px;
+    width: 320px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .15);
+    z-index: 200;
+}
+
+.oc-notifications__header {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.oc-notifications__list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.oc-notification {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.oc-notification.unread {
+    background: #f5f8ff;
+}
+
+.oc-notifications__dropdown {
+    display: none;
+}
+
+.oc-notifications.open .oc-notifications__dropdown {
+    display: block;
+}
+
+.oc-notifications__dropdown {
+    opacity: 0;
+    transform: translateY(-6px);
+    pointer-events: none;
+    transition: 0.15s ease;
+}
+
+.oc-notifications.open .oc-notifications__dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}

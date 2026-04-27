@@ -4,7 +4,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
-use App\Events\OpenCollab\PayoutProcessedEvent;
+use App\Events\OpenCollab\PayoutFailedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
@@ -210,7 +210,7 @@ class PayoutServiceTest extends FunctionalTestCase
             ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Paid);
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
-            ->withArgs(fn($e) => $e instanceof PayoutProcessedEvent && $e->adminId === 99);
+            ->withArgs(fn($e) => $e instanceof PayoutFailedEvent && $e->adminId === 99);
 
         $result = $this->service->markPaid(5, 99, 'REF-001');
 

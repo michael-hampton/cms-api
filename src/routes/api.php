@@ -76,9 +76,11 @@ use App\Controllers\OpenCollab\ArticleHistoryController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
+use App\Controllers\OpenCollab\ContributorNotificationPreferenceController;
 use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
+use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
@@ -1379,6 +1381,17 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);
     });
+
+    $router->group(['prefix' => 'notifications'], function () use ($router) {
+        $router->get('', [NotificationController::class, 'index']);
+        $router->get('/unread-count', [NotificationController::class, 'unreadCount']);
+        $router->post('/read', [NotificationController::class, 'markAsRead']);
+        $router->post('/read-all', [NotificationController::class, 'markAllAsRead']);
+        $router->post('/preferences', [ContributorNotificationPreferenceController::class, 'update']);
+        $router->post('/preferences/batch', [ContributorNotificationPreferenceController::class, 'updateBatch']
+        );
+    });
+
 
     $router->get('/admin/contracts', [AdminContractController::class, 'index']);
     $router->get('/admin/contracts/latest', [AdminContractController::class, 'latest']);

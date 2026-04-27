@@ -154,6 +154,116 @@ $pageClass = '';
         </div>
     </div>
 
+    <!-- Notification Preferences -->
+    <!-- Notification Preferences -->
+    <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .5s ease;">
+        <div class="oc-card__header">
+            <span class="oc-card__title">Notification Preferences</span>
+        </div>
+
+        <div class="oc-card__body">
+
+            <div style="font-size:.85rem;color:var(--slate);margin-bottom:16px;">
+                Control how and when you receive updates from the platform.
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:18px;">
+
+                <?php foreach ($grouped as $category => $items): ?>
+
+                    <!-- CATEGORY BLOCK -->
+                    <div style="border:1px solid #f1f5f9;border-radius:10px;overflow:hidden;">
+
+                        <!-- category header -->
+                        <div style="background:#fafafa;padding:10px 14px;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--slate);">
+                            <?= ucfirst($category) ?>
+                        </div>
+
+                        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px;">
+
+                            <?php foreach ($items as $type): ?>
+
+                                <?php
+                                $isRequired = $type['required'] ?? false;
+                                $isEnabled = true; // replace with real user preference lookup later
+                                ?>
+
+                                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+
+                                    <!-- LEFT -->
+                                    <div style="flex:1;">
+
+                                        <div style="display:flex;align-items:center;gap:8px;">
+
+                                            <div style="font-weight:500;font-size:.875rem;color:var(--navy);">
+                                                <?= htmlspecialchars($type['name'] ?? $type['code']) ?>
+                                            </div>
+
+                                            <?php if ($isRequired): ?>
+                                                <span style="font-size:.65rem;background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:999px;">
+                                                Required
+                                            </span>
+                                            <?php endif; ?>
+
+                                        </div>
+
+                                        <div style="font-size:.75rem;color:var(--slate);margin-top:3px;">
+                                            <?= htmlspecialchars($type['code']) ?>
+                                        </div>
+
+                                    </div>
+
+                                    <!-- RIGHT (CHANNEL TOGGLES) -->
+                                    <div style="display:flex;gap:14px;align-items:center;">
+
+                                        <!-- EMAIL -->
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--slate);">
+                                            <input type="checkbox"
+                                                   class="notif-toggle"
+                                                   data-code="<?= $type['code'] ?>"
+                                                   data-id="<?= $type['consent_type_id'] ?>"
+                                                   data-channel="email"
+                                                    <?= $isEnabled ? 'checked' : '' ?>
+                                                    <?= $isRequired ? 'disabled' : '' ?>>
+                                            Email
+                                        </label>
+
+                                        <!-- IN-APP -->
+                                        <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--slate);">
+                                            <input type="checkbox"
+                                                   class="notif-toggle"
+                                                   data-id="<?= $type['consent_type_id'] ?>"
+                                                   data-code="<?= $type['code'] ?>"
+                                                   data-channel="in_app"
+                                                    <?= $isEnabled ? 'checked' : '' ?>
+                                                    <?= $isRequired ? 'disabled' : '' ?>>
+                                            In-app
+                                        </label>
+
+                                    </div>
+
+                                </div>
+
+                            <?php endforeach; ?>
+
+                        </div>
+                    </div>
+
+                <?php endforeach; ?>
+
+            </div>
+
+            <button id="notif-save-btn"
+                    class="oc-btn oc-btn--primary oc-btn--sm"
+                    onclick="savePreferences()"
+                    disabled>
+                Save Changes
+            </button>
+        </div>
+
+
+    </div>
+
     <!-- Danger zone -->
     <div class="oc-danger-zone" id="danger" style="animation:fadeSlideIn .55s ease;">
         <div class="oc-danger-zone__title">Danger Zone</div>
@@ -236,6 +346,81 @@ $pageClass = '';
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = localStorage.getItem('oc_token') || '';
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
+    let preferenceState = {};
+    let isDirty = false;
+    const saveBtn = document.getElementById('notif-save-btn');
+
+    document.querySelectorAll('.notif-toggle').forEach(el => {
+        const code = el.dataset.code;
+        const channel = el.dataset.channel;
+        const id = el.dataset.id;
+
+        if (!preferenceState[id]) {
+            preferenceState[id] = {};
+        }
+
+        preferenceState[id][channel] = el.checked;
+
+        el.addEventListener('change', function () {
+            const code = this.dataset.code;
+            const id = this.dataset.id;
+            const channel = this.dataset.channel;
+
+            preferenceState[id][channel] = this.checked;
+
+            markDirty();
+        });
+    });
+
+    function markDirty() {
+        isDirty = true;
+        if (saveBtn) saveBtn.disabled = false;
+    }
+
+    async function savePreferences() {
+        if (!isDirty) return;
+
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = 'Saving...';
+
+        const payload = [];
+
+        for (const id in preferenceState) {
+            for (const channel in preferenceState[id]) {
+                payload.push({
+                    consent_type_id: id,
+                    channel: channel,
+                    granted: preferenceState[id][channel]
+                });
+            }
+        }
+
+        try {
+            const res = await fetch(`/api/${SITE}/open-collab/notifications/preferences/batch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${TOKEN}`
+                },
+                body: JSON.stringify({preferences: payload})
+            });
+
+            if (!res.ok) throw new Error('Failed');
+
+            isDirty = false;
+            saveBtn.innerHTML = 'Saved ✓';
+
+            setTimeout(() => {
+                saveBtn.innerHTML = 'Save Changes';
+                saveBtn.disabled = true;
+            }, 1200);
+
+        } catch (e) {
+            console.error(e);
+            saveBtn.innerHTML = 'Save Changes';
+            saveBtn.disabled = false;
+        }
+    }
 
     // Profile form
     document.getElementById('profile-form')?.addEventListener('submit', async function (e) {

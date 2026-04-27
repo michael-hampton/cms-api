@@ -371,9 +371,10 @@ abstract class FormRequest extends Request
     /**
      * Validate the request data
      */
-    protected function validate(): void
+    protected function validate(array $data = []): void
     {
-        $rules = $this->rules();
+        $rules = $data ?: $this->rules();
+
         $messages = $this->messages();
 
         foreach ($rules as $field => $rule) {

@@ -4,7 +4,10 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\DisputeStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
+use App\Events\OpenCollab\DisputeRaisedEvent;
+use App\Events\OpenCollab\DisputeResolvedEvent;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\EarningsDispute;
 use App\Repositories\Cms\UserRepositoryInterface;
@@ -32,6 +35,7 @@ class EarningsDisputeService
         private readonly UserRepositoryInterface $userRepository,
         private readonly Database                  $database,
         private readonly NotificationDispatcher  $notificationDispatcher,
+        private readonly EventDispatcher $eventDispatcher,
     )
     {
     }
@@ -70,6 +74,10 @@ class EarningsDisputeService
                 new DisputeRaisedNotification($dispute, $contributor)
             );
         }
+
+        $this->eventDispatcher->dispatch(
+            new DisputeRaisedEvent($userId, $dispute->id)
+        );
 
         return $dispute;
     }
@@ -158,6 +166,10 @@ class EarningsDisputeService
                 );
             }
         }
+
+        $this->eventDispatcher->dispatch(
+            new DisputeResolvedEvent($dispute->user_id, $dispute->id, '')
+        );
 
         return $resolved;
     }

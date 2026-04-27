@@ -12,6 +12,7 @@ class ViolationRecordedEvent
 {
     public function __construct(
         public readonly ContributorViolation $violation,
+        public readonly int $userId
     )
     {
     }

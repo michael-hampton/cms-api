@@ -94,7 +94,7 @@ class ViolationService
             return $violation;
         });
 
-        $this->eventDispatcher->dispatch(new ViolationRecordedEvent($violation));
+        $this->eventDispatcher->dispatch(new ViolationRecordedEvent($violation, $userId));
 
         return $violation;
     }

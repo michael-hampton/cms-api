@@ -15,6 +15,7 @@ class ArticleRejectedEvent
         public readonly Page            $page,
         public readonly int             $adminId,
         public readonly RejectionReason $reason,
+        public readonly int $userId,
         public readonly ?string         $notes,
     )
     {

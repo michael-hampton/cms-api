@@ -150,7 +150,7 @@ class ArticleApprovalService
             return $this->pageRepository->find($page->id);
         });
 
-        $this->eventDispatcher->dispatch(new ArticleApprovedEvent($page, $adminId));
+        $this->eventDispatcher->dispatch(new ArticleApprovedEvent($page, $adminId, $page->contributor_id));
 
         return $page;
     }
@@ -202,7 +202,7 @@ class ArticleApprovalService
             return $this->pageRepository->find($page->id);
         });
 
-        $this->eventDispatcher->dispatch(new ArticleRejectedEvent($page, $adminId, $reason, $notes));
+        $this->eventDispatcher->dispatch(new ArticleRejectedEvent($page, $adminId, $reason, $page->contributor_id, $notes));
 
         return $page;
     }

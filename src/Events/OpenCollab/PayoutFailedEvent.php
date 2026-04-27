@@ -4,16 +4,13 @@ namespace App\Events\OpenCollab;
 
 use App\Models\Payout;
 
-/**
- * Fired when an admin marks a payout as paid.
- * Listeners: notify contributor, write activity event.
- */
-class PayoutProcessedEvent
+class PayoutFailedEvent
 {
     public function __construct(
         public readonly Payout $payout,
         public readonly int    $adminId,
-        public readonly int $userId
+        public readonly int    $userId,
+        public readonly string $reason = ''
     )
     {
     }

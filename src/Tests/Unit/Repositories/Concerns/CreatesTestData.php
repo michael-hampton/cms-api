@@ -78,6 +78,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\Tag;
 use App\Models\Territory;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Models\Voucher;
 
 trait CreatesTestData
@@ -1023,5 +1024,21 @@ trait CreatesTestData
     {
         $issueDelivery = $this->createIssueDelivery();
         return PrintBatch::create(array_merge(['issue_delivery_id' => $issueDelivery->id], $overrides));
+    }
+
+    protected function createUserNotification(array $overrides = []): Model
+    {
+        $user = $overrides['user_id'] ?? $this->createUser()->id;
+
+        $data = array_merge([
+            'user_id' => $user,
+            'type' => 'article_approved',
+            'data' => json_encode(['article_id' => 1]),
+            'read_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ], $overrides);
+
+        return UserNotification::create($data);
     }
 }

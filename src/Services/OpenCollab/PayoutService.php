@@ -4,6 +4,7 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
+use App\Events\OpenCollab\PayoutFailedEvent;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
@@ -170,6 +171,8 @@ class PayoutService
             $this->notificationDispatcher->dispatch(
                 new PayoutApprovedNotification($payout, $contributor)
             );
+
+            $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId, $payout->user_id));
         }
 
         return $payout;
@@ -216,7 +219,7 @@ class PayoutService
             return $this->payoutRepository->find($payout->id);
         });
 
-        $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId));
+        $this->eventDispatcher->dispatch(new PayoutFailedEvent($payout, $adminId, $payout->user_id));
 
         $contributor = $this->userRepository->find($payout->user_id);
         if ($contributor) {
@@ -268,6 +271,8 @@ class PayoutService
             $this->notificationDispatcher->dispatch(
                 new PayoutDeclinedNotification($payout, $contributor, $reason)
             );
+
+            $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId, $payout->user_id));
         }
 
         return $payout;

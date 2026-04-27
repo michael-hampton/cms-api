@@ -109,9 +109,7 @@
                         <tr>
                             <td style="white-space:nowrap;color:var(--slate);font-size:.78rem;">
                                 <?= !empty($txArr['created_at'])
-                                        ? (is_string($txArr['created_at'])
-                                                ? date('d M Y', strtotime($txArr['created_at']))
-                                                : $txArr['created_at']->format('d M Y'))
+                                        ? $txArr['created_at']->format('d M Y')
                                         : '–' ?>
                             </td>
                             <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -193,7 +191,7 @@
                                 </span>
                             </td>
                             <td style="font-size:.78rem;color:var(--slate);">
-                                <?= $payout->created_at ? date('d M Y', strtotime($payout->created_at)) : '–' ?>
+                                <?= $payout->created_at ? $payout->created_at->format('d M Y') : '–' ?>
                             </td>
                             <td>
                                 <?php if (in_array($status, ['paid', 'approved'])): ?>

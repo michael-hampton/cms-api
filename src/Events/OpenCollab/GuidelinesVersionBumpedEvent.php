@@ -17,6 +17,7 @@ class GuidelinesVersionBumpedEvent
         public readonly Guideline $guideline,
         public readonly int       $siteId,
         public readonly int       $newVersion,
+        public readonly int $userId
     )
     {
     }

@@ -19,6 +19,7 @@ class ContractPublishedEvent
     public function __construct(
         public readonly Contract $contract,
         public readonly int      $siteId,
+        public readonly int $userId
     )
     {
     }
