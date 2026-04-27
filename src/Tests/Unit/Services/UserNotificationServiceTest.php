@@ -4,40 +4,41 @@ namespace App\Tests\Unit\Services;
 
 use App\Models\User;
 use App\Repositories\UserNotificationRepository;
+use App\Services\OpenCollab\UserConsentService;
 use App\Services\UserNotificationService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 
 class UserNotificationServiceTest extends FunctionalTestCase
 {
+    private UserConsentService $userConsentService;
+
     public function test_it_notifies_user(): void
     {
         $user = new User(['id' => 1]);
 
-        $repo = Mockery::mock(UserNotificationRepository::class);
-        $repo->shouldReceive('create')
+        $this->repo->shouldReceive('create')
             ->once()
             ->with(1, 'article_approved', ['article_id' => 10]);
 
-        $service = new UserNotificationService($repo);
+        $this->userConsentService->shouldReceive('hasConsent')
+            ->once()
+            ->andReturn(true);
 
-        $service->notify($user, 'article_approved', ['article_id' => 10]);
-        self::assertTrue(true);
+        $this->service->notify($user, 'article_approved', ['article_id' => 10]);
+        $this->assertTrue(true);
     }
 
     public function test_it_gets_unread_count(): void
     {
         $user = new User(['id' => 1]);
 
-        $repo = Mockery::mock(UserNotificationRepository::class);
-        $repo->shouldReceive('countUnread')
+        $this->repo->shouldReceive('countUnread')
             ->once()
             ->with(1)
             ->andReturn(5);
 
-        $service = new UserNotificationService($repo);
-
-        $count = $service->getUnreadCount($user);
+        $count = $this->service->getUnreadCount($user);
 
         $this->assertEquals(5, $count);
     }
@@ -46,14 +47,23 @@ class UserNotificationServiceTest extends FunctionalTestCase
     {
         $user = new User(['id' => 1]);
 
-        $repo = Mockery::mock(UserNotificationRepository::class);
-        $repo->shouldReceive('markAsRead')
+        $this->service->markAsRead($user, 99);
+        $this->assertTrue(true);
+    }
+
+    public function setUp(): void
+    {
+        parent::setUp();
+
+        $this->repo = Mockery::mock(UserNotificationRepository::class);
+        $this->userConsentService = Mockery::mock(UserConsentService::class);
+        $this->repo->shouldReceive('markAsRead')
             ->once()
             ->with(99, 1);
 
-        $service = new UserNotificationService($repo);
-
-        $service->markAsRead($user, 99);
-        $this->assertTrue(true);
+        $this->service = new UserNotificationService(
+            $this->repo,
+            $this->userConsentService
+        );
     }
 }

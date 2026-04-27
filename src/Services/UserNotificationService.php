@@ -38,9 +38,9 @@ class UserNotificationService
 
     protected function canNotify(User $user, string $type, string $channel = 'in_app'): bool
     {
-        return $this->consentService->isGranted(
-            user: $user,
-            code: $type,
+        return $this->consentService->hasConsent(
+            userId: $user->id,
+            consentTypeCode: $type,
             channel: $channel
         );
     }
