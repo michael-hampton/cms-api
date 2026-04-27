@@ -1,83 +1,81 @@
 <?php
-// src/Repositories/EmailThemeRepository.php
 
 namespace App\Repositories\Newsletters;
 
 use App\Framework\Support\Collection;
-use App\Models\EmailTheme;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
-use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
-use App\Search\SearchEngine;
 
+/**
+ * Thin adapter — all persistence is delegated to NewsletterBrandingRepository.
+ *
+ * The frontend and service layer continue to call methods on this class;
+ * internally every call is forwarded to the branding repository so there
+ * is a single source of truth.
+ */
 class EmailThemeRepository extends Repository
 {
-    private SearchEngine $searchEngine;
-
-    public function __construct()
+    public function __construct(
+        private readonly NewsletterBrandingRepository $brandingRepository,
+    )
     {
-        $config = SearchConfigurationFactory::create('email-theme');
-        $this->searchEngine = new SearchEngine($config);
-
         parent::__construct();
     }
 
-    public function getDefaultForSite(int $siteId): ?EmailTheme
+    // ── Read ──────────────────────────────────────────────────────────────────
+
+    public function getAllBySite(int $siteId): Collection
     {
-        return EmailTheme::default()
-            ->where('site_id', $siteId)
-            ->active()
-            ->first();
+        return $this->brandingRepository->getAllBySite($siteId);
     }
 
     public function getActiveBySite(int $siteId): Collection
     {
-        return EmailTheme::active()
-            ->where('site_id', $siteId)
-            ->orderBy('name', 'asc')
-            ->get();
+        return $this->brandingRepository->getActiveBySite($siteId);
     }
 
-    public function getAllBySite(int $siteId): Collection
+    public function getDefaultForSite(int $siteId): ?NewsletterBrandingConfiguration
     {
-        return EmailTheme::bySite($siteId)
-            ->orderBy('name', 'asc')
-            ->get();
-    }
-
-    public function setDefaultTheme(int $themeId, int $siteId): bool
-    {
-        // Unset all defaults for this site
-        EmailTheme::where('site_id', $siteId)
-            ->update(['is_default' => 0]);
-
-        // Set new default
-        $theme = EmailTheme::find($themeId);
-        if ($theme && $theme->site_id === $siteId) {
-            return $theme->update(['is_default' => true]);
-        }
-
-        return false;
-    }
-
-    public function search(SearchCriteria $criteria): PaginatedResult
-    {
-        $query = EmailTheme::with(['colors', 'fonts', 'assets', 'settings']);
-        return $this->searchEngine->search($query, $criteria);
+        return $this->brandingRepository->getDefaultForSite($siteId);
     }
 
     public function getAlternatives(int $excludeId, int $siteId): Collection
     {
-        return EmailTheme::active()
-            ->where('site_id', $siteId)
-            ->where('id', '!=', $excludeId)
-            ->orderBy('name', 'asc')
-            ->get();
+        return $this->brandingRepository->getAlternatives($excludeId, $siteId);
     }
 
+    public function findBySlug(string $slug, ?int $siteId = null): ?NewsletterBrandingConfiguration
+    {
+        return $this->brandingRepository->findBySlug($slug, $siteId);
+    }
+
+    public function slugExistsForSite(string $slug, int $siteId, ?int $excludeId = null): bool
+    {
+        return $this->brandingRepository->slugExistsForSite($slug, $siteId, $excludeId);
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        return $this->brandingRepository->search($criteria);
+    }
+
+    // ── Write ─────────────────────────────────────────────────────────────────
+
+    public function setDefaultTheme(int $themeId, int $siteId): bool
+    {
+        return $this->brandingRepository->setDefaultTheme($themeId, $siteId);
+    }
+
+    // ── Base Repository overrides ─────────────────────────────────────────────
+
+    /**
+     * find() is inherited from Repository and uses getModelClass() directly,
+     * so it works without delegation.
+     */
     protected function getModelClass(): string
     {
-        return EmailTheme::class;
+        return NewsletterBrandingConfiguration::class;
     }
 }

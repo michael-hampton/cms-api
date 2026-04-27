@@ -1,138 +1,87 @@
 <?php
-// src/Actions/CloneEmailTheme.php
 
 namespace App\Actions\EmailTheme;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Str;
-use App\Models\EmailTheme;
-use App\Models\EmailThemeAsset;
-use App\Models\EmailThemeColor;
-use App\Models\EmailThemeFont;
-use App\Models\EmailThemeSetting;
-use App\Services\Cms\ImageUploadService;
+use App\Models\NewsletterBrandingConfiguration;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
+use App\Resources\EmailThemeResource;
 
+/**
+ * Clones a NewsletterBrandingConfiguration (email_template type) into a new record.
+ *
+ * The clone receives:
+ *   - a new name (caller-supplied or auto-generated)
+ *   - a unique slug derived from the new name
+ *   - is_default = false  (clones never start as default)
+ *   - the full theme_json from the source record
+ *   - clone_history updated to include the source id
+ */
 class CloneEmailTheme
 {
     public function __construct(
-        private Database           $db,
-        private ImageUploadService $imageUploadService
+        private readonly NewsletterBrandingRepository $brandingRepository,
+        private readonly Database                     $db,
     )
     {
     }
 
-    public function handle(int $themeId, ?string $newName = null): array
+    /**
+     * @throws \RuntimeException when the source theme is not found
+     */
+    public function handle(int $sourceId, ?string $newName = null): array
     {
-        return $this->db->transaction(function () use ($themeId, $newName) {
-            $original = EmailTheme::find($themeId);
+        return $this->db->transaction(function () use ($sourceId, $newName) {
+            $source = NewsletterBrandingConfiguration::find($sourceId);
 
-            if (!$original) {
-                throw new \Exception("Email theme with ID {$themeId} not found");
+            if (!$source) {
+                throw new \RuntimeException("Email theme {$sourceId} not found.");
             }
 
-            // Determine new name
-            $cloneName = $newName ?? $original->name . ' (Copy)';
+            $name = $newName ?? ($source->name . ' (Copy)');
+            $slug = $this->ensureUniqueSlug(Str::slug($name), $source->site_id);
 
-            // Generate unique slug
-            $baseSlug = Str::slug($cloneName);
-            $slug = $this->generateUniqueSlug($baseSlug, $original->site_id);
+            // Build clone_history: append the source id to whatever the source already carries
+            $history = $source->clone_history ?? [];
+            $history[] = [
+                'cloned_from' => $source->id,
+                'cloned_at' => date('Y-m-d H:i:s'),
+            ];
 
-            // Clone theme
-            $cloned = EmailTheme::create([
-                'name' => $cloneName,
+            $clone = NewsletterBrandingConfiguration::create([
+                'site_id' => $source->site_id,
+                'newsletter_id' => null,
+                'name' => $name,
                 'slug' => $slug,
-                'description' => $original->description,
-                'is_active' => false, // Start as inactive
-                'is_default' => false, // Never clone as default
-                'site_id' => $original->site_id,
-                'created_by' => $original->created_by
+                'description' => $source->description,
+                'is_active' => $source->is_active,
+                'is_default' => false,
+                'type' => NewsletterBrandingConfiguration::TYPE_EMAIL_TEMPLATE,
+                'theme_json' => $source->theme_json,
+                'logo_url' => $source->logo_url,
+                'header_text' => $source->header_text,
+                'footer_text' => $source->footer_text,
+                'custom_css' => $source->custom_css,
+                'clone_history' => $history,
             ]);
-
-            // Clone colors
-            $colors = EmailThemeColor::where('theme_id', $original->id)->get();
-            foreach ($colors as $color) {
-                EmailThemeColor::create([
-                    'theme_id' => $cloned->id,
-                    'color_key' => $color->color_key,
-                    'color_value' => $color->color_value
-                ]);
-            }
-
-            // Clone fonts
-            $fonts = EmailThemeFont::where('theme_id', $original->id)->get();
-            foreach ($fonts as $font) {
-                EmailThemeFont::create([
-                    'theme_id' => $cloned->id,
-                    'font_key' => $font->font_key,
-                    'font_family' => $font->font_family,
-                    'font_size' => $font->font_size,
-                    'font_weight' => $font->font_weight
-                ]);
-            }
-
-            // Clone assets (including logo)
-            $assets = EmailThemeAsset::where('theme_id', $original->id)->get();
-            foreach ($assets as $asset) {
-                $newAssetUrl = $asset->asset_url;
-
-                // If asset is a logo, duplicate the file
-                if ($asset->asset_key === 'logo' && $asset->asset_url) {
-                    try {
-                        $newAssetUrl = $this->imageUploadService->duplicate($asset->asset_url);
-                    } catch (\Exception $e) {
-                        // If duplication fails, keep original URL
-                    }
-                }
-
-                EmailThemeAsset::create([
-                    'theme_id' => $cloned->id,
-                    'asset_key' => $asset->asset_key,
-                    'asset_type' => $asset->asset_type,
-                    'asset_url' => $newAssetUrl,
-                    'alt_text' => $asset->alt_text,
-                    'width' => $asset->width,
-                    'height' => $asset->height
-                ]);
-            }
-
-            // Clone settings
-            $settings = EmailThemeSetting::where('theme_id', $original->id)->get();
-            foreach ($settings as $setting) {
-                EmailThemeSetting::create([
-                    'theme_id' => $cloned->id,
-                    'setting_key' => $setting->setting_key,
-                    'setting_value' => $setting->setting_value,
-                    'setting_type' => $setting->setting_type
-                ]);
-            }
-
-            // Add clone history
-//            $cloneHistory = $original->clone_history ?? [];
-//            $cloneHistory[] = [
-//                'cloned_from_id' => $original->id,
-//                'cloned_at' => date('Y-m-d H:i:s'),
-//                'cloned_by' => auth()->id() ?? null
-//            ];
-//            $cloned->update(['clone_history' => $cloneHistory]);
 
             return [
                 'success' => true,
-                'theme' => $cloned->fresh()->toArray(),
-                'message' => 'Email theme duplicated successfully'
+                'theme' => EmailThemeResource::make($clone)->toArray(),
             ];
         });
     }
 
-    private function generateUniqueSlug(string $baseSlug, int $siteId, int $counter = 0): string
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private function ensureUniqueSlug(string $slug, int $siteId): string
     {
-        $slug = $counter === 0 ? $baseSlug : "{$baseSlug}-{$counter}";
+        $base = $slug;
+        $counter = 1;
 
-        $exists = EmailTheme::where('slug', $slug)
-            ->where('site_id', $siteId)
-            ->exists();
-
-        if ($exists) {
-            return $this->generateUniqueSlug($baseSlug, $siteId, $counter + 1);
+        while ($this->brandingRepository->slugExistsForSite($slug, $siteId)) {
+            $slug = $base . '-' . $counter++;
         }
 
         return $slug;

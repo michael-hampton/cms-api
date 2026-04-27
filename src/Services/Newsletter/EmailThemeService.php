@@ -5,27 +5,37 @@ namespace App\Services\Newsletter;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
-use App\Models\EmailTheme;
-use App\Models\EmailThemeColor;
-use App\Models\EmailThemeFont;
-use App\Repositories\Cms\EmailThemeAssetRepository;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Repositories\Newsletters\EmailThemeRepository;
-use App\Repositories\Newsletters\EmailThemeSettingRepository;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Search\PaginatedResult;
 use App\Search\SearchCriteria;
 use App\Services\Cms\ImageUploadService;
 
+/**
+ * Thin service adapter.
+ *
+ * All EmailTheme controller endpoints continue to call this class unchanged.
+ * Internally every operation delegates to NewsletterBrandingRepository so
+ * there is no duplicated persistence logic.
+ *
+ * Theme data (colors / fonts / assets / settings) is stored in and read from
+ * theme_json on NewsletterBrandingConfiguration.
+ */
 class EmailThemeService
 {
     public function __construct(
-        private readonly Database                    $db,
+        private readonly Database                     $db,
         private readonly EmailThemeRepository        $repository,
+        private readonly NewsletterBrandingRepository $brandingRepository,
         private readonly ImageUploadService          $imageUploadService,
-        private readonly EmailThemeAssetRepository   $emailThemeAssetRepository,
-        private readonly EmailThemeSettingRepository $emailThemeSettingRepository
     )
     {
     }
+
+    // =========================================================================
+    // Read
+    // =========================================================================
 
     public function getAllThemes(int $siteId): Collection
     {
@@ -37,68 +47,41 @@ class EmailThemeService
         return $this->repository->getActiveBySite($siteId);
     }
 
-    public function getThemeById(int $id): ?EmailTheme
+    public function getThemeById(int $id): ?NewsletterBrandingConfiguration
     {
         return $this->repository->find($id);
     }
 
-    public function getThemeBySlug(string $slug, int $siteId): ?EmailTheme
+    public function getThemeBySlug(string $slug, int $siteId): ?NewsletterBrandingConfiguration
     {
         return $this->repository->findBySlug($slug, $siteId);
     }
 
-    public function getDefaultTheme(int $siteId): ?EmailTheme
+    public function getDefaultTheme(int $siteId): ?NewsletterBrandingConfiguration
     {
         return $this->repository->getDefaultForSite($siteId);
     }
 
+    public function getAlternativeThemes(int $excludeId, int $siteId): Collection
+    {
+        return $this->repository->getAlternatives($excludeId, $siteId);
+    }
+
+    public function search(SearchCriteria $criteria): PaginatedResult
+    {
+        return $this->repository->search($criteria);
+    }
+
     /**
-     * Return the resolved variable map for a theme.
-     *
-     * Used by the frontend editor to populate its initial state from a
-     * saved theme without re-deriving the structure itself.
+     * Return the resolved variable map for a theme — used by the frontend
+     * editor to populate its initial state without re-deriving the structure.
      */
     public function getThemeVariables(int $id): array
     {
-        $theme = $this->repository->find($id, ['assets', 'colors', 'fonts', 'settings']);
+        $theme = $this->repository->find($id);
 
         if (!$theme) {
-            throw new \Exception('Theme not found');
-        }
-
-        $colors = [];
-        foreach ($theme->colors as $item) {
-            $colors[$item->color_key] = $item->color_value;
-        }
-
-        $fonts = [];
-        foreach ($theme->fonts as $item) {
-            $fonts[$item->font_key] = [
-                'family' => $item->font_family,
-                'size' => $item->font_size,
-                'weight' => $item->font_weight,
-            ];
-        }
-
-        $settings = [];
-        foreach ($theme->settings as $item) {
-            $raw = $item->setting_value;
-            $settings[$item->setting_key] = match ($item->setting_type) {
-                'boolean' => in_array(strtolower((string)$raw), ['1', 'true', 'yes'], true),
-                'number' => (int)$raw,
-                default => $raw,
-            };
-        }
-
-        $assets = [];
-        foreach ($theme->assets as $item) {
-            $assets[$item->asset_key] = [
-                'type' => $item->asset_type,
-                'url' => $item->asset_url,
-                'alt' => $item->alt_text,
-                'width' => $item->width,
-                'height' => $item->height,
-            ];
+            throw new \RuntimeException('Theme not found');
         }
 
         return [
@@ -108,66 +91,51 @@ class EmailThemeService
             'description' => $theme->description,
             'is_active' => $theme->is_active,
             'is_default' => $theme->is_default,
-            'colors' => $colors,
-            'fonts' => $fonts,
-            'settings' => $settings,
-            'assets' => $assets,
+            'colors' => $theme->getColors(),
+            'fonts' => $theme->getFonts(),
+            'settings' => $theme->getSettings(),
+            'assets' => $theme->getAssets(),
         ];
     }
 
-    public function createTheme(array $data, int $siteId, $logoFile = null): EmailTheme
+    // =========================================================================
+    // Write
+    // =========================================================================
+
+    public function createTheme(array $data, int $siteId, mixed $logoFile = null): NewsletterBrandingConfiguration
     {
         return $this->db->transaction(function () use ($data, $siteId, $logoFile) {
             if (empty($data['slug'])) {
-                $data['slug'] = Str::slug($data['name']);
+                $data['slug'] = Str::slug($data['name'] ?? '');
             }
 
             $data['slug'] = $this->ensureUniqueSlug($data['slug'], $siteId);
             $data['site_id'] = $siteId;
+            $data['type'] = NewsletterBrandingConfiguration::TYPE_EMAIL_TEMPLATE;
 
-            if ($logoFile && $logoFile->isValid()) {
-                $logoPath = $this->imageUploadService->upload($logoFile);
-                if (!isset($data['assets'])) {
-                    $data['assets'] = [];
-                }
-                $data['assets']['logo'] = array_merge(
-                    $data['assets']['logo'] ?? [],
-                    ['url' => $logoPath]
-                );
-            }
+            $data = $this->uploadLogoIfPresent($data, $logoFile);
 
             if ($data['is_default'] ?? false) {
-                EmailTheme::bySite($siteId)->update(['is_default' => false]);
+                $this->clearSiteDefaults($siteId);
             }
 
-            $colors = $data['colors'] ?? [];
-            $fonts = $data['fonts'] ?? [];
-            $assets = $data['assets'] ?? [];
-            $settings = $data['settings'] ?? [];
+            $themeJson = $this->extractThemeJson($data);
+            $record = $this->buildRecord($data, $themeJson);
 
-            unset($data['colors'], $data['fonts'], $data['assets'], $data['settings']);
-
-            $theme = $this->repository->create($data);
-
-            $this->syncColors($theme->id, $colors);
-            $this->syncFonts($theme->id, $fonts);
-            $this->syncAssets($theme->id, $assets);
-            $this->syncSettings($theme->id, $settings);
-
-            return $this->repository->find($theme->id, ['assets', 'colors', 'fonts', 'settings']);
+            return $this->repository->create($record);
         });
     }
 
-    public function updateTheme(int $id, array $data, $logoFile = null): EmailTheme
+    public function updateTheme(int $id, array $data, mixed $logoFile = null): NewsletterBrandingConfiguration
     {
         return $this->db->transaction(function () use ($id, $data, $logoFile) {
             $theme = $this->repository->find($id);
 
             if (!$theme) {
-                throw new \Exception('Theme not found');
+                throw new \RuntimeException('Theme not found');
             }
 
-            if (isset($data['name']) && $data['name'] !== $theme->name) {
+            if (isset($data['name']) && $data['name'] !== $theme->name && !isset($data['slug'])) {
                 $data['slug'] = $this->ensureUniqueSlug(
                     Str::slug($data['name']),
                     $theme->site_id,
@@ -175,51 +143,31 @@ class EmailThemeService
                 );
             }
 
-            if ($logoFile && $logoFile->isValid()) {
-                $oldAssets = $theme->getAssets();
-                if (isset($oldAssets['logo']['url'])) {
-                    $this->imageUploadService->delete($oldAssets['logo']['url']);
-                }
-
-                $logoPath = $this->imageUploadService->upload($logoFile);
-                if (!isset($data['assets'])) {
-                    $data['assets'] = [];
-                }
-                $data['assets']['logo'] = array_merge(
-                    $data['assets']['logo'] ?? [],
-                    ['url' => $logoPath]
-                );
-            }
+            $data = $this->uploadLogoIfPresent($data, $logoFile, $theme);
 
             if (($data['is_default'] ?? false) && !$theme->is_default) {
-                EmailTheme::bySite($theme->site_id)
-                    ->where('id', '!=', $id)
-                    ->update(['is_default' => false]);
+                $this->clearSiteDefaults($theme->site_id, $id);
             }
 
-            $colors = $data['colors'] ?? null;
-            $fonts = $data['fonts'] ?? null;
-            $assets = $data['assets'] ?? null;
-            $settings = $data['settings'] ?? null;
+            // Merge incoming theme_json sub-keys with what is already stored
+            $existingJson = $theme->theme_json ?? [];
+            $incomingJson = $this->extractThemeJson($data);
+            $mergedJson = $this->mergeThemeJson($existingJson, $incomingJson, $data);
 
-            unset($data['colors'], $data['fonts'], $data['assets'], $data['settings']);
+            $updates = $this->buildScalarUpdates($data);
 
-            $theme = $this->repository->update($id, $data);
-
-            if ($colors !== null) {
-                $this->syncColors($id, $colors);
-            }
-            if ($fonts !== null) {
-                $this->syncFonts($id, $fonts);
-            }
-            if ($assets !== null) {
-                $this->syncAssets($id, $assets);
-            }
-            if ($settings !== null) {
-                $this->syncSettings($id, $settings);
+            if (!empty($mergedJson)) {
+                $updates['theme_json'] = $mergedJson;
             }
 
-            return $theme->fresh();
+            // Propagate logo_url from assets into the top-level convenience column
+            if (isset($mergedJson['assets']['logo']['url'])) {
+                $updates['logo_url'] = $mergedJson['assets']['logo']['url'];
+            }
+
+            $this->repository->update($id, $updates);
+
+            return $this->repository->find($id);
         });
     }
 
@@ -228,11 +176,13 @@ class EmailThemeService
         $theme = $this->repository->find($id);
 
         if (!$theme) {
-            throw new \Exception('Theme not found');
+            throw new \RuntimeException('Theme not found');
         }
 
         if ($theme->is_default) {
-            throw new \Exception('Cannot delete default theme. Please set another theme as default first.');
+            throw new \RuntimeException(
+                'Cannot delete the default theme. Please set another theme as default first.'
+            );
         }
 
         $assets = $theme->getAssets();
@@ -240,107 +190,150 @@ class EmailThemeService
             $this->imageUploadService->delete($assets['logo']['url']);
         }
 
-        return $theme->delete();
+        return (bool)$theme->delete();
     }
 
     public function setDefaultTheme(int $themeId, int $siteId): bool
     {
-        return $this->repository->setDefaultTheme($themeId, $siteId);
+        return $this->brandingRepository->setDefaultTheme($themeId, $siteId);
     }
 
-    public function search(SearchCriteria $criteria): PaginatedResult
+    // =========================================================================
+    // Private helpers
+    // =========================================================================
+
+    /**
+     * Upload a logo file and inject the resulting URL into $data['assets']['logo'].
+     * When a previous logo URL exists on $existingTheme, it is deleted first.
+     */
+    private function uploadLogoIfPresent(
+        array                            $data,
+        mixed                            $logoFile,
+        ?NewsletterBrandingConfiguration $existingTheme = null
+    ): array
     {
-        return $this->repository->search($criteria);
+        if (!$logoFile || !$logoFile->isValid()) {
+            return $data;
+        }
+
+        if ($existingTheme) {
+            $oldAssets = $existingTheme->getAssets();
+            if (isset($oldAssets['logo']['url'])) {
+                $this->imageUploadService->delete($oldAssets['logo']['url']);
+            }
+        }
+
+        $logoPath = $this->imageUploadService->upload($logoFile);
+
+        $data['assets'] = $data['assets'] ?? [];
+        $data['assets']['logo'] = array_merge(
+            $data['assets']['logo'] ?? [],
+            ['url' => $logoPath]
+        );
+
+        return $data;
     }
 
-    public function getAlternativeThemes(int $excludeId, int $siteId): Collection
+    /**
+     * Extract colors / fonts / assets / settings from a flat data array and
+     * return them as a theme_json array.  Any sub-key present is included;
+     * absent sub-keys are omitted so callers can do partial updates.
+     */
+    private function extractThemeJson(array $data): array
     {
-        return $this->repository->getAlternatives($excludeId, $siteId);
+        $json = [];
+
+        foreach (['colors', 'fonts', 'assets', 'settings'] as $key) {
+            if (isset($data[$key])) {
+                $json[$key] = $data[$key];
+            }
+        }
+
+        return $json;
     }
 
-    // -------------------------------------------------------------------------
-    // Private sync helpers
-    // -------------------------------------------------------------------------
+    /**
+     * Merge incoming theme_json partial update over the existing stored value.
+     * Sub-keys absent from the incoming payload are preserved from existing.
+     * If incoming payload contains a sub-key it fully replaces that sub-key.
+     */
+    private function mergeThemeJson(array $existing, array $incoming, array $data): array
+    {
+        if (empty($incoming)) {
+            return $existing;
+        }
+
+        $merged = $existing;
+
+        foreach (['colors', 'fonts', 'assets', 'settings'] as $key) {
+            if (array_key_exists($key, $data)) {
+                // Explicit null means "clear this sub-key"
+                if ($data[$key] === null) {
+                    unset($merged[$key]);
+                } else {
+                    $merged[$key] = $incoming[$key];
+                }
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Build the scalar columns to persist.  Strips theme_json sub-key fields
+     * from $data so they are not written as top-level columns.
+     */
+    private function buildScalarUpdates(array $data): array
+    {
+        $scalar = array_diff_key($data, array_flip(['colors', 'fonts', 'assets', 'settings']));
+
+        // logo_url is derived from assets — never set it directly from input
+        unset($scalar['logo_url']);
+
+        return $scalar;
+    }
+
+    /**
+     * Assemble the full record array for a new theme.
+     */
+    private function buildRecord(array $data, array $themeJson): array
+    {
+        $scalar = $this->buildScalarUpdates($data);
+
+        $record = array_merge($scalar, [
+            'type' => NewsletterBrandingConfiguration::TYPE_EMAIL_TEMPLATE,
+            'theme_json' => $themeJson,
+        ]);
+
+        // Propagate logo_url into the convenience column
+        if (isset($themeJson['assets']['logo']['url'])) {
+            $record['logo_url'] = $themeJson['assets']['logo']['url'];
+        }
+
+        return $record;
+    }
+
+    private function clearSiteDefaults(int $siteId, ?int $exceptId = null): void
+    {
+        $query = NewsletterBrandingConfiguration::emailTemplates()
+            ->bySite($siteId);
+
+        if ($exceptId !== null) {
+            $query->where('id', '!=', $exceptId);
+        }
+
+        $query->update(['is_default' => 0]);
+    }
 
     private function ensureUniqueSlug(string $slug, int $siteId, ?int $excludeId = null): string
     {
-        $originalSlug = $slug;
+        $base = $slug;
         $counter = 1;
 
-        while (true) {
-            $query = EmailTheme::bySlug($slug)->where('site_id', $siteId);
-
-            if ($excludeId) {
-                $query->where('id', '!=', $excludeId);
-            }
-
-            if (!$query->exists()) {
-                break;
-            }
-
-            $slug = $originalSlug . '-' . $counter++;
+        while ($this->repository->slugExistsForSite($slug, $siteId, $excludeId)) {
+            $slug = $base . '-' . $counter++;
         }
 
         return $slug;
-    }
-
-    private function syncColors(int $themeId, array $colors): void
-    {
-        EmailThemeColor::where('theme_id', $themeId)->delete();
-
-        foreach ($colors as $key => $value) {
-            EmailThemeColor::create([
-                'theme_id' => $themeId,
-                'color_key' => $key,
-                'color_value' => $value,
-            ]);
-        }
-    }
-
-    private function syncFonts(int $themeId, array $fonts): void
-    {
-        EmailThemeFont::where('theme_id', $themeId)->delete();
-
-        foreach ($fonts as $key => $font) {
-            EmailThemeFont::create([
-                'theme_id' => $themeId,
-                'font_key' => $key,
-                'font_family' => $font['family'] ?? '',
-                'font_size' => $font['size'] ?? null,
-                'font_weight' => $font['weight'] ?? null,
-            ]);
-        }
-    }
-
-    private function syncAssets(int $themeId, array $assets): void
-    {
-        $this->emailThemeAssetRepository->deleteAssetsForTheme($themeId);
-
-        foreach ($assets as $key => $asset) {
-            $this->emailThemeAssetRepository->create([
-                'theme_id' => $themeId,
-                'asset_key' => $key,
-                'asset_type' => $asset['type'] ?? 'image',
-                'asset_url' => $asset['url'],
-                'alt_text' => $asset['alt'] ?? null,
-                'width' => $asset['width'] ?? null,
-                'height' => $asset['height'] ?? null,
-            ]);
-        }
-    }
-
-    private function syncSettings(int $themeId, array $settings): void
-    {
-        $this->emailThemeSettingRepository->deleteSettingsForTheme($themeId);
-
-        foreach ($settings as $key => $value) {
-            $type = is_bool($value) ? 'boolean' : (is_numeric($value) ? 'number' : 'string');
-            $this->emailThemeSettingRepository->create([
-                'theme_id' => $themeId,
-                'setting_key' => $key,
-                'setting_value' => (string)$value,
-                'setting_type' => $type,
-            ]);
-        }
     }
 }

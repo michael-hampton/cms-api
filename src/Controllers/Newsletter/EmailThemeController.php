@@ -1,5 +1,4 @@
 <?php
-// src/Controllers/EmailThemeController.php
 
 namespace App\Controllers\Newsletter;
 
@@ -22,16 +21,26 @@ use App\Services\Newsletter\EmailThemePreviewService;
 use App\Services\Newsletter\EmailThemeService;
 use Exception;
 
+/**
+ * All endpoint signatures are unchanged — the frontend requires no updates.
+ *
+ * Internally, EmailThemeService and EmailThemeRepository are now thin adapters
+ * over NewsletterBrandingRepository/NewsletterBrandingConfiguration.
+ */
 class EmailThemeController extends Controller
 {
     public function __construct(
-        private EmailThemeService             $emailThemeService,
-        private EmailThemePreviewService $emailThemePreviewService,
-        private readonly EmailThemeRepository $emailThemeRepository
+        private readonly EmailThemeService        $emailThemeService,
+        private readonly EmailThemePreviewService $emailThemePreviewService,
+        private readonly EmailThemeRepository     $emailThemeRepository,
     )
     {
         parent::__construct();
     }
+
+    // =========================================================================
+    // CRUD
+    // =========================================================================
 
     public function index(Request $request, string $site): JsonResponse
     {
@@ -52,7 +61,6 @@ class EmailThemeController extends Controller
         try {
             $data = $request->validated();
             $siteId = Site::resolveSite($site);
-
             $logoFile = $request->hasFile('logo') ? $request->file('logo') : null;
 
             $theme = $this->emailThemeService->createTheme($data, $siteId, $logoFile);
@@ -110,17 +118,19 @@ class EmailThemeController extends Controller
     public function destroy(int $id, Request $request, string $site): JsonResponse
     {
         try {
-            $result = $this->emailThemeService->deleteTheme($id);
-
-            if (!$result) {
-                return $this->errorResponse('Email theme not found', 404);
-            }
+            $this->emailThemeService->deleteTheme($id);
 
             return $this->successResponse('Email theme deleted successfully');
         } catch (Exception $e) {
-            return $this->errorResponse($e->getMessage(), 404);
+            // deleteTheme throws RuntimeException for not-found and for default-theme guard
+            $status = str_contains($e->getMessage(), 'not found') ? 404 : 500;
+            return $this->errorResponse($e->getMessage(), $status);
         }
     }
+
+    // =========================================================================
+    // Theme palette queries
+    // =========================================================================
 
     public function getActive(string $site): JsonResponse
     {
@@ -166,12 +176,14 @@ class EmailThemeController extends Controller
         }
     }
 
+    // =========================================================================
+    // Bulk operations
+    // =========================================================================
+
     public function duplicate(int $id, Request $request, string $site): JsonResponse
     {
         try {
-            $data = $request->all();
-            $newName = $data['name'] ?? null;
-
+            $newName = $request->all()['name'] ?? null;
             $cloneEmailTheme = Container::getInstance()->make(CloneEmailTheme::class);
             $results = $cloneEmailTheme->handle($id, $newName);
 
@@ -206,12 +218,12 @@ class EmailThemeController extends Controller
         }
     }
 
-    // -------------------------------------------------------------------------
+    // =========================================================================
     // Preview endpoints
-    // -------------------------------------------------------------------------
+    // =========================================================================
 
     /**
-     * Render a live preview from an existing saved theme.
+     * Render a live preview from a saved theme.
      *
      * GET /cms/{site}/email-themes/{id}/preview?sample=default|minimal|promotion
      */
@@ -237,7 +249,6 @@ class EmailThemeController extends Controller
      * Render a live preview from raw (unsaved) editor data.
      *
      * POST /cms/{site}/email-themes/preview
-     *
      * Body: { theme: {...}, sample: 'default'|'minimal'|'promotion' }
      */
     public function previewFromData(Request $request): JsonResponse

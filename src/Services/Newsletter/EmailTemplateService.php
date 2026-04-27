@@ -9,6 +9,7 @@ use App\Framework\Support\Str;
 use App\Models\EmailTemplate;
 use App\Models\EmailTheme;
 use App\Models\Model;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Models\NewsletterLayout;
 use App\Repositories\Newsletters\EmailTemplateRepository;
 use App\Repositories\Newsletters\EmailTemplateVersionRepository;
@@ -287,7 +288,7 @@ class EmailTemplateService
         return $this->buildPreviewResult($html);
     }
 
-    private function resolveTheme(NewsletterLayout $template): ?EmailTheme
+    private function resolveTheme(NewsletterLayout $template): ?NewsletterBrandingConfiguration
     {
         if ($template->use_default_theme !== false) {
             return null; // EmailTemplateRenderer falls back to site default when null
@@ -299,7 +300,7 @@ class EmailTemplateService
     /**
      * Render a template to HTML for dispatch (used by email send pipeline).
      */
-    public function render(int $id, array $runtimeData = [], ?EmailTheme $theme = null): string
+    public function render(int $id, array $runtimeData = [], ?NewsletterBrandingConfiguration $theme = null): string
     {
         $template = $this->repository->find($id);
 

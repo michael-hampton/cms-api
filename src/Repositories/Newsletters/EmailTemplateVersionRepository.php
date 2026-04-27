@@ -30,16 +30,6 @@ class EmailTemplateVersionRepository extends Repository
     // ── Read ──────────────────────────────────────────────────────────────────
 
     /**
-     * Find a specific version by its sequential number within a template.
-     */
-    public function findByNumber(int $templateId, int $versionNumber): ?EmailTemplateVersion
-    {
-        return EmailTemplateVersion::where('email_template_id', $templateId)
-            ->where('version_number', $versionNumber)
-            ->first();
-    }
-
-    /**
      * The highest version_number recorded for a template (0 when none exists).
      */
     public function maxVersionNumber(int $templateId): int
@@ -62,6 +52,6 @@ class EmailTemplateVersionRepository extends Repository
 
     protected function getModelClass(): string
     {
-        return EmailTemplateVersion::class;
+        return NewsletterLayoutVersion::class;
     }
 }

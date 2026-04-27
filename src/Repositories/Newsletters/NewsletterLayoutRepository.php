@@ -156,6 +156,6 @@ class NewsletterLayoutRepository extends Repository
 
         // Replace with however your repository accesses its base query builder,
         // e.g. Campaign::query() or $this->model->newQuery()
-        return $engine->search($this->query(), $criteria);
+        return $engine->search($this->where('type', 'newsletter'), $criteria);
     }
 }

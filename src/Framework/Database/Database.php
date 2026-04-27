@@ -453,6 +453,12 @@ class Database
                 }
             }
 
+            $params = array_map(function ($value) {
+                return $value instanceof \DateTimeInterface
+                    ? $value->format('Y-m-d H:i:s')
+                    : $value;
+            }, $params);
+
             if ($isSchemaQuery) {
                 foreach ($params as $key => $value) {
                     $escaped = str_replace("'", "''", $value);
@@ -481,10 +487,6 @@ class Database
             return $stmt;
 
         } catch (\PDOException $e) {
-            echo $sql;
-            print_r($params);
-            echo $e->getMessage();
-            die('no');
             Logger::error('Database query failed', [
                 'sql' => $sql,
                 'params' => $params,

@@ -4,7 +4,9 @@
 namespace App\Tests\Unit\Repositories\Cms;
 
 use App\Models\EmailTheme;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Repositories\Newsletters\EmailThemeRepository;
+use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -16,11 +18,12 @@ class EmailThemeRepositoryTest extends RepositoryTestCase
 
     public function test_it_can_find_theme_by_slug_and_site(): void
     {
-        $theme = EmailTheme::create([
+        $theme = NewsletterBrandingConfiguration::create([
             'name' => 'Test Theme',
             'slug' => 'test-theme',
             'site_id' => $this->siteId,
-            'is_active' => true
+            'is_active' => true,
+            'type' => 'email_template'
         ]);
 
         $found = $this->repository->findBySlug('test-theme', $this->siteId);
@@ -31,12 +34,13 @@ class EmailThemeRepositoryTest extends RepositoryTestCase
 
     public function test_get_default_for_site(): void
     {
-        $default = EmailTheme::create([
+        $default = NewsletterBrandingConfiguration::create([
             'name' => 'Default',
             'slug' => 'default',
             'site_id' => $this->siteId,
             'is_default' => true,
-            'is_active' => true
+            'is_active' => true,
+            'type' => 'email_template'
         ]);
 
         $found = $this->repository->getDefaultForSite($this->siteId);
@@ -48,9 +52,9 @@ class EmailThemeRepositoryTest extends RepositoryTestCase
 
     public function test_get_active_by_site(): void
     {
-        EmailTheme::create(['name' => 'Active 1', 'slug' => 'active-1', 'site_id' => $this->siteId, 'is_active' => true]);
-        EmailTheme::create(['name' => 'Active 2', 'slug' => 'active-2', 'site_id' => $this->siteId, 'is_active' => true]);
-        EmailTheme::create(['name' => 'Inactive', 'slug' => 'inactive', 'site_id' => $this->siteId, 'is_active' => false]);
+        NewsletterBrandingConfiguration::create(['name' => 'Active 1', 'slug' => 'active-1', 'site_id' => $this->siteId, 'is_active' => true, 'type' => 'email_template']);
+        NewsletterBrandingConfiguration::create(['name' => 'Active 2', 'slug' => 'active-2', 'site_id' => $this->siteId, 'is_active' => true, 'type' => 'email_template']);
+        NewsletterBrandingConfiguration::create(['name' => 'Inactive', 'slug' => 'inactive', 'site_id' => $this->siteId, 'is_active' => false, 'type' => 'email_template']);
 
         $active = $this->repository->getActiveBySite($this->siteId);
 
@@ -59,8 +63,8 @@ class EmailThemeRepositoryTest extends RepositoryTestCase
 
     public function test_set_default_theme(): void
     {
-        $theme1 = EmailTheme::create(['name' => 'Theme 1', 'slug' => 'theme-1', 'site_id' => $this->siteId, 'is_default' => true, 'is_active' => true]);
-        $theme2 = EmailTheme::create(['name' => 'Theme 2', 'slug' => 'theme-2', 'site_id' => $this->siteId, 'is_default' => false, 'is_active' => true]);
+        $theme1 = NewsletterBrandingConfiguration::create(['name' => 'Theme 1', 'slug' => 'theme-1', 'site_id' => $this->siteId, 'is_default' => true, 'is_active' => true, 'type' => 'email_template']);
+        $theme2 = NewsletterBrandingConfiguration::create(['name' => 'Theme 2', 'slug' => 'theme-2', 'site_id' => $this->siteId, 'is_default' => false, 'is_active' => true, 'type' => 'email_template']);
 
         $result = $this->repository->setDefaultTheme($theme2->id, $this->siteId);
 
@@ -76,7 +80,7 @@ class EmailThemeRepositoryTest extends RepositoryTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = new EmailThemeRepository();
+        $this->repository = new EmailThemeRepository(app(NewsletterBrandingRepository::class));
     }
 
 //    public function test_search_returns_paginated_results(): void

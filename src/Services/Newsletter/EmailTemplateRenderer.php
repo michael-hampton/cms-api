@@ -2,6 +2,7 @@
 
 namespace App\Services\Newsletter;
 
+use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
 use App\Models\EmailTheme;
 use App\Models\Newsletter;
@@ -12,23 +13,21 @@ use App\Services\Newsletter\Renderers\EmailBlockRendererRegistry;
 use App\Services\Newsletter\Services\BlockDataFactory;
 
 /**
- * Renders an EmailTemplate's block array to a complete email HTML document.
+ * Renders an email template (NewsletterLayout with type='email_template') to a
+ * complete HTML document.
  *
- * This class is now a thin adapter over the shared newsletter rendering
- * pipeline (BlockDataFactory + EmailBlockRendererRegistry + LayoutBlockVariableResolver).
- * All per-block rendering logic lives in those collaborators, not here.
+ * This class is a thin adapter. All per-block rendering is handled by the
+ * shared newsletter pipeline:
+ *   BlockDataFactory → EmailBlockRendererRegistry → LayoutBlockVariableResolver
  *
- * Responsibilities:
- *   - Visible block filtering
- *   - Native block rendering (spacer, order_summary, ad_slot)
- *   - Delegating all other blocks to the shared newsletter renderer pipeline
- *   - Theme application and email chrome wrapping
+ * The only logic that lives here is:
+ *   - Building the NewsletterRenderContext from the flat email-template model
+ *   - Dispatching native structural blocks (spacer, order_summary, ad_slot)
+ *   - Translating the two aliased type names (button→cta, product_card→product)
+ *   - Assembling the email chrome (header, footer, doctype)
  *
- * Does NOT:
- *   - Contain its own type registry (EmailTemplateBlockRegistry is deleted)
- *   - Duplicate BlockDataFactory's normalisation logic
- *   - Duplicate LayoutBlockVariableResolver's interpolation logic
- *   - Persist anything or send emails
+ * EmailTemplateBlockRegistry has been deleted — its tiny normalisation map is
+ * expressed in normaliseType() / normaliseData() below.
  */
 class EmailTemplateRenderer
 {
@@ -45,28 +44,28 @@ class EmailTemplateRenderer
     // ── Public API ────────────────────────────────────────────────────────────
 
     /**
-     * Render a saved template with a live runtime data map.
+     * Render a saved email template layout.
      */
     public function render(
-        NewsletterLayout $template,
-        array         $runtimeData = [],
-        ?EmailTheme   $themeOverride = null,
+        NewsletterLayout $layout,
+        array            $runtimeData = [],
+        ?EmailTheme      $themeOverride = null,
     ): string
     {
-        $theme = $themeOverride ?? $template->theme;
-        $context = $this->buildRenderContext($template->site_id, $runtimeData);
+        $theme = $themeOverride ?? ($layout->theme_id ? null : null); // resolved by service
+        $context = $this->buildRenderContext($layout->site_id, $layout, $runtimeData);
 
-        $this->adResolver->warmCache($template->site_id, $context->member);
+        $this->adResolver->warmCache($layout->site_id, $context->member);
 
         $bodyHtml = $this->renderBlocks(
-            $template->getVisibleBlocks(),
+            $layout->getVisibleBlocks(),
             $runtimeData,
-            $template->site_id,
+            $layout->site_id,
             $theme,
             $context,
         );
 
-        return $this->wrapInChrome($bodyHtml, $theme, $template->name);
+        return $this->wrapInChrome($bodyHtml, $theme, $layout->name);
     }
 
     /**
@@ -79,7 +78,14 @@ class EmailTemplateRenderer
         ?EmailTheme $theme = null,
     ): string
     {
-        $context = $this->buildRenderContext($siteId, $runtimeData);
+        // Build a minimal layout shell so we can populate a render context.
+        $shell = new NewsletterLayout();
+        $shell->id = 0;
+        $shell->name = 'Preview';
+        $shell->slug = 'preview';
+        $shell->site_id = $siteId;
+
+        $context = $this->buildRenderContext($siteId, $shell, $runtimeData);
         $this->adResolver->warmCache($siteId, $context->member);
 
         $visible = array_values(array_filter($blocks, fn($b) => ($b['visible'] ?? true) === true));
@@ -89,8 +95,8 @@ class EmailTemplateRenderer
     }
 
     /**
-     * Extract all {{ variable }} tokens from a block list (used by the frontend
-     * to show unresolved token counts).
+     * Extract all {{ variable }} tokens from a block list.
+     * Used by the frontend to show unresolved token counts.
      *
      * @return string[]
      */
@@ -119,14 +125,21 @@ class EmailTemplateRenderer
         return array_keys($tokens);
     }
 
-    // ── Internal rendering ────────────────────────────────────────────────────
+    // ── Rendering ─────────────────────────────────────────────────────────────
 
-    private function buildRenderContext(int $siteId, array $runtimeData): NewsletterRenderContext
+    private function buildRenderContext(
+        int              $siteId,
+        NewsletterLayout $layout,
+        array            $runtimeData,
+    ): NewsletterRenderContext
     {
+        // The newsletter pipeline expects a Newsletter model for context.
+        // We construct a minimal one from the layout so variable resolution
+        // (newsletter.title etc.) works correctly in block content.
         $newsletter = new Newsletter();
-        $newsletter->id = (int)($runtimeData['newsletter.id'] ?? 0);
-        $newsletter->title = (string)($runtimeData['newsletter.title'] ?? 'Email Template');
-        $newsletter->slug = (string)($runtimeData['newsletter.slug'] ?? 'email-template');
+        $newsletter->id = $layout->id;
+        $newsletter->title = $layout->name;
+        $newsletter->slug = $layout->slug;
         $newsletter->template = 'email-template';
         $newsletter->interval = 'adhoc';
         $newsletter->design_config = [];
@@ -159,11 +172,7 @@ class EmailTemplateRenderer
 
         foreach ($blocks as $block) {
             $type = $block['type'] ?? '';
-            $data = $block['data'] ?? [];
-
-            // Resolve {{ variable }} placeholders before hydration.
-            $data = $this->variableResolver->resolveBlock($data, $variables);
-
+            $data = $this->variableResolver->resolveBlock($block['data'] ?? [], $variables);
             $html = $this->renderSingleBlock($type, $data, $siteId, $theme, $context);
 
             if ($html !== null && $html !== '') {
@@ -175,14 +184,13 @@ class EmailTemplateRenderer
     }
 
     /**
-     * Dispatch a single block to the appropriate renderer.
+     * Dispatch a single block.
      *
-     * Native structural blocks (spacer, two_column, order_summary, ad_slot) are
-     * handled inline here. Everything else goes through the shared newsletter
-     * pipeline — BlockDataFactory → EmailBlockRendererRegistry — exactly as the
-     * newsletter slot renderer does.
+     * Native structural blocks are handled inline. All other blocks go through
+     * the shared newsletter pipeline (BlockDataFactory → EmailBlockRendererRegistry)
+     * exactly as SlotRenderer does — ensuring zero duplication of render logic.
      *
-     * Returns null to signal "omit this block entirely" (e.g. ad with no fill).
+     * Returns null to signal "omit this block entirely".
      */
     private function renderSingleBlock(
         string                  $type,
@@ -192,28 +200,26 @@ class EmailTemplateRenderer
         NewsletterRenderContext $context,
     ): ?string
     {
-        // ── Native structural blocks ──────────────────────────────────────────
+        // Native structural blocks
         if ($this->isNative($type)) {
             return match ($type) {
                 'spacer' => $this->renderSpacer($data),
                 'single_column',
-                'two_column' => null,   // transparent structural wrappers
+                'two_column' => null,
                 'order_summary' => $this->renderOrderSummary($data),
                 'ad_slot' => $this->renderAdSlot($data, $siteId, $context),
                 default => null,
             };
         }
 
-        // ── Skip unknown types ────────────────────────────────────────────────
-        if (!$this->rendererRegistry->has($type) && $this->normaliseType($type) === null) {
+        // Resolve any type alias (button → cta, product_card → product)
+        $pipelineType = $this->normaliseType($type);
+        $pipelineData = $this->normaliseData($type, $data);
+
+        if (!$this->rendererRegistry->has($pipelineType)) {
             $this->logger->warning('EmailTemplateRenderer: unknown block type, skipped', ['type' => $type]);
             return null;
         }
-
-        // ── Shared newsletter pipeline ────────────────────────────────────────
-        // Normalise template-specific type aliases (e.g. 'button' → 'cta').
-        $pipelineType = $this->normaliseType($type) ?? $type;
-        $pipelineData = $this->normaliseData($type, $data);
 
         try {
             $blockData = $this->blockDataFactory->create($pipelineType, $pipelineData);
@@ -229,11 +235,8 @@ class EmailTemplateRenderer
         }
     }
 
-    // ── Type alias resolution ─────────────────────────────────────────────────
+    // ── Type normalisation ────────────────────────────────────────────────────
 
-    /**
-     * Block types that are handled natively (no newsletter pipeline).
-     */
     private function isNative(string $type): bool
     {
         return in_array($type, [
@@ -242,29 +245,23 @@ class EmailTemplateRenderer
     }
 
     /**
-     * Map email-template-editor type aliases → newsletter pipeline type names.
-     *
-     * The email template editor uses a handful of simplified aliases that differ
-     * from the canonical newsletter block types. All other types pass through
-     * unchanged (the registry handles them directly).
-     *
-     * Returns null when the type is already canonical or unknown.
+     * Resolve email-template type aliases to canonical newsletter pipeline types.
+     * For any type that needs no translation the same value is returned, so the
+     * caller can always use the result directly.
      */
-    private function normaliseType(string $type): ?string
+    private function normaliseType(string $type): string
     {
         return match ($type) {
             'button' => 'cta',
             'product_card' => 'product',
-            default => null,
+            default => $type,
         };
     }
 
     /**
-     * Translate the raw data shape for aliased types.
-     *
-     * Only the aliased types (button → cta, product_card → product) need
-     * translation. All canonical types pass their data through as-is because
-     * their DTO fromArray() methods already handle the full field set.
+     * Translate data shape for aliased types only.
+     * All canonical types pass their data through unchanged because their
+     * fromArray() implementations already accept the full field set.
      */
     private function normaliseData(string $type, array $data): array
     {
@@ -318,27 +315,35 @@ class EmailTemplateRenderer
 
         if ($showItems) {
             $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;margin-bottom:12px;">';
-            $html .= '<tr><td style="color:#333;padding:4px 0;">{{ order.items }}</td><td style="text-align:right;color:#333;padding:4px 0;">{{ order.subtotal }}</td></tr>';
+            $html .= '<tr><td style="color:#333;padding:4px 0;">{{ order.items }}</td>'
+                . '<td style="text-align:right;color:#333;padding:4px 0;">{{ order.subtotal }}</td></tr>';
             $html .= '</table>';
         }
 
         if ($showShip) {
             $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="font-size:13px;">';
-            $html .= '<tr><td style="color:#666;padding:2px 0;">Shipping</td><td style="text-align:right;color:#666;padding:2px 0;">{{ order.shipping_cost }}</td></tr>';
+            $html .= '<tr><td style="color:#666;padding:2px 0;">Shipping</td>'
+                . '<td style="text-align:right;color:#666;padding:2px 0;">{{ order.shipping_cost }}</td></tr>';
             $html .= '</table>';
         }
 
         if ($showTotals) {
             $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid #e9ecef;margin-top:10px;padding-top:10px;font-size:14px;">';
-            $html .= '<tr><td style="font-weight:700;color:#333;padding:4px 0;">Total</td><td style="text-align:right;font-weight:700;color:#333;padding:4px 0;">{{ order.total }}</td></tr>';
+            $html .= '<tr><td style="font-weight:700;color:#333;padding:4px 0;">Total</td>'
+                . '<td style="text-align:right;font-weight:700;color:#333;padding:4px 0;">{{ order.total }}</td></tr>';
             $html .= '</table>';
         }
 
         $html .= '</td></tr></table>';
+
         return $html;
     }
 
-    private function renderAdSlot(array $data, int $siteId, NewsletterRenderContext $context): ?string
+    private function renderAdSlot(
+        array                   $data,
+        int                     $siteId,
+        NewsletterRenderContext $context,
+    ): ?string
     {
         $placement = $data['placement'] ?? 'mid';
         $fallback = $data['fallback'] ?? 'hide';
@@ -351,15 +356,21 @@ class EmailTemplateRenderer
                 $adData = $adBlock['data'] ?? [];
                 $blockData = $this->blockDataFactory->create($adType, $adData);
                 $rendered = $this->rendererRegistry->render($adType, $blockData, $context);
+
                 return $rendered->wasRendered ? $rendered->html : null;
             } catch (\Throwable $e) {
-                $this->logger->error('EmailTemplateRenderer: ad block render failed', ['error' => $e->getMessage()]);
+                $this->logger->error('EmailTemplateRenderer: ad block render failed', [
+                    'error' => $e->getMessage(),
+                ]);
                 return null;
             }
         }
 
+        // No ad available
         if ($fallback === 'placeholder') {
-            return '<div style="border:2px dashed #e9ecef;padding:16px;text-align:center;color:#aaa;font-size:12px;margin:16px 0;">Ad slot — ' . htmlspecialchars($placement) . '</div>';
+            return '<div style="border:2px dashed #e9ecef;padding:16px;text-align:center;'
+                . 'color:#aaa;font-size:12px;margin:16px 0;">Ad slot — '
+                . htmlspecialchars($placement) . '</div>';
         }
 
         return null; // 'hide' — no spacing residue
@@ -369,8 +380,8 @@ class EmailTemplateRenderer
 
     private function wrapInChrome(string $bodyHtml, ?EmailTheme $theme, string $subject): string
     {
-        $appName = \App\Framework\Support\Config::get('app.name', 'Application');
-        $appUrl = \App\Framework\Support\Config::get('app.url', 'http://localhost');
+        $appName = Config::get('app.name', 'Application');
+        $appUrl = Config::get('app.url', 'http://localhost');
         $year = date('Y');
 
         $primary = $theme ? $theme->getColor('primary', '#667eea') : '#667eea';
@@ -401,7 +412,9 @@ class EmailTemplateRenderer
             $w = !empty($logo['width']) ? ' width="' . (int)$logo['width'] . '"' : '';
             $h = !empty($logo['height']) ? ' height="' . (int)$logo['height'] . '"' : '';
             $alt = htmlspecialchars($logo['alt'] ?? $appName, ENT_QUOTES);
-            $logoHtml = '<img src="' . htmlspecialchars($logo['url'], ENT_QUOTES) . '" alt="' . $alt . '"' . $w . $h . ' style="max-height:50px;display:block;margin:0 auto 10px;">';
+            $logoHtml = '<img src="' . htmlspecialchars($logo['url'], ENT_QUOTES)
+                . '" alt="' . $alt . '"' . $w . $h
+                . ' style="max-height:50px;display:block;margin:0 auto 10px;">';
         }
 
         // Footer
@@ -417,6 +430,7 @@ class EmailTemplateRenderer
 </p>
 HTML;
             }
+
             $footerHtml = <<<HTML
 <tr>
   <td style="background:{$cardBg};padding:{$padding}px 30px;text-align:center;border-top:1px solid {$borderColor};">

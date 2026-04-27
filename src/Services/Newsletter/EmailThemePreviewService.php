@@ -3,13 +3,19 @@
 namespace App\Services\Newsletter;
 
 use App\Framework\Support\Config;
-use App\Models\EmailTheme;
+use App\Models\NewsletterBrandingConfiguration;
 
 /**
- * Renders a live HTML preview of an EmailTheme without dispatching mail.
+ * Renders a live HTML preview of an email theme without dispatching mail.
  *
- * Intentionally not coupled to a Mailable instance — it accepts raw theme
- * data so the editor can preview unsaved changes in real time.
+ * All theme data is read from NewsletterBrandingConfiguration.theme_json:
+ *   { colors, fonts, assets, settings }
+ *
+ * renderFromModel() accepts a NewsletterBrandingConfiguration (previously
+ * accepted EmailTheme — signature is updated but the internal render path
+ * is identical).
+ *
+ * renderFromData() accepts the raw editor payload and is unchanged.
  */
 class EmailThemePreviewService
 {
@@ -84,88 +90,84 @@ MD,
         ],
     ];
 
+    // =========================================================================
+    // Public API
+    // =========================================================================
+
     /**
-     * Render a preview from a fully-formed EmailTheme model.
+     * Render a preview from a fully-formed NewsletterBrandingConfiguration model.
+     * theme_json is the authoritative data source.
      */
-    public function renderFromModel(EmailTheme $theme, string $sampleType = 'default'): string
+    public function renderFromModel(NewsletterBrandingConfiguration $theme, string $sampleType = 'default'): string
     {
         $themeData = $this->extractThemeData($theme);
         return $this->render($themeData, $sampleType);
     }
 
-    private function extractThemeData(EmailTheme $theme): array
+    /**
+     * Render a preview from raw (unsaved) editor data.
+     * $data shape: { colors, fonts, assets, settings, name }
+     */
+    public function renderFromData(array $data, string $sampleType = 'default'): string
+    {
+        $themeData = $this->normaliseData($data);
+        return $this->render($themeData, $sampleType);
+    }
+
+    // =========================================================================
+    // Private — data extraction
+    // =========================================================================
+
+    /**
+     * Flatten a NewsletterBrandingConfiguration into the plain array shape
+     * expected by render().  All data comes from theme_json.
+     */
+    private function extractThemeData(NewsletterBrandingConfiguration $theme): array
     {
         return [
-            'colors' => $this->keyValueToMap($theme->colors ?? [], 'color_key', 'color_value'),
-            'fonts' => $this->fontsToMap($theme->fonts ?? []),
-            'settings' => $this->settingsToMap($theme->settings ?? []),
-            'assets' => $this->assetsToMap($theme->assets ?? []),
-            'name' => $theme->name,
+            'colors' => $theme->getColors(),
+            'fonts' => $theme->getFonts(),
+            'settings' => $theme->getSettings(),
+            'assets' => $theme->getAssets(),
+            'name' => $theme->name ?? Config::get('app.name', 'Application'),
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private function keyValueToMap(iterable $collection, string $keyField, string $valueField): array
+    private function normaliseData(array $data): array
     {
-        $map = [];
-        foreach ($collection as $item) {
-            $map[$item->$keyField] = $item->$valueField;
-        }
-        return $map;
+        return [
+            'colors' => $data['colors'] ?? [],
+            'fonts' => $data['fonts'] ?? [],
+            'settings' => $data['settings'] ?? [],
+            'assets' => $data['assets'] ?? [],
+            'name' => $data['name'] ?? Config::get('app.name', 'Application'),
+        ];
     }
 
-    private function fontsToMap(iterable $collection): array
-    {
-        $map = [];
-        foreach ($collection as $item) {
-            $key = $item->font_key;
-            $map[$key] = [
-                'family' => $item->font_family ?? '',
-                'size' => $item->font_size ?? null,
-                'weight' => $item->font_weight ?? null,
-            ];
-        }
-        return $map;
-    }
-
-    private function settingsToMap(iterable $collection): array
-    {
-        $map = [];
-        foreach ($collection as $item) {
-            $raw = $item->setting_value ?? '';
-            $type = $item->setting_type ?? 'string';
-            $map[$item->setting_key] = match ($type) {
-                'boolean' => in_array(strtolower((string)$raw), ['1', 'true', 'yes'], true),
-                'number' => (int)$raw,
-                default => $raw,
-            };
-        }
-        return $map;
-    }
-
-    private function assetsToMap(iterable $collection): array
-    {
-        $map = [];
-        foreach ($collection as $item) {
-            $key = $item->asset_key;
-            $map[$key] = [
-                'url' => $item->asset_url ?? '',
-                'alt' => $item->alt_text ?? '',
-                'width' => $item->width ?? null,
-                'height' => $item->height ?? null,
-            ];
-        }
-        return $map;
-    }
+    // =========================================================================
+    // Private — rendering
+    // =========================================================================
 
     private function render(array $theme, string $sampleType): string
     {
         $sample = self::SAMPLE_CONTENT[$sampleType] ?? self::SAMPLE_CONTENT['default'];
         $content = $this->convertMarkdown($sample['body'], $theme);
         return $this->wrapTemplate($content, $sample, $theme);
+    }
+
+    private function color(array $theme, string $key, string $default): string
+    {
+        return $theme['colors'][$key] ?? $default;
+    }
+
+    private function setting(array $theme, string $key, mixed $default): mixed
+    {
+        return $theme['settings'][$key] ?? $default;
+    }
+
+    private function font(array $theme, string $key): array
+    {
+        return $theme['fonts'][$key] ?? [];
     }
 
     private function convertMarkdown(string $markdown, array $theme): string
@@ -178,18 +180,16 @@ MD,
         $textLight = $this->color($theme, 'text_light', '#6c757d');
         $border = $this->color($theme, 'border', '#e9ecef');
         $link = $this->color($theme, 'link', '#3498db');
-        $cardBg = $this->color($theme, 'card_background', '#ffffff');
         $panelBg = $this->color($theme, 'card_background', '#f8f9fa');
-
         $borderRadius = (int)$this->setting($theme, 'border_radius', 6);
 
         $html = nl2br(htmlspecialchars($markdown, ENT_QUOTES, 'UTF-8', false));
 
         // Headings
-        $html = preg_replace('/^## (.+)$/m', '<h2 style="color:' . $text . ';font-size:20px;margin:18px 0 8px;font-weight:600;line-height:1.3;">$1</h2>', $html);
-        $html = preg_replace('/^### (.+)$/m', '<h3 style="color:' . $textLight . ';font-size:16px;margin:14px 0 6px;font-weight:600;">$1</h3>', $html);
+        $html = preg_replace('/^## (.+)$/m', "<h2 style=\"color:{$text};font-size:20px;margin:18px 0 8px;font-weight:600;line-height:1.3;\">$1</h2>", $html);
+        $html = preg_replace('/^### (.+)$/m', "<h3 style=\"color:{$textLight};font-size:16px;margin:14px 0 6px;font-weight:600;\">$1</h3>", $html);
 
-        // Bold / italic / strike
+        // Inline formatting
         $html = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $html);
         $html = preg_replace('/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/', '<em>$1</em>', $html);
         $html = preg_replace('/~~(.+?)~~/', '<del style="text-decoration:line-through;">$1</del>', $html);
@@ -197,49 +197,54 @@ MD,
         // Links
         $html = preg_replace(
             '/\[(.+?)\]\((.+?)\)/',
-            '<a href="$2" style="color:' . $link . ';text-decoration:underline;">$1</a>',
+            "<a href=\"\$2\" style=\"color:{$link};text-decoration:underline;\">\$1</a>",
             $html
         );
 
         // Buttons
         $html = preg_replace(
             '/@button\(([^,]+),\s*([^)]+)\)/',
-            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td align="center">
-              <a href="$2" style="display:inline-block;padding:13px 32px;background:' . $success . ';color:#ffffff;text-decoration:none;border-radius:' . $borderRadius . 'px;font-weight:700;font-size:15px;letter-spacing:0.3px;">$1</a>
-            </td></tr></table>',
+            "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:20px 0;\"><tr><td align=\"center\">"
+            . "<a href=\"\$2\" style=\"display:inline-block;padding:13px 32px;background:{$success};color:#ffffff;"
+            . "text-decoration:none;border-radius:{$borderRadius}px;font-weight:700;font-size:15px;\">\$1</a>"
+            . "</td></tr></table>",
             $html
         );
         $html = preg_replace(
             '/@buttonSecondary\(([^,]+),\s*([^)]+)\)/',
-            '<table width="100%" cellpadding="0" cellspacing="0" style="margin:16px 0;"><tr><td align="center">
-              <a href="$2" style="display:inline-block;padding:10px 24px;background:' . $secondary . ';color:#ffffff;text-decoration:none;border-radius:' . $borderRadius . 'px;font-size:14px;">$1</a>
-            </td></tr></table>',
+            "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;\"><tr><td align=\"center\">"
+            . "<a href=\"\$2\" style=\"display:inline-block;padding:10px 24px;background:{$secondary};color:#ffffff;"
+            . "text-decoration:none;border-radius:{$borderRadius}px;font-size:14px;\">\$1</a>"
+            . "</td></tr></table>",
             $html
         );
 
         // Panel
         $html = preg_replace(
             '/@panel\((.+?)\)/s',
-            '<div style="background:' . $panelBg . ';border-left:4px solid ' . $primary . ';padding:14px 18px;margin:16px 0;border-radius:0 ' . $borderRadius . 'px ' . $borderRadius . 'px 0;">$1</div>',
+            "<div style=\"background:{$panelBg};border-left:4px solid {$primary};padding:14px 18px;"
+            . "margin:16px 0;border-radius:0 {$borderRadius}px {$borderRadius}px 0;\">$1</div>",
             $html
         );
 
         // Promotion
         $html = preg_replace(
             '/@promotion\((.+?)\)/s',
-            '<div style="background:#fff8e1;border:2px solid ' . $warning . ';padding:16px;margin:16px 0;border-radius:' . $borderRadius . 'px;text-align:center;"><strong style="color:#7a5c00;font-size:15px;">$1</strong></div>',
+            "<div style=\"background:#fff8e1;border:2px solid {$warning};padding:16px;margin:16px 0;"
+            . "border-radius:{$borderRadius}px;text-align:center;\"><strong style=\"color:#7a5c00;font-size:15px;\">$1</strong></div>",
             $html
         );
 
         // Table
         $html = preg_replace_callback(
             '/@table\(([^)]+)\)(.*?)@endtable/s',
-            function ($m) use ($border, $panelBg, $text) {
+            function (array $m) use ($border, $panelBg, $text): string {
                 $headers = explode('|', $m[1]);
                 $tableHtml = '<table style="width:100%;border-collapse:collapse;margin:18px 0;font-size:14px;">';
                 $tableHtml .= '<thead><tr>';
                 foreach ($headers as $h) {
-                    $tableHtml .= '<th style="border-bottom:2px solid ' . $border . ';padding:10px 12px;text-align:left;font-weight:700;color:' . $text . ';background:' . $panelBg . ';">' . trim($h) . '</th>';
+                    $tableHtml .= "<th style=\"border-bottom:2px solid {$border};padding:10px 12px;text-align:left;"
+                        . "font-weight:700;color:{$text};background:{$panelBg};\">" . trim($h) . '</th>';
                 }
                 $tableHtml .= '</tr></thead><tbody>';
                 preg_match_all('/@row\(([^)]+)\)/', $m[2], $rows);
@@ -247,7 +252,8 @@ MD,
                     $cells = explode('|', $row);
                     $tableHtml .= '<tr>';
                     foreach ($cells as $cell) {
-                        $tableHtml .= '<td style="border-bottom:1px solid ' . $border . ';padding:10px 12px;color:' . $text . ';">' . trim($cell) . '</td>';
+                        $tableHtml .= "<td style=\"border-bottom:1px solid {$border};padding:10px 12px;"
+                            . "color:{$text};\">" . trim($cell) . '</td>';
                     }
                     $tableHtml .= '</tr>';
                 }
@@ -260,46 +266,45 @@ MD,
         // Divider
         $html = str_replace(
             '@divider',
-            '<hr style="border:none;border-top:1px solid ' . $border . ';margin:24px 0;">',
+            "<hr style=\"border:none;border-top:1px solid {$border};margin:24px 0;\">",
             $html
         );
 
         // Price
         $html = preg_replace(
             '/@price\(([0-9.,]+)\)/',
-            '<span style="font-size:26px;font-weight:800;color:' . $text . ';">$$1</span>',
+            "<span style=\"font-size:26px;font-weight:800;color:{$text};\">$$1</span>",
             $html
         );
 
         // Subcopy
         $html = preg_replace(
             '/@subcopy\((.+?)\)/s',
-            '<p style="font-size:12px;color:' . $textLight . ';margin-top:28px;padding-top:16px;border-top:1px solid ' . $border . ';line-height:1.7;">$1</p>',
+            "<p style=\"font-size:12px;color:{$textLight};margin-top:28px;padding-top:16px;"
+            . "border-top:1px solid {$border};line-height:1.7;\">$1</p>",
             $html
         );
 
-        // Bullet lists (- item)
+        // Bullet lists
         $html = preg_replace(
             '/^- (.+)$/m',
-            '<li style="margin:4px 0;color:' . $text . ';">$1</li>',
+            "<li style=\"margin:4px 0;color:{$text};\">$1</li>",
             $html
         );
-        $html = preg_replace('/(<li[^>]*>.*?<\/li>(\s*<br\s*\/?>)*)+/s', '<ul style="padding-left:20px;margin:12px 0;">$0</ul>', $html);
+        $html = preg_replace(
+            '/(<li[^>]*>.*?<\/li>(\s*<br\s*\/?>)*)+/s',
+            '<ul style="padding-left:20px;margin:12px 0;">$0</ul>',
+            $html
+        );
 
         // Horizontal rule
-        $html = preg_replace('/^---$/m', '<hr style="border:none;border-top:1px solid ' . $border . ';margin:20px 0;">', $html);
+        $html = preg_replace(
+            '/^---$/m',
+            "<hr style=\"border:none;border-top:1px solid {$border};margin:20px 0;\">",
+            $html
+        );
 
         return $html;
-    }
-
-    private function color(array $theme, string $key, string $default): string
-    {
-        return $theme['colors'][$key] ?? $default;
-    }
-
-    private function setting(array $theme, string $key, mixed $default): mixed
-    {
-        return $theme['settings'][$key] ?? $default;
     }
 
     private function wrapTemplate(string $content, array $sample, array $theme): string
@@ -338,7 +343,8 @@ MD,
             $w = !empty($logo['width']) ? ' width="' . (int)$logo['width'] . '"' : '';
             $h = !empty($logo['height']) ? ' height="' . (int)$logo['height'] . '"' : '';
             $alt = htmlspecialchars($logo['alt'] ?? $appName, ENT_QUOTES);
-            $logoHtml = '<img src="' . htmlspecialchars($logo['url'], ENT_QUOTES) . '" alt="' . $alt . '"' . $w . $h . ' style="max-height:50px;display:block;margin:0 auto 10px;">';
+            $logoHtml = '<img src="' . htmlspecialchars($logo['url'], ENT_QUOTES) . "\" alt=\"{$alt}\"{$w}{$h}"
+                . ' style="max-height:50px;display:block;margin:0 auto 10px;">';
         }
 
         $footerHtml = '';
@@ -363,6 +369,7 @@ HTML;
         }
 
         $greeting = htmlspecialchars($sample['greeting'] ?? 'Hello,', ENT_QUOTES);
+        $subject = htmlspecialchars($sample['subject'] ?? '', ENT_QUOTES);
 
         return <<<HTML
 <!DOCTYPE html>
@@ -371,13 +378,14 @@ HTML;
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
-<title>{$sample['subject']}</title>
+<title>{$subject}</title>
 </head>
 <body style="margin:0;padding:0;background-color:{$bgColor};font-family:{$fontFamily};color:{$text};font-size:{$fontSize};line-height:1.6;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background-color:{$bgColor};padding:24px 0;">
   <tr>
     <td align="center">
-      <table width="{$maxWidth}" cellpadding="0" cellspacing="0" style="max-width:{$maxWidth}px;width:100%;background-color:{$cardBg};border-radius:{$borderRadius}px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+      <table width="{$maxWidth}" cellpadding="0" cellspacing="0"
+             style="max-width:{$maxWidth}px;width:100%;background-color:{$cardBg};border-radius:{$borderRadius}px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <!-- Header -->
         <tr>
           <td style="background:{$headerGradient};padding:32px 30px;text-align:center;">
@@ -394,9 +402,7 @@ HTML;
         </tr>
         <!-- Footer -->
         <tr>
-          <td>
-            {$footerHtml}
-          </td>
+          <td>{$footerHtml}</td>
         </tr>
       </table>
     </td>
@@ -405,35 +411,5 @@ HTML;
 </body>
 </html>
 HTML;
-    }
-
-    // -------------------------------------------------------------------------
-    // Rendering
-    // -------------------------------------------------------------------------
-
-    private function font(array $theme, string $key): array
-    {
-        return $theme['fonts'][$key] ?? [];
-    }
-
-    /**
-     * Render a preview from raw unsaved theme data (used by the editor).
-     * $data matches the shape of CreateEmailThemeRequest / UpdateEmailThemeRequest.
-     */
-    public function renderFromData(array $data, string $sampleType = 'default'): string
-    {
-        $themeData = $this->normaliseData($data);
-        return $this->render($themeData, $sampleType);
-    }
-
-    private function normaliseData(array $data): array
-    {
-        return [
-            'colors' => $data['colors'] ?? [],
-            'fonts' => $data['fonts'] ?? [],
-            'settings' => $data['settings'] ?? [],
-            'assets' => $data['assets'] ?? [],
-            'name' => $data['name'] ?? Config::get('app.name', 'Application'),
-        ];
     }
 }
