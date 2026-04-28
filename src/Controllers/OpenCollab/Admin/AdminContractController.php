@@ -6,7 +6,10 @@ use App\Controllers\Controller;
 use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\SiteContext;
+use App\Jobs\OpenCollab\ContractFanoutJob;
+use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
 use App\Repositories\OpenCollab\ContractRepository;
 
 /**
@@ -23,7 +26,7 @@ use App\Repositories\OpenCollab\ContractRepository;
 class AdminContractController extends Controller
 {
     public function __construct(
-        private readonly ContractRepository $contractRepository,
+        private readonly ContractRepository $contractRepository
     )
     {
         parent::__construct();
@@ -89,7 +92,10 @@ class AdminContractController extends Controller
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        event(new ContractPublishedEvent($contract, $siteId, 1)); //todo needs more work
+        event(new ContractPublishedEvent($contract, $siteId, 1));
+
+        dispatch(ContractFanoutJob::for($contract->id, SiteContext::getId()));
+
 
         return $this->jsonResponse([
             'contract' => $this->formatContract($contract),

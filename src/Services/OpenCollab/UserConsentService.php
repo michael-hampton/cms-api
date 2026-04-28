@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\NotificationChannel;
 use App\Framework\Database\Database;
 use App\Repositories\Members\Consents\ConsentTypeRepository;
 use App\Repositories\OpenCollab\UserConsentRepository;
@@ -24,8 +25,6 @@ use App\Repositories\OpenCollab\UserConsentRepository;
  */
 class UserConsentService
 {
-    private const CHANNELS = ['email', 'in_app'];
-
     public function __construct(
         private readonly UserConsentRepository $userConsentRepository,
         private readonly ConsentTypeRepository $consentTypeRepository,
@@ -64,14 +63,14 @@ class UserConsentService
 
         foreach ($types as $type) {
             $channels = [];
-            foreach (self::CHANNELS as $channel) {
-                // If no stored preference exists yet, default to true (opt-in by default)
-                $channels[$channel] = $storedMap[$type->id][$channel] ?? true;
+            foreach (NotificationChannel::cases() as $channel) {
+                $value = $channel->value;
+
+                // Fall back to opted-in if no stored preference exists yet
+                $granted = $storedMap[$type->id][$value] ?? true;
 
                 // Required types are always granted — enforce regardless of stored value
-                if ($type->isRequired()) {
-                    $channels[$channel] = true;
-                }
+                $channels[$value] = $type->isRequired() ? true : $granted;
             }
 
             $grouped[$type->category][] = [
@@ -86,6 +85,45 @@ class UserConsentService
 
         return $grouped;
     }
+
+    /**
+     * Returns all contributor-scoped consent types paired with the user's
+     * current preference for each type+channel combination.
+     *
+     * Shape: [
+     *   ['type' => ConsentType, 'channel' => string, 'is_granted' => bool]
+     * ]
+     */
+    public function preferencesForUser(int $userId): array
+    {
+        $consents = $this->userConsentRepository->allContributorConsentsForUser($userId);
+
+        // Index existing rows by type+channel for O(1) lookup
+        $index = [];
+        foreach ($consents as $consent) {
+            $index[$consent->consent_type_id . ':' . $consent->channel] = $consent;
+        }
+
+        $types = $this->consentTypeRepository->findByScope('contributor');
+
+        $result = [];
+        foreach ($types as $type) {
+            foreach (['email', 'in_app'] as $channel) {
+                $key = $type->id . ':' . $channel;
+                $row = $index[$key] ?? null;
+                $result[] = [
+                    'consent_type_id' => $type->id,
+                    'code' => $type->code,
+                    'name' => $type->name,
+                    'channel' => $channel,
+                    'is_granted' => $row ? $row->isActive() : true, // default ON
+                ];
+            }
+        }
+
+        return $result;
+    }
+
 
     /**
      * Save a contributor's notification preferences in bulk.
@@ -139,10 +177,12 @@ class UserConsentService
      */
     private function validateChannels(array $preferences): void
     {
+        $valid = NotificationChannel::values();
+
         foreach ($preferences as $pref) {
-            if (!in_array($pref['channel'], self::CHANNELS, true)) {
+            if (!in_array($pref['channel'], $valid, true)) {
                 throw new \InvalidArgumentException(
-                    "Invalid channel [{$pref['channel']}]. Allowed: " . implode(', ', self::CHANNELS) . "."
+                    "Invalid channel [{$pref['channel']}]. Allowed: " . implode(', ', $valid) . '.'
                 );
             }
         }
@@ -172,10 +212,10 @@ class UserConsentService
     // ── Private ───────────────────────────────────────────────────────────────
 
     /**
-     * Ensure a user has a full set of default preferences for all contributor
-     * consent types. Called once when a contributor completes onboarding.
+     * Seed default (opted-in) preferences for all contributor consent types.
      *
-     * Uses bulkUpsert with insert-or-ignore semantics — existing rows are untouched.
+     * Called once when a contributor completes onboarding.
+     * Uses insert-or-ignore semantics — existing rows are never overwritten.
      */
     public function seedDefaultsForUser(int $userId): void
     {
@@ -183,11 +223,11 @@ class UserConsentService
 
         $defaults = [];
         foreach ($types as $type) {
-            foreach (self::CHANNELS as $channel) {
+            foreach (NotificationChannel::cases() as $channel) {
                 $defaults[] = [
                     'consent_type_id' => $type->id,
-                    'channel' => $channel,
-                    'granted' => true, // all default to on
+                    'channel' => $channel->value,
+                    'granted' => true,
                 ];
             }
         }

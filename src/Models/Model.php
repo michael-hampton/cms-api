@@ -390,54 +390,104 @@ abstract class Model
 
     public static function upsert(array $values, array $uniqueBy, ?array $update = null): int
     {
-        $instance = new static();
-        $database = $instance->database;
-
         if (empty($values)) {
             return 0;
         }
 
-        $update = $update ?: array_keys($values[0]);
+        $instance = new static();
+        $database = $instance->database;
         $table = $instance->table;
 
-        // Build INSERT ... ON DUPLICATE KEY UPDATE query
+        // ----------------------------
+        // Normalise update definitions
+        // ----------------------------
+        $update = self::normaliseUpdate($update, $values[0]);
+
+        // ----------------------------
+        // Columns
+        // ----------------------------
         $columns = array_keys($values[0]);
-        $quotedColumns = array_map(function ($col) {
-            return "`{$col}`";
-        }, $columns);
+
+        $quotedColumns = array_map(
+            fn($col) => "`{$col}`",
+            $columns
+        );
 
         $sql = "INSERT INTO `{$table}` (" . implode(', ', $quotedColumns) . ") VALUES ";
 
+        // ----------------------------
+        // Bind values
+        // ----------------------------
         $placeholders = [];
         $bindings = [];
         $paramCounter = 0;
 
         foreach ($values as $row) {
             $rowPlaceholders = [];
+
             foreach ($columns as $column) {
                 $paramKey = 'param_' . $paramCounter++;
                 $rowPlaceholders[] = ":{$paramKey}";
-                $bindings[$paramKey] = $row[$column];
+                $bindings[$paramKey] = $row[$column] ?? null;
             }
+
             $placeholders[] = '(' . implode(', ', $rowPlaceholders) . ')';
         }
 
         $sql .= implode(', ', $placeholders);
 
-        // Add ON DUPLICATE KEY UPDATE
+        // ----------------------------
+        // ON DUPLICATE KEY UPDATE
+        // ----------------------------
         $updateParts = [];
-        foreach ($update as $column => $value) {
-            if ($value instanceof RawExpression) {
-                $updateParts[] = "`{$column}` = {$value->value}";
-            } else {
-                $updateParts[] = "`{$column}` = VALUES(`{$column}`)";
-            }
+
+        foreach ($update as $column => $expression) {
+            $updateParts[] = "`{$column}` = {$expression}";
         }
 
         $sql .= ' ON DUPLICATE KEY UPDATE ' . implode(', ', $updateParts);
 
-        $stmt = $database->query($sql, $bindings);
-        return $stmt->rowCount();
+        return $database->query($sql, $bindings)->rowCount();
+    }
+
+    private static function normaliseUpdate(array $update, array $firstRow): array
+    {
+        $result = [];
+
+        // default: update all columns using VALUES()
+        if (empty($update)) {
+            foreach (array_keys($firstRow) as $col) {
+                $result[$col] = "VALUES(`{$col}`)";
+            }
+
+            return $result;
+        }
+
+        foreach ($update as $key => $value) {
+
+            // CASE 1: ['col1','col2']
+            if (is_int($key)) {
+                $result[$value] = "VALUES(`{$value}`)";
+                continue;
+            }
+
+            // CASE 2: RawExpression
+            if ($value instanceof RawExpression) {
+                $result[$key] = $value->value;
+                continue;
+            }
+
+            // CASE 3: boolean shorthand
+            if ($value === true) {
+                $result[$key] = "VALUES(`{$key}`)";
+                continue;
+            }
+
+            // CASE 4: fallback safety
+            $result[$key] = "VALUES(`{$key}`)";
+        }
+
+        return $result;
     }
 
     public static function query(): QueryBuilder

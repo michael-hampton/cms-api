@@ -6,6 +6,7 @@ use App\Framework\Support\Config;
 use App\Framework\Support\Logger;
 use App\Models\EmailTheme;
 use App\Models\Newsletter;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Models\NewsletterLayout;
 use App\Services\Newsletter\DTOs\NewsletterRenderContext;
 use App\Services\Newsletter\Layout\LayoutBlockVariableResolver;
@@ -49,7 +50,7 @@ class EmailTemplateRenderer
     public function render(
         NewsletterLayout $layout,
         array            $runtimeData = [],
-        ?EmailTheme      $themeOverride = null,
+        ?NewsletterBrandingConfiguration $themeOverride = null,
     ): string
     {
         $theme = $themeOverride ?? ($layout->theme_id ? null : null); // resolved by service
@@ -75,7 +76,7 @@ class EmailTemplateRenderer
         array       $blocks,
         array       $runtimeData,
         int         $siteId,
-        ?EmailTheme $theme = null,
+        ?NewsletterBrandingConfiguration $theme = null,
     ): string
     {
         // Build a minimal layout shell so we can populate a render context.
@@ -159,7 +160,7 @@ class EmailTemplateRenderer
         array                   $blocks,
         array                   $runtimeData,
         int                     $siteId,
-        ?EmailTheme             $theme,
+        ?NewsletterBrandingConfiguration $theme,
         NewsletterRenderContext $context,
     ): string
     {
@@ -196,7 +197,7 @@ class EmailTemplateRenderer
         string                  $type,
         array                   $data,
         int                     $siteId,
-        ?EmailTheme             $theme,
+        ?NewsletterBrandingConfiguration $theme,
         NewsletterRenderContext $context,
     ): ?string
     {
@@ -345,7 +346,7 @@ class EmailTemplateRenderer
         NewsletterRenderContext $context,
     ): ?string
     {
-        $placement = $data['placement'] ?? 'mid';
+        $placement = $data['placement'] ?: 'top';
         $fallback = $data['fallback'] ?? 'hide';
 
         $adBlock = $this->adResolver->resolveBlock($placement, $siteId, $context->member);

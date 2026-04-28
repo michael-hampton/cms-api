@@ -1007,4 +1007,17 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return $target;
     }
 
+    public function when($value, callable $callback, ?callable $default = null): static
+    {
+        if ($value) {
+            return $callback($this) ?? $this;
+        }
+
+        if ($default) {
+            return $default($this) ?? $this;
+        }
+
+        return $this;
+    }
+
 }

@@ -4,13 +4,14 @@ namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
 use App\Framework\Notifications\AbstractNotification;
+use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Mail\OpenCollab\DisputeResolvedMail;
 use App\Models\EarningsDispute;
 use App\Models\User;
 
 final class DisputeResolvedNotification extends AbstractNotification
-    implements EmailableNotification
+    implements EmailableNotification, ConsentAwareNotification
 {
     public function __construct(
         public readonly EarningsDispute $dispute,
@@ -37,5 +38,10 @@ final class DisputeResolvedNotification extends AbstractNotification
             $this->wasApproved,
             $this->adminNotes,
         );
+    }
+
+    public function consentType(): string
+    {
+        return 'contributor.dispute_raised';
     }
 }

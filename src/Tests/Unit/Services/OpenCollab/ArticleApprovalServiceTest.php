@@ -12,10 +12,13 @@ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Page;
 use App\Models\Site;
+use App\Models\User;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
@@ -32,6 +35,8 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
     private MockInterface $databaseMock;
     private MockInterface $policy;
     private MockInterface $siteRepository;
+    private NotificationDispatcher $notificationDispatcher;
+    private UserRepositoryInterface $userRepository;
 
     // ── submitForReview() — policy enforcement ────────────────────────────────
 
@@ -207,6 +212,12 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
             ->once()
             ->withArgs(fn($e) => $e instanceof ArticleApprovedEvent && $e->adminId === 55);
 
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->id = 1;
+
+        $this->userRepository->shouldReceive('find')->once()->with(7)->andReturn($user);
+        $this->notificationDispatcher->shouldReceive('dispatch')->once();
+
         $result = $this->service->approve(1, adminId: 55);
 
         $this->assertEquals(PageStatus::PUBLISHED->value, $result->status);
@@ -252,6 +263,12 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
             ->once()
             ->withArgs(fn($e) => $e instanceof ArticleRejectedEvent && $e->reason === RejectionReason::Quality);
 
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->id = 1;
+
+        $this->userRepository->shouldReceive('find')->once()->with(7)->andReturn($user);
+        $this->notificationDispatcher->shouldReceive('dispatch')->once();
+
         $this->service->reject(1, 55, RejectionReason::Quality, 'Needs more depth.');
         $this->assertTrue(true);
     }
@@ -294,6 +311,8 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->policy = Mockery::mock(ContributorPolicy::class);
         $this->siteRepository = Mockery::mock(SiteRepository::class);
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
+        $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
 
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
 
@@ -303,7 +322,9 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
             $this->eventDispatcher,
             $this->databaseMock,
             $this->policy,
-            $this->siteRepository
+            $this->siteRepository,
+            $this->notificationDispatcher,
+            $this->userRepository
         );
     }
 

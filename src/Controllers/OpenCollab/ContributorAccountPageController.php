@@ -28,7 +28,6 @@ class ContributorAccountPageController extends Controller
         $userId = Auth::id();
         $siteId = SiteContext::getId();
         $contract = $this->contractRepository->latestForSite($siteId);
-        $consentTypes = $this->userConsentService->getPreferences($userId);
 
         return $this->view('open-collab.settings.index', [
             'profile' => $this->contributorProfileRepository->findByUserId($userId),
@@ -36,7 +35,6 @@ class ContributorAccountPageController extends Controller
             'contractSignatures' => $this->contractRepository->getForUser($userId, $contract->id)?->toArray() ?? [],
             'guidelinesAck' => $this->guidelinesRepository->getForUser($userId, $siteId),
             'site' => SiteContext::slug(),
-            'grouped' => $consentTypes,
             'currentUser' => User::find($userId)
         ]);
     }

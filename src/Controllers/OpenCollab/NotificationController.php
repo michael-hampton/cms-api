@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
 use App\Models\User;
 use App\Services\NotificationFormatter;
 use App\Services\UserNotificationService;
@@ -19,23 +20,23 @@ class NotificationController extends Controller
         parent::__construct();
     }
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $user = $this->user(); // however you resolve auth
+        $unreadOnly = filter_var($request->get('unread_only', false), FILTER_VALIDATE_BOOLEAN);
+        $userId = Auth::id();
 
-        $notifications = $this->service->getNotifications($user);
+        $notifications = $this->service->getNotifications($userId);
 
-        return $this->resourceResponse(
-            [
-                'data' => array_map(
-                    fn($n) => $this->formatter->format($n) + [
-                            'id' => $n->id,
-                            'read' => $n->read_at !== null,
-                            'created_at' => $n->created_at,
-                        ],
-                    $notifications->all()
-                ),
-            ]);
+        $items = $notifications
+            ->when($unreadOnly, fn($c) => $c->filter(fn($n) => !$n->isRead()))
+            ->map(fn($n) => $this->formatNotification($n))
+            ->values()
+            ->toArray();
+
+        return $this->resourceResponse([
+            'notifications' => $items,
+            'unread_count' => $this->service->getUnreadCount($userId),
+        ]);
     }
 
     private function user(): User
@@ -46,18 +47,18 @@ class NotificationController extends Controller
 
     public function unreadCount(): JsonResponse
     {
-        $user = $this->user();
+        $userId = Auth::id();
 
         return $this->resourceResponse([
-            'count' => $this->service->getUnreadCount($user),
+            'count' => $this->service->getUnreadCount($userId),
         ]);
     }
 
-    public function markAsRead(): JsonResponse
+    public function markAsRead(Request $request): JsonResponse
     {
         $user = $this->user();
 
-        $notificationId = (int)($_POST['notification_id'] ?? 0);
+        $notificationId = (int)($request->get('notification_id') ?? 0);
 
         if ($notificationId <= 0) {
             return $this->errorResponse('Invalid notification_id');
@@ -79,14 +80,15 @@ class NotificationController extends Controller
         return $this->resourceResponse(['success' => true]);
     }
 
-    private function transform($notification): array
+    private function formatNotification($notification): array
     {
-        return [
+        return array_merge($this->formatter->format($notification), [
             'id' => $notification->id,
             'type' => $notification->type,
             'data' => $notification->data,
-            'read' => $notification->read_at !== null,
+            'is_read' => $notification->read_at !== null,
+            'read_at' => $notification->read_at,
             'created_at' => $notification->created_at,
-        ];
+        ]);
     }
 }

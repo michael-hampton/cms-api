@@ -5,9 +5,11 @@ namespace App\Framework\Notifications\Channels;
 use App\Framework\Mail\MailManager;
 use App\Framework\Notifications\AdminNotification;
 use App\Framework\Notifications\ChannelInterface;
+use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Framework\Notifications\NotificationInterface;
 use App\Framework\Support\Logger;
+use App\Services\OpenCollab\UserConsentService;
 
 /**
  * Delivers notifications to individual recipients via email.
@@ -27,6 +29,8 @@ final class EmailChannel implements ChannelInterface
     public function __construct(
         private readonly MailManager $mailManager,
         private readonly Logger      $logger,
+        private readonly UserConsentService $consentService,
+
     )
     {
     }
@@ -42,6 +46,14 @@ final class EmailChannel implements ChannelInterface
     {
         /** @var EmailableNotification $notification */
         $email = $notification->recipientEmail();
+
+        if (
+            $notification instanceof ConsentAwareNotification &&
+            $notification->recipientUserId() !== null &&
+            !$this->consentService->hasConsent($notification->recipientUserId(), $notification->consentType(), 'email')
+        ) {
+            return false;
+        }
 
         try {
             return $this->mailManager

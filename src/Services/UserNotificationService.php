@@ -45,14 +45,14 @@ class UserNotificationService
         );
     }
 
-    public function getNotifications(User $user, int $limit = 20)
+    public function getNotifications(int $userId, int $limit = 20)
     {
-        return $this->repository->getForUser($user->id, $limit);
+        return $this->repository->getForUser($userId, $limit);
     }
 
-    public function getUnreadCount(User $user): int
+    public function getUnreadCount(int $userId): int
     {
-        return $this->repository->countUnread($user->id);
+        return $this->repository->countUnread($userId);
     }
 
     public function markAsRead(User $user, int $notificationId): void

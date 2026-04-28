@@ -154,114 +154,32 @@ $pageClass = '';
         </div>
     </div>
 
-    <!-- Notification Preferences -->
-    <!-- Notification Preferences -->
-    <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .5s ease;">
+    <!-- Notification Preferences section -->
+    <div class="oc-card" style="margin-bottom:24px; animation:fadeSlideIn .5s ease;">
         <div class="oc-card__header">
             <span class="oc-card__title">Notification Preferences</span>
         </div>
-
         <div class="oc-card__body">
-
-            <div style="font-size:.85rem;color:var(--slate);margin-bottom:16px;">
+            <div style="font-size:.85rem; color:var(--slate); margin-bottom:16px;">
                 Control how and when you receive updates from the platform.
             </div>
 
-            <div style="display:flex;flex-direction:column;gap:18px;">
-
-                <?php foreach ($grouped as $category => $items): ?>
-
-                    <!-- CATEGORY BLOCK -->
-                    <div style="border:1px solid #f1f5f9;border-radius:10px;overflow:hidden;">
-
-                        <!-- category header -->
-                        <div style="background:#fafafa;padding:10px 14px;font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--slate);">
-                            <?= ucfirst($category) ?>
-                        </div>
-
-                        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px;">
-
-                            <?php foreach ($items as $type): ?>
-
-                                <?php
-                                $isRequired = $type['required'] ?? false;
-                                $isEnabled = true; // replace with real user preference lookup later
-                                ?>
-
-                                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-
-                                    <!-- LEFT -->
-                                    <div style="flex:1;">
-
-                                        <div style="display:flex;align-items:center;gap:8px;">
-
-                                            <div style="font-weight:500;font-size:.875rem;color:var(--navy);">
-                                                <?= htmlspecialchars($type['name'] ?? $type['code']) ?>
-                                            </div>
-
-                                            <?php if ($isRequired): ?>
-                                                <span style="font-size:.65rem;background:#fee2e2;color:#b91c1c;padding:2px 6px;border-radius:999px;">
-                                                Required
-                                            </span>
-                                            <?php endif; ?>
-
-                                        </div>
-
-                                        <div style="font-size:.75rem;color:var(--slate);margin-top:3px;">
-                                            <?= htmlspecialchars($type['code']) ?>
-                                        </div>
-
-                                    </div>
-
-                                    <!-- RIGHT (CHANNEL TOGGLES) -->
-                                    <div style="display:flex;gap:14px;align-items:center;">
-
-                                        <!-- EMAIL -->
-                                        <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--slate);">
-                                            <input type="checkbox"
-                                                   class="notif-toggle"
-                                                   data-code="<?= $type['code'] ?>"
-                                                   data-id="<?= $type['consent_type_id'] ?>"
-                                                   data-channel="email"
-                                                    <?= $isEnabled ? 'checked' : '' ?>
-                                                    <?= $isRequired ? 'disabled' : '' ?>>
-                                            Email
-                                        </label>
-
-                                        <!-- IN-APP -->
-                                        <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--slate);">
-                                            <input type="checkbox"
-                                                   class="notif-toggle"
-                                                   data-id="<?= $type['consent_type_id'] ?>"
-                                                   data-code="<?= $type['code'] ?>"
-                                                   data-channel="in_app"
-                                                    <?= $isEnabled ? 'checked' : '' ?>
-                                                    <?= $isRequired ? 'disabled' : '' ?>>
-                                            In-app
-                                        </label>
-
-                                    </div>
-
-                                </div>
-
-                            <?php endforeach; ?>
-
-                        </div>
-                    </div>
-
-                <?php endforeach; ?>
-
+            <div class="oc-notif-prefs" id="notif-prefs-grid">
+                <div class="oc-notif-prefs__header">
+                    <div class="oc-notif-prefs__header-cell">Event</div>
+                    <div class="oc-notif-prefs__header-cell">Email</div>
+                    <div class="oc-notif-prefs__header-cell">In-app</div>
+                </div>
+                <!-- rows injected by JS -->
             </div>
 
             <button id="notif-save-btn"
                     class="oc-btn oc-btn--primary oc-btn--sm"
-                    onclick="savePreferences()"
+                    onclick="saveNotifPreferences()"
                     disabled>
                 Save Changes
             </button>
         </div>
-
-
     </div>
 
     <!-- Danger zone -->
@@ -346,54 +264,95 @@ $pageClass = '';
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const TOKEN = localStorage.getItem('oc_token') || '';
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
-    let preferenceState = {};
     let isDirty = false;
     const saveBtn = document.getElementById('notif-save-btn');
+    const preferenceState = {}; // { "typeId:channel": bool }
 
-    document.querySelectorAll('.notif-toggle').forEach(el => {
-        const code = el.dataset.code;
-        const channel = el.dataset.channel;
-        const id = el.dataset.id;
+    async function loadNotifPreferences() {
+        try {
+            const res = await fetch(`/api/${SITE}/open-collab/notifications/preferences`, {
+                headers: {Authorization: `Bearer ${TOKEN}`}
+            });
 
-        if (!preferenceState[id]) {
-            preferenceState[id] = {};
+            if (!res.ok) throw new Error('Failed to load preferences');
+
+            const data = await res.json();
+            const grid = document.getElementById('notif-prefs-grid');
+
+            // Clear existing content (except header if you have one)
+            // Keep the header and clear previous dynamic rows
+            grid.innerHTML = `
+            <div class="oc-notif-prefs__header">
+                <div class="oc-notif-prefs__header-cell">Event</div>
+                <div class="oc-notif-prefs__header-cell">Email</div>
+                <div class="oc-notif-prefs__header-cell">In-app</div>
+            </div>`;
+
+            const byType = {};
+            for (const pref of data.preferences) {
+                if (!byType[pref.consent_type_id]) {
+                    byType[pref.consent_type_id] = {name: pref.name, code: pref.code, channels: {}};
+                }
+                byType[pref.consent_type_id].channels[pref.channel] = pref.is_granted;
+
+                // Populate the state object so saving works
+                preferenceState[pref.consent_type_id] = preferenceState[pref.consent_type_id] || {};
+                preferenceState[pref.consent_type_id][pref.channel] = pref.is_granted;
+            }
+
+            for (const [typeId, info] of Object.entries(byType)) {
+                const row = `
+                <div class="oc-notif-prefs__row">
+                    <div class="oc-notif-prefs__label">${escHtml(info.name)}</div>
+                    <div class="oc-notif-prefs__check">
+                        <input type="checkbox" data-id="${typeId}" data-channel="email"
+                               ${info.channels['email'] ? 'checked' : ''}
+                               onchange="updatePrefState(${typeId}, 'email', this.checked)">
+                    </div>
+                    <div class="oc-notif-prefs__check">
+                        <input type="checkbox" data-id="${typeId}" data-channel="in_app"
+                               ${info.channels['in_app'] ? 'checked' : ''}
+                               onchange="updatePrefState(${typeId}, 'in_app', this.checked)">
+                    </div>
+                </div>`;
+                grid.insertAdjacentHTML('beforeend', row);
+            }
+        } catch (e) {
+            console.error(e);
+            const grid = document.getElementById('notif-prefs-grid');
+            grid.innerHTML = '<div class="oc-alert oc-alert--error">Could not load notification preferences.</div>';
         }
-
-        preferenceState[id][channel] = el.checked;
-
-        el.addEventListener('change', function () {
-            const code = this.dataset.code;
-            const id = this.dataset.id;
-            const channel = this.dataset.channel;
-
-            preferenceState[id][channel] = this.checked;
-
-            markDirty();
-        });
-    });
-
-    function markDirty() {
-        isDirty = true;
-        if (saveBtn) saveBtn.disabled = false;
     }
 
-    async function savePreferences() {
-        if (!isDirty) return;
+    function escHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Saving...';
+    function updatePrefState(id, channel, value) {
+        if (!preferenceState[id]) preferenceState[id] = {};
+        preferenceState[id][channel] = value;
+        markDirty();
+    }
 
+    async function saveNotifPreferences() {
         const payload = [];
 
-        for (const id in preferenceState) {
-            for (const channel in preferenceState[id]) {
+        // Correctly iterate through the nested structure: ID -> Channel -> Value
+        for (const typeId in preferenceState) {
+            for (const channel in preferenceState[typeId]) {
                 payload.push({
-                    consent_type_id: id,
+                    consent_type_id: parseInt(typeId),
                     channel: channel,
-                    granted: preferenceState[id][channel]
+                    granted: !!preferenceState[typeId][channel]
                 });
             }
         }
+
+        const saveBtn = document.getElementById('notif-save-btn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = 'Saving...';
 
         try {
             const res = await fetch(`/api/${SITE}/open-collab/notifications/preferences/batch`, {
@@ -405,21 +364,26 @@ $pageClass = '';
                 body: JSON.stringify({preferences: payload})
             });
 
-            if (!res.ok) throw new Error('Failed');
-
-            isDirty = false;
-            saveBtn.innerHTML = 'Saved ✓';
-
-            setTimeout(() => {
-                saveBtn.innerHTML = 'Save Changes';
-                saveBtn.disabled = true;
-            }, 1200);
-
+            if (res.ok) {
+                saveBtn.innerHTML = 'Saved ✓';
+                isDirty = false;
+                setTimeout(() => {
+                    saveBtn.innerHTML = 'Save Changes';
+                    saveBtn.disabled = true;
+                }, 2000);
+            } else {
+                throw new Error('Save failed');
+            }
         } catch (e) {
-            console.error(e);
-            saveBtn.innerHTML = 'Save Changes';
+            alert('Could not save preferences. Please try again.');
             saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Save Changes';
         }
+    }
+
+    function markDirty() {
+        isDirty = true;
+        if (saveBtn) saveBtn.disabled = false;
     }
 
     // Profile form
@@ -577,5 +541,8 @@ $pageClass = '';
             btn.textContent = 'Request closure';
         }
     }
+
+    loadNotifPreferences();
+
 </script>
 @endsection

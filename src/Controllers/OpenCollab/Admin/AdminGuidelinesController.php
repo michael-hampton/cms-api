@@ -6,9 +6,16 @@ use App\Controllers\Controller;
 use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\SiteContext;
+use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
+use App\Jobs\Subscriptions\BuildPrintBatchesJob;
 use App\Models\Site;
+use App\Repositories\Cms\UserRepository;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
+use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Services\OpenCollab\Notifications\GuidelineUpdatedNotification;
+use App\Services\OpenCollab\Notifications\ViolationRecordedNotification;
 
 /**
  * Admin CRUD for contributor brand guidelines.
@@ -25,6 +32,10 @@ class AdminGuidelinesController extends Controller
 {
     public function __construct(
         private readonly GuidelinesContentRepository $guidelinesContentRepository,
+        private readonly NotificationDispatcher $notificationDispatcher,
+        private readonly UserSiteRepository     $userSiteRepository,
+        private readonly UserRepository         $userRepository
+
     )
     {
         parent::__construct();
@@ -112,8 +123,7 @@ class AdminGuidelinesController extends Controller
             );
         }
 
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $content = trim($body['content'] ?? $request->input('content', ''));
+        $content = $request->input('content', '');
 
         if (empty($content)) {
             return $this->errorResponse('Guidelines content is required.', 422);
@@ -123,6 +133,8 @@ class AdminGuidelinesController extends Controller
         }
 
         $guideline->update(['content' => $content]);
+
+        dispatch(GuidelineUpdatedFanoutJob::for($guideline->id, SiteContext::getId()));
 
         return $this->jsonResponse([
             'guideline' => $this->formatGuideline($guideline->fresh()),

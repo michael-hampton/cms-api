@@ -12,10 +12,14 @@ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
+use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Services\OpenCollab\Notifications\ArticleApprovedNotification;
+use App\Services\OpenCollab\Notifications\ArticleRejectedNotification;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
@@ -34,12 +38,15 @@ use App\Services\OpenCollab\Policies\ContributorPolicy;
 class ArticleApprovalService
 {
     public function __construct(
-        private readonly PageRepository     $pageRepository,
-        private readonly ActivityRepository $activityRepository,
-        private readonly EventDispatcher    $eventDispatcher,
-        private readonly Database           $database,
-        private readonly ContributorPolicy $policy,
-        private readonly SiteRepository    $siteRepository
+        private readonly PageRepository          $pageRepository,
+        private readonly ActivityRepository      $activityRepository,
+        private readonly EventDispatcher         $eventDispatcher,
+        private readonly Database                $database,
+        private readonly ContributorPolicy       $policy,
+        private readonly SiteRepository          $siteRepository,
+        private readonly NotificationDispatcher  $notificationDispatcher,
+        private readonly UserRepositoryInterface $userRepository,
+
     )
     {
     }
@@ -140,6 +147,14 @@ class ArticleApprovalService
                 'published_at' => date('Y-m-d H:i:s'),
             ]);
 
+            $contributor = $this->userRepository->find($page->contributor_id);
+
+            if ($contributor) {
+                $this->notificationDispatcher->dispatch(
+                    new ArticleApprovedNotification($page, $contributor)
+                );
+            }
+
             $this->activityRepository->record(
                 siteId: $page->site_id,
                 userId: (int)$page->contributor_id,
@@ -198,6 +213,14 @@ class ArticleApprovalService
                     'rejected_by' => $adminId,
                 ],
             );
+
+            $contributor = $this->userRepository->find($page->contributor_id);
+
+            if ($contributor) {
+                $this->notificationDispatcher->dispatch(
+                    new ArticleRejectedNotification($page, $contributor, $reason->value)
+                );
+            }
 
             return $this->pageRepository->find($page->id);
         });

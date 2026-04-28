@@ -8,10 +8,13 @@ use App\Enums\OpenCollab\ViolationType;
 use App\Events\OpenCollab\ViolationRecordedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ContributorViolation;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ViolationRepository;
+use App\Services\OpenCollab\Notifications\ArticleRejectedNotification;
+use App\Services\OpenCollab\Notifications\ViolationRecordedNotification;
 
 /**
  * Records violations and enforces automatic suspension/ban thresholds.
@@ -35,6 +38,8 @@ class ViolationService
         private readonly EventDispatcher         $eventDispatcher,
         private readonly Database                $database,
         private readonly Logger                  $logger,
+        private readonly NotificationDispatcher $notificationDispatcher,
+
     )
     {
     }
@@ -89,6 +94,12 @@ class ViolationService
                     'violation_id' => $violation->id,
                     'action' => $action->value,
                 ]);
+            }
+
+            if ($user) {
+                $this->notificationDispatcher->dispatch(
+                    new ViolationRecordedNotification($violation, $user)
+                );
             }
 
             return $violation;

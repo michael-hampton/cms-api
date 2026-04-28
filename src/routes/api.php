@@ -1387,6 +1387,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->get('/unread-count', [NotificationController::class, 'unreadCount']);
         $router->post('/read', [NotificationController::class, 'markAsRead']);
         $router->post('/read-all', [NotificationController::class, 'markAllAsRead']);
+        $router->get('/preferences', [ContributorNotificationPreferenceController::class, 'index']);
         $router->post('/preferences', [ContributorNotificationPreferenceController::class, 'update']);
         $router->post('/preferences/batch', [ContributorNotificationPreferenceController::class, 'updateBatch']
         );

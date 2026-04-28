@@ -4,13 +4,14 @@ namespace App\Services\OpenCollab\Notifications;
 
 use App\Framework\Mail\Mailable;
 use App\Framework\Notifications\AbstractNotification;
+use App\Framework\Notifications\ConsentAwareNotification;
 use App\Framework\Notifications\EmailableNotification;
 use App\Mail\OpenCollab\PayoutPaidMail;
 use App\Models\Payout;
 use App\Models\User;
 
 final class PayoutPaidNotification extends AbstractNotification
-    implements EmailableNotification
+    implements EmailableNotification, ConsentAwareNotification
 {
     public function __construct(
         public readonly Payout  $payout,
@@ -30,5 +31,10 @@ final class PayoutPaidNotification extends AbstractNotification
     public function toMailable(): Mailable
     {
         return new PayoutPaidMail($this->payout, $this->contributor, $this->reference);
+    }
+
+    public function consentType(): string
+    {
+        return 'contributor.payout_processed';
     }
 }

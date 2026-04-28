@@ -39,4 +39,9 @@ class ContentRecommendationService
     {
         $this->trendingRepository->calculateTrendingScores($siteId);
     }
+
+    public function getLatestContent(int $siteId, int $limit, ?Member $member = null)
+    {
+        return $this->recommendationRepository->getRecentlyViewedArticles($siteId, $limit);
+    }
 }

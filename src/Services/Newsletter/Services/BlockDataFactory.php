@@ -2,6 +2,8 @@
 
 namespace App\Services\Newsletter\Services;
 
+use App\Services\Newsletter\DTOs\BlockData\ArticleCardBlockData;
+use App\Services\Newsletter\DTOs\BlockData\ArticleRecommendationsBlockData;
 use App\Services\Newsletter\DTOs\BlockData\AwardBlockData;
 use App\Services\Newsletter\DTOs\BlockData\BannerBlockData;
 use App\Services\Newsletter\DTOs\BlockData\BaseBlockData;
@@ -28,7 +30,9 @@ use App\Services\Newsletter\DTOs\BlockData\PageLinksBlockData;
 use App\Services\Newsletter\DTOs\BlockData\PersonBlockData;
 use App\Services\Newsletter\DTOs\BlockData\ProductBlockData;
 use App\Services\Newsletter\DTOs\BlockData\ProductComparisonBlockData;
+use App\Services\Newsletter\DTOs\BlockData\ProductRecommendationsBlockData;
 use App\Services\Newsletter\DTOs\BlockData\QuoteBlockData;
+use App\Services\Newsletter\DTOs\BlockData\RecentlyViewedBlockData;
 use App\Services\Newsletter\DTOs\BlockData\RewardBlockData;
 use App\Services\Newsletter\DTOs\BlockData\SchemaBlockData;
 use App\Services\Newsletter\DTOs\BlockData\SectionBlockData;
@@ -40,6 +44,7 @@ use App\Services\Newsletter\DTOs\BlockData\TeamBlockData;
 use App\Services\Newsletter\DTOs\BlockData\TeaserBlockData;
 use App\Services\Newsletter\DTOs\BlockData\TestimonialBlockData;
 use App\Services\Newsletter\DTOs\BlockData\TextBlockData;
+use App\Services\Newsletter\DTOs\BlockData\TrendingContentBlockData;
 
 class BlockDataFactory
 {
@@ -83,7 +88,12 @@ class BlockDataFactory
             'event' => EventBlockData::fromArray($data),
             'map-location' => MapLocationBlockData::fromArray($data),
             'page-grid' => PagegridBlockData::fromArray($data),
-            default => throw new \InvalidArgumentException("Unknown block type: {$type}")
+            'article_card' => ArticleCardBlockData::fromArray($data),
+            'article_recommendations' => ArticleRecommendationsBlockData::fromArray($data),
+            'recently_viewed_articles' => RecentlyViewedBlockData::fromArray($data),
+            'product_recommendations' => ProductRecommendationsBlockData::fromArray($data),
+            'trending_content' => TrendingContentBlockData::fromArray($data),
+            default => throw new \InvalidArgumentException("Unknown block type: {$type}"),
         };
     }
 }

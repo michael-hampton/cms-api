@@ -15,6 +15,8 @@ use App\Framework\Notifications\EmailableNotification;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Notifications\NotificationInterface;
 use App\Framework\Support\Logger;
+use App\Services\OpenCollab\UserConsentService;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 class NotificationDispatcherTest extends TestCase
@@ -144,7 +146,7 @@ class NotificationDispatcherTest extends TestCase
 
     private function makeEmailChannel(): EmailChannel
     {
-        return new EmailChannel(\Mockery::mock(MailManager::class), $this->makeLogger());
+        return new EmailChannel(\Mockery::mock(MailManager::class), $this->makeLogger(), \Mockery::mock(UserConsentService::class));
     }
 
     public function testEmailChannelRejectsNotificationWithoutEmail(): void
@@ -206,7 +208,7 @@ class NotificationDispatcherTest extends TestCase
         $mailManager = \Mockery::mock(MailManager::class);
         $mailManager->shouldReceive('to')->with('buyer@example.com')->once()->andReturn($pending);
 
-        $channel = new EmailChannel($mailManager, $this->makeLogger());
+        $channel = new EmailChannel($mailManager, $this->makeLogger(), Mockery::mock(UserConsentService::class));
         $result = $channel->send($n);
 
         $this->assertTrue($result);
@@ -223,7 +225,7 @@ class NotificationDispatcherTest extends TestCase
         $logger = \Mockery::mock(Logger::class);
         $logger->shouldReceive('error')->once();
 
-        $channel = new EmailChannel($mailManager, $logger);
+        $channel = new EmailChannel($mailManager, $logger, Mockery::mock(UserConsentService::class));
 
         $this->assertFalse($channel->send($n));
     }

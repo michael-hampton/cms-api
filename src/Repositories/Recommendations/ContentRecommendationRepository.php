@@ -2,8 +2,10 @@
 
 namespace App\Repositories\Recommendations;
 
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Comment;
+use App\Models\Member;
 use App\Models\MemberReadingPreference;
 use App\Models\Page;
 use App\Models\PageLike;
@@ -158,6 +160,44 @@ class ContentRecommendationRepository extends Repository
 
         return $query->with(['categories', 'tags', 'pageAuthors.author', 'metadata'])
             ->orderBy('published_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getRecentlyViewedArticles(
+        int     $siteId,
+        int     $limit,
+        ?Member $member = null
+    )
+    {
+        $query = Database::table('pages')
+            ->select([
+                'pages.id',
+                'pages.title',
+                'pages.slug',
+                'pages.meta_description as description',
+                'pages.hero_image_id',
+                Database::raw('MAX(page_views.viewed_at) as last_viewed_at'),
+            ])
+            ->join('page_views', 'pages.id', '=', 'page_views.page_id')
+            ->where('pages.site_id', $siteId);
+
+        if ($member !== null) {
+            $query->where('page_views.member_id', $member->id);
+        } elseif (!empty($ipAddress)) {
+            $query->where('page_views.ip_address', $ipAddress)
+                ->whereNull('page_views.member_id');
+        }
+
+        return $query
+            ->groupBy(
+                'pages.id',
+                'pages.title',
+                'pages.slug',
+                'pages.meta_description',
+                'pages.hero_image_id'
+            )
+            ->orderByDesc('last_viewed_at')
             ->limit($limit)
             ->get();
     }

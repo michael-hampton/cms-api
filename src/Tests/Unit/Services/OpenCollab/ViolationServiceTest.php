@@ -8,6 +8,7 @@ use App\Enums\OpenCollab\ViolationType;
 use App\Events\OpenCollab\ViolationRecordedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\ContributorViolation;
 use App\Models\User;
@@ -26,6 +27,7 @@ class ViolationServiceTest extends FunctionalTestCase
     private MockInterface $eventDispatcher;
     private MockInterface $databaseMock;
     private MockInterface $logger;
+    private NotificationDispatcher $notificationDispatcher;
 
     // -------------------------------------------------------------------------
     // record()
@@ -275,6 +277,7 @@ class ViolationServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->logger = Mockery::mock(Logger::class);
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
+        $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
 
         $this->service = new ViolationService(
             $this->violationRepository,
@@ -282,7 +285,10 @@ class ViolationServiceTest extends FunctionalTestCase
             $this->eventDispatcher,
             $this->databaseMock,
             $this->logger,
+            $this->notificationDispatcher
         );
+
+        $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
     }
 
     protected function tearDown(): void

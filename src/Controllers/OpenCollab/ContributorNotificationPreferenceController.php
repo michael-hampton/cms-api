@@ -11,9 +11,18 @@ use App\Services\OpenCollab\UserConsentService;
 
 class ContributorNotificationPreferenceController extends Controller
 {
-    public function __construct(private readonly UserConsentService $consentService)
+    public function __construct(
+        private readonly UserConsentService $consentService,
+    )
     {
         parent::__construct();
+    }
+
+    public function index(): JsonResponse
+    {
+        $preferences = $this->consentService->preferencesForUser(Auth::id());
+
+        return $this->resourceResponse(['preferences' => $preferences]);
     }
 
     public function updateBatch(UpdateUserPreferencesRequest $request, string $site): JsonResponse
@@ -26,7 +35,7 @@ class ContributorNotificationPreferenceController extends Controller
                 $data['preferences']
             );
 
-            return $this->jsonResponse(['success' => true]);
+            return $this->successResponse('Notification preferences saved.');
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         }

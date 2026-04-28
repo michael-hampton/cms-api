@@ -157,26 +157,29 @@
 
             <div class="oc-header__actions">
 
-                <!-- 🔔 Notification Bell -->
-                <div class="oc-notifications" id="oc-notifications">
-                    <button class="oc-notifications__btn" id="notification-btn" aria-label="Notifications">
+                <!-- Notification bell -->
+                <div class="oc-notif-bell" id="notif-bell-wrap">
+                    <button class="oc-notif-bell__btn" id="notif-bell"
+                            aria-label="Notifications"
+                            onclick="toggleNotifDropdown()">
                         <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
-                            <path d="M10 2a4 4 0 00-4 4v2.586L5.293 10.293A1 1 0 006 12h8a1 1 0 00.707-1.707L14 8.586V6a4 4 0 00-4-4z"/>
-                            <path d="M7 14a3 3 0 006 0H7z"/>
+                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-2.83-2h5.66A3 3 0 0110 18z"/>
                         </svg>
-
-                        <span class="oc-notifications__badge" id="notification-count" hidden>0</span>
+                        <span class="oc-notif-bell__badge" id="notif-count-badge"></span>
                     </button>
 
-                    <!-- Dropdown -->
-                    <div class="oc-notifications__dropdown" id="notification-dropdown">
-                        <div class="oc-notifications__header">
-                            <span>Notifications</span>
-                            <button id="mark-all-read" class="oc-link">Mark all as read</button>
+                    <div class="oc-notif-dropdown" id="notif-dropdown">
+                        <div class="oc-notif-dropdown__header">
+                            <span class="oc-notif-dropdown__heading">Notifications</span>
+                            <button class="oc-notif-dropdown__mark-all" onclick="markAllNotifRead()">
+                                Mark all read
+                            </button>
                         </div>
-
-                        <div id="notification-list" class="oc-notifications__list">
-                            <div class="oc-notifications__empty">No notifications</div>
+                        <div class="oc-notif-dropdown__list" id="notif-list">
+                            <div class="oc-notif-dropdown__empty" id="notif-empty">No notifications</div>
+                        </div>
+                        <div class="oc-notif-dropdown__footer">
+                            <a href="/<?= $site ?>/open-collab/notifications">View all</a>
                         </div>
                     </div>
                 </div>
@@ -256,139 +259,155 @@
     (function () {
         const API_BASE = '/api/<?= $site ?>/open-collab/notifications';
 
-        const btn = document.getElementById('notification-btn');
-        const dropdown = document.getElementById('notification-dropdown');
-        const list = document.getElementById('notification-list');
-        const badge = document.getElementById('notification-count');
-
-        function openDropdown() {
-            wrapper.classList.add('open');
-            loadNotifications();
-        }
-
-        function closeDropdown() {
-            wrapper.classList.remove('open');
-        }
-
-        document.addEventListener('click', (e) => {
-            if (!wrapper.contains(e.target)) {
-                closeDropdown();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeDropdown();
-            }
-        });
-
-        function toggleDropdown() {
-            wrapper.classList.contains('open') ? closeDropdown() : openDropdown();
-        }
-
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleDropdown();
-        });
         mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
 
-        if (!btn) return; // guard for pages without header
+        (function initNotifBell() {
+            const SITE_SLUG = '<?= htmlspecialchars($site ?? '') ?>';
+            const TOKEN = localStorage.getItem('oc_token') || '';
+            const baseUrl = `/api/${SITE_SLUG}/open-collab/notifications`;
 
-        btn.addEventListener('click', () => {
-            dropdown.hidden = !dropdown.hidden;
+            let dropdownOpen = false;
 
-            if (!dropdown.hidden) {
-                loadNotifications();
-            }
-        });
-
-        function loadUnreadCount() {
-            fetch(API_BASE + '/unread-count', {headers: authHeaders()})
-                .then(r => r.json())
-                .then(data => {
+            async function fetchCount() {
+                if (!TOKEN) return;
+                try {
+                    const res = await fetch(`${baseUrl}/unread-count`, {
+                        headers: {Authorization: `Bearer ${TOKEN}`}
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const badge = document.getElementById('notif-count-badge');
                     if (data.count > 0) {
-                        badge.hidden = false;
-                        badge.innerText = data.count;
+                        badge.textContent = data.count > 99 ? '99+' : data.count;
+                        badge.classList.add('oc-notif-bell__badge--visible');
                     } else {
-                        badge.hidden = true;
+                        badge.classList.remove('oc-notif-bell__badge--visible');
                     }
-                });
-        }
-
-        function loadNotifications() {
-            fetch(API_BASE, {headers: authHeaders()})
-                .then(r => r.json())
-                .then(data => renderNotifications(data.data || []));
-        }
-
-        function renderNotifications(items) {
-            if (!items.length) {
-                list.innerHTML = '<div class="oc-notifications__empty">No notifications</div>';
-                return;
+                } catch {
+                }
             }
 
-            list.innerHTML = items.map(n => `
-        <div class="oc-notification ${n.read ? '' : 'unread'}" data-id="${n.id}">
-            <div class="oc-notification__title">${n.title}</div>
-            <div class="oc-notification__message">${n.message}</div>
+            async function loadDropdown() {
+                if (!TOKEN) return;
+                try {
+                    const res = await fetch(`${baseUrl}?unread_only=0`, {
+                        headers: {Authorization: `Bearer ${TOKEN}`}
+                    });
+                    if (!res.ok) return;
+                    const data = await res.json();
 
-            ${n.action_url ? `<a href="${n.action_url}" class="oc-notification__link">View</a>` : ''}
-        </div>
-    `).join('');
-        }
+                    const list = document.getElementById('notif-list');
+                    const empty = document.getElementById('notif-empty');
 
-        list.addEventListener('click', e => {
-            const el = e.target.closest('.oc-notification');
-            if (!el) return;
+                    if (!data.notifications.length) {
+                        empty.style.display = 'block';
+                        return;
+                    }
 
-            const id = el.dataset.id;
+                    empty.style.display = 'none';
+                    list.innerHTML = '';
 
-            fetch(API_BASE + '/read', {
-                method: 'POST',
-                headers: authHeaders(),
-                body: JSON.stringify({notification_id: id})
-            });
+                    data.notifications.slice(0, 15).forEach(n => {
+                        const item = document.createElement('div');
+                        item.className = 'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
 
-            el.classList.remove('unread');
-            loadUnreadCount();
-        });
+                        // Ensure the message/body is captured correctly
+                        const messageText = n.body || n.message || '';
 
-        document.getElementById('mark-all-read')?.addEventListener('click', () => {
-            fetch(API_BASE + '/read-all', {
-                method: 'POST',
-                headers: authHeaders()
-            }).then(() => {
-                document.querySelectorAll('.oc-notification').forEach(n => n.classList.remove('unread'));
-                loadUnreadCount();
-            });
-        });
+                        item.innerHTML = `
+        <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
+        <div class="oc-notif-item__body">
+            <div class="oc-notif-item__title" style="font-weight: 600; color: var(--navy);">${escapeHtml(n.title)}</div>
+            ${messageText ? `<div class="oc-notif-item__text" style="font-size: .8rem; color: var(--slate); margin-top: 2px;">${escapeHtml(messageText)}</div>` : ''}
+            <div class="oc-notif-item__time" style="font-size: .7rem; color: var(--slate-pale); margin-top: 4px;">${formatRelative(n.created_at)}</div>
+        </div>`;
 
-        function authHeaders() {
-            return {
-                'Authorization': 'Bearer ' + localStorage.getItem('token'),
-                'Content-Type': 'application/json'
+                        item.addEventListener('click', () => markOneNotifRead(n.id, item));
+                        list.appendChild(item);
+                    });
+                } catch {
+                }
+            }
+
+            async function markOneNotifRead(id, el) {
+                el.style.background = 'transparent';
+                const dot = el.querySelector('div[style*="border-radius:50%"]');
+                if (dot) dot.style.display = 'none';
+
+                try {
+                    await fetch(`${baseUrl}/read`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`},
+                        body: JSON.stringify({notification_id: id})
+                    });
+                    fetchCount();
+                } catch {
+                }
+            }
+
+            window.markAllNotifRead = async function () {
+                try {
+                    await fetch(`${baseUrl}/read-all`, {
+                        method: 'POST',
+                        headers: {Authorization: `Bearer ${TOKEN}`}
+                    });
+                    document.getElementById('notif-count-badge').style.display = 'none';
+                    document.querySelectorAll('#notif-list > div').forEach(el => {
+                        el.style.background = 'transparent';
+                    });
+                } catch {
+                }
             };
-        }
 
-        function formatTitle(n) {
-            switch (n.type) {
-                case 'article_approved':
-                    return 'Article approved';
-                case 'article_rejected':
-                    return 'Article rejected';
-                case 'payout_processed':
-                    return 'Payout processed';
-                default:
-                    return 'Notification';
+            window.toggleNotifDropdown = function () {
+                const panel = document.getElementById('notif-dropdown');
+                dropdownOpen = !dropdownOpen;
+
+                if (dropdownOpen) {
+                    panel.style.display = 'block'; // Ensure it's visible
+                    panel.classList.add('oc-notif-dropdown--open');
+                    loadDropdown();
+                } else {
+                    panel.classList.remove('oc-notif-dropdown--open');
+                    panel.style.display = 'none';
+                }
+            };
+
+            document.addEventListener('click', e => {
+                const wrap = document.getElementById('notif-bell-wrap');
+                const panel = document.getElementById('notif-dropdown');
+
+                if (dropdownOpen && !wrap.contains(e.target)) {
+                    panel.classList.remove('oc-notif-dropdown--open');
+                    panel.style.display = 'none';
+                    dropdownOpen = false;
+                }
+            });
+
+            function escapeHtml(s) {
+                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             }
-        }
 
-        function formatMessage(n) {
-            return JSON.stringify(n.data);
-        }
+            function formatRelative(iso) {
+                const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
 
-        loadUnreadCount();
-        setInterval(loadUnreadCount, 30000);
+                // Handle future dates or system clock drift
+                if (diff < 0) return 'just now';
+
+                if (diff < 60) return 'just now';
+                if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+                if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+                if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+
+                // For anything over a week, show the actual date
+                return new Date(iso).toLocaleDateString();
+            }
+
+            // Initial count fetch + poll every 30s
+            fetchCount();
+            setInterval(fetchCount, 30_000);
+        })();
+
     })();
 </script>
 

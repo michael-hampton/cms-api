@@ -4,6 +4,7 @@ namespace App\Repositories\OpenCollab;
 
 use App\Framework\Support\Collection;
 use App\Models\UserConsent;
+use App\Repositories\Repository;
 
 /**
  * Persistence layer for user notification preferences (user_consents table).
@@ -11,7 +12,7 @@ use App\Models\UserConsent;
  * All queries are scoped by user_id. The consent_type_id + channel pair
  * uniquely identifies a preference row.
  */
-class UserConsentRepository
+class UserConsentRepository extends Repository
 {
     /**
      * Returns all consent rows for a given user, with their consent_type relation.
@@ -63,11 +64,37 @@ class UserConsentRepository
      *
      * @param array<int, array{consent_type_id: int, channel: string, granted: bool}> $preferences
      */
-    public function bulkUpsert(int $userId, array $preferences): void
+    public function bulkUpsert(int $userId, array $rows): void
     {
-        foreach ($preferences as $pref) {
-            $this->upsert($userId, $pref['consent_type_id'], $pref['channel'], $pref['granted']);
+        if (empty($rows)) {
+            return;
         }
+
+        $now = date('Y-m-d H:i:s');
+
+        $payload = array_map(fn(array $row) => [
+            'user_id' => $userId,
+            'consent_type_id' => $row['consent_type_id'],
+            'channel' => $row['channel'],
+            'is_granted' => (int)(bool)$row['granted'],
+            'granted_at' => $row['granted'] ? $now : null,
+            'revoked_at' => $row['granted'] ? null : $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $rows);
+
+        $updateColumns = [
+            'is_granted',
+            'granted_at',
+            'revoked_at',
+            'updated_at',
+        ];
+
+        UserConsent::upsert(
+            $payload,
+            ['user_id', 'consent_type_id', 'channel'],
+            $updateColumns
+        );
     }
 
     /**
@@ -89,7 +116,38 @@ class UserConsentRepository
         return $consent;
     }
 
-    public function seedDefaults(int $userId, array $defaults)
+    /**
+     * Insert default preference rows, ignoring any that already exist.
+     *
+     * Used during contributor onboarding to seed all types to opted-in.
+     * Caller is responsible for wrapping in a transaction.
+     *
+     * @param array<int, array{consent_type_id: int, channel: string, granted: bool}> $defaults
+     */
+    public function seedDefaults(int $userId, array $defaults): void
     {
+        $now = now();
+        $payload = [];
+
+        foreach ($defaults as $row) {
+            $payload[] = [
+                'user_id' => $userId,
+                'consent_type_id' => $row['consent_type_id'],
+                'channel' => $row['channel'],
+                'is_granted' => $row['granted'],
+                'granted_at' => $row['granted'] ? $now : null,
+                'revoked_at' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        // insertOrIgnore — existing rows survive untouched
+        $this->database->table('user_consents')->insertOrIgnore($payload);
+    }
+
+    protected function getModelClass(): string
+    {
+        return UserConsent::class;
     }
 }

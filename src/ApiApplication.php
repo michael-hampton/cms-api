@@ -84,6 +84,7 @@ use App\Framework\Queue\QueueDriverInterface;
 use App\Framework\Routing\RouteLoader;
 use App\Framework\Storage\StoragePathResolver;
 use App\Framework\Storage\StoragePathResolverInterface;
+use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\DeliverIssueDeliveryJob;
 use App\Listeners\Alerts\LogOfferExpiryAlertDispatched;
 use App\Listeners\BadgeEarnedListener;
@@ -135,6 +136,7 @@ use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
+use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
@@ -147,6 +149,9 @@ use App\Services\Members\AddressLookupService;
 use App\Services\Members\AddressLookupServiceInterface;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
 use App\Services\Members\Comments\SimpleSpamDetector;
+use App\Services\Newsletter\RecommendationResolver;
+use App\Services\Newsletter\Renderers\ArticleCardBlockRenderer;
+use App\Services\Newsletter\Renderers\ArticleRecommendationsBlockRenderer;
 use App\Services\Newsletter\Renderers\AwardBlockRenderer;
 use App\Services\Newsletter\Renderers\BannerBlockRenderer;
 use App\Services\Newsletter\Renderers\BuyingGuideBlockRenderer;
@@ -174,7 +179,9 @@ use App\Services\Newsletter\Renderers\PageLinksBlockRenderer;
 use App\Services\Newsletter\Renderers\PersonBlockRenderer;
 use App\Services\Newsletter\Renderers\ProductBlockRenderer;
 use App\Services\Newsletter\Renderers\ProductComparisonBlockRenderer;
+use App\Services\Newsletter\Renderers\ProductRecommendationBlockRenderer;
 use App\Services\Newsletter\Renderers\QuoteBlockRenderer;
+use App\Services\Newsletter\Renderers\RecentlyViewedArticlesBlockRenderer;
 use App\Services\Newsletter\Renderers\RewardBlockRenderer;
 use App\Services\Newsletter\Renderers\SchemaBlockRenderer;
 use App\Services\Newsletter\Renderers\SectionBlockRenderer;
@@ -186,6 +193,7 @@ use App\Services\Newsletter\Renderers\TeamBlockRenderer;
 use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
 use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
 use App\Services\Newsletter\Renderers\TextBlockRenderer;
+use App\Services\Newsletter\Renderers\TrendingContentBlockRenderer;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\Shared\NativeSessionStore;
@@ -358,7 +366,12 @@ class ApiApplication
                     new CardGroupBlockRenderer(new CardBlockRenderer()),
                     new EventBlockRenderer(),
                     new PagegridBlockRenderer(),
-                    new StatsBlockRenderer()
+                    new StatsBlockRenderer(),
+                    new ArticleCardBlockRenderer(app(PageRepository::class), app(Logger::class)),
+                    new ArticleRecommendationsBlockRenderer(app(RecommendationResolver::class)),
+                    new ProductRecommendationBlockRenderer(app(RecommendationResolver::class)),
+                    new TrendingContentBlockRenderer(app(RecommendationResolver::class)),
+                    new RecentlyViewedArticlesBlockRenderer(app(RecommendationResolver::class))
                 ]);
             }
         );
