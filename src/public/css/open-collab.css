@@ -1554,7 +1554,7 @@ body {
 }
 
 .oc-notif-dropdown__list {
-    max-height: 360px;
+    max-height: 300px;
     overflow-y: auto;
     overscroll-behavior: contain;
 }

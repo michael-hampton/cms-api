@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Models\Model;
 use App\Models\User;
 use App\Services\NotificationFormatter;
 use App\Services\UserNotificationService;
@@ -20,29 +21,42 @@ class NotificationController extends Controller
         parent::__construct();
     }
 
+    /**
+     * GET /api/{site}/open-collab/notifications
+     *
+     * Query params:
+     *   unread_only  bool   (default false)
+     *   cursor       string opaque cursor returned from the previous page
+     *   per_page     int    (default 15, max 50)
+     *
+     * Response:
+     * {
+     *   "notifications": [...],
+     *   "next_cursor": "eyJpZCI6MTIzfQ=="|null,
+     *   "unread_count": 4
+     * }
+     *
+     * When next_cursor is null there are no further pages.
+     */
     public function index(Request $request): JsonResponse
     {
         $unreadOnly = filter_var($request->get('unread_only', false), FILTER_VALIDATE_BOOLEAN);
+        $cursor = $request->get('cursor') ?: null;
+        $perPage = min((int)$request->get('per_page', 15), 50);
         $userId = Auth::id();
 
-        $notifications = $this->service->getNotifications($userId);
+        $page = $this->service->getNotificationsCursor($userId, $cursor, $perPage, $unreadOnly);
 
-        $items = $notifications
-            ->when($unreadOnly, fn($c) => $c->filter(fn($n) => !$n->isRead()))
-            ->map(fn($n) => $this->formatNotification($n))
-            ->values()
-            ->toArray();
+        $items = array_map(
+            fn($n) => $this->formatNotification($n),
+            $page['items'],
+        );
 
         return $this->resourceResponse([
             'notifications' => $items,
+            'next_cursor' => $page['next_cursor'],
             'unread_count' => $this->service->getUnreadCount($userId),
         ]);
-    }
-
-    private function user(): User
-    {
-        // Replace with your actual auth resolver
-        return User::find(Auth::id());
     }
 
     public function unreadCount(): JsonResponse
@@ -56,8 +70,7 @@ class NotificationController extends Controller
 
     public function markAsRead(Request $request): JsonResponse
     {
-        $user = $this->user();
-
+        $user = $this->resolveUser();
         $notificationId = (int)($request->get('notification_id') ?? 0);
 
         if ($notificationId <= 0) {
@@ -69,15 +82,20 @@ class NotificationController extends Controller
         return $this->resourceResponse(['success' => true]);
     }
 
-    // ─────────────────────────────
-
     public function markAllAsRead(): JsonResponse
     {
-        $user = $this->user();
+        $user = $this->resolveUser();
 
         $this->service->markAllAsRead($user);
 
         return $this->resourceResponse(['success' => true]);
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private function resolveUser(): Model
+    {
+        return User::find(Auth::id());
     }
 
     private function formatNotification($notification): array

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Framework\Database\CursorPaginator;
 use App\Models\User;
 use App\Repositories\UserNotificationRepository;
 use App\Services\OpenCollab\UserConsentService;
@@ -63,5 +64,30 @@ class UserNotificationService
     public function markAllAsRead(User $user): void
     {
         $this->repository->markAllAsRead($user->id);
+    }
+
+    /**
+     * Returns one page of notifications plus an opaque cursor for the next page.
+     *
+     * @return array{items: array, next_cursor: string|null}
+     */
+    public function getNotificationsCursor(
+        int     $userId,
+        ?string $cursor,
+        int     $perPage,
+        bool    $unreadOnly = false,
+    ): array
+    {
+        $paginator = CursorPaginator::from($cursor);
+
+        $query = $this->repository
+            ->queryForUser($userId, $unreadOnly)
+            ->orderBy('id', 'desc');
+
+        $query = $paginator->apply($query);
+
+        $rows = $query->limit($perPage + 1)->get();
+
+        return $paginator->paginate($rows, $perPage);
     }
 }

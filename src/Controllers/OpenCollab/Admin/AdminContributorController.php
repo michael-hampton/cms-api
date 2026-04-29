@@ -2,6 +2,9 @@
 
 namespace App\Controllers\OpenCollab\Admin;
 
+use App\Actions\OpenCollab\ChangeContributorRoleAction;
+use App\Actions\OpenCollab\DeactivateContributorAction;
+use App\Actions\OpenCollab\ReactivateContributorAction;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -11,7 +14,6 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 use App\Requests\OpenCollab\CloseContributorAccountRequest;
-use App\Services\Cms\UserService;
 use App\Services\OpenCollab\ContributorTerminationService;
 use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\SiteAccessService;
@@ -20,17 +22,18 @@ use App\Services\OpenCollab\SiteAccessService;
  * Admin contributor management area.
  *
  * Routes:
- *   GET  /api/{site}/open-collab/admin/contributors                    — list / search
- *   GET  /api/{site}/open-collab/admin/contributors/{id}               — show profile
- *   POST /api/{site}/open-collab/admin/contributors/{id}/deactivate    — deactivate
- *   POST /api/{site}/open-collab/admin/contributors/{id}/reactivate    — reactivate
- *   POST /api/{site}/open-collab/admin/contributors/{id}/close         — full closure
- *   POST /api/{site}/open-collab/admin/contributors/{id}/grant-access  — grant site access
- *   POST /api/{site}/open-collab/admin/contributors/{id}/revoke-access — revoke site access
+ *   GET    /api/{site}/open-collab/admin/contributors                    — list / search
+ *   GET    /api/{site}/open-collab/admin/contributors/{id}               — show profile
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/deactivate    — deactivate (reason required)
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/reactivate    — reactivate (reason required)
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/close         — full closure
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/grant-access  — grant site access
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/revoke-access — revoke site access
+ *   POST   /api/{site}/open-collab/admin/contributors/{id}/role          — change role (reason required)
  *
- *   GET  /api/{site}/open-collab/admin/invitations                     — list all invitations
- *   POST /api/{site}/open-collab/admin/invitations/{id}/resend         — resend (create new)
- *   DELETE /api/{site}/open-collab/admin/invitations/{id}              — revoke
+ *   GET    /api/{site}/open-collab/admin/invitations                     — list all invitations
+ *   POST   /api/{site}/open-collab/admin/invitations/{id}/resend         — resend (create new)
+ *   DELETE /api/{site}/open-collab/admin/invitations/{id}                — revoke
  */
 class AdminContributorController extends Controller
 {
@@ -40,7 +43,9 @@ class AdminContributorController extends Controller
         private readonly SiteAccessService             $siteAccessService,
         private readonly InvitationService             $invitationService,
         private readonly InvitationRepository          $invitationRepository,
-        private readonly UserService $userService
+        private readonly DeactivateContributorAction $deactivateAction,
+        private readonly ReactivateContributorAction $reactivateAction,
+        private readonly ChangeContributorRoleAction $changeRoleAction,
     )
     {
         parent::__construct();
@@ -61,31 +66,6 @@ class AdminContributorController extends Controller
         return $this->jsonResponse($this->formatPaginatedUsers($results));
     }
 
-    private function formatPaginatedUsers(array $result): array
-    {
-        // Adapt to however the framework returns paginated results
-        $items = $result['data'] ?? $result;
-        if (is_object($items) && method_exists($items, 'toArray')) {
-            $items = $items->toArray();
-        }
-
-        return array_map(fn($u) => $this->formatUser($u), (array)$items);
-    }
-
-    private function formatUser(\App\Models\User|array $user): array
-    {
-        $values = is_array($user) ? $user : $user->toArray();
-
-        return [
-            'id' => $values['id'] ?? null,
-            'name' => $values['name'] ?? null,
-            'email' => $values['email'] ?? null,
-            'is_active' => (bool)($values['is_active'] ?? false),
-            'is_contributor' => (bool)($values['is_contributor'] ?? false),
-            'created_at' => $values['created_at'] ?? null,
-        ];
-    }
-
     /**
      * GET /api/{site}/open-collab/admin/contributors/{id}
      */
@@ -102,42 +82,48 @@ class AdminContributorController extends Controller
 
     /**
      * POST /api/{site}/open-collab/admin/contributors/{id}/deactivate
-     * Soft deactivate — sets is_active = false. Account is preserved.
+     *
+     * Body: { "reason": "..." }
      */
-    public function deactivate(int $id): JsonResponse
+    public function deactivate(Request $request, int $id): JsonResponse
     {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        try {
+            $this->deactivateAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                reason: (string)$request->get('reason', ''),
+            );
 
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
+            return $this->successResponse('Contributor deactivated.');
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
         }
-
-        $model = is_array($contributor) ? \App\Models\User::find($contributor['id']) : $contributor;
-        $model?->update(['is_active' => false]);
-
-        return $this->successResponse('Contributor deactivated.');
     }
 
     /**
      * POST /api/{site}/open-collab/admin/contributors/{id}/reactivate
+     *
+     * Body: { "reason": "..." }
      */
-    public function reactivate(int $id): JsonResponse
+    public function reactivate(Request $request, int $id): JsonResponse
     {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        try {
+            $this->reactivateAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                reason: (string)$request->get('reason', ''),
+            );
 
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
+            return $this->successResponse('Contributor reactivated.');
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
         }
-
-        $model = is_array($contributor) ? \App\Models\User::find($contributor['id']) : $contributor;
-        $model?->update(['is_active' => true]);
-
-        return $this->successResponse('Contributor reactivated.');
     }
 
     /**
      * POST /api/{site}/open-collab/admin/contributors/{id}/close
-     * Full account closure — irreversible through the normal UI.
      */
     public function close(CloseContributorAccountRequest $request, int $id): JsonResponse
     {
@@ -159,7 +145,7 @@ class AdminContributorController extends Controller
         }
     }
 
-    // ── Invitations ───────────────────────────────────────────────────────────
+    // ── Site access ───────────────────────────────────────────────────────────
 
     /**
      * POST /api/{site}/open-collab/admin/contributors/{id}/grant-access
@@ -181,6 +167,32 @@ class AdminContributorController extends Controller
         return $this->successResponse('Site access revoked.');
     }
 
+    // ── Role ──────────────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/role
+     *
+     * Body: { "role": "editor", "reason": "..." }
+     */
+    public function updateRole(Request $request, int $id): JsonResponse
+    {
+        try {
+            $this->changeRoleAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                newRole: (string)$request->get('role', ''),
+                reason: (string)$request->get('reason', ''),
+            );
+
+            return $this->successResponse('Role updated.');
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    // ── Invitations ───────────────────────────────────────────────────────────
+
     /**
      * GET /api/{site}/open-collab/admin/invitations
      */
@@ -193,24 +205,8 @@ class AdminContributorController extends Controller
         );
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private function formatInvitation(\App\Models\Invitation $inv): array
-    {
-        return [
-            'id' => $inv->id,
-            'email' => $inv->email,
-            'status' => $inv->resolveStatus()->value,
-            'expires_at' => $inv->expires_at,
-            'used_at' => $inv->used_at,
-            'revoked_at' => $inv->revoked_at,
-            'created_at' => $inv->created_at,
-        ];
-    }
-
     /**
      * POST /api/{site}/open-collab/admin/invitations/{id}/resend
-     * Creates a new invitation for the same email (old one may be expired/used).
      */
     public function resendInvitation(int $id): JsonResponse
     {
@@ -250,27 +246,42 @@ class AdminContributorController extends Controller
         }
     }
 
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/role
-     *
-     * Body: { "role": "editor" }
-     */
-    public function updateRole(Request $request, int $id): JsonResponse
+    // ── Formatting ────────────────────────────────────────────────────────────
+
+    private function formatPaginatedUsers(array $result): array
     {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
-
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
+        $items = $result['data'] ?? $result;
+        if (is_object($items) && method_exists($items, 'toArray')) {
+            $items = $items->toArray();
         }
 
-        $role = $request->get('role');
+        return array_map(fn($u) => $this->formatUser($u), (array)$items);
+    }
 
-        if (!$role) {
-            return $this->errorResponse('Role is required.', 422);
-        }
+    private function formatUser(\App\Models\User|array $user): array
+    {
+        $values = is_array($user) ? $user : $user->toArray();
 
-        $this->userService->updateUser($id, ['role' => $role]);
+        return [
+            'id' => $values['id'] ?? null,
+            'name' => $values['name'] ?? null,
+            'email' => $values['email'] ?? null,
+            'is_active' => (bool)($values['is_active'] ?? false),
+            'is_contributor' => (bool)($values['is_contributor'] ?? false),
+            'created_at' => $values['created_at'] ?? null,
+        ];
+    }
 
-        return $this->successResponse('Role updated.');
+    private function formatInvitation(\App\Models\Invitation $inv): array
+    {
+        return [
+            'id' => $inv->id,
+            'email' => $inv->email,
+            'status' => $inv->resolveStatus()->value,
+            'expires_at' => $inv->expires_at,
+            'used_at' => $inv->used_at,
+            'revoked_at' => $inv->revoked_at,
+            'created_at' => $inv->created_at,
+        ];
     }
 }

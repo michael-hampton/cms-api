@@ -171,7 +171,7 @@
                     <div class="oc-notif-dropdown" id="notif-dropdown">
                         <div class="oc-notif-dropdown__header">
                             <span class="oc-notif-dropdown__heading">Notifications</span>
-                            <button class="oc-notif-dropdown__mark-all" onclick="markAllNotifRead()">
+                            <button class="oc-notif-dropdown__mark-all" onclick="window.bell.markAllRead()">
                                 Mark all read
                             </button>
                         </div>
@@ -179,7 +179,9 @@
                             <div class="oc-notif-dropdown__empty" id="notif-empty">No notifications</div>
                         </div>
                         <div class="oc-notif-dropdown__footer">
-                            <a href="/<?= $site ?>/open-collab/notifications">View all</a>
+                            <button id="notif-load-more" class="oc-notif-dropdown__mark-all">
+                                Load more
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -256,7 +258,7 @@
     const btn = document.getElementById('notification-btn');
     const dropdown = document.getElementById('notification-dropdown');
 
-    (function () {
+    /*(function () {
         const API_BASE = '/api/<?= $site ?>/open-collab/notifications';
 
         mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
@@ -265,6 +267,18 @@
             const SITE_SLUG = '<?= htmlspecialchars($site ?? '') ?>';
             const TOKEN = localStorage.getItem('oc_token') || '';
             const baseUrl = `/api/${SITE_SLUG}/open-collab/notifications`;
+            const dropdown = document.getElementById('notif-dropdown');
+            let nextCursor = null;
+            let loading = false;
+
+            dropdown.addEventListener('scroll', () => {
+                const nearBottom =
+                    dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 10;
+
+                if (nearBottom && nextCursor && !loading) {
+                    loadDropdown(false);
+                }
+            });
 
             let dropdownOpen = false;
 
@@ -287,61 +301,64 @@
                 }
             }
 
-            async function loadDropdown() {
-                if (!TOKEN) return;
+            async function loadDropdown(reset = true) {
+                if (!TOKEN || loading) return;
+
+                loading = true;
+
                 try {
-                    const res = await fetch(`${baseUrl}?unread_only=0`, {
-                        headers: {Authorization: `Bearer ${TOKEN}`}
+                    const url = new URL(baseUrl, window.location.origin);
+
+                    url.searchParams.set('per_page', 15);
+                    url.searchParams.set('unread_only', 0);
+
+                    if (!reset && nextCursor) {
+                        url.searchParams.set('cursor', nextCursor);
+                    }
+
+                    const res = await fetch(url, {
+                        headers: { Authorization: `Bearer ${TOKEN}` }
                     });
+
                     if (!res.ok) return;
+
                     const data = await res.json();
 
                     const list = document.getElementById('notif-list');
                     const empty = document.getElementById('notif-empty');
 
-                    if (!data.notifications.length) {
+                    if (reset) {
+                        list.innerHTML = '';
+                    }
+
+                    if (!data.notifications.length && reset) {
                         empty.style.display = 'block';
                         return;
                     }
 
                     empty.style.display = 'none';
-                    list.innerHTML = '';
 
-                    data.notifications.slice(0, 15).forEach(n => {
+                    data.notifications.forEach(n => {
                         const item = document.createElement('div');
                         item.className = 'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
 
-                        // Ensure the message/body is captured correctly
                         const messageText = n.body || n.message || '';
 
                         item.innerHTML = `
-        <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
-        <div class="oc-notif-item__body">
-            <div class="oc-notif-item__title" style="font-weight: 600; color: var(--navy);">${escapeHtml(n.title)}</div>
-            ${messageText ? `<div class="oc-notif-item__text" style="font-size: .8rem; color: var(--slate); margin-top: 2px;">${escapeHtml(messageText)}</div>` : ''}
-            <div class="oc-notif-item__time" style="font-size: .7rem; color: var(--slate-pale); margin-top: 4px;">${formatRelative(n.created_at)}</div>
-        </div>`;
+                <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
+                <div class="oc-notif-item__body">
+                    <div class="oc-notif-item__title">${escapeHtml(n.title)}</div>
+                    ${messageText ? `<div class="oc-notif-item__text">${escapeHtml(messageText)}</div>` : ''}
+                </div>
+            `;
 
-                        item.addEventListener('click', () => markOneNotifRead(n.id, item));
                         list.appendChild(item);
                     });
-                } catch {
-                }
-            }
 
-            async function markOneNotifRead(id, el) {
-                el.style.background = 'transparent';
-                const dot = el.querySelector('div[style*="border-radius:50%"]');
-                if (dot) dot.style.display = 'none';
+                    nextCursor = data.next_cursor;
 
-                try {
-                    await fetch(`${baseUrl}/read`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}`},
-                        body: JSON.stringify({notification_id: id})
-                    });
-                    fetchCount();
-                } catch {
+                } finally {
+                    loading = false;
                 }
             }
 
@@ -408,7 +425,237 @@
             setInterval(fetchCount, 30_000);
         })();
 
-    })();
+    })();*/
+
+    class NotificationBell {
+        constructor({siteSlug, token}) {
+            this.siteSlug = siteSlug;
+            this.token = token;
+
+            this.baseUrl = `/api/${siteSlug}/open-collab/notifications`;
+
+            // state
+            this.dropdownOpen = false;
+            this.nextCursor = null;
+            this.loading = false;
+
+            // DOM
+            this.dropdown = null;
+            this.list = null;
+            this.empty = null;
+            this.badge = null;
+        }
+
+        init() {
+            this.dropdown = document.getElementById('notif-dropdown');
+            this.list = document.getElementById('notif-list');
+            this.empty = document.getElementById('notif-empty');
+            this.badge = document.getElementById('notif-count-badge');
+
+            this.bindEvents();
+            this.startPolling();
+        }
+
+        bindEvents() {
+            // scroll pagination
+            this.list.addEventListener('scroll', () => {
+                const nearBottom =
+                    this.list.scrollTop + this.list.clientHeight >=
+                    this.list.scrollHeight - 10;
+
+                if (nearBottom && this.nextCursor && !this.loading) {
+                    this.load(false);
+                }
+            });
+
+            document.getElementById('notif-load-more')
+                .addEventListener('click', () => {
+                    this.load(false);
+                });
+
+            // click outside
+            document.addEventListener('click', (e) => {
+                const wrap = document.getElementById('notif-bell-wrap');
+
+                if (this.dropdownOpen && !wrap.contains(e.target)) {
+                    this.close();
+                }
+            });
+        }
+
+        toggle() {
+            this.dropdownOpen ? this.close() : this.open();
+        }
+
+        open() {
+            this.dropdownOpen = true;
+
+            this.dropdown.style.display = 'block';
+            this.dropdown.classList.add('oc-notif-dropdown--open');
+
+            this.nextCursor = null;
+            this.load(true);
+        }
+
+        close() {
+            this.dropdownOpen = false;
+
+            this.dropdown.classList.remove('oc-notif-dropdown--open');
+            this.dropdown.style.display = 'none';
+        }
+
+        async load(reset = true) {
+            if (!this.token || this.loading) return;
+
+            this.loading = true;
+
+            const btn = document.getElementById('notif-load-more');
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Loading...';
+            }
+
+            try {
+                const url = new URL(this.baseUrl, window.location.origin);
+
+                url.searchParams.set('per_page', 15);
+                url.searchParams.set('unread_only', 0);
+
+                if (!reset && this.nextCursor) {
+                    url.searchParams.set('cursor', this.nextCursor);
+                }
+
+                const res = await fetch(url, {
+                    headers: {
+                        Authorization: `Bearer ${this.token}`
+                    }
+                });
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+                // reset only on first load
+                if (reset) {
+                    this.list.innerHTML = '';
+                }
+
+                if (reset && (!data.notifications || data.notifications.length === 0)) {
+                    this.empty.style.display = 'block';
+                    return;
+                }
+
+                this.empty.style.display = 'none';
+
+                data.notifications.forEach(n => {
+                    const item = document.createElement('div');
+                    item.className =
+                        'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
+
+                    const message = n.body || n.message || '';
+
+                    item.innerHTML = `
+                <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
+                <div class="oc-notif-item__body">
+                    <div class="oc-notif-item__title">${this.escape(n.title)}</div>
+                    ${message ? `<div class="oc-notif-item__text">${this.escape(message)}</div>` : ''}
+                </div>
+            `;
+
+                    this.list.appendChild(item);
+                });
+
+                // update cursor
+                this.nextCursor = data.next_cursor;
+
+                // 👇 key improvement: button state
+                if (btn) {
+                    if (!this.nextCursor) {
+                        btn.style.display = 'none';
+                    } else {
+                        btn.style.display = 'block';
+                        btn.disabled = false;
+                        btn.textContent = 'Load more';
+                    }
+                }
+
+            } finally {
+                this.loading = false;
+            }
+        }
+
+        startPolling() {
+            this.fetchCount();
+
+            setInterval(() => this.fetchCount(), 30000);
+        }
+
+        async fetchCount() {
+            if (!this.token) return;
+
+            try {
+                const res = await fetch(`${this.baseUrl}/unread-count`, {
+                    headers: {Authorization: `Bearer ${this.token}`}
+                });
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+
+                if (data.count > 0) {
+                    this.badge.textContent = data.count > 99 ? '99+' : data.count;
+                    this.badge.classList.add('oc-notif-bell__badge--visible');
+                } else {
+                    this.badge.classList.remove('oc-notif-bell__badge--visible');
+                }
+            } catch {
+            }
+        }
+
+        async markAllRead() {
+            if (!this.token) return;
+
+            try {
+                await fetch(`${this.baseUrl}/read-all`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${this.token}`
+                    }
+                });
+
+                // UI update (no full reload needed)
+                this.badge.classList.remove('oc-notif-bell__badge--visible');
+                this.badge.textContent = '';
+
+                // mark items visually as read
+                this.list.querySelectorAll('.oc-notif-item').forEach(el => {
+                    el.classList.remove('oc-notif-item--unread');
+                });
+
+            } catch (e) {
+                // optional: console.warn('Failed to mark all as read', e);
+            }
+        }
+
+        escape(s) {
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+    }
+
+    const bell = new NotificationBell({
+        siteSlug: '<?= htmlspecialchars($site ?? '') ?>',
+        token: localStorage.getItem('oc_token') || ''
+    });
+
+    bell.init();
+
+    // expose toggle for button
+    window.toggleNotifDropdown = () => bell.toggle();
+    window.markAllNotifRead = () => bell.markAllRead?.();
 </script>
 
 @yield('scripts')

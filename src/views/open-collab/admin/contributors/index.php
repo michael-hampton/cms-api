@@ -162,6 +162,30 @@
     </div>
 </div>
 
+<div id="action-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
+     onclick="if(event.target===this)closeActionModal()">
+    <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+        <h3 id="action-modal-title"
+            style="font-family:var(--font-display);font-size:1.2rem;color:var(--navy);margin-bottom:6px;">Update
+            Status</h3>
+        <p id="action-modal-desc" style="font-size:.85rem;color:var(--slate);margin-bottom:20px;"></p>
+
+        <div class="oc-form-group">
+            <label class="oc-label" for="action-reason">Reason for change</label>
+            <textarea class="oc-input" id="action-reason" rows="3"
+                      placeholder="Explain why this status is changing..."></textarea>
+        </div>
+
+        <div id="action-modal-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
+
+        <div style="display:flex;gap:10px;">
+            <button onclick="closeActionModal()" class="oc-btn oc-btn--ghost" style="flex:1;">Cancel</button>
+            <button id="action-confirm-btn" class="oc-btn" style="flex:1;">Confirm</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -176,6 +200,9 @@
     const PER_PAGE = 25;
     let debounceTimer = null;
     let lastResults = [];   // cached for client-side status filter fallback
+    let currentActionId = null;
+    let currentActionType = null;
+    let pendingRole = null;
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', () => {
@@ -276,37 +303,45 @@
             ? '<span class="oc-badge oc-badge--published">Active</span>'
             : '<span class="oc-badge oc-badge--revoked">Inactive</span>';
 
+        // Call openActionModal instead of direct API functions
         const actionBtn = isActive
-            ? `<button onclick="deactivate(${c.id}, this)"
-                       class="oc-btn oc-btn--ghost oc-btn--sm"
-                       style="border-color:#fecaca;color:var(--red);">Deactivate</button>`
-            : `<button onclick="reactivate(${c.id}, this)"
-                       class="oc-btn oc-btn--ghost oc-btn--sm"
-                       style="border-color:#bbf7d0;color:var(--green);">Reactivate</button>`;
+            ? `<button onclick="openActionModal(${c.id}, 'deactivate')"
+                   class="oc-btn oc-btn--ghost oc-btn--sm"
+                   style="border-color:#fecaca;color:var(--red);">Deactivate</button>`
+            : `<button onclick="openActionModal(${c.id}, 'reactivate')"
+                   class="oc-btn oc-btn--ghost oc-btn--sm"
+                   style="border-color:#bbf7d0;color:var(--green);">Reactivate</button>`;
 
         return `<tr id="contrib-row-${c.id}">
-            <td>
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);
-                                display:grid;place-items:center;font-weight:700;font-size:.8rem;
-                                color:var(--amber);flex-shrink:0;">${escHtml(initial)}</div>
-                    <div>
-                        <div style="font-weight:500;color:var(--navy);">${escHtml(c.name || '–')}</div>
-                        <div style="font-size:.75rem;color:var(--slate);">${escHtml(c.email || '')}</div>
-                    </div>
+        <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);
+                            display:grid;place-items:center;font-weight:700;font-size:.8rem;
+                            color:var(--amber);flex-shrink:0;">${escHtml(initial)}</div>
+                <div>
+                    <div style="font-weight:500;color:var(--navy);">${escHtml(c.name || '–')}</div>
+                    <div style="font-size:.75rem;color:var(--slate);">${escHtml(c.email || '')}</div>
                 </div>
-            </td>
-            <td>${statusBadge}</td>
-            <td style="font-size:.82rem;color:var(--slate);">${escHtml(c.role || 'contributor')}</td>
-            <td style="font-size:.78rem;color:var(--slate);">${joined}</td>
-            <td style="text-align:right;">
-                <div style="display:flex;gap:6px;justify-content:flex-end;">
-                    <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${c.id}"
-                       class="oc-btn oc-btn--ghost oc-btn--sm">View</a>
-                    ${actionBtn}
-                </div>
-            </td>
-        </tr>`;
+            </div>
+        </td>
+        <td>${statusBadge}</td>
+        <td>
+            <select class="oc-input" style="font-size:.82rem; padding:4px 8px; height:auto; width:auto;"
+                    onchange="openActionModal(${c.id}, 'role', this.value)">
+                <option value="contributor" ${c.role === 'contributor' ? 'selected' : ''}>Contributor</option>
+                <option value="editor" ${c.role === 'editor' ? 'selected' : ''}>Editor</option>
+                <option value="admin" ${c.role === 'admin' ? 'selected' : ''}>Admin</option>
+            </select>
+        </td>
+        <td style="font-size:.78rem;color:var(--slate);">${joined}</td>
+        <td style="text-align:right;">
+            <div style="display:flex;gap:6px;justify-content:flex-end;">
+                <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${c.id}"
+                   class="oc-btn oc-btn--ghost oc-btn--sm">View</a>
+                ${actionBtn}
+            </div>
+        </td>
+    </tr>`;
     }
 
     // ── Pagination ────────────────────────────────────────────────────────────
@@ -416,49 +451,104 @@
         }
     }
 
-    async function deactivate(id, btn) {
-        if (!confirm('Deactivate this contributor? They will lose access immediately.')) return;
-        btn.disabled = true;
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/deactivate`, {
-                method: 'POST',
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-            });
-            if (res.ok) {
-                showToast('Contributor deactivated');
-                // Patch local cache and re-render without API call
-                const c = lastResults.find(x => x.id === id);
-                if (c) c.is_active = false;
-                renderTable(lastResults);
-            } else {
-                showToast('Deactivation failed', false);
-                btn.disabled = false;
-            }
-        } catch {
-            showToast('Network error', false);
-            btn.disabled = false;
+    function openActionModal(id, type, role = null) {
+        currentActionId = id;
+        currentActionType = type;
+        pendingRole = role;
+
+        const isDeactivate = type === 'deactivate';
+        const isRole = type === 'role';
+
+        const title = document.getElementById('action-modal-title');
+        const desc = document.getElementById('action-modal-desc');
+        const btn = document.getElementById('action-confirm-btn');
+
+        if (isRole) {
+            title.textContent = 'Change Contributor Role';
+            desc.textContent = `Changing role to "${role}". Please provide a reason.`;
+            btn.className = 'oc-btn oc-btn--amber';
+            btn.textContent = 'Update Role';
+        } else {
+            title.textContent = isDeactivate ? 'Deactivate Account' : 'Reactivate Account';
+            desc.textContent = isDeactivate
+                ? 'They will lose access immediately. Please provide a reason.'
+                : 'Access will be restored. Please provide a reason.';
+            btn.className = isDeactivate ? 'oc-btn oc-btn--danger' : 'oc-btn oc-btn--amber';
+            btn.textContent = isDeactivate ? 'Deactivate account' : 'Reactivate account';
         }
+
+        btn.onclick = submitStatusChange;
+        document.getElementById('action-modal').style.display = 'grid';
+        document.getElementById('action-reason').focus();
     }
 
-    async function reactivate(id, btn) {
+    function closeActionModal() {
+        document.getElementById('action-modal').style.display = 'none';
+        document.getElementById('action-reason').value = '';
+        document.getElementById('action-modal-errors').style.display = 'none';
+        // Refresh table to revert select dropdown if user cancelled
+        renderTable(lastResults);
+    }
+
+    async function submitStatusChange() {
+        const reason = document.getElementById('action-reason').value.trim();
+        const errBox = document.getElementById('action-modal-errors');
+        const btn = document.getElementById('action-confirm-btn');
+        errBox.style.display = 'none';
+
+        if (!reason) {
+            errBox.textContent = 'Please provide a reason.';
+            errBox.style.display = 'block';
+            return;
+        }
+
         btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.innerHTML = '<div class="oc-spinner"></div> Processing…';
+
+        let url, body;
+        if (currentActionType === 'role') {
+            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/role`;
+            body = JSON.stringify({role: pendingRole, reason: reason});
+        } else {
+            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/${currentActionType}`;
+            body = JSON.stringify({reason: reason});
+        }
+
         try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/reactivate`, {
+            const res = await fetch(url, {
                 method: 'POST',
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${TOKEN()}`,
+                    'Accept': 'application/json'
+                },
+                body: body,
             });
+
             if (res.ok) {
-                showToast('Contributor reactivated');
-                const c = lastResults.find(x => x.id === id);
-                if (c) c.is_active = true;
+                closeActionModal();
+                showToast('Update successful');
+
+                // Update local cache
+                const c = lastResults.find(x => x.id === currentActionId);
+                if (c) {
+                    if (currentActionType === 'role') c.role = pendingRole;
+                    else c.is_active = (currentActionType === 'reactivate');
+                }
                 renderTable(lastResults);
             } else {
-                showToast('Reactivation failed', false);
+                const data = await res.json();
+                errBox.textContent = data.error || 'Request failed.';
+                errBox.style.display = 'block';
                 btn.disabled = false;
+                btn.textContent = originalText;
             }
-        } catch {
-            showToast('Network error', false);
+        } catch (e) {
+            errBox.textContent = 'Network error.';
+            errBox.style.display = 'block';
             btn.disabled = false;
+            btn.textContent = originalText;
         }
     }
 

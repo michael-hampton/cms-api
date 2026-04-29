@@ -2,6 +2,7 @@
 
 namespace App\Repositories;
 
+use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Model;
 use App\Models\UserNotification;
@@ -61,5 +62,16 @@ class UserNotificationRepository
             ->where('user_id', $userId)
             ->whereNull('read_at')
             ->update(['read_at' => now()]);
+    }
+
+    public function queryForUser(int $userId, bool $unreadOnly): QueryBuilder
+    {
+        $query = UserNotification::where('user_id', $userId);
+
+        if ($unreadOnly) {
+            $query->whereNull('read_at');
+        }
+
+        return $query;
     }
 }

@@ -209,7 +209,7 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                 </div>
 
                 <?php if ($isActive): ?>
-                    <button onclick="deactivate(<?= (int)$contributor['id'] ?>)"
+                    <button onclick="openActionModal(<?= (int)$contributor['id'] ?>, 'deactivate')"
                             class="oc-btn oc-btn--ghost oc-btn--block"
                             style="border-color:#fecaca;color:var(--red);">
                         <svg viewBox="0 0 20 20" fill="currentColor" width="14">
@@ -220,7 +220,7 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                         Deactivate account
                     </button>
                 <?php else: ?>
-                    <button onclick="reactivate(<?= (int)$contributor['id'] ?>)"
+                    <button onclick="openActionModal(<?= (int)$contributor['id'] ?>, 'reactivate')"
                             class="oc-btn oc-btn--ghost oc-btn--block"
                             style="border-color:#bbf7d0;color:var(--green);">
                         <svg viewBox="0 0 20 20" fill="currentColor" width="14">
@@ -265,6 +265,30 @@ $isActive = (bool)($contributor['is_active'] ?? true);
 
 </div>
 
+<div id="action-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
+     onclick="if(event.target===this)closeActionModal()">
+    <div style="background:#fff;border-radius:12px;padding:28px 32px;max-width:400px;width:92%;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+        <h3 id="action-modal-title"
+            style="font-family:var(--font-display);font-size:1.2rem;color:var(--navy);margin-bottom:6px;">Update
+            Status</h3>
+        <p id="action-modal-desc" style="font-size:.85rem;color:var(--slate);margin-bottom:20px;"></p>
+
+        <div class="oc-form-group">
+            <label class="oc-label" for="action-reason">Reason for change</label>
+            <textarea class="oc-input" id="action-reason" rows="3"
+                      placeholder="Explain why this status is changing..."></textarea>
+        </div>
+
+        <div id="action-modal-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
+
+        <div style="display:flex;gap:10px;">
+            <button onclick="closeActionModal()" class="oc-btn oc-btn--ghost" style="flex:1;">Cancel</button>
+            <button id="action-confirm-btn" class="oc-btn" style="flex:1;">Confirm</button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -273,26 +297,92 @@ $isActive = (bool)($contributor['is_active'] ?? true);
     const CONTRIBUTOR_ID = <?= (int)$contributor['id'] ?>;
     const CONTRIBUTOR_EMAIL = '<?= htmlspecialchars($contributor['email'] ?? '') ?>';
     const TOKEN = () => localStorage.getItem('oc_token') || '';
+    let currentActionId = null;
+    let currentActionType = ''; // 'deactivate' or 'reactivate'
+    let pendingRole = null; // Store the role temporarily until the modal is confirmed
 
-    async function deactivate(id) {
-        if (!confirm('Deactivate this contributor?')) return;
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/deactivate`, {
-            method: 'POST', headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        if (res.ok) {
-            showToast('Deactivated');
-            setTimeout(() => location.reload(), 800);
-        } else showToast('Failed', false);
+    function openActionModal(id, type, role = null) {
+        currentActionId = id;
+        currentActionType = type;
+        pendingRole = role; // Store the role for the submit function
+
+        const isDeactivate = type === 'deactivate';
+        const isReactivate = type === 'reactivate';
+        const isRole = type === 'role';
+
+        const titleEl = document.getElementById('action-modal-title');
+        const descEl = document.getElementById('action-modal-desc');
+        const btn = document.getElementById('action-confirm-btn');
+
+        if (isRole) {
+            titleEl.textContent = 'Change Contributor Role';
+            descEl.textContent = `Please provide a reason for changing the role to "${role}".`;
+            btn.className = 'oc-btn oc-btn--amber';
+            btn.textContent = 'Update Role';
+        } else {
+            titleEl.textContent = isDeactivate ? 'Deactivate Account' : 'Reactivate Account';
+            descEl.textContent = isDeactivate
+                ? 'The contributor will lose access immediately. Please provide a reason.'
+                : 'This will restore the contributor\'s access. Please provide a reason.';
+
+            btn.className = isDeactivate ? 'oc-btn oc-btn--danger' : 'oc-btn oc-btn--amber';
+            btn.textContent = isDeactivate ? 'Deactivate account' : 'Reactivate account';
+        }
+
+        btn.onclick = submitStatusChange;
+
+        document.getElementById('action-modal').style.display = 'grid';
+        document.getElementById('action-reason').focus();
     }
 
-    async function reactivate(id) {
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/reactivate`, {
-            method: 'POST', headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+    function closeActionModal() {
+        document.getElementById('action-modal').style.display = 'none';
+        document.getElementById('action-reason').value = '';
+        document.getElementById('action-modal-errors').style.display = 'none';
+    }
+
+    async function submitStatusChange() {
+        const reason = document.getElementById('action-reason').value.trim();
+        const errBox = document.getElementById('action-modal-errors');
+        const btn = document.getElementById('action-confirm-btn');
+
+        if (!reason) {
+            errBox.textContent = 'Please provide a reason for this action.';
+            errBox.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<div class="oc-spinner"></div> Processing...';
+
+        if (currentActionType === 'role') {
+            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/role`;
+            body = JSON.stringify({role: pendingRole, reason: reason}); // Now has the value
+        } else {
+            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/${currentActionType}`;
+            body = JSON.stringify({reason: reason});
+        }
+
+        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${currentActionId}/${currentActionType}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${TOKEN()}`,
+                'Accept': 'application/json'
+            },
+            body: body,
         });
+
         if (res.ok) {
-            showToast('Reactivated');
+            showToast(currentActionType === 'deactivate' ? 'Deactivated' : 'Reactivated');
             setTimeout(() => location.reload(), 800);
-        } else showToast('Failed', false);
+        } else {
+            const data = await res.json();
+            errBox.textContent = data.error || 'Request failed.';
+            errBox.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Confirm';
+        }
     }
 
     async function grantAccess(id) {
@@ -311,16 +401,22 @@ $isActive = (bool)($contributor['is_active'] ?? true);
     }
 
     async function updateRole(id, role) {
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${id}/role`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({role}),
-        });
-        res.ok ? showToast('Role updated') : showToast('Failed to update role', false);
+        // Save the target role and ID
+        currentActionId = id;
+        currentActionType = 'role';
+        pendingRole = role;
+
+        // Configure the modal for Role Change
+        document.getElementById('action-modal-title').textContent = 'Change Contributor Role';
+        document.getElementById('action-modal-desc').textContent = `You are changing the role to "${role.charAt(0).toUpperCase() + role.slice(1)}". Please provide a reason for this change.`;
+
+        const btn = document.getElementById('action-confirm-btn');
+        btn.className = 'oc-btn oc-btn--amber';
+        btn.textContent = 'Update Role';
+        btn.onclick = submitStatusChange; // Reuses the same submission logic
+
+        document.getElementById('action-modal').style.display = 'grid';
+        document.getElementById('action-reason').focus();
     }
 
     async function sendNewInvite() {
