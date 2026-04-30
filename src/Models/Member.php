@@ -451,4 +451,15 @@ class Member extends Model
     {
         return $this->belongsTo(User::class, 'assigned_agent_id', 'id', $relation);
     }
+
+    public function segments($relation = false)
+    {
+        return $this->belongsToMany(
+            \App\Models\Segment::class,
+            'member_segments', // pivot table
+            'member_id',
+            'segment_id',
+            $relation
+        );
+    }
 }

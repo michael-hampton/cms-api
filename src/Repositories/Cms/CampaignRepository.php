@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Cms;
 
+use App\Enums\Campaigns\CampaignScheduleStatus;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Campaign;
@@ -261,6 +262,19 @@ class CampaignRepository extends Repository
         $campaign = $this->findBySlug($slug, $siteId);
 
         return ($campaign && $campaign instanceof Campaign && $campaign->isValidForSignup()) ? $campaign : null;
+    }
+
+    /**
+     * Returns all campaigns whose scheduled_at has arrived and whose
+     * schedule_status is still `scheduled` (not paused or already sent).
+     *
+     * @return Collection<Campaign>
+     */
+    public function findDueForDispatch(): Collection
+    {
+        return Campaign::where('schedule_status', CampaignScheduleStatus::Scheduled->value)
+            ->where('scheduled_at', '<=', now())
+            ->get();
     }
 
     protected function getModelClass(): string

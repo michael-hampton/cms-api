@@ -3,6 +3,7 @@
 
 namespace App\Tests\Unit\Repositories\Cms;
 
+use App\Enums\Campaigns\CampaignScheduleStatus;
 use App\Models\Campaign;
 use App\Repositories\Cms\CampaignRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -266,6 +267,51 @@ class CampaignRepositoryTest extends RepositoryTestCase
         $this->assertEquals(0, $stats[0]['clicks']);
         $this->assertEquals(0, $stats[0]['open_rate']);
         $this->assertEquals(0, $stats[0]['click_rate']);
+    }
+
+    public function test_it_finds_only_due_scheduled_campaigns(): void
+    {
+        $newsletter = $this->createNewsletter();
+
+        $now = date('Y-m-d H:i:s');
+
+        // ✅ should be returned (past)
+        $dueCampaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Due Campaign',
+            'slug' => 'due',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'schedule_status' => CampaignScheduleStatus::Scheduled->value,
+            'scheduled_at' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+        ]);
+
+        // ❌ should NOT be returned (future)
+        $futureCampaign = Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Future Campaign',
+            'slug' => 'future',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'schedule_status' => CampaignScheduleStatus::Scheduled->value,
+            'scheduled_at' => date('Y-m-d H:i:s', strtotime('+2 hours')),
+        ]);
+
+        // ❌ wrong status
+        Campaign::create([
+            'site_id' => $this->siteId,
+            'name' => 'Wrong Status Campaign',
+            'slug' => 'wrong-status',
+            'newsletter_id' => $newsletter->id,
+            'is_active' => true,
+            'schedule_status' => CampaignScheduleStatus::Sent->value,
+            'scheduled_at' => date('Y-m-d H:i:s', strtotime('-2 hours')),
+        ]);
+
+        $result = $this->repository->findDueForDispatch();
+
+        $this->assertCount(1, $result);
+        $this->assertEquals($dueCampaign->id, $result->first()->id);
     }
 
     protected function setUp(): void

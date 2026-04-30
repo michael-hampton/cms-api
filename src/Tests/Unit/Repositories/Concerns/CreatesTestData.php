@@ -72,6 +72,7 @@ use App\Models\ProductVoucher;
 use App\Models\PromotionIssueExclusion;
 use App\Models\RegionSet;
 use App\Models\RewardDefinition;
+use App\Models\Segment;
 use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -1040,5 +1041,17 @@ trait CreatesTestData
         ], $overrides);
 
         return UserNotification::create($data);
+    }
+
+    public function createSegment(array $overrides = []): Model
+    {
+        return Segment::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Segment',
+            'key' => uniqid(),
+            'is_active' => true,
+            'description' => 'Test Segment',
+            'category' => 'test'
+        ]));
     }
 }

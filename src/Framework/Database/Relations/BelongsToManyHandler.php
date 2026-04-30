@@ -253,11 +253,21 @@ class BelongsToManyHandler extends RelationshipHandler implements PivotOperation
             $pivotRecord = array_merge($pivotData, [
                 $this->relationData['foreign_key'] => $parentId,
                 $this->relationData['related_key'] => $relatedId,
-                'created_at' => $pivotData['created_at'] ?? date('Y-m-d H:i:s'),
-                'updated_at' => $pivotData['updated_at'] ?? date('Y-m-d H:i:s'),
             ]);
 
-            $insertQuery = new QueryBuilder($this->relationData['pivot_table'], $this->eagerLoader, $this->database);
+            if (!empty($this->relationData['with_timestamps'])) {
+                $now = date('Y-m-d H:i:s');
+
+                $pivotRecord['created_at'] = $pivotData['created_at'] ?? $now;
+                $pivotRecord['updated_at'] = $pivotData['updated_at'] ?? $now;
+            }
+
+            $insertQuery = new QueryBuilder(
+                $this->relationData['pivot_table'],
+                $this->eagerLoader,
+                $this->database
+            );
+
             if ($insertQuery->insert($pivotRecord)) {
                 $attached++;
             }

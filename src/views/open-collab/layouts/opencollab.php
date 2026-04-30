@@ -171,7 +171,7 @@
                     <div class="oc-notif-dropdown" id="notif-dropdown">
                         <div class="oc-notif-dropdown__header">
                             <span class="oc-notif-dropdown__heading">Notifications</span>
-                            <button class="oc-notif-dropdown__mark-all" onclick="window.bell.markAllRead()">
+                            <button class="oc-notif-dropdown__mark-all" onclick="window.markAllNotifRead()">
                                 Mark all read
                             </button>
                         </div>
@@ -258,175 +258,6 @@
     const btn = document.getElementById('notification-btn');
     const dropdown = document.getElementById('notification-dropdown');
 
-    /*(function () {
-        const API_BASE = '/api/<?= $site ?>/open-collab/notifications';
-
-        mq.addEventListener('change', e => toggleBtn.style.display = e.matches ? 'grid' : 'none');
-
-        (function initNotifBell() {
-            const SITE_SLUG = '<?= htmlspecialchars($site ?? '') ?>';
-            const TOKEN = localStorage.getItem('oc_token') || '';
-            const baseUrl = `/api/${SITE_SLUG}/open-collab/notifications`;
-            const dropdown = document.getElementById('notif-dropdown');
-            let nextCursor = null;
-            let loading = false;
-
-            dropdown.addEventListener('scroll', () => {
-                const nearBottom =
-                    dropdown.scrollTop + dropdown.clientHeight >= dropdown.scrollHeight - 10;
-
-                if (nearBottom && nextCursor && !loading) {
-                    loadDropdown(false);
-                }
-            });
-
-            let dropdownOpen = false;
-
-            async function fetchCount() {
-                if (!TOKEN) return;
-                try {
-                    const res = await fetch(`${baseUrl}/unread-count`, {
-                        headers: {Authorization: `Bearer ${TOKEN}`}
-                    });
-                    if (!res.ok) return;
-                    const data = await res.json();
-                    const badge = document.getElementById('notif-count-badge');
-                    if (data.count > 0) {
-                        badge.textContent = data.count > 99 ? '99+' : data.count;
-                        badge.classList.add('oc-notif-bell__badge--visible');
-                    } else {
-                        badge.classList.remove('oc-notif-bell__badge--visible');
-                    }
-                } catch {
-                }
-            }
-
-            async function loadDropdown(reset = true) {
-                if (!TOKEN || loading) return;
-
-                loading = true;
-
-                try {
-                    const url = new URL(baseUrl, window.location.origin);
-
-                    url.searchParams.set('per_page', 15);
-                    url.searchParams.set('unread_only', 0);
-
-                    if (!reset && nextCursor) {
-                        url.searchParams.set('cursor', nextCursor);
-                    }
-
-                    const res = await fetch(url, {
-                        headers: { Authorization: `Bearer ${TOKEN}` }
-                    });
-
-                    if (!res.ok) return;
-
-                    const data = await res.json();
-
-                    const list = document.getElementById('notif-list');
-                    const empty = document.getElementById('notif-empty');
-
-                    if (reset) {
-                        list.innerHTML = '';
-                    }
-
-                    if (!data.notifications.length && reset) {
-                        empty.style.display = 'block';
-                        return;
-                    }
-
-                    empty.style.display = 'none';
-
-                    data.notifications.forEach(n => {
-                        const item = document.createElement('div');
-                        item.className = 'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
-
-                        const messageText = n.body || n.message || '';
-
-                        item.innerHTML = `
-                <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
-                <div class="oc-notif-item__body">
-                    <div class="oc-notif-item__title">${escapeHtml(n.title)}</div>
-                    ${messageText ? `<div class="oc-notif-item__text">${escapeHtml(messageText)}</div>` : ''}
-                </div>
-            `;
-
-                        list.appendChild(item);
-                    });
-
-                    nextCursor = data.next_cursor;
-
-                } finally {
-                    loading = false;
-                }
-            }
-
-            window.markAllNotifRead = async function () {
-                try {
-                    await fetch(`${baseUrl}/read-all`, {
-                        method: 'POST',
-                        headers: {Authorization: `Bearer ${TOKEN}`}
-                    });
-                    document.getElementById('notif-count-badge').style.display = 'none';
-                    document.querySelectorAll('#notif-list > div').forEach(el => {
-                        el.style.background = 'transparent';
-                    });
-                } catch {
-                }
-            };
-
-            window.toggleNotifDropdown = function () {
-                const panel = document.getElementById('notif-dropdown');
-                dropdownOpen = !dropdownOpen;
-
-                if (dropdownOpen) {
-                    panel.style.display = 'block'; // Ensure it's visible
-                    panel.classList.add('oc-notif-dropdown--open');
-                    loadDropdown();
-                } else {
-                    panel.classList.remove('oc-notif-dropdown--open');
-                    panel.style.display = 'none';
-                }
-            };
-
-            document.addEventListener('click', e => {
-                const wrap = document.getElementById('notif-bell-wrap');
-                const panel = document.getElementById('notif-dropdown');
-
-                if (dropdownOpen && !wrap.contains(e.target)) {
-                    panel.classList.remove('oc-notif-dropdown--open');
-                    panel.style.display = 'none';
-                    dropdownOpen = false;
-                }
-            });
-
-            function escapeHtml(s) {
-                return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            }
-
-            function formatRelative(iso) {
-                const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
-
-                // Handle future dates or system clock drift
-                if (diff < 0) return 'just now';
-
-                if (diff < 60) return 'just now';
-                if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-                if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-                if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
-
-                // For anything over a week, show the actual date
-                return new Date(iso).toLocaleDateString();
-            }
-
-            // Initial count fetch + poll every 30s
-            fetchCount();
-            setInterval(fetchCount, 30_000);
-        })();
-
-    })();*/
-
     class NotificationBell {
         constructor({siteSlug, token}) {
             this.siteSlug = siteSlug;
@@ -438,12 +269,14 @@
             this.dropdownOpen = false;
             this.nextCursor = null;
             this.loading = false;
+            this.initialLoaded = false;
 
             // DOM
             this.dropdown = null;
             this.list = null;
             this.empty = null;
             this.badge = null;
+            this.loadMoreBtn = null;
         }
 
         init() {
@@ -451,6 +284,7 @@
             this.list = document.getElementById('notif-list');
             this.empty = document.getElementById('notif-empty');
             this.badge = document.getElementById('notif-count-badge');
+            this.loadMoreBtn = document.getElementById('notif-load-more');
 
             this.bindEvents();
             this.startPolling();
@@ -468,15 +302,16 @@
                 }
             });
 
-            document.getElementById('notif-load-more')
-                .addEventListener('click', () => {
+            // button pagination
+            if (this.loadMoreBtn) {
+                this.loadMoreBtn.addEventListener('click', () => {
                     this.load(false);
                 });
+            }
 
             // click outside
             document.addEventListener('click', (e) => {
                 const wrap = document.getElementById('notif-bell-wrap');
-
                 if (this.dropdownOpen && !wrap.contains(e.target)) {
                     this.close();
                 }
@@ -493,8 +328,11 @@
             this.dropdown.style.display = 'block';
             this.dropdown.classList.add('oc-notif-dropdown--open');
 
-            this.nextCursor = null;
-            this.load(true);
+            // only load once unless you decide to invalidate
+            if (!this.initialLoaded) {
+                this.nextCursor = null;
+                this.load(true);
+            }
         }
 
         close() {
@@ -509,11 +347,9 @@
 
             this.loading = true;
 
-            const btn = document.getElementById('notif-load-more');
-
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = 'Loading...';
+            if (this.loadMoreBtn) {
+                this.loadMoreBtn.disabled = true;
+                this.loadMoreBtn.textContent = 'Loading...';
             }
 
             try {
@@ -527,67 +363,121 @@
                 }
 
                 const res = await fetch(url, {
-                    headers: {
-                        Authorization: `Bearer ${this.token}`
-                    }
+                    headers: {Authorization: `Bearer ${this.token}`}
                 });
 
                 if (!res.ok) return;
 
                 const data = await res.json();
 
-                // reset only on first load
                 if (reset) {
                     this.list.innerHTML = '';
                 }
 
                 if (reset && (!data.notifications || data.notifications.length === 0)) {
                     this.empty.style.display = 'block';
+                    this.initialLoaded = true;
                     return;
                 }
 
                 this.empty.style.display = 'none';
 
-                data.notifications.forEach(n => {
-                    const item = document.createElement('div');
-                    item.className =
-                        'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
+                this.appendNotifications(data.notifications);
 
-                    const message = n.body || n.message || '';
+                // cursor
+                this.nextCursor = data.next_cursor || false;
 
-                    item.innerHTML = `
-                <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
-                <div class="oc-notif-item__body">
-                    <div class="oc-notif-item__title">${this.escape(n.title)}</div>
-                    ${message ? `<div class="oc-notif-item__text">${this.escape(message)}</div>` : ''}
-                </div>
-            `;
-
-                    this.list.appendChild(item);
-                });
-
-                // update cursor
-                this.nextCursor = data.next_cursor;
-
-                // 👇 key improvement: button state
-                if (btn) {
+                // button state
+                if (this.loadMoreBtn) {
                     if (!this.nextCursor) {
-                        btn.style.display = 'none';
+                        this.loadMoreBtn.style.display = 'none';
                     } else {
-                        btn.style.display = 'block';
-                        btn.disabled = false;
-                        btn.textContent = 'Load more';
+                        this.loadMoreBtn.style.display = 'block';
+                        this.loadMoreBtn.disabled = false;
+                        this.loadMoreBtn.textContent = 'Load more';
                     }
                 }
+
+                this.initialLoaded = true;
 
             } finally {
                 this.loading = false;
             }
         }
 
+        appendNotifications(notifications) {
+            const fragment = document.createDocumentFragment();
+
+            notifications.forEach(n => {
+                const item = document.createElement('div');
+                item.className =
+                    'oc-notif-item' + (n.is_read ? '' : ' oc-notif-item--unread');
+
+                const message = n.body || n.message || '';
+
+                item.innerHTML = `
+                <div class="oc-notif-item__dot ${n.is_read ? 'oc-notif-item__dot--hidden' : ''}"></div>
+                <div class="oc-notif-item__body">
+                    <div class="oc-notif-item__title">${this.escape(n.title)}</div>
+                    ${message ? `<div class="oc-notif-item__text">${this.escape(message)}</div>` : ''}
+                    <div class="oc-notif-item__time">${this.formatRelative(n.created_at)}</div>
+                </div>
+            `;
+
+                item.addEventListener('click', () => this.markOneRead(n.id, item));
+
+                fragment.appendChild(item);
+            });
+
+            this.list.appendChild(fragment);
+        }
+
+        async markOneRead(id, el) {
+            // optimistic UI
+            el.classList.remove('oc-notif-item--unread');
+
+            const dot = el.querySelector('.oc-notif-item__dot');
+            if (dot) dot.classList.add('oc-notif-item__dot--hidden');
+
+            try {
+                await fetch(`${this.baseUrl}/read`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.token}`
+                    },
+                    body: JSON.stringify({notification_id: id})
+                });
+
+                this.fetchCount();
+            } catch {
+            }
+        }
+
+        async markAllRead() {
+            if (!this.token) return;
+
+            try {
+                await fetch(`${this.baseUrl}/read-all`, {
+                    method: 'POST',
+                    headers: {Authorization: `Bearer ${this.token}`}
+                });
+
+                this.badge.classList.remove('oc-notif-bell__badge--visible');
+                this.badge.textContent = '';
+
+                this.list.querySelectorAll('.oc-notif-item').forEach(el => {
+                    el.classList.remove('oc-notif-item--unread');
+                    const dot = el.querySelector('.oc-notif-item__dot');
+                    if (dot) dot.classList.add('oc-notif-item__dot--hidden');
+                });
+
+            } catch {
+            }
+        }
+
         startPolling() {
             this.fetchCount();
-
             setInterval(() => this.fetchCount(), 30000);
         }
 
@@ -608,34 +498,22 @@
                     this.badge.classList.add('oc-notif-bell__badge--visible');
                 } else {
                     this.badge.classList.remove('oc-notif-bell__badge--visible');
+                    this.badge.textContent = '';
                 }
+
             } catch {
             }
         }
 
-        async markAllRead() {
-            if (!this.token) return;
+        formatRelative(iso) {
+            const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
 
-            try {
-                await fetch(`${this.baseUrl}/read-all`, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${this.token}`
-                    }
-                });
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
 
-                // UI update (no full reload needed)
-                this.badge.classList.remove('oc-notif-bell__badge--visible');
-                this.badge.textContent = '';
-
-                // mark items visually as read
-                this.list.querySelectorAll('.oc-notif-item').forEach(el => {
-                    el.classList.remove('oc-notif-item--unread');
-                });
-
-            } catch (e) {
-                // optional: console.warn('Failed to mark all as read', e);
-            }
+            return new Date(iso).toLocaleDateString();
         }
 
         escape(s) {
@@ -646,6 +524,7 @@
         }
     }
 
+    // init
     const bell = new NotificationBell({
         siteSlug: '<?= htmlspecialchars($site ?? '') ?>',
         token: localStorage.getItem('oc_token') || ''
@@ -653,9 +532,9 @@
 
     bell.init();
 
-    // expose toggle for button
+    // expose to HTML
     window.toggleNotifDropdown = () => bell.toggle();
-    window.markAllNotifRead = () => bell.markAllRead?.();
+    window.markAllNotifRead = () => bell.markAllRead();
 </script>
 
 @yield('scripts')

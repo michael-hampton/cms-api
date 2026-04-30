@@ -205,4 +205,10 @@ abstract class RelationshipHandler implements RelationshipLoaderInterface, Relat
 
         return $parentId;
     }
+
+    public function withTimestamps(): self
+    {
+        $this->relationData['with_timestamps'] = true;
+        return $this;
+    }
 }

@@ -230,4 +230,20 @@ class MemberRepository extends Repository
             ->get()
             ->toArray();
     }
+
+    public function chunkActiveForSegment(
+        int      $segmentId,
+        int      $chunkSize,
+        callable $callback
+    ): void
+    {
+        Member::query()
+            ->where('is_active', true)
+            ->whereHas('segments', function ($q) use ($segmentId) {
+                $q->where('segments.id', $segmentId);
+            })
+            ->chunkById($chunkSize, function ($members) use ($callback) {
+                $callback($members->all());
+            });
+    }
 }

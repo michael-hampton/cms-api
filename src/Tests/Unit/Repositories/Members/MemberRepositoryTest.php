@@ -485,4 +485,61 @@ class MemberRepositoryTest extends RepositoryTestCase
         $this->assertEquals('OriginalDisplay', $updated->display_name);
         $this->assertEquals('test@example.com', $updated->email);
     }
+
+    public function test_it_chunks_active_members_for_segment(): void
+    {
+        $segment = $this->createSegment();
+
+        $activeMembers = collect([
+            $this->createMember(['status' => 'active']),
+            $this->createMember(['status' => 'active']),
+            $this->createMember(['status' => 'active']),
+        ]);
+
+        // Attach to segment
+        foreach ($activeMembers as $member) {
+            $member->segments(true)->attach($segment->id, ['site_id' => $this->siteId, 'assigned_at' => now()]);
+        }
+
+        // Noise (should NOT be returned)
+        $inactiveMember = $this->createMember(['is_active' => false]);
+        $inactiveMember->segments(true)->attach($segment->id, ['site_id' => $this->siteId, 'assigned_at' => now()]);
+
+        $otherSegmentMember = $this->createMember(['status' => 'active']);
+
+        $collected = [];
+
+        $this->repository->chunkActiveForSegment(
+            segmentId: $segment->id,
+            chunkSize: 2,
+            callback: function ($members) use (&$collected) {
+                foreach ($members as $member) {
+                    $collected[] = $member->id;
+                }
+            }
+        );
+
+        $this->assertCount(3, $collected);
+        $this->assertEqualsCanonicalizing(
+            $activeMembers->pluck('id')->all(),
+            $collected
+        );
+    }
+
+    public function test_it_handles_empty_segment(): void
+    {
+        $segment = $this->createSegment();
+
+        $called = false;
+
+        $this->repository->chunkActiveForSegment(
+            segmentId: $segment->id,
+            chunkSize: 2,
+            callback: function ($members) use (&$called) {
+                $called = true;
+            }
+        );
+
+        $this->assertFalse($called);
+    }
 }

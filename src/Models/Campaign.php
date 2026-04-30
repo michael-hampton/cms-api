@@ -1,8 +1,8 @@
 <?php
-// src/Models/Campaign.php
 
 namespace App\Models;
 
+use App\Enums\Campaigns\CampaignScheduleStatus;
 use App\Models\Concerns\TracksCreator;
 use DateTime;
 
@@ -25,6 +25,8 @@ class Campaign extends Model
         'campaign_id',
         'start_date',
         'end_date',
+        'scheduled_at',
+        'schedule_status',
         'tracking_params',
         'created_at',
         'updated_at',
@@ -40,7 +42,7 @@ class Campaign extends Model
         'push_body',
         'push_icon',
         'push_url',
-        'purpose'
+        'purpose',
     ];
 
     protected $casts = [
@@ -48,6 +50,7 @@ class Campaign extends Model
         'gates_premium_content' => 'boolean',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
+        'scheduled_at' => 'datetime',
         'tracking_params' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -56,6 +59,37 @@ class Campaign extends Model
         'priority' => 'integer',
         'fallback_channels' => 'array',
     ];
+
+    // ── Scheduling ────────────────────────────────────────────────────────────
+
+    /**
+     * Returns true when the campaign is waiting for its scheduled_at time.
+     */
+    public function isScheduled(): bool
+    {
+        return $this->schedule_status === CampaignScheduleStatus::Scheduled->value
+            && $this->scheduled_at !== null;
+    }
+
+    /**
+     * Returns true when the schedule has been paused before firing.
+     */
+    public function isSchedulePaused(): bool
+    {
+        return $this->schedule_status === CampaignScheduleStatus::Paused->value;
+    }
+
+    /**
+     * Returns true when the campaign is due to be dispatched right now.
+     * Used by DispatchScheduledCampaignsCommand.
+     */
+    public function isDueForDispatch(): bool
+    {
+        return $this->isScheduled()
+            && $this->scheduled_at <= new DateTime();
+    }
+
+    // ── Existing lifecycle ────────────────────────────────────────────────────
 
     public static function findBySlug(string $slug, int $siteId): ?self
     {
@@ -89,12 +123,10 @@ class Campaign extends Model
 
         $now = new DateTime();
 
-        // Check start date
         if ($this->start_date && $this->start_date > $now) {
             return false;
         }
 
-        // Check end date
         if ($this->end_date && $this->end_date < $now) {
             return false;
         }
@@ -147,14 +179,14 @@ class Campaign extends Model
     {
         $this->status = 'paused';
         $this->is_active = false;
-        $this->updated_at = new \DateTime();
+        $this->updated_at = new DateTime();
     }
 
     public function resume(): void
     {
         $this->status = 'active';
         $this->is_active = true;
-        $this->updated_at = new \DateTime();
+        $this->updated_at = new DateTime();
     }
 
     public function isValidForSignup(): bool
