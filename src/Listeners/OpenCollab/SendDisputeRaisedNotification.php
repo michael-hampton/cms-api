@@ -14,7 +14,8 @@ class SendDisputeRaisedNotification extends BaseUserNotificationListener
             'dispute_raised',
             [
                 'dispute_id' => $event->disputeId,
-            ]
+            ],
+            'contributor.dispute_raised'
         );
     }
 }

@@ -127,44 +127,51 @@ $breadcrumbs = [['label' => 'Guidelines']];
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    async function loadGuidelines() {
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines`, {
-                headers: {
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json'
+    class GuidelinesManager {
+        #site;
+        #token;
+
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+            this.#load();
+        }
+
+        async #load() {
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                const data = await res.json();
+                const items = Array.isArray(data) ? data : (data.data ?? []);
+
+                document.getElementById('guidelines-loading').style.display = 'none';
+                document.getElementById('guideline-count').textContent = items.length;
+
+                if (!items.length) {
+                    document.getElementById('guidelines-empty').style.display = 'block';
+                    return;
                 }
-            });
-            const data = await res.json();
-            const items = Array.isArray(data) ? data : (data.data ?? []);
 
-            document.getElementById('guidelines-loading').style.display = 'none';
-            document.getElementById('guideline-count').textContent = items.length;
+                const list = document.getElementById('guidelines-list');
+                list.style.display = 'block';
+                list.innerHTML = '';
 
-            if (!items.length) {
-                document.getElementById('guidelines-empty').style.display = 'block';
-                return;
-            }
-
-            const list = document.getElementById('guidelines-list');
-            list.style.display = 'block';
-            list.innerHTML = '';
-
-            items.forEach((g, i) => {
-                const isLatest = i === 0;
-                const created = g.created_at ? new Date(g.created_at).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                }) : '—';
-                const preview = g.content ? g.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
-
-                const div = document.createElement('div');
-                div.id = `guideline-row-${g.id}`;
-                div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
-                div.innerHTML = `
+                items.forEach((g, i) => {
+                    const isLatest = i === 0;
+                    const created = g.created_at
+                        ? new Date(g.created_at).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                        })
+                        : '—';
+                    const preview = g.content ? g.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
+                    const div = document.createElement('div');
+                    div.id = `guideline-row-${g.id}`;
+                    div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
+                    div.innerHTML = `
                     <div>
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
                             <span style="font-weight:600;color:var(--navy);">Version ${g.version}</span>
@@ -173,149 +180,171 @@ $breadcrumbs = [['label' => 'Guidelines']];
                         <div style="font-size:.75rem;color:var(--slate);">Created ${created} · ${preview}</div>
                     </div>
                     <div style="display:flex;gap:6px;flex-shrink:0;">
-                        <button onclick="viewGuideline(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                        ${isLatest ? `<button onclick="editGuideline(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                        ${isLatest ? `<button onclick="deleteGuideline(${g.id}, ${g.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
+                        <button onclick="manager.view(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
+                        ${isLatest ? `<button onclick="manager.edit(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                        ${isLatest ? `<button onclick="manager.delete(${g.id}, ${g.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
                     </div>`;
-                list.appendChild(div);
+                    list.appendChild(div);
+                });
+            } catch {
+                document.getElementById('guidelines-loading').innerHTML =
+                    '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
+            }
+        }
+
+        async create() {
+            const content = document.getElementById('guideline-content').value.trim();
+            const errBox = document.getElementById('create-errors');
+            const btn = document.getElementById('create-btn');
+            errBox.style.display = 'none';
+
+            if (!content || content.length < 50) {
+                errBox.textContent = content ? 'Minimum 50 characters.' : 'Content is required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({content}),
             });
-        } catch {
-            document.getElementById('guidelines-loading').innerHTML = '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
-        }
-    }
-
-    async function createGuideline() {
-        const content = document.getElementById('guideline-content').value.trim();
-        const errBox = document.getElementById('create-errors');
-        const btn = document.getElementById('create-btn');
-        errBox.style.display = 'none';
-        if (!content || content.length < 50) {
-            errBox.textContent = content ? 'Minimum 50 characters.' : 'Content is required.';
-            errBox.style.display = 'block';
-            return;
-        }
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
-        const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({content}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('guideline-content').value = '';
-            showToast('✓ Guidelines version published');
-            reloadList();
-        } else {
-            errBox.textContent = data.error || data.message || 'Failed.';
-            errBox.style.display = 'block';
-        }
-        btn.disabled = false;
-        btn.textContent = 'Publish new version';
-    }
-
-    async function viewGuideline(id, version) {
-        document.getElementById('view-modal-title').textContent = `Guidelines v${version}`;
-        document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
-        document.getElementById('view-modal').style.display = 'grid';
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines/${id}`, {headers: {'Authorization': `Bearer ${TOKEN()}`}});
             const data = await res.json();
-            document.getElementById('view-modal-content').innerHTML = (data.data?.guideline ?? data.guideline)?.content || '<em>No content</em>';
-        } catch {
-            document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed.</span>';
-        }
-    }
-
-    function closeViewModal() {
-        document.getElementById('view-modal').style.display = 'none';
-    }
-
-    async function editGuideline(id, version) {
-        document.getElementById('edit-modal-title').textContent = `Edit Guidelines v${version}`;
-        document.getElementById('edit-guideline-id').value = id;
-        document.getElementById('edit-content').value = '';
-        document.getElementById('edit-errors').style.display = 'none';
-        document.getElementById('edit-modal').style.display = 'grid';
-        const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines/${id}`, {headers: {'Authorization': `Bearer ${TOKEN()}`}});
-        const data = await res.json();
-        document.getElementById('edit-content').value = (data.data?.guideline ?? data.guideline)?.content ?? '';
-    }
-
-    function closeEditModal() {
-        document.getElementById('edit-modal').style.display = 'none';
-    }
-
-    async function saveEdit() {
-        const id = document.getElementById('edit-guideline-id').value;
-        const content = document.getElementById('edit-content').value.trim();
-        const errBox = document.getElementById('edit-errors');
-        const btn = document.getElementById('save-edit-btn');
-        errBox.style.display = 'none';
-        if (!content || content.length < 50) {
-            errBox.textContent = content ? 'Minimum 50 characters.' : 'Content required.';
-            errBox.style.display = 'block';
-            return;
-        }
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-        const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({content}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            closeEditModal();
-            showToast('✓ Guidelines updated');
-            reloadList();
-        } else {
-            errBox.textContent = data.error || data.message || 'Failed.';
-            errBox.style.display = 'block';
-        }
-        btn.disabled = false;
-        btn.textContent = 'Save changes';
-    }
-
-    async function deleteGuideline(id, version, btn) {
-        if (!confirm(`Delete guidelines v${version}? This cannot be undone.`)) return;
-        btn.disabled = true;
-        const res = await fetch(`/api/${SITE}/open-collab/admin/guidelines/${id}`, {
-            method: 'DELETE', headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('Guidelines deleted');
-            reloadList();
-        } else {
-            showToast(data.error || data.message || 'Cannot delete.', false);
+            if (res.ok) {
+                document.getElementById('guideline-content').value = '';
+                this.#showToast('✓ Guidelines version published');
+                this.#reload();
+            } else {
+                errBox.textContent = data.error || data.message || 'Failed.';
+                errBox.style.display = 'block';
+            }
             btn.disabled = false;
+            btn.textContent = 'Publish new version';
+        }
+
+        async view(id, version) {
+            document.getElementById('view-modal-title').textContent = `Guidelines v${version}`;
+            document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
+            document.getElementById('view-modal').style.display = 'grid';
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`},
+                });
+                const data = await res.json();
+                document.getElementById('view-modal-content').innerHTML =
+                    (data.data?.guideline ?? data.guideline)?.content || '<em>No content</em>';
+            } catch {
+                document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed.</span>';
+            }
+        }
+
+        closeViewModal() {
+            document.getElementById('view-modal').style.display = 'none';
+        }
+
+        async edit(id, version) {
+            document.getElementById('edit-modal-title').textContent = `Edit Guidelines v${version}`;
+            document.getElementById('edit-guideline-id').value = id;
+            document.getElementById('edit-content').value = '';
+            document.getElementById('edit-errors').style.display = 'none';
+            document.getElementById('edit-modal').style.display = 'grid';
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
+                headers: {Authorization: `Bearer ${this.#token()}`},
+            });
+            const data = await res.json();
+            document.getElementById('edit-content').value =
+                (data.data?.guideline ?? data.guideline)?.content ?? '';
+        }
+
+        closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+        }
+
+        async saveEdit() {
+            const id = document.getElementById('edit-guideline-id').value;
+            const content = document.getElementById('edit-content').value.trim();
+            const errBox = document.getElementById('edit-errors');
+            const btn = document.getElementById('save-edit-btn');
+            errBox.style.display = 'none';
+
+            if (!content || content.length < 50) {
+                errBox.textContent = content ? 'Minimum 50 characters.' : 'Content required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({content}),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.closeEditModal();
+                this.#showToast('✓ Guidelines updated');
+                this.#reload();
+            } else {
+                errBox.textContent = data.error || data.message || 'Failed.';
+                errBox.style.display = 'block';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Save changes';
+        }
+
+        async delete(id, version, btn) {
+            if (!confirm(`Delete guidelines v${version}? This cannot be undone.`)) return;
+            btn.disabled = true;
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
+                method: 'DELETE',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('Guidelines deleted');
+                this.#reload();
+            } else {
+                this.#showToast(data.error || data.message || 'Cannot delete.', false);
+                btn.disabled = false;
+            }
+        }
+
+        #reload() {
+            document.getElementById('guidelines-list').style.display = 'none';
+            const loading = document.getElementById('guidelines-loading');
+            loading.style.display = 'block';
+            loading.innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
+            this.#load();
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    function reloadList() {
-        document.getElementById('guidelines-list').style.display = 'none';
-        document.getElementById('guidelines-loading').style.display = 'block';
-        document.getElementById('guidelines-loading').innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
-        loadGuidelines();
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
-    }
-
-    loadGuidelines();
+    const manager = new GuidelinesManager(SITE, () => localStorage.getItem('oc_token') || '');
+    const createGuideline = () => manager.create();
+    const closeViewModal = () => manager.closeViewModal();
+    const closeEditModal = () => manager.closeEditModal();
+    const saveEdit = () => manager.saveEdit();
 </script>
 @endsection

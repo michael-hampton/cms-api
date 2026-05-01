@@ -15,7 +15,8 @@ class SendArticleRejectedNotification extends BaseUserNotificationListener
             [
                 'article_id' => $event->page->id,
                 'reason' => $event->reason,
-            ]
+            ],
+            'contributor.article_rejected'
         );
     }
 }

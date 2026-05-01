@@ -136,41 +136,52 @@ $breadcrumbs = [['label' => 'Contracts']];
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    async function loadContracts() {
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/contracts`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-            });
-            const data = await res.json();
-            const items = Array.isArray(data) ? data : (data.data ?? []);
+    class ContractsManager {
+        #site;
+        #token;
 
-            document.getElementById('contracts-loading').style.display = 'none';
-            document.getElementById('contract-count').textContent = items.length;
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+            this.#loadContracts();
+        }
 
-            if (!items.length) {
-                document.getElementById('contracts-empty').style.display = 'block';
-                return;
-            }
+        async #loadContracts() {
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                const data = await res.json();
+                const items = Array.isArray(data) ? data : (data.data ?? []);
 
-            const list = document.getElementById('contracts-list');
-            list.style.display = 'block';
-            list.innerHTML = '';
+                document.getElementById('contracts-loading').style.display = 'none';
+                document.getElementById('contract-count').textContent = items.length;
 
-            items.forEach((c, i) => {
-                const isLatest = i === 0;
-                const created = c.created_at ? new Date(c.created_at).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                }) : '—';
-                const preview = c.content ? c.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
+                if (!items.length) {
+                    document.getElementById('contracts-empty').style.display = 'block';
+                    return;
+                }
 
-                const div = document.createElement('div');
-                div.id = `contract-row-${c.id}`;
-                div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
-                div.innerHTML = `
+                const list = document.getElementById('contracts-list');
+                list.style.display = 'block';
+                list.innerHTML = '';
+
+                items.forEach((c, i) => {
+                    const isLatest = i === 0;
+                    const created = c.created_at
+                        ? new Date(c.created_at).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                        })
+                        : '—';
+                    const preview = c.content ? c.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
+
+                    const div = document.createElement('div');
+                    div.id = `contract-row-${c.id}`;
+                    div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
+                    div.innerHTML = `
                     <div>
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
                             <span style="font-weight:600;color:var(--navy);">Version ${c.version}</span>
@@ -179,160 +190,177 @@ $breadcrumbs = [['label' => 'Contracts']];
                         <div style="font-size:.75rem;color:var(--slate);">Created ${created} · ${preview}</div>
                     </div>
                     <div style="display:flex;gap:6px;flex-shrink:0;">
-                        <button onclick="viewContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                        ${isLatest ? `<button onclick="editContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                        ${isLatest ? `<button onclick="deleteContract(${c.id}, ${c.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
+                        <button onclick="manager.viewContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
+                        ${isLatest ? `<button onclick="manager.editContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                        ${isLatest ? `<button onclick="manager.deleteContract(${c.id}, ${c.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
                     </div>`;
-                list.appendChild(div);
+                    list.appendChild(div);
+                });
+            } catch {
+                document.getElementById('contracts-loading').innerHTML =
+                    '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
+            }
+        }
+
+        async createContract() {
+            const content = document.getElementById('contract-content').value.trim();
+            const errBox = document.getElementById('create-errors');
+            const btn = document.getElementById('create-btn');
+            errBox.style.display = 'none';
+
+            if (!content || content.length < 50) {
+                errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({content}),
             });
-        } catch {
-            document.getElementById('contracts-loading').innerHTML = '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
-        }
-    }
-
-    async function createContract() {
-        const content = document.getElementById('contract-content').value.trim();
-        const errBox = document.getElementById('create-errors');
-        const btn = document.getElementById('create-btn');
-        errBox.style.display = 'none';
-
-        if (!content || content.length < 50) {
-            errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contracts`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({content}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('contract-content').value = '';
-            showToast('✓ Contract version published');
-            reloadList();
-        } else {
-            errBox.textContent = data.error || data.message || 'Failed.';
-            errBox.style.display = 'block';
-        }
-        btn.disabled = false;
-        btn.textContent = 'Publish new version';
-    }
-
-    async function viewContract(id, version) {
-        document.getElementById('view-modal-title').textContent = `Contract v${version}`;
-        document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
-        document.getElementById('view-modal').style.display = 'grid';
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/contracts/${id}`, {headers: {'Authorization': `Bearer ${TOKEN()}`}});
             const data = await res.json();
-            document.getElementById('view-modal-content').innerHTML = (data.data?.contract ?? data.contract)?.content || '<em>No content</em>';
-        } catch {
-            document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed to load.</span>';
-        }
-    }
-
-    function closeViewModal() {
-        document.getElementById('view-modal').style.display = 'none';
-    }
-
-    async function editContract(id, version) {
-        document.getElementById('edit-modal-title').textContent = `Edit Contract v${version}`;
-        document.getElementById('edit-contract-id').value = id;
-        document.getElementById('edit-content').value = '';
-        document.getElementById('edit-errors').style.display = 'none';
-        document.getElementById('edit-modal').style.display = 'grid';
-
-        // Load existing content
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contracts/${id}`, {headers: {'Authorization': `Bearer ${TOKEN()}`}});
-        const data = await res.json();
-        const content = (data.data?.contract ?? data.contract)?.content ?? '';
-        document.getElementById('edit-content').value = content;
-    }
-
-    function closeEditModal() {
-        document.getElementById('edit-modal').style.display = 'none';
-    }
-
-    async function saveEdit() {
-        const id = document.getElementById('edit-contract-id').value;
-        const content = document.getElementById('edit-content').value.trim();
-        const errBox = document.getElementById('edit-errors');
-        const btn = document.getElementById('save-edit-btn');
-        errBox.style.display = 'none';
-
-        if (!content || content.length < 50) {
-            errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contracts/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({content}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            closeEditModal();
-            showToast('✓ Contract updated');
-            reloadList();
-        } else {
-            errBox.textContent = data.error || data.message || 'Failed.';
-            errBox.style.display = 'block';
-        }
-        btn.disabled = false;
-        btn.textContent = 'Save changes';
-    }
-
-    async function deleteContract(id, version, btn) {
-        if (!confirm(`Delete contract v${version}? This cannot be undone.`)) return;
-        btn.disabled = true;
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contracts/${id}`, {
-            method: 'DELETE',
-            headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('Contract deleted');
-            document.getElementById(`contract-row-${id}`)?.remove();
-            reloadList();
-        } else {
-            showToast(data.error || data.message || 'Cannot delete.', false);
+            if (res.ok) {
+                document.getElementById('contract-content').value = '';
+                this.#showToast('✓ Contract version published');
+                this.#reloadList();
+            } else {
+                errBox.textContent = data.error || data.message || 'Failed.';
+                errBox.style.display = 'block';
+            }
             btn.disabled = false;
+            btn.textContent = 'Publish new version';
+        }
+
+        async viewContract(id, version) {
+            document.getElementById('view-modal-title').textContent = `Contract v${version}`;
+            document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
+            document.getElementById('view-modal').style.display = 'grid';
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`},
+                });
+                const data = await res.json();
+                document.getElementById('view-modal-content').innerHTML =
+                    (data.data?.contract ?? data.contract)?.content || '<em>No content</em>';
+            } catch {
+                document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed to load.</span>';
+            }
+        }
+
+        closeViewModal() {
+            document.getElementById('view-modal').style.display = 'none';
+        }
+
+        async editContract(id, version) {
+            document.getElementById('edit-modal-title').textContent = `Edit Contract v${version}`;
+            document.getElementById('edit-contract-id').value = id;
+            document.getElementById('edit-content').value = '';
+            document.getElementById('edit-errors').style.display = 'none';
+            document.getElementById('edit-modal').style.display = 'grid';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
+                headers: {Authorization: `Bearer ${this.#token()}`},
+            });
+            const data = await res.json();
+            document.getElementById('edit-content').value =
+                (data.data?.contract ?? data.contract)?.content ?? '';
+        }
+
+        closeEditModal() {
+            document.getElementById('edit-modal').style.display = 'none';
+        }
+
+        async saveEdit() {
+            const id = document.getElementById('edit-contract-id').value;
+            const content = document.getElementById('edit-content').value.trim();
+            const errBox = document.getElementById('edit-errors');
+            const btn = document.getElementById('save-edit-btn');
+            errBox.style.display = 'none';
+
+            if (!content || content.length < 50) {
+                errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({content}),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.closeEditModal();
+                this.#showToast('✓ Contract updated');
+                this.#reloadList();
+            } else {
+                errBox.textContent = data.error || data.message || 'Failed.';
+                errBox.style.display = 'block';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Save changes';
+        }
+
+        async deleteContract(id, version, btn) {
+            if (!confirm(`Delete contract v${version}? This cannot be undone.`)) return;
+            btn.disabled = true;
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
+                method: 'DELETE',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('Contract deleted');
+                document.getElementById(`contract-row-${id}`)?.remove();
+                this.#reloadList();
+            } else {
+                this.#showToast(data.error || data.message || 'Cannot delete.', false);
+                btn.disabled = false;
+            }
+        }
+
+        #reloadList() {
+            document.getElementById('contracts-list').style.display = 'none';
+            const loading = document.getElementById('contracts-loading');
+            loading.style.display = 'block';
+            loading.innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
+            this.#loadContracts();
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    function reloadList() {
-        document.getElementById('contracts-list').style.display = 'none';
-        document.getElementById('contracts-loading').style.display = 'block';
-        document.getElementById('contracts-loading').innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
-        loadContracts();
-    }
+    const manager = new ContractsManager(
+        SITE,
+        () => localStorage.getItem('oc_token') || ''
+    );
+    const createContract = () => manager.createContract();
+    const closeViewModal = () => manager.closeViewModal();
+    const closeEditModal = () => manager.closeEditModal();
+    const saveEdit = () => manager.saveEdit();
 
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
-    }
-
-    loadContracts();
 </script>
 @endsection

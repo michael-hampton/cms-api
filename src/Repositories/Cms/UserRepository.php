@@ -12,7 +12,6 @@ use App\Search\SearchEngine;
 
 class UserRepository extends Repository implements UserRepositoryInterface
 {
-
     public function findByEmail(string $email, ?int $siteId = null): ?User
     {
         $user = User::where('email', $email)
@@ -55,5 +54,14 @@ class UserRepository extends Repository implements UserRepositoryInterface
     protected function getModelClass(): string
     {
         return User::class;
+    }
+
+    public function updateUserWithPassword(int $id, array $data): Model
+    {
+        if (!empty($data['password'])) {
+            $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+        }
+
+        return $this->update($id, $data);
     }
 }

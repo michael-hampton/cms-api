@@ -6,10 +6,8 @@ use App\Controllers\Controller;
 use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\SiteContext;
 use App\Jobs\OpenCollab\ContractFanoutJob;
-use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
 use App\Repositories\OpenCollab\ContractRepository;
 
 /**
@@ -71,8 +69,7 @@ class AdminContractController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $content = trim($body['content'] ?? $request->input('content', ''));
+        $content = trim($request->input('content', ''));
 
         if (empty($content)) {
             return $this->errorResponse('Contract content is required.', 422);

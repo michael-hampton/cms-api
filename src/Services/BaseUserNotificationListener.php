@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Repositories\OpenCollab\UserSiteRepository;
+use Exception;
 
 abstract class BaseUserNotificationListener
 {
@@ -13,29 +14,35 @@ abstract class BaseUserNotificationListener
     {
     }
 
-    protected function notify(
-        int    $userId,
-        string $type,
-        array  $data = []
-    ): void
-    {
-        $user = new \App\Models\User(['id' => $userId]);
-
-        $this->service->notify($user, $type, $data);
-    }
-
     protected function notifyAllContributors(
         int    $siteId,
         string $type,
         string $title,
         string $body,
         array  $data = [],
+        string $consentType = ''
     ): void
     {
         $userIds = $this->userSiteRepository->userIdsForSite($siteId);
 
         foreach ($userIds as $userId) {
-            $this->notify($userId, $type, $data);
+            $this->notify($userId, $type, $data, $consentType);
+        }
+    }
+
+    protected function notify(
+        int    $userId,
+        string $type,
+        array  $data = [],
+        string $consentType = ''
+    ): void
+    {
+        try {
+            $user = new \App\Models\User(['id' => $userId]);
+
+            $this->service->notify($user, $type, $data, 'in_app', $consentType);
+        } catch (Exception $exception) {
+            // silent fail
         }
     }
 }

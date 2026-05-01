@@ -51,9 +51,9 @@ class ViolationController extends Controller
     {
         $violations = $this->violationRepository->forContributor($userId, SiteContext::getId());
 
-        return $this->resourceResponse(
-            $violations->map(fn($v) => $this->formatViolation($v))->toArray()
-        );
+        return $this->resourceResponse([
+            'data' => $violations->map(fn($v) => $this->formatViolation($v))->values()
+        ]);
     }
 
     private function formatViolation(\App\Models\ContributorViolation $v): array

@@ -225,36 +225,49 @@
 
 @section('scripts')
 <script>
-    const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
+    class ScheduledPayoutsManager {
+        #site;
+        #token;
 
-    async function forcePayout(id, btn) {
-        if (!confirm('Force-approve this payout now?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-        const res = await fetch(`/api/${SITE}/open-collab/admin/payouts/${id}/approve`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        const data = await res.json();
+        async forceApprove(id, btn) {
+            if (!confirm('Force-approve this payout now?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
 
-        if (res.ok) {
-            showToast('✓ Payout approved');
-            document.getElementById('sched-row-' + id)?.remove();
-        } else {
-            showToast(data.error || 'Failed', false);
-            btn.disabled = false;
-            btn.textContent = 'Force approve';
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts/${id}/approve`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('✓ Payout approved');
+                document.getElementById(`sched-row-${id}`)?.remove();
+            } else {
+                this.#showToast(data.error || 'Failed', false);
+                btn.disabled = false;
+                btn.textContent = 'Force approve';
+            }
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
-    }
+    const manager = new ScheduledPayoutsManager(SITE, () => localStorage.getItem('oc_token') || '');
+
+    // Shim for PHP-rendered onclick
+    const forcePayout = (id, btn) => manager.forceApprove(id, btn);
 </script>
 @endsection

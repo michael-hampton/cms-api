@@ -129,19 +129,68 @@ class InvitationServiceTest extends FunctionalTestCase
 
     public function test_accept_reuses_existing_user_when_email_already_registered(): void
     {
-        $invitation = $this->makeInvitation(['id' => 5, 'site_id' => 1, 'email' => 'existing@example.com']);
-        $existingUser = $this->makeUser(['id' => 3, 'email' => 'existing@example.com']);
+        $invitation = $this->makeInvitation([
+            'id' => 5,
+            'site_id' => 1,
+            'email' => 'existing@example.com'
+        ]);
 
-        $this->invitationRepository->shouldReceive('findByToken')->andReturn($invitation);
-        $this->userRepository->shouldReceive('findByEmail')->andReturn($existingUser);
+        $existingUser = $this->makeUser([
+            'id' => 3,
+            'email' => 'existing@example.com'
+        ]);
+
+        $updatedUser = $this->makeUser([
+            'id' => 3,
+            'email' => 'existing@example.com',
+            'name' => 'Jane',
+            'is_active' => true
+        ]);
+
+        $this->invitationRepository
+            ->shouldReceive('findByToken')
+            ->andReturn($invitation);
+
+        $this->userRepository
+            ->shouldReceive('findByEmail')
+            ->andReturn($existingUser);
+
+        // 👇 THIS is the missing piece
+        $this->userRepository
+            ->shouldReceive('updateUserWithPassword')
+            ->with(3, \Mockery::on(function ($data) {
+                return $data['name'] === 'Jane'
+                    && $data['password'] === 'password'
+                    && $data['is_active'] === true;
+            }))
+            ->once()
+            ->andReturn($updatedUser);
 
         // Must NOT create a new user
         $this->userRepository->shouldNotReceive('create');
 
-        $this->siteAccessService->shouldReceive('grantAccess')->with(3, 1)->once();
-        $this->invitationRepository->shouldReceive('markAsUsed')->with(5, 3)->once();
-        $this->onboardingService->shouldReceive('start')->with(3, 1)->once();
-        $this->eventDispatcher->shouldReceive('dispatch')->once();
+        $this->siteAccessService
+            ->shouldReceive('grantAccess')
+            ->with(3, 1)
+            ->once();
+
+        $this->invitationRepository
+            ->shouldReceive('markAsUsed')
+            ->with(5, 3)
+            ->once();
+
+        $this->onboardingService
+            ->shouldReceive('start')
+            ->with(3, 1)
+            ->once();
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once();
+
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
+            ->once(); // ⚠️ you were missing this too
 
         $user = $this->service->accept('valid-token', 'Jane', 'password');
 

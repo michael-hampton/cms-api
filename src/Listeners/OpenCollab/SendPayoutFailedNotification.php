@@ -14,7 +14,8 @@ class SendPayoutFailedNotification extends BaseUserNotificationListener
             'payout_failed',
             [
                 'reason' => $event->reason,
-            ]
+            ],
+            'contributor.payout_failed'
         );
     }
 }

@@ -187,89 +187,96 @@ $isDefault = !isset($terms->id) || !$terms->id;
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // Live-update the summary sidebar as the admin types
-    document.getElementById('payout-delay')?.addEventListener('input', function () {
-        const v = parseInt(this.value) || 0;
-        document.getElementById('summary-delay').textContent = v + ' day' + (v !== 1 ? 's' : '');
-    });
+    class PaymentTermsManager {
+        #site;
+        #token;
 
-    document.getElementById('minimum-payout')?.addEventListener('input', function () {
-        const v = parseFloat(this.value);
-        document.getElementById('summary-minimum').textContent = isNaN(v) ? '—' : '£' + v.toFixed(2);
-    });
-
-    document.getElementById('payment-terms-form').addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const errBox = document.getElementById('form-errors');
-        const okBox = document.getElementById('form-success');
-        const btn = document.getElementById('save-btn');
-        errBox.style.display = 'none';
-        //okBox.style.display  = 'none';
-
-        const delayDays = parseInt(document.getElementById('payout-delay').value);
-        const minPounds = parseFloat(document.getElementById('minimum-payout').value);
-
-        // Strict validation
-        if (isNaN(delayDays) || delayDays < 0) {
-            errBox.textContent = 'Payout delay must be 0 or more days.';
-            errBox.style.display = 'block';
-            return;
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+            this.#bindLivePreview();
+            this.#bindSubmit();
         }
 
-        if (isNaN(minPounds) || minPounds < 0.50) {
-            errBox.textContent = 'Minimum payout amount must be at least £0.50.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        // Convert pounds to pence — integer, no floating point drift
-        const minimumPence = Math.round(minPounds * 100);
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/payment-terms`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({
-                    payout_delay_days: delayDays,
-                    minimum_payout_amount: minimumPence,
-                }),
+        #bindLivePreview() {
+            document.getElementById('payout-delay')?.addEventListener('input', function () {
+                const v = parseInt(this.value) || 0;
+                document.getElementById('summary-delay').textContent = `${v} day${v !== 1 ? 's' : ''}`;
             });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                //okBox.textContent = '✓ Payment terms saved successfully.';
-                //okBox.style.display = 'flex';
-                showToast('✓ Payment terms saved');
-                setTimeout(() => okBox.style.display = 'none', 4000);
-            } else {
-                errBox.textContent = data.error || data.message || 'Save failed.';
-                errBox.style.display = 'block';
-            }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> Save payment terms`;
+            document.getElementById('minimum-payout')?.addEventListener('input', function () {
+                const v = parseFloat(this.value);
+                document.getElementById('summary-minimum').textContent = isNaN(v) ? '—' : `£${v.toFixed(2)}`;
+            });
         }
-    });
 
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
+        #bindSubmit() {
+            document.getElementById('payment-terms-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.#save();
+            });
+        }
+
+        async #save() {
+            const errBox = document.getElementById('form-errors');
+            const btn = document.getElementById('save-btn');
+            errBox.style.display = 'none';
+
+            const delayDays = parseInt(document.getElementById('payout-delay').value);
+            const minPounds = parseFloat(document.getElementById('minimum-payout').value);
+
+            if (isNaN(delayDays) || delayDays < 0) {
+                errBox.textContent = 'Payout delay must be 0 or more days.';
+                errBox.style.display = 'block';
+                return;
+            }
+            if (isNaN(minPounds) || minPounds < 0.50) {
+                errBox.textContent = 'Minimum payout amount must be at least £0.50.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            const minimumPence = Math.round(minPounds * 100);
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/payment-terms`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({payout_delay_days: delayDays, minimum_payout_amount: minimumPence}),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.#showToast('✓ Payment terms saved');
+                } else {
+                    errBox.textContent = data.error || data.message || 'Save failed.';
+                    errBox.style.display = 'block';
+                }
+            } catch {
+                errBox.textContent = 'Network error. Please try again.';
+                errBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<svg viewBox="0 0 20 20" fill="currentColor" width="15"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg> Save payment terms`;
+            }
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
+        }
     }
+
+    const manager = new PaymentTermsManager(SITE, () => localStorage.getItem('oc_token') || '');
 </script>
 @endsection

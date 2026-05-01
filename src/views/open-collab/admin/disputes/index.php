@@ -185,333 +185,315 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    let allDisputes = [];
-    let currentStatus = 'all';
-    let currentQuery = '';
-    let debounceTimer = null;
+    class AdminDisputesManager {
+        #site;
+        #token;
+        #state = {
+            all: [],
+            statusFilter: 'all',
+            query: '',
+            pendingResolveId: null,
+            pendingRejectId: null,
+        };
+        #debounceTimer = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('search-input').addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                currentQuery = this.value.trim().toLowerCase();
-                renderDisputes();
-            }, 300);
-        });
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-        loadDisputes();
-    });
-
-    function setStatusFilter(status, btn) {
-        currentStatus = status;
-        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
-        btn.classList.add('filter-pill--active');
-        renderDisputes();
-    }
-
-    async function loadDisputes() {
-        showState('loading');
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/disputes`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        init() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(this.#debounceTimer);
+                this.#debounceTimer = setTimeout(() => {
+                    this.#state.query = e.target.value.trim().toLowerCase();
+                    this.#render();
+                }, 300);
             });
-            if (!res.ok) {
-                showState('error');
+            document.getElementById('resolve-adjustment')?.addEventListener('input', function () {
+                document.getElementById('resolve-reason-group').style.display = this.value ? 'block' : 'none';
+            });
+            this.#load();
+        }
+
+        setStatusFilter(status, btn) {
+            this.#state.statusFilter = status;
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+            btn.classList.add('filter-pill--active');
+            this.#render();
+        }
+
+        async #load() {
+            this.#showState('loading');
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/disputes`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                this.#state.all = Array.isArray(data) ? data : (data.data ?? []);
+                this.#render();
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #render() {
+            let filtered = this.#state.all;
+            if (this.#state.statusFilter !== 'all') filtered = filtered.filter(d => d.status === this.#state.statusFilter);
+            if (this.#state.query) {
+                filtered = filtered.filter(d =>
+                    String(d.user_id).includes(this.#state.query) ||
+                    String(d.earnings_ledger_id).includes(this.#state.query) ||
+                    (d.reason ?? '').toLowerCase().includes(this.#state.query)
+                );
+            }
+
+            document.getElementById('results-count').textContent = filtered.length;
+            document.getElementById('results-title').textContent =
+                this.#state.statusFilter === 'all' ? 'All Disputes' : `${this.#cap(this.#state.statusFilter)} Disputes`;
+
+            if (!filtered.length) {
+                this.#showState('empty');
+                document.getElementById('empty-message').textContent =
+                    this.#state.query ? `No disputes matching "${this.#state.query}"` : 'No disputes found';
+                document.getElementById('empty-sub').textContent =
+                    this.#state.statusFilter !== 'all' ? `No ${this.#state.statusFilter} disputes.` : 'Earnings disputes will appear here.';
                 return;
             }
-            const data = await res.json();
-            allDisputes = Array.isArray(data) ? data : (data.data ?? []);
-            renderDisputes();
-        } catch {
-            showState('error');
-        }
-    }
 
-    function renderDisputes() {
-        let filtered = allDisputes;
-
-        if (currentStatus !== 'all') {
-            filtered = filtered.filter(d => d.status === currentStatus);
-        }
-
-        if (currentQuery) {
-            filtered = filtered.filter(d =>
-                String(d.user_id).includes(currentQuery) ||
-                String(d.earnings_ledger_id).includes(currentQuery) ||
-                (d.reason ?? '').toLowerCase().includes(currentQuery)
-            );
-        }
-
-        document.getElementById('results-count').textContent = filtered.length;
-        document.getElementById('results-title').textContent =
-            currentStatus === 'all' ? 'All Disputes' : `${capitalise(currentStatus)} Disputes`;
-
-        if (!filtered.length) {
-            showState('empty');
-            document.getElementById('empty-message').textContent =
-                currentQuery ? `No disputes matching "${currentQuery}"` : 'No disputes found';
-            document.getElementById('empty-sub').textContent =
-                currentStatus !== 'all' ? `No ${currentStatus} disputes.` : 'Earnings disputes will appear here.';
-            return;
-        }
-
-        const list = document.getElementById('disputes-list');
-        list.innerHTML = '';
-
-        filtered.forEach((d, i) => {
-            const isLast = i === filtered.length - 1;
-            const statusBadge = {
-                open: 'oc-badge--waiting-approval',
-                resolved: 'oc-badge--published',
-                rejected: 'oc-badge--revoked',
-            }[d.status] ?? 'oc-badge--draft';
-
-            const createdAt = d.created_at
-                ? new Date(d.created_at).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })
-                : '';
-
-            const actionsHtml = d.status === 'open'
-                ? `<button onclick="openResolveModal(${d.id})" class="oc-btn oc-btn--primary oc-btn--sm">
-                       <svg viewBox="0 0 20 20" fill="currentColor" width="13">
-                           <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-                       </svg>
+            const list = document.getElementById('disputes-list');
+            list.innerHTML = '';
+            filtered.forEach((d, i) => {
+                const isLast = i === filtered.length - 1;
+                const statusBadge = {
+                    open: 'oc-badge--waiting-approval',
+                    resolved: 'oc-badge--published',
+                    rejected: 'oc-badge--revoked',
+                }[d.status] ?? 'oc-badge--draft';
+                const createdAt = d.created_at
+                    ? new Date(d.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })
+                    : '';
+                const actionsHtml = d.status === 'open'
+                    ? `<button onclick="manager.openResolveModal(${d.id})" class="oc-btn oc-btn--primary oc-btn--sm">
+                       <svg viewBox="0 0 20 20" fill="currentColor" width="13"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                        Resolve
                    </button>
-                   <button onclick="openRejectModal(${d.id})" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">
-                       Reject
-                   </button>`
-                : `<span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${capitalise(d.status)}</span>`;
-
-            const adminNotesHtml = d.admin_notes
-                ? `<div style="margin-top:8px;padding:8px 12px;font-size:.78rem;
-                               background:${d.status === 'resolved' ? '#f0fdf4' : '#fff9f9'};
-                               border:1px solid ${d.status === 'resolved' ? '#bbf7d0' : '#fecaca'};
-                               border-radius:6px;color:var(--navy);">
+                   <button onclick="manager.openRejectModal(${d.id})" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Reject</button>`
+                    : `<span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${this.#cap(d.status)}</span>`;
+                const adminNotesHtml = d.admin_notes
+                    ? `<div style="margin-top:8px;padding:8px 12px;font-size:.78rem;background:${d.status === 'resolved' ? '#f0fdf4' : '#fff9f9'};border:1px solid ${d.status === 'resolved' ? '#bbf7d0' : '#fecaca'};border-radius:6px;color:var(--navy);">
                        <strong style="color:${d.status === 'resolved' ? 'var(--green)' : 'var(--red)'};">Admin response:</strong>
-                       ${escHtml(d.admin_notes)}
-                   </div>`
-                : '';
+                       ${this.#esc(d.admin_notes)}
+                   </div>` : '';
 
-            const div = document.createElement('div');
-            div.id = `dispute-row-${d.id}`;
-            div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
-            div.innerHTML = `
+                const div = document.createElement('div');
+                div.id = `dispute-row-${d.id}`;
+                div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
+                div.innerHTML = `
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                     <div style="flex:1;min-width:0;">
                         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
-                            <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${d.user_id}"
-                               style="font-weight:600;color:var(--navy);text-decoration:none;">
-                                User #${d.user_id}
-                            </a>
-                            <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
-                                         border-radius:10px;padding:2px 8px;font-family:monospace;">
-                                Ledger #${d.earnings_ledger_id}
-                            </span>
-                            <span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${capitalise(d.status)}</span>
+                            <a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${d.user_id}" style="font-weight:600;color:var(--navy);text-decoration:none;">User #${d.user_id}</a>
+                            <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);border-radius:10px;padding:2px 8px;font-family:monospace;">Ledger #${d.earnings_ledger_id}</span>
+                            <span class="oc-badge ${statusBadge}" style="font-size:.65rem;">${this.#cap(d.status)}</span>
                         </div>
-                        <div style="font-size:.875rem;color:var(--navy);line-height:1.55;margin-bottom:4px;
-                                    background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;
-                                    padding:10px 14px;">
-                            <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
-                                           color:var(--slate);display:block;margin-bottom:4px;">
-                                Contributor's reason
-                            </strong>
-                            ${escHtml(d.reason ?? '')}
+                        <div style="font-size:.875rem;color:var(--navy);line-height:1.55;margin-bottom:4px;background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;padding:10px 14px;">
+                            <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--slate);display:block;margin-bottom:4px;">Contributor's reason</strong>
+                            ${this.#esc(d.reason ?? '')}
                         </div>
                         ${adminNotesHtml}
                         <div style="font-size:.75rem;color:var(--slate-light);margin-top:4px;">${createdAt}</div>
                     </div>
-                    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
-                        ${actionsHtml}
-                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">${actionsHtml}</div>
                 </div>`;
-            list.appendChild(div);
-        });
-
-        showState('list');
-    }
-
-    // ── Resolve modal ─────────────────────────────────────────
-    document.getElementById('resolve-adjustment')?.addEventListener('input', function () {
-        document.getElementById('resolve-reason-group').style.display = this.value ? 'block' : 'none';
-    });
-
-    function openResolveModal(id) {
-        document.getElementById('resolve-dispute-id').value = id;
-        document.getElementById('resolve-notes').value = '';
-        document.getElementById('resolve-adjustment').value = '';
-        document.getElementById('resolve-adjustment-reason').value = '';
-        document.getElementById('resolve-reason-group').style.display = 'none';
-        document.getElementById('resolve-errors').style.display = 'none';
-        document.getElementById('resolve-modal').style.display = 'grid';
-        document.getElementById('resolve-notes').focus();
-    }
-
-    function closeResolveModal() {
-        document.getElementById('resolve-modal').style.display = 'none';
-    }
-
-    async function submitResolve() {
-        const id = document.getElementById('resolve-dispute-id').value;
-        const notes = document.getElementById('resolve-notes').value.trim();
-        const adjRaw = document.getElementById('resolve-adjustment').value.trim();
-        const adjReason = document.getElementById('resolve-adjustment-reason').value.trim();
-        const errBox = document.getElementById('resolve-errors');
-        const btn = document.getElementById('resolve-confirm-btn');
-        errBox.style.display = 'none';
-
-        if (!notes) {
-            errBox.textContent = 'Admin notes are required.';
-            errBox.style.display = 'block';
-            return;
+                list.appendChild(div);
+            });
+            this.#showState('list');
         }
 
-        let adjustmentAmount = null;
-        if (adjRaw !== '') {
-            const parsed = parseFloat(adjRaw);
-            if (isNaN(parsed)) {
-                errBox.textContent = 'Adjustment amount must be a valid number.';
+        openResolveModal(id) {
+            this.#state.pendingResolveId = id;
+            document.getElementById('resolve-notes').value = '';
+            document.getElementById('resolve-adjustment').value = '';
+            document.getElementById('resolve-adjustment-reason').value = '';
+            document.getElementById('resolve-reason-group').style.display = 'none';
+            document.getElementById('resolve-errors').style.display = 'none';
+            document.getElementById('resolve-modal').style.display = 'grid';
+            document.getElementById('resolve-notes').focus();
+        }
+
+        closeResolveModal() {
+            this.#state.pendingResolveId = null;
+            document.getElementById('resolve-modal').style.display = 'none';
+        }
+
+        async submitResolve() {
+            const id = this.#state.pendingResolveId;
+            const notes = document.getElementById('resolve-notes').value.trim();
+            const adjRaw = document.getElementById('resolve-adjustment').value.trim();
+            const adjReason = document.getElementById('resolve-adjustment-reason').value.trim();
+            const errBox = document.getElementById('resolve-errors');
+            const btn = document.getElementById('resolve-confirm-btn');
+            errBox.style.display = 'none';
+
+            if (!notes) {
+                errBox.textContent = 'Admin notes are required.';
                 errBox.style.display = 'block';
                 return;
             }
-            adjustmentAmount = Math.round(parsed * 100);
-        }
 
-        if (adjustmentAmount !== null && !adjReason) {
-            errBox.textContent = 'An adjustment reason is required when applying an adjustment.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Resolving…';
-
-        const payload = {admin_notes: notes};
-        if (adjustmentAmount !== null) {
-            payload.adjustment_amount = adjustmentAmount;
-            payload.adjustment_reason = adjReason;
-        }
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/disputes/${id}/resolve`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closeResolveModal();
-            showToast('✓ Dispute resolved');
-            // Update in local cache and re-render
-            const dispute = allDisputes.find(d => d.id === parseInt(id));
-            if (dispute) {
-                dispute.status = 'resolved';
-                dispute.admin_notes = notes;
+            let adjustmentAmount = null;
+            if (adjRaw !== '') {
+                const parsed = parseFloat(adjRaw);
+                if (isNaN(parsed)) {
+                    errBox.textContent = 'Adjustment amount must be a valid number.';
+                    errBox.style.display = 'block';
+                    return;
+                }
+                adjustmentAmount = Math.round(parsed * 100);
             }
-            renderDisputes();
-        } else {
-            errBox.textContent = data.error || data.message || 'Resolve failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Resolve dispute';
-        }
-    }
-
-    // ── Reject modal ──────────────────────────────────────────
-    function openRejectModal(id) {
-        document.getElementById('reject-dispute-id').value = id;
-        document.getElementById('reject-notes').value = '';
-        document.getElementById('reject-errors').style.display = 'none';
-        document.getElementById('reject-modal').style.display = 'grid';
-        document.getElementById('reject-notes').focus();
-    }
-
-    function closeRejectModal() {
-        document.getElementById('reject-modal').style.display = 'none';
-    }
-
-    async function submitReject() {
-        const id = document.getElementById('reject-dispute-id').value;
-        const notes = document.getElementById('reject-notes').value.trim();
-        const errBox = document.getElementById('reject-errors');
-        const btn = document.getElementById('reject-confirm-btn');
-        errBox.style.display = 'none';
-
-        if (!notes) {
-            errBox.textContent = 'Admin notes are required.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Rejecting…';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/disputes/${id}/reject`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({admin_notes: notes}),
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closeRejectModal();
-            showToast('Dispute rejected');
-            const dispute = allDisputes.find(d => d.id === parseInt(id));
-            if (dispute) {
-                dispute.status = 'rejected';
-                dispute.admin_notes = notes;
+            if (adjustmentAmount !== null && !adjReason) {
+                errBox.textContent = 'An adjustment reason is required when applying an adjustment.';
+                errBox.style.display = 'block';
+                return;
             }
-            renderDisputes();
-        } else {
-            errBox.textContent = data.error || data.message || 'Reject failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Reject dispute';
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Resolving…';
+
+            const payload = {admin_notes: notes};
+            if (adjustmentAmount !== null) {
+                payload.adjustment_amount = adjustmentAmount;
+                payload.adjustment_reason = adjReason;
+            }
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/disputes/${id}/resolve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                this.closeResolveModal();
+                this.#showToast('✓ Dispute resolved');
+                const d = this.#state.all.find(x => x.id === parseInt(id));
+                if (d) {
+                    d.status = 'resolved';
+                    d.admin_notes = notes;
+                }
+                this.#render();
+            } else {
+                errBox.textContent = data.error || data.message || 'Resolve failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Resolve dispute';
+            }
+        }
+
+        openRejectModal(id) {
+            this.#state.pendingRejectId = id;
+            document.getElementById('reject-notes').value = '';
+            document.getElementById('reject-errors').style.display = 'none';
+            document.getElementById('reject-modal').style.display = 'grid';
+            document.getElementById('reject-notes').focus();
+        }
+
+        closeRejectModal() {
+            this.#state.pendingRejectId = null;
+            document.getElementById('reject-modal').style.display = 'none';
+        }
+
+        async submitReject() {
+            const id = this.#state.pendingRejectId;
+            const notes = document.getElementById('reject-notes').value.trim();
+            const errBox = document.getElementById('reject-errors');
+            const btn = document.getElementById('reject-confirm-btn');
+            errBox.style.display = 'none';
+
+            if (!notes) {
+                errBox.textContent = 'Admin notes are required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Rejecting…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/disputes/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({admin_notes: notes}),
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                this.closeRejectModal();
+                this.#showToast('Dispute rejected');
+                const d = this.#state.all.find(x => x.id === parseInt(id));
+                if (d) {
+                    d.status = 'rejected';
+                    d.admin_notes = notes;
+                }
+                this.#render();
+            } else {
+                errBox.textContent = data.error || data.message || 'Reject failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Reject dispute';
+            }
+        }
+
+        #showState(state) {
+            document.getElementById('disputes-loading').style.display = state === 'loading' ? 'block' : 'none';
+            document.getElementById('disputes-empty').style.display = state === 'empty' ? 'block' : 'none';
+            document.getElementById('disputes-error').style.display = state === 'error' ? 'block' : 'none';
+            document.getElementById('disputes-list').style.display = state === 'list' ? 'flex' : 'none';
+        }
+
+        #cap(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────
-    function showState(state) {
-        document.getElementById('disputes-loading').style.display = state === 'loading' ? 'block' : 'none';
-        document.getElementById('disputes-empty').style.display = state === 'empty' ? 'block' : 'none';
-        document.getElementById('disputes-error').style.display = state === 'error' ? 'block' : 'none';
-        document.getElementById('disputes-list').style.display = state === 'list' ? 'flex' : 'none';
-    }
-
-    function capitalise(str) {
-        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new AdminDisputesManager(SITE, () => localStorage.getItem('oc_token') || '');
+    document.addEventListener('DOMContentLoaded', () => manager.init());
+    const submitResolve = () => manager.submitResolve();
+    const submitReject = () => manager.submitReject();
+    const setStatusFilter = (status, btn) => manager.setStatusFilter(status, btn);
 </script>
 @endsection

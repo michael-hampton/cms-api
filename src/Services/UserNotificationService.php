@@ -22,11 +22,12 @@ class UserNotificationService
         User   $user,
         string $type,
         array  $data = [],
-        string $channel = 'in_app'
+        string $channel = 'in_app',
+        string $consentType = ''
     ): void
     {
         // Later: plug in consent check here
-        if (!$this->canNotify($user, $type, $channel)) {
+        if (!$this->canNotify($user, $consentType ?: $type, $channel)) {
             return;
         }
 

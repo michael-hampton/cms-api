@@ -21,6 +21,12 @@
                 <div class="oc-sidebar__logo">O</div>
                 <span class="oc-sidebar__brand-name">OpenCollab</span>
             </a>
+
+            @include('open-collab.partials.brand-switcher', [
+            'site' => $site,
+            'currentSiteName' => $currentSiteName ?? $site,
+            'availableSites' => $availableSites ?? [],
+            ])
         </div>
 
         <div class="oc-sidebar__nav">
@@ -83,7 +89,7 @@
             </a>
 
             <a href="/<?= $site ?>/open-collab/payouts"
-               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'disputes' ? 'active' : '' ?>">
+               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'payouts' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">
                     <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
                     <path fill-rule="evenodd"
@@ -156,7 +162,6 @@
             <div class="oc-header__spacer"></div>
 
             <div class="oc-header__actions">
-
                 <!-- Notification bell -->
                 <div class="oc-notif-bell" id="notif-bell-wrap">
                     <button class="oc-notif-bell__btn" id="notif-bell"
@@ -187,7 +192,6 @@
                 </div>
 
                 <?php if (!empty($headerActions)): echo $headerActions; endif; ?>
-
             </div>
         </header>
 
@@ -218,14 +222,13 @@
             </div>
         <?php endif; ?>
 
-        <!-- Page Content -->
         <main class="oc-page <?= $pageClass ?? '' ?>" id="main-content" role="main">
             @yield('content')
         </main>
 
-    </div><!-- /oc-main -->
+    </div>
 
-</div><!-- /oc-shell -->
+</div>
 
 <!-- Mobile sidebar toggle -->
 <button

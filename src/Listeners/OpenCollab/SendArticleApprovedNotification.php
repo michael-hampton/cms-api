@@ -15,7 +15,8 @@ class SendArticleApprovedNotification extends BaseUserNotificationListener
             [
                 'article_id' => $event->page->id,
                 'title' => $event->page->title,
-            ]
+            ],
+            'contributor.article_approved'
         );
     }
 }

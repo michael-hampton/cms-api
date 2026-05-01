@@ -30,6 +30,10 @@ class InvitationController extends Controller
      */
     public function store(CreateInvitationRequest $request): JsonResponse
     {
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 401);
+        }
+
         try {
 
             $data = $request->validated();

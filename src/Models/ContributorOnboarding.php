@@ -16,6 +16,7 @@ class ContributorOnboarding extends Model
         'status',
         'created_at',
         'updated_at',
+        'completed_at'
     ];
 
     protected $casts = [

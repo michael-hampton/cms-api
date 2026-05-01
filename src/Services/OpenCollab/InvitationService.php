@@ -45,35 +45,6 @@ class InvitationService
     }
 
     /**
-     * Admin creates an invitation for an email address.
-     *
-     * @throws \InvalidArgumentException if a live invitation already exists
-     */
-    public function create(string $email, int $invitedBy, int $siteId, int $ttlHours = 72): Model
-    {
-        if ($this->invitationRepository->hasPendingInviteForEmail($email, $siteId)) {
-            throw new \InvalidArgumentException(
-                "A pending invitation already exists for {$email}."
-            );
-        }
-
-        $invitation = $this->invitationRepository->create([
-            'site_id' => $siteId,
-            'email' => $email,
-            'token' => $this->generateToken(),
-            'invited_by' => $invitedBy ?: null,
-            'status' => InvitationStatus::Pending->value,
-            'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
-        ]);
-
-        $this->notificationDispatcher->dispatch(
-            new InvitationCreatedNotification($invitation)
-        );
-
-        return $invitation;
-    }
-
-    /**
      * Resends an existing invitation. Triggers whatever notification the
      * invitation model/mail system provides. Stub-safe: fails silently if
      * no send() infrastructure exists yet.
@@ -120,6 +91,12 @@ class InvitationService
                     'role' => 'contributor',
                     'is_contributor' => true,
                 ]);
+            } else {
+                $user = $this->userRepository->updateUserWithPassword($user->id, [
+                    'name' => $name,
+                    'password' => $password,
+                    'is_active' => true,
+                ]);
             }
 
             $this->siteAccessService->grantAccess(
@@ -143,6 +120,40 @@ class InvitationService
 
             return $user;
         });
+    }
+
+    /**
+     * Admin creates an invitation for an email address.
+     *
+     * @throws \InvalidArgumentException if a live invitation already exists
+     */
+    public function create(string $email, int $invitedBy, int $siteId, int $ttlHours = 72): Model
+    {
+        if ($this->invitationRepository->hasPendingInviteForEmail($email, $siteId)) {
+            throw new \InvalidArgumentException(
+                "A pending invitation already exists for {$email}."
+            );
+        }
+
+        $invitation = $this->invitationRepository->create([
+            'site_id' => $siteId,
+            'email' => $email,
+            'token' => $this->generateToken(),
+            'invited_by' => $invitedBy ?: null,
+            'status' => InvitationStatus::Pending->value,
+            'expires_at' => date('Y-m-d H:i:s', strtotime("+{$ttlHours} hours")),
+        ]);
+
+        $this->notificationDispatcher->dispatch(
+            new InvitationCreatedNotification($invitation)
+        );
+
+        return $invitation;
+    }
+
+    private function generateToken(): string
+    {
+        return bin2hex(random_bytes(32));
     }
 
     /**
@@ -227,10 +238,5 @@ class InvitationService
         }
 
         $this->invitationRepository->revoke($invitationId, $revokedBy);
-    }
-
-    private function generateToken(): string
-    {
-        return bin2hex(random_bytes(32));
     }
 }

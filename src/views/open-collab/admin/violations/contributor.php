@@ -70,76 +70,7 @@ $actionBadges = ['warning' => 'oc-badge--waiting-approval', 'suspension' => 'oc-
             </div>
         </div>
 
-        <?php if ($violations->isEmpty()): ?>
-            <div class="oc-card" style="padding:48px 24px;text-align:center;">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="32"
-                     style="opacity:.2;display:block;margin:0 auto 12px;color:var(--green);">
-                    <path fill-rule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clip-rule="evenodd"/>
-                </svg>
-                <div style="font-weight:500;color:var(--navy);">No violations for this contributor</div>
-            </div>
-        <?php else: ?>
-            <div class="oc-card" style="overflow:hidden;">
-                <div class="oc-card__header">
-                    <span class="oc-card__title">Violation History</span>
-                    <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);padding:2px 8px;border-radius:10px;font-weight:600;">
-                        <?= $violations->count() ?>
-                    </span>
-                </div>
-                <div style="display:flex;flex-direction:column;">
-                    <?php foreach ($violations as $i => $v):
-                        $vArr = is_array($v) ? $v : (method_exists($v, 'toArray') ? $v->toArray() : (array)$v);
-                        $isResolved = !empty($vArr['resolved_at']);
-                        $severity = $vArr['severity'] ?? 'low';
-                        $action = $vArr['action_taken'] ?? 'warning';
-                        $isLast = $i === $violations->count() - 1;
-                        ?>
-                        <div style="padding:16px 20px;<?= !$isLast ? 'border-bottom:1px solid var(--border);' : '' ?>">
-                            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
-                                <div>
-                                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-                                        <span style="font-weight:600;font-size:.875rem;color:var(--navy);">
-                                            <?= htmlspecialchars(str_replace('_', ' ', ucfirst($vArr['type'] ?? ''))) ?>
-                                        </span>
-                                        <span class="oc-badge <?= $actionBadges[$action] ?? 'oc-badge--draft' ?>"
-                                              style="font-size:.65rem;">
-                                            <?= ucfirst($action) ?>
-                                        </span>
-                                        <span style="font-size:.72rem;font-weight:600;color:<?= $severityColors[$severity] ?? '#64748b' ?>;">
-                                            <?= ucfirst($severity) ?> severity
-                                        </span>
-                                    </div>
-                                    <div style="font-size:.8rem;color:var(--slate);">
-                                        <?= htmlspecialchars($vArr['reason'] ?? '') ?>
-                                    </div>
-                                </div>
-                                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
-                                    <div style="font-size:.72rem;color:var(--slate-light);">
-                                        <?= !empty($vArr['created_at']) ? date('d M Y', strtotime($vArr['created_at'])) : '' ?>
-                                    </div>
-                                    <?php if ($isResolved): ?>
-                                        <span class="oc-badge oc-badge--published"
-                                              style="font-size:.65rem;">Resolved</span>
-                                    <?php else: ?>
-                                        <button onclick="openResolveModal(<?= (int)$vArr['id'] ?>)"
-                                                class="oc-btn oc-btn--primary oc-btn--sm" style="font-size:.72rem;">
-                                            Resolve
-                                        </button>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                            <?php if ($isResolved && !empty($vArr['resolution_notes'])): ?>
-                                <div style="font-size:.75rem;color:var(--slate);padding:8px 12px;background:var(--cream-dark);border-radius:6px;margin-top:6px;">
-                                    <strong>Resolution:</strong> <?= htmlspecialchars($vArr['resolution_notes']) ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
+        <div id="violations-container"></div>
 
     </div>
 
@@ -207,97 +138,213 @@ $actionBadges = ['warning' => 'oc-badge--waiting-approval', 'suspension' => 'oc-
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const CONTRIBUTOR_ID = <?= (int)$contributor['id'] ?>;
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    async function recordViolation() {
-        const type = document.getElementById('v-type').value;
-        const severity = document.getElementById('v-severity').value;
-        const action = document.getElementById('v-action').value;
-        const reason = document.getElementById('v-reason').value.trim();
-        const errBox = document.getElementById('record-errors');
-        const btn = document.getElementById('record-btn');
-        errBox.style.display = 'none';
+    class ContributorViolationsManager {
+        #site;
+        #token;
+        #contributorId;
+        #pendingResolveId = null;
 
-        if (!reason || reason.length < 10) {
-            errBox.textContent = 'Reason must be at least 10 characters.';
-            errBox.style.display = 'block';
-            return;
+        // Configuration for UI elements
+        static #SEV_COLORS = {high: '#ef4444', medium: '#f97316', low: '#eab308'};
+        static #ACT_BADGES = {
+            warning: 'oc-badge--waiting-approval',
+            suspension: 'oc-badge--revoked',
+            ban: 'oc-badge--revoked'
+        };
+
+        constructor({site, token, contributorId}) {
+            this.#site = site;
+            this.#token = token;
+            this.#contributorId = contributorId;
+            this.loadList();
         }
 
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Recording…';
+        async loadList() {
+            const container = document.getElementById('violations-container');
+            container.innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
 
-        const payload = {type, severity, reason};
-        if (action) payload.action_taken = action;
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/contributors/${this.#contributorId}/violations`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.#token()}`,
+                        'Accept': 'application/json'
+                    }
+                });
 
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributors/${CONTRIBUTOR_ID}/violations`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('✓ Violation recorded');
-            setTimeout(() => location.reload(), 800);
-        } else {
-            errBox.textContent = data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Failed.');
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.innerHTML = '⚠ Record violation';
+                const violations = await res.json();
+                this.#render(violations.data);
+            } catch (err) {
+                container.innerHTML = '<div class="oc-alert oc-alert--error">Failed to load violations.</div>';
+            }
+        }
+
+        #render(violations) {
+            const container = document.getElementById('violations-container');
+
+            if (!violations || violations.length === 0) {
+                container.innerHTML = `
+                <div class="oc-card" style="padding:48px 24px;text-align:center;">
+                    <div style="font-weight:500;color:var(--navy);">No violations for this contributor</div>
+                </div>`;
+                return;
+            }
+
+            const html = violations.map((v, i) => {
+                const isResolved = !!v.resolved_at;
+                const severity = v.severity || 'low';
+                const action = v.action_taken || 'warning';
+                const isLast = i === violations.length - 1;
+                const border = !isLast ? 'border-bottom:1px solid var(--border);' : '';
+
+                return `
+                <div style="padding:16px 20px; ${border}">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+                        <div>
+                            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                                <span style="font-weight:600;font-size:.875rem;color:var(--navy);">
+                                    ${(v.type || '').replace('_', ' ').toUpperCase()}
+                                </span>
+                                <span class="oc-badge ${ContributorViolationsManager.#ACT_BADGES[action] || 'oc-badge--draft'}" style="font-size:.65rem;">
+                                    ${action.charAt(0).toUpperCase() + action.slice(1)}
+                                </span>
+                                <span style="font-size:.72rem;font-weight:600;color:${ContributorViolationsManager.#SEV_COLORS[severity]};">
+                                    ${severity.charAt(0).toUpperCase() + severity.slice(1)} severity
+                                </span>
+                            </div>
+                            <div style="font-size:.8rem;color:var(--slate);">${v.reason || ''}</div>
+                        </div>
+                        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
+                            <div style="font-size:.72rem;color:var(--slate-light);">${v.created_at ? v.created_at.split(' ')[0] : ''}</div>
+                            ${isResolved
+                    ? '<span class="oc-badge oc-badge--published" style="font-size:.65rem;">Resolved</span>'
+                    : `<button onclick="openResolveModal(${v.id})" class="oc-btn oc-btn--primary oc-btn--sm" style="font-size:.72rem;">Resolve</button>`
+                }
+                        </div>
+                    </div>
+                    ${isResolved && v.resolution_notes ? `
+                        <div style="font-size:.75rem;color:var(--slate);padding:8px 12px;background:var(--cream-dark);border-radius:6px;margin-top:6px;">
+                            <strong>Resolution:</strong> ${v.resolution_notes}
+                        </div>` : ''}
+                </div>`;
+            }).join('');
+
+            container.innerHTML = `
+            <div class="oc-card" style="overflow:hidden;">
+                <div class="oc-card__header">
+                    <span class="oc-card__title">Violation History</span>
+                    <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);padding:2px 8px;border-radius:10px;font-weight:600;">
+                        ${violations.length}
+                    </span>
+                </div>
+                <div style="display:flex;flex-direction:column;">${html}</div>
+            </div>`;
+        }
+
+        async recordViolation() {
+            const type = document.getElementById('v-type').value;
+            const severity = document.getElementById('v-severity').value;
+            const action = document.getElementById('v-action').value;
+            const reason = document.getElementById('v-reason').value.trim();
+            const errBox = document.getElementById('record-errors');
+            const btn = document.getElementById('record-btn');
+            errBox.style.display = 'none';
+
+            if (!reason || reason.length < 10) {
+                errBox.textContent = 'Reason must be at least 10 characters.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Recording…';
+
+            const payload = {type, severity, reason};
+            if (action) payload.action_taken = action;
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contributors/${this.#contributorId}/violations`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('✓ Violation recorded');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                errBox.textContent = data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Failed.');
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.innerHTML = '⚠ Record violation';
+            }
+        }
+
+        openResolveModal(id) {
+            this.#pendingResolveId = id;
+            document.getElementById('resolve-notes').value = '';
+            document.getElementById('resolve-errors').style.display = 'none';
+            document.getElementById('resolve-modal').style.display = 'grid';
+        }
+
+        closeResolveModal() {
+            this.#pendingResolveId = null;
+            document.getElementById('resolve-modal').style.display = 'none';
+        }
+
+        async submitResolve() {
+            const id = this.#pendingResolveId;
+            const notes = document.getElementById('resolve-notes').value.trim();
+            const errBox = document.getElementById('resolve-errors');
+            const btn = document.getElementById('resolve-confirm-btn');
+            errBox.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/violations/${id}/resolve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({notes: notes || undefined}),
+            });
+            if (res.ok) {
+                this.closeResolveModal();
+                this.#showToast('✓ Resolved');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                const d = await res.json();
+                errBox.textContent = d.error || 'Failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Resolve';
+            }
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    function openResolveModal(id) {
-        document.getElementById('resolve-violation-id').value = id;
-        document.getElementById('resolve-notes').value = '';
-        document.getElementById('resolve-errors').style.display = 'none';
-        document.getElementById('resolve-modal').style.display = 'grid';
-    }
-
-    function closeResolveModal() {
-        document.getElementById('resolve-modal').style.display = 'none';
-    }
-
-    async function submitResolve() {
-        const id = document.getElementById('resolve-violation-id').value;
-        const notes = document.getElementById('resolve-notes').value.trim();
-        const errBox = document.getElementById('resolve-errors');
-        const btn = document.getElementById('resolve-confirm-btn');
-        errBox.style.display = 'none';
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
-        const res = await fetch(`/api/${SITE}/open-collab/admin/violations/${id}/resolve`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({notes: notes || undefined}),
-        });
-        if (res.ok) {
-            closeResolveModal();
-            showToast('✓ Resolved');
-            setTimeout(() => location.reload(), 800);
-        } else {
-            const d = await res.json();
-            errBox.textContent = d.error || 'Failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Resolve';
-        }
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => el.style.opacity = '0', 2800);
-    }
+    const manager = new ContributorViolationsManager({
+        site: SITE,
+        token: () => localStorage.getItem('oc_token') || '',
+        contributorId: CONTRIBUTOR_ID,
+    });
+    const recordViolation = () => manager.recordViolation();
+    const openResolveModal = (id) => manager.openResolveModal(id);
+    const closeResolveModal = () => manager.closeResolveModal();
+    const submitResolve = () => manager.submitResolve();
 </script>
 @endsection

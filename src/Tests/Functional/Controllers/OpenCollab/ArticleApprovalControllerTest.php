@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Enums\Pages\PageStatus;
+use App\Models\ContributorProfile;
+use App\Models\Site;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -46,6 +48,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         ]);
 
         $response = $this->postForSite("/api/open-collab/admin/articles/{$page->id}/approve");
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -106,6 +109,22 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         $this->assertDatabaseHas('pages', ['id' => $page->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
     }
 
+    public function test_contributor_cannot_submit_their_own_article_for_review_when_onboarding_incomplete(): void
+    {
+        $this->actingAs($this->contributor);
+
+        $this->setupSiteOnboarding(true);
+
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::DRAFT->value,
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/pages/{$page->id}/submit");
+
+        $this->assertEquals(302, $response->getStatusCode());
+    }
+
     public function test_submit_returns_403_for_page_owned_by_another_contributor(): void
     {
         $this->actingAs($this->contributor);
@@ -140,6 +159,13 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         ]);
     }
 
+    private function setupSiteOnboarding(bool $requiresSiteOnboarding = false): void
+    {
+        $site = Site::find($this->siteId);
+
+        $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -149,6 +175,13 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
             'role' => 'contributor',
             'is_contributor' => true,
         ]);
+
+        ContributorProfile::create([
+            'user_id' => $this->contributor->id,
+            'bio' => 'test bio',
+        ]);
+
+        $this->setupSiteOnboarding();
 
         $this->otherContributor = $this->createUser([
             'email' => 'other-article-owner@example.com',

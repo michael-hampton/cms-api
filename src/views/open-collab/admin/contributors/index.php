@@ -191,385 +191,352 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // ── State ─────────────────────────────────────────────────────────────────
-    let currentQuery = '';
-    let currentStatus = '';   // '' | 'active' | 'inactive'
-    let currentPage = 1;
-    const PER_PAGE = 25;
-    let debounceTimer = null;
-    let lastResults = [];   // cached for client-side status filter fallback
-    let currentActionId = null;
-    let currentActionType = null;
-    let pendingRole = null;
+    class ContributorsManager {
+        #site;
+        #token;
 
-    // ── Bootstrap ─────────────────────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('search-input').addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            currentPage = 1;
-            debounceTimer = setTimeout(() => {
-                currentQuery = this.value.trim();
-                loadContributors();
-            }, 320);
-        });
+        #state = {
+            query: '',
+            status: '',
+            page: 1,
+            perPage: 25,
+            results: [],
+            actionId: null,
+            actionType: null,
+            pendingRole: null,
+        };
 
-        loadContributors();
-    });
+        #debounceTimer = null;
 
-    // ── Filter pills ──────────────────────────────────────────────────────────
-    function setStatusFilter(status, btn) {
-        currentStatus = status;
-        currentPage = 1;
-        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
-        btn.classList.add('filter-pill--active');
-        renderTable(lastResults);   // re-filter client-side (no extra API call needed)
-    }
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-    // ── Load from API ─────────────────────────────────────────────────────────
-    async function loadContributors() {
-        showState('loading');
+        init() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(this.#debounceTimer);
+                this.#state.page = 1;
+                this.#debounceTimer = setTimeout(() => {
+                    this.#state.query = e.target.value.trim();
+                    this.#load();
+                }, 320);
+            });
+            this.#load();
+        }
 
-        const params = new URLSearchParams({per_page: PER_PAGE, page: currentPage});
-        if (currentQuery) params.set('q', currentQuery);
+        setStatusFilter(status, btn) {
+            this.#state.status = status;
+            this.#state.page = 1;
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+            btn.classList.add('filter-pill--active');
+            this.#renderTable(this.#state.results);
+        }
 
-        try {
-            const res = await fetch(
-                `/api/${SITE}/open-collab/admin/contributors?${params}`,
-                {headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'}}
-            );
+        async #load() {
+            this.#showState('loading');
+            const params = new URLSearchParams({per_page: this.#state.perPage, page: this.#state.page});
+            if (this.#state.query) params.set('q', this.#state.query);
 
-            if (!res.ok) {
-                showState('error');
+            try {
+                const res = await fetch(
+                    `/api/${this.#site}/open-collab/admin/contributors?${params}`,
+                    {headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'}}
+                );
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                const items = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+                this.#state.results = items;
+                this.#renderTable(items);
+                this.#renderPagination(data);
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #renderTable(items) {
+            const filtered = this.#filterByStatus(items);
+            const q = this.#state.query;
+            document.getElementById('results-title').textContent = q ? `Results for "${q}"` : 'All Contributors';
+            document.getElementById('results-count').textContent = filtered.length;
+
+            if (!filtered.length) {
+                this.#showState('empty');
+                document.getElementById('empty-message').textContent = q ? `No contributors matching "${q}"` : 'No contributors yet';
+                document.getElementById('empty-sub').textContent = q ? 'Try a different search term.' : 'Send invitations to add contributors.';
                 return;
             }
 
-            const data = await res.json();
-            // Support both flat array and paginated { data: [...], total, ... }
-            const items = Array.isArray(data)
-                ? data
-                : (Array.isArray(data.data) ? data.data : []);
-
-            lastResults = items;
-            renderTable(items);
-            renderPagination(data);
-        } catch {
-            showState('error');
-        }
-    }
-
-    // ── Render table with optional client-side status filter ──────────────────
-    function renderTable(items) {
-        const filtered = filterByStatus(items);
-        const count = filtered.length;
-
-        const q = currentQuery;
-        document.getElementById('results-title').textContent =
-            q ? `Results for "${q}"` : 'All Contributors';
-        document.getElementById('results-count').textContent = count;
-
-        if (!count) {
-            showState('empty');
-            document.getElementById('empty-message').textContent =
-                q ? `No contributors matching "${q}"` : 'No contributors yet';
-            document.getElementById('empty-sub').textContent =
-                q ? 'Try a different search term.' : 'Send invitations to add contributors.';
-            return;
+            document.getElementById('contributors-tbody').innerHTML = filtered.map(c => this.#buildRow(c)).join('');
+            this.#showState('table');
         }
 
-        const tbody = document.getElementById('contributors-tbody');
-        tbody.innerHTML = filtered.map(c => buildRow(c)).join('');
-        showState('table');
-    }
+        #filterByStatus(items) {
+            if (!this.#state.status) return items;
+            return items.filter(c => this.#state.status === 'active' ? c.is_active !== false : c.is_active === false);
+        }
 
-    function filterByStatus(items) {
-        if (!currentStatus) return items;
-        return items.filter(c =>
-            currentStatus === 'active'
-                ? (c.is_active !== false)
-                : (c.is_active === false)
-        );
-    }
+        #buildRow(c) {
+            const isActive = c.is_active !== false;
+            const initial = (c.name || 'C').charAt(0).toUpperCase();
+            const joined = c.created_at
+                ? new Date(c.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
+                : '–';
+            const statusBadge = isActive
+                ? '<span class="oc-badge oc-badge--published">Active</span>'
+                : '<span class="oc-badge oc-badge--revoked">Inactive</span>';
+            const actionBtn = isActive
+                ? `<button onclick="manager.openActionModal(${c.id},'deactivate')" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Deactivate</button>`
+                : `<button onclick="manager.openActionModal(${c.id},'reactivate')" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#bbf7d0;color:var(--green);">Reactivate</button>`;
 
-    function buildRow(c) {
-        const isActive = c.is_active !== false;
-        const initial = (c.name || 'C').charAt(0).toUpperCase();
-        const joined = c.created_at
-            ? new Date(c.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
-            : '–';
-
-        const statusBadge = isActive
-            ? '<span class="oc-badge oc-badge--published">Active</span>'
-            : '<span class="oc-badge oc-badge--revoked">Inactive</span>';
-
-        // Call openActionModal instead of direct API functions
-        const actionBtn = isActive
-            ? `<button onclick="openActionModal(${c.id}, 'deactivate')"
-                   class="oc-btn oc-btn--ghost oc-btn--sm"
-                   style="border-color:#fecaca;color:var(--red);">Deactivate</button>`
-            : `<button onclick="openActionModal(${c.id}, 'reactivate')"
-                   class="oc-btn oc-btn--ghost oc-btn--sm"
-                   style="border-color:#bbf7d0;color:var(--green);">Reactivate</button>`;
-
-        return `<tr id="contrib-row-${c.id}">
-        <td>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);
-                            display:grid;place-items:center;font-weight:700;font-size:.8rem;
-                            color:var(--amber);flex-shrink:0;">${escHtml(initial)}</div>
-                <div>
-                    <div style="font-weight:500;color:var(--navy);">${escHtml(c.name || '–')}</div>
-                    <div style="font-size:.75rem;color:var(--slate);">${escHtml(c.email || '')}</div>
+            return `<tr id="contrib-row-${c.id}">
+            <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <div style="width:32px;height:32px;border-radius:50%;background:var(--navy);display:grid;place-items:center;font-weight:700;font-size:.8rem;color:var(--amber);flex-shrink:0;">${this.#esc(initial)}</div>
+                    <div>
+                        <div style="font-weight:500;color:var(--navy);">${this.#esc(c.name || '–')}</div>
+                        <div style="font-size:.75rem;color:var(--slate);">${this.#esc(c.email || '')}</div>
+                    </div>
                 </div>
-            </div>
-        </td>
-        <td>${statusBadge}</td>
-        <td>
-            <select class="oc-input" style="font-size:.82rem; padding:4px 8px; height:auto; width:auto;"
-                    onchange="openActionModal(${c.id}, 'role', this.value)">
-                <option value="contributor" ${c.role === 'contributor' ? 'selected' : ''}>Contributor</option>
-                <option value="editor" ${c.role === 'editor' ? 'selected' : ''}>Editor</option>
-                <option value="admin" ${c.role === 'admin' ? 'selected' : ''}>Admin</option>
-            </select>
-        </td>
-        <td style="font-size:.78rem;color:var(--slate);">${joined}</td>
-        <td style="text-align:right;">
-            <div style="display:flex;gap:6px;justify-content:flex-end;">
-                <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${c.id}"
-                   class="oc-btn oc-btn--ghost oc-btn--sm">View</a>
-                ${actionBtn}
-            </div>
-        </td>
-    </tr>`;
-    }
-
-    // ── Pagination ────────────────────────────────────────────────────────────
-    function renderPagination(data) {
-        // If the API returned flat array or no pagination metadata, hide pagination
-        if (Array.isArray(data) || !data.total) {
-            document.getElementById('pagination-bar').style.display = 'none';
-            return;
+            </td>
+            <td>${statusBadge}</td>
+            <td>
+                <select class="oc-input" style="font-size:.82rem;padding:4px 8px;height:auto;width:auto;"
+                        onchange="manager.openActionModal(${c.id},'role',this.value)">
+                    <option value="contributor" ${c.role === 'contributor' ? 'selected' : ''}>Contributor</option>
+                    <option value="editor" ${c.role === 'editor' ? 'selected' : ''}>Editor</option>
+                    <option value="admin" ${c.role === 'admin' ? 'selected' : ''}>Admin</option>
+                </select>
+            </td>
+            <td style="font-size:.78rem;color:var(--slate);">${joined}</td>
+            <td style="text-align:right;">
+                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                    <a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${c.id}" class="oc-btn oc-btn--ghost oc-btn--sm">View</a>
+                    ${actionBtn}
+                </div>
+            </td>
+        </tr>`;
         }
 
-        const total = data.total ?? 0;
-        const totalPages = Math.ceil(total / PER_PAGE);
-
-        if (totalPages <= 1) {
-            document.getElementById('pagination-bar').style.display = 'none';
-            return;
-        }
-
-        document.getElementById('pagination-bar').style.display = 'flex';
-        document.getElementById('pagination-info').textContent =
-            `Showing ${Math.min((currentPage - 1) * PER_PAGE + 1, total)}–${Math.min(currentPage * PER_PAGE, total)} of ${total}`;
-
-        document.getElementById('prev-btn').disabled = currentPage <= 1;
-        document.getElementById('next-btn').disabled = currentPage >= totalPages;
-
-        // Page number pills (show up to 5 around current)
-        const pills = document.getElementById('page-pills');
-        pills.innerHTML = '';
-        const start = Math.max(1, currentPage - 2);
-        const end = Math.min(totalPages, currentPage + 2);
-        for (let p = start; p <= end; p++) {
-            const btn = document.createElement('button');
-            btn.textContent = p;
-            btn.className = 'oc-btn oc-btn--ghost oc-btn--sm';
-            if (p === currentPage) {
-                btn.style.background = 'var(--navy)';
-                btn.style.color = '#fff';
-                btn.style.borderColor = 'var(--navy)';
+        #renderPagination(data) {
+            const bar = document.getElementById('pagination-bar');
+            if (Array.isArray(data) || !data.total) {
+                bar.style.display = 'none';
+                return;
             }
-            btn.addEventListener('click', () => {
-                currentPage = p;
-                loadContributors();
-            });
-            pills.appendChild(btn);
-        }
-    }
-
-    function changePage(delta) {
-        currentPage += delta;
-        loadContributors();
-    }
-
-    // ── UI state helpers ──────────────────────────────────────────────────────
-    function showState(state) {
-        const states = {
-            loading: 'contributors-loading', empty: 'contributors-empty',
-            error: 'contributors-error', table: 'contributors-table'
-        };
-        Object.entries(states).forEach(([k, id]) => {
-            document.getElementById(id).style.display = k === state ? (k === 'table' ? 'block' : 'block') : 'none';
-        });
-        if (state !== 'table') {
-            document.getElementById('pagination-bar').style.display = 'none';
-        }
-    }
-
-    // ── Actions ───────────────────────────────────────────────────────────────
-    async function sendInvite() {
-        const email = document.getElementById('invite-email').value.trim();
-        const errBox = document.getElementById('invite-errors');
-        const btn = document.getElementById('invite-btn');
-        errBox.style.display = 'none';
-
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            errBox.textContent = 'A valid email address is required.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Sending…';
-
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/invitations`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({email}),
-            });
-            const data = await res.json();
-            if (res.ok) {
-                document.getElementById('invite-email').value = '';
-                showToast('✓ Invitation sent to ' + email);
-            } else {
-                errBox.textContent = data.error || data.message || 'Failed to send invitation.';
-                errBox.style.display = 'block';
+            const total = data.total ?? 0;
+            const totalPages = Math.ceil(total / this.#state.perPage);
+            if (totalPages <= 1) {
+                bar.style.display = 'none';
+                return;
             }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Send invitation';
-        }
-    }
 
-    function openActionModal(id, type, role = null) {
-        currentActionId = id;
-        currentActionType = type;
-        pendingRole = role;
+            bar.style.display = 'flex';
+            document.getElementById('pagination-info').textContent =
+                `Showing ${Math.min((this.#state.page - 1) * this.#state.perPage + 1, total)}–${Math.min(this.#state.page * this.#state.perPage, total)} of ${total}`;
+            document.getElementById('prev-btn').disabled = this.#state.page <= 1;
+            document.getElementById('next-btn').disabled = this.#state.page >= totalPages;
 
-        const isDeactivate = type === 'deactivate';
-        const isRole = type === 'role';
-
-        const title = document.getElementById('action-modal-title');
-        const desc = document.getElementById('action-modal-desc');
-        const btn = document.getElementById('action-confirm-btn');
-
-        if (isRole) {
-            title.textContent = 'Change Contributor Role';
-            desc.textContent = `Changing role to "${role}". Please provide a reason.`;
-            btn.className = 'oc-btn oc-btn--amber';
-            btn.textContent = 'Update Role';
-        } else {
-            title.textContent = isDeactivate ? 'Deactivate Account' : 'Reactivate Account';
-            desc.textContent = isDeactivate
-                ? 'They will lose access immediately. Please provide a reason.'
-                : 'Access will be restored. Please provide a reason.';
-            btn.className = isDeactivate ? 'oc-btn oc-btn--danger' : 'oc-btn oc-btn--amber';
-            btn.textContent = isDeactivate ? 'Deactivate account' : 'Reactivate account';
-        }
-
-        btn.onclick = submitStatusChange;
-        document.getElementById('action-modal').style.display = 'grid';
-        document.getElementById('action-reason').focus();
-    }
-
-    function closeActionModal() {
-        document.getElementById('action-modal').style.display = 'none';
-        document.getElementById('action-reason').value = '';
-        document.getElementById('action-modal-errors').style.display = 'none';
-        // Refresh table to revert select dropdown if user cancelled
-        renderTable(lastResults);
-    }
-
-    async function submitStatusChange() {
-        const reason = document.getElementById('action-reason').value.trim();
-        const errBox = document.getElementById('action-modal-errors');
-        const btn = document.getElementById('action-confirm-btn');
-        errBox.style.display = 'none';
-
-        if (!reason) {
-            errBox.textContent = 'Please provide a reason.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        const originalText = btn.textContent;
-        btn.innerHTML = '<div class="oc-spinner"></div> Processing…';
-
-        let url, body;
-        if (currentActionType === 'role') {
-            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/role`;
-            body = JSON.stringify({role: pendingRole, reason: reason});
-        } else {
-            url = `/api/${SITE}/open-collab/admin/contributors/${currentActionId}/${currentActionType}`;
-            body = JSON.stringify({reason: reason});
-        }
-
-        try {
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json'
-                },
-                body: body,
-            });
-
-            if (res.ok) {
-                closeActionModal();
-                showToast('Update successful');
-
-                // Update local cache
-                const c = lastResults.find(x => x.id === currentActionId);
-                if (c) {
-                    if (currentActionType === 'role') c.role = pendingRole;
-                    else c.is_active = (currentActionType === 'reactivate');
+            const pills = document.getElementById('page-pills');
+            pills.innerHTML = '';
+            const start = Math.max(1, this.#state.page - 2);
+            const end = Math.min(totalPages, this.#state.page + 2);
+            for (let p = start; p <= end; p++) {
+                const btn = document.createElement('button');
+                btn.textContent = p;
+                btn.className = 'oc-btn oc-btn--ghost oc-btn--sm';
+                if (p === this.#state.page) {
+                    btn.style.background = 'var(--navy)';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = 'var(--navy)';
                 }
-                renderTable(lastResults);
-            } else {
+                btn.addEventListener('click', () => {
+                    this.#state.page = p;
+                    this.#load();
+                });
+                pills.appendChild(btn);
+            }
+        }
+
+        changePage(delta) {
+            this.#state.page += delta;
+            this.#load();
+        }
+
+        async sendInvite() {
+            const email = document.getElementById('invite-email').value.trim();
+            const errBox = document.getElementById('invite-errors');
+            const btn = document.getElementById('invite-btn');
+            errBox.style.display = 'none';
+
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                errBox.textContent = 'A valid email address is required.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Sending…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/invitations`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json'
+                    },
+                    body: JSON.stringify({email}),
+                });
                 const data = await res.json();
-                errBox.textContent = data.error || 'Request failed.';
+                if (res.ok) {
+                    document.getElementById('invite-email').value = '';
+                    this.#showToast(`✓ Invitation sent to ${email}`);
+                } else {
+                    errBox.textContent = data.error || data.message || 'Failed to send invitation.';
+                    errBox.style.display = 'block';
+                }
+            } catch {
+                errBox.textContent = 'Network error. Please try again.';
+                errBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Send invitation';
+            }
+        }
+
+        openActionModal(id, type, role = null) {
+            this.#state.actionId = id;
+            this.#state.actionType = type;
+            this.#state.pendingRole = role;
+
+            const title = document.getElementById('action-modal-title');
+            const desc = document.getElementById('action-modal-desc');
+            const btn = document.getElementById('action-confirm-btn');
+
+            if (type === 'role') {
+                title.textContent = 'Change Contributor Role';
+                desc.textContent = `Changing role to "${role}". Please provide a reason.`;
+                btn.className = 'oc-btn oc-btn--amber';
+                btn.textContent = 'Update Role';
+            } else {
+                const isDeactivate = type === 'deactivate';
+                title.textContent = isDeactivate ? 'Deactivate Account' : 'Reactivate Account';
+                desc.textContent = isDeactivate
+                    ? 'They will lose access immediately. Please provide a reason.'
+                    : 'Access will be restored. Please provide a reason.';
+                btn.className = isDeactivate ? 'oc-btn oc-btn--danger' : 'oc-btn oc-btn--amber';
+                btn.textContent = isDeactivate ? 'Deactivate account' : 'Reactivate account';
+            }
+
+            btn.onclick = () => this.submitAction();
+            document.getElementById('action-modal').style.display = 'grid';
+            document.getElementById('action-reason').focus();
+        }
+
+        closeActionModal() {
+            document.getElementById('action-modal').style.display = 'none';
+            document.getElementById('action-reason').value = '';
+            document.getElementById('action-modal-errors').style.display = 'none';
+            this.#renderTable(this.#state.results);
+        }
+
+        async submitAction() {
+            const reason = document.getElementById('action-reason').value.trim();
+            const errBox = document.getElementById('action-modal-errors');
+            const btn = document.getElementById('action-confirm-btn');
+            errBox.style.display = 'none';
+
+            if (!reason) {
+                errBox.textContent = 'Please provide a reason.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.innerHTML = '<div class="oc-spinner"></div> Processing…';
+
+            const {actionId, actionType, pendingRole} = this.#state;
+            const url = actionType === 'role'
+                ? `/api/${this.#site}/open-collab/admin/contributors/${actionId}/role`
+                : `/api/${this.#site}/open-collab/admin/contributors/${actionId}/${actionType}`;
+            const body = actionType === 'role'
+                ? JSON.stringify({role: pendingRole, reason})
+                : JSON.stringify({reason});
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json'
+                    },
+                    body,
+                });
+
+                if (res.ok) {
+                    this.closeActionModal();
+                    this.#showToast('Update successful');
+                    const c = this.#state.results.find(x => x.id === actionId);
+                    if (c) {
+                        if (actionType === 'role') c.role = pendingRole;
+                        else c.is_active = actionType === 'reactivate';
+                    }
+                    this.#renderTable(this.#state.results);
+                } else {
+                    const data = await res.json();
+                    errBox.textContent = data.error || 'Request failed.';
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
+            } catch {
+                errBox.textContent = 'Network error.';
                 errBox.style.display = 'block';
                 btn.disabled = false;
                 btn.textContent = originalText;
             }
-        } catch (e) {
-            errBox.textContent = 'Network error.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = originalText;
+        }
+
+        #showState(state) {
+            const map = {
+                loading: 'contributors-loading',
+                empty: 'contributors-empty',
+                error: 'contributors-error',
+                table: 'contributors-table',
+            };
+            Object.entries(map).forEach(([k, id]) => {
+                document.getElementById(id).style.display = k === state ? 'block' : 'none';
+            });
+            if (state !== 'table') document.getElementById('pagination-bar').style.display = 'none';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Utilities ─────────────────────────────────────────────────────────────
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new ContributorsManager(
+        SITE,
+        () => localStorage.getItem('oc_token') || ''
+    );
+    document.addEventListener('DOMContentLoaded', () => manager.init());
 </script>
 @endsection

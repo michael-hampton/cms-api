@@ -193,119 +193,142 @@ $breadcrumbs = [['label' => 'Approval Queue']];
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    function togglePreview(id) {
-        const panel = document.getElementById('preview-panel-' + id);
-        const btn = document.getElementById('preview-toggle-' + id);
-        const open = panel.style.display === 'none';
-        panel.style.display = open ? 'block' : 'none';
-        btn.textContent = open ? 'Hide content' : 'Preview content';
-    }
+    class PendingArticlesManager {
+        #site;
+        #token;
+        #pendingRejectId = null;
 
-    async function approveArticle(id, btn) {
-        if (!confirm('Approve and publish this article?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/articles/${id}/approve`, {
-                method: 'POST',
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showToast('✓ Article approved and published');
-                const card = document.getElementById('article-card-' + id);
-                if (card) {
-                    card.style.opacity = '.4';
-                    card.style.pointerEvents = 'none';
+        togglePreview(id) {
+            const panel = document.getElementById(`preview-panel-${id}`);
+            const btn = document.getElementById(`preview-toggle-${id}`);
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            btn.textContent = open ? 'Hide content' : 'Preview content';
+        }
+
+        async approveArticle(id, btn) {
+            if (!confirm('Approve and publish this article?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/articles/${id}/approve`, {
+                    method: 'POST',
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.#showToast('✓ Article approved and published');
+                    const card = document.getElementById(`article-card-${id}`);
+                    if (card) {
+                        card.style.opacity = '.4';
+                        card.style.pointerEvents = 'none';
+                    }
+                    setTimeout(() => card?.remove(), 1200);
+                } else {
+                    this.#showToast(data.error || 'Approval failed', false);
+                    btn.disabled = false;
+                    btn.innerHTML = '✓ Approve';
                 }
-                setTimeout(() => card?.remove(), 1200);
-            } else {
-                showToast(data.error || 'Approval failed', false);
+            } catch {
+                this.#showToast('Network error', false);
                 btn.disabled = false;
                 btn.innerHTML = '✓ Approve';
             }
-        } catch {
-            showToast('Network error', false);
-            btn.disabled = false;
-            btn.innerHTML = '✓ Approve';
-        }
-    }
-
-    function openRejectModal(id) {
-        document.getElementById('reject-page-id').value = id;
-        document.getElementById('reject-reason').value = '';
-        document.getElementById('reject-notes').value = '';
-        document.getElementById('reject-modal-errors').style.display = 'none';
-        document.getElementById('reject-modal').style.display = 'grid';
-        document.getElementById('reject-reason').focus();
-    }
-
-    function closeRejectModal() {
-        document.getElementById('reject-modal').style.display = 'none';
-    }
-
-    async function submitRejection() {
-        const id = document.getElementById('reject-page-id').value;
-        const reason = document.getElementById('reject-reason').value;
-        const notes = document.getElementById('reject-notes').value.trim();
-        const errBox = document.getElementById('reject-modal-errors');
-        const btn = document.getElementById('reject-confirm-btn');
-
-        errBox.style.display = 'none';
-        if (!reason) {
-            errBox.textContent = 'Please select a rejection reason.';
-            errBox.style.display = 'block';
-            return;
         }
 
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Rejecting…';
+        openRejectModal(id) {
+            this.#pendingRejectId = id;
+            document.getElementById('reject-reason').value = '';
+            document.getElementById('reject-notes').value = '';
+            document.getElementById('reject-modal-errors').style.display = 'none';
+            document.getElementById('reject-modal').style.display = 'grid';
+            document.getElementById('reject-reason').focus();
+        }
 
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/articles/${id}/reject`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({reason, notes: notes || undefined}),
-            });
-            const data = await res.json();
-            if (res.ok) {
-                closeRejectModal();
-                showToast('Article rejected — contributor notified');
-                const card = document.getElementById('article-card-' + id);
-                if (card) {
-                    card.style.opacity = '.4';
-                    card.style.pointerEvents = 'none';
+        closeRejectModal() {
+            this.#pendingRejectId = null;
+            document.getElementById('reject-modal').style.display = 'none';
+        }
+
+        async submitRejection() {
+            const id = this.#pendingRejectId;
+            const reason = document.getElementById('reject-reason').value;
+            const notes = document.getElementById('reject-notes').value.trim();
+            const errBox = document.getElementById('reject-modal-errors');
+            const btn = document.getElementById('reject-confirm-btn');
+
+            errBox.style.display = 'none';
+            if (!reason) {
+                errBox.textContent = 'Please select a rejection reason.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Rejecting…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/articles/${id}/reject`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({reason, notes: notes || undefined}),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.closeRejectModal();
+                    this.#showToast('Article rejected — contributor notified');
+                    const card = document.getElementById(`article-card-${id}`);
+                    if (card) {
+                        card.style.opacity = '.4';
+                        card.style.pointerEvents = 'none';
+                    }
+                    setTimeout(() => card?.remove(), 1200);
+                } else {
+                    errBox.textContent = data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Rejection failed.');
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Reject article';
                 }
-                setTimeout(() => card?.remove(), 1200);
-            } else {
-                errBox.textContent = data.error || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Rejection failed.');
+            } catch {
+                errBox.textContent = 'Network error. Please try again.';
                 errBox.style.display = 'block';
                 btn.disabled = false;
                 btn.textContent = 'Reject article';
             }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Reject article';
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 3000);
         }
     }
 
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 3000);
-    }
+    const manager = new PendingArticlesManager(
+        SITE,
+        () => localStorage.getItem('oc_token') || ''
+    );
+
+    // Global shims for inline onclick handlers in PHP-rendered HTML
+    const togglePreview = (id) => manager.togglePreview(id);
+    const approveArticle = (id, btn) => manager.approveArticle(id, btn);
+    const openRejectModal = (id) => manager.openRejectModal(id);
+    const closeRejectModal = () => manager.closeRejectModal();
+    const submitRejection = () => manager.submitRejection();
 </script>
 @endsection

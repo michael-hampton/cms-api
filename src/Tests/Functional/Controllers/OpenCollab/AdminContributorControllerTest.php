@@ -52,13 +52,44 @@ class AdminContributorControllerTest extends FunctionalTestCase
     {
         UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
 
-        $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/deactivate");
+        $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/deactivate", ['reason' => 'test']);
+
         $this->assertEquals(200, $deactivateResponse->getStatusCode());
         $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 0]);
 
-        $reactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/reactivate");
+        $reactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/reactivate", ['reason' => 'test']);
         $this->assertEquals(200, $reactivateResponse->getStatusCode());
         $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 1]);
+    }
+
+    public function test_admin_can_deactivate_account_without_reason(): void
+    {
+        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
+
+        $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/deactivate");
+        $data = json_decode($deactivateResponse->getContent(), true);
+
+        $this->assertArrayHasKey('error', $data);
+
+        $this->assertEquals('Reason is required to deactivate a contributor.', $data['error']);
+
+        $this->assertEquals(422, $deactivateResponse->getStatusCode());
+
+    }
+
+    public function test_admin_can_reactivate_account_without_reason(): void
+    {
+        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId, 'is_active' => 0]);
+
+        $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/reactivate");
+        $data = json_decode($deactivateResponse->getContent(), true);
+
+        $this->assertArrayHasKey('error', $data);
+
+        $this->assertEquals('Reason is required to reactivate a contributor.', $data['error']);
+
+        $this->assertEquals(422, $deactivateResponse->getStatusCode());
+
     }
 
     public function test_admin_can_close_contributor_account(): void
@@ -86,10 +117,12 @@ class AdminContributorControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'is_active' => 0]);
         $this->assertDatabaseMissing('oc_user_sites', ['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
+
+
         $this->assertDatabaseHas('oc_payouts', [
             'id' => $pendingPayout->id,
             'status' => PayoutStatus::Rejected->value,
-            'rejection_reason' => 'Account closed.',
+            'rejection_reason' => 'Account closed: Repeated policy breaches.',
         ]);
         $this->assertDatabaseHas('pages', ['id' => $page->id, 'status' => PageStatus::ARCHIVED->value]);
     }

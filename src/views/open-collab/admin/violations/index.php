@@ -168,233 +168,216 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    let allViolations = [];
-    let statusFilter = 'all';
-    let severityFilter = 'all';
-    let searchQuery = '';
-    let debounceTimer = null;
+    class ViolationsManager {
+        #site;
+        #token;
+        #state = {
+            all: [],
+            statusFilter: 'all',
+            severityFilter: 'all',
+            query: '',
+            pendingResolveId: null,
+        };
+        #debounceTimer = null;
 
-    const SEV_COLORS = {high: '#ef4444', medium: '#f97316', low: '#eab308'};
-    const ACT_BADGES = {
-        warning: 'oc-badge--waiting-approval',
-        suspension: 'oc-badge--revoked',
-        ban: 'oc-badge--revoked'
-    };
-    const ACT_LABELS = {warning: 'Warning', suspension: 'Suspended', ban: 'Banned'};
+        static #SEV_COLORS = {high: '#ef4444', medium: '#f97316', low: '#eab308'};
+        static #ACT_BADGES = {
+            warning: 'oc-badge--waiting-approval',
+            suspension: 'oc-badge--revoked',
+            ban: 'oc-badge--revoked'
+        };
+        static #ACT_LABELS = {warning: 'Warning', suspension: 'Suspended', ban: 'Banned'};
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('search-input').addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                searchQuery = this.value.trim().toLowerCase();
-                renderViolations();
-            }, 300);
-        });
-        loadViolations();
-    });
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-    function setStatusFilter(status, btn) {
-        statusFilter = status;
-        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
-        btn.classList.add('filter-pill--active');
-        renderViolations();
-    }
-
-    function setSeverityFilter(sev, btn) {
-        severityFilter = sev;
-        document.querySelectorAll('.sev-pill').forEach(b => b.classList.remove('sev-pill--active'));
-        btn.classList.add('sev-pill--active');
-        renderViolations();
-    }
-
-    async function loadViolations() {
-        // Load from the site-wide violations endpoint via AdminViolationPageController's
-        // backing data: GET /api/{site}/open-collab/admin/violations
-        // This calls ViolationController::index (scoped to the site).
-        // We iterate over known contributors and aggregate, OR use the per-site endpoint.
-        // The existing ViolationController::index takes a userId — for the site-wide view
-        // we fall back to the page controller's own repository call via a dedicated endpoint.
-        // Using /api/{site}/open-collab/admin/violations is the correct route.
-        showState('loading');
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/violations`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        init() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(this.#debounceTimer);
+                this.#debounceTimer = setTimeout(() => {
+                    this.#state.query = e.target.value.trim().toLowerCase();
+                    this.#render();
+                }, 300);
             });
-            if (!res.ok) {
-                showState('error');
+            this.#load();
+        }
+
+        setStatusFilter(status, btn) {
+            this.#state.statusFilter = status;
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+            btn.classList.add('filter-pill--active');
+            this.#render();
+        }
+
+        setSeverityFilter(sev, btn) {
+            this.#state.severityFilter = sev;
+            document.querySelectorAll('.sev-pill').forEach(b => b.classList.remove('sev-pill--active'));
+            btn.classList.add('sev-pill--active');
+            this.#render();
+        }
+
+        async #load() {
+            this.#showState('loading');
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/violations`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                this.#state.all = Array.isArray(data) ? data : (data.data ?? []);
+                this.#render();
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #render() {
+            let filtered = this.#state.all;
+            if (this.#state.statusFilter === 'open') filtered = filtered.filter(v => !v.resolved_at);
+            if (this.#state.statusFilter === 'resolved') filtered = filtered.filter(v => v.resolved_at);
+            if (this.#state.severityFilter !== 'all') filtered = filtered.filter(v => v.severity === this.#state.severityFilter);
+            if (this.#state.query) {
+                filtered = filtered.filter(v =>
+                    String(v.user_id).includes(this.#state.query) ||
+                    (v.type ?? '').toLowerCase().includes(this.#state.query) ||
+                    (v.reason ?? '').toLowerCase().includes(this.#state.query)
+                );
+            }
+
+            document.getElementById('results-count').textContent = filtered.length;
+            document.getElementById('results-title').textContent =
+                this.#state.statusFilter === 'all' ? 'All Violations' : `${this.#cap(this.#state.statusFilter)} Violations`;
+
+            if (!filtered.length) {
+                this.#showState('empty');
+                document.getElementById('empty-message').textContent =
+                    this.#state.query ? `No violations matching "${this.#state.query}"` : 'No violations recorded';
+                document.getElementById('empty-sub').textContent =
+                    this.#state.query ? 'Try a different search term.' : 'Contributors are behaving well.';
                 return;
             }
-            const data = await res.json();
-            allViolations = Array.isArray(data) ? data : (data.data ?? []);
-            renderViolations();
-        } catch {
-            showState('error');
-        }
-    }
 
-    function renderViolations() {
-        let filtered = allViolations;
+            const rows = filtered.map(v => {
+                const isResolved = !!v.resolved_at;
+                const severity = v.severity ?? 'low';
+                const action = v.action_taken ?? 'warning';
+                const sevColor = ViolationsManager.#SEV_COLORS[severity] ?? '#64748b';
+                const actBadge = ViolationsManager.#ACT_BADGES[action] ?? 'oc-badge--draft';
+                const actLabel = ViolationsManager.#ACT_LABELS[action] ?? this.#cap(action);
+                const createdAt = v.created_at
+                    ? new Date(v.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                    })
+                    : '—';
+                const actionCell = isResolved
+                    ? `<div style="display:flex;gap:6px;justify-content:flex-end;"><a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${v.user_id}/violations" class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a></div>`
+                    : `<div style="display:flex;gap:6px;justify-content:flex-end;"><a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${v.user_id}/violations" class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a><button onclick="manager.openResolveModal(${v.id})" class="oc-btn oc-btn--primary oc-btn--sm">Resolve</button></div>`;
 
-        if (statusFilter === 'open') filtered = filtered.filter(v => !v.resolved_at);
-        if (statusFilter === 'resolved') filtered = filtered.filter(v => v.resolved_at);
-        if (severityFilter !== 'all') filtered = filtered.filter(v => v.severity === severityFilter);
-
-        if (searchQuery) {
-            filtered = filtered.filter(v =>
-                String(v.user_id).includes(searchQuery) ||
-                (v.type ?? '').toLowerCase().includes(searchQuery) ||
-                (v.reason ?? '').toLowerCase().includes(searchQuery)
-            );
-        }
-
-        document.getElementById('results-count').textContent = filtered.length;
-        document.getElementById('results-title').textContent =
-            statusFilter === 'all' ? 'All Violations' : `${capitalise(statusFilter)} Violations`;
-
-        if (!filtered.length) {
-            showState('empty');
-            document.getElementById('empty-message').textContent =
-                searchQuery ? `No violations matching "${searchQuery}"` : 'No violations recorded';
-            document.getElementById('empty-sub').textContent =
-                searchQuery ? 'Try a different search term.' : 'Contributors are behaving well.';
-            return;
-        }
-
-        const tbody = document.getElementById('violations-tbody');
-        const rows = [];
-
-        filtered.forEach(v => {
-            const isResolved = !!v.resolved_at;
-            const severity = v.severity ?? 'low';
-            const action = v.action_taken ?? 'warning';
-            const sevColor = SEV_COLORS[severity] ?? '#64748b';
-            const actBadge = ACT_BADGES[action] ?? 'oc-badge--draft';
-            const actLabel = ACT_LABELS[action] ?? capitalise(action);
-            const createdAt = v.created_at
-                ? new Date(v.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
-                : '—';
-
-            const actionCell = isResolved
-                ? `<div style="display:flex;gap:6px;justify-content:flex-end;">
-                       <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}/violations"
-                          class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a>
-                   </div>`
-                : `<div style="display:flex;gap:6px;justify-content:flex-end;">
-                       <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}/violations"
-                          class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a>
-                       <button onclick="openResolveModal(${v.id})" class="oc-btn oc-btn--primary oc-btn--sm">Resolve</button>
-                   </div>`;
-
-            rows.push(`<tr>
-                <td>
-                    <a href="/${escHtml(SITE)}/open-collab/admin/contributors/${v.user_id}"
-                       style="font-weight:500;color:var(--navy);text-decoration:none;">
-                        User #${v.user_id}
-                    </a>
-                </td>
-                <td style="font-size:.82rem;color:var(--navy);">
-                    ${escHtml((v.type ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}
-                </td>
-                <td>
-                    <span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;color:${sevColor};">
-                        <span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>
-                        ${capitalise(severity)}
-                    </span>
-                </td>
+                return `<tr>
+                <td><a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${v.user_id}" style="font-weight:500;color:var(--navy);text-decoration:none;">User #${v.user_id}</a></td>
+                <td style="font-size:.82rem;color:var(--navy);">${this.#esc((v.type ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}</td>
+                <td><span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;color:${sevColor};"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;"></span>${this.#cap(severity)}</span></td>
                 <td><span class="oc-badge ${actBadge}">${actLabel}</span></td>
                 <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
-                <td>
-                    ${isResolved
-                ? '<span class="oc-badge oc-badge--published">Resolved</span>'
-                : '<span class="oc-badge oc-badge--draft">Open</span>'}
-                </td>
+                <td>${isResolved ? '<span class="oc-badge oc-badge--published">Resolved</span>' : '<span class="oc-badge oc-badge--draft">Open</span>'}</td>
                 <td style="text-align:right;">${actionCell}</td>
             </tr>
-            ${v.reason ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--slate);background:var(--cream-dark);">
-                <strong>Reason:</strong> ${escHtml(v.reason)}
-            </td></tr>` : ''}`);
-        });
+            ${v.reason ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--slate);background:var(--cream-dark);"><strong>Reason:</strong> ${this.#esc(v.reason)}</td></tr>` : ''}`;
+            });
 
-        tbody.innerHTML = rows.join('');
-        showState('table');
-    }
+            document.getElementById('violations-tbody').innerHTML = rows.join('');
+            this.#showState('table');
+        }
 
-    // ── Resolve modal ─────────────────────────────────────────
-    function openResolveModal(id) {
-        document.getElementById('resolve-violation-id').value = id;
-        document.getElementById('resolve-notes').value = '';
-        document.getElementById('resolve-errors').style.display = 'none';
-        document.getElementById('resolve-modal').style.display = 'grid';
-    }
+        openResolveModal(id) {
+            this.#state.pendingResolveId = id;
+            document.getElementById('resolve-notes').value = '';
+            document.getElementById('resolve-errors').style.display = 'none';
+            document.getElementById('resolve-modal').style.display = 'grid';
+        }
 
-    function closeResolveModal() {
-        document.getElementById('resolve-modal').style.display = 'none';
-    }
+        closeResolveModal() {
+            this.#state.pendingResolveId = null;
+            document.getElementById('resolve-modal').style.display = 'none';
+        }
 
-    async function submitResolve() {
-        const id = document.getElementById('resolve-violation-id').value;
-        const notes = document.getElementById('resolve-notes').value.trim();
-        const errBox = document.getElementById('resolve-errors');
-        const btn = document.getElementById('resolve-confirm-btn');
-        errBox.style.display = 'none';
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
+        async submitResolve() {
+            const id = this.#state.pendingResolveId;
+            const notes = document.getElementById('resolve-notes').value.trim();
+            const errBox = document.getElementById('resolve-errors');
+            const btn = document.getElementById('resolve-confirm-btn');
+            errBox.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
 
-        const res = await fetch(`/api/${SITE}/open-collab/admin/violations/${id}/resolve`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({notes: notes || undefined}),
-        });
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/violations/${id}/resolve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({notes: notes || undefined}),
+            });
 
-        if (res.ok) {
-            closeResolveModal();
-            showToast('✓ Violation resolved');
-            const v = allViolations.find(x => x.id === parseInt(id));
-            if (v) {
-                v.resolved_at = new Date().toISOString();
-                v.resolution_notes = notes;
+            if (res.ok) {
+                this.closeResolveModal();
+                this.#showToast('✓ Violation resolved');
+                const v = this.#state.all.find(x => x.id === parseInt(id));
+                if (v) {
+                    v.resolved_at = new Date().toISOString();
+                    v.resolution_notes = notes;
+                }
+                this.#render();
+            } else {
+                const data = await res.json();
+                errBox.textContent = data.error || 'Failed to resolve.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Resolve';
             }
-            renderViolations();
-        } else {
-            const data = await res.json();
-            errBox.textContent = data.error || 'Failed to resolve.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Resolve';
+        }
+
+        #showState(state) {
+            document.getElementById('violations-loading').style.display = state === 'loading' ? 'block' : 'none';
+            document.getElementById('violations-empty').style.display = state === 'empty' ? 'block' : 'none';
+            document.getElementById('violations-error').style.display = state === 'error' ? 'block' : 'none';
+            document.getElementById('violations-table-wrap').style.display = state === 'table' ? 'block' : 'none';
+        }
+
+        #cap(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────
-    function showState(state) {
-        document.getElementById('violations-loading').style.display = state === 'loading' ? 'block' : 'none';
-        document.getElementById('violations-empty').style.display = state === 'empty' ? 'block' : 'none';
-        document.getElementById('violations-error').style.display = state === 'error' ? 'block' : 'none';
-        document.getElementById('violations-table-wrap').style.display = state === 'table' ? 'block' : 'none';
-    }
+    const manager = new ViolationsManager(SITE, () => localStorage.getItem('oc_token') || '');
+    document.addEventListener('DOMContentLoaded', () => manager.init());
+    const setStatusFilter = (status, btn) => manager.setStatusFilter(status, btn);
+    const submitResolve = () => manager.submitResolve();
+    const setSeverityFilter = (status, btn) => manager.setSeverityFilter(status, btn);
 
-    function capitalise(str) {
-        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
 </script>
 @endsection

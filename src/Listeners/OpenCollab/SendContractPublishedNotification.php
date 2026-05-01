@@ -15,6 +15,7 @@ class SendContractPublishedNotification extends BaseUserNotificationListener
             title: 'New contributor agreement',
             body: "A new contract (v{$event->contract->version}) requires your signature.",
             data: ['contract_id' => $event->contract->id],
+            consentType: 'contributor.contract_published'
         );
     }
 }

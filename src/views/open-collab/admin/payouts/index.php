@@ -243,386 +243,331 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    let allPayouts = [];
-    let currentFilter = 'all';
-    let searchQuery = '';
-    let debounceTimer = null;
+    class AdminPayoutsManager {
+        #site;
+        #token;
+        #state = {
+            all: [],
+            filter: 'all',
+            query: '',
+            pendingDeclineId: null,
+            pendingPaidId: null,
+        };
+        #debounceTimer = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('search-input').addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                searchQuery = this.value.trim().toLowerCase();
-                renderPayouts();
-            }, 300);
-        });
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-        loadPayouts();
-    });
-
-    function setFilter(status, btn) {
-        currentFilter = status;
-        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
-        btn.classList.add('filter-pill--active');
-        renderPayouts();
-    }
-
-    // ── Load ──────────────────────────────────────────────────────────────────
-    async function loadPayouts() {
-        showState('loading');
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/payouts?per_page=200`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        init() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(this.#debounceTimer);
+                this.#debounceTimer = setTimeout(() => {
+                    this.#state.query = e.target.value.trim().toLowerCase();
+                    this.#render();
+                }, 300);
             });
-            if (!res.ok) {
-                showState('error');
+            this.#load();
+        }
+
+        setFilter(status, btn) {
+            this.#state.filter = status;
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+            btn.classList.add('filter-pill--active');
+            this.#render();
+        }
+
+        async #load() {
+            this.#showState('loading');
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts?per_page=200`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                this.#state.all = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+                this.#updateStats();
+                this.#render();
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #updateStats() {
+            const pending = this.#state.all.filter(p => p.status === 'pending');
+            const pendingTotal = pending.reduce((s, p) => s + (p.amount_pence ?? p.amount ?? 0), 0);
+            document.getElementById('stat-pending').textContent = pending.length;
+            document.getElementById('stat-pending-amount').textContent = `£${(pendingTotal / 100).toFixed(2)}`;
+            document.getElementById('stat-total').textContent = this.#state.all.length;
+        }
+
+        #render() {
+            let filtered = this.#state.filter !== 'all'
+                ? this.#state.all.filter(p => p.status === this.#state.filter)
+                : [...this.#state.all];
+
+            if (this.#state.query) {
+                filtered = filtered.filter(p =>
+                    String(p.user_id).includes(this.#state.query) ||
+                    (p.reference ?? '').toLowerCase().includes(this.#state.query)
+                );
+            }
+
+            document.getElementById('results-count').textContent = filtered.length;
+            document.getElementById('results-title').textContent =
+                this.#state.filter === 'all' ? 'All Payouts' : `${this.#cap(this.#state.filter)} Payouts`;
+
+            const pendingItems = this.#state.all.filter(p => p.status === 'pending');
+            const pendingCard = document.getElementById('pending-card');
+            if (pendingItems.length > 0 && ['all', 'pending'].includes(this.#state.filter)) {
+                pendingCard.style.display = 'block';
+                document.getElementById('pending-card-count').textContent = `${pendingItems.length} pending`;
+                this.#renderPendingTable(pendingItems);
+            } else {
+                pendingCard.style.display = 'none';
+            }
+
+            if (!filtered.length) {
+                this.#showState('empty');
+                document.getElementById('empty-message').textContent =
+                    this.#state.query ? `No payouts matching "${this.#state.query}"` : 'No payouts yet';
+                document.getElementById('empty-sub').textContent =
+                    this.#state.filter !== 'all' ? `No ${this.#state.filter} payouts.` : '';
                 return;
             }
 
-            const data = await res.json();
-            allPayouts = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
-
-            updateStats();
-            renderPayouts();
-        } catch {
-            showState('error');
-        }
-    }
-
-    function updateStats() {
-        const pending = allPayouts.filter(p => p.status === 'pending');
-        const pendingTotal = pending.reduce((s, p) => s + (p.amount_pence ?? p.amount ?? 0), 0);
-
-        document.getElementById('stat-pending').textContent = pending.length;
-        document.getElementById('stat-pending-amount').textContent = '£' + (pendingTotal / 100).toFixed(2);
-        document.getElementById('stat-total').textContent = allPayouts.length;
-    }
-
-    // ── Render ────────────────────────────────────────────────────────────────
-    function renderPayouts() {
-        let filtered = allPayouts;
-
-        if (currentFilter !== 'all') {
-            filtered = filtered.filter(p => p.status === currentFilter);
+            this.#renderMainTable(filtered);
+            this.#showState('table');
         }
 
-        if (searchQuery) {
-            filtered = filtered.filter(p =>
-                String(p.user_id).includes(searchQuery) ||
-                (p.reference ?? '').toLowerCase().includes(searchQuery)
-            );
-        }
-
-        document.getElementById('results-count').textContent = filtered.length;
-        document.getElementById('results-title').textContent =
-            currentFilter === 'all' ? 'All Payouts' : capitalise(currentFilter) + ' Payouts';
-
-        // Pending quick-action card
-        const pendingItems = allPayouts.filter(p => p.status === 'pending');
-        const pendingCard = document.getElementById('pending-card');
-        if (pendingItems.length > 0 && (currentFilter === 'all' || currentFilter === 'pending')) {
-            pendingCard.style.display = 'block';
-            document.getElementById('pending-card-count').textContent = `${pendingItems.length} pending`;
-            renderPendingTable(pendingItems);
-        } else {
-            pendingCard.style.display = 'none';
-        }
-
-        if (!filtered.length) {
-            showState('empty');
-            document.getElementById('empty-message').textContent =
-                searchQuery ? `No payouts matching "${searchQuery}"` : 'No payouts yet';
-            document.getElementById('empty-sub').textContent =
-                currentFilter !== 'all' ? `No ${currentFilter} payouts.` : '';
-            return;
-        }
-
-        renderMainTable(filtered);
-        showState('table');
-    }
-
-    function renderPendingTable(items) {
-        document.getElementById('pending-tbody').innerHTML = items.map(p => {
-            const currency = (p.currency ?? 'GBP').toUpperCase();
-            const symbol = currency === 'GBP' ? '£' : '$';
-            const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
-            const createdAt = fmtDate(p.created_at);
-            return `<tr id="pending-row-${p.id}">
-                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
-                    PAY-${String(p.id).padStart(6, '0')}
-                </td>
-                <td>
-                    <a href="/admin/contributors/${p.user_id}"
-                       style="font-weight:500;color:var(--navy);text-decoration:none;">
-                        User #${p.user_id}
-                    </a>
-                </td>
+        #renderPendingTable(items) {
+            document.getElementById('pending-tbody').innerHTML = items.map(p => {
+                const currency = (p.currency ?? 'GBP').toUpperCase();
+                const symbol = currency === 'GBP' ? '£' : '$';
+                const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
+                return `<tr id="pending-row-${p.id}">
+                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">PAY-${String(p.id).padStart(6, '0')}</td>
+                <td><a href="/admin/contributors/${p.user_id}" style="font-weight:500;color:var(--navy);text-decoration:none;">User #${p.user_id}</a></td>
                 <td style="font-weight:600;color:var(--navy);">${symbol}${amount}</td>
-                <td style="font-size:.82rem;color:var(--slate);">${escHtml(currency)}</td>
-                <td style="font-size:.82rem;color:var(--slate);">
-                    ${escHtml((p.method ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}
-                </td>
-                <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
+                <td style="font-size:.82rem;color:var(--slate);">${this.#esc(currency)}</td>
+                <td style="font-size:.82rem;color:var(--slate);">${this.#esc((p.method ?? '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()))}</td>
+                <td style="font-size:.78rem;color:var(--slate);">${this.#fmtDate(p.created_at)}</td>
                 <td>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <button onclick="approvePayout(${p.id}, this)"
-                                class="oc-btn oc-btn--primary oc-btn--sm"
-                                id="approve-btn-${p.id}">
-                            Approve
-                        </button>
-                        <button onclick="openDeclineModal(${p.id})"
-                                class="oc-btn oc-btn--ghost oc-btn--sm"
-                                style="border-color:#fecaca;color:var(--red);">
-                            Decline
-                        </button>
+                        <button onclick="manager.approve(${p.id}, this)" class="oc-btn oc-btn--primary oc-btn--sm" id="approve-btn-${p.id}">Approve</button>
+                        <button onclick="manager.openDeclineModal(${p.id})" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Decline</button>
                     </div>
                 </td>
             </tr>`;
-        }).join('');
-    }
+            }).join('');
+        }
 
-    function renderMainTable(items) {
-        const rows = items.map(p => {
-            const status = p.status ?? 'pending';
-            const statusCls = {
-                paid: 'oc-badge--published', approved: 'oc-badge--free',
-                pending: 'oc-badge--waiting-approval', rejected: 'oc-badge--revoked',
-            }[status] ?? 'oc-badge--draft';
-            const currency = (p.currency ?? 'GBP').toUpperCase();
-            const symbol = currency === 'GBP' ? '£' : '$';
-            const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
-            const createdAt = fmtDate(p.created_at);
+        #renderMainTable(items) {
+            document.getElementById('payouts-tbody').innerHTML = items.map(p => {
+                const status = p.status ?? 'pending';
+                const statusCls = {
+                    paid: 'oc-badge--published',
+                    approved: 'oc-badge--free',
+                    pending: 'oc-badge--waiting-approval',
+                    rejected: 'oc-badge--revoked'
+                }[status] ?? 'oc-badge--draft';
+                const currency = (p.currency ?? 'GBP').toUpperCase();
+                const symbol = currency === 'GBP' ? '£' : '$';
+                const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
+                const pdfBtn = ['paid', 'approved'].includes(status)
+                    ? `<a href="/api/${this.#esc(this.#site)}/open-collab/admin/payouts/${p.id}/statement" class="oc-btn oc-btn--ghost oc-btn--sm" download>PDF</a>` : '';
+                const markPaidBtn = status === 'approved'
+                    ? `<button onclick="manager.openPaidModal(${p.id})" class="oc-btn oc-btn--primary oc-btn--sm">Mark paid</button>` : '';
+                const rejectionRow = p.rejection_reason
+                    ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;"><strong>Decline reason:</strong> ${this.#esc(p.rejection_reason)}</td></tr>` : '';
 
-            const pdfBtn = ['paid', 'approved'].includes(status)
-                ? `<a href="/api/${escHtml(SITE)}/open-collab/admin/payouts/${p.id}/statement"
-                      class="oc-btn oc-btn--ghost oc-btn--sm" download>
-                       <svg viewBox="0 0 20 20" fill="currentColor" width="12" style="margin-right:3px;">
-                           <path fill-rule="evenodd"
-                                 d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                                 clip-rule="evenodd"/>
-                       </svg>PDF
-                   </a>`
-                : '';
-
-            const markPaidBtn = status === 'approved'
-                ? `<button onclick="openPaidModal(${p.id})" class="oc-btn oc-btn--primary oc-btn--sm">
-                       Mark paid
-                   </button>`
-                : '';
-
-            const rejectionRow = p.rejection_reason
-                ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;">
-                       <strong>Decline reason:</strong> ${escHtml(p.rejection_reason)}
-                   </td></tr>`
-                : '';
-
-            return `<tr id="all-row-${p.id}">
-                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">
-                    PAY-${String(p.id).padStart(6, '0')}
-                </td>
-                <td>
-                    <a href="/admin/contributors/${p.user_id}"
-                       style="font-weight:500;color:var(--navy);text-decoration:none;">
-                        User #${p.user_id}
-                    </a>
-                </td>
+                return `<tr id="all-row-${p.id}">
+                <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">PAY-${String(p.id).padStart(6, '0')}</td>
+                <td><a href="/admin/contributors/${p.user_id}" style="font-weight:500;color:var(--navy);text-decoration:none;">User #${p.user_id}</a></td>
                 <td style="font-weight:600;">${symbol}${amount}</td>
-                <td style="font-size:.82rem;color:var(--slate);">${escHtml(currency)}</td>
-                <td><span class="oc-badge ${statusCls}" id="badge-${p.id}">${capitalise(status)}</span></td>
-                <td style="font-size:.78rem;color:var(--slate);">${createdAt}</td>
-                <td>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-                        ${markPaidBtn}
-                        ${pdfBtn}
-                    </div>
-                </td>
+                <td style="font-size:.82rem;color:var(--slate);">${this.#esc(currency)}</td>
+                <td><span class="oc-badge ${statusCls}" id="badge-${p.id}">${this.#cap(status)}</span></td>
+                <td style="font-size:.78rem;color:var(--slate);">${this.#fmtDate(p.created_at)}</td>
+                <td><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${markPaidBtn}${pdfBtn}</div></td>
             </tr>${rejectionRow}`;
-        });
+            }).join('');
+        }
 
-        document.getElementById('payouts-tbody').innerHTML = rows.join('');
-    }
-
-    // ── Approve ───────────────────────────────────────────────────────────────
-    async function approvePayout(id, btn) {
-        if (!confirm('Approve this payout request?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/payouts/${id}/approve`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            showToast('✓ Payout approved');
-            // Update local cache and re-render
-            const p = allPayouts.find(x => x.id === id);
-            if (p) {
-                p.status = 'approved';
-                p.approved_at = new Date().toISOString();
+        async approve(id, btn) {
+            if (!confirm('Approve this payout request?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts/${id}/approve`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('✓ Payout approved');
+                const p = this.#state.all.find(x => x.id === id);
+                if (p) {
+                    p.status = 'approved';
+                    p.approved_at = new Date().toISOString();
+                }
+                this.#updateStats();
+                this.#render();
+            } else {
+                this.#showToast(data.error || data.message || 'Approval failed', false);
+                btn.disabled = false;
+                btn.textContent = 'Approve';
             }
-            updateStats();
-            renderPayouts();
-        } else {
-            showToast(data.error || data.message || 'Approval failed', false);
-            btn.disabled = false;
-            btn.textContent = 'Approve';
-        }
-    }
-
-    // ── Decline modal ─────────────────────────────────────────────────────────
-    function openDeclineModal(id) {
-        document.getElementById('decline-payout-id').value = id;
-        document.getElementById('decline-reason').value = '';
-        document.getElementById('decline-errors').style.display = 'none';
-        document.getElementById('decline-modal').style.display = 'grid';
-        document.getElementById('decline-reason').focus();
-    }
-
-    function closeDeclineModal() {
-        document.getElementById('decline-modal').style.display = 'none';
-    }
-
-    async function submitDecline() {
-        const id = document.getElementById('decline-payout-id').value;
-        const reason = document.getElementById('decline-reason').value.trim();
-        const errBox = document.getElementById('decline-errors');
-        const btn = document.getElementById('decline-confirm-btn');
-        errBox.style.display = 'none';
-
-        if (!reason) {
-            errBox.textContent = 'A reason is required.';
-            errBox.style.display = 'block';
-            return;
         }
 
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Declining…';
+        openDeclineModal(id) {
+            this.#state.pendingDeclineId = id;
+            document.getElementById('decline-reason').value = '';
+            document.getElementById('decline-errors').style.display = 'none';
+            document.getElementById('decline-modal').style.display = 'grid';
+            document.getElementById('decline-reason').focus();
+        }
 
-        const res = await fetch(`/api/${SITE}/open-collab/admin/payouts/${id}/reject`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({reason}),
-        });
-        const data = await res.json();
+        closeDeclineModal() {
+            this.#state.pendingDeclineId = null;
+            document.getElementById('decline-modal').style.display = 'none';
+        }
 
-        if (res.ok) {
-            closeDeclineModal();
-            showToast('Payout declined');
-            const p = allPayouts.find(x => x.id === parseInt(id));
-            if (p) {
-                p.status = 'rejected';
-                p.rejection_reason = reason;
+        async submitDecline() {
+            const id = this.#state.pendingDeclineId;
+            const reason = document.getElementById('decline-reason').value.trim();
+            const errBox = document.getElementById('decline-errors');
+            const btn = document.getElementById('decline-confirm-btn');
+            errBox.style.display = 'none';
+
+            if (!reason) {
+                errBox.textContent = 'A reason is required.';
+                errBox.style.display = 'block';
+                return;
             }
-            updateStats();
-            renderPayouts();
-        } else {
-            errBox.textContent = data.error || data.message || 'Decline failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Decline payout';
-        }
-    }
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Declining…';
 
-    // ── Mark paid modal ───────────────────────────────────────────────────────
-    function openPaidModal(id) {
-        document.getElementById('paid-payout-id').value = id;
-        document.getElementById('paid-reference').value = '';
-        document.getElementById('paid-notes').value = '';
-        document.getElementById('paid-errors').style.display = 'none';
-        document.getElementById('paid-modal').style.display = 'grid';
-        document.getElementById('paid-reference').focus();
-    }
-
-    function closePaidModal() {
-        document.getElementById('paid-modal').style.display = 'none';
-    }
-
-    async function submitMarkPaid() {
-        const id = document.getElementById('paid-payout-id').value;
-        const reference = document.getElementById('paid-reference').value.trim();
-        const notes = document.getElementById('paid-notes').value.trim();
-        const errBox = document.getElementById('paid-errors');
-        const btn = document.getElementById('paid-confirm-btn');
-        errBox.style.display = 'none';
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/payouts/${id}/paid`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({
-                reference: reference || undefined,
-                notes: notes || undefined,
-            }),
-        });
-        const data = await res.json();
-
-        if (res.ok) {
-            closePaidModal();
-            showToast('✓ Payout marked as paid');
-            const p = allPayouts.find(x => x.id === parseInt(id));
-            if (p) {
-                p.status = 'paid';
-                p.reference = reference || p.reference;
-                p.processed_at = new Date().toISOString();
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({reason}),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.closeDeclineModal();
+                this.#showToast('Payout declined');
+                const p = this.#state.all.find(x => x.id === parseInt(id));
+                if (p) {
+                    p.status = 'rejected';
+                    p.rejection_reason = reason;
+                }
+                this.#updateStats();
+                this.#render();
+            } else {
+                errBox.textContent = data.error || data.message || 'Decline failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Decline payout';
             }
-            updateStats();
-            renderPayouts();
-        } else {
-            errBox.textContent = data.error || data.message || 'Failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Confirm paid';
+        }
+
+        openPaidModal(id) {
+            this.#state.pendingPaidId = id;
+            document.getElementById('paid-reference').value = '';
+            document.getElementById('paid-notes').value = '';
+            document.getElementById('paid-errors').style.display = 'none';
+            document.getElementById('paid-modal').style.display = 'grid';
+            document.getElementById('paid-reference').focus();
+        }
+
+        closePaidModal() {
+            this.#state.pendingPaidId = null;
+            document.getElementById('paid-modal').style.display = 'none';
+        }
+
+        async submitMarkPaid() {
+            const id = this.#state.pendingPaidId;
+            const reference = document.getElementById('paid-reference').value.trim();
+            const notes = document.getElementById('paid-notes').value.trim();
+            const errBox = document.getElementById('paid-errors');
+            const btn = document.getElementById('paid-confirm-btn');
+            errBox.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts/${id}/paid`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json'
+                },
+                body: JSON.stringify({reference: reference || undefined, notes: notes || undefined}),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.closePaidModal();
+                this.#showToast('✓ Payout marked as paid');
+                const p = this.#state.all.find(x => x.id === parseInt(id));
+                if (p) {
+                    p.status = 'paid';
+                    p.reference = reference || p.reference;
+                    p.processed_at = new Date().toISOString();
+                }
+                this.#updateStats();
+                this.#render();
+            } else {
+                errBox.textContent = data.error || data.message || 'Failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Confirm paid';
+            }
+        }
+
+        #showState(state) {
+            document.getElementById('payouts-loading').style.display = state === 'loading' ? 'block' : 'none';
+            document.getElementById('payouts-empty').style.display = state === 'empty' ? 'block' : 'none';
+            document.getElementById('payouts-error').style.display = state === 'error' ? 'block' : 'none';
+            document.getElementById('payouts-table-wrap').style.display = state === 'table' ? 'block' : 'none';
+        }
+
+        #fmtDate(str) {
+            if (!str) return '—';
+            return new Date(str).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+        }
+
+        #cap(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function showState(state) {
-        document.getElementById('payouts-loading').style.display = state === 'loading' ? 'block' : 'none';
-        document.getElementById('payouts-empty').style.display = state === 'empty' ? 'block' : 'none';
-        document.getElementById('payouts-error').style.display = state === 'error' ? 'block' : 'none';
-        document.getElementById('payouts-table-wrap').style.display = state === 'table' ? 'block' : 'none';
-    }
-
-    function fmtDate(str) {
-        if (!str) return '—';
-        return new Date(str).toLocaleDateString('en-GB', {
-            day: 'numeric', month: 'short', year: 'numeric',
-        });
-    }
-
-    function capitalise(str) {
-        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new AdminPayoutsManager(SITE, () => localStorage.getItem('oc_token') || '');
+    document.addEventListener('DOMContentLoaded', () => manager.init());
+    const submitDecline = () => manager.submitDecline();
+    const setFilter = (status, btn) => manager.setFilter(status, btn);
+    const submitMarkPaid = () => manager.submitMarkPaid();
 </script>
 @endsection

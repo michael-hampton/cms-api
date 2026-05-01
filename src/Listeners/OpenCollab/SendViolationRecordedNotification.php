@@ -14,7 +14,8 @@ class SendViolationRecordedNotification extends BaseUserNotificationListener
             'violation_recorded',
             [
                 'message' => $event->violation,
-            ]
+            ],
+            'contributor.violation_recorded'
         );
     }
 }

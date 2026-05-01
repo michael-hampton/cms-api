@@ -2,7 +2,6 @@
 
 namespace App\Repositories\OpenCollab;
 
-use App\Enums\OpenCollab\InvitationStatus;
 use App\Models\Invitation;
 use App\Repositories\Repository;
 
@@ -98,11 +97,6 @@ class InvitationRepository extends Repository
         return Invitation::where('site_id', $siteId)
             ->orderBy('id', 'desc')
             ->get();
-    }
-
-    public function resolveStatus(Invitation $invitation): InvitationStatus
-    {
-        return $invitation->resolveStatus();
     }
 
     public function findLatestForEmail(string $email, int $siteId): ?Invitation

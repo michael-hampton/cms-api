@@ -210,6 +210,7 @@ abstract class FunctionalTestCase extends TestCase
         $this->authenticatedUser = null;
         Auth::$user = null;
         $this->authToken = null;
+        Auth::logout();
         return $this;
     }
 
@@ -433,6 +434,8 @@ abstract class FunctionalTestCase extends TestCase
 
     protected function postForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
     {
+        $this->unauthenticate();
+
         if (!empty($files)) {
             $_FILES = $files;
         }

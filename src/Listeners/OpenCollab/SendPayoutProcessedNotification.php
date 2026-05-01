@@ -14,7 +14,8 @@ class SendPayoutProcessedNotification extends BaseUserNotificationListener
             'payout_processed',
             [
                 'amount' => $event->payout->amount,
-            ]
+            ],
+            'contributor.payout_processed'
         );
     }
 }

@@ -112,202 +112,205 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    let allRequests = [];
-    let debounceTimer = null;
+    class ContributorRequestsManager {
+        #site;
+        #token;
+        #allRequests = [];
+        #pendingRejectId = null;
+        #debounceTimer = null;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('search-input').addEventListener('input', function () {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => renderRequests(this.value.trim().toLowerCase()), 300);
-        });
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-        loadRequests();
-    });
-
-    async function loadRequests() {
-        showState('loading');
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/admin/contributor-requests`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        init() {
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                clearTimeout(this.#debounceTimer);
+                this.#debounceTimer = setTimeout(
+                    () => this.#render(e.target.value.trim().toLowerCase()),
+                    300
+                );
             });
-            if (!res.ok) {
-                showState('error');
+            this.#loadRequests();
+        }
+
+        async #loadRequests() {
+            this.#showState('loading');
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/contributor-requests`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                this.#allRequests = Array.isArray(data) ? data : (data.data ?? []);
+                this.#render('');
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #render(query) {
+            const filtered = query
+                ? this.#allRequests.filter(r =>
+                    (r.name ?? '').toLowerCase().includes(query) ||
+                    (r.email ?? '').toLowerCase().includes(query) ||
+                    (r.bio ?? '').toLowerCase().includes(query))
+                : this.#allRequests;
+
+            document.getElementById('results-count').textContent = filtered.length;
+            document.getElementById('pending-badge').textContent = `${filtered.length} pending`;
+
+            if (!filtered.length) {
+                this.#showState('empty');
+                document.getElementById('empty-message').textContent =
+                    query ? `No requests matching "${query}"` : 'No pending requests';
+                document.getElementById('empty-sub').textContent = query
+                    ? 'Try a different search term.'
+                    : 'When contributors submit an access request it will appear here.';
                 return;
             }
-            const data = await res.json();
-            allRequests = Array.isArray(data) ? data : (data.data ?? []);
-            renderRequests('');
-        } catch {
-            showState('error');
-        }
-    }
 
-    function renderRequests(query) {
-        const filtered = query
-            ? allRequests.filter(r =>
-                (r.name ?? '').toLowerCase().includes(query) ||
-                (r.email ?? '').toLowerCase().includes(query) ||
-                (r.bio ?? '').toLowerCase().includes(query))
-            : allRequests;
-
-        document.getElementById('results-count').textContent = filtered.length;
-        document.getElementById('pending-badge').textContent = `${filtered.length} pending`;
-
-        if (!filtered.length) {
-            showState('empty');
-            document.getElementById('empty-message').textContent =
-                query ? `No requests matching "${query}"` : 'No pending requests';
-            document.getElementById('empty-sub').textContent =
-                query ? 'Try a different search term.' : 'When contributors submit an access request it will appear here.';
-            return;
-        }
-
-        const list = document.getElementById('requests-list');
-        list.innerHTML = '';
-
-        filtered.forEach((r, i) => {
-            const isLast = i === filtered.length - 1;
-            const submitted = r.created_at
-                ? new Date(r.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
-                : '';
-            const initial = (r.name || 'C').charAt(0).toUpperCase();
-
-            const div = document.createElement('div');
-            div.id = `request-row-${r.id}`;
-            div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
-            div.innerHTML = `
+            const list = document.getElementById('requests-list');
+            list.innerHTML = '';
+            filtered.forEach((r, i) => {
+                const isLast = i === filtered.length - 1;
+                const submitted = r.created_at
+                    ? new Date(r.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                    })
+                    : '';
+                const initial = (r.name || 'C').charAt(0).toUpperCase();
+                const div = document.createElement('div');
+                div.id = `request-row-${r.id}`;
+                div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
+                div.innerHTML = `
                 <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
                     <div style="flex:1;min-width:0;">
                         <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;flex-wrap:wrap;">
-                            <div style="width:34px;height:34px;border-radius:50%;background:var(--navy);
-                                        display:grid;place-items:center;font-weight:700;font-size:.82rem;
-                                        color:var(--amber);flex-shrink:0;">${escHtml(initial)}</div>
+                            <div style="width:34px;height:34px;border-radius:50%;background:var(--navy);display:grid;place-items:center;font-weight:700;font-size:.82rem;color:var(--amber);flex-shrink:0;">${this.#esc(initial)}</div>
                             <div>
-                                <div style="font-weight:600;color:var(--navy);font-size:.9rem;">${escHtml(r.name ?? '')}</div>
-                                <div style="font-size:.75rem;color:var(--slate);">${escHtml(r.email ?? '')}</div>
+                                <div style="font-weight:600;color:var(--navy);font-size:.9rem;">${this.#esc(r.name ?? '')}</div>
+                                <div style="font-size:.75rem;color:var(--slate);">${this.#esc(r.email ?? '')}</div>
                             </div>
                             <span style="font-size:.72rem;color:var(--slate-light);">Submitted ${submitted}</span>
                         </div>
-                        <div style="background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;
-                                    padding:10px 14px;font-size:.82rem;color:var(--navy);line-height:1.55;
-                                    margin-left:44px;">
-                            ${escHtml(r.bio ?? '')}
+                        <div style="background:var(--cream-dark);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:.82rem;color:var(--navy);line-height:1.55;margin-left:44px;">
+                            ${this.#esc(r.bio ?? '')}
                         </div>
                     </div>
                     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;flex-shrink:0;">
-                        <button onclick="approveRequest(${r.id}, this)"
-                                class="oc-btn oc-btn--primary oc-btn--sm"
-                                id="approve-btn-${r.id}">
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="13">
-                                <path fill-rule="evenodd"
-                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                      clip-rule="evenodd"/>
-                            </svg>
+                        <button onclick="manager.approve(${r.id}, this)" class="oc-btn oc-btn--primary oc-btn--sm" id="approve-btn-${r.id}">
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="13"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             Approve &amp; invite
                         </button>
-                        <button onclick="openRejectModal(${r.id})"
-                                class="oc-btn oc-btn--ghost oc-btn--sm"
-                                style="border-color:#fecaca;color:var(--red);">
-                            Reject
-                        </button>
+                        <button onclick="manager.openRejectModal(${r.id})" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Reject</button>
                     </div>
                 </div>`;
-            list.appendChild(div);
-        });
-
-        showState('list');
-    }
-
-    // ── Approve ───────────────────────────────────────────────
-    async function approveRequest(id, btn) {
-        if (!confirm('Approve this request and send an invitation?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributor-requests/${id}/approve`, {
-            method: 'POST',
-            headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('✓ Invitation sent to ' + (data.data?.invitation?.email ?? ''));
-            allRequests = allRequests.filter(r => r.id !== id);
-            renderRequests(document.getElementById('search-input').value.trim().toLowerCase());
-        } else {
-            showToast(data.error || 'Approval failed', false);
-            btn.disabled = false;
-            btn.textContent = '✓ Approve & invite';
+                list.appendChild(div);
+            });
+            this.#showState('list');
         }
-    }
 
-    // ── Reject modal ──────────────────────────────────────────
-    function openRejectModal(id) {
-        document.getElementById('reject-request-id').value = id;
-        document.getElementById('reject-reason').value = '';
-        document.getElementById('reject-errors').style.display = 'none';
-        document.getElementById('reject-modal').style.display = 'grid';
-    }
+        async approve(id, btn) {
+            if (!confirm('Approve this request and send an invitation?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
 
-    function closeRejectModal() {
-        document.getElementById('reject-modal').style.display = 'none';
-    }
-
-    async function submitReject() {
-        const id = document.getElementById('reject-request-id').value;
-        const reason = document.getElementById('reject-reason').value.trim();
-        const errBox = document.getElementById('reject-errors');
-        const btn = document.getElementById('reject-confirm-btn');
-        errBox.style.display = 'none';
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div>';
-
-        const res = await fetch(`/api/${SITE}/open-collab/admin/contributor-requests/${id}/reject`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN()}`,
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify({reason: reason || undefined}),
-        });
-        if (res.ok) {
-            closeRejectModal();
-            showToast('Request rejected');
-            allRequests = allRequests.filter(r => r.id !== parseInt(id));
-            renderRequests(document.getElementById('search-input').value.trim().toLowerCase());
-        } else {
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contributor-requests/${id}/approve`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
             const data = await res.json();
-            errBox.textContent = data.error || 'Rejection failed.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Reject';
+            if (res.ok) {
+                this.#showToast(`✓ Invitation sent to ${data.data?.invitation?.email ?? ''}`);
+                this.#allRequests = this.#allRequests.filter(r => r.id !== id);
+                this.#render(document.getElementById('search-input').value.trim().toLowerCase());
+            } else {
+                this.#showToast(data.error || 'Approval failed', false);
+                btn.disabled = false;
+                btn.textContent = '✓ Approve & invite';
+            }
+        }
+
+        openRejectModal(id) {
+            this.#pendingRejectId = id;
+            document.getElementById('reject-reason').value = '';
+            document.getElementById('reject-errors').style.display = 'none';
+            document.getElementById('reject-modal').style.display = 'grid';
+        }
+
+        closeRejectModal() {
+            this.#pendingRejectId = null;
+            document.getElementById('reject-modal').style.display = 'none';
+        }
+
+        async submitReject() {
+            const id = this.#pendingRejectId;
+            const reason = document.getElementById('reject-reason').value.trim();
+            const errBox = document.getElementById('reject-errors');
+            const btn = document.getElementById('reject-confirm-btn');
+            errBox.style.display = 'none';
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/contributor-requests/${id}/reject`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify({reason: reason || undefined}),
+            });
+            if (res.ok) {
+                this.closeRejectModal();
+                this.#showToast('Request rejected');
+                this.#allRequests = this.#allRequests.filter(r => r.id !== parseInt(id));
+                this.#render(document.getElementById('search-input').value.trim().toLowerCase());
+            } else {
+                const data = await res.json();
+                errBox.textContent = data.error || 'Rejection failed.';
+                errBox.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Reject';
+            }
+        }
+
+        #showState(state) {
+            document.getElementById('requests-loading').style.display = state === 'loading' ? 'block' : 'none';
+            document.getElementById('requests-empty').style.display = state === 'empty' ? 'block' : 'none';
+            document.getElementById('requests-error').style.display = state === 'error' ? 'block' : 'none';
+            document.getElementById('requests-list').style.display = state === 'list' ? 'flex' : 'none';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────
-    function showState(state) {
-        document.getElementById('requests-loading').style.display = state === 'loading' ? 'block' : 'none';
-        document.getElementById('requests-empty').style.display = state === 'empty' ? 'block' : 'none';
-        document.getElementById('requests-error').style.display = state === 'error' ? 'block' : 'none';
-        document.getElementById('requests-list').style.display = state === 'list' ? 'flex' : 'none';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new ContributorRequestsManager(
+        SITE,
+        () => localStorage.getItem('oc_token') || ''
+    );
+    document.addEventListener('DOMContentLoaded', () => manager.init());
+    const submitReject = () => manager.submitReject();
 </script>
 @endsection

@@ -15,6 +15,7 @@ class SendGuidelinesUpdatedNotification extends BaseUserNotificationListener
             title: 'Guidelines updated',
             body: "Brand guidelines (v{$event->newVersion}) require your acknowledgement.",
             data: ['version' => $event->newVersion],
+            consentType: 'contributor.guidelines_updated'
         );
     }
 }

@@ -4,8 +4,10 @@ namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Enums\OpenCollab\LedgerEntryType;
 use App\Enums\OpenCollab\PayoutStatus;
+use App\Models\ContributorProfile;
 use App\Models\EarningsLedger;
 use App\Models\Payout;
+use App\Models\Site;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -102,6 +104,8 @@ class PayoutControllerTest extends FunctionalTestCase
             'reference_id' => 'sale-2',
         ]);
 
+        $this->setupSiteOnboarding();
+
         $response = $this->postForSite('/api/open-collab/payouts', [
             'method' => 'bank_transfer',
         ]);
@@ -114,6 +118,29 @@ class PayoutControllerTest extends FunctionalTestCase
             'status' => PayoutStatus::Pending->value,
             'method' => 'bank_transfer',
         ]);
+    }
+
+    public function test_contributor_cannot_request_payout_when_onboarding_incomplete(): void
+    {
+        $this->actingAs($this->contributor);
+
+        $page = $this->createPage(['contributor_id' => $this->contributor->id]);
+        EarningsLedger::create([
+            'user_id' => $this->contributor->id,
+            'article_id' => $page->id,
+            'type' => LedgerEntryType::Sale->value,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'reference_id' => 'sale-2',
+        ]);
+
+        $this->setupSiteOnboarding(true);
+
+        $response = $this->postForSite('/api/open-collab/payouts', [
+            'method' => 'bank_transfer',
+        ]);
+
+        $this->assertEquals(409, $response->getStatusCode());
     }
 
     public function test_request_returns_422_when_balance_is_below_minimum(): void
@@ -267,6 +294,13 @@ class PayoutControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('reference', $data['errors']);
     }
 
+    private function setupSiteOnboarding(bool $requiresSiteOnboarding = false): void
+    {
+        $site = Site::find($this->siteId);
+
+        $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -275,6 +309,11 @@ class PayoutControllerTest extends FunctionalTestCase
             'email' => 'payout-contributor@example.com',
             'role' => 'contributor',
             'is_contributor' => true,
+        ]);
+
+        ContributorProfile::create([
+            'user_id' => $this->contributor->id,
+            'bio' => 'test bio',
         ]);
     }
 }

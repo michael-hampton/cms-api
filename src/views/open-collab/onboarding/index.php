@@ -272,156 +272,245 @@
 </main>
 
 <script>
-    const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
-
-    // Payment method toggle
-    document.querySelectorAll('[name="payment_method_type"]').forEach(radio => {
-        radio.addEventListener('change', function () {
-            const isStripe = this.value === 'stripe';
-            document.getElementById('stripe-section').style.display = isStripe ? 'block' : 'none';
-            document.getElementById('bank-section').style.display = isStripe ? 'none' : 'block';
-
-            document.querySelectorAll('.payment-method-card').forEach(card => {
-                const forId = card.dataset.for;
-                const checked = document.getElementById(forId)?.checked;
-                card.style.borderColor = checked ? 'var(--navy)' : 'var(--border)';
-                card.style.background = checked ? 'var(--navy)' : '';
-                card.querySelectorAll('svg').forEach(s => s.setAttribute('fill', checked ? 'var(--amber)' : 'var(--slate)'));
-                card.querySelectorAll('span').forEach(s => s.style.color = checked ? '#fff' : 'var(--slate)');
-            });
-        });
-    });
-
-    // Stripe init (only on payment step)
-    let stripe, cardElement;
-    <?php if ($vm->currentStepName() === 'payment'): ?>
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
-    if (STRIPE_KEY) {
-        stripe = Stripe(STRIPE_KEY);
-        const elems = stripe.elements();
-        cardElement = elems.create('card', {
-            hidePostalCode: true,
-            style: {
-                base: {
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: '15px',
-                    color: '#0f1929',
-                    '::placeholder': {color: '#94a3b8'},
-                },
-            },
-        });
-        cardElement.mount('#stripe-card-element');
-        cardElement.on('change', ({error}) => {
-            document.getElementById('stripe-card-errors').textContent = error ? error.message : '';
-        });
-    }
-    <?php endif; ?>
+    const CURRENT_STEP = '<?= $vm->currentStepName() ?>';
+    const SITE = '<?= htmlspecialchars($site ?? '') ?>';
 
-    document.getElementById('onboarding-form')?.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const btn = document.getElementById('submit-btn');
-        const errBox = document.getElementById('form-errors');
-        const okBox = document.getElementById('form-success');
-        errBox.style.display = 'none';
-        okBox.style.display = 'none';
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
+    class OnboardingStepBase {
+        _site;
+        _token;
 
-        const step = '<?= $vm->currentStepName() ?>';
-        let payload = {};
-        let endpoint = step;
-
-        if (step === 'profile') {
-            const bio = document.getElementById('bio')?.value.trim();
-            if (!bio || bio.length < 20) {
-                document.getElementById('bio-error').textContent = 'Bio must be at least 20 characters.';
-                document.getElementById('bio-error').classList.add('visible');
-                btn.disabled = false;
-                btn.textContent = 'Save & continue';
-                return;
-            }
-            payload = {bio};
+        constructor(site, token) {
+            this._site = site;
+            this._token = token;
+            this._bindForm();
         }
 
-        if (step === 'payment') {
-            const pmType = document.querySelector('[name="payment_method_type"]:checked')?.value;
-            if (pmType === 'stripe' && stripe && cardElement) {
-                const {token: stripeToken, error} = await stripe.createToken(cardElement);
-                if (error) {
-                    document.getElementById('stripe-card-errors').textContent = error.message;
-                    btn.disabled = false;
-                    btn.textContent = 'Save payment details';
-                    return;
-                }
-                payload = {
-                    payment_method_type: 'stripe',
-                    stripe_token: stripeToken.id,
-                    tax_country: document.getElementById('tax-country')?.value || '',
-                };
-            } else {
-                payload = {
-                    payment_method_type: 'bank_transfer',
-                    stripe_token: document.getElementById('bank-account')?.value || 'bank',
-                    tax_country: document.getElementById('tax-country')?.value || '',
-                };
-            }
+        _bindForm() {
+            document.getElementById('onboarding-form')?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this._submit();
+            });
         }
 
-        if (step === 'contract') {
-            const agreed = document.getElementById('agreed')?.checked;
-            const cid = this.querySelector('[name="contract_id"]')?.value;
-            if (!agreed) {
-                document.getElementById('agree-error').textContent = 'You must agree to continue.';
-                document.getElementById('agree-error').classList.add('visible');
-                btn.disabled = false;
-                btn.textContent = 'Sign & continue';
-                return;
-            }
-            payload = {contract_id: parseInt(cid), agreed: true};
+        // Subclasses implement this
+        async _submit() {
         }
 
-        if (step === 'guidelines') {
-            const agreed = document.getElementById('guidelines-agreed')?.checked;
-            const version = this.querySelector('[name="version"]')?.value;
-            if (!agreed) {
-                errBox.textContent = 'Please acknowledge the guidelines.';
-                errBox.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Complete onboarding';
-                return;
-            }
-            payload = {version: parseInt(version), agreed: true};
+        _showError(msg) {
+            const el = document.getElementById('form-errors');
+            el.textContent = msg;
+            el.style.display = 'block';
         }
 
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/onboarding/${endpoint}`, {
+        _clearError() {
+            document.getElementById('form-errors').style.display = 'none';
+        }
+
+        async _post(endpoint, payload) {
+            return fetch(`/api/${this._site}/open-collab/onboarding/${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${this._token}`,
                 },
                 body: JSON.stringify(payload),
             });
-            const data = await res.json();
+        }
 
+        _setButtonLoading(text = 'Saving…') {
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<div class="oc-spinner"></div> ${text}`;
+            return btn;
+        }
+
+        _resetButton(btn, label) {
+            btn.disabled = false;
+            btn.innerHTML = label;
+        }
+
+        async _handleResponse(res, btn, originalLabel) {
+            const data = await res.json();
             if (res.ok) {
                 window.location.reload();
             } else {
                 let msg = data.message || 'An error occurred.';
                 if (data.errors) msg = Object.values(data.errors).flat().join(' ');
-                errBox.textContent = msg;
-                errBox.style.display = 'block';
-                btn.disabled = false;
-                btn.innerHTML = 'Try again';
+                this._showError(msg);
+                this._resetButton(btn, originalLabel);
             }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.innerHTML = 'Try again';
         }
+    }
+
+    class ProfileStep extends OnboardingStepBase {
+        async _submit() {
+            this._clearError();
+            const bio = document.getElementById('bio')?.value.trim();
+
+            if (!bio || bio.length < 20) {
+                document.getElementById('bio-error').textContent = 'Bio must be at least 20 characters.';
+                document.getElementById('bio-error').classList.add('visible');
+                return;
+            }
+
+            const btn = this._setButtonLoading('Saving…');
+            const res = await this._post('profile', {bio});
+            await this._handleResponse(res, btn, 'Save & continue');
+        }
+    }
+
+    class PaymentStep extends OnboardingStepBase {
+        #stripe = null;
+        #cardElement = null;
+
+        constructor(site, token, stripeKey) {
+            super(site, token);
+            if (stripeKey) this.#initStripe(stripeKey);
+            this.#bindMethodToggle();
+        }
+
+        #initStripe(key) {
+            this.#stripe = Stripe(key);
+            const elems = this.#stripe.elements();
+            this.#cardElement = elems.create('card', {
+                hidePostalCode: true,
+                style: {
+                    base: {
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: '15px',
+                        color: '#0f1929',
+                        '::placeholder': {color: '#94a3b8'},
+                    },
+                },
+            });
+            this.#cardElement.mount('#stripe-card-element');
+            this.#cardElement.on('change', ({error}) => {
+                document.getElementById('stripe-card-errors').textContent = error ? error.message : '';
+            });
+        }
+
+        #bindMethodToggle() {
+            document.querySelectorAll('[name="payment_method_type"]').forEach(radio => {
+                radio.addEventListener('change', () => this.#onMethodChange());
+            });
+        }
+
+        #onMethodChange() {
+            const isStripe = document.querySelector('[name="payment_method_type"]:checked')?.value === 'stripe';
+            document.getElementById('stripe-section').style.display = isStripe ? 'block' : 'none';
+            document.getElementById('bank-section').style.display = isStripe ? 'none' : 'block';
+
+            document.querySelectorAll('.payment-method-card').forEach(card => {
+                const checked = document.getElementById(card.dataset.for)?.checked;
+                card.style.borderColor = checked ? 'var(--navy)' : 'var(--border)';
+                card.style.background = checked ? 'var(--navy)' : '';
+                card.querySelectorAll('svg').forEach(s => s.setAttribute('fill', checked ? 'var(--amber)' : 'var(--slate)'));
+                card.querySelectorAll('span').forEach(s => {
+                    s.style.color = checked ? '#fff' : 'var(--slate)';
+                });
+            });
+        }
+
+        async _submit() {
+            this._clearError();
+            const btn = this._setButtonLoading('Saving…');
+            const pmType = document.querySelector('[name="payment_method_type"]:checked')?.value;
+
+            if (pmType === 'stripe' && this.#stripe && this.#cardElement) {
+                const {token: stripeToken, error} = await this.#stripe.createToken(this.#cardElement);
+                if (error) {
+                    document.getElementById('stripe-card-errors').textContent = error.message;
+                    this._resetButton(btn, 'Save payment details');
+                    return;
+                }
+                const res = await this._post('payment', {
+                    payment_method_type: 'stripe',
+                    stripe_token: stripeToken.id,
+                    tax_country: document.getElementById('tax-country')?.value || '',
+                });
+                await this._handleResponse(res, btn, 'Save payment details');
+            } else {
+                const res = await this._post('payment', {
+                    payment_method_type: 'bank_transfer',
+                    stripe_token: document.getElementById('bank-account')?.value || 'bank',
+                    tax_country: document.getElementById('tax-country')?.value || '',
+                });
+                await this._handleResponse(res, btn, 'Save payment details');
+            }
+        }
+    }
+
+    class ContractStep extends OnboardingStepBase {
+        async _submit() {
+            this._clearError();
+            const agreed = document.getElementById('agreed')?.checked;
+            const cid = document.querySelector('[name="contract_id"]')?.value;
+
+            if (!agreed) {
+                document.getElementById('agree-error').textContent = 'You must agree to continue.';
+                document.getElementById('agree-error').classList.add('visible');
+                return;
+            }
+
+            const btn = this._setButtonLoading('Signing…');
+            const res = await this._post('contract', {
+                contract_id: parseInt(cid),
+                agreed: true,
+            });
+            await this._handleResponse(res, btn, 'Sign & continue');
+        }
+    }
+
+    class GuidelinesStep extends OnboardingStepBase {
+        async _submit() {
+            this._clearError();
+            const agreed = document.getElementById('guidelines-agreed')?.checked;
+            const version = document.querySelector('[name="version"]')?.value;
+
+            if (!agreed) {
+                this._showError('Please acknowledge the guidelines.');
+                return;
+            }
+
+            const btn = this._setButtonLoading('Completing…');
+            const res = await this._post('guidelines', {
+                version: parseInt(version),
+                agreed: true,
+            });
+            await this._handleResponse(res, btn, 'Complete onboarding');
+        }
+    }
+
+    class OnboardingManager {
+        #step;
+
+        constructor({site, token, stripeKey, currentStep}) {
+            this.#step = this.#createStep(currentStep, site, token, stripeKey);
+        }
+
+        #createStep(name, site, token, stripeKey) {
+            switch (name) {
+                case 'profile':
+                    return new ProfileStep(site, token);
+                case 'payment':
+                    return new PaymentStep(site, token, stripeKey);
+                case 'contract':
+                    return new ContractStep(site, token);
+                case 'guidelines':
+                    return new GuidelinesStep(site, token);
+                default:
+                    return null;
+            }
+        }
+    }
+
+    const onboardingManager = new OnboardingManager({
+        site: SITE,
+        token: localStorage.getItem('oc_token') || '',
+        stripeKey: STRIPE_KEY,
+        currentStep: CURRENT_STEP,
     });
 </script>
 </body>

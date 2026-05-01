@@ -261,26 +261,37 @@ $pageClass = '';
 
 @section('scripts')
 <script>
-    const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = localStorage.getItem('oc_token') || '';
+    const CURRENT_USER_EMAIL = '<?= htmlspecialchars($currentUser->email ?? '') ?>';
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
-    let isDirty = false;
-    const saveBtn = document.getElementById('notif-save-btn');
-    const preferenceState = {}; // { "typeId:channel": bool }
+    const SITE = '<?= htmlspecialchars($site ?? '') ?>';
 
-    async function loadNotifPreferences() {
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/notifications/preferences`, {
-                headers: {Authorization: `Bearer ${TOKEN}`}
-            });
+    class NotificationPreferencesManager {
+        #site;
+        #token;
+        #state = {};
+        #dirty = false;
 
-            if (!res.ok) throw new Error('Failed to load preferences');
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-            const data = await res.json();
+        async load() {
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/notifications/preferences`, {
+                    headers: {Authorization: `Bearer ${this.#token}`},
+                });
+                if (!res.ok) throw new Error('Failed to load preferences');
+                const data = await res.json();
+                this.#buildGrid(data.preferences);
+            } catch {
+                document.getElementById('notif-prefs-grid').innerHTML =
+                    '<div class="oc-alert oc-alert--error">Could not load notification preferences.</div>';
+            }
+        }
+
+        #buildGrid(preferences) {
             const grid = document.getElementById('notif-prefs-grid');
-
-            // Clear existing content (except header if you have one)
-            // Keep the header and clear previous dynamic rows
             grid.innerHTML = `
             <div class="oc-notif-prefs__header">
                 <div class="oc-notif-prefs__header-cell">Event</div>
@@ -289,260 +300,339 @@ $pageClass = '';
             </div>`;
 
             const byType = {};
-            for (const pref of data.preferences) {
+            for (const pref of preferences) {
                 if (!byType[pref.consent_type_id]) {
                     byType[pref.consent_type_id] = {name: pref.name, code: pref.code, channels: {}};
                 }
                 byType[pref.consent_type_id].channels[pref.channel] = pref.is_granted;
-
-                // Populate the state object so saving works
-                preferenceState[pref.consent_type_id] = preferenceState[pref.consent_type_id] || {};
-                preferenceState[pref.consent_type_id][pref.channel] = pref.is_granted;
+                if (!this.#state[pref.consent_type_id]) this.#state[pref.consent_type_id] = {};
+                this.#state[pref.consent_type_id][pref.channel] = pref.is_granted;
             }
 
             for (const [typeId, info] of Object.entries(byType)) {
-                const row = `
+                grid.insertAdjacentHTML('beforeend', `
                 <div class="oc-notif-prefs__row">
-                    <div class="oc-notif-prefs__label">${escHtml(info.name)}</div>
+                    <div class="oc-notif-prefs__label">${this.#esc(info.name)}</div>
                     <div class="oc-notif-prefs__check">
                         <input type="checkbox" data-id="${typeId}" data-channel="email"
                                ${info.channels['email'] ? 'checked' : ''}
-                               onchange="updatePrefState(${typeId}, 'email', this.checked)">
+                               onchange="notifManager.updateNotifState(${typeId}, 'email', this.checked)">
                     </div>
                     <div class="oc-notif-prefs__check">
                         <input type="checkbox" data-id="${typeId}" data-channel="in_app"
                                ${info.channels['in_app'] ? 'checked' : ''}
-                               onchange="updatePrefState(${typeId}, 'in_app', this.checked)">
+                               onchange="notifManager.updateNotifState(${typeId}, 'in_app', this.checked)">
                     </div>
-                </div>`;
-                grid.insertAdjacentHTML('beforeend', row);
-            }
-        } catch (e) {
-            console.error(e);
-            const grid = document.getElementById('notif-prefs-grid');
-            grid.innerHTML = '<div class="oc-alert oc-alert--error">Could not load notification preferences.</div>';
-        }
-    }
-
-    function escHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    function updatePrefState(id, channel, value) {
-        if (!preferenceState[id]) preferenceState[id] = {};
-        preferenceState[id][channel] = value;
-        markDirty();
-    }
-
-    async function saveNotifPreferences() {
-        const payload = [];
-
-        // Correctly iterate through the nested structure: ID -> Channel -> Value
-        for (const typeId in preferenceState) {
-            for (const channel in preferenceState[typeId]) {
-                payload.push({
-                    consent_type_id: parseInt(typeId),
-                    channel: channel,
-                    granted: !!preferenceState[typeId][channel]
-                });
+                </div>`);
             }
         }
 
-        const saveBtn = document.getElementById('notif-save-btn');
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = 'Saving...';
-
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/notifications/preferences/batch`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN}`
-                },
-                body: JSON.stringify({preferences: payload})
-            });
-
-            if (res.ok) {
-                saveBtn.innerHTML = 'Saved ✓';
-                isDirty = false;
-                setTimeout(() => {
-                    saveBtn.innerHTML = 'Save Changes';
-                    saveBtn.disabled = true;
-                }, 2000);
-            } else {
-                throw new Error('Save failed');
-            }
-        } catch (e) {
-            alert('Could not save preferences. Please try again.');
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = 'Save Changes';
-        }
-    }
-
-    function markDirty() {
-        isDirty = true;
-        if (saveBtn) saveBtn.disabled = false;
-    }
-
-    // Profile form
-    document.getElementById('profile-form')?.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const btn = document.getElementById('profile-save-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
-
-        const res = await fetch(`/api/${SITE}/open-collab/onboarding/profile`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${TOKEN}`
-            },
-            body: JSON.stringify({bio: document.getElementById('bio').value})
-        });
-
-        const data = await res.json();
-        if (res.ok) {
-            document.getElementById('profile-success').textContent = '✓ Profile updated';
-            document.getElementById('profile-success').style.display = 'flex';
-            setTimeout(() => document.getElementById('profile-success').style.display = 'none', 3000);
-        } else {
-            const err = document.getElementById('profile-errors');
-            err.textContent = data.message || 'Save failed.';
-            err.style.display = 'block';
+        updateState(id, channel, value) {
+            if (!this.#state[id]) this.#state[id] = {};
+            this.#state[id][channel] = value;
+            this.#markDirty();
         }
 
-        btn.disabled = false;
-        btn.textContent = 'Save profile';
-    });
-
-    // Stripe init
-    let stripe, cardElement;
-    if (STRIPE_KEY) {
-        stripe = Stripe(STRIPE_KEY);
-        const elems = stripe.elements();
-        cardElement = elems.create('card', {
-            style: {
-                base: {
-                    fontFamily: "'DM Sans', sans-serif",
-                    fontSize: '15px',
-                    color: '#0f1929',
-                    '::placeholder': {color: '#94a3b8'}
+        async save() {
+            const payload = [];
+            for (const typeId in this.#state) {
+                for (const channel in this.#state[typeId]) {
+                    payload.push({
+                        consent_type_id: parseInt(typeId),
+                        channel,
+                        granted: !!this.#state[typeId][channel],
+                    });
                 }
             }
-        });
-        cardElement.mount('#stripe-card-element');
-        cardElement.on('change', ({error}) => {
-            document.getElementById('stripe-card-errors').textContent = error ? error.message : '';
-        });
-    }
 
-    async function savePaymentDetails() {
-        const btn = document.getElementById('save-payment-btn');
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
+            const btn = document.getElementById('notif-save-btn');
+            btn.disabled = true;
+            btn.innerHTML = 'Saving...';
 
-        let stripeToken = 'bank';
-        if (stripe && cardElement) {
-            const {token, error} = await stripe.createToken(cardElement);
-            if (error) {
-                document.getElementById('stripe-card-errors').textContent = error.message;
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/notifications/preferences/batch`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                    body: JSON.stringify({preferences: payload}),
+                });
+                if (!res.ok) throw new Error('Save failed');
+                this.#dirty = false;
+                btn.innerHTML = 'Saved ✓';
+                setTimeout(() => {
+                    btn.innerHTML = 'Save Changes';
+                    btn.disabled = true;
+                }, 2000);
+            } catch {
+                alert('Could not save preferences. Please try again.');
                 btn.disabled = false;
-                btn.textContent = 'Save payment details';
-                return;
+                btn.innerHTML = 'Save Changes';
             }
-            stripeToken = token.id;
         }
 
-        const res = await fetch(`/api/${SITE}/open-collab/onboarding/payment`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}`},
-            body: JSON.stringify({
-                payment_method_type: 'stripe',
-                stripe_token: stripeToken,
-                tax_country: document.getElementById('tax-country-settings')?.value || ''
-            })
-        });
+        #markDirty() {
+            this.#dirty = true;
+            const btn = document.getElementById('notif-save-btn');
+            if (btn) btn.disabled = false;
+        }
 
-        if (res.ok) {
-            window.location.reload();
-        } else {
-            const data = await res.json();
-            alert(data.message || 'Failed to save payment details.');
-            btn.disabled = false;
-            btn.textContent = 'Save payment details';
+        #esc(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
     }
 
-    function showCloseAccountModal() {
-        document.getElementById('close-modal').style.display = 'grid';
-    }
+    class ProfileManager {
+        #site;
+        #token;
 
-    function hideCloseAccountModal() {
-        document.getElementById('close-modal').style.display = 'none';
-    }
-
-    async function submitCloseAccount() {
-        const email = document.getElementById('confirm-email').value.trim();
-        const reason = document.getElementById('close-reason').value;
-        const notes = document.getElementById('close-notes').value.trim();
-        const errBox = document.getElementById('close-modal-errors');
-        const btn = document.getElementById('close-submit-btn');
-
-        errBox.style.display = 'none';
-
-        const expectedEmail = '<?= htmlspecialchars($currentUser->email ?? '') ?>';
-        if (email.toLowerCase() !== expectedEmail.toLowerCase()) {
-            errBox.textContent = 'Email does not match your account email.';
-            errBox.style.display = 'block';
-            return;
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+            this.#bindForm();
         }
 
-        if (!reason) {
-            errBox.textContent = 'Please select a reason.';
-            errBox.style.display = 'block';
-            return;
+        #bindForm() {
+            document.getElementById('profile-form')?.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.#save();
+            });
         }
 
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Submitting…';
+        async #save() {
+            const btn = document.getElementById('profile-save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
 
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/contributor/close-account`, {
+            const res = await fetch(`/api/${this.#site}/open-collab/onboarding/profile`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}`},
-                body: JSON.stringify({reason, notes})
+                headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                body: JSON.stringify({bio: document.getElementById('bio').value}),
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                const ok = document.getElementById('profile-success');
+                ok.textContent = '✓ Profile updated';
+                ok.style.display = 'flex';
+                setTimeout(() => {
+                    ok.style.display = 'none';
+                }, 3000);
+            } else {
+                const err = document.getElementById('profile-errors');
+                err.textContent = data.message || 'Save failed.';
+                err.style.display = 'block';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Save profile';
+        }
+    }
+
+    class PaymentDetailsManager {
+        #site;
+        #token;
+        #stripe = null;
+        #cardElement = null;
+
+        constructor(site, token, stripeKey) {
+            this.#site = site;
+            this.#token = token;
+            if (stripeKey) this.#initStripe(stripeKey);
+        }
+
+        #initStripe(key) {
+            this.#stripe = Stripe(key);
+            const elems = this.#stripe.elements();
+            this.#cardElement = elems.create('card', {
+                style: {
+                    base: {
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontSize: '15px',
+                        color: '#0f1929',
+                        '::placeholder': {color: '#94a3b8'},
+                    },
+                },
+            });
+            this.#cardElement.mount('#stripe-card-element');
+            this.#cardElement.on('change', ({error}) => {
+                document.getElementById('stripe-card-errors').textContent = error ? error.message : '';
+            });
+        }
+
+        async save() {
+            const btn = document.getElementById('save-payment-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
+
+            let stripeToken = 'bank';
+            if (this.#stripe && this.#cardElement) {
+                const {token, error} = await this.#stripe.createToken(this.#cardElement);
+                if (error) {
+                    document.getElementById('stripe-card-errors').textContent = error.message;
+                    btn.disabled = false;
+                    btn.textContent = 'Save payment details';
+                    return;
+                }
+                stripeToken = token.id;
+            }
+
+            const res = await fetch(`/api/${this.#site}/open-collab/onboarding/payment`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                body: JSON.stringify({
+                    payment_method_type: 'stripe',
+                    stripe_token: stripeToken,
+                    tax_country: document.getElementById('tax-country-settings')?.value || '',
+                }),
             });
 
             if (res.ok) {
-                hideCloseAccountModal();
-                document.body.innerHTML = `
-        <div style="min-height:100vh;display:grid;place-items:center;font-family:'DM Sans',sans-serif;background:var(--cream);">
-          <div style="text-align:center;max-width:400px;padding:32px;">
-            <div style="width:56px;height:56px;background:#dcfce7;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;">
-              <svg viewBox="0 0 20 20" fill="#16a34a" width="24"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-            </div>
-            <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;color:#0f1929;margin-bottom:8px;">Request received</h2>
-            <p style="color:#64748b;font-size:.9rem;line-height:1.6;">We've received your account closure request. Our team will review it and contact you within 2 business days.</p>
-          </div>
-        </div>`;
+                window.location.reload();
             } else {
                 const data = await res.json();
-                errBox.textContent = data.message || 'Submission failed. Please try again.';
+                alert(data.message || 'Failed to save payment details.');
+                btn.disabled = false;
+                btn.textContent = 'Save payment details';
+            }
+        }
+    }
+
+    class AccountClosureManager {
+        #site;
+        #token;
+        #expectedEmail;
+
+        constructor(site, token, expectedEmail) {
+            this.#site = site;
+            this.#token = token;
+            this.#expectedEmail = expectedEmail;
+        }
+
+        openModal() {
+            document.getElementById('close-modal').style.display = 'grid';
+        }
+
+        closeModal() {
+            document.getElementById('close-modal').style.display = 'none';
+        }
+
+        async submit() {
+            const email = document.getElementById('confirm-email').value.trim();
+            const reason = document.getElementById('close-reason').value;
+            const notes = document.getElementById('close-notes').value.trim();
+            const errBox = document.getElementById('close-modal-errors');
+            const btn = document.getElementById('close-submit-btn');
+            errBox.style.display = 'none';
+
+            if (email.toLowerCase() !== this.#expectedEmail.toLowerCase()) {
+                errBox.textContent = 'Email does not match your account email.';
+                errBox.style.display = 'block';
+                return;
+            }
+            if (!reason) {
+                errBox.textContent = 'Please select a reason.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Submitting…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/contributor/close-account`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                    body: JSON.stringify({reason, notes}),
+                });
+
+                if (res.ok) {
+                    this.closeModal();
+                    document.body.innerHTML = `
+                    <div style="min-height:100vh;display:grid;place-items:center;font-family:'DM Sans',sans-serif;background:var(--cream);">
+                        <div style="text-align:center;max-width:400px;padding:32px;">
+                            <div style="width:56px;height:56px;background:#dcfce7;border-radius:50%;display:grid;place-items:center;margin:0 auto 16px;">
+                                <svg viewBox="0 0 20 20" fill="#16a34a" width="24"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                            </div>
+                            <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;color:#0f1929;margin-bottom:8px;">Request received</h2>
+                            <p style="color:#64748b;font-size:.9rem;line-height:1.6;">We've received your account closure request. Our team will review it and contact you within 2 business days.</p>
+                        </div>
+                    </div>`;
+                } else {
+                    const data = await res.json();
+                    errBox.textContent = data.message || 'Submission failed. Please try again.';
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Request closure';
+                }
+            } catch {
+                errBox.textContent = 'Network error. Please try again.';
                 errBox.style.display = 'block';
                 btn.disabled = false;
                 btn.textContent = 'Request closure';
             }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Request closure';
         }
     }
 
-    loadNotifPreferences();
+    class SettingsManager {
+        #profile;
+        #payment;
+        #closure;
+        #notif;
+
+        constructor({site, token, stripeKey, expectedEmail}) {
+            this.#notif = new NotificationPreferencesManager(site, token);
+            this.#profile = new ProfileManager(site, token);
+            this.#payment = new PaymentDetailsManager(site, token, stripeKey);
+            this.#closure = new AccountClosureManager(site, token, expectedEmail);
+        }
+
+        init() {
+            this.#notif.load();
+        }
+
+        // Delegated public surface for inline handlers
+        updateNotifState(id, channel, value) {
+            this.#notif.updateState(id, channel, value);
+        }
+
+        saveNotifPreferences() {
+            this.#notif.save();
+        }
+
+        savePaymentDetails() {
+            this.#payment.save();
+        }
+
+        showCloseAccountModal() {
+            this.#closure.openModal();
+        }
+
+        hideCloseAccountModal() {
+            this.#closure.closeModal();
+        }
+
+        submitCloseAccount() {
+            this.#closure.submit();
+        }
+    }
+
+    const settingsManager = new SettingsManager({
+        site: SITE,
+        token: localStorage.getItem('oc_token') || '',
+        stripeKey: STRIPE_KEY,
+        expectedEmail: CURRENT_USER_EMAIL,
+    });
+
+    settingsManager.init();
+
+    // Shims for PHP-rendered inline handlers
+    const notifManager = settingsManager; // updateNotifState called directly on settingsManager
+    const saveNotifPreferences = () => settingsManager.saveNotifPreferences();
+    const savePaymentDetails = () => settingsManager.savePaymentDetails();
+    const showCloseAccountModal = () => settingsManager.showCloseAccountModal();
+    const hideCloseAccountModal = () => settingsManager.hideCloseAccountModal();
+    const submitCloseAccount = () => settingsManager.submitCloseAccount();
 
 </script>
 @endsection

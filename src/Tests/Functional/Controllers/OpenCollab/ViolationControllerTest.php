@@ -39,12 +39,12 @@ class ViolationControllerTest extends FunctionalTestCase
         ]);
 
         $response = $this->getForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations");
+
         $data = json_decode($response->getContent(), true);
-        $items = array_values(array_filter($data, static fn($key) => is_int($key), ARRAY_FILTER_USE_KEY));
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertCount(1, $items);
-        $this->assertEquals($siteViolation->id, $items[0]['id']);
+        $this->assertCount(1, $data['data']);
+        $this->assertEquals($siteViolation->id, $data['data'][0]['id']);
     }
 
     public function test_store_records_violation_and_deactivates_user_when_threshold_triggers_ban(): void

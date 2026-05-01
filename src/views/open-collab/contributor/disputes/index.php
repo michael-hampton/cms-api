@@ -199,268 +199,242 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // IDs of ledger entries that already have an open dispute (populated after load)
-    let openDisputeLedgerIds = new Set();
-    let allDisputes = [];
-    let currentFilter = 'all';
+    class ContributorDisputesManager {
+        #site;
+        #token;
+        #state = {
+            all: [],
+            filter: 'all',
+            openLedgerIds: new Set(),
+        };
 
-    document.addEventListener('DOMContentLoaded', loadDisputes);
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-    // ── Filter ────────────────────────────────────────────────────────────────
-    function setFilter(status, btn) {
-        currentFilter = status;
-        document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
-        btn.classList.add('filter-pill--active');
-        renderDisputes();
-    }
+        init() {
+            this.#load();
+        }
 
-    // ── Load disputes from API ────────────────────────────────────────────────
-    async function loadDisputes() {
-        showState('loading');
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/disputes`, {
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        setFilter(status, btn) {
+            this.#state.filter = status;
+            document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('filter-pill--active'));
+            btn.classList.add('filter-pill--active');
+            this.#render();
+        }
+
+        async #load() {
+            this.#showState('loading');
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/disputes`, {
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                if (!res.ok) {
+                    this.#showState('error');
+                    return;
+                }
+                const data = await res.json();
+                this.#state.all = Array.isArray(data) ? data : (data.data ?? []);
+                this.#state.openLedgerIds = new Set(
+                    this.#state.all.filter(d => d.status === 'open').map(d => d.earnings_ledger_id)
+                );
+                this.#applyDropdownDisabledState();
+                this.#updateStats();
+                this.#render();
+            } catch {
+                this.#showState('error');
+            }
+        }
+
+        #applyDropdownDisabledState() {
+            const select = document.getElementById('dispute-ledger-select');
+            if (!select) return;
+            Array.from(select.options).forEach(opt => {
+                if (!opt.value) return;
+                opt.disabled = this.#state.openLedgerIds.has(parseInt(opt.value));
+                if (opt.disabled && !opt.text.includes('(open dispute)')) {
+                    opt.text += ' · (open dispute)';
+                }
             });
-            if (!res.ok) {
-                showState('error');
+        }
+
+        #updateStats() {
+            document.getElementById('stat-open').textContent = this.#state.all.filter(d => d.status === 'open').length;
+            document.getElementById('stat-resolved').textContent = this.#state.all.filter(d => d.status === 'resolved').length;
+            document.getElementById('stat-rejected').textContent = this.#state.all.filter(d => d.status === 'rejected').length;
+        }
+
+        #render() {
+            const filtered = this.#state.filter === 'all'
+                ? this.#state.all
+                : this.#state.all.filter(d => d.status === this.#state.filter);
+
+            document.getElementById('list-count').textContent = filtered.length;
+            document.getElementById('list-title').textContent =
+                this.#state.filter === 'all' ? 'My Disputes' : `${this.#cap(this.#state.filter)} Disputes`;
+
+            if (!filtered.length) {
+                this.#showState('empty');
                 return;
             }
 
-            const data = await res.json();
-            allDisputes = Array.isArray(data) ? data : (data.data ?? []);
-
-            // Build the set of ledger IDs already under an open dispute
-            // so we can grey-out / disable those options in the dropdown.
-            openDisputeLedgerIds = new Set(
-                allDisputes
-                    .filter(d => d.status === 'open')
-                    .map(d => d.earnings_ledger_id)
-            );
-            applyDropdownDisabledState();
-
-            updateStats();
-            renderDisputes();
-        } catch {
-            showState('error');
-        }
-    }
-
-    /**
-     * Disable dropdown options for ledger entries that already have an open dispute.
-     * Options remain visible so the contributor can see the entry but can't resubmit.
-     */
-    function applyDropdownDisabledState() {
-        const select = document.getElementById('dispute-ledger-select');
-        if (!select) return;
-
-        Array.from(select.options).forEach(opt => {
-            if (!opt.value) return; // placeholder
-            opt.disabled = openDisputeLedgerIds.has(parseInt(opt.value));
-            if (opt.disabled) {
-                opt.text = opt.text.replace(' · (open dispute)', '') + ' · (open dispute)';
-            }
-        });
-    }
-
-    function updateStats() {
-        document.getElementById('stat-open').textContent = allDisputes.filter(d => d.status === 'open').length;
-        document.getElementById('stat-resolved').textContent = allDisputes.filter(d => d.status === 'resolved').length;
-        document.getElementById('stat-rejected').textContent = allDisputes.filter(d => d.status === 'rejected').length;
-    }
-
-    // ── Render dispute list ───────────────────────────────────────────────────
-    function renderDisputes() {
-        const filtered = currentFilter === 'all'
-            ? allDisputes
-            : allDisputes.filter(d => d.status === currentFilter);
-
-        document.getElementById('list-count').textContent = filtered.length;
-        document.getElementById('list-title').textContent =
-            currentFilter === 'all' ? 'My Disputes' : capitalise(currentFilter) + ' Disputes';
-
-        if (!filtered.length) {
-            showState('empty');
-            return;
-        }
-
-        const list = document.getElementById('disputes-list');
-        list.innerHTML = '';
-
-        filtered.forEach((d, i) => {
-            const isLast = i === filtered.length - 1;
-            const badge = {
-                open: {cls: 'oc-badge--waiting-approval', label: 'Under review'},
-                resolved: {cls: 'oc-badge--published', label: 'Resolved'},
-                rejected: {cls: 'oc-badge--revoked', label: 'Rejected'},
-            }[d.status] ?? {cls: 'oc-badge--draft', label: capitalise(d.status)};
-
-            const createdAt = d.created_at
-                ? new Date(d.created_at).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})
-                : '';
-
-            const adminNotesHtml = d.admin_notes
-                ? `<div style="font-size:.82rem;color:var(--navy);line-height:1.5;
-                           background:${d.status === 'resolved' ? '#f0fdf4' : '#fff9f9'};
-                           border:1px solid ${d.status === 'resolved' ? '#bbf7d0' : '#fecaca'};
-                           border-radius:6px;padding:10px 14px;margin-top:8px;">
-                       <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
-                               color:${d.status === 'resolved' ? 'var(--green)' : 'var(--red)'};
-                               display:block;margin-bottom:3px;">Admin response</strong>
-                       ${escHtml(d.admin_notes)}
+            const list = document.getElementById('disputes-list');
+            list.innerHTML = '';
+            filtered.forEach((d, i) => {
+                const isLast = i === filtered.length - 1;
+                const badge = {
+                    open: {cls: 'oc-badge--waiting-approval', label: 'Under review'},
+                    resolved: {cls: 'oc-badge--published', label: 'Resolved'},
+                    rejected: {cls: 'oc-badge--revoked', label: 'Rejected'},
+                }[d.status] ?? {cls: 'oc-badge--draft', label: this.#cap(d.status)};
+                const createdAt = d.created_at
+                    ? new Date(d.created_at).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric'
+                    })
+                    : '';
+                const adminNotesHtml = d.admin_notes
+                    ? `<div style="font-size:.82rem;color:var(--navy);line-height:1.5;background:${d.status === 'resolved' ? '#f0fdf4' : '#fff9f9'};border:1px solid ${d.status === 'resolved' ? '#bbf7d0' : '#fecaca'};border-radius:6px;padding:10px 14px;margin-top:8px;">
+                       <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:${d.status === 'resolved' ? 'var(--green)' : 'var(--red)'};display:block;margin-bottom:3px;">Admin response</strong>
+                       ${this.#esc(d.admin_notes)}
                    </div>`
-                : (d.status === 'open'
-                    ? `<div style="font-size:.78rem;color:var(--slate);font-style:italic;margin-top:4px;">
-                           Our team is reviewing this — usually within 2–3 business days.
-                       </div>`
-                    : '');
+                    : (d.status === 'open' ? '<div style="font-size:.78rem;color:var(--slate);font-style:italic;margin-top:4px;">Our team is reviewing this — usually within 2–3 business days.</div>' : '');
 
-            const div = document.createElement('div');
-            div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
-            div.innerHTML = `
+                const div = document.createElement('div');
+                div.style.cssText = `padding:18px 20px;${!isLast ? 'border-bottom:1px solid var(--border);' : ''}`;
+                div.innerHTML = `
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
                     <span class="oc-badge ${badge.cls}">${badge.label}</span>
-                    <span style="font-size:.72rem;color:var(--slate);font-family:monospace;">
-                        Ledger #${d.earnings_ledger_id}
-                    </span>
+                    <span style="font-size:.72rem;color:var(--slate);font-family:monospace;">Ledger #${d.earnings_ledger_id}</span>
                     <span style="font-size:.72rem;color:var(--slate-light);">${createdAt}</span>
                 </div>
                 <div style="font-size:.875rem;color:var(--navy);line-height:1.55;margin-bottom:4px;">
-                    <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;
-                                   color:var(--slate);display:block;margin-bottom:3px;">Your reason</strong>
-                    ${escHtml(d.reason ?? '')}
+                    <strong style="font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--slate);display:block;margin-bottom:3px;">Your reason</strong>
+                    ${this.#esc(d.reason ?? '')}
                 </div>
                 ${adminNotesHtml}`;
-            list.appendChild(div);
-        });
-
-        showState('list');
-    }
-
-    // ── Raise dispute modal ───────────────────────────────────────────────────
-    function openDisputeModal() {
-        document.getElementById('dispute-ledger-id').value = '';
-        document.getElementById('dispute-ledger-select').value = '';
-        document.getElementById('dispute-reason').value = '';
-        document.getElementById('selected-entry-summary').style.display = 'none';
-        document.getElementById('dispute-modal-errors').style.display = 'none';
-        document.getElementById('dispute-modal').style.display = 'grid';
-    }
-
-    function closeDisputeModal() {
-        document.getElementById('dispute-modal').style.display = 'none';
-    }
-
-    function selectLedgerEntry(sel) {
-        const opt = sel.options[sel.selectedIndex];
-        const id = opt.value;
-        document.getElementById('dispute-ledger-id').value = id;
-
-        const summary = document.getElementById('selected-entry-summary');
-        if (!id) {
-            summary.style.display = 'none';
-            return;
-        }
-
-        summary.style.display = 'block';
-        summary.innerHTML = `
-            <div style="display:flex;gap:20px;flex-wrap:wrap;">
-                <div>
-                    <span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Amount</span><br>
-                    <strong style="color:var(--navy);">${escHtml(opt.dataset.amount || '—')}</strong>
-                </div>
-                <div>
-                    <span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Type</span><br>
-                    <strong style="color:var(--navy);">${escHtml(opt.dataset.type || '—')}</strong>
-                </div>
-                <div>
-                    <span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Date</span><br>
-                    <strong style="color:var(--navy);">${escHtml(opt.dataset.date || '—')}</strong>
-                </div>
-            </div>`;
-    }
-
-    async function submitDispute() {
-        const ledgerId = parseInt(document.getElementById('dispute-ledger-id').value);
-        const reason = document.getElementById('dispute-reason').value.trim();
-        const errBox = document.getElementById('dispute-modal-errors');
-        const btn = document.getElementById('dispute-submit-btn');
-        errBox.style.display = 'none';
-
-        if (!ledgerId || ledgerId <= 0) {
-            errBox.textContent = 'Please select an earnings entry to dispute.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        if (reason.length < 10) {
-            errBox.textContent = 'Please provide a reason of at least 10 characters.';
-            errBox.style.display = 'block';
-            return;
-        }
-
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner"></div> Submitting…';
-
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/disputes`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN()}`,
-                    'Accept': 'application/json',
-                },
-                body: JSON.stringify({earnings_ledger_id: ledgerId, reason}),
+                list.appendChild(div);
             });
+            this.#showState('list');
+        }
 
-            const data = await res.json();
+        openDisputeModal() {
+            document.getElementById('dispute-ledger-id').value = '';
+            document.getElementById('dispute-ledger-select').value = '';
+            document.getElementById('dispute-reason').value = '';
+            document.getElementById('selected-entry-summary').style.display = 'none';
+            document.getElementById('dispute-modal-errors').style.display = 'none';
+            document.getElementById('dispute-modal').style.display = 'grid';
+        }
 
-            if (res.ok) {
-                closeDisputeModal();
-                showToast('✓ Dispute submitted — we\'ll review it shortly');
-                await loadDisputes(); // refresh list + re-disable dropdown options
-            } else {
-                errBox.textContent = data.error || data.message || 'Submission failed.';
+        closeDisputeModal() {
+            document.getElementById('dispute-modal').style.display = 'none';
+        }
+
+        selectLedgerEntry(sel) {
+            const opt = sel.options[sel.selectedIndex];
+            const id = opt.value;
+            document.getElementById('dispute-ledger-id').value = id;
+            const summary = document.getElementById('selected-entry-summary');
+            if (!id) {
+                summary.style.display = 'none';
+                return;
+            }
+            summary.style.display = 'block';
+            summary.innerHTML = `
+            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                <div><span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Amount</span><br><strong style="color:var(--navy);">${this.#esc(opt.dataset.amount || '—')}</strong></div>
+                <div><span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Type</span><br><strong style="color:var(--navy);">${this.#esc(opt.dataset.type || '—')}</strong></div>
+                <div><span style="color:var(--slate);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;">Date</span><br><strong style="color:var(--navy);">${this.#esc(opt.dataset.date || '—')}</strong></div>
+            </div>`;
+        }
+
+        async submitDispute() {
+            const ledgerId = parseInt(document.getElementById('dispute-ledger-id').value);
+            const reason = document.getElementById('dispute-reason').value.trim();
+            const errBox = document.getElementById('dispute-modal-errors');
+            const btn = document.getElementById('dispute-submit-btn');
+            errBox.style.display = 'none';
+
+            if (!ledgerId || ledgerId <= 0) {
+                errBox.textContent = 'Please select an earnings entry to dispute.';
+                errBox.style.display = 'block';
+                return;
+            }
+            if (reason.length < 10) {
+                errBox.textContent = 'Please provide a reason of at least 10 characters.';
+                errBox.style.display = 'block';
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div> Submitting…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/disputes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json'
+                    },
+                    body: JSON.stringify({earnings_ledger_id: ledgerId, reason}),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.closeDisputeModal();
+                    this.#showToast("✓ Dispute submitted — we'll review it shortly");
+                    await this.#load();
+                } else {
+                    errBox.textContent = data.error || data.message || 'Submission failed.';
+                    errBox.style.display = 'block';
+                    btn.disabled = false;
+                    btn.textContent = 'Submit dispute';
+                }
+            } catch {
+                errBox.textContent = 'Network error. Please try again.';
                 errBox.style.display = 'block';
                 btn.disabled = false;
                 btn.textContent = 'Submit dispute';
             }
-        } catch {
-            errBox.textContent = 'Network error. Please try again.';
-            errBox.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = 'Submit dispute';
+        }
+
+        #showState(state) {
+            document.getElementById('disputes-loading').style.display = state === 'loading' ? 'block' : 'none';
+            document.getElementById('disputes-empty').style.display = state === 'empty' ? 'block' : 'none';
+            document.getElementById('disputes-error').style.display = state === 'error' ? 'block' : 'none';
+            document.getElementById('disputes-list').style.display = state === 'list' ? 'flex' : 'none';
+        }
+
+        #cap(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+
+        #esc(str) {
+            if (str == null) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-    function showState(state) {
-        document.getElementById('disputes-loading').style.display = state === 'loading' ? 'block' : 'none';
-        document.getElementById('disputes-empty').style.display = state === 'empty' ? 'block' : 'none';
-        document.getElementById('disputes-error').style.display = state === 'error' ? 'block' : 'none';
-        document.getElementById('disputes-list').style.display = state === 'list' ? 'flex' : 'none';
-    }
-
-    function capitalise(str) {
-        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
-    }
-
-    function escHtml(str) {
-        if (str == null) return '';
-        return String(str)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new ContributorDisputesManager(SITE, () => localStorage.getItem('oc_token') || '');
+    document.addEventListener('DOMContentLoaded', () => manager.init());
+    const setFilter = (status, btn) => manager.setFilter(status, btn);
+    const openDisputeModal = () => manager.openDisputeModal();
+    const closeDisputeModal = () => manager.closeDisputeModal(); // Add if missing
+    const submitDispute = () => manager.submitDispute();
+    const selectLedgerEntry = (sel) => manager.selectLedgerEntry(sel);
 </script>
 @endsection

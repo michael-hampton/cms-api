@@ -227,101 +227,110 @@ $statusOrder = ['on_hold' => 0, 'draft' => 1, 'waiting_approval' => 2, 'publishe
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
-    const TOKEN = () => localStorage.getItem('oc_token') || '';
 
-    // ── Filter ────────────────────────────────────────────────
-    function setFilter(filter, btn) {
-        document.querySelectorAll('.filter-btn').forEach(b => {
-            b.style.background = '';
-            b.style.color = '';
-            b.style.borderColor = '';
-        });
-        btn.style.background = 'var(--navy)';
-        btn.style.color = '#fff';
-        btn.style.borderColor = 'var(--navy)';
+    class ArticlesManager {
+        #site;
+        #token;
 
-        let shown = 0;
-        document.querySelectorAll('.article-row').forEach(row => {
-            const s = row.dataset.status;
-            const match = filter === 'all' || s === filter;
-            row.style.display = match ? '' : 'none';
-            if (match) shown++;
-        });
-        document.getElementById('article-count').textContent = shown;
-    }
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
 
-    // ── Expand/collapse detail panel ─────────────────────────
-    function toggleExpand(id) {
-        const panel = document.getElementById('expand-panel-' + id);
-        const chevron = document.getElementById('expand-chevron-' + id);
-        if (!panel) return;
-        const open = panel.style.display === 'none';
-        panel.style.display = open ? 'block' : 'none';
-        chevron.style.transform = open ? 'rotate(180deg)' : '';
-    }
-
-    // ── Submit for review ─────────────────────────────────────
-    async function submitArticle(id, btn) {
-        if (!confirm('Submit this article for editorial review?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div>';
-
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/pages/${id}/submit`, {
-                method: 'POST',
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
+        setFilter(filter, btn) {
+            document.querySelectorAll('.filter-btn').forEach(b => {
+                b.style.background = b.style.color = b.style.borderColor = '';
             });
-            const data = await res.json();
-            if (res.ok) {
-                showToast('✓ Article submitted for review');
-                setTimeout(() => window.location.reload(), 800);
-            } else {
-                showToast(data.error || 'Submit failed', false);
+            btn.style.background = 'var(--navy)';
+            btn.style.color = '#fff';
+            btn.style.borderColor = 'var(--navy)';
+
+            let shown = 0;
+            document.querySelectorAll('.article-row').forEach(row => {
+                const match = filter === 'all' || row.dataset.status === filter;
+                row.style.display = match ? '' : 'none';
+                if (match) shown++;
+            });
+            document.getElementById('article-count').textContent = shown;
+        }
+
+        toggleExpand(id) {
+            const panel = document.getElementById(`expand-panel-${id}`);
+            const chevron = document.getElementById(`expand-chevron-${id}`);
+            if (!panel) return;
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            chevron.style.transform = open ? 'rotate(180deg)' : '';
+        }
+
+        async submitArticle(id, btn) {
+            if (!confirm('Submit this article for editorial review?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div>';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/pages/${id}/submit`, {
+                    method: 'POST',
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.#showToast('✓ Article submitted for review');
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    this.#showToast(data.error || 'Submit failed', false);
+                    btn.disabled = false;
+                    btn.textContent = 'Submit for review';
+                }
+            } catch {
+                this.#showToast('Network error', false);
                 btn.disabled = false;
                 btn.textContent = 'Submit for review';
             }
-        } catch {
-            showToast('Network error', false);
-            btn.disabled = false;
-            btn.textContent = 'Submit for review';
         }
-    }
 
-    // ── Resubmit after rejection ──────────────────────────────
-    async function resubmitArticle(id, btn) {
-        if (!confirm('Resubmit this article for review?')) return;
-        btn.disabled = true;
-        btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div>';
+        async resubmitArticle(id, btn) {
+            if (!confirm('Resubmit this article for review?')) return;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div>';
 
-        try {
-            const res = await fetch(`/api/${SITE}/open-collab/pages/${id}/resubmit`, {
-                method: 'POST',
-                headers: {'Authorization': `Bearer ${TOKEN()}`, 'Accept': 'application/json'},
-            });
-            const data = await res.json();
-            if (res.ok) {
-                showToast('✓ Article resubmitted');
-                setTimeout(() => window.location.reload(), 800);
-            } else {
-                showToast(data.error || 'Resubmit failed', false);
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/pages/${id}/resubmit`, {
+                    method: 'POST',
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    this.#showToast('✓ Article resubmitted');
+                    setTimeout(() => window.location.reload(), 800);
+                } else {
+                    this.#showToast(data.error || 'Resubmit failed', false);
+                    btn.disabled = false;
+                    btn.textContent = 'Resubmit';
+                }
+            } catch {
+                this.#showToast('Network error', false);
                 btn.disabled = false;
                 btn.textContent = 'Resubmit';
             }
-        } catch {
-            showToast('Network error', false);
-            btn.disabled = false;
-            btn.textContent = 'Resubmit';
+        }
+
+        #showToast(msg, ok = true) {
+            const el = document.getElementById('status-toast');
+            el.textContent = msg;
+            el.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            el.style.opacity = '1';
+            setTimeout(() => {
+                el.style.opacity = '0';
+            }, 2800);
         }
     }
 
-    function showToast(msg, ok = true) {
-        const el = document.getElementById('status-toast');
-        el.textContent = msg;
-        el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-        el.style.opacity = '1';
-        setTimeout(() => {
-            el.style.opacity = '0';
-        }, 2800);
-    }
+    const manager = new ArticlesManager(SITE, () => localStorage.getItem('oc_token') || '');
+
+    const setFilter = (f, btn) => manager.setFilter(f, btn);
+    const toggleExpand = (id) => manager.toggleExpand(id);
+    const submitArticle = (id, b) => manager.submitArticle(id, b);
+    const resubmitArticle = (id, b) => manager.resubmitArticle(id, b);
 </script>
 @endsection

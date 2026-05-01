@@ -16,8 +16,7 @@ class GuidelinesVersionBumpedEvent
     public function __construct(
         public readonly Guideline $guideline,
         public readonly int       $siteId,
-        public readonly int       $newVersion,
-        public readonly int $userId
+        public readonly int $newVersion
     )
     {
     }

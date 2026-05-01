@@ -38,7 +38,7 @@ class UserNotificationServiceTest extends FunctionalTestCase
             ->with(1)
             ->andReturn(5);
 
-        $count = $this->service->getUnreadCount($user);
+        $count = $this->service->getUnreadCount(1);
 
         $this->assertEquals(5, $count);
     }

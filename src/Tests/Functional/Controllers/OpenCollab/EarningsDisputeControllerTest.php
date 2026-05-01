@@ -160,6 +160,8 @@ class EarningsDisputeControllerTest extends FunctionalTestCase
             'reference_id' => 'test',
         ]);
 
+        $this->unauthenticate();
+
         $response = $this->postForSiteUnauthenticated('/api/open-collab/disputes', [
             'earnings_ledger_id' => $earningsLedger->id,
             'reason' => 'A valid reason that is long enough.',
