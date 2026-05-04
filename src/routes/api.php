@@ -139,6 +139,9 @@ $router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowCon
 $router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
 
+$router->put('/api/sites/{id}/toggle-status', [SiteController::class, 'toggleStatus']);
+
+
 $router->post('/api/{site}/member/auth/login', [\App\Controllers\MemberAuthController::class, 'apiLogin']);
 
 $router->get('/api/{site}/admin/badges', [BadgeAdminApiController::class, 'index']);
