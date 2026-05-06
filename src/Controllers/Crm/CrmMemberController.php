@@ -11,6 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\CrmMemberRepository;
 use App\Requests\Crm\UpdateMemberRequest;
+use App\Services\Members\CrmMemberProfileService;
 use App\Services\Members\CrmMemberService;
 use Exception;
 use InvalidArgumentException;
@@ -18,9 +19,10 @@ use InvalidArgumentException;
 class CrmMemberController extends Controller
 {
     public function __construct(
-        private readonly CrmMemberRepository $crmMemberRepository,
-        private readonly CrmMemberService    $crmMemberService,
-        private readonly AddressRepository   $addressRepository,
+        private readonly CrmMemberRepository     $crmMemberRepository,
+        private readonly CrmMemberService        $crmMemberService,
+        private readonly AddressRepository       $addressRepository,
+        private readonly CrmMemberProfileService $crmMemberProfileService,
     )
     {
         parent::__construct();
@@ -94,7 +96,7 @@ class CrmMemberController extends Controller
      * GET /crm/members/{id}
      * Show a single member's CRM profile.
      */
-    public function show(int $id): mixed
+    public function show(Request $request, int $id): mixed
     {
         if (!Auth::check()) {
             return $this->redirect('/login');
@@ -106,14 +108,20 @@ class CrmMemberController extends Controller
             return $this->redirect('/crm/members')->withErrors(['message' => 'Member not found.']);
         }
 
-        $addresses = $this->addressRepository->getAddressesForMember($id);
-        $agents = $this->crmMemberRepository->getAgents(SiteContext::getId());
+//        $addresses = $this->addressRepository->getAddressesForMember($id);
+//        $agents = $this->crmMemberRepository->getAgents(SiteContext::getId());
 
-        return $this->view('crm/members/show', [
-            'member' => $member,
-            'addresses' => $addresses,
-            'agents' => $agents,
+
+        return $this->resourceResponse([
+            'member' => $this->crmMemberProfileService->buildDetailPayload($member, SiteContext::getId()),
         ]);
+
+
+//        return $this->view('crm/members/show', [
+//            'member' => $member,
+//            'addresses' => $addresses,
+//            'agents' => $agents,
+//        ]);
     }
 
     /**
@@ -213,7 +221,7 @@ class CrmMemberController extends Controller
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (Exception $e) {
-            return $this->resourceResponse(['success' => false, 'message' => 'Failed to update member.'], 500);
+            return $this->resourceResponse(['success' => false, 'message' => 'Failed to update member. ' . $e->getMessage()], 500);
         }
     }
 

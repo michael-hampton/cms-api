@@ -56,6 +56,21 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertStringNotContainsString('Other', $content);
     }
 
+    public function test_index_filters_by_order_number_search(): void
+    {
+        $target = $this->createMember(['first_name' => 'Order', 'last_name' => 'Match', 'email' => 'order-match@example.com']);
+        $other = $this->createMember(['first_name' => 'Other', 'last_name' => 'Member', 'email' => 'other-member@example.com']);
+
+        $this->createOrder(['user_id' => $target->id, 'site_id' => $this->siteId, 'order_number' => 'CRM-12345']);
+        $this->createOrder(['user_id' => $other->id, 'site_id' => $this->siteId, 'order_number' => 'CRM-99999']);
+
+        $response = $this->get('/crm/members?search=12345');
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('Order', $content);
+        $this->assertStringNotContainsString('other-member@example.com', $content);
+    }
+
     public function test_index_filters_by_status_active(): void
     {
         $this->createMember(['first_name' => 'ActiveMember', 'is_active' => true]);
@@ -117,6 +132,53 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $response = $this->get('/crm/members/' . $this->member->id);
 
         $this->assertStringContainsString('123 Test Street', $response->getContent());
+    }
+
+    public function test_show_returns_json_detail_payload_for_api_requests(): void
+    {
+        $this->createAddress([
+            'member_id' => $this->member->id,
+            'address_line_1' => '55 CRM Street',
+        ]);
+
+        $this->createOrder([
+            'user_id' => $this->member->id,
+            'site_id' => $this->siteId,
+            'order_number' => 'CRM-555',
+            'total' => 42.50,
+        ]);
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('member', $data);
+        $this->assertArrayHasKey('activity', $data['member']);
+        $this->assertArrayHasKey('subscription_summary', $data['member']);
+        $this->assertArrayHasKey('recent_orders', $data['member']);
+        $this->assertArrayHasKey('addresses', $data['member']);
+        $this->assertSame('CRM-555', $data['member']['recent_orders'][0]['order_number']);
+    }
+
+    public function test_show_json_detail_includes_grouped_consents(): void
+    {
+        $marketingType = $this->createConsentType([
+            'code' => 'marketing_email',
+            'name' => 'Marketing Email',
+            'category' => 'marketing',
+        ]);
+        $this->createMemberConsent([
+            'member' => $this->member,
+            'consent_type' => $marketingType,
+            'is_granted' => true,
+        ]);
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id);
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('consents', $data['member']);
+        $this->assertArrayHasKey('marketing', $data['member']['consents']);
     }
 
     // ── Edit ─────────────────────────────────────────────────────────────────
@@ -244,6 +306,82 @@ class CrmMemberControllerTest extends FunctionalTestCase
             'assigned_agent_id' => $agent->id,
             'crm_notes' => 'Called on Monday, follow up required.',
         ]);
+    }
+
+    public function test_update_saves_personal_business_and_privacy_fields(): void
+    {
+        $response = $this->post('/crm/members/' . $this->member->id, [
+            'first_name' => 'Jane',
+            'last_name' => 'Doe',
+            'email' => 'jane.doe@example.com',
+            'phone' => '+441234567890',
+            'company_name' => 'Acme Ltd',
+            'job_title' => 'Buyer',
+            'vat_number' => 'GB123456789',
+            'region' => 'GB',
+            'timezone' => 'Europe/London',
+            'is_active' => 1,
+            'show_activity' => 0,
+            'show_badges' => 1,
+            'communication_preferences' => [
+                'marketing_emails' => true,
+                'special_offers' => false,
+                'third_party_communications' => true,
+            ],
+        ]);
+
+        $this->assertResponseStatus(200, $response);
+
+        $this->assertDatabaseHas('members', [
+            'id' => $this->member->id,
+            'phone' => '+441234567890',
+            'company_name' => 'Acme Ltd',
+            'job_title' => 'Buyer',
+            'vat_number' => 'GB123456789',
+            'region' => 'GB',
+            'timezone' => 'Europe/London',
+            'show_activity' => 0,
+            'show_badges' => 1,
+        ]);
+    }
+
+    public function test_crm_order_search_returns_filtered_orders(): void
+    {
+        $member = $this->createMember(['first_name' => 'Order', 'last_name' => 'Customer', 'email' => 'order.customer@example.com']);
+        $this->createOrder([
+            'site_id' => $this->siteId,
+            'user_id' => $member->id,
+            'order_number' => 'CRM-ORDER-100',
+            'status' => 'processing',
+        ]);
+
+        $response = $this->getForSite('/api/crm/orders?search=CRM-ORDER-100&status=processing');
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertCount(1, $data['items']);
+        $this->assertSame('CRM-ORDER-100', $data['items'][0]['order_number']);
+    }
+
+    public function test_crm_member_consents_endpoint_returns_grouped_consents(): void
+    {
+        $consentType = $this->createConsentType([
+            'code' => 'analytics_tracking',
+            'category' => 'analytics',
+            'name' => 'Analytics Tracking',
+        ]);
+
+        $this->createMemberConsent([
+            'member' => $this->member,
+            'consent_type' => $consentType,
+        ]);
+
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id . '/consents');
+
+        $this->assertResponseStatus(200, $response);
+        $data = json_decode($response->getContent(), true);
+        $this->assertArrayHasKey('analytics', $data['items']);
     }
 
     public function test_update_returns_401_for_unauthenticated_request(): void

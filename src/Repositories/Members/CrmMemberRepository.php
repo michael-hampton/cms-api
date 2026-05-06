@@ -4,6 +4,8 @@ namespace App\Repositories\Members;
 
 use App\Framework\Support\Collection;
 use App\Models\Member;
+use App\Models\Order;
+use App\Models\Subscription;
 use App\Repositories\Repository;
 
 class CrmMemberRepository extends Repository
@@ -21,10 +23,22 @@ class CrmMemberRepository extends Repository
             ->where('anonymous', false);
 
         if (!empty($search)) {
-            $query->where(function ($q) use ($search) {
+            $orderMemberIds = Order::where('site_id', $siteId)
+                ->where('order_number', 'LIKE', "%{$search}%")
+                ->get()
+                ->pluck('user_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $query->where(function ($q) use ($search, $orderMemberIds) {
                 $q->where('first_name', 'LIKE', "%{$search}%")
                     ->orWhere('last_name', 'LIKE', "%{$search}%")
                     ->orWhere('email', 'LIKE', "%{$search}%");
+                if (!empty($orderMemberIds)) {
+                    $q->orWhereIn('id', $orderMemberIds);
+                }
             });
         }
 
@@ -68,6 +82,35 @@ class CrmMemberRepository extends Repository
         return \App\Models\User::where('site_id', $siteId)
             ->orderBy('name')
             ->get();
+    }
+
+    public function getRecentSubscriptionsForMember(int $memberId, int $siteId, int $limit = 5): Collection
+    {
+        return Subscription::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getRecentOrdersForMember(int $memberId, int $siteId, int $limit = 5): Collection
+    {
+        return Order::where('user_id', $memberId)
+            ->where('site_id', $siteId)
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getOrderSummaryForMember(int $memberId, int $siteId): array
+    {
+        $query = Order::where('user_id', $memberId)
+            ->where('site_id', $siteId);
+
+        return [
+            'count' => (clone $query)->count(),
+            'total' => (float)((clone $query)->sum('total') ?? 0),
+        ];
     }
 
     protected function getModelClass(): string

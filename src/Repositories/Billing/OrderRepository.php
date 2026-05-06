@@ -3,6 +3,7 @@
 namespace App\Repositories\Billing;
 
 use App\Framework\Support\Collection;
+use App\Models\Member;
 use App\Models\Order;
 use App\Models\Subscription;
 use App\Repositories\Repository;
@@ -310,5 +311,108 @@ class OrderRepository extends Repository
     public function getRecentForMerchant(int $merchantId, int $limit = 10): Collection
     {
         return Order::with(['items', 'items.product'])->where('merchant_id', $merchantId)->latest()->limit($limit)->get();
+    }
+
+    public function searchForCrm(int $siteId, array $filters = []): array
+    {
+        $page = max(1, (int)($filters['page'] ?? 1));
+        $perPage = min(100, max(1, (int)($filters['per_page'] ?? 20)));
+
+        $query = Order::with(['items', 'user', 'billingAddress', 'shippingAddress'])
+            ->withCount(['items'])
+            ->where('site_id', $siteId);
+
+        if (!empty($filters['member_id'])) {
+            $query->where('user_id', (int)$filters['member_id']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = trim((string)$filters['search']);
+            $query->where(function ($q) use ($search, $siteId) {
+                $matchingMemberIds = Member::where('site_id', $siteId)
+                    ->where(function ($memberQuery) use ($search) {
+                        $memberQuery->where('first_name', 'LIKE', "%{$search}%")
+                            ->orWhere('last_name', 'LIKE', "%{$search}%")
+                            ->orWhere('email', 'LIKE', "%{$search}%");
+                    })
+                    ->get()
+                    ->pluck('id')
+                    ->all();
+
+                $q->where('order_number', 'LIKE', "%{$search}%");
+
+                if (!empty($matchingMemberIds)) {
+                    $q->orWhereIn('user_id', $matchingMemberIds);
+                }
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['payment_status'])) {
+            $query->where('payment_status', $filters['payment_status']);
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->where('created_at', '>=', $filters['date_from'] . ' 00:00:00');
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
+        }
+
+        if ($filters['min_total'] !== null && $filters['min_total'] !== '') {
+            $query->where('total', '>=', (float)$filters['min_total']);
+        }
+
+        if ($filters['max_total'] !== null && $filters['max_total'] !== '') {
+            $query->where('total', '<=', (float)$filters['max_total']);
+        }
+
+        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortOrder = strtolower((string)($filters['sort_order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+
+        if ($sortBy === 'customer_name') {
+            $query->leftJoin('members', 'orders.user_id', '=', 'members.id')
+                ->select('orders.*')
+                ->orderBy('members.first_name', $sortOrder)
+                ->orderBy('members.last_name', $sortOrder);
+        } else {
+            $sortableFields = ['created_at', 'order_number', 'status', 'total', 'payment_status'];
+            $query->orderBy(in_array($sortBy, $sortableFields, true) ? $sortBy : 'created_at', $sortOrder);
+        }
+
+        $total = (clone $query)->count();
+        $orders = $query
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage)
+            ->get();
+
+        return [
+            'items' => $orders->map(function (Order $order) {
+                return [
+                    ...$order->toArray(),
+                    'customer_name' => $order->customer_name,
+                    'customer_email' => $order->customer_email,
+                    'created_at' => $order->created_at?->format('Y-m-d H:i:s'),
+                    'shipping_address' => $order->shippingAddress?->toArray() ?? $order->shipping_address,
+                    'billing_address' => $order->billingAddress?->toArray() ?? $order->billing_address,
+                    'member' => $order->user ? [
+                        'id' => $order->user->id,
+                        'first_name' => $order->user->first_name,
+                        'last_name' => $order->user->last_name,
+                        'email' => $order->user->email,
+                    ] : null,
+                ];
+            })->values(),
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'total_pages' => (int)ceil($total / $perPage),
+            ],
+        ];
     }
 }

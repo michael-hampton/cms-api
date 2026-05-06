@@ -31,6 +31,7 @@ use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\RequiredWithoutRule;
 use App\Framework\Validation\Rules\RequiredWithRule;
+use App\Framework\Validation\Rules\SizeRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\StringRule;
 use App\Framework\Validation\Rules\UniqueRule;
@@ -41,7 +42,7 @@ use App\Framework\Validation\Validator;
 use App\Models\User;
 use Exception;
 
-abstract class FormRequest extends Request
+abstract class  FormRequest extends Request
 {
     use HasModel;
 
@@ -344,6 +345,7 @@ abstract class FormRequest extends Request
             'accepted' => AcceptedRule::class,
             'nullable' => NullableRule::class,
             'min' => MinLengthRule::class,
+            'size' => SizeRule::class,
             'email' => EmailRule::class,
             'exists' => ExistsRule::class,
             'unique' => UniqueRule::class,

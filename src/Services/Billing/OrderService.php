@@ -51,6 +51,11 @@ class OrderService
         return $order;
     }
 
+    public function searchForCrm(int $siteId, array $filters = []): array
+    {
+        return $this->orderRepository->searchForCrm($siteId, $filters);
+    }
+
 //    public function createOrder(array $data, array $items, int $siteId): Order
 //    {
 //        return $this->database->transaction(function () use ($data, $items, $siteId) {

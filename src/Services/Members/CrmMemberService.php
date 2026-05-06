@@ -44,9 +44,18 @@ class CrmMemberService
                 'first_name',
                 'last_name',
                 'email',
+                'phone',
+                'company_name',
+                'job_title',
+                'vat_number',
+                'region',
+                'timezone',
                 'is_active',
                 'assigned_agent_id',
                 'crm_notes',
+                'show_activity',
+                'show_badges',
+                'communication_preferences',
             ];
 
             $payload = array_intersect_key($data, array_flip($allowedFields));
@@ -105,9 +114,18 @@ class CrmMemberService
                 'first_name',
                 'last_name',
                 'email',
+                'phone',
+                'company_name',
+                'job_title',
+                'vat_number',
+                'region',
+                'timezone',
                 'is_active',
                 'assigned_agent_id',
                 'crm_notes',
+                'show_activity',
+                'show_badges',
+                'communication_preferences',
             ];
 
             $payload = array_intersect_key($data, array_flip($allowedFields));

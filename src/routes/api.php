@@ -28,7 +28,9 @@ use App\Controllers\Cms\TerritoryController;
 use App\Controllers\Cms\UserController;
 use App\Controllers\Cms\VideoController;
 use App\Controllers\Crm\CrmAddressController;
+use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
+use App\Controllers\Crm\CrmOrderController;
 use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
@@ -495,6 +497,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/crm/members', [CrmMemberController::class, 'store']);
         $router->put('/crm/members/{id}', [CrmMemberController::class, 'update']);
         $router->delete('/crm/members/{id}', [CrmMemberController::class, 'destroy']);
+        $router->get('/crm/orders', [CrmOrderController::class, 'index']);
+        $router->get('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'index']);
+        $router->put('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'update']);
 
         $router->get('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'index']);
 
