@@ -30,7 +30,10 @@ use App\Controllers\Cms\VideoController;
 use App\Controllers\Crm\CrmAddressController;
 use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
+use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
+use App\Controllers\Crm\CrmSubscriptionController;
+use App\Controllers\Crm\StripeConfigController;
 use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
@@ -163,6 +166,7 @@ $router->get('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\Se
 $router->post('/api/{site}/admin/segments', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'store']);
 $router->put('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'update']);
 $router->delete('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'destroy']);
+
 
 $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
     $router->get('/dashboard', [MemberDashboardApiController::class, 'index']);
@@ -500,6 +504,56 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/crm/orders', [CrmOrderController::class, 'index']);
         $router->get('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'index']);
         $router->put('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'update']);
+
+        $router->get(
+            '/crm/subscriptions/{subscriptionId}/history',
+            [CrmSubscriptionController::class, 'history'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions',
+            [CrmSubscriptionController::class, 'createForMember'],
+        );
+
+        $router->get(
+            '/crm/billing/stripe-config',
+            [StripeConfigController::class, 'config'],
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/payment-methods',
+            [CrmMemberPaymentMethodsController::class, 'index'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/cancel',
+            [CrmSubscriptionController::class, 'cancelForMember'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/pause-delivery',
+            [CrmSubscriptionController::class, 'pauseDeliveryForMember'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/resume-delivery',
+            [CrmSubscriptionController::class, 'resumeDeliveryForMember'],
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/payments',
+            [CrmSubscriptionController::class, 'payments'],
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues',
+            [CrmSubscriptionController::class, 'issues'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/subscriptions/{subscriptionId}/reactivate',
+            [CrmSubscriptionController::class, 'reactivateForMember'],
+        );
 
         $router->get('/crm/members/{memberId}/addresses', [CrmAddressController::class, 'index']);
 

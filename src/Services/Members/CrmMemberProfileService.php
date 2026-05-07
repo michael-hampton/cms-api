@@ -91,7 +91,15 @@ class CrmMemberProfileService
                     ];
                 })->values(),
             ],
-            'subscriptions' => $subscriptions,
+            'subscriptions' => $subscriptions->map(function ($subscription) {
+                return array_merge($subscription->toArray(), [
+                    'created_at' => $subscription->created_at?->format('Y-m-d H:i:s'),
+                    'updated_at' => $subscription->updated_at?->format('Y-m-d H:i:s'),
+                    'start_date' => $subscription->start_date?->format('Y-m-d H:i:s'),
+                    'end_date' => $subscription->end_date?->format('Y-m-d H:i:s'),
+                    'next_billing_date' => $subscription->next_billing_date?->format('Y-m-d H:i:s'),
+                ]);
+            }),
             'recent_orders' => $orders->map(function ($order) {
                 return [
                     'id' => $order->id,

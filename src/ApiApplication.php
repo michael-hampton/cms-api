@@ -54,7 +54,15 @@ use App\Events\Subscriptions\InvoicePaymentSucceeded;
 use App\Events\Subscriptions\IssueDeliveryDispatched;
 use App\Events\Subscriptions\LabelRunFailed;
 use App\Events\Subscriptions\LabelRunGenerated;
+use App\Events\Subscriptions\PaymentFailed;
+use App\Events\Subscriptions\PaymentRefunded;
+use App\Events\Subscriptions\PaymentSucceeded;
+use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCancelledByStripe;
+use App\Events\Subscriptions\SubscriptionCreated;
+use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionReactivated;
+use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Console\Artisan;
 use App\Framework\Console\Commands\MakeControllerCommand;
 use App\Framework\Console\Commands\MakeMigrationCommand;
@@ -132,6 +140,7 @@ use App\Listeners\Subscriptions\LabelRunGeneratedListener;
 use App\Listeners\Subscriptions\OnInvoicePaymentFailed;
 use App\Listeners\Subscriptions\OnInvoicePaymentSucceeded;
 use App\Listeners\Subscriptions\OnSubscriptionCancelledByStripe;
+use App\Listeners\Subscriptions\RecordSubscriptionHistoryListener;
 use App\Models\Block;
 use App\Models\Page;
 use App\Observers\BlockObserver;
@@ -575,5 +584,16 @@ class ApiApplication
         $eventDispatcher->listen(ContractPublishedEvent::class, [SendContractPublishedNotification::class, 'handle']);
         $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [SendGuidelinesUpdatedNotification::class, 'handle']);
         $eventDispatcher->listen(ViolationRecordedEvent::class, [SendViolationRecordedNotification::class, 'handle']);
+
+        $eventDispatcher->listen(SubscriptionCreated::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionCreated']);
+        $eventDispatcher->listen(SubscriptionCancelled::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionCancelled']);
+        $eventDispatcher->listen(SubscriptionReactivated::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionReactivated']);
+        $eventDispatcher->listen(SubscriptionPaused::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionPaused']);
+        $eventDispatcher->listen(SubscriptionResumed::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionResumed']);
+        $eventDispatcher->listen(PaymentSucceeded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentSucceeded']);
+        $eventDispatcher->listen(PaymentFailed::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentFailed']);
+        $eventDispatcher->listen(PaymentRefunded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentRefunded']);
+
+
     }
 }

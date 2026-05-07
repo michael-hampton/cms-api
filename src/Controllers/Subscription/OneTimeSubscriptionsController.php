@@ -5,6 +5,7 @@ namespace App\Controllers\Subscription;
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Events\Subscriptions\PaymentSucceeded;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -327,6 +328,13 @@ class OneTimeSubscriptionsController extends Controller
             // processSubscriptionPayment already set active on the Stripe side;
             // activateSubscription handles the DB transition + order linkage.
             //$this->subscriptionService->activateSubscription((int)$subId, $orderId);
+
+            event(new PaymentSucceeded(
+                subscriptionId: $subscription->id,
+                paymentId: $paymentResult['payment_id'],
+                amountCents: $subscription->plan->price,
+                currency: strtoupper($subscription->plan->currency),
+            ));
         }
 
         // Mark the order complete through the repository (no raw static calls).

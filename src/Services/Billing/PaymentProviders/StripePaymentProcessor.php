@@ -132,6 +132,13 @@ class StripePaymentProcessor
                     'current_period_start' => date('Y-m-d H:i:s', $stripeSubscription->current_period_start),
                     'current_period_end' => date('Y-m-d H:i:s', $stripeSubscription->current_period_end)
                 ]);
+
+                if (!empty($data['order_id'])) {
+                    $this->orderRepository->update($data['order_id'], [
+                        'status' => 'completed',
+                        'payment_status' => 'paid'
+                    ]);
+                }
             }
 
             return [
@@ -141,7 +148,8 @@ class StripePaymentProcessor
                 'status' => $stripeSubscription->status,
                 'customer_id' => $customerId,
                 'requires_action' => $requiresAction,
-                'payment_intent_client_secret' => $clientSecret
+                'payment_intent_client_secret' => $clientSecret,
+                'payment_id' => $payment->id,
             ];
 
         } catch (ApiErrorException $e) {
@@ -516,6 +524,68 @@ class StripePaymentProcessor
         }
     }
 
+    private function handleInvoicePaymentSucceeded($invoice): array
+    {
+        // Find payment by subscription ID
+        $payment = Payment::where('metadata->stripe_subscription_id', $invoice->subscription)->first();
+
+        if ($payment) {
+            $this->paymentRepository->update($payment->id, [
+                'status' => 'completed',
+                'paid_at' => date('Y-m-d H:i:s'),
+                'transaction_id' => $invoice->id
+            ]);
+        }
+
+        return ['success' => true];
+    }
+
+    private function handleInvoicePaymentFailed($invoice): array
+    {
+        $payment = Payment::where('metadata->stripe_subscription_id', $invoice->subscription)->first();
+
+        if ($payment) {
+            $this->paymentRepository->update($payment->id, [
+                'status' => 'failed',
+                'failed_at' => date('Y-m-d H:i:s'),
+                'error_message' => 'Payment failed'
+            ]);
+        }
+
+        return ['success' => true];
+    }
+
+    private function handleSubscriptionUpdated($stripeSubscription): array
+    {
+        $subscription = Subscription::where('payment_subscription_id', $stripeSubscription->id)->first();
+
+        if ($subscription) {
+            $subscription->update([
+                'status' => match ($stripeSubscription->status) {
+                    'active', 'trialing' => 'active',
+                    'past_due' => 'suspended',
+                    'canceled', 'incomplete_expired' => 'cancelled',
+                    default => 'pending'
+                },
+                'current_period_start' => date('Y-m-d H:i:s', $stripeSubscription->current_period_start),
+                'current_period_end' => date('Y-m-d H:i:s', $stripeSubscription->current_period_end)
+            ]);
+        }
+
+        return ['success' => true];
+    }
+
+    private function handleSubscriptionDeleted($stripeSubscription): array
+    {
+        $subscription = Subscription::where('payment_subscription_id', $stripeSubscription->id)->first();
+
+        if ($subscription) {
+            $subscription->update(['status' => 'cancelled']);
+        }
+
+        return ['success' => true];
+    }
+
     private function handleChargeRefunded($charge): array
     {
         try {
@@ -651,149 +721,6 @@ class StripePaymentProcessor
         return false;
     }
 
-    /**
-     * Create a refund record in the refunds table
-     */
-    private function createRefundRecord(Payment $payment, float $refundAmount, string $stripeRefundId): void
-    {
-        $refundRepo = new \App\Repositories\Billing\RefundRepository();
-
-        // Check if refund already exists for this charge
-        $existingRefund = \App\Models\Refund::where('site_id', $payment->site_id)
-            ->where('order_id', $payment->order_id)
-            ->whereRaw("JSON_EXTRACT(internal_notes, '$.stripe_refund_id') = ?", [$stripeRefundId])
-            ->first();
-
-        if ($existingRefund) {
-            return; // Already processed
-        }
-
-        $order = \App\Models\Order::find($payment->order_id);
-        if (!$order) {
-            return;
-        }
-
-        // Create refund record
-        $refundData = [
-            'order_id' => $payment->order_id,
-            'site_id' => $payment->site_id,
-            'refund_type' => 'full', // Can be 'partial' if amount is less than order total
-            'refund_amount' => $refundAmount,
-            'reason' => 'Stripe refund processed',
-            'internal_notes' => json_encode([
-                'stripe_refund_id' => $stripeRefundId,
-                'payment_id' => $payment->id,
-                'processed_via_webhook' => true,
-                'processed_at' => date('Y-m-d H:i:s')
-            ]),
-            'notify_customer' => false, // Already notified by Stripe
-            'restock_items' => false, // Manual decision needed
-            'status' => 'processed',
-            'processed_at' => date('Y-m-d H:i:s'),
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-
-        // Determine if full or partial refund
-        if ($refundAmount < $order->total) {
-            $refundData['refund_type'] = 'partial';
-        }
-
-        $refund = $refundRepo->create($refundData);
-
-        // Create refund items based on order items
-        $orderItems = \App\Models\OrderItem::where('order_id', $order->id)->get();
-
-        foreach ($orderItems as $orderItem) {
-            // Calculate proportional refund for each item
-            $itemRefundAmount = ($orderItem->price * $orderItem->quantity / $order->total) * $refundAmount;
-
-            $refundRepo->createRefundItem([
-                'refund_id' => $refund->id,
-                'order_item_id' => $orderItem->id,
-                'product_id' => $orderItem->product_id,
-                'product_name' => $orderItem->product_name,
-                'quantity' => $orderItem->quantity,
-                'refund_quantity' => $orderItem->quantity, // Full refund of item
-                'unit_price' => $orderItem->price,
-                'refund_amount' => $itemRefundAmount,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s')
-            ]);
-        }
-
-        // Update order status
-        $totalRefunded = $refundRepo->getTotalRefundedAmount($order->id);
-        $orderStatus = $totalRefunded >= $order->total ? 'refunded' : 'partially_refunded';
-
-        \App\Models\Order::where('id', $order->id)->update([
-            'status' => $orderStatus,
-            'payment_status' => 'refunded'
-        ]);
-    }
-
-    private function handleInvoicePaymentSucceeded($invoice): array
-    {
-        // Find payment by subscription ID
-        $payment = Payment::where('metadata->stripe_subscription_id', $invoice->subscription)->first();
-
-        if ($payment) {
-            $this->paymentRepository->update($payment->id, [
-                'status' => 'completed',
-                'paid_at' => date('Y-m-d H:i:s'),
-                'transaction_id' => $invoice->id
-            ]);
-        }
-
-        return ['success' => true];
-    }
-
-    private function handleInvoicePaymentFailed($invoice): array
-    {
-        $payment = Payment::where('metadata->stripe_subscription_id', $invoice->subscription)->first();
-
-        if ($payment) {
-            $this->paymentRepository->update($payment->id, [
-                'status' => 'failed',
-                'failed_at' => date('Y-m-d H:i:s'),
-                'error_message' => 'Payment failed'
-            ]);
-        }
-
-        return ['success' => true];
-    }
-
-    private function handleSubscriptionUpdated($stripeSubscription): array
-    {
-        $subscription = Subscription::where('payment_subscription_id', $stripeSubscription->id)->first();
-
-        if ($subscription) {
-            $subscription->update([
-                'status' => match ($stripeSubscription->status) {
-                    'active', 'trialing' => 'active',
-                    'past_due' => 'suspended',
-                    'canceled', 'incomplete_expired' => 'cancelled',
-                    default => 'pending'
-                },
-                'current_period_start' => date('Y-m-d H:i:s', $stripeSubscription->current_period_start),
-                'current_period_end' => date('Y-m-d H:i:s', $stripeSubscription->current_period_end)
-            ]);
-        }
-
-        return ['success' => true];
-    }
-
-    private function handleSubscriptionDeleted($stripeSubscription): array
-    {
-        $subscription = Subscription::where('payment_subscription_id', $stripeSubscription->id)->first();
-
-        if ($subscription) {
-            $subscription->update(['status' => 'cancelled']);
-        }
-
-        return ['success' => true];
-    }
-
     public function createPaymentIntent(array $orderData): array
     {
         try {
@@ -879,64 +806,6 @@ class StripePaymentProcessor
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e)
-            ];
-        }
-    }
-
-    private function getPaymentIntentFromInvoice($invoiceId): ?string
-    {
-        try {
-            if (is_string($invoiceId)) {
-                $invoice = $this->stripe->invoices->retrieve($invoiceId);
-            } else {
-                $invoice = $invoiceId;
-            }
-
-            return $invoice->payment_intent ?? null;
-        } catch (\Exception $e) {
-            return null;
-        }
-    }
-
-    /**
-     * Get customer's payment methods
-     */
-    public function getCustomerPaymentMethods($member): array
-    {
-        $paymentMethods = [];
-        $defaultPaymentMethodId = null;
-
-        if (!$member->stripe_customer_id) {
-            return [
-                'payment_methods' => [],
-                'default_payment_method_id' => null
-            ];
-        }
-
-        try {
-            $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
-            $defaultPaymentMethodId = $customer->invoice_settings->default_payment_method;
-
-            $methods = $this->stripe->paymentMethods->all([
-                'customer' => $member->stripe_customer_id,
-                'type' => 'card',
-            ]);
-
-            $paymentMethods = $methods->data;
-
-            return [
-                'success' => true,
-                'payment_methods' => $paymentMethods,
-                'default_payment_method_id' => $defaultPaymentMethodId
-            ];
-        } catch (\Exception $e) {
-            error_log('Error fetching payment methods: ' . $e->getMessage());
-
-            return [
-                'success' => false,
-                'payment_methods' => [],
-                'default_payment_method_id' => null,
-                'message' => 'Failed to fetch payment methods'
             ];
         }
     }
@@ -1382,41 +1251,6 @@ class StripePaymentProcessor
     }
 
     /**
-     * Check if payment method is expiring soon
-     */
-    public function isPaymentMethodExpiring($paymentMethod, int $monthsThreshold = 2): bool
-    {
-        if (!isset($paymentMethod->card)) {
-            return false;
-        }
-
-        $card = $paymentMethod->card;
-        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
-        $expiryDate->modify('last day of this month');
-
-        $now = new \DateTime();
-        $threshold = (clone $now)->modify("+{$monthsThreshold} months");
-
-        return $expiryDate <= $threshold && $expiryDate >= $now;
-    }
-
-    /**
-     * Check if payment method is expired
-     */
-    public function isPaymentMethodExpired($paymentMethod): bool
-    {
-        if (!isset($paymentMethod->card)) {
-            return false;
-        }
-
-        $card = $paymentMethod->card;
-        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
-        $expiryDate->modify('last day of this month');
-
-        return $expiryDate < new \DateTime();
-    }
-
-    /**
      * Get payment methods with expiry warnings
      */
     public function getPaymentMethodsWithWarnings($member, array $customerPaymentMethods = []): array
@@ -1451,6 +1285,84 @@ class StripePaymentProcessor
         $result['has_warnings'] = !empty($warnings);
 
         return $result;
+    }
+
+    /**
+     * Get customer's payment methods
+     */
+    public function getCustomerPaymentMethods($member): array
+    {
+        $paymentMethods = [];
+        $defaultPaymentMethodId = null;
+
+        if (!$member->stripe_customer_id) {
+            return [
+                'payment_methods' => [],
+                'default_payment_method_id' => null
+            ];
+        }
+
+        try {
+            $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
+            $defaultPaymentMethodId = $customer->invoice_settings->default_payment_method;
+
+            $methods = $this->stripe->paymentMethods->all([
+                'customer' => $member->stripe_customer_id,
+                'type' => 'card',
+            ]);
+
+            $paymentMethods = $methods->data;
+
+            return [
+                'success' => true,
+                'payment_methods' => $paymentMethods,
+                'default_payment_method_id' => $defaultPaymentMethodId
+            ];
+        } catch (\Exception $e) {
+            error_log('Error fetching payment methods: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'payment_methods' => [],
+                'default_payment_method_id' => null,
+                'message' => 'Failed to fetch payment methods'
+            ];
+        }
+    }
+
+    /**
+     * Check if payment method is expired
+     */
+    public function isPaymentMethodExpired($paymentMethod): bool
+    {
+        if (!isset($paymentMethod->card)) {
+            return false;
+        }
+
+        $card = $paymentMethod->card;
+        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate->modify('last day of this month');
+
+        return $expiryDate < new \DateTime();
+    }
+
+    /**
+     * Check if payment method is expiring soon
+     */
+    public function isPaymentMethodExpiring($paymentMethod, int $monthsThreshold = 2): bool
+    {
+        if (!isset($paymentMethod->card)) {
+            return false;
+        }
+
+        $card = $paymentMethod->card;
+        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate->modify('last day of this month');
+
+        $now = new \DateTime();
+        $threshold = (clone $now)->modify("+{$monthsThreshold} months");
+
+        return $expiryDate <= $threshold && $expiryDate >= $now;
     }
 
     /**
@@ -1749,6 +1661,102 @@ class StripePaymentProcessor
                 'success' => false,
                 'message' => 'An unexpected error occurred during off-session charge.',
             ];
+        }
+    }
+
+    /**
+     * Create a refund record in the refunds table
+     */
+    private function createRefundRecord(Payment $payment, float $refundAmount, string $stripeRefundId): void
+    {
+        $refundRepo = new \App\Repositories\Billing\RefundRepository();
+
+        // Check if refund already exists for this charge
+        $existingRefund = \App\Models\Refund::where('site_id', $payment->site_id)
+            ->where('order_id', $payment->order_id)
+            ->whereRaw("JSON_EXTRACT(internal_notes, '$.stripe_refund_id') = ?", [$stripeRefundId])
+            ->first();
+
+        if ($existingRefund) {
+            return; // Already processed
+        }
+
+        $order = \App\Models\Order::find($payment->order_id);
+        if (!$order) {
+            return;
+        }
+
+        // Create refund record
+        $refundData = [
+            'order_id' => $payment->order_id,
+            'site_id' => $payment->site_id,
+            'refund_type' => 'full', // Can be 'partial' if amount is less than order total
+            'refund_amount' => $refundAmount,
+            'reason' => 'Stripe refund processed',
+            'internal_notes' => json_encode([
+                'stripe_refund_id' => $stripeRefundId,
+                'payment_id' => $payment->id,
+                'processed_via_webhook' => true,
+                'processed_at' => date('Y-m-d H:i:s')
+            ]),
+            'notify_customer' => false, // Already notified by Stripe
+            'restock_items' => false, // Manual decision needed
+            'status' => 'processed',
+            'processed_at' => date('Y-m-d H:i:s'),
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        // Determine if full or partial refund
+        if ($refundAmount < $order->total) {
+            $refundData['refund_type'] = 'partial';
+        }
+
+        $refund = $refundRepo->create($refundData);
+
+        // Create refund items based on order items
+        $orderItems = \App\Models\OrderItem::where('order_id', $order->id)->get();
+
+        foreach ($orderItems as $orderItem) {
+            // Calculate proportional refund for each item
+            $itemRefundAmount = ($orderItem->price * $orderItem->quantity / $order->total) * $refundAmount;
+
+            $refundRepo->createRefundItem([
+                'refund_id' => $refund->id,
+                'order_item_id' => $orderItem->id,
+                'product_id' => $orderItem->product_id,
+                'product_name' => $orderItem->product_name,
+                'quantity' => $orderItem->quantity,
+                'refund_quantity' => $orderItem->quantity, // Full refund of item
+                'unit_price' => $orderItem->price,
+                'refund_amount' => $itemRefundAmount,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+
+        // Update order status
+        $totalRefunded = $refundRepo->getTotalRefundedAmount($order->id);
+        $orderStatus = $totalRefunded >= $order->total ? 'refunded' : 'partially_refunded';
+
+        \App\Models\Order::where('id', $order->id)->update([
+            'status' => $orderStatus,
+            'payment_status' => 'refunded'
+        ]);
+    }
+
+    private function getPaymentIntentFromInvoice($invoiceId): ?string
+    {
+        try {
+            if (is_string($invoiceId)) {
+                $invoice = $this->stripe->invoices->retrieve($invoiceId);
+            } else {
+                $invoice = $invoiceId;
+            }
+
+            return $invoice->payment_intent ?? null;
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

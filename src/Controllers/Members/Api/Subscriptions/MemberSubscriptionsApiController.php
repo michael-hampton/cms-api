@@ -3,6 +3,9 @@
 namespace App\Controllers\Members\Api\Subscriptions;
 
 use App\Controllers\Controller;
+use App\Events\Subscriptions\SubscriptionCancelled;
+use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -86,6 +89,12 @@ class MemberSubscriptionsApiController extends Controller
             $message = $cancelAtPeriodEnd
                 ? 'Subscription will be cancelled at the end of the billing period.'
                 : 'Subscription cancelled successfully.';
+
+            event(new SubscriptionCancelled(
+                subscriptionId: $subscription->id,
+                cancelAtPeriodEnd: $cancelAtPeriodEnd,
+                endDate: now()
+            ));
 
             return $this->resourceResponse([
                 'success' => true,
@@ -273,6 +282,13 @@ class MemberSubscriptionsApiController extends Controller
 
             $result = $this->deliveryService->pauseDelivery($subscriptionId, $pauseStart, $pauseEnd, $reason);
 
+            event(new SubscriptionPaused(
+                subscription: $subscription,
+                pauseStart: $pauseStart->format('Y-m-d H:i:s'),
+                pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
+                reason: $reason,
+            ));
+
             return $this->resourceResponse($result);
         } catch (\Exception $e) {
             return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 400);
@@ -294,6 +310,11 @@ class MemberSubscriptionsApiController extends Controller
 
         try {
             $result = $this->deliveryService->resumeDelivery($subscriptionId);
+
+            event(new SubscriptionResumed(
+                subscription: $subscription,
+                memberId: $member->id
+            ));
 
             return $this->resourceResponse($result);
         } catch (\Exception $e) {
