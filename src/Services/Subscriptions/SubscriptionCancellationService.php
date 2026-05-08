@@ -81,7 +81,7 @@ class SubscriptionCancellationService
 
             // Create a refund if immediate cancellation requested
             if (!$cancelAtPeriodEnd && ($options['create_refund'] ?? false)) {
-                $this->refundService->createProRatedRefund($subscription, 'immediate_cancellation');
+                $this->refundService->createProRatedRefund($subscription, 'immediate_cancellation'); //todo what about amounts being set?
             }
 
             if (!$cancelAtPeriodEnd) {

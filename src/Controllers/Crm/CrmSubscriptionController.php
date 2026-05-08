@@ -160,10 +160,12 @@ class CrmSubscriptionController extends Controller
 
         $cancelAtPeriodEnd = (bool)$request->input('cancel_at_period_end', true);
         $reason = trim((string)$request->input('reason', ''));
+        $issueRefund = !$cancelAtPeriodEnd && (bool)$request->input('issue_refund', false);
 
         $result = $this->cancellationService->cancelSubscription($subscriptionId, [
             'cancel_at_period_end' => $cancelAtPeriodEnd,
             'reason' => $reason ?: null,
+            'create_refund' => $issueRefund,
         ]);
 
         if (!$result['success']) {
@@ -478,6 +480,58 @@ class CrmSubscriptionController extends Controller
         return $this->resourceResponse([
             'success' => true,
             'plan' => $plan->toArray(),
+        ]);
+    }
+
+    /**
+     * GET /api/{site}/admin/members/{memberId}/subscription-stats
+     *
+     * Returns aggregate subscription stats for the CRM member detail panel:
+     *   active_count      int          — active + trialing subscriptions
+     *   cancelled_count   int          — cancelled subscriptions
+     *   last_payment_date string|null  — most recent completed payment date
+     *   next_payment_date string|null  — earliest next_billing_date on active subs
+     */
+    public function subscriptionStatsForMember(Request $request, int $memberId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $subscriptions = $this->subscriptionRepository->getSubscriptionHistory($memberId, $siteId);
+
+        $activeCount = $subscriptions->filter(fn($s) => in_array($s->status, ['active', 'trialing']))->count();
+        $cancelledCount = $subscriptions->filter(fn($s) => $s->status === 'cancelled')->count();
+
+        // Last completed payment across all subscriptions for this member
+        $lastPaymentDate = null;
+        foreach ($subscriptions as $sub) {
+            $payment = $this->paymentRepository->getLastSubscriptionPayment($sub->id);
+            if ($payment?->paid_at) {
+                $candidate = $payment->paid_at->format('Y-m-d H:i:s');
+                if ($lastPaymentDate === null || $candidate > $lastPaymentDate) {
+                    $lastPaymentDate = $candidate;
+                }
+            }
+        }
+
+        // Earliest upcoming billing date across active/trialing subscriptions
+        $nextPaymentDate = $subscriptions
+            ->filter(fn($s) => in_array($s->status, ['active', 'trialing']) && $s->next_billing_date)
+            ->map(fn($s) => $s->next_billing_date instanceof \DateTimeInterface
+                ? $s->next_billing_date->format('Y-m-d H:i:s')
+                : (string)$s->next_billing_date)
+            ->sort()
+            ->first();
+
+        return $this->resourceResponse([
+            'success' => true,
+            'active_count' => $activeCount,
+            'cancelled_count' => $cancelledCount,
+            'last_payment_date' => $lastPaymentDate,
+            'next_payment_date' => $nextPaymentDate ?? null,
         ]);
     }
 }

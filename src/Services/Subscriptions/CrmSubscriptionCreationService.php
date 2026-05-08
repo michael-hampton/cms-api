@@ -97,8 +97,9 @@ class CrmSubscriptionCreationService
             throw new InvalidArgumentException('Member already has an active subscription on this plan.');
         }
 
-        if (empty($deliveryAddressId) && !empty($deliveryAddress)) {
-            $deliveryAddressId = $this->addressRepository->createAddressForMember($memberId, $deliveryAddress, $siteId);
+        if ($deliveryAddressId === null && !empty($deliveryAddress)) {
+            $deliveryAddress = $this->addressRepository->createAddressForMember($memberId, $deliveryAddress, $siteId);
+            $deliveryAddressId = $deliveryAddress->id;
         }
 
         // ── Impersonate member and inject cart item ────────────────────────────

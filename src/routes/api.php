@@ -510,6 +510,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [CrmSubscriptionController::class, 'history'],
         );
 
+        $router->get(
+            '/crm/members/{memberId}/subscription-stats',
+            [CrmSubscriptionController::class, 'subscriptionStatsForMember'],
+        );
+
         $router->post(
             '/crm/members/{memberId}/subscriptions',
             [CrmSubscriptionController::class, 'createForMember'],
