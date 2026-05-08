@@ -542,13 +542,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->get(
             '/crm/members/{memberId}/payments',
-            [CrmSubscriptionController::class, 'payments'],
+            [CrmSubscriptionController::class, 'paymentsForMember'],
         );
 
         $router->get(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/issues',
-            [CrmSubscriptionController::class, 'issues'],
+            [CrmSubscriptionController::class, 'issuesForSubscription'],
         );
+
+        $router->get('/crm/subscriptions/plans/{planId}', [CrmSubscriptionController::class, 'getPlan']);
+
 
         $router->post(
             '/crm/members/{memberId}/subscriptions/{subscriptionId}/reactivate',

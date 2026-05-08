@@ -6,6 +6,7 @@ use App\Exceptions\Checkout\CheckoutException;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Session\Session;
 use App\Framework\Support\Logger;
+use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -37,6 +38,7 @@ class CrmSubscriptionCreationService
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
         private readonly MemberAuthWrapper                  $memberAuth,
         private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly AddressRepository $addressRepository,
     )
     {
     }
@@ -59,6 +61,8 @@ class CrmSubscriptionCreationService
         int    $planId,
         string $paymentMethodId,
         int    $siteId,
+        ?int   $deliveryAddressId = null,
+        ?array $deliveryAddress = null
     ): array
     {
         // ── Validate ──────────────────────────────────────────────────────────
@@ -93,6 +97,10 @@ class CrmSubscriptionCreationService
             throw new InvalidArgumentException('Member already has an active subscription on this plan.');
         }
 
+        if (empty($deliveryAddressId) && !empty($deliveryAddress)) {
+            $deliveryAddressId = $this->addressRepository->createAddressForMember($memberId, $deliveryAddress, $siteId);
+        }
+
         // ── Impersonate member and inject cart item ────────────────────────────
         //
         // The checkout service reads the cart via CartService and uses
@@ -124,6 +132,7 @@ class CrmSubscriptionCreationService
                 'last_name' => $member->last_name,
                 'email' => $member->email,
                 'phone' => $member->phone ?? '',
+                'saved_address' => $deliveryAddressId ?? null
             ];
 
             $result = $this->checkoutService->processCheckout($data, $siteId);

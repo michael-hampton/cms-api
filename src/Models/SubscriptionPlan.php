@@ -41,7 +41,9 @@ class SubscriptionPlan extends Model
         'categories',
         'tags',
         'print_image_url',
-        'digital_image_url'
+        'digital_image_url',
+        'created_at',
+        'updated_at'
     ];
 
     protected $casts = [
@@ -59,6 +61,8 @@ class SubscriptionPlan extends Model
         'premium_access' => 'array',
         'release_date' => 'datetime',
         'pre_release_enabled' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
 
     public function site($relation = false)
