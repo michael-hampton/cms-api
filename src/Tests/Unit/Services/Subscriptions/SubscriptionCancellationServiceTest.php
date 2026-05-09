@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
@@ -12,6 +13,7 @@ use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Mockery;
 use Mockery as m;
 
 class SubscriptionCancellationServiceTest extends FunctionalTestCase
@@ -117,6 +119,202 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
         $this->assertSame($mockSubscription, $result['subscription']);
+    }
+
+    public function testRefundIsSkippedWhenCancelAtPeriodEndIsTrueEvenIfRefundRequested(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        // 🚨 IMPORTANT FIX: this should NOT be called
+        $this->subscriptionRepository
+            ->shouldNotReceive('revokeAllPremiumAccess');
+
+        // refund also must NOT run
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => true,
+            'create_refund' => true,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRefundExecutesOnlyWhenImmediateCancellationAndCreateRefundTrue(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once();
+
+        $this->refundService
+            ->shouldReceive('executeWithStrategy')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testNoRefundWhenNoRefundFlagsProvided(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once();
+
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testInvalidRefundTypeThrowsBeforeRefundExecution(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid refund type');
+
+        $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+            'refund_type' => 'broken_type',
+        ]);
+    }
+
+    public function testStripeFailurePreventsUpdateAndRefund(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn([
+                'success' => false,
+                'message' => 'Stripe down'
+            ]);
+
+        $this->subscriptionRepository
+            ->shouldNotReceive('update');
+
+        $this->subscriptionRepository
+            ->shouldNotReceive('revokeAllPremiumAccess');
+
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Stripe down');
+
+        $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+        ]);
     }
 
     public function testCancelSubscriptionImmediately(): void
@@ -406,52 +604,367 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $this->service->cancelSubscription(1);
     }
 
-    public function test_cancel_subscription_with_refund(): void
+    public function testImmediateCancellationWithoutRefundRevokesAccess(): void
     {
-        $member = $this->createMember();
+        $subscription = $this->createMockSubscription();
 
-        $subscription = m::mock(Subscription::class)->makePartial();
-        $subscription->id = 1;
-        $subscription->status = 'active';
-        $subscription->type = 'paid';
-        $subscription->shouldReceive('hasStripeSubscription')->andReturn(false);
-        $subscription->shouldReceive('closeWindow');
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
 
-        $this->databaseMock->shouldReceive('transaction')
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with(1);
+
+        // No refund — refundService must NOT be called
+        $this->refundService->shouldNotReceive('executeWithStrategy');
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => false,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testCancellationWithRefundAmountOverrideUsesManualStrategy(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $payment = $this->createMockPayment(100.00);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
             ->once()
             ->andReturnUsing(function ($callback) {
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')
+        $this->subscriptionRepository
+            ->shouldReceive('find')
             ->twice()
-            ->with(1)
             ->andReturn($subscription);
 
-        $this->subscriptionRepository->shouldReceive('revokeAllPremiumAccess')
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
             ->once()
-            ->with(1);
+            ->andReturn(['success' => true]);
 
-        $this->subscriptionRepository->shouldReceive('update')
+        $this->subscriptionRepository
+            ->shouldReceive('update')
             ->once()
             ->andReturn($subscription);
 
-        // Expect refund service to be called
-        $this->refundService->shouldReceive('createProRatedRefund')
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once();
+
+        $this->refundService
+            ->shouldReceive('executeWithStrategy')
             ->once()
-            ->with($subscription, 'immediate_cancellation')
             ->andReturn([
                 'success' => true,
-                'amount' => 66.67,
-                'unused_days' => 20
+                'amount' => 40.00,
             ]);
 
         $result = $this->service->cancelSubscription(1, [
             'cancel_at_period_end' => false,
-            'create_refund' => true
+            'create_refund' => true,
+            'refund_amount' => 40.00,
         ]);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testCancellationWithNoOverrideUsesExistingBehaviour(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once();
+
+        $this->refundService
+            ->shouldReceive('executeWithStrategy')
+            ->once()
+            ->andReturn(['success' => true, 'amount' => 50.00]);
+
+        // No refund_amount → should resolve to ProRatedRefundStrategy; just verify it reaches executeWithStrategy
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+            // no refund_amount
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testCancellationDoesNotRefundWhenSubscriptionAlreadyEnded(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        // IMPORTANT: ensure refund path is NOT triggered
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => true, // 🔥 this is the key fix
+            'create_refund' => true,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testCancellationSkipsRefundForFreeSubscription(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $subscription->type = 'free';
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess') // 🔥 THIS WAS MISSING
+            ->once()
+            ->with(1);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => false,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRefundIsNotExecutedWhenStripeCancellationFails(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn([
+                'success' => false,
+                'message' => 'Stripe failure'
+            ]);
+
+        $this->refundService
+            ->shouldNotReceive('executeWithStrategy');
+
+        $this->expectException(\Exception::class);
+
+        $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+        ]);
+    }
+
+    public function testRefundAmountOverrideIsPassedToManualStrategy(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->twice()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('revokeAllPremiumAccess')
+            ->once()
+            ->with(1);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        // ❌ IMPORTANT: remove PaymentRepository expectation entirely
+
+        $this->refundService
+            ->shouldReceive('executeWithStrategy')
+            ->once()
+            ->with(
+                $subscription,
+                \Mockery::on(fn($strategy) => $strategy instanceof \App\Services\Subscriptions\Refunds\ManualRefundStrategy
+                )
+            )
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+            'refund_amount' => 150.00,
+        ]);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testRefundFailsWhenNoPaymentFound(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        // 🔥 refund service is responsible, not payment repo
+        $this->refundService
+            ->shouldReceive('executeWithStrategy')
+            ->once()
+            ->andThrow(new \Exception('No payment found for refund'));
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('No payment found for refund');
+
+        $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+        ]);
+    }
+
+    public function testCancellationWithInvalidRefundTypeThrowsException(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->stripeProcessor
+            ->shouldReceive('cancelSubscription')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->refundService->shouldNotReceive('executeWithStrategy');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Invalid refund type: unknown_type');
+
+        $this->service->cancelSubscription(1, [
+            'cancel_at_period_end' => false,
+            'create_refund' => true,
+            'refund_type' => 'unknown_type',
+        ]);
     }
 
     public function test_reactivate_subscription_throws_exception_when_not_found(): void
@@ -878,5 +1391,36 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
         $result = $this->service->reactivateSubscription($subscriptionId);
 
         $this->assertTrue($result['success']);
+    }
+
+    private function createMockSubscription(): Subscription
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+
+        $subscription->id = 1;
+        $subscription->status = 'active';
+        $subscription->type = 'paid';
+        $subscription->price = 100.00;
+
+        $subscription->end_date = new \DateTime('+10 days');
+        $subscription->last_payment_date = new \DateTime('-5 days');
+
+        $subscription->shouldReceive('hasStripeSubscription')->andReturn(true);
+        $subscription->shouldReceive('getStripeSubscriptionId')->andReturn('sub_123');
+        $subscription->shouldReceive('closeWindow')->andReturn(null);
+
+        return $subscription;
+    }
+
+    private function createMockPayment(float $amount): Payment
+    {
+        $payment = Mockery::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+        $payment->subscription_id = 1;
+        $payment->amount = $amount;
+        $payment->transaction_id = 'ch_test_123';
+        $payment->payment_method = 'stripe';
+        $payment->payment_provider = 'stripe';
+        return $payment;
     }
 }

@@ -7,6 +7,10 @@ use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Subscriptions\Refunds\FullRefundStrategy;
+use App\Services\Subscriptions\Refunds\ProRatedRefundStrategy;
+use App\Services\Subscriptions\Refunds\RefundResult;
+use App\Services\Subscriptions\Refunds\RefundStrategy;
 use Exception;
 
 class SubscriptionRefundService
@@ -14,169 +18,179 @@ class SubscriptionRefundService
     public function __construct(
         private readonly PaymentRepository      $paymentRepository,
         private readonly StripePaymentProcessor $stripeProcessor,
-        private readonly Database               $database
+        private readonly Database $database,
     )
     {
     }
 
     /**
-     * Create a full refund for a subscription
+     * Create a full refund for a subscription.
+     * Public signature is stable — delegates to FullRefundStrategy internally.
      */
     public function createFullRefund(
         Subscription $subscription,
-        string       $reason = 'customer_request'
+        string $reason = 'customer_request',
     ): array
     {
-        return $this->database->transaction(function () use ($subscription, $reason) {
-            $lastPayment = $this->paymentRepository->getLastSubscriptionPayment($subscription->id);
+        $strategy = new FullRefundStrategy($this->paymentRepository, $reason);
+        return $this->executeRefund($subscription, $strategy);
+    }
 
-            if (!$lastPayment) {
-                throw new Exception('No payment found for refund');
-            }
+    /**
+     * Create a pro-rated refund based on unused subscription time.
+     * Public signature is stable — delegates to ProRatedRefundStrategy internally.
+     *
+     * Date guards fire before any transaction is opened; zero-refund
+     * scenarios exit cleanly without touching the database or provider.
+     */
+    public function createProRatedRefund(
+        Subscription $subscription,
+        string $reason = 'early_cancellation',
+    ): array
+    {
+        $strategy = new ProRatedRefundStrategy($this->paymentRepository, $reason);
 
-            // Issue refund with payment provider
-            $providerRefund = null;
-            if ($subscription->hasStripeSubscription() && $lastPayment->transaction_id) {
-                $providerRefund = $this->stripeProcessor->refund(
-                    $lastPayment->transaction_id,
-                    $lastPayment->amount,
-                    ['reason' => $reason]
-                );
+        // Pre-calculate outside the transaction so we can exit early for
+        // no-refund-due without opening (and immediately rolling back) a
+        // transaction. The strategy is stateless so recalculating inside
+        // the transaction is safe and cheap.
+        $preview = $strategy->calculate($subscription);
 
-                if (!$providerRefund['success']) {
-                    throw new Exception('Provider refund failed: ' . ($providerRefund['message'] ?? 'Unknown error'));
-                }
-            }
-
-            // Create local refund payment record
-            $refundPayment = $this->paymentRepository->create([
-                'subscription_id' => $subscription->id,
-                'site_id' => $subscription->site_id,
-                'payment_method' => $lastPayment->payment_method,
-                'payment_provider' => $lastPayment->payment_provider,
-                'amount' => -$lastPayment->amount,
-                'currency' => $subscription->currency,
-                'status' => 'completed',
-                'paid_at' => now_datetime()->format('Y-m-d H:i:s'),
-                'transaction_id' => $providerRefund['refund_id'] ?? null,
-                'metadata' => [
-                    'refund_type' => 'full',
-                    'original_payment_id' => $lastPayment->id,
-                    'reason' => $reason,
-                    'provider_refund' => $providerRefund !== null
-                ]
-            ]);
-
-            Logger::info('Full refund created', [
-                'subscription_id' => $subscription->id,
-                'refund_payment_id' => $refundPayment->id,
-                'amount' => $lastPayment->amount,
-                'provider_refund_id' => $providerRefund['refund_id'] ?? null
-            ]);
-
+        if ($preview->noRefundDue) {
             return [
-                'success' => true,
-                'refund_payment' => $refundPayment,
-                'amount' => $lastPayment->amount,
-                'provider_refund' => $providerRefund
+                'success' => false,
+                'message' => $preview->meta['reason'],
+                'unused_days' => 0,
             ];
+        }
+
+        return $this->executeRefund($subscription, $strategy);
+    }
+
+    /**
+     * Execute a refund using an explicitly resolved strategy.
+     * Entry point for SubscriptionCancellationService when it needs to apply
+     * a strategy it has already selected (e.g. ManualRefundStrategy).
+     */
+    public function executeWithStrategy(
+        Subscription   $subscription,
+        RefundStrategy $strategy,
+    ): array
+    {
+        return $this->executeRefund($subscription, $strategy);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal execution
+    // -------------------------------------------------------------------------
+
+    private function executeRefund(
+        Subscription   $subscription,
+        RefundStrategy $strategy,
+    ): array
+    {
+        return $this->database->transaction(function () use ($subscription, $strategy) {
+            $result = $strategy->calculate($subscription);
+            return $this->persistRefund($subscription, $result);
         });
     }
 
     /**
-     * Create a pro-rated refund based on unused time
+     * Issue the provider refund (when applicable) and write the local payment
+     * record. This is the only location that performs I/O — no strategy touches
+     * this layer directly.
+     *
+     * All values come from scalar fields in RefundResult::meta. No ORM objects
+     * are read from meta here; the strategy is responsible for populating the
+     * required scalar fields.
      */
-    public function createProRatedRefund(
-        Subscription $subscription,
-        string       $reason = 'early_cancellation'
-    ): array
+    private function persistRefund(Subscription $subscription, RefundResult $result): array
     {
-        if (!$subscription->end_date || !$subscription->last_payment_date) {
-            throw new Exception('Cannot calculate pro-rated refund: missing dates');
-        }
+        $transactionId = $result->meta['transaction_id'] ?? null;
+        $paymentMethod = $result->meta['payment_method'] ?? 'stripe';
+        $paymentProvider = $result->meta['payment_provider'] ?? 'stripe';
 
-        $now = new \DateTime();
-        $endDate = $subscription->end_date;
-        $lastPayment = $subscription->last_payment_date;
-
-        // Calculate unused days
-        $totalDays = $lastPayment->diff($endDate)->days;
-        $usedDays = $lastPayment->diff($now)->days;
-        $unusedDays = max(0, $totalDays - $usedDays);
-
-        if ($unusedDays <= 0) {
-            return [
-                'success' => false,
-                'message' => 'No unused time remaining',
-                'unused_days' => 0
-            ];
-        }
-
-        // Calculate refund amount
-        $refundAmount = ($subscription->price / $totalDays) * $unusedDays;
-
-        // Create payment record for refund
-        $lastCompletedPayment = $this->paymentRepository->getLastSubscriptionPayment($subscription->id);
-
-        if (!$lastCompletedPayment) {
-            throw new Exception('No payment found for refund');
-        }
-
-        // Issue refund with payment provider
         $providerRefund = null;
-        if ($subscription->hasStripeSubscription() && $lastCompletedPayment->transaction_id) {
+
+        if ($subscription->hasStripeSubscription() && $transactionId) {
+            $refundOptions = ['reason' => $result->meta['reason'] ?? 'customer_request'];
+
+            if ($result->type === 'pro_rated') {
+                $refundOptions['metadata'] = [
+                    'unused_days' => $result->meta['unused_days'],
+                    'total_days' => $result->meta['total_days'],
+                ];
+            }
+
             $providerRefund = $this->stripeProcessor->refund(
-                $lastCompletedPayment->transaction_id,
-                $refundAmount,
-                [
-                    'reason' => $reason,
-                    'metadata' => [
-                        'unused_days' => $unusedDays,
-                        'total_days' => $totalDays
-                    ]
-                ]
+                $transactionId,
+                $result->amount,
+                $refundOptions,
             );
 
             if (!$providerRefund['success']) {
-                throw new Exception('Provider refund failed: ' . ($providerRefund['message'] ?? 'Unknown error'));
+                throw new Exception(
+                    'Provider refund failed: ' . ($providerRefund['message'] ?? 'Unknown error')
+                );
             }
         }
 
-        // Create local refund payment record
+        $refundType = match ($result->type) {
+            'pro_rated' => 'pro_rated_cancellation',
+            default => $result->type,
+        };
+
+        $auditMeta = [
+            'refund_type' => $refundType,
+            'original_payment_id' => $result->meta['original_payment_id'] ?? null,
+            'reason' => $result->meta['reason'] ?? null,
+            'provider_refund' => $providerRefund !== null,
+            'strategy' => $result->type,
+            'final_amount' => $result->amount,
+            'override_amount' => $result->type === 'manual' ? $result->amount : null,
+            'calculated_amount' => $result->meta['original_amount'] ?? $result->amount,
+        ];
+
+        if ($result->type === 'pro_rated') {
+            $auditMeta['unused_days'] = $result->meta['unused_days'];
+            $auditMeta['total_days'] = $result->meta['total_days'];
+        }
+
         $refundPayment = $this->paymentRepository->create([
             'subscription_id' => $subscription->id,
             'site_id' => $subscription->site_id,
-            'payment_method' => 'stripe',
-            'payment_provider' => 'stripe',
-            'amount' => -$refundAmount, // Negative for refund
+            'payment_method' => $paymentMethod,
+            'payment_provider' => $paymentProvider,
+            'amount' => -$result->amount,
             'currency' => $subscription->currency,
             'status' => 'completed',
             'paid_at' => date('Y-m-d H:i:s'),
-            'metadata' => [
-                'refund_type' => 'pro_rated_cancellation',
-                'original_payment_id' => $lastCompletedPayment->id,
-                'unused_days' => $unusedDays,
-                'total_days' => $totalDays,
-                'reason' => $reason,
-                'provider_refund' => $providerRefund !== null
-            ]
+            'transaction_id' => $providerRefund['refund_id'] ?? null,
+            'metadata' => $auditMeta,
         ]);
 
-        Logger::info('Pro-rated refund created', [
+        Logger::info('Refund processed', [
             'subscription_id' => $subscription->id,
             'refund_payment_id' => $refundPayment->id,
-            'refund_amount' => $refundAmount,
-            'unused_days' => $unusedDays,
-            'provider_refund_id' => $providerRefund['refund_id'] ?? null
+            'strategy' => $result->type,
+            'calculated_amount' => $result->meta['original_amount'] ?? $result->amount,
+            'final_amount' => $result->amount,
+            'override_amount' => $result->type === 'manual' ? $result->amount : null,
+            'provider_refund_id' => $providerRefund['refund_id'] ?? null,
         ]);
 
-        return [
+        $response = [
             'success' => true,
             'refund_payment' => $refundPayment,
-            'amount' => $refundAmount,
-            'unused_days' => $unusedDays,
-            'total_days' => $totalDays,
-            'provider_refund' => $providerRefund
+            'amount' => $result->amount,
+            'provider_refund' => $providerRefund,
         ];
+
+        if ($result->type === 'pro_rated') {
+            $response['unused_days'] = $result->meta['unused_days'];
+            $response['total_days'] = $result->meta['total_days'];
+        }
+
+        return $response;
     }
 }

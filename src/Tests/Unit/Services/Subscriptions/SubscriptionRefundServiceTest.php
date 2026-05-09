@@ -186,27 +186,34 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->assertNull($result['provider_refund']);
     }
 
-    public function testCreateProRatedRefundSuccessfully()
+    public function testCreateProRatedRefundSuccessfully(): void
     {
         $subscription = $this->createMockSubscriptionWithDates();
         $lastPayment = $this->createMockPayment();
 
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        // Strategy calculate() is called twice: once as a pre-check outside the
+        // transaction, and once inside. Both calls go through getLastSubscriptionPayment.
         $this->mockPaymentRepository
             ->shouldReceive('getLastSubscriptionPayment')
-            ->once()
             ->andReturn($lastPayment);
 
-        $expectedRefundAmount = ($subscription->price / 30) * 15; // 15 unused days
+        $expectedRefundAmount = ($subscription->price / 30) * 15;
 
         $this->mockStripeProcessor
             ->shouldReceive('refund')
             ->once()
             ->andReturn([
                 'success' => true,
-                'refund_id' => 'refund_123'
+                'refund_id' => 'refund_123',
             ]);
 
         $refundPayment = $this->createMockPayment();
+
         $this->mockPaymentRepository
             ->shouldReceive('create')
             ->once()
@@ -248,14 +255,18 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->service->createProRatedRefund($subscription);
     }
 
-    public function testCreateProRatedRefundIncludesMetadata()
+    public function testCreateProRatedRefundIncludesMetadata(): void
     {
         $subscription = $this->createMockSubscriptionWithDates();
         $lastPayment = $this->createMockPayment();
 
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
         $this->mockPaymentRepository
             ->shouldReceive('getLastSubscriptionPayment')
-            ->once()
             ->andReturn($lastPayment);
 
         $this->mockStripeProcessor
@@ -267,11 +278,12 @@ class SubscriptionRefundServiceTest extends TestCase
                 Mockery::on(function ($options) {
                     return isset($options['metadata']['unused_days'])
                         && isset($options['metadata']['total_days']);
-                })
+                }),
             )
             ->andReturn(['success' => true, 'refund_id' => 'refund_123']);
 
         $refundPayment = $this->createMockPayment();
+
         $this->mockPaymentRepository
             ->shouldReceive('create')
             ->once()
