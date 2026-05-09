@@ -25,9 +25,15 @@ class MemberNote extends Model
         'author_name',
         'body',
         'parent_id',
+        'deleted_at'
     ];
 
     protected bool $useSoftDeletes = true;
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
     // ── Relationships ──────────────────────────────────────────────────────
 
@@ -48,19 +54,5 @@ class MemberNote extends Model
     public function isReply(): bool
     {
         return $this->parent_id !== null;
-    }
-
-    public function toArray(): array
-    {
-        return [
-            'id' => $this->id,
-            'member_id' => $this->member_id,
-            'author_id' => $this->author_id,
-            'author_name' => $this->author_name,
-            'body' => $this->body,
-            'parent_id' => $this->parent_id,
-            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
-            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
-        ];
     }
 }

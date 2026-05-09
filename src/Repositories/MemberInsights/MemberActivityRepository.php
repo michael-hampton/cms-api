@@ -33,6 +33,29 @@ class MemberActivityRepository extends Repository
         ];
     }
 
+    public function getPaginatedForMember(
+        int $memberId,
+        int $page,
+        int $perPage
+    ): array
+    {
+        $query = $this->where('member_id', $memberId)
+            ->orderByDesc('created_at');
+
+        $total = $query->count();
+
+        $rows = $query
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage)
+            ->get();
+
+        return [
+            'data' => $rows,
+            'total' => $total,
+            'last_page' => max(1, (int)ceil($total / $perPage)),
+        ];
+    }
+
     protected function getModelClass(): string
     {
         return MemberActivity::class;

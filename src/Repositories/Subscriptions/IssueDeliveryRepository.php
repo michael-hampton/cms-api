@@ -5,6 +5,7 @@ namespace App\Repositories\Subscriptions;
 use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Subscriptions\IssueDeliveryStatus;
 use App\Enums\Subscriptions\IssueScheduleStatus;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
 use App\Repositories\Repository;
@@ -360,4 +361,180 @@ class IssueDeliveryRepository extends Repository
             ->get();
     }
 
+    /**
+     * Return a paginated list of issue deliveries for a subscription.
+     *
+     * Type classification logic (mirrors the previous PHP implementation):
+     *   - delivered : a matching issues_delivered row exists and is_delivered = 1
+     *   - missed    : estimated_delivery_date < NOW() and no delivered record
+     *   - upcoming  : everything else
+     *
+     * The filter param maps directly to these types:
+     *   all      → no type filter
+     *   upcoming → type = upcoming
+     *   previous → type = delivered
+     *   missed   → type = missed
+     *
+     * Ordering:
+     *   upcoming rows → estimated_delivery_date ASC
+     *   delivered/missed rows → estimated_delivery_date DESC
+     *   Combined via a sort_weight trick so upcoming appears first.
+     *
+     * @param int $planId
+     * @param int $subscriptionId
+     * @param string $filter all|upcoming|previous|missed
+     * @param \DateTime|null $from
+     * @param \DateTime|null $to
+     * @param int $page
+     * @param int $perPage
+     *
+     * @return array{ data: array, total: int, last_page: int }
+     */
+    public function getPaginatedForSubscription(
+        int        $planId,
+        int        $subscriptionId,
+        string     $filter = 'all',
+        ?\DateTime $from = null,
+        ?\DateTime $to = null,
+        int        $page = 1,
+        int        $perPage = 15,
+    ): array
+    {
+
+        // ── 1. Load delivered map (subscription-specific) ─────────────────────
+        $delivered = Database::table('issues_delivered')
+            ->where('subscription_id', $subscriptionId)
+            ->get()
+            ->keyBy('issue_delivery_id')
+            ->toArray();
+
+        // ── 2. Base query — NO limit/offset here ──────────────────────────────
+        $query = IssueDelivery::query()
+            ->where('subscription_plan_id', $planId)
+            ->select([
+                'id',
+                'issue_number',
+                'issue_title',
+                'on_sale_date',
+                'estimated_delivery_date',
+                'status',
+            ]);
+
+        // ── 3. Date filters ────────────────────────────────────────────────────
+        if ($from !== null) {
+            $query->where(
+                'estimated_delivery_date',
+                '>=',
+                $from->format('Y-m-d 00:00:00')
+            );
+        }
+
+        if ($to !== null) {
+            $query->where(
+                'estimated_delivery_date',
+                '<=',
+                $to->format('Y-m-d 23:59:59')
+            );
+        }
+
+        // ── 4. Fetch + classify ───────────────────────────────────────────────
+        $now = new \DateTime();
+
+        $rows = $query
+            ->get()
+            ->map(function ($row) use ($delivered, $now) {
+
+                $delivery = $delivered[$row->id] ?? null;
+
+                $isDelivered = $delivery !== null;
+
+                $isMissed = !$isDelivered
+                    && $row->estimated_delivery_date !== null
+                    && $row->estimated_delivery_date < $now;
+
+                $type = $isDelivered
+                    ? 'delivered'
+                    : ($isMissed ? 'missed' : 'upcoming');
+
+                return [
+                    'id' => $row->id,
+
+                    'issue_number' => $row->issue_number,
+
+                    'issue_title' => $row->issue_title,
+
+                    'on_sale_date' => $row->on_sale_date
+                        ? $row->on_sale_date->format('Y-m-d')
+                        : null,
+
+                    'estimated_delivery_date' => $row->estimated_delivery_date
+                        ? $row->estimated_delivery_date->format('Y-m-d')
+                        : null,
+
+                    'status' => $row->status,
+
+                    'type' => $type,
+
+                    'delivered_at' => isset($delivery['delivered_at'])
+                        ? (
+                        $delivery['delivered_at'] instanceof \DateTimeInterface
+                            ? $delivery['delivered_at']->format('Y-m-d H:i:s')
+                            : $delivery['delivered_at']
+                        )
+                        : null,
+                ];
+            });
+
+        // ── 5. Type filter ────────────────────────────────────────────────────
+        $typeMap = [
+            'upcoming' => 'upcoming',
+            'previous' => 'delivered',
+            'missed' => 'missed',
+        ];
+
+        if (isset($typeMap[$filter])) {
+            $rows = $rows->filter(
+                fn($row) => $row['type'] === $typeMap[$filter]
+            );
+        }
+
+        // ── 6. Sort ────────────────────────────────────────────────────────────
+        $rows = $rows->sort(function (array $a, array $b) {
+
+            $dateA = $a['estimated_delivery_date'] ?? '';
+            $dateB = $b['estimated_delivery_date'] ?? '';
+
+            // upcoming vs upcoming → ascending
+            if ($a['type'] === 'upcoming' && $b['type'] === 'upcoming') {
+                return strcmp($dateA, $dateB);
+            }
+
+            // upcoming always first
+            if ($a['type'] === 'upcoming') {
+                return -1;
+            }
+
+            if ($b['type'] === 'upcoming') {
+                return 1;
+            }
+
+            // delivered/missed → descending
+            return strcmp($dateB, $dateA);
+        });
+
+        // ── 7. Totals ──────────────────────────────────────────────────────────
+        $total = $rows->count();
+
+        // ── 8. Pagination ──────────────────────────────────────────────────────
+        $data = $rows
+            ->values()
+            ->slice(($page - 1) * $perPage, $perPage)
+            ->all();
+
+        return [
+            'data' => $data,
+            'total' => $total,
+            'last_page' => max(1, (int)ceil($total / $perPage)),
+        ];
+    }
 }

@@ -2,6 +2,7 @@
 
 // config/app.php
 return [
+    'debug' => true,
     'url' => env('APP_URL', 'http://localhost'),
     'default_site_id' => 1,
     'name' => env('APP_NAME', 'CMS Application'),

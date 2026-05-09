@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Repositories\Billing;
 
 use App\Models\Member;
+use App\Models\Model;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
@@ -431,5 +432,107 @@ class OrderRepositoryTest extends RepositoryTestCase
 
         // Assert
         $this->assertNull($found);
+    }
+
+    public function test_get_paginated_for_member_returns_only_that_members_orders(): void
+    {
+        $member1 = $this->createMember();
+        $member2 = $this->createMember();
+
+        $this->createOrderForMember($member1->id);
+        $this->createOrderForMember($member1->id);
+        $this->createOrderForMember($member2->id);
+
+        $result = $this->repository->getPaginatedForMember($member1->id, $this->siteId, 1, 20);
+
+        $this->assertEquals(2, $result['total']);
+        foreach ($result['data'] as $order) {
+            $this->assertEquals($member1->id, $order->user_id);
+        }
+    }
+
+    public function test_get_paginated_for_member_respects_per_page(): void
+    {
+        $member = $this->createMember();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->createOrderForMember($member->id);
+        }
+
+        $result = $this->repository->getPaginatedForMember($member->id, $this->siteId, 1, 3);
+
+        $this->assertCount(3, $result['data']);
+        $this->assertEquals(5, $result['total']);
+        $this->assertEquals(2, $result['last_page']);
+    }
+
+    public function test_get_paginated_for_member_returns_second_page(): void
+    {
+        $member = $this->createMember();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->createOrderForMember($member->id);
+        }
+
+        $result = $this->repository->getPaginatedForMember($member->id, $this->siteId, 2, 3);
+
+        $this->assertCount(2, $result['data']);
+        $this->assertEquals(5, $result['total']);
+    }
+
+    public function test_get_paginated_for_member_returns_empty_when_no_orders(): void
+    {
+        $member = $this->createMember();
+
+        $result = $this->repository->getPaginatedForMember($member->id, $this->siteId, 1, 20);
+
+        $this->assertEquals(0, $result['total']);
+        $this->assertCount(0, $result['data']);
+        $this->assertEquals(1, $result['last_page']); // never below 1
+    }
+
+    public function test_get_paginated_for_member_scopes_to_site(): void
+    {
+        $member = $this->createMember();
+        $otherSiteId = $this->createSite();
+
+        $this->createOrderForMember($member->id); // correct site
+        Order::create([
+            'site_id' => $otherSiteId->id,
+            'user_id' => $member->id,
+            'order_number' => 'ORD-' . uniqid(),
+            'status' => 'pending',
+            'total' => 50.00,
+        ]);
+
+        $result = $this->repository->getPaginatedForMember($member->id, $this->siteId, 1, 20);
+
+        $this->assertEquals(1, $result['total']);
+    }
+
+    public function test_get_paginated_for_member_orders_by_created_at_desc(): void
+    {
+        $member = $this->createMember();
+
+        $old = $this->createOrderForMember($member->id, ['created_at' => '2024-01-01 10:00:00']);
+        $new = $this->createOrderForMember($member->id, ['created_at' => '2024-06-01 10:00:00']);
+
+        $result = $this->repository->getPaginatedForMember($member->id, $this->siteId, 1, 20);
+
+        $this->assertEquals($new->id, $result['data']->first()->id);
+    }
+
+    private function createOrderForMember(int $memberId, array $overrides = []): Model
+    {
+        return Order::create(array_merge([
+            'site_id' => $this->siteId,
+            'user_id' => $memberId,
+            'order_number' => 'ORD-' . uniqid(),
+            'status' => 'pending',
+            'payment_status' => 'unpaid',
+            'total' => 50.00,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], $overrides));
     }
 }

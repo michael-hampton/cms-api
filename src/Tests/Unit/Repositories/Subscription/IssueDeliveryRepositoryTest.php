@@ -6,6 +6,7 @@ use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Stock\StockException;
 use App\Models\IssueDelivery;
+use App\Models\Model;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
@@ -649,6 +650,275 @@ class IssueDeliveryRepositoryTest extends RepositoryTestCase
 
         $this->assertEquals(15, $restored->stock_quantity);
         $this->assertEquals(15, IssueDelivery::find($issue->id)->stock_quantity);
+    }
+
+    public function test_returns_array_with_expected_keys(): void
+    {
+        $sub = $this->createSubscription();
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+        );
+
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('total', $result);
+        $this->assertArrayHasKey('last_page', $result);
+    }
+
+    public function test_returns_empty_result_when_no_deliveries_exist(): void
+    {
+        $sub = $this->createSubscription();
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+        );
+
+        $this->assertEquals(0, $result['total']);
+        $this->assertEmpty($result['data']);
+        $this->assertEquals(1, $result['last_page']);
+    }
+
+    public function test_upcoming_delivery_is_classified_as_upcoming(): void
+    {
+        $sub = $this->createSubscription();
+        $issue = $this->makeUpcoming($sub->plan_id);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'all',
+        );
+
+        $row = collect($result['data'])->firstWhere('id', $issue->id);
+        $this->assertNotNull($row);
+        $this->assertEquals('upcoming', $row['type']);
+    }
+
+    public function test_past_undelivered_issue_is_classified_as_missed(): void
+    {
+        $sub = $this->createSubscription();
+        $issue = $this->makeMissed($sub->plan_id);
+        // Deliberately no markDelivered() call — this is what makes it 'missed'
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'all',
+        );
+
+        $row = collect($result['data'])->firstWhere('id', $issue->id);
+        $this->assertNotNull($row);
+        $this->assertEquals('missed', $row['type']);
+    }
+
+    public function test_issue_with_delivered_record_is_classified_as_delivered(): void
+    {
+        $sub = $this->createSubscription();
+        $issue = $this->makePast($sub->plan_id);
+        $this->markDelivered($issue->id, $sub->id);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'all',
+        );
+
+        $row = collect($result['data'])->firstWhere('id', $issue->id);
+        $this->assertNotNull($row);
+        $this->assertEquals('delivered', $row['type']);
+    }
+
+    public function test_filter_upcoming_excludes_past_issues(): void
+    {
+        $sub = $this->createSubscription();
+        $past = $this->makePast($sub->plan_id, 1);
+        $upcoming = $this->makeUpcoming($sub->plan_id, 2);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'upcoming',
+        );
+
+        $ids = array_column($result['data'], 'id');
+        $this->assertContains($upcoming->id, $ids);
+        $this->assertNotContains($past->id, $ids);
+    }
+
+    public function test_filter_previous_returns_only_delivered(): void
+    {
+        $sub = $this->createSubscription();
+        $past = $this->makePast($sub->plan_id, 1);
+        $upcoming = $this->makeUpcoming($sub->plan_id, 2);
+        $this->markDelivered($past->id, $sub->id);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'previous',
+        );
+
+        $ids = array_column($result['data'], 'id');
+        $this->assertContains($past->id, $ids);
+        $this->assertNotContains($upcoming->id, $ids);
+    }
+
+    public function test_filter_missed_returns_only_missed_issues(): void
+    {
+        $sub = $this->createSubscription();
+        $missed = $this->makeMissed($sub->plan_id, 1);
+        $delivered = $this->makeMissed($sub->plan_id, 2);
+        $this->markDelivered($delivered->id, $sub->id);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'missed',
+        );
+
+        $ids = array_column($result['data'], 'id');
+        $this->assertContains($missed->id, $ids);
+        $this->assertNotContains($delivered->id, $ids);
+    }
+
+    public function test_pagination_respects_per_page(): void
+    {
+        $sub = $this->createSubscription();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->makeUpcoming($sub->plan_id, $i);
+        }
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'upcoming',
+            null,
+            null,
+            1,
+            3,
+        );
+
+        // Current page contains 3 rows
+        $this->assertCount(3, $result['data']);
+
+        // Total matching rows across all pages
+        $this->assertEquals(5, $result['total']);
+
+        // 5 rows @ 3 per page = 2 pages
+        $this->assertEquals(2, $result['last_page']);
+    }
+
+    public function test_pagination_returns_second_page(): void
+    {
+        $sub = $this->createSubscription();
+
+        for ($i = 1; $i <= 5; $i++) {
+            $this->makeUpcoming($sub->plan_id, $i);
+        }
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'all',
+            null,
+            null,
+            2,
+            3,
+        );
+
+        $this->assertCount(2, $result['data']);
+    }
+
+    public function test_each_row_has_required_fields(): void
+    {
+        $sub = $this->createSubscription();
+        $this->makeUpcoming($sub->plan_id);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+        );
+
+        $row = $result['data'][0];
+        foreach (['id', 'issue_number', 'issue_title', 'on_sale_date', 'estimated_delivery_date', 'status', 'type'] as $key) {
+            $this->assertArrayHasKey($key, $row, "Row is missing key: {$key}");
+        }
+    }
+
+    public function test_from_date_excludes_earlier_deliveries(): void
+    {
+        $sub = $this->createSubscription();
+        $early = IssueDelivery::create([
+            'subscription_plan_id' => $sub->plan_id,
+            'issue_number' => 1,
+            'estimated_delivery_date' => '2024-01-10',
+        ]);
+        $late = IssueDelivery::create([
+            'subscription_plan_id' => $sub->plan_id,
+            'issue_number' => 2,
+            'estimated_delivery_date' => '2024-06-01',
+        ]);
+
+        $result = $this->repository->getPaginatedForSubscription(
+            $sub->plan_id,
+            $sub->id,
+            'all',
+            new \DateTime('2024-03-01'),
+        );
+
+        $ids = array_column($result['data'], 'id');
+        $this->assertContains($late->id, $ids);
+        $this->assertNotContains($early->id, $ids);
+    }
+
+    private function markDelivered(int $issueDeliveryId, int $subscriptionId): void
+    {
+        \App\Framework\Database\Database::table('issues_delivered')->insert([
+            'issue_delivery_id' => $issueDeliveryId,
+            'subscription_id' => $subscriptionId,
+            'delivered_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    private function makeMissed(int $planId, int $issueNumber = 99): Model
+    {
+        return IssueDelivery::create([
+            'subscription_plan_id' => $planId,
+            'issue_number' => $issueNumber,
+            'issue_title' => "Old Issue #{$issueNumber}",
+            'on_sale_date' => date('Y-m-d', strtotime('-20 days')),
+            'estimated_delivery_date' => date('Y-m-d', strtotime('-10 days')),
+            'status' => 'Delivered',
+        ]);
+    }
+
+    /** Create an IssueDelivery row tied to $planId with a future delivery date. */
+    private function makeUpcoming(int $planId, int $issueNumber = 1): Model
+    {
+        return IssueDelivery::create([
+            'subscription_plan_id' => $planId,
+            'issue_number' => $issueNumber,
+            'issue_title' => "Issue #{$issueNumber}",
+            'on_sale_date' => date('Y-m-d', strtotime('+' . $issueNumber . ' days')),
+            'estimated_delivery_date' => date('Y-m-d', strtotime('+' . ($issueNumber + 5) . ' days')),
+            'status' => 'Scheduled',
+        ]);
+    }
+
+    /** Create an IssueDelivery row tied to $planId with a past delivery date. */
+    private function makePast(int $planId, int $issueNumber = 99): Model
+    {
+        return IssueDelivery::create([
+            'subscription_plan_id' => $planId,
+            'issue_number' => $issueNumber,
+            'issue_title' => "Old Issue #{$issueNumber}",
+            'on_sale_date' => date('Y-m-d', strtotime('-20 days')),
+            'estimated_delivery_date' => date('Y-m-d', strtotime('-10 days')),
+            'status' => 'Delivered',
+        ]);
     }
 
     protected function setUp(): void

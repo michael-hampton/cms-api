@@ -10,8 +10,9 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
-use App\Models\IssueDelivery;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
@@ -35,6 +36,8 @@ class CrmSubscriptionController extends Controller
         private readonly IssuesDeliveredRepository  $issuesDeliveredRepository,
         private readonly PaymentRepository          $paymentRepository,
         private readonly SubscriptionPlanRepository $planRepository,
+        private readonly OrderRepository          $orderRepository,
+        private readonly MemberActivityRepository $activityRepository,
     )
     {
         parent::__construct();
@@ -203,8 +206,8 @@ class CrmSubscriptionController extends Controller
 
         event(new SubscriptionPaused(
             subscription: $subscription,
-            pauseStart: $pauseStart->format('Y-m-d H:i:s'),
             pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
+            pauseStart: $pauseStart->format('Y-m-d H:i:s'),
             reason: $reason,
         ));
 
@@ -258,9 +261,11 @@ class CrmSubscriptionController extends Controller
      * GET /api/{site}/admin/members/{memberId}/subscriptions/{subscriptionId}/issues
      *
      * Query params:
-     *   filter  string  all|upcoming|previous|missed  (default: all)
-     *   from    string  Y-m-d  optional date range start
-     *   to      string  Y-m-d  optional date range end
+     *   filter    string  all|upcoming|previous|missed  (default: all)
+     *   from      string  Y-m-d  optional
+     *   to        string  Y-m-d  optional
+     *   page      int     (default: 1)
+     *   per_page  int     (default: 15, max: 50)
      *
      * Returns a merged, chronologically-sorted list combining:
      *   - IssueDelivery (scheduled/upcoming deliveries from the issue schedule)
@@ -276,7 +281,6 @@ class CrmSubscriptionController extends Controller
 
         $subscription = $this->subscriptionRepository->find($subscriptionId, ['plan']);
 
-
         if (!$subscription || $subscription->member_id !== $memberId) {
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
@@ -284,80 +288,32 @@ class CrmSubscriptionController extends Controller
         $filter = $request->input('filter', 'all');
         $fromRaw = $request->input('from');
         $toRaw = $request->input('to');
-        $now = new \DateTime();
-
-        $from = $fromRaw ? new \DateTime($fromRaw) : null;
-        $to = $toRaw ? (new \DateTime($toRaw))->setTime(23, 59, 59) : null;
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
 
         try {
-            // ── Scheduled deliveries (IssueDelivery) ───────────────────────
-            $schedules = IssueDelivery::where('subscription_plan_id', $subscription->plan_id)->get();
-
-            // ── Delivered records (IssuesDelivered) ────────────────────────
-            $delivered = $this->issuesDeliveredRepository->getForSubscription($subscriptionId);
-            $deliveredByScheduleId = [];
-            foreach ($delivered as $d) {
-                $deliveredByScheduleId[$d->issue_delivery_id] = $d;
-            }
-
-            $rows = [];
-
-            foreach ($schedules as $schedule) {
-                $estimatedDate = $schedule->estimated_delivery_date
-                    ? $schedule->estimated_delivery_date
-                    : null;
-                $onSaleDate = $schedule->on_sale_date
-                    ? $schedule->on_sale_date
-                    : null;
-
-                // Classify row type
-                $deliveredRecord = $deliveredByScheduleId[$schedule->id] ?? null;
-
-                if ($deliveredRecord && $deliveredRecord->isDelivered()) {
-                    $type = 'delivered';
-                } elseif ($estimatedDate && $estimatedDate < $now && !$deliveredRecord) {
-                    $type = 'missed';
-                } else {
-                    $type = 'upcoming';
-                }
-
-                // Apply filter
-                if ($filter === 'upcoming' && $type !== 'upcoming') continue;
-                if ($filter === 'previous' && $type !== 'delivered') continue;
-                if ($filter === 'missed' && $type !== 'missed') continue;
-
-                // Apply date range filter on estimated_delivery_date
-                if ($from && $estimatedDate && $estimatedDate < $from) continue;
-                if ($to && $estimatedDate && $estimatedDate > $to) continue;
-
-                $rows[] = [
-                    'id' => $schedule->id,
-                    'issue_number' => $schedule->issue_number,
-                    'issue_title' => $schedule->issue_title,
-                    'on_sale_date' => $onSaleDate?->format('Y-m-d'),
-                    'estimated_delivery_date' => $estimatedDate?->format('Y-m-d'),
-                    'status' => $schedule->status,
-                    'type' => $type,
-                    'delivered_at' => $deliveredRecord?->delivered_at?->format('Y-m-d H:i:s'),
-                ];
-            }
-
-            // Sort: upcoming asc by estimated date, delivered/missed desc
-            usort($rows, function (array $a, array $b) {
-                $dateA = $a['estimated_delivery_date'] ?? '';
-                $dateB = $b['estimated_delivery_date'] ?? '';
-                if ($a['type'] === 'upcoming' && $b['type'] === 'upcoming') {
-                    return strcmp($dateA, $dateB);
-                }
-                return strcmp($dateB, $dateA);
-            });
+            $result = $this->issueDeliveryRepository->getPaginatedForSubscription(
+                planId: $subscription->plan_id,
+                subscriptionId: $subscriptionId,
+                filter: $filter,
+                from: $fromRaw ? new \DateTime($fromRaw) : null,
+                to: $toRaw ? new \DateTime($toRaw) : null,
+                page: $page,
+                perPage: $perPage,
+            );
 
             return $this->resourceResponse([
                 'success' => true,
-                'issues' => $rows,
-                'total' => count($rows),
+                'issues' => $result['data'],
+                'pagination' => [
+                    'total' => $result['total'],
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => $result['last_page'],
+                ],
             ]);
         } catch (\Exception $e) {
+            echo $e->getMessage();
             Logger::error('Failed to fetch issues for subscription', [
                 'subscription_id' => $subscriptionId,
                 'error' => $e->getMessage(),
@@ -376,6 +332,8 @@ class CrmSubscriptionController extends Controller
      *
      * Query params:
      *   context  string  all|subscription|orders  (default: all)
+     *    page      int     (default: 1)
+     *    per_page  int     (default: 15, max: 50)
      *
      * Returns all payments associated with the member, sourced from both
      * subscription payments and order payments. Uses PaymentRepository
@@ -389,48 +347,35 @@ class CrmSubscriptionController extends Controller
 
         $siteId = SiteContext::getId();
         $context = $request->input('context', 'all');
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
 
         try {
-            // Resolve all subscription IDs belonging to this member
-            $subscriptions = $this->subscriptionRepository->getSubscriptionHistory($memberId, $siteId);
-            $subscriptionIds = $subscriptions->pluck('id')->all();
-
             $payments = collect();
 
-            // ── Subscription payments ──────────────────────────────────────
             if (in_array($context, ['all', 'subscription'], true)) {
-                foreach ($subscriptionIds as $subId) {
-                    $subPayments = $this->paymentRepository->findBySubscriptionId($subId);
-                    $payments = $payments->merge($subPayments);
-                }
+                // Single query for all subscription payments for this member on this site
+                $subPayments = $this->paymentRepository->findByMemberSubscriptions($memberId, $siteId);
+                $payments = $payments->merge($subPayments);
             }
 
-            // ── Order payments ─────────────────────────────────────────────
             if (in_array($context, ['all', 'orders'], true)) {
-                $member = $this->memberRepository->find($memberId);
-
-                if ($member) {
-                    // Retrieve orders for member and fetch their payments
-                    $orders = $member->orders ?? collect();
-                    foreach ($orders as $order) {
-                        $orderPayments = $this->paymentRepository->findByOrderId($order->id);
-                        // Exclude payments already captured via subscription_id to avoid duplication
-                        foreach ($orderPayments as $p) {
-                            if (!$p->subscription_id) {
-                                $payments->push($p);
-                            }
-                        }
-                    }
-                }
+                // Single query for all order payments for this member, excluding
+                // those already captured via a subscription_id to avoid duplication
+                $orderPayments = $this->paymentRepository->findByMemberOrders($memberId);
+                $payments = $payments->merge($orderPayments);
             }
 
-            // Deduplicate by ID and sort newest first
-            $unique = $payments
+            $sorted = $payments
                 ->unique('id')
                 ->sortByDesc('created_at')
                 ->values();
 
-            $rows = $unique->map(fn($p) => [
+            $total = $sorted->count();
+            $lastPage = (int)ceil($total / $perPage);
+            $slice = $sorted->forPage($page, $perPage);
+
+            $rows = $slice->map(fn($p) => [
                 'id' => $p->id,
                 'amount' => $p->amount,
                 'currency' => $p->currency ?? 'GBP',
@@ -440,14 +385,21 @@ class CrmSubscriptionController extends Controller
                 'created_at' => $p->created_at->format('Y-m-d H:i:s'),
                 'order_id' => $p->order_id,
                 'subscription_id' => $p->subscription_id,
-            ])->all();
+            ])->values()->all();
 
             return $this->resourceResponse([
                 'success' => true,
                 'payments' => $rows,
-                'total' => count($rows),
+                'pagination' => [
+                    'total' => $total,
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => $lastPage,
+                ],
             ]);
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             Logger::error('Failed to fetch payments for member', [
                 'member_id' => $memberId,
                 'error' => $e->getMessage(),
@@ -533,5 +485,127 @@ class CrmSubscriptionController extends Controller
             'last_payment_date' => $lastPaymentDate,
             'next_payment_date' => $nextPaymentDate ?? null,
         ]);
+    }
+
+    /**
+     * GET /api/{site}/crm/members/{memberId}/orders
+     *
+     * Query params:
+     *   page      int  (default: 1)
+     *   per_page  int  (default: 15, max: 50)
+     *
+     * Returns orders for a member, paginated, newest first.
+     * Scoped to the current site.
+     */
+    public function ordersForMember(Request $request, int $memberId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
+
+        try {
+            $result = $this->orderRepository->getPaginatedForMember(
+                memberId: $memberId,
+                siteId: $siteId,
+                page: $page,
+                perPage: $perPage,
+            );
+
+            $rows = $result['data']->map(fn($order) => [
+                'id' => $order->id,
+                'order_number' => $order->order_number,
+                'status' => $order->status,
+                'total' => $order->total,
+                'currency' => $order->currency ?? 'GBP',
+                'item_count' => $order->item_count ?? 0,
+                'created_at' => $order->created_at?->format('Y-m-d H:i:s'),
+            ])->all();
+
+            return $this->resourceResponse([
+                'success' => true,
+                'orders' => $rows,
+                'pagination' => [
+                    'total' => $result['total'],
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => $result['last_page'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
+            Logger::error('Failed to fetch orders for member', [
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to load orders.'], 500);
+        }
+    }
+
+    /**
+     * GET /api/{site}/crm/members/{memberId}/activity
+     *
+     * Query params:
+     *   page      int  (default: 1)
+     *   per_page  int  (default: 15, max: 50)
+     *
+     * Returns recent member activity events, paginated, newest first.
+     */
+    public function activityForMember(Request $request, int $memberId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
+
+        // Verify member belongs to site before exposing data
+        $member = $this->memberRepository->find($memberId);
+
+        if (!$member || $member->site_id !== $siteId) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Member not found.'], 404);
+        }
+
+        try {
+            $result = $this->activityRepository->getPaginatedForMember(
+                memberId: $memberId,
+                page: $page,
+                perPage: $perPage,
+            );
+
+            $rows = $result['data']->map(fn($act) => [
+                'id' => $act->id,
+                'activity_type' => $act->activity_type,
+                'points' => $act->points ?? null,
+                'metadata' => $act->metadata ?? null,
+                'activity_date' => $act->activity_date?->format('Y-m-d H:i:s')
+                    ?? $act->created_at?->format('Y-m-d H:i:s'),
+            ])->all();
+
+            return $this->resourceResponse([
+                'success' => true,
+                'activities' => $rows,
+                'pagination' => [
+                    'total' => $result['total'],
+                    'per_page' => $perPage,
+                    'current_page' => $page,
+                    'last_page' => $result['last_page'],
+                ],
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to fetch activity for member', [
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => 'Failed to load activity.'], 500);
+        }
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Repositories\Billing;
 
+use App\Models\Model;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
@@ -343,6 +345,168 @@ class PaymentRepositoryTest extends RepositoryTestCase
 
         $this->assertEquals(3, $totalCount);
         $this->assertEquals(1, $failedCount);
+    }
+
+    public function test_find_by_member_subscriptions_returns_payments_for_all_member_subscriptions(): void
+    {
+        $member = $this->createMember();
+        $sub1 = $this->createSubscriptionForMember($member->id);
+        $sub2 = $this->createSubscriptionForMember($member->id);
+
+        $p1 = $this->createPayment(['subscription_id' => $sub1->id]);
+        $p2 = $this->createPayment(['subscription_id' => $sub2->id]);
+
+        // Payment for a different member's subscription — must NOT appear
+        $other = $this->createMember();
+        $subOther = $this->createSubscriptionForMember($other->id);
+        $this->createPayment(['subscription_id' => $subOther->id]);
+
+        $payments = $this->repository->findByMemberSubscriptions($member->id, $this->siteId);
+
+        $ids = $payments->pluck('id')->all();
+        $this->assertContains($p1->id, $ids);
+        $this->assertContains($p2->id, $ids);
+        $this->assertCount(2, $payments);
+    }
+
+    public function test_find_by_member_subscriptions_returns_empty_when_no_subscriptions(): void
+    {
+        $member = $this->createMember();
+        $payments = $this->repository->findByMemberSubscriptions($member->id, $this->siteId);
+
+        $this->assertCount(0, $payments);
+    }
+
+    public function test_find_by_member_subscriptions_scopes_to_site(): void
+    {
+        $member = $this->createMember();
+        $otherSiteId = $this->createSite();
+
+        // Subscription on a different site — should be excluded
+        $subOtherSite = Subscription::create([
+            'member_id' => $member->id,
+            'site_id' => $otherSiteId->id,
+            'plan_name' => 'Other',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 9.99,
+            'currency' => 'GBP',
+        ]);
+        $this->createPayment(['subscription_id' => $subOtherSite->id]);
+
+        $payments = $this->repository->findByMemberSubscriptions($member->id, $this->siteId);
+
+        $this->assertCount(0, $payments);
+    }
+
+    public function test_find_by_member_orders_returns_payments_linked_to_member_orders(): void
+    {
+        $member = $this->createMember();
+        $order = $this->createOrderForMember($member->id);
+
+        $p = Payment::create([
+            'order_id' => $order->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 100.00,
+            'currency' => 'GBP',
+            // No subscription_id — pure order payment
+        ]);
+
+        $payments = $this->repository->findByMemberOrders($member->id);
+
+        $this->assertTrue($payments->contains('id', $p->id));
+    }
+
+    public function test_find_by_member_orders_excludes_subscription_linked_payments_by_default(): void
+    {
+        $member = $this->createMember();
+        $sub = $this->createSubscriptionForMember($member->id);
+        $order = $this->createOrderForMember($member->id);
+
+        $subPayment = Payment::create([
+            'order_id' => $order->id,
+            'subscription_id' => $sub->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 50.00,
+            'currency' => 'GBP',
+        ]);
+
+        $payments = $this->repository->findByMemberOrders($member->id, true);
+
+        $this->assertFalse($payments->contains('id', $subPayment->id));
+    }
+
+    public function test_find_by_member_orders_includes_subscription_linked_when_flag_false(): void
+    {
+        $member = $this->createMember();
+        $sub = $this->createSubscriptionForMember($member->id);
+        $order = $this->createOrderForMember($member->id);
+
+        $subPayment = Payment::create([
+            'order_id' => $order->id,
+            'subscription_id' => $sub->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 50.00,
+            'currency' => 'GBP',
+        ]);
+
+        $payments = $this->repository->findByMemberOrders($member->id, false);
+
+        $this->assertTrue($payments->contains('id', $subPayment->id));
+    }
+
+    public function test_find_by_member_orders_does_not_return_other_members_payments(): void
+    {
+        $member = $this->createMember();
+        $other = $this->createMember();
+
+        $otherOrder = $this->createOrderForMember($other->id);
+        Payment::create([
+            'order_id' => $otherOrder->id,
+            'site_id' => $this->siteId,
+            'payment_method' => 'stripe',
+            'payment_provider' => 'stripe',
+            'status' => 'completed',
+            'amount' => 75.00,
+            'currency' => 'GBP',
+        ]);
+
+        $payments = $this->repository->findByMemberOrders($member->id, false);
+
+        $this->assertCount(0, $payments);
+    }
+
+    private function createSubscriptionForMember(int $memberId): Model
+    {
+        return Subscription::create([
+            'member_id' => $memberId,
+            'site_id' => $this->siteId,
+            'plan_name' => 'Premium',
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'price' => 29.99,
+            'currency' => 'GBP',
+        ]);
+    }
+
+    private function createOrderForMember(int $memberId): Model
+    {
+        return Order::create([
+            'site_id' => $this->siteId,
+            'user_id' => $memberId,
+            'order_number' => 'ORD-' . uniqid(),
+            'status' => 'completed',
+            'total' => 100.00,
+        ]);
     }
 
 

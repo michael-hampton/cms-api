@@ -3,6 +3,7 @@
 namespace App\Repositories\Billing;
 
 use App\Enums\PaymentStatus;
+use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Payment;
 use App\Repositories\Repository;
@@ -178,6 +179,48 @@ class PaymentRepository extends Repository
                 'payment_provider' => 'stripe',
             ]
         );
+    }
+
+    /**
+     * Fetch all payments linked to any of the member's subscriptions on a given
+     * site in a single JOIN query — eliminates the N+1 pattern.
+     *
+     * @return Collection
+     */
+    public function findByMemberSubscriptions(int $memberId, int $siteId): Collection
+    {
+        return Database::table('payments')
+            ->join('subscriptions', 'subscriptions.id', '=', 'payments.subscription_id')
+            ->where('subscriptions.member_id', $memberId)
+            ->where('subscriptions.site_id', $siteId)
+            ->select('payments.*')
+            ->orderByDesc('payments.created_at')
+            ->get();
+    }
+
+    /**
+     * Fetch all payments linked to orders belonging to a member.
+     *
+     * @param bool $excludeSubscriptionLinked When true, rows where
+     *   subscription_id IS NOT NULL are excluded to prevent double-counting
+     *   payments that were also captured via a subscription.
+     *
+     * @return Collection
+     */
+    public function findByMemberOrders(int $memberId, bool $excludeSubscriptionLinked = true): Collection
+    {
+        $query = Database::table('payments')
+            ->join('orders', 'orders.id', '=', 'payments.order_id')
+            ->where('orders.user_id', $memberId)
+            ->select('payments.*');
+
+        if ($excludeSubscriptionLinked) {
+            $query->whereNull('payments.subscription_id');
+        }
+
+        return $query
+            ->orderByDesc('payments.created_at')
+            ->get();
     }
 
     protected function getModelClass(): string

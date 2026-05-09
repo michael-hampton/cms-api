@@ -117,6 +117,31 @@ class OrderRepository extends Repository
         ]);
     }
 
+    public function getPaginatedForMember(
+        int $memberId,
+        int $siteId,
+        int $page,
+        int $perPage
+    ): array
+    {
+        $query = Order::where('user_id', $memberId)
+            ->where('site_id', $siteId)
+            ->orderByDesc('id');
+
+        $total = $query->count();
+
+        $rows = $query
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage)
+            ->get();
+
+        return [
+            'data' => $rows,
+            'total' => $total,
+            'last_page' => max(1, (int)ceil($total / $perPage)),
+        ];
+    }
+
     protected function getModelClass(): string
     {
         return Order::class;

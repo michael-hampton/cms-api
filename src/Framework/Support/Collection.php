@@ -747,11 +747,15 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         return $carry;
     }
 
-    public function sort(): static
+    public function sort(?callable $callback = null): static
     {
         $items = $this->items;
 
-        sort($items);
+        if ($callback !== null) {
+            usort($items, $callback);
+        } else {
+            sort($items);
+        }
 
         return new static($items);
     }
@@ -1018,6 +1022,15 @@ class Collection implements IteratorAggregate, Countable, JsonSerializable
         }
 
         return $this;
+    }
+
+    public function forPage(int $page, int $perPage): self
+    {
+        $offset = max(0, ($page - 1) * $perPage);
+
+        return new self(
+            array_slice($this->items, $offset, $perPage)
+        );
     }
 
 }

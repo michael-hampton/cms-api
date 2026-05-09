@@ -474,7 +474,7 @@ class ApiApplication
         try {
             $request = $this->container->resolve(Request::class);
             return $this->router->dispatch($method, $path, $request);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return $this->handleException($e);
         }
     }
@@ -482,7 +482,7 @@ class ApiApplication
     /**
      * Handle exceptions with proper error responses
      */
-    private function handleException(Exception $e): Response
+    private function handleException(Exception|\Error $e): Response
     {
         $data = [
             'error' => 'Internal Server Error',

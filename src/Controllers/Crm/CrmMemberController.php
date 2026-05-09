@@ -39,55 +39,45 @@ class CrmMemberController extends Controller
         }
 
         $siteId = SiteContext::getId();
-
         $search = $request->get('search', '');
         $status = $request->get('status');
         $agentId = $request->get('agent_id') ? (int)$request->get('agent_id') : null;
+        $country = $request->get('country');        // NEW
+        $subscriptionStatus = $request->get('subscription_status'); // NEW
         $page = max(1, (int)$request->get('page', 1));
 
         $result = $this->crmMemberRepository->searchMembers(
-            $siteId,
-            $search,
-            $status,
-            $agentId,
-            20,
-            $page
+            siteId: $siteId,
+            search: $search,
+            status: $status,
+            assignedAgentId: $agentId,
+            perPage: 20,
+            page: $page,
+            country: $country,
+            subscriptionStatus: $subscriptionStatus,
         );
 
         $agents = $this->crmMemberRepository->getAgents($siteId);
 
         if ($request->wantsJson()) {
-            return $this->resourceResponse(
-                [
-                    'items' => $result['data']->map(function ($member) {
-                        return [
-                            ...$member->toArray(),
-                            'created_at' => $member->created_at?->format('Y-m-d H:i:s'),
-                        ];
-                    }),
-                    'pagination' => [
-                        'total' => $result['total'],
-                        'per_page' => $result['per_page'],
-                        'current_page' => $result['current_page'],
-                        'last_page' => $result['last_page'],
-                    ],
-                ]
-            );
+            return $this->resourceResponse([
+                'items' => $result['data']->map(fn($m) => [
+                    ...$m->toArray(),
+                    'created_at' => $m->created_at?->format('Y-m-d H:i:s'),
+                ]),
+                'pagination' => [
+                    'total' => $result['total'],
+                    'per_page' => $result['per_page'],
+                    'current_page' => $result['current_page'],
+                    'last_page' => $result['last_page'],
+                ],
+            ]);
         }
 
         return $this->view('crm/members/index', [
             'members' => $result['data'],
-            'pagination' => [
-                'total' => $result['total'],
-                'per_page' => $result['per_page'],
-                'current_page' => $result['current_page'],
-                'last_page' => $result['last_page'],
-            ],
-            'filters' => [
-                'search' => $search,
-                'status' => $status,
-                'agent_id' => $agentId,
-            ],
+            'pagination' => $result,
+            'filters' => compact('search', 'status', 'agentId', 'country', 'subscriptionStatus'),
             'agents' => $agents,
         ]);
     }
@@ -245,6 +235,23 @@ class CrmMemberController extends Controller
         } catch (Exception $e) {
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to deactivate member.'], 500);
         }
+    }
+
+    public function filterOptions(): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthorized', 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $countries = $this->crmMemberRepository->getDistinctCountries($siteId);
+        $subscriptionStatuses = $this->crmMemberRepository->getDistinctSubscriptionStatuses($siteId);
+
+        return $this->resourceResponse([
+            'countries' => $countries,
+            'subscription_statuses' => $subscriptionStatuses,
+        ]);
     }
 
 }

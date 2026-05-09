@@ -31,7 +31,7 @@ class MemberNoteRepository extends Repository
             ->where('site_id', $siteId)
             ->whereNull('parent_id')
             ->with('replies')
-            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->limit($perPage)
             ->offset($offset)
             ->get();
@@ -55,8 +55,10 @@ class MemberNoteRepository extends Repository
 
     public function deleteParentAndChildren(MemberNote $note): void
     {
-        // Soft-delete replies too so threads don't become orphaned.
-        MemberNote::where('parent_id', $note->id)->delete();
+        MemberNote::where('parent_id', $note->id)
+            ->get()
+            ->each(fn(MemberNote $reply) => $reply->delete());
+
         $note->delete();
     }
 

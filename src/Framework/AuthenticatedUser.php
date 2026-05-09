@@ -34,4 +34,9 @@ class AuthenticatedUser extends Model
 
         return Gate::allows($ability, [$this, $model]);
     }
+
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
 }

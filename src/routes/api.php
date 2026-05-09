@@ -28,8 +28,10 @@ use App\Controllers\Cms\TerritoryController;
 use App\Controllers\Cms\UserController;
 use App\Controllers\Cms\VideoController;
 use App\Controllers\Crm\CrmAddressController;
+use App\Controllers\Crm\CrmCommunicationsController;
 use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
+use App\Controllers\Crm\CrmMemberNoteController;
 use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
 use App\Controllers\Crm\CrmSubscriptionController;
@@ -120,6 +122,9 @@ use App\Controllers\Vouchers\VoucherController;
 use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Middleware\AuthenticateMemberWithToken;
 
+/**
+ * @var $router \App\Framework\Http\Router
+ */
 $router->get('/api/boosts', [BoostController::class, 'index']);
 $router->get('/api/boosts/{id}', [BoostController::class, 'show']);
 $router->post('/api/boosts', [BoostController::class, 'store']);
@@ -497,6 +502,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         // crm
         $router->get('/crm/members', [CrmMemberController::class, 'index']);
+        $router->get('/crm/members/filter-options', [CrmMemberController::class, 'filterOptions']);
         $router->get('/crm/members/{id}', [CrmMemberController::class, 'show']);
         $router->post('/crm/members', [CrmMemberController::class, 'store']);
         $router->put('/crm/members/{id}', [CrmMemberController::class, 'update']);
@@ -504,6 +510,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/crm/orders', [CrmOrderController::class, 'index']);
         $router->get('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'index']);
         $router->put('/crm/members/{memberId}/consents', [CrmMemberConsentController::class, 'update']);
+
+        $router->get('/crm/members/{memberId}/orders', [CrmSubscriptionController::class, 'ordersForMember']);
+        $router->get('/crm/members/{memberId}/communications', [CrmCommunicationsController::class, 'index']);
+        $router->get('/crm/members/{memberId}/activity', [CrmSubscriptionController::class, 'activityForMember']);
+
+
+        //    "path": "/api/test-ste/crm/members/1/activity"
 
         $router->get(
             '/crm/subscriptions/{subscriptionId}/history',
@@ -518,6 +531,26 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post(
             '/crm/members/{memberId}/subscriptions',
             [CrmSubscriptionController::class, 'createForMember'],
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/notes',
+            [CrmMemberNoteController::class, 'index'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/notes',
+            [CrmMemberNoteController::class, 'store'],
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/notes/{id}',
+            [CrmMemberNoteController::class, 'update'],
+        );
+
+        $router->delete(
+            '/crm/members/{memberId}/notes/{id}',
+            [CrmMemberNoteController::class, 'destroy'],
         );
 
         $router->get(
