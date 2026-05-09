@@ -771,6 +771,37 @@ abstract class FunctionalTestCase extends TestCase
         return (int)$stmt->fetch()['count'];
     }
 
+    protected function assertSoftDeleted(string $table, array $attributes): void
+    {
+        $sql = "SELECT COUNT(*) as count FROM {$table}";
+        $bindings = [];
+        $conditions = [];
+
+        foreach ($attributes as $key => $value) {
+            if (is_null($value)) {
+                $conditions[] = "`{$key}` IS NULL";
+            } else {
+                $conditions[] = "`{$key}` = :{$key}";
+                $bindings[$key] = $value;
+            }
+        }
+
+        $conditions[] = "`deleted_at` IS NOT NULL";
+
+        $sql .= ' WHERE ' . implode(' AND ', $conditions);
+
+        $stmt = $this->database->query($sql, $bindings);
+
+        $count = (int)$stmt->fetch()['count'];
+
+        $this->assertGreaterThan(
+            0,
+            $count,
+            "Failed asserting that table [{$table}] contains soft deleted record with attributes: "
+            . json_encode($attributes)
+        );
+    }
+
     protected function assertDatabaseCount(string $string, int $int)
     {
         $count = $this->countRecords($string);

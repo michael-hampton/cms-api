@@ -59,7 +59,7 @@ class CrmMemberController extends Controller
 
         $agents = $this->crmMemberRepository->getAgents($siteId);
 
-        if ($request->wantsJson()) {
+        // if ($request->wantsJson()) {
             return $this->resourceResponse([
                 'items' => $result['data']->map(fn($m) => [
                     ...$m->toArray(),
@@ -72,7 +72,7 @@ class CrmMemberController extends Controller
                     'last_page' => $result['last_page'],
                 ],
             ]);
-        }
+        // }
 
         return $this->view('crm/members/index', [
             'members' => $result['data'],

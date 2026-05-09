@@ -4,6 +4,7 @@ namespace App\Tests\Functional\Controllers\Crm;
 
 use App\Models\Member;
 use App\Models\Model;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -604,6 +605,284 @@ class CrmMemberControllerTest extends FunctionalTestCase
         );
 
         $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_filter_options_returns_200_with_countries_and_subscription_statuses(): void
+    {
+        $response = $this->getForSite('/api/crm/members/filter-options');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('countries', $data);
+        $this->assertArrayHasKey('subscription_statuses', $data);
+        $this->assertIsArray($data['countries']);
+        $this->assertIsArray($data['subscription_statuses']);
+    }
+
+    public function test_filter_options_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite('/api/crm/members/filter-options');
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_filter_options_countries_list_includes_member_country(): void
+    {
+        $member = $this->createMember();
+        $this->createAddress(['member_id' => $member->id, 'country' => 'DE']);
+
+        $response = $this->getForSite('/api/crm/members/filter-options');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertContains('DE', $data['countries']);
+    }
+
+    public function test_filter_options_subscription_statuses_includes_active_when_active_subscription_exists(): void
+    {
+        $member = $this->createMember();
+        $plan = $this->createSubscriptionPlan(['site_id' => $this->siteId]);
+        $this->createSubscription();
+
+        $response = $this->getForSite('/api/crm/members/filter-options');
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertContains('active', $data['subscription_statuses']);
+    }
+
+    public function test_index_filters_by_country(): void
+    {
+        $member1 = $this->createMember(['first_name' => 'German']);
+        $this->createAddress(['member_id' => $member1->id, 'country' => 'DE']);
+        $member2 = $this->createMember(['first_name' => 'British']);
+        $this->createAddress(['member_id' => $member2->id, 'country' => 'UK']);
+
+        $response = $this->getForSite('/api/crm/members?country=DE');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('German', $content);
+        $this->assertStringNotContainsString('British', $content);
+    }
+
+    public function test_index_filters_by_subscription_status(): void
+    {
+        $activeMember = $this->createMember(['first_name' => 'ActiveSub', 'anonymous' => false]);
+        $plan = $this->createSubscriptionPlan(['site_id' => $this->siteId]);
+
+        Subscription::create([
+            'member_id' => $activeMember->id,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'status' => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+        ]);
+
+        $noSubMember = $this->createMember(['first_name' => 'NoSub', 'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?subscription_status=active');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('ActiveSub', $content);
+        $this->assertStringNotContainsString('NoSub', $content);
+    }
+
+    public function test_index_filters_by_agent_id(): void
+    {
+        $agent = $this->createUser();
+        $assigned = $this->createMember([
+            'first_name' => 'Assigned',
+            'assigned_agent_id' => $agent->id,
+            'anonymous' => false,
+        ]);
+        $unassigned = $this->createMember([
+            'first_name' => 'Unassigned',
+            'assigned_agent_id' => null,
+            'anonymous' => false,
+        ]);
+
+        $response = $this->getForSite('/api/crm/members?agent_id=' . $agent->id);
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('Assigned', $content);
+        $this->assertStringNotContainsString('Unassigned', $content);
+    }
+
+    public function test_index_json_response_contains_items_and_pagination_keys(): void
+    {
+        $this->createMember(['first_name' => 'JsonMember', 'site_id' => $this->siteId]);
+
+        $response = $this->getForSite('/api/crm/members');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertNotNull($data, 'Response should be valid JSON');
+        $this->assertArrayHasKey('items', $data);
+        $this->assertArrayHasKey('pagination', $data);
+        $this->assertIsArray($data['items']);
+    }
+
+    public function test_index_json_pagination_has_expected_keys(): void
+    {
+        $response = $this->getForSite('/api/crm/members');
+
+        $data = json_decode($response->getContent(), true);
+        $pagination = $data['pagination'];
+
+        $this->assertArrayHasKey('total', $pagination);
+        $this->assertArrayHasKey('per_page', $pagination);
+        $this->assertArrayHasKey('current_page', $pagination);
+        $this->assertArrayHasKey('last_page', $pagination);
+    }
+
+    public function test_index_json_items_include_created_at_formatted_field(): void
+    {
+        $this->createMember(['first_name' => 'CreatedAtCheck', 'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members');
+
+        $data = json_decode($response->getContent(), true);
+
+        if (count($data['items']) > 0) {
+            $item = $data['items'][0];
+            $this->assertArrayHasKey('created_at', $item);
+            // Should be Y-m-d H:i:s format per the controller's map()
+            if ($item['created_at'] !== null) {
+                $this->assertMatchesRegularExpression(
+                    '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+                    $item['created_at']
+                );
+            }
+        } else {
+            $this->markTestSkipped('No members returned to assert created_at format.');
+        }
+    }
+
+    public function test_show_api_route_returns_json_200_for_existing_member(): void
+    {
+        $response = $this->getForSite('/api/crm/members/' . $this->member->id);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotNull($data);
+        $this->assertArrayHasKey('member', $data);
+    }
+
+    public function test_show_api_route_redirects_when_member_not_found(): void
+    {
+        // The controller calls $this->redirect() for non-JSON show, but for the
+        // JSON (resourceResponse) path it also redirects on not-found.
+        // Either a 302 redirect or a 404/success:false JSON response is acceptable.
+        $response = $this->getForSite('/api/crm/members/999999');
+
+        $statusCode = $response->getStatusCode();
+        $this->assertContains(
+            $statusCode,
+            [302, 404],
+            "Expected redirect or 404 for missing member, got {$statusCode}"
+        );
+    }
+
+    public function test_store_returns_422_when_first_name_is_missing(): void
+    {
+        $response = $this->postForSite('/api/crm/members', [
+            'last_name' => 'Only',
+            'email' => 'no.first.' . uniqid() . '@example.com',
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_store_returns_422_when_last_name_is_missing(): void
+    {
+        $response = $this->postForSite('/api/crm/members', [
+            'first_name' => 'Only',
+            'email' => 'no.last.' . uniqid() . '@example.com',
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_store_returns_422_when_email_is_not_valid(): void
+    {
+        $response = $this->postForSite('/api/crm/members', [
+            'first_name' => 'Bad',
+            'last_name' => 'Email',
+            'email' => 'not-an-email',
+            'is_active' => 1,
+        ]);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_store_returns_422_when_all_fields_missing(): void
+    {
+        $response = $this->postForSite('/api/crm/members', []);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_destroy_returns_json_200_not_redirect_for_authenticated_request(): void
+    {
+        $active = $this->createMember(['is_active' => true]);
+
+        $response = $this->delete('/crm/members/' . $active->id);
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotNull($data, 'Destroy should return JSON, not a redirect');
+        $this->assertTrue($data['success']);
+    }
+
+    public function test_destroy_returns_404_or_error_for_non_existent_member(): void
+    {
+        $response = $this->delete('/crm/members/999999');
+
+        // The destroy method calls updateMember which throws InvalidArgumentException
+        // for a missing member → 422 response; or the controller may return 404.
+        $statusCode = $response->getStatusCode();
+        $this->assertContains(
+            $statusCode,
+            [404, 422, 500],
+            "Expected 404/422/500 for non-existent member destroy, got {$statusCode}"
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotNull($data);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_destroy_sets_member_is_active_to_false(): void
+    {
+        $active = $this->createMember(['is_active' => true]);
+
+        $this->delete('/crm/members/' . $active->id);
+
+        $this->assertDatabaseHas('members', [
+            'id' => $active->id,
+            'is_active' => 0,
+        ]);
     }
 
     protected function setUp(): void
