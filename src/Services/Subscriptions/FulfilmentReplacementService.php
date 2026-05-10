@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Subscriptions\IssueReplacementRequested;
 use App\Framework\Support\Logger;
 use App\Repositories\Subscriptions\FulfilmentReplacementRepository;
@@ -70,13 +72,13 @@ class FulfilmentReplacementService
             throw new \InvalidArgumentException("Subscription does not belong to this site.");
         }
 
-        if ($subscription->status !== 'active') {
+        if ($subscription->status !== SubscriptionStatus::ACTIVE->value) {
             throw new \InvalidArgumentException(
                 "Only active subscriptions can have issues replaced. Current status: {$subscription->status}."
             );
         }
 
-        if ($subscription->delivery_type && $subscription->delivery_type !== 'print') {
+        if ($subscription->delivery_type && $subscription->delivery_type !== SubscriptionType::PRINTED->value) {
             throw new \InvalidArgumentException(
                 "Issue replacement is only available for print subscriptions."
             );
@@ -99,7 +101,6 @@ class FulfilmentReplacementService
             issueId: $issueId,
             reason: $reason,
             createdBy: $agentId,
-            status: 'pending',
         );
 
         // ── Emit event (listener dispatches the job) ───────────────────────

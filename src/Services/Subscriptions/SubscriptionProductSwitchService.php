@@ -149,7 +149,7 @@ class SubscriptionProductSwitchService
 
             // Step 1 — End old subscription
             $this->subscriptionRepository->update($oldSubscription->id, [
-                'status' => 'replaced',
+                'status' => SubscriptionStatus::REPLACED->value,
                 'ended_at' => $now->format('Y-m-d H:i:s'),
                 'end_reason' => SubscriptionEndReason::PRODUCT_CHANGE->value,
                 'auto_renew' => false,

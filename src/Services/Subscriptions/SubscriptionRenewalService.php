@@ -35,9 +35,8 @@ use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
  */
 class SubscriptionRenewalService
 {
-
     private const NON_RENEWABLE_STATUSES = [
-        'replaced',
+        SubscriptionStatus::REPLACED->value,
         SubscriptionStatus::EXPIRED->value,
     ];
 
@@ -141,7 +140,7 @@ class SubscriptionRenewalService
 
             // Step 1 — End the old subscription
             $this->subscriptionRepository->update($oldSubscription->id, [
-                'status' => 'replaced',
+                'status' => SubscriptionStatus::REPLACED->value,
                 'ended_at' => $now->format('Y-m-d H:i:s'),
                 'end_reason' => SubscriptionEndReason::RENEWAL->value,
                 'auto_renew' => false,
