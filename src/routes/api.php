@@ -533,6 +533,21 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [CrmSubscriptionController::class, 'createForMember'],
         );
 
+        $router->post('/crm/members/{memberId}/subscriptions/{subscriptionId}/renew',
+            [CrmSubscriptionController::class, 'renewForMember']);
+
+        $router->get('/crm/members/{memberId}/subscriptions/{subscriptionId}/switch-preview',
+            [CrmSubscriptionController::class, 'switchPreview']);
+
+        $router->post('crm/members/{memberId}/subscriptions/{subscriptionId}/switch',
+            [CrmSubscriptionController::class, 'switchProductForMember']);
+
+        $router->post('crm/members/{memberId}/subscriptions/{subscriptionId}/issues/{issueId}/replace',
+            [CrmSubscriptionController::class, 'requestIssueReplacement']);
+
+        $router->post('crm/members/{memberId}/subscriptions/{subscriptionId}/suspend',
+            [CrmSubscriptionController::class, 'suspendForMember']);
+
         $router->get(
             '/crm/members/{memberId}/notes',
             [CrmMemberNoteController::class, 'index'],

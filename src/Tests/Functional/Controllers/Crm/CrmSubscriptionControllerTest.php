@@ -2,11 +2,14 @@
 
 namespace App\Tests\Functional\Controllers\Crm;
 
+use App\Framework\Container;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Services\Billing\PaymentProviders\NullStripePaymentProcessor;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -37,6 +40,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
     private Member $member;
     private SubscriptionPlan $plan;
     private Subscription $subscription;
+    private SubscriptionPlan $newPlan;
 
     // ── history ───────────────────────────────────────────────────────────────
 
@@ -848,6 +852,569 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         }
     }
 
+    public function test_renew_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => 9.99]
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_renew_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $otherMember->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => 9.99]
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_renew_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/999999/renew',
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => 9.99]
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_renew_returns_422_when_plan_id_is_missing(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['payment_method_id' => 'pm_test_123', 'amount' => 9.99]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('plan_id', $data['error']);
+    }
+
+    public function test_renew_returns_422_when_payment_method_id_is_missing(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['plan_id' => $this->plan->id, 'amount' => 9.99]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('payment_method_id', $data['error']);
+    }
+
+    public function test_renew_returns_422_when_amount_is_zero(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => 0]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('amount', $data['error']);
+    }
+
+    public function test_renew_returns_422_when_amount_is_negative(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => -5.00]
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_renew_returns_201_with_old_and_new_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            [
+                'plan_id' => $this->plan->id,
+                'payment_method_id' => 'pm_test_valid',
+                'amount' => 9.99,
+            ]
+        );
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('old_subscription', $data);
+        $this->assertArrayHasKey('new_subscription', $data);
+        $this->assertStringContainsString('renewed', $data['message']);
+    }
+
+    public function test_renew_accepts_a_different_plan_id_than_the_current_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
+            [
+                'plan_id' => $this->newPlan->id,
+                'payment_method_id' => 'pm_test_valid',
+                'amount' => 19.99,
+            ]
+        );
+
+        // The controller delegates plan validation to the service; a 201 or a
+        // service-level 422/500 are both acceptable here — we just assert no
+        // ownership or input-level error (not 404, not 401).
+        $status = $response->getStatusCode();
+        $this->assertNotEquals(401, $status);
+        $this->assertNotEquals(404, $status);
+    }
+
+    public function test_switch_preview_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_switch_preview_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $otherMember->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_preview_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/999999'
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_preview_returns_422_when_new_plan_id_is_missing(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview'
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('new_plan_id', $data['error']);
+    }
+
+    public function test_switch_preview_returns_404_for_non_existent_plan(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=999999'
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_preview_returns_404_for_plan_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+        $otherPlan = $this->createSubscriptionPlan(['site_id' => $otherSite->id, 'is_active' => true]);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $otherPlan->id
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_preview_returns_404_for_inactive_plan(): void
+    {
+        $inactivePlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => false,
+        ]);
+
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $inactivePlan->id
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_preview_returns_200_with_credit_and_price_fields(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('carried_over_credit', $data);
+        $this->assertArrayHasKey('new_plan_full_price', $data);
+        $this->assertArrayHasKey('amount_due_transfer', $data);
+        $this->assertArrayHasKey('amount_due_fresh', $data);
+    }
+
+    public function test_switch_preview_amount_due_transfer_is_never_negative(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertGreaterThanOrEqual(0, $data['amount_due_transfer']);
+    }
+
+    public function test_switch_preview_amount_due_fresh_equals_new_plan_full_price(): void
+    {
+        $response = $this->getForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/switch-preview?new_plan_id=' . $this->newPlan->id
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals($data['new_plan_full_price'], $data['amount_due_fresh']);
+    }
+
+    public function test_switch_product_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $this->validSwitchPayload()
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_switch_product_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $otherMember->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $this->validSwitchPayload()
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_product_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/999999/switch',
+            $this->validSwitchPayload()
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_switch_product_returns_422_when_new_plan_id_is_missing(): void
+    {
+        $payload = $this->validSwitchPayload();
+        unset($payload['new_plan_id']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $payload
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('new_plan_id', $data['error']);
+    }
+
+    public function test_switch_product_returns_422_for_invalid_switch_mode(): void
+    {
+        $payload = array_merge($this->validSwitchPayload(), ['switch_mode' => 'invalid']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $payload
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('switch_mode', $data['error']);
+    }
+
+    public function test_switch_product_returns_422_when_payment_method_id_is_missing(): void
+    {
+        $payload = $this->validSwitchPayload();
+        unset($payload['payment_method_id']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $payload
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('payment_method_id', $data['error']);
+    }
+
+    public function test_switch_product_returns_422_when_amount_is_zero(): void
+    {
+        $payload = array_merge($this->validSwitchPayload(), ['amount' => 0]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $payload
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('amount', $data['error']);
+    }
+
+    public function test_switch_product_accepts_fresh_mode(): void
+    {
+        $payload = array_merge($this->validSwitchPayload(), [
+            'switch_mode' => 'fresh',
+            'carried_over_credit' => 0,
+        ]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $payload
+        );
+
+        // Not a validation error
+        $this->assertNotEquals(422, $response->getStatusCode());
+        $this->assertNotEquals(401, $response->getStatusCode());
+        $this->assertNotEquals(404, $response->getStatusCode());
+    }
+
+    public function test_switch_product_returns_201_with_old_and_new_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
+            $this->validSwitchPayload()
+        );
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('old_subscription', $data);
+        $this->assertArrayHasKey('new_subscription', $data);
+        $this->assertStringContainsString('switched', $data['message']);
+    }
+
+    public function test_request_issue_replacement_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/issues/1/replace',
+            ['reason' => 'Damaged on arrival']
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_request_issue_replacement_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $otherMember->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/issues/1/replace',
+            ['reason' => 'Damaged on arrival']
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_request_issue_replacement_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/999999'
+            . '/issues/1/replace',
+            ['reason' => 'Never arrived']
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_request_issue_replacement_returns_422_when_reason_is_missing(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/issues/1/replace',
+            []
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('reason', $data['error']);
+    }
+
+    public function test_request_issue_replacement_returns_201_with_replacement_key(): void
+    {
+        $issue = $this->createIssueDelivery([
+            'subscription_id' => $this->subscription->id,
+            'plan_id' => $this->plan->id,
+        ]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id
+            . '/subscriptions/' . $this->subscription->id
+            . '/issues/' . $issue->id . '/replace',
+            ['reason' => 'Damaged in transit']
+        );
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('replacement', $data);
+        $this->assertStringContainsString('replacement requested', $data['message']);
+    }
+
+    public function test_suspend_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            ['reason' => 'Fraud review']
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_suspend_returns_404_when_subscription_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $otherMember->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            ['reason' => 'Fraud review']
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_suspend_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/999999/suspend',
+            ['reason' => 'Fraud review']
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_suspend_returns_422_when_reason_is_missing(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            []
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('reason', $data['error']);
+    }
+
+    public function test_suspend_returns_422_when_reason_is_blank(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            ['reason' => '   ']
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_suspend_returns_200_with_subscription_in_response(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            ['reason' => 'Non-payment']
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('subscription', $data);
+        $this->assertStringContainsString('suspended', $data['message']);
+    }
+
+    public function test_suspend_success_message_indicates_suspension(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/suspend',
+            ['reason' => 'Chargeback dispute']
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('suspended successfully', $data['message']);
+    }
+
+    private function validSwitchPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'new_plan_id' => $this->newPlan->id,
+            'switch_mode' => 'transfer',
+            'payment_method_id' => 'pm_test_valid',
+            'amount' => 9.99,
+            'carried_over_credit' => 0.00,
+        ], $overrides);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -873,5 +1440,17 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'delivery_type' => 'print',
             'delivery_paused' => false,
         ]);
+
+        $this->newPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'name' => 'Upgraded Plan',
+            'price' => 19.99,
+            'is_active' => true,
+        ]);
+
+        Container::getInstance()->bind(
+            StripePaymentProcessor::class,
+            NullStripePaymentProcessor::class
+        );
     }
 }

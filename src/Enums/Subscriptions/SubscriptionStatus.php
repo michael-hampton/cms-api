@@ -6,6 +6,7 @@ enum SubscriptionStatus: string
 {
     case PENDING = 'pending';
     case ACTIVE = 'active';
+    case PAUSED = 'paused';
     case PAST_DUE = 'past_due';
     case CANCELLED = 'cancelled';
     case EXPIRED = 'expired';
@@ -13,4 +14,6 @@ enum SubscriptionStatus: string
     case TRIALING = 'trialing';
     case SCHEDULED = 'scheduled';
     case GRACE_PERIOD = 'grace_period';
+    case SUSPENDED = 'suspended';
+    case REPLACED = 'replaced';
 }
