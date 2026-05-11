@@ -38,6 +38,49 @@ $isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
 $isSubscription = !empty($cartSubscriptionItems);
 $isOneTimeCart = $isOneTimeCart ?? false;
 $isMixedSubscriptionCart = $isMixedSubscriptionCart ?? false;
+
+// ── Basket type derivation ────────────────────────────────────────────────
+// Inspect every cart item (subscription + product) to determine whether the
+// basket contains print, digital, or a combination of both.
+// Subscription items carry delivery_type in their options array.
+// Non-subscription product items are assumed to be physical (print).
+$hasPrint = false;
+$hasDigital = false;
+
+foreach ($items ?? [] as $item) {
+    if (!empty($item['subscription_plan_id'])) {
+        $deliveryType = strtolower($item['options']['delivery_type'] ?? 'print');
+        if ($deliveryType === 'digital') {
+            $hasDigital = true;
+        } else {
+            // 'print', 'print_digital', or any physical type
+            $hasPrint = true;
+            if (str_contains($deliveryType, 'digital')) {
+                $hasDigital = true;
+            }
+        }
+    } else {
+        // Plain product — physical by nature
+        $hasPrint = true;
+    }
+}
+
+if ($hasPrint && $hasDigital) {
+    $basketType = 'print_and_digital';
+} elseif ($hasDigital) {
+    $basketType = 'digital_only';
+} else {
+    $basketType = 'print_only';
+}
+
+// For digital-only baskets the shipping address is never needed.
+// Override the controller-supplied $requiresShipping so every downstream
+// component (address-lookup, validation) picks up the correct value.
+if ($basketType === 'digital_only') {
+    $requiresShipping = false;
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 $subscriptionCartSnapshot = array_values(array_map(function ($item) {
     $options = $item['options'] ?? [];
     $planId = (int)($item['subscription_plan_id'] ?? 0);
@@ -51,6 +94,7 @@ $subscriptionCartSnapshot = array_values(array_map(function ($item) {
             'is_one_time' => $plan?->isOneTime() ?? false,
     ];
 }, $cartSubscriptionItems));
+
 $site = SiteContext::slug();
 $apiBase = '/api/' . $site;
 ?>
@@ -229,7 +273,7 @@ $apiBase = '/api/' . $site;
         color: var(--success-color);
     }
 
-    /* ── Order summary overrides ──────────────────────────────────── */
+    /* ── Order summary ────────────────────────────────────────────── */
     .order-summary {
         position: sticky;
         top: 100px;
@@ -294,27 +338,30 @@ $apiBase = '/api/' . $site;
 @include('checkout/components/page-header', [
 'title'       => 'Checkout',
 'breadcrumbs' => [
-['label' => 'Home',  'href' => '/'],
-['label' => 'Cart',  'href' => '/cart'],
+['label' => 'Home',     'href' => '/'],
+['label' => 'Cart',     'href' => '/cart'],
 ['label' => 'Checkout'],
 ],
 ])
 @endsection
 
 @section('content')
+
 <!-- ── Progress stepper (steps mode only) ───────────────────────── -->
 <?php if ($checkoutMode === 'steps'): ?>
     <div class="checkout-progress">
         <div class="progress-steps">
             <div class="progress-line" id="progress-line" style="width: 33%;"></div>
-            <div class="step completed" id="step-1-indicator" onclick="window.location.href='/cart'"
-                 title="Return to cart">
+            <div class="step completed" id="step-1-indicator"
+                 onclick="window.location.href='/cart'" title="Return to cart">
                 <div class="step-circle">✓</div>
                 <div class="step-label">Cart</div>
             </div>
             <div class="step active" id="step-2-indicator">
                 <div class="step-circle">2</div>
-                <div class="step-label">Shipping</div>
+                <div class="step-label">
+                    <?= $basketType === 'digital_only' ? 'Details' : 'Shipping' ?>
+                </div>
             </div>
             <div class="step" id="step-3-indicator">
                 <div class="step-circle">3</div>
@@ -349,47 +396,57 @@ $apiBase = '/api/' . $site;
 <?php endif; ?>
 
 <div class="checkout-layout">
+
     <!-- ── Left: form ─────────────────────────────────────────── -->
     <div class="checkout-form">
         <form id="checkout-form">
 
-            <!-- ════ STEP 2: Contact + Shipping ════ -->
+            <!-- ════ STEP 2: Contact + Shipping / Details ════ -->
             <?php if ($checkoutMode === 'steps'): ?>
-            <div id="step-2-section"><?php endif; ?>
+            <div id="step-2-section">
+                <?php endif; ?>
 
                 @include('checkout/components/form/billing-form', [
                 'member' => $member ?? null,
                 'requiresShipping' => $requiresShipping ?? true,
-                'showSavedAddresses' => true,
+                'basketType' => $basketType,
+                ])
+
+                <!-- Gift options — shown for all basket types -->
+                @include('checkout/components/form/gift-fields', [
+                'basketType' => $basketType,
+                'isGift' => false,
                 ])
 
                 <?php if ($checkoutMode === 'steps'): ?>
                     @include('checkout/components/form/button', [
                     'id'      => 'continue-to-payment-btn',
-                    'type' => 'button',
+                    'type'    => 'button',
                     'label'   => 'Continue to Payment',
                     'variant' => 'primary',
                     'onclick' => 'window.checkoutManager.advanceToPayment()',
                     'style'   => 'margin-top: 2rem;',
-                    'icon' => '
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-                         stroke-linecap="round" stroke-linejoin="round">
+                    'icon'    => '
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
                         <path d="M2 9h20"></path>
                         <rect x="5" y="12" width="3" height="2" rx="0.5"></rect>
                         <path d="M10 13h7"></path>
-                    </svg>'
+                    </svg>',
                     ])
                 <?php endif; ?>
 
-                <?php if ($checkoutMode === 'steps'): ?></div><?php endif; ?>
+                <?php if ($checkoutMode === 'steps'): ?>
+            </div>
+        <?php endif; ?>
 
             <!-- ════ STEP 3: Payment ════ -->
             <?php if ($checkoutMode === 'steps'): ?>
-            <div id="step-3-section" style="display: none;"><?php endif; ?>
+            <div id="step-3-section" style="display: none;">
+                <?php endif; ?>
 
                 @include('checkout/components/payment-method-selector')
-
                 @include('checkout/components/saved-cards')
 
                 <div id="payment-request-button"></div>
@@ -407,20 +464,23 @@ $apiBase = '/api/' . $site;
                 'class' => 'full-width',
                 'type' => 'textarea',
                 'id' => 'notes',
-                'value' => ''
+                'value' => '',
                 ])
                 @include('checkout/components/form/form-section', ['close' => true])
 
                 <?php if ($checkoutMode === 'steps'): ?>
                     @include('checkout/components/form/button', [
-                    'label'   => '← Back to Shipping',
+                    'label'   => '← Back to ' . ($basketType === 'digital_only' ? 'Details' : 'Shipping'),
                     'variant' => 'secondary',
                     'onclick' => 'window.checkoutManager.goToStep(2)',
                     'style'   => 'margin-top: 1rem;',
                     ])
                 <?php endif; ?>
 
-                <?php if ($checkoutMode === 'steps'): ?></div><?php endif; ?>
+                <?php if ($checkoutMode === 'steps'): ?>
+            </div>
+        <?php endif; ?>
+
         </form>
     </div>
 
@@ -442,6 +502,7 @@ $apiBase = '/api/' . $site;
     'submitBtnLabel' => 'Place Order',
     'backUrl' => '/cart',
     ])
+
 </div>
 
 @endsection
@@ -458,6 +519,7 @@ $apiBase = '/api/' . $site;
             'initialShipping' => (float)($shipping ?? 0),
             'subscriptionCartSnapshot' => $subscriptionCartSnapshot,
     ]) ?>;
+
     const API_BASE = CHECKOUT_BOOTSTRAP.apiBase;
     const PLAN_CURRENCY = CHECKOUT_BOOTSTRAP.planCurrency;
     const TAX_RATE = CHECKOUT_BOOTSTRAP.taxRate;
@@ -473,24 +535,13 @@ $apiBase = '/api/' . $site;
 @js('checkout-auth.js')
 
 <script>
-    /*
-     * Restore the correct card UI when the user switches back to "card" after
-     * having selected another payment method (e.g. PayPal → Card).
-     *
-     * payment-method-selector.js calls window.onPaymentMethodChange(method)
-     * on every selection. Without this hook, #saved-cards-section stays hidden
-     * because showPaymentSection() hides it, and only the Stripe element reappears.
-     *
-     * Fix: if cards were already fetched, re-run displaySavedCards() which shows
-     * #saved-cards-section and hides #new-card-section. Otherwise do nothing —
-     * saved-cards.js loadSavedCards() will handle first-load visibility.
-     */
     window.onPaymentMethodChange = function (method) {
         if (window.checkoutManager) {
             window.checkoutManager.handlePaymentMethodChange(method);
         }
     };
 </script>
+
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
@@ -499,6 +550,7 @@ $apiBase = '/api/' . $site;
             'stripeKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'checkoutMode' => $checkoutMode,
             'requiresShipping' => $requiresShipping ?? true,
+            'basketType' => $basketType,
             'isMixedCart' => $isMixedCart,
             'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
             'isSubscriptionCart' => $isSubscription,
@@ -512,12 +564,14 @@ $apiBase = '/api/' . $site;
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
     const SITE = <?= json_encode($site) ?>;
 
+    // ── StripeService ────────────────────────────────────────────────────
     class StripeService {
         constructor(stripeKey) {
             this.stripeKey = stripeKey;
             this.stripe = null;
             this.elements = null;
             this.cardElement = null;
+            this._cardComplete = false;
         }
 
         async init() {
@@ -537,6 +591,8 @@ $apiBase = '/api/' . $site;
                 this.cardElement.mount('#card-element');
                 this.cardElement.on('change', (event) => {
                     document.getElementById('card-errors').textContent = event.error ? event.error.message : '';
+                    this._cardComplete = event.complete;
+                    window.checkoutManager?.syncPlaceOrderButton();
                 });
             }
 
@@ -544,19 +600,22 @@ $apiBase = '/api/' . $site;
             if (paymentSection) paymentSection.style.display = 'none';
         }
 
+        isReady() {
+            // If a saved card is selected, Stripe element doesn't need to be filled
+            if (window.selectedCardId) return true;
+            // cardElement tracks its complete state via the 'change' event
+            return this._cardComplete === true;
+        }
+
         async createPaymentMethod(billingDetails) {
-            if (window.selectedCardId) {
-                return {id: window.selectedCardId};
-            }
+            if (window.selectedCardId) return {id: window.selectedCardId};
 
             const {paymentMethod, error} = await this.stripe.createPaymentMethod({
                 type: 'card',
                 card: this.cardElement,
                 billing_details: billingDetails,
             });
-
             if (error) throw new Error(error.message);
-
             return paymentMethod;
         }
 
@@ -564,21 +623,16 @@ $apiBase = '/api/' . $site;
             const paymentResult = window.selectedCardId
                 ? await this.stripe.confirmCardPayment(clientSecret, {payment_method: window.selectedCardId})
                 : await this.stripe.confirmCardPayment(clientSecret, {
-                    payment_method: {
-                        card: this.cardElement,
-                        billing_details: billingDetails,
-                    },
+                    payment_method: {card: this.cardElement, billing_details: billingDetails},
                     setup_future_usage: 'off_session',
                 });
 
-            if (paymentResult.error) {
-                throw new Error(paymentResult.error.message);
-            }
-
+            if (paymentResult.error) throw new Error(paymentResult.error.message);
             return paymentResult.paymentIntent;
         }
     }
 
+    // ── ApiService ───────────────────────────────────────────────────────
     class ApiService {
         constructor(apiBase) {
             this.apiBase = apiBase;
@@ -647,6 +701,7 @@ $apiBase = '/api/' . $site;
         }
     }
 
+    // ── CartFlowService ──────────────────────────────────────────────────
     class CartFlowService {
         constructor(apiService, subscriptionItems) {
             this.api = apiService;
@@ -654,28 +709,25 @@ $apiBase = '/api/' . $site;
         }
 
         get oneTimeItems() {
-            return this.subscriptionItems.filter((item) => item.is_one_time);
+            return this.subscriptionItems.filter(i => i.is_one_time);
         }
 
         get recurringItems() {
-            return this.subscriptionItems.filter((item) => !item.is_one_time);
+            return this.subscriptionItems.filter(i => !i.is_one_time);
         }
 
         async replaceCart(items) {
             const clearResult = await this.api.clearCart();
-            if (!clearResult.success) {
-                throw new Error(clearResult.message || 'Failed to prepare cart for checkout.');
-            }
+            if (!clearResult.success) throw new Error(clearResult.message || 'Failed to prepare cart for checkout.');
 
             for (const item of items) {
                 const addResult = await this.api.addSubscriptionItem(item);
-                if (!addResult.success) {
-                    throw new Error(addResult.message || 'Failed to rebuild checkout cart.');
-                }
+                if (!addResult.success) throw new Error(addResult.message || 'Failed to rebuild checkout cart.');
             }
         }
     }
 
+    // ── CheckoutManager ──────────────────────────────────────────────────
     class CheckoutManager {
         constructor({stripeService, apiService, cartFlowService, config}) {
             this.stripe = stripeService;
@@ -697,11 +749,35 @@ $apiBase = '/api/' . $site;
 
         bindEvents() {
             document.getElementById('place-order-btn')?.addEventListener('click', () => this.process());
+
+            // Re-evaluate button when saved card selection changes
+            document.addEventListener('change', (e) => {
+                if (e.target?.name === 'saved_card' || e.target?.name === 'payment_method') {
+                    this.syncPlaceOrderButton();
+                }
+            });
+        }
+
+        syncPlaceOrderButton() {
+            const btn = document.getElementById('place-order-btn');
+            if (!btn) return;
+
+            const selectedMethod = window.selectedPaymentMethod ?? 'card';
+
+            if (selectedMethod !== 'card') {
+                // PayPal / bank — Stripe element not required
+                btn.disabled = false;
+                btn.title = '';
+                return;
+            }
+
+            const hasCard = window.selectedCardId || this.stripe._cardComplete === true;
+            btn.disabled = !hasCard;
+            btn.title = hasCard ? '' : 'Please enter your card details to continue';
         }
 
         handlePaymentMethodChange(method) {
             if (method !== 'card') return;
-
             if (window.savedCards && window.savedCards.length > 0
                 && typeof window.displaySavedCards === 'function') {
                 window.displaySavedCards();
@@ -713,20 +789,63 @@ $apiBase = '/api/' . $site;
             if (block) block.style.display = this.config.isSubscriptionCart ? '' : 'none';
         }
 
+        // ── Field validation ─────────────────────────────────────────────
+        /**
+         * Returns the list of required field names for the current basket type.
+         *
+         * Digital-only:      no address fields required.
+         * Print / P+D:       address fields required (unless a saved address is selected).
+         * All baskets:       first_name, last_name, email always required.
+         * Gift (when shown): recipient_first_name, recipient_last_name required.
+         *                    recipient_email required when basket includes digital.
+         */
+        _requiredFields() {
+            const isDigitalOnly = this.config.basketType === 'digital_only';
+            const includesDigital = ['digital_only', 'print_and_digital'].includes(this.config.basketType);
+            const isGift = document.getElementById('is-gift-checkbox')?.checked ?? false;
+
+            const base = ['first_name', 'last_name'];
+
+            // Email is required whenever basket includes digital content
+            if (includesDigital) base.push('email');
+
+            // Address fields — only for non-digital-only baskets without a saved address
+            if (!isDigitalOnly && !selectedAddressId) {
+                base.push('address', 'city', 'postal_code', 'country');
+            }
+
+            // Gift recipient fields
+            if (isGift) {
+                base.push('recipient_first_name', 'recipient_last_name');
+                // AC2 note: recipient_email validation is NOT enforced for print+digital
+                // gift flow at the shipping step — it is validated at submission instead.
+                if (this.config.basketType === 'digital_only') {
+                    base.push('recipient_email');
+                }
+            }
+
+            return base;
+        }
+
         validateShippingFields() {
-            document.querySelectorAll('.form-error').forEach((el) => el.textContent = '');
-            if (!this.config.requiresShipping) return true;
+            document.querySelectorAll('.form-error').forEach(el => (el.textContent = ''));
 
+            if (!this.config.requiresShipping && this.config.basketType === 'digital_only') {
+                // For digital-only, only validate non-address fields
+                return this._validateFields(['first_name', 'last_name', 'email']);
+            }
+
+            return this._validateFields(this._requiredFields());
+        }
+
+        _validateFields(fields) {
             const data = Object.fromEntries(new FormData(document.getElementById('checkout-form')));
-            const required = selectedAddressId
-                ? ['first_name', 'last_name', 'email']
-                : ['first_name', 'last_name', 'email', 'address', 'city', 'postal_code', 'country'];
-
             let hasErrors = false;
-            for (const field of required) {
+
+            for (const field of fields) {
                 if (!data[field]?.trim()) {
-                    const element = document.getElementById(`error-${field}`);
-                    if (element) element.textContent = 'This field is required';
+                    const el = document.getElementById(`error-${field}`);
+                    if (el) el.textContent = 'This field is required';
                     hasErrors = true;
                 }
             }
@@ -734,6 +853,7 @@ $apiBase = '/api/' . $site;
             return !hasErrors;
         }
 
+        // ── Step navigation ──────────────────────────────────────────────
         goToStep(step) {
             if (this.config.checkoutMode !== 'steps') return;
             if (step === this.currentStep) return;
@@ -748,10 +868,10 @@ $apiBase = '/api/' . $site;
                 4: document.getElementById('step-4-indicator'),
             };
 
-            Object.values(indicators).forEach((element) => {
-                element.classList.remove('active', 'completed');
-                element.style.cursor = '';
-                element.onclick = null;
+            Object.values(indicators).forEach(el => {
+                el.classList.remove('active', 'completed');
+                el.style.cursor = '';
+                el.onclick = null;
             });
 
             if (step === 2) {
@@ -774,6 +894,7 @@ $apiBase = '/api/' . $site;
             }
 
             document.getElementById('alert-container').innerHTML = '';
+
             if (!this.validateShippingFields()) {
                 showAlert('Please fill in all required fields before continuing.', 'error');
                 return;
@@ -782,6 +903,7 @@ $apiBase = '/api/' . $site;
             this.goToStep(3);
         }
 
+        // ── State ────────────────────────────────────────────────────────
         setState(state) {
             this.state = state;
             const btn = document.getElementById('place-order-btn');
@@ -818,19 +940,22 @@ $apiBase = '/api/' . $site;
             };
         }
 
+        // ── Payload builder ──────────────────────────────────────────────
         buildPayload({includeVoucher = true} = {}) {
             const formData = new FormData(document.getElementById('checkout-form'));
             const data = Object.fromEntries(formData);
 
-            document.querySelectorAll('.form-error').forEach((el) => el.textContent = '');
+            document.querySelectorAll('.form-error').forEach(el => (el.textContent = ''));
             document.getElementById('alert-container').innerHTML = '';
             this.setCardError('');
 
+            // Pre-order acceptance
             const acceptPreOrder = document.getElementById('accept-pre-order');
             if (acceptPreOrder && !acceptPreOrder.checked) {
                 throw new Error('You must accept the pre-order terms to continue.');
             }
 
+            // Subscription consent
             const globalConsentBlock = document.getElementById('global-renewal-consent-block');
             const globalConsentCb = document.getElementById('global-renewal-consent');
             if (globalConsentCb && !globalConsentCb.checked && this.config.isSubscriptionCart) {
@@ -853,12 +978,17 @@ $apiBase = '/api/' . $site;
                 data.us_renewal_consent = '1';
             }
 
-            if (selectedAddressId) {
+            // For digital-only baskets, strip any address keys that might have
+            // leaked in from autofill so the server doesn't attempt to validate them.
+            if (this.config.basketType === 'digital_only') {
+                ['address', 'address2', 'city', 'state', 'postal_code', 'country'].forEach(k => delete data[k]);
+            } else if (selectedAddressId) {
                 data.saved_address = selectedAddressId;
-                ['address', 'address2', 'city', 'state', 'postal_code', 'country'].forEach((key) => delete data[key]);
+                ['address', 'address2', 'city', 'state', 'postal_code', 'country'].forEach(k => delete data[k]);
             }
 
-            if (this.config.checkoutMode !== 'steps' && this.config.requiresShipping && !this.validateShippingFields()) {
+            // Single-page mode validation
+            if (this.config.checkoutMode !== 'steps' && !this._validateFields(this._requiredFields())) {
                 throw new Error('Please fill in all required fields.');
             }
 
@@ -872,6 +1002,7 @@ $apiBase = '/api/' . $site;
             return data;
         }
 
+        // ── Subscription helpers ─────────────────────────────────────────
         normalizeSubscriptionIds(result) {
             return Array.isArray(result) ? result : (result ? [result] : []);
         }
@@ -889,10 +1020,8 @@ $apiBase = '/api/' . $site;
 
         async confirmSubscriptionCheckout({orderId, subscriptionIds, paymentIntentId = null, paymentMethodId = null}) {
             const payload = {order_id: orderId};
-
             if (paymentIntentId) payload.payment_intent_id = paymentIntentId;
             if (paymentMethodId) payload.payment_method_id = paymentMethodId;
-
             if (subscriptionIds.length === 1) {
                 payload.subscription_id = subscriptionIds[0];
             } else {
@@ -900,19 +1029,16 @@ $apiBase = '/api/' . $site;
             }
 
             const result = await this.api.confirmSubscriptionPayment(payload);
-            if (!result.success) {
-                throw new Error(result.message || 'Payment confirmation failed');
-            }
+            if (!result.success) throw new Error(result.message || 'Payment confirmation failed');
 
             this.completedSubscriptionIds.push(...subscriptionIds);
             this.completedSubscriptionIds = [...new Set(this.completedSubscriptionIds)];
         }
 
+        // ── Checkout flows ───────────────────────────────────────────────
         async handleRegularCheckout(data) {
             const result = await this.api.processRegularCheckout(data);
-            if (!result.success) {
-                throw new Error(result.message || 'Failed to process order');
-            }
+            if (!result.success) throw new Error(result.message || 'Failed to process order');
 
             const contexts = result.stripe_contexts;
             const clientSecret = contexts ? contexts[Object.keys(contexts)[0]].client_secret : result.client_secret;
@@ -923,22 +1049,15 @@ $apiBase = '/api/' . $site;
                     payment_intent_id: paymentIntent.id,
                     checkout_id: result.checkout_id,
                 });
-
-                if (!confirmResult.success) {
-                    throw new Error(confirmResult.message || 'Payment confirmation failed');
-                }
-
+                if (!confirmResult.success) throw new Error(confirmResult.message || 'Payment confirmation failed');
                 window.location.href = `/order-confirmation?checkout_id=${confirmResult.checkout_id}`;
             }
         }
 
         async handleRecurringFlow(data) {
             this.setState('processing_recurring');
-
             const result = await this.api.createRecurringSubscriptionCheckout(data);
-            if (!result.success) {
-                throw new Error(result.message || 'Checkout failed');
-            }
+            if (!result.success) throw new Error(result.message || 'Checkout failed');
 
             const subscriptionIds = this.normalizeSubscriptionIds(
                 result.data.subscription_ids || result.data.subscription_id
@@ -954,11 +1073,8 @@ $apiBase = '/api/' . $site;
 
         async handleOneTimeFlow(data) {
             this.setState('processing_one_time');
-
             const result = await this.api.createOneTimeSubscriptionCheckout(data);
-            if (!result.success) {
-                throw new Error(result.message || 'Checkout failed');
-            }
+            if (!result.success) throw new Error(result.message || 'Checkout failed');
 
             const contexts = result.data.stripe_contexts;
             const clientSecret = contexts
@@ -991,7 +1107,9 @@ $apiBase = '/api/' . $site;
             } catch (error) {
                 this.storePendingOneTimeState(oneTimeItems);
                 await this.cartFlow.replaceCart(oneTimeItems);
-                throw new Error(`Recurring subscriptions were created successfully, but the one-time payment still needs to be completed. ${error.message}`);
+                throw new Error(
+                    `Recurring subscriptions were created successfully, but the one-time payment still needs to be completed. ${error.message}`
+                );
             }
 
             this.clearPendingOneTimeState();
@@ -1027,6 +1145,7 @@ $apiBase = '/api/' . $site;
             }
         }
 
+        // ── Main entry point ─────────────────────────────────────────────
         async process() {
             if (this.config.isMixedCart) {
                 showAlert('Your cart contains both subscription and physical items. Please return to your cart.', 'error');
@@ -1046,13 +1165,12 @@ $apiBase = '/api/' . $site;
                 showAlert(error.message || 'Payment failed', 'error');
                 this.state = 'failed';
             } finally {
-                if (this.state !== 'complete') {
-                    this.setState('idle');
-                }
+                if (this.state !== 'complete') this.setState('idle');
             }
         }
     }
 
+    // ── Bootstrap ────────────────────────────────────────────────────────
     const apiService = new ApiService(API_BASE);
     window.checkoutManager = new CheckoutManager({
         stripeService: new StripeService(CHECKOUT_CONFIG.stripeKey),
@@ -1062,7 +1180,9 @@ $apiBase = '/api/' . $site;
     });
 
     checkLoginStatus();
-    window.checkoutManager.init();
+    window.checkoutManager.init().then(() => {
+        window.checkoutManager.syncPlaceOrderButton();
+    });
 
     if (appliedVoucher) {
         window.appliedVoucher = appliedVoucher;
@@ -1071,6 +1191,15 @@ $apiBase = '/api/' . $site;
 
     <?php if (($member?->country ?? '') === 'US'): ?>
     handleCountryChange('US');
+
+    (function () {
+        const btn = document.getElementById('place-order-btn');
+        if (btn && !btn.disabled) {
+            btn.disabled = true;
+            btn.title = 'Please enter your card details to continue';
+        }
+    })();
+
     <?php endif; ?>
 </script>
 @endsection

@@ -169,7 +169,10 @@ class SubscriptionPlanRepository extends Repository
     {
         return SubscriptionPlan::with(['site', 'pricingTiers'])
             ->where('is_active', true)
-            ->where('plan_type', 'onetime');
+            ->where(function ($q) {
+                $q->where('plan_type', 'onetime')
+                    ->orWhere('plan_type', 'recurring');
+            });
     }
 
     /**

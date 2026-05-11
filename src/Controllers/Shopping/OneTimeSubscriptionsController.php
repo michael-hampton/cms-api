@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controllers\Subscription;
+namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\SubscriptionSortOption;
@@ -332,7 +332,7 @@ class OneTimeSubscriptionsController extends Controller
             event(new PaymentSucceeded(
                 subscriptionId: $subscription->id,
                 paymentId: $paymentResult['payment_id'],
-                amountCents: $subscription->plan->price,
+                amountCents: (int)round($subscription->plan->price * 100),
                 currency: strtoupper($subscription->plan->currency),
             ));
         }

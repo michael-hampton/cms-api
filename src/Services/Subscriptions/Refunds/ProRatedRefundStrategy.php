@@ -7,17 +7,16 @@ use App\Repositories\Billing\PaymentRepository;
 use Exception;
 
 /**
- * Data-aware strategy: performs a read-only repository call to fetch the last
- * payment. This is intentional — the strategy needs the payment's transaction
- * identifiers for the service layer to issue the provider refund.
+ * Calculates a pro-rated refund based on the actual amount charged (taken from
+ * the last payment record) rather than the plan's base price. This ensures
+ * pricing-tier discounts, sale prices, and vouchers are all reflected correctly.
  *
- * All monetary arithmetic uses bcmath (scale 6) to avoid float precision drift.
- * The returned amount is a PHP float suitable for the strategy boundary; the
- * provider layer is responsible for converting to the smallest currency unit.
+ * Arithmetic uses PHP's native round() at 6 decimal places — bcmath is NOT
+ * required and must NOT be re-introduced (not available in this environment).
  */
 class ProRatedRefundStrategy implements RefundStrategy
 {
-    private const BCMATH_SCALE = 6;
+    private const PRECISION = 6;
 
     public function __construct(
         private readonly PaymentRepository $payments,
@@ -29,7 +28,6 @@ class ProRatedRefundStrategy implements RefundStrategy
     public function calculate(Subscription $subscription): RefundResult
     {
         $this->assertDatesPresent($subscription);
-        $this->assertPriceValid($subscription);
 
         $now = new \DateTime();
         $endDate = $subscription->end_date;
@@ -47,6 +45,17 @@ class ProRatedRefundStrategy implements RefundStrategy
             );
         }
 
+        // Fetch the payment first — we need its amount as the authoritative price.
+        // This is intentional: the strategy is read-only and the service layer
+        // issues the actual refund against the provider.
+        $payment = $this->payments->getLastSubscriptionPayment($subscription->id);
+
+        if (!$payment) {
+            throw new Exception('No payment found for refund');
+        }
+
+        $this->assertPaymentAmountValid($payment->amount);
+
         if ($unusedDays === 0) {
             return new RefundResult(
                 amount: 0.0,
@@ -60,24 +69,21 @@ class ProRatedRefundStrategy implements RefundStrategy
             );
         }
 
-        $price = number_format($subscription->price, self::BCMATH_SCALE, '.', '');
-        $dailyRate = bcdiv($price, (string)$totalDays, self::BCMATH_SCALE);
-        $refundAmount = bcmul($dailyRate, (string)$unusedDays, self::BCMATH_SCALE);
-
-        $payment = $this->payments->getLastSubscriptionPayment($subscription->id);
-
-        if (!$payment) {
-            throw new Exception('No payment found for refund');
-        }
+        // Use the actual charged amount — accounts for pricing tiers, sale prices,
+        // and voucher discounts automatically.
+        $paidAmount = round((float)$payment->amount, self::PRECISION);
+        $dailyRate = round($paidAmount / $totalDays, self::PRECISION);
+        $refundAmount = round($dailyRate * $unusedDays, self::PRECISION);
 
         return new RefundResult(
-            amount: (float)$refundAmount,
+            amount: $refundAmount,
             type: 'pro_rated',
             meta: [
                 'original_payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
                 'payment_method' => $payment->payment_method,
                 'payment_provider' => $payment->payment_provider,
+                'paid_amount' => $paidAmount,
                 'unused_days' => $unusedDays,
                 'total_days' => $totalDays,
                 'reason' => $this->reason,
@@ -98,20 +104,20 @@ class ProRatedRefundStrategy implements RefundStrategy
         }
     }
 
-    private function assertPriceValid(Subscription $subscription): void
-    {
-        if (!$subscription->price || $subscription->price <= 0) {
-            throw new Exception(
-                'Cannot calculate pro-rated refund: subscription price is invalid'
-            );
-        }
-    }
-
     private function assertDatesOrdered(\DateTime $paymentDate, \DateTime $endDate): void
     {
         if ($paymentDate >= $endDate) {
             throw new Exception(
                 'Cannot calculate pro-rated refund: payment date is not before end date'
+            );
+        }
+    }
+
+    private function assertPaymentAmountValid(mixed $amount): void
+    {
+        if (!$amount || (float)$amount <= 0) {
+            throw new Exception(
+                'Cannot calculate pro-rated refund: payment amount is invalid'
             );
         }
     }

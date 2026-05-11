@@ -1622,6 +1622,119 @@ class CartServiceTest extends FunctionalTestCase
         $this->assertGreaterThan(0, $price);
     }
 
+    public function testUpdateQuantityForDigitalSubscriptionSucceeds(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = false;
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy->shouldReceive('canPurchase')->andReturn(true);
+        $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        //$cartItem->shouldReceive('getAttribute')->with('subscription_plan_id')->andReturn(1);
+        // $cartItem->shouldReceive('getAttribute')->with('price')->andReturn(9.99);
+        $cartItem->price = 9.99;
+
+        $this->cartRepository->shouldReceive('findById')->once()->andReturn($cartItem);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+        $this->cartRepository->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(fn($d) => $d['quantity'] === 2 && $d['subtotal'] === 19.98));
+
+        $result = $this->service->updateQuantity(1, 2);
+
+        $this->assertTrue($result['success']);
+        $this->assertEquals('Cart updated', $result['message']);
+    }
+
+    public function testUpdateQuantityForSubscriptionFailsWhenPlanUnavailable(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = false;
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy->shouldReceive('canPurchase')->andReturn(false);
+        $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->shouldReceive('getAttribute')->with('subscription_plan_id')->andReturn(1);
+
+        $this->cartRepository->shouldReceive('findById')->once()->andReturn($cartItem);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $result = $this->service->updateQuantity(1, 2);
+
+        $this->assertFalse($result['success']);
+        $this->assertEquals('Subscription is no longer available for purchase', $result['message']);
+    }
+
+    public function testUpdateQuantityForPrintSubscriptionFailsWhenIssueOutOfStock(): void
+    {
+        $issue = Mockery::mock(\App\Models\IssueDelivery::class)->makePartial();
+        $issue->stock_quantity = 1;
+
+        $issuePolicy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
+        $issuePolicy->shouldReceive('isPreOrder')->andReturn(false);
+        $issue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy->shouldReceive('canPurchase')->andReturn(true);
+        $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
+        $plan->shouldReceive('getNextIssue')->andReturn($issue);
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->shouldReceive('getAttribute')->with('subscription_plan_id')->andReturn(1);
+
+        $this->cartRepository->shouldReceive('findById')->once()->andReturn($cartItem);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $result = $this->service->updateQuantity(1, 3);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('1 in stock', $result['message']);
+    }
+
+    public function testUpdateQuantityForPrintSubscriptionAllowsPreorderQuantity(): void
+    {
+        $issue = Mockery::mock(\App\Models\IssueDelivery::class)->makePartial();
+        $issue->stock_quantity = 0;
+
+        $issuePolicy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
+        $issuePolicy->shouldReceive('isPreOrder')->andReturn(true);
+        $issue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+
+        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy->shouldReceive('canPurchase')->andReturn(true);
+        $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
+        $plan->shouldReceive('getNextIssue')->andReturn($issue);
+
+        $cartItem = Mockery::mock(CartItem::class)->makePartial();
+        $cartItem->subscription_plan_id = 1;
+        $cartItem->shouldReceive('getAttribute')->with('subscription_plan_id')->andReturn(1);
+        $cartItem->shouldReceive('getAttribute')->with('price')->andReturn(9.99);
+        $cartItem->price = 9.99;
+
+        $this->cartRepository->shouldReceive('findById')->once()->andReturn($cartItem);
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(1)->andReturn($plan);
+        $this->cartRepository->shouldReceive('update')->once();
+
+        $result = $this->service->updateQuantity(1, 2);
+
+        $this->assertTrue($result['success']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

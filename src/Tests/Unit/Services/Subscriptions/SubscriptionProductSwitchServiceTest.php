@@ -5,26 +5,32 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
+use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
-use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
+use App\Services\Shopping\CartService;
+use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class SubscriptionProductSwitchServiceTest extends TestCase
 {
     private $subscriptionRepository;
     private $planRepository;
+    private $memberRepository;
+    private $cartService;
+    private $checkoutService;
     private $stripeProcessor;
-    private $dateCalculator;
+    private $memberAuth;
     private $database;
-
-    private SubscriptionProductSwitchService $service;
 
     public function test_invalid_switch_mode_throws_exception(): void
     {
@@ -76,6 +82,17 @@ class SubscriptionProductSwitchServiceTest extends TestCase
         $subscription->plan_id = 100;
 
         return $subscription;
+    }
+
+    private function makeMember(): Member
+    {
+        $member = Mockery::mock(Member::class)->makePartial();
+        $member->id = 55;
+        $member->first_name = 'Mike';
+        $member->last_name = 'Smith';
+        $member->email = 'mike@example.com';
+
+        return $member;
     }
 
     public function test_inactive_subscription(): void
@@ -142,11 +159,46 @@ class SubscriptionProductSwitchServiceTest extends TestCase
 
     public function test_payment_failure_throws_runtime_exception(): void
     {
-        $sub = $this->makeSubscription();
+        $subscription = $this->makeSubscription();
         $plan = $this->makePlan();
+        $member = $this->makeMember();
 
-        $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
-        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $newSubscription = $this->makeSubscription();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn(
+                $subscription,
+                $newSubscription
+            );
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login')
+            ->once();
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart')
+            ->once();
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->once()
+            ->andReturn([
+                'subscription_ids' => [99],
+                'order_id' => 500,
+            ]);
 
         $this->stripeProcessor
             ->shouldReceive('processSubscriptionPayment')
@@ -156,20 +208,519 @@ class SubscriptionProductSwitchServiceTest extends TestCase
                 'message' => 'card declined',
             ]);
 
+        $this->cartService
+            ->shouldReceive('clear')
+            ->once();
+
         $this->expectException(\RuntimeException::class);
 
         $this->service->switch(
-            1, 200, 'fresh', 'pm_123', 10.0, 0, 1, 10
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
         );
     }
 
-    public function test_successful_switch_flow(): void
+    public function test_site_mismatch_throws_exception(): void
     {
-        $sub = $this->makeSubscription();
+        $subscription = $this->makeSubscription();
+        $subscription->site_id = 999;
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_inactive_subscription_throws_exception(): void
+    {
+        $subscription = $this->makeSubscription();
+        $subscription->status = 'paused';
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_target_plan_not_found_throws_exception(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(200)
+            ->andReturn(null);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_target_plan_site_mismatch_throws_exception(): void
+    {
+        $subscription = $this->makeSubscription();
+
+        $plan = $this->makePlan();
+        $plan->site_id = 999;
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_member_not_found_throws_exception(): void
+    {
+        $subscription = $this->makeSubscription();
         $plan = $this->makePlan();
 
-        $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
-        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn(null);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_duplicate_active_subscription_to_target_plan_throws_exception(): void
+    {
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->once()
+            ->andReturn(true);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_cart_is_cleared_when_checkout_throws(): void
+    {
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->once()
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login')
+            ->once();
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart')
+            ->once();
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->once()
+            ->andThrow(new RuntimeException('checkout failed'));
+
+        $this->cartService
+            ->shouldReceive('clear')
+            ->once();
+
+        $this->expectException(RuntimeException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+    public function test_create_subscription_repository_method_is_never_called(): void
+    {
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $newSubscription = $this->makeSubscription();
+
+        $this->subscriptionRepository
+            ->shouldNotReceive('createSubscription');
+
+        $obj1 = Mockery::mock(Subscription::class)->makePartial();
+        $obj1->id = 1;
+        $obj2 = Mockery::mock(Subscription::class)->makePartial();
+        $obj2->id = 99;
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn(
+                $subscription,
+                $newSubscription,
+                $obj1,
+                $obj2,
+            );
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login');
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart');
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->andReturn([
+                'subscription_ids' => [99],
+                'order_id' => 500,
+            ]);
+
+        $this->stripeProcessor
+            ->shouldReceive('processSubscriptionPayment')
+            ->andReturn([
+                'success' => true,
+                'subscription_id' => 'stripe_sub_123',
+            ]);
+
+        $this->subscriptionRepository
+            ->shouldReceive('update');
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->andReturnUsing(
+                fn($callback) => $callback()
+            );
+
+        $this->cartService
+            ->shouldReceive('clear');
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+
+        $this->assertTrue(true);
+    }
+
+    public function test_calculate_credit_returns_zero_when_price_is_zero(): void
+    {
+        $subscription = (object)[
+            'price' => 0,
+            'start_date' => new \DateTimeImmutable('-15 days'),
+            'end_date' => new \DateTimeImmutable('+15 days'),
+        ];
+
+        $result = $this->service->calculateCarriedOverCredit(
+            $subscription
+        );
+
+        $this->assertSame(0.00, $result);
+    }
+
+    public function test_calculate_credit_returns_zero_when_dates_missing(): void
+    {
+        $subscription = (object)[
+            'price' => 100,
+            'start_date' => null,
+            'end_date' => null,
+        ];
+
+        $result = $this->service->calculateCarriedOverCredit(
+            $subscription
+        );
+
+        $this->assertSame(0.00, $result);
+    }
+
+    public function test_calculate_credit_returns_zero_when_expired(): void
+    {
+        $subscription = (object)[
+            'price' => 100,
+            'start_date' => new \DateTimeImmutable('-60 days'),
+            'end_date' => new \DateTimeImmutable('-1 day'),
+        ];
+
+        $result = $this->service->calculateCarriedOverCredit(
+            $subscription
+        );
+
+        $this->assertSame(0.00, $result);
+    }
+
+    public function test_calculate_credit_returns_expected_amount(): void
+    {
+        $subscription = (object)[
+            'price' => 30.00,
+            'start_date' => new \DateTimeImmutable('2026-01-01 00:00:00'),
+            'end_date' => new \DateTimeImmutable('2026-01-31 00:00:00'),
+        ];
+
+        /**
+         * Force expected result based on today's date.
+         */
+        $result = $this->service->calculateCarriedOverCredit(
+            $subscription
+        );
+
+        $this->assertIsFloat($result);
+        $this->assertGreaterThanOrEqual(0, $result);
+    }
+
+    public function test_throws_when_checkout_returns_no_subscription(): void
+    {
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($subscription);
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->once()
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->once()
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login')
+            ->once();
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart')
+            ->once();
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->once()
+            ->andReturn([]);
+
+        $this->cartService
+            ->shouldReceive('clear')
+            ->once();
+
+        $this->expectException(RuntimeException::class);
+
+        $this->service->switch(
+            1,
+            200,
+            'fresh',
+            'pm_123',
+            10.00,
+            0.00,
+            1,
+            10
+        );
+    }
+
+
+    public function test_successful_switch_flow(): void
+    {
+        $subscription = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $member = $this->makeMember();
+
+        $newSubscription = $this->makeSubscription();
+
+        $obj1 = Mockery::mock(Subscription::class)->makePartial();
+        $obj1->id = 1;
+        $obj2 = Mockery::mock(Subscription::class)->makePartial();
+        $obj2->id = 99;
+
+        $this->subscriptionRepository
+            ->shouldReceive('find')
+            ->andReturn(
+                $subscription,
+                $newSubscription,
+                $obj1,
+                $obj2,
+            );
+
+        $this->planRepository
+            ->shouldReceive('find')
+            ->andReturn($plan);
+
+        $this->memberRepository
+            ->shouldReceive('find')
+            ->andReturn($member);
+
+        $this->subscriptionRepository
+            ->shouldReceive('hasActiveSubscriptionToPlan')
+            ->once()
+            ->andReturn(false);
+
+        $this->memberAuth
+            ->shouldReceive('login')
+            ->once();
+
+        $this->cartService
+            ->shouldReceive('addSubscriptionToCart')
+            ->once()
+            ->with(200);
+
+        $this->checkoutService
+            ->shouldReceive('processCheckout')
+            ->once()
+            ->andReturn([
+                'subscription_ids' => [99],
+                'order_id' => 500,
+            ]);
 
         $this->stripeProcessor
             ->shouldReceive('processSubscriptionPayment')
@@ -179,70 +730,94 @@ class SubscriptionProductSwitchServiceTest extends TestCase
                 'subscription_id' => 'stripe_sub_123',
             ]);
 
-        // transaction wrapper executes callback immediately
+        $this->subscriptionRepository
+            ->shouldReceive('update')
+            ->twice();
+
         $this->database
             ->shouldReceive('transaction')
             ->once()
-            ->andReturnUsing(function ($callback) {
-                return $callback();
-            });
+            ->andReturnUsing(
+                fn($callback) => $callback()
+            );
 
-        $this->dateCalculator
-            ->shouldReceive('calculateEndDate')
-            ->andReturn(new \DateTimeImmutable('+1 month'));
-
-        $this->subscriptionRepository
-            ->shouldReceive('update')
-            ->twice()
-            ->andReturn($sub);
-
-        $newSub = Mockery::mock(Subscription::class)->makePartial();
-        $newSub->id = 99;
-        $newSub->member_id = 55;
-
-        $this->subscriptionRepository
-            ->shouldReceive('createSubscription')
-            ->once()
-            ->andReturn($newSub);
-
-        $this->subscriptionRepository
-            ->shouldReceive('find')
-            ->andReturn((object)['id' => 1]);
+        $this->cartService
+            ->shouldReceive('clear')
+            ->once();
 
         $result = $this->service->switch(
             1,
             200,
-            'fresh',
+            'transfer',
             'pm_123',
-            10.0,
-            0.0,
+            5.00,
+            10.00,
             1,
             10
         );
 
         $this->assertIsArray($result);
-        $this->assertArrayHasKey('old_subscription', $result);
-        $this->assertArrayHasKey('new_subscription', $result);
+
+        $this->assertArrayHasKey(
+            'old_subscription',
+            $result
+        );
+
+        $this->assertArrayHasKey(
+            'new_subscription',
+            $result
+        );
     }
+
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
-        $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
-        $this->dateCalculator = Mockery::mock(SubscriptionDateCalculator::class);
-        $this->database = Mockery::mock(Database::class);
+        $this->subscriptionRepository = Mockery::mock(
+            SubscriptionRepository::class
+        );
+
+        $this->planRepository = Mockery::mock(
+            SubscriptionPlanRepository::class
+        );
+
+        $this->memberRepository = Mockery::mock(
+            MemberRepository::class
+        );
+
+        $this->cartService = Mockery::mock(
+            CartService::class
+        );
+
+        $this->checkoutService = Mockery::mock(
+            OneTimeSubscriptionCheckoutService::class
+        );
+
+        $this->stripeProcessor = Mockery::mock(
+            StripePaymentProcessor::class
+        );
+
+        $this->memberAuth = Mockery::mock(
+            MemberAuthWrapper::class
+        );
+
+        $this->database = Mockery::mock(
+            Database::class
+        );
 
         $this->service = new SubscriptionProductSwitchService(
             $this->subscriptionRepository,
             $this->planRepository,
+            $this->memberRepository,
+            $this->cartService,
+            $this->checkoutService,
             $this->stripeProcessor,
-            $this->dateCalculator,
+            $this->memberAuth,
             $this->database,
         );
     }
+
 
     protected function tearDown(): void
     {

@@ -238,6 +238,29 @@
     </div>
 </div>
 
+<div class="oc-card" style="margin-top:24px;">
+    <div class="oc-card__header">
+        <span class="oc-card__title">Recent Stripe Webhook Events</span>
+    </div>
+    <div id="stripe-events-loading" style="padding:16px;color:var(--slate);">Loading events…</div>
+    <div id="stripe-events-empty" style="display:none;padding:16px;color:var(--slate);">No Stripe webhook events yet.
+    </div>
+    <div id="stripe-events-wrap" style="display:none;overflow-x:auto;">
+        <table class="oc-table">
+            <thead>
+            <tr>
+                <th>Event ID</th>
+                <th>Type</th>
+                <th>Processed</th>
+                <th>Failed</th>
+                <th>Error</th>
+            </tr>
+            </thead>
+            <tbody id="stripe-events-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -270,6 +293,7 @@
                 }, 300);
             });
             this.#load();
+            this.#loadWebhookEvents();
         }
 
         setFilter(status, btn) {
@@ -381,10 +405,15 @@
                 const amount = ((p.amount_pence ?? p.amount ?? 0) / 100).toFixed(2);
                 const pdfBtn = ['paid', 'approved'].includes(status)
                     ? `<a href="/api/${this.#esc(this.#site)}/open-collab/admin/payouts/${p.id}/statement" class="oc-btn oc-btn--ghost oc-btn--sm" download>PDF</a>` : '';
-                const markPaidBtn = status === 'approved'
+                const markPaidBtn = (status === 'approved' && p.method !== 'stripe')
                     ? `<button onclick="manager.openPaidModal(${p.id})" class="oc-btn oc-btn--primary oc-btn--sm">Mark paid</button>` : '';
+                const retryBtn = (status === 'failed' && p.method === 'stripe')
+                    ? `<button onclick="manager.retry(${p.id}, this)" class="oc-btn oc-btn--ghost oc-btn--sm">Retry</button>` : '';
                 const rejectionRow = p.rejection_reason
                     ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;"><strong>Decline reason:</strong> ${this.#esc(p.rejection_reason)}</td></tr>` : '';
+                const failureReason = p.provider_response_json?.error || p.provider_response_json?.reason || '';
+                const failureRow = failureReason
+                    ? `<tr><td colspan="7" style="padding:0 16px 10px;font-size:.78rem;color:var(--red);background:#fff9f9;"><strong>Stripe failure:</strong> ${this.#esc(failureReason)}</td></tr>` : '';
 
                 return `<tr id="all-row-${p.id}">
                 <td style="font-family:monospace;font-size:.78rem;color:var(--slate);">PAY-${String(p.id).padStart(6, '0')}</td>
@@ -393,8 +422,8 @@
                 <td style="font-size:.82rem;color:var(--slate);">${this.#esc(currency)}</td>
                 <td><span class="oc-badge ${statusCls}" id="badge-${p.id}">${this.#cap(status)}</span></td>
                 <td style="font-size:.78rem;color:var(--slate);">${this.#fmtDate(p.created_at)}</td>
-                <td><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${markPaidBtn}${pdfBtn}</div></td>
-            </tr>${rejectionRow}`;
+                <td><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${retryBtn}${markPaidBtn}${pdfBtn}</div></td>
+            </tr>${rejectionRow}${failureRow}`;
             }).join('');
         }
 
@@ -530,6 +559,66 @@
                 btn.disabled = false;
                 btn.textContent = 'Confirm paid';
             }
+        }
+
+        async retry(id, btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner"></div>';
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/payouts/${id}/retry`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.#showToast('Retry queued');
+                const p = this.#state.all.find(x => x.id === id);
+                if (p) {
+                    p.status = 'approved';
+                    p.provider_status = 'retry_queued';
+                }
+                this.#render();
+            } else {
+                this.#showToast(data.error || data.message || 'Retry failed', false);
+                btn.disabled = false;
+                btn.textContent = 'Retry';
+            }
+        }
+
+        async #loadWebhookEvents() {
+            const loading = document.getElementById('stripe-events-loading');
+            const empty = document.getElementById('stripe-events-empty');
+            const wrap = document.getElementById('stripe-events-wrap');
+
+            const res = await fetch(`/api/${this.#site}/open-collab/admin/stripe-webhooks`, {
+                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+            });
+
+            if (!res.ok) {
+                loading.textContent = 'Unable to load Stripe webhook history.';
+                return;
+            }
+
+            const rows = await res.json();
+            const events = Array.isArray(rows?.data) ? rows.data : (Array.isArray(rows) ? rows : []);
+
+            if (events.length === 0) {
+                loading.style.display = 'none';
+                empty.style.display = 'block';
+                return;
+            }
+
+            document.getElementById('stripe-events-tbody').innerHTML = events.map((event) => `
+                <tr>
+                    <td style="font-family:monospace;font-size:.78rem;">${this.#esc(event.stripe_event_id)}</td>
+                    <td>${this.#esc(event.type)}</td>
+                    <td>${this.#fmtDate(event.processed_at)}</td>
+                    <td>${this.#fmtDate(event.failed_at)}</td>
+                    <td style="max-width:280px;white-space:normal;">${this.#esc(event.error_message || '')}</td>
+                </tr>
+            `).join('');
+
+            loading.style.display = 'none';
+            wrap.style.display = 'block';
         }
 
         #showState(state) {

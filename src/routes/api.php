@@ -91,6 +91,7 @@ use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
+use App\Controllers\OpenCollab\StripeConnectController;
 use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\OpenCollab\ViolationController;
 use App\Controllers\Product\MerchantContactController;
@@ -439,6 +440,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [PayoutController::class, 'request']
         );
 
+        $router->post(
+            '/open-collab/stripe-connect/onboard',
+            [StripeConnectController::class, 'onboard']
+        );
+
+        $router->get(
+            '/open-collab/stripe-connect/status',
+            [StripeConnectController::class, 'status']
+        );
+
         $router->get(
             '/open-collab/admin/payouts',
             [PayoutController::class, 'adminIndex']
@@ -457,6 +468,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post(
             '/open-collab/admin/payouts/{id}/reject',
             [PayoutController::class, 'reject']
+        );
+
+        $router->post(
+            '/open-collab/admin/payouts/{id}/retry',
+            [PayoutController::class, 'retry']
+        );
+
+        $router->get(
+            '/open-collab/admin/stripe-webhooks',
+            [StripeWebhookController::class, 'adminIndex']
         );
 
         $router->get(

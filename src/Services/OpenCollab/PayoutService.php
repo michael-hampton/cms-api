@@ -11,6 +11,7 @@ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
+use App\Jobs\OpenCollab\ProcessStripePayoutJob;
 use App\Models\Model;
 use App\Models\Payout;
 use App\Repositories\Cms\SiteRepository;
@@ -175,6 +176,11 @@ class PayoutService
             $this->eventDispatcher->dispatch(new PayoutProcessedEvent($payout, $adminId, $payout->user_id));
         }
 
+        // Stripe payouts are executed asynchronously after approval.
+        if ($payout->method === 'stripe') {
+            dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts');
+        }
+
         return $payout;
     }
 
@@ -197,6 +203,12 @@ class PayoutService
         if (!$payout->isApproved()) {
             throw new \InvalidArgumentException(
                 "Payout [{$payoutId}] cannot be marked as paid from status [{$payout->status}]."
+            );
+        }
+
+        if ($payout->method === 'stripe') {
+            throw new \InvalidArgumentException(
+                "Payout [{$payoutId}] is Stripe-backed and must be finalised by Stripe webhooks."
             );
         }
 
@@ -227,6 +239,49 @@ class PayoutService
                 new PayoutPaidNotification($payout, $contributor, $reference)
             );
         }
+
+        return $payout;
+    }
+
+    public function retryStripeFailedPayout(int $payoutId, int $adminId): Payout
+    {
+        $payout = $this->payoutRepository->find($payoutId);
+
+        if (!$payout) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
+        }
+
+        if ($payout->status === PayoutStatus::Paid->value) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] is already paid and cannot be retried.");
+        }
+
+        if ($payout->method !== 'stripe') {
+            throw new \InvalidArgumentException("Only Stripe payouts can be retried.");
+        }
+
+        if ($payout->status !== PayoutStatus::Failed->value) {
+            throw new \InvalidArgumentException("Only failed payouts can be retried.");
+        }
+
+        $payout = $this->database->transaction(function () use ($payout, $adminId): Payout {
+            $this->payoutRepository->update($payout->id, [
+                'status' => PayoutStatus::Approved->value,
+                'provider_status' => 'retry_queued',
+                'processed_at' => null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->payoutAuditRepository->log(
+                payoutId: $payout->id,
+                action: PayoutAuditAction::Approved,
+                performedBy: $adminId,
+                reason: 'Stripe payout retry requested.',
+            );
+
+            return $this->payoutRepository->find($payout->id);
+        });
+
+        dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts');
 
         return $payout;
     }

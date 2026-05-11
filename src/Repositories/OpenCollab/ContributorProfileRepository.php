@@ -7,6 +7,16 @@ use App\Repositories\Repository;
 
 class ContributorProfileRepository extends Repository
 {
+    public function __construct(
+        ?ContributorPayoutAccountRepository $payoutAccountRepository = null,
+    )
+    {
+        $this->payoutAccountRepository = $payoutAccountRepository ?? new ContributorPayoutAccountRepository();
+        parent::__construct();
+    }
+
+    private readonly ContributorPayoutAccountRepository $payoutAccountRepository;
+
     public function markPaymentSetup(int $userId, string $stripeToken): void
     {
         $this->createOrUpdate($userId, [
@@ -34,9 +44,8 @@ class ContributorProfileRepository extends Repository
 
     public function isPaymentSetup(int $userId): bool
     {
-        return ContributorProfile::where('user_id', $userId)
-            ->whereNotNull('payment_details')
-            ->exists();
+        $account = $this->payoutAccountRepository->findByUserId($userId, 'stripe');
+        return (bool)($account?->payouts_enabled);
     }
 
     protected function getModelClass(): string

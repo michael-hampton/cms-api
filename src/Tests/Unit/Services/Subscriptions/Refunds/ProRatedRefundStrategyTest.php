@@ -38,39 +38,6 @@ class ProRatedRefundStrategyTest extends TestCase
         $this->assertEqualsWithDelta(50.00, $result->amount, 0.50);
     }
 
-    private function createMockSubscription(
-        float $price,
-        int   $lastPaymentDaysAgo,
-        int   $endDateDaysFromNow,
-    ): Subscription
-    {
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 1;
-        $subscription->price = $price;
-        $subscription->currency = 'USD';
-        $subscription->last_payment_date = new \DateTime("-{$lastPaymentDaysAgo} days");
-        $subscription->end_date = new \DateTime(
-            ($endDateDaysFromNow >= 0 ? '+' : '') . "{$endDateDaysFromNow} days"
-        );
-        return $subscription;
-    }
-
-    // -------------------------------------------------------------------------
-    // Happy path
-    // -------------------------------------------------------------------------
-
-    private function createMockPayment(float $amount): Payment
-    {
-        $payment = Mockery::mock(Payment::class)->makePartial();
-        $payment->id = 1;
-        $payment->subscription_id = 1;
-        $payment->amount = $amount;
-        $payment->transaction_id = 'ch_test_123';
-        $payment->payment_method = 'stripe';
-        $payment->payment_provider = 'stripe';
-        return $payment;
-    }
-
     public function testCalculateAmountUsesDecimalPrecision(): void
     {
         // Price that would cause float drift if calculated naively:
@@ -141,8 +108,14 @@ class ProRatedRefundStrategyTest extends TestCase
             endDateDaysFromNow: -30,
         );
 
-        // Repository must NOT be called — no refund means no payment fetch needed
-        $this->mockPaymentRepository->shouldNotReceive('getLastSubscriptionPayment');
+        $payment = $this->createMockPayment(100.00);
+
+        // Payment IS fetched — the amount must be validated before we can safely
+        // return noRefundDue; we cannot short-circuit before assertPaymentAmountValid.
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->andReturn($payment);
 
         $strategy = new ProRatedRefundStrategy($this->mockPaymentRepository);
         $result = $strategy->calculate($subscription);
@@ -190,31 +163,41 @@ class ProRatedRefundStrategyTest extends TestCase
     // Guard: invalid price
     // -------------------------------------------------------------------------
 
-    public function testThrowsWhenPriceIsZero(): void
+    public function testThrowsWhenPaymentAmountIsZero(): void
     {
         $subscription = $this->createMockSubscription(
-            price: 0.0,
+            price: 100.00,
             lastPaymentDaysAgo: 5,
             endDateDaysFromNow: 25,
         );
 
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->andReturn($this->createMockPayment(0.00));
+
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Cannot calculate pro-rated refund: subscription price is invalid');
+        $this->expectExceptionMessage('Cannot calculate pro-rated refund: payment amount is invalid');
 
         $strategy = new ProRatedRefundStrategy($this->mockPaymentRepository);
         $strategy->calculate($subscription);
     }
 
-    public function testThrowsWhenPriceIsNegative(): void
+    public function testThrowsWhenPaymentAmountIsNegative(): void
     {
         $subscription = $this->createMockSubscription(
-            price: -50.00,
+            price: 100.00,
             lastPaymentDaysAgo: 5,
             endDateDaysFromNow: 25,
         );
 
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->andReturn($this->createMockPayment(-50.00));
+
         $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Cannot calculate pro-rated refund: subscription price is invalid');
+        $this->expectExceptionMessage('Cannot calculate pro-rated refund: payment amount is invalid');
 
         $strategy = new ProRatedRefundStrategy($this->mockPaymentRepository);
         $strategy->calculate($subscription);
@@ -317,6 +300,38 @@ class ProRatedRefundStrategyTest extends TestCase
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+    private function createMockSubscription(
+        float $price,
+        int   $lastPaymentDaysAgo,
+        int   $endDateDaysFromNow,
+    ): Subscription
+    {
+        $subscription = Mockery::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->price = $price;
+        $subscription->currency = 'USD';
+        $subscription->last_payment_date = new \DateTime("-{$lastPaymentDaysAgo} days");
+        $subscription->end_date = new \DateTime(
+            ($endDateDaysFromNow >= 0 ? '+' : '') . "{$endDateDaysFromNow} days"
+        );
+        return $subscription;
+    }
+
+    // -------------------------------------------------------------------------
+    // Happy path
+    // -------------------------------------------------------------------------
+
+    private function createMockPayment(float $amount): Payment
+    {
+        $payment = Mockery::mock(Payment::class)->makePartial();
+        $payment->id = 1;
+        $payment->subscription_id = 1;
+        $payment->amount = $amount;
+        $payment->transaction_id = 'ch_test_123';
+        $payment->payment_method = 'stripe';
+        $payment->payment_provider = 'stripe';
+        return $payment;
+    }
 
     protected function setUp(): void
     {

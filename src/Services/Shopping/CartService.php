@@ -42,68 +42,6 @@ class CartService
     {
     }
 
-    public function getSessionId(): string
-    {
-        if (empty(Session::get('cart_session_id'))) {
-            Session::put('cart_session_id', uniqid('cart_', true));
-        }
-        return Session::get('cart_session_id');
-    }
-
-    private function getUserId(): ?int
-    {
-        return Session::get('member_id');
-    }
-
-    public function getItems(): array
-    {
-        $sessionId = $this->getSessionId();
-        $userId = $this->getUserId();
-
-        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
-
-        return $items->map(function ($item) {
-            $product = $item->product;
-            $merchant = $item->merchant;
-
-            $itemData = [
-                'id' => $item->id,
-                'product_id' => $item->product_id,
-                'variant_id' => $item->variant_id,
-                'product_name' => $product->name ?? 'Unknown',
-                'merchant_name' => $merchant?->name ?? 'Unknown',
-                'product_slug' => $product->slug ?? '',
-                'product_image' => $product->image ?? '',
-                'price' => $item->price,
-                'quantity' => $item->quantity,
-                'subtotal' => $item->subtotal,
-                'options' => $item->options,
-                'item_type' => $item->getItemType(),
-                'merchant_id' => $item->getMerchantId(),
-                'subscription_plan_id' => $item->subscription_plan_id,
-            ];
-
-            if ($item->variant_id) {
-                $variant = $this->productRepository->getVariantById($item->variant_id);
-
-                $itemData['variant_options'] = $item->variant->options;
-                $itemData['sku'] = $variant->sku;
-            }
-
-            if ($item->isOffer()) {
-                $itemData['offer_id'] = $item->getOfferId();
-                $itemData['badge'] = 'Limited-time offer';
-            }
-
-            if ($item->isBundle()) {
-                $itemData['bundle_id'] = $item->getBundleId();
-                $itemData['badge'] = 'Bundle deal';
-            }
-
-            return $itemData;
-        })->toArray();
-    }
-
     public function addItem(
         int   $productId,
         int   $quantity = 1,
@@ -188,6 +126,19 @@ class CartService
         return ['success' => true, 'message' => 'Product added to cart'];
     }
 
+    public function getSessionId(): string
+    {
+        if (empty(Session::get('cart_session_id'))) {
+            Session::put('cart_session_id', uniqid('cart_', true));
+        }
+        return Session::get('cart_session_id');
+    }
+
+    private function getUserId(): ?int
+    {
+        return Session::get('member_id');
+    }
+
     public function updateQuantity(int $cartItemId, int $quantity): array
     {
         if ($quantity < 1) {
@@ -203,15 +154,51 @@ class CartService
             return ['success' => false, 'message' => 'Cart item not found'];
         }
 
-        $product = $cartItem->product;
-        $variant = $cartItem->variant_id ? $cartItem->variant : null;
+        $options = is_string($cartItem->options)
+            ? json_decode($cartItem->options, true)
+            : ($cartItem->options ?? []);
 
-        // Use stock resolver to check variant or product stock
-        try {
-            $this->stockResolver->assertCanUpdate($product, $variant, $quantity);
-        } catch (InsufficientStockException $e) {
-            return ['success' => false, 'message' => $e->getUserMessage()];
+        if ($cartItem->subscription_plan_id) {
+            $plan = $this->subscriptionPlanRepository->find($cartItem->subscription_plan_id);
+
+            if ($plan) {
+                $policy = $plan->availabilityPolicy();
+
+                if (!$policy->canPurchase()) {
+                    return ['success' => false, 'message' => 'Subscription is no longer available for purchase'];
+                }
+
+                if ($plan->print_shipping_required) {
+                    $nextIssue = $plan->getNextIssue();
+
+                    if ($nextIssue) {
+                        $issuePolicy = $nextIssue->availabilityPolicy();
+
+                        if (!$issuePolicy->canPurchase()) {
+                            return ['success' => false, 'message' => 'The next issue is not available for purchase'];
+                        }
+
+                        if ($nextIssue->stock_quantity < $quantity && !$issuePolicy->isPreOrder()) {
+                            return [
+                                'success' => false,
+                                'message' => "Cannot add more items. Only {$nextIssue->stock_quantity} in stock.",
+                            ];
+                        }
+                    }
+                }
+            }
+        } else {
+            $product = $cartItem->product;
+            $variant = $cartItem->variant_id ? $cartItem->variant : null;
+
+            // Use stock resolver to check variant or product stock
+            try {
+                $this->stockResolver->assertCanUpdate($product, $variant, $quantity);
+            } catch (InsufficientStockException $e) {
+                return ['success' => false, 'message' => $e->getUserMessage()];
+            }
         }
+
 
         $this->cartRepository->update($cartItemId, [
             'quantity' => $quantity,
@@ -310,6 +297,16 @@ class CartService
         $userId = $this->getUserId();
 
         return $this->cartRepository->getCountBySessionOrUser($userId, $sessionId);
+    }
+
+    /**
+     * Alias for addSubscriptionToCart for one-time subscriptions.
+     *
+     * This method name is more explicit for one-time use cases.
+     */
+    public function addOneTimeSubscription(int $subscriptionPlanId, string $deliveryType = 'print'): array
+    {
+        return $this->addSubscriptionToCart($subscriptionPlanId, $deliveryType);
     }
 
     /**
@@ -421,16 +418,6 @@ class CartService
         return ($sale !== null && $sale < $base) ? (float)$sale : (float)$base;
     }
 
-    /**
-     * Alias for addSubscriptionToCart for one-time subscriptions.
-     *
-     * This method name is more explicit for one-time use cases.
-     */
-    public function addOneTimeSubscription(int $subscriptionPlanId, string $deliveryType = 'print'): array
-    {
-        return $this->addSubscriptionToCart($subscriptionPlanId, $deliveryType);
-    }
-
     public function addOfferToCart(int $offerId): array
     {
         $offer = $this->offerRepository->find($offerId);
@@ -516,6 +503,33 @@ class CartService
                 'cart_items' => $cartItems
             ];
         });
+    }
+
+    public function getShipmentBreakdown(array $shippingData = []): array
+    {
+        $merchantGroups = $this->getItemsGroupedByMerchant();
+        $requiresShipping = $this->requiresShipping();
+
+        $shipments = [];
+
+        foreach ($merchantGroups as $group) {
+            $shipping = $this->shippingService->calculateShipping(
+                $group['subtotal'],
+                $shippingData,
+                $requiresShipping
+            );
+
+            $shipments[] = [
+                'merchant_id' => $group['merchant_id'],
+                'merchant_name' => $group['merchant_name'],
+                'item_count' => count($group['items']),
+                'subtotal' => $group['subtotal'],
+                'shipping' => $shipping,
+                'items' => $group['items'],
+            ];
+        }
+
+        return $shipments;
     }
 
     public function getItemsGroupedByMerchant(): array
@@ -611,31 +625,9 @@ class CartService
         return array_values($grouped);
     }
 
-    public function getShipmentBreakdown(array $shippingData = []): array
+    public function requiresShipping(): bool
     {
-        $merchantGroups = $this->getItemsGroupedByMerchant();
-        $requiresShipping = $this->requiresShipping();
-
-        $shipments = [];
-
-        foreach ($merchantGroups as $group) {
-            $shipping = $this->shippingService->calculateShipping(
-                $group['subtotal'],
-                $shippingData,
-                $requiresShipping
-            );
-
-            $shipments[] = [
-                'merchant_id' => $group['merchant_id'],
-                'merchant_name' => $group['merchant_name'],
-                'item_count' => count($group['items']),
-                'subtotal' => $group['subtotal'],
-                'shipping' => $shipping,
-                'items' => $group['items'],
-            ];
-        }
-
-        return $shipments;
+        return !$this->hasOnlyDigitalItems();
     }
 
     public function hasOnlyDigitalItems(): bool
@@ -694,11 +686,6 @@ class CartService
         ]);
 
         return ['success' => true, 'message' => 'Start date updated'];
-    }
-
-    public function requiresShipping(): bool
-    {
-        return !$this->hasOnlyDigitalItems();
     }
 
     /**
@@ -843,5 +830,54 @@ class CartService
         }
 
         return false;
+    }
+
+    public function getItems(): array
+    {
+        $sessionId = $this->getSessionId();
+        $userId = $this->getUserId();
+
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+
+        return $items->map(function ($item) {
+            $product = $item->product;
+            $merchant = $item->merchant;
+
+            $itemData = [
+                'id' => $item->id,
+                'product_id' => $item->product_id,
+                'variant_id' => $item->variant_id,
+                'product_name' => $product->name ?? 'Unknown',
+                'merchant_name' => $merchant?->name ?? 'Unknown',
+                'product_slug' => $product->slug ?? '',
+                'product_image' => $product->image ?? '',
+                'price' => $item->price,
+                'quantity' => $item->quantity,
+                'subtotal' => $item->subtotal,
+                'options' => $item->options,
+                'item_type' => $item->getItemType(),
+                'merchant_id' => $item->getMerchantId(),
+                'subscription_plan_id' => $item->subscription_plan_id,
+            ];
+
+            if ($item->variant_id) {
+                $variant = $this->productRepository->getVariantById($item->variant_id);
+
+                $itemData['variant_options'] = $item->variant->options;
+                $itemData['sku'] = $variant->sku;
+            }
+
+            if ($item->isOffer()) {
+                $itemData['offer_id'] = $item->getOfferId();
+                $itemData['badge'] = 'Limited-time offer';
+            }
+
+            if ($item->isBundle()) {
+                $itemData['bundle_id'] = $item->getBundleId();
+                $itemData['badge'] = 'Bundle deal';
+            }
+
+            return $itemData;
+        })->toArray();
     }
 }

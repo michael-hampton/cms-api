@@ -229,6 +229,50 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->service->markPaid(5, 99);
     }
 
+    public function test_mark_paid_rejects_stripe_payouts(): void
+    {
+        $payout = $this->makePayout([
+            'id' => 6,
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+        ]);
+
+        $this->payoutRepository->shouldReceive('find')->andReturn($payout);
+        $this->payoutRepository->shouldNotReceive('update');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/must be finalised by Stripe webhooks/i');
+        $this->service->markPaid(6, 99);
+    }
+
+    public function test_retry_stripe_failed_payout_transitions_to_approved(): void
+    {
+        $failed = $this->makePayout([
+            'id' => 15,
+            'status' => PayoutStatus::Failed->value,
+            'method' => 'stripe',
+        ]);
+        $approved = $this->makePayout([
+            'id' => 15,
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+        ]);
+
+        $this->payoutRepository->shouldReceive('find')->with(15)->andReturn($failed, $approved);
+        $this->payoutRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn($id, $data) => $id === 15
+                && $data['status'] === PayoutStatus::Approved->value
+                && $data['provider_status'] === 'retry_queued'
+            );
+        $this->payoutAuditRepository->shouldReceive('log')
+            ->once()
+            ->withArgs(fn($pid, $action) => $pid === 15 && $action === PayoutAuditAction::Approved);
+
+        $result = $this->service->retryStripeFailedPayout(15, 99);
+        $this->assertEquals(PayoutStatus::Approved->value, $result->status);
+    }
+
     // ── reject() ──────────────────────────────────────────────────────────────
 
     public function test_reject_transitions_pending_to_rejected_with_audit_and_reason(): void

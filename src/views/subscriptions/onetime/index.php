@@ -271,28 +271,111 @@ $selectedTags = !empty($filters['tags'])
         .mini-cart-items {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
+            padding: 1rem 1.5rem;
         }
 
+        /* ── Cart item ── */
         .cart-item {
             padding: 1rem 0;
             border-bottom: 1px solid #e2e8f0;
         }
 
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+
+        .cart-item-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
         .cart-item-name {
             font-weight: 600;
-            margin-bottom: .5rem;
+            font-size: 0.9rem;
+            flex: 1;
+        }
+
+        .cart-item-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #94a3b8;
+            padding: 2px;
+            line-height: 0;
+            border-radius: 4px;
+            transition: color 0.2s, background 0.2s;
+            flex-shrink: 0;
+        }
+
+        .cart-item-remove:hover {
+            color: #ef4444;
+            background: #fef2f2;
         }
 
         .cart-item-details {
-            font-size: .875rem;
+            font-size: .8rem;
             color: #64748b;
-            margin-bottom: .5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .cart-item-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .cart-item-price {
-            font-weight: 600;
+            font-weight: 700;
             color: #2563eb;
+            font-size: 0.95rem;
+        }
+
+        /* ── Quantity controls ── */
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .qty-btn {
+            background: #f8fafc;
+            border: none;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            transition: background 0.15s, color 0.15s;
+            line-height: 1;
+        }
+
+        .qty-btn:hover:not(:disabled) {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .qty-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .qty-value {
+            min-width: 28px;
+            text-align: center;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #1e293b;
+            padding: 0 4px;
         }
 
         .mini-cart-footer {
@@ -306,6 +389,27 @@ $selectedTags = !empty($filters['tags'])
             margin-bottom: 1rem;
             font-size: 1.125rem;
             font-weight: 700;
+        }
+
+        /* ── Clear cart button ── */
+        .clear-cart-btn {
+            background: none;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #94a3b8;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .clear-cart-btn:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+            background: #fef2f2;
         }
 
         .cart-overlay {
@@ -323,7 +427,7 @@ $selectedTags = !empty($filters['tags'])
             display: block;
         }
 
-        /* ── Plan card image ─────────────────────────────────────── */
+        /* ── Plan card ─────────────────────────────────────────── */
         .plan-card__cover {
             width: 100%;
             aspect-ratio: 4/3;
@@ -381,14 +485,29 @@ $selectedTags = !empty($filters['tags'])
             margin-bottom: 0.4rem;
         }
 
-        /* ── SEARCH CLEAR BUTTON ─────────────────────────────────── */
+        /* ── Cart button states ─────────────────────────────────── */
         /*
-         * The sidebar search label is already position:relative in the shared
-         * stylesheet (it wraps the SVG icon + input). The clear button is
-         * injected by JS and sits at the trailing edge of the input.
+         * .plan-card__btn--cart has three visual states:
+         *   default   — normal cart icon
+         *   --loading — spinner emoji, disabled
+         *   --in-cart — green tint, tick icon, indicates item is in cart
          */
+        .plan-card__btn--cart {
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+        }
+
+        .plan-card__btn--cart.is-in-cart {
+            background: #d1fae5 !important;
+            color: #065f46 !important;
+            border-color: #6ee7b7 !important;
+        }
+
+        .plan-card__btn--cart.is-loading {
+            opacity: 0.6;
+        }
+
+        /* ── Search clear button ─────────────────────────────────── */
         .search-clear-btn {
-            /*position: absolute;*/
             right: 8px;
             top: 50%;
             transform: translateY(-50%);
@@ -396,7 +515,7 @@ $selectedTags = !empty($filters['tags'])
             border: none;
             cursor: pointer;
             color: var(--ink-muted, #94a3b8);
-            display: none; /* shown by JS when input has value */
+            display: none;
             padding: 2px;
             line-height: 0;
             border-radius: 50%;
@@ -407,23 +526,13 @@ $selectedTags = !empty($filters['tags'])
             color: var(--ink, #1e293b);
         }
 
-        /* Nudge the input so text doesn't slide under the ×  */
         .sidebar__search input {
             padding-right: 28px;
         }
 
-        /* ── MOBILE FILTER TOGGLE + DRAWER ───────────────────────── */
-        /*
-         * On mobile (<= 768 px) the sidebar is hidden by default. A sticky
-         * toolbar button opens a full-width bottom-sheet drawer containing
-         * the sidebar content. An overlay dismisses it.
-         *
-         * The .layout grid breakpoint is inherited from _pressstack-shared.css.
-         * We simply keep .sidebar display:none on small screens and reveal it
-         * as a fixed drawer when .filter-drawer--open is present on <body>.
-         */
+        /* ── Mobile filter bar ───────────────────────────────────── */
         .mobile-filter-bar {
-            display: none; /* shown only on mobile */
+            display: none;
             position: sticky;
             top: 0;
             z-index: 200;
@@ -456,7 +565,6 @@ $selectedTags = !empty($filters['tags'])
             color: var(--gold);
         }
 
-        /* Active-filter count badge on the toggle button */
         .mobile-filter-toggle__count {
             background: var(--gold);
             color: #fff;
@@ -471,7 +579,6 @@ $selectedTags = !empty($filters['tags'])
             display: inline-block;
         }
 
-        /* Inline mobile search — full width, sits right of the filter toggle */
         .mobile-search-wrap {
             flex: 1;
             position: relative;
@@ -520,13 +627,13 @@ $selectedTags = !empty($filters['tags'])
             color: var(--ink);
         }
 
-        /* The drawer itself */
+        /* ── Filter drawer ───────────────────────────────────────── */
         .filter-drawer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 85dvh; /* leaves a peek of content behind */
+            height: 85dvh;
             background: var(--white);
             border-radius: 20px 20px 0 0;
             box-shadow: 0 -8px 40px rgba(0, 0, 0, .18);
@@ -581,7 +688,6 @@ $selectedTags = !empty($filters['tags'])
             -webkit-overflow-scrolling: touch;
         }
 
-        /* The drawer body houses .sidebar__body content, reuse its styles */
         .filter-drawer__body .sidebar__body {
             padding: 0;
         }
@@ -598,7 +704,6 @@ $selectedTags = !empty($filters['tags'])
             flex: 1;
         }
 
-        /* Overlay behind the drawer */
         .filter-drawer-overlay {
             position: fixed;
             inset: 0;
@@ -614,13 +719,12 @@ $selectedTags = !empty($filters['tags'])
             opacity: 1;
         }
 
-        /* ── Responsive breakpoints ──────────────────────────────── */
+        /* ── Responsive ──────────────────────────────────────────── */
         @media (max-width: 768px) {
             .mobile-filter-bar {
                 display: flex;
             }
 
-            /* Hide desktop sidebar — its form is cloned into the drawer */
             .sidebar {
                 display: none !important;
             }
@@ -638,7 +742,6 @@ $selectedTags = !empty($filters['tags'])
         }
 
         @media (min-width: 769px) {
-            /* Ensure drawer never shows on desktop even if class is present */
             .filter-drawer,
             .filter-drawer-overlay,
             .mobile-filter-bar {
@@ -673,7 +776,7 @@ $selectedTags = !empty($filters['tags'])
     </nav>
 
     <div class="header-right">
-        <div class="cart-badge" onclick="openMiniCart()">
+        <div class="cart-badge" onclick="window.shop.cart.open()">
             <div class="cart-info">
                 <div class="cart-icon">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -710,9 +813,9 @@ $selectedTags = !empty($filters['tags'])
     </div>
 </div>
 
-<!-- ── Mobile filter bar (hidden on desktop via CSS) ──────────────── -->
+<!-- ── Mobile filter bar ──────────────────────────────────────────── -->
 <div class="mobile-filter-bar" id="mobile-filter-bar">
-    <button class="mobile-filter-toggle" id="mobile-filter-toggle" onclick="openFilterDrawer()">
+    <button class="mobile-filter-toggle" id="mobile-filter-toggle" onclick="window.shop.filters.openDrawer()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="4" y1="6" x2="20" y2="6"/>
             <line x1="4" y1="12" x2="14" y2="12"/>
@@ -746,14 +849,14 @@ $selectedTags = !empty($filters['tags'])
 </div>
 
 <!-- ── Filter drawer overlay ──────────────────────────────────────── -->
-<div class="filter-drawer-overlay" id="filter-drawer-overlay" onclick="closeFilterDrawer()"></div>
+<div class="filter-drawer-overlay" id="filter-drawer-overlay" onclick="window.shop.filters.closeDrawer()"></div>
 
 <!-- ── Filter drawer ──────────────────────────────────────────────── -->
 <div class="filter-drawer" id="filter-drawer" role="dialog" aria-modal="true" aria-label="Filters">
     <div class="filter-drawer__handle"></div>
     <div class="filter-drawer__header">
         <span class="filter-drawer__title">Filter publications</span>
-        <button class="filter-drawer__close" onclick="closeFilterDrawer()" aria-label="Close filters">
+        <button class="filter-drawer__close" onclick="window.shop.filters.closeDrawer()" aria-label="Close filters">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                  stroke-linecap="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -761,15 +864,11 @@ $selectedTags = !empty($filters['tags'])
             </svg>
         </button>
     </div>
-    <!--
-        The sidebar form content is cloned into here by JS (initFilterDrawer).
-        We do NOT duplicate PHP markup — a single form is the source of truth,
-        and the clone stays in sync via the syncDrawerToSidebar helper.
-    -->
     <div class="filter-drawer__body" id="filter-drawer-body"></div>
     <div class="filter-drawer__footer">
-        <button type="button" class="filter-btn filter-btn--clear" onclick="drawerClearFilters()">Clear</button>
-        <button type="button" class="filter-btn" onclick="drawerApplyFilters()">Apply filters</button>
+        <button type="button" class="filter-btn filter-btn--clear" onclick="window.shop.filters.drawerClear()">Clear
+        </button>
+        <button type="button" class="filter-btn" onclick="window.shop.filters.drawerApply()">Apply filters</button>
     </div>
 </div>
 
@@ -790,10 +889,6 @@ $selectedTags = !empty($filters['tags'])
 
                 <div class="sidebar__section">
                     <div class="sidebar__label">Search</div>
-                    <!--
-                        position:relative is already on .sidebar__search in the
-                        shared sheet. The clear button is injected by JS.
-                    -->
                     <label class="sidebar__search" id="sidebar-search-wrap">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                              stroke-width="2">
@@ -853,7 +948,7 @@ $selectedTags = !empty($filters['tags'])
                             <button type="button"
                                     class="category-pill <?= in_array($cat['name'], $selectedCategories) ? 'active' : '' ?>"
                                     data-category="<?= htmlspecialchars($cat['name']) ?>"
-                                    onclick="toggleCategory('<?= htmlspecialchars($cat['name']) ?>')">
+                                    onclick="window.shop.filters.toggleCategory('<?= htmlspecialchars($cat['name']) ?>')">
                                 <span class="category-pill__dot"
                                       style="background:<?= htmlspecialchars($cat['color']) ?>"></span>
                                 <?= htmlspecialchars($cat['icon'] . ' ' . $cat['name']) ?>
@@ -892,7 +987,8 @@ $selectedTags = !empty($filters['tags'])
                     </div>
                 <?php endif; ?>
 
-                <button type="button" class="filter-btn filter-btn--clear" onclick="clearFilters()">Clear all filters
+                <button type="button" class="filter-btn filter-btn--clear" onclick="window.shop.filters.clear()">Clear
+                    all filters
                 </button>
                 <button type="submit" class="filter-btn">Apply filters</button>
             </form>
@@ -919,7 +1015,7 @@ $selectedTags = !empty($filters['tags'])
                     <?php foreach ($available_categories as $cat): ?>
                         <div class="cat-tile <?= in_array($cat['name'], $selectedCategories) ? 'selected' : '' ?>"
                              data-category="<?= htmlspecialchars($cat['name']) ?>"
-                             onclick="toggleCategory('<?= htmlspecialchars($cat['name']) ?>')">
+                             onclick="window.shop.filters.toggleCategory('<?= htmlspecialchars($cat['name']) ?>')">
                             <div class="cat-tile__icon" style="background:<?= htmlspecialchars($cat['color']) ?>">
                                 <?= $cat['icon'] ?>
                             </div>
@@ -988,7 +1084,7 @@ $selectedTags = !empty($filters['tags'])
                                         </div>
                                         <button class="bundle-card__cta"
                                                 data-delivery_type="<?= $bundle['delivery_type'] ?? 'print' ?>"
-                                                onclick="event.preventDefault(); addToCart('bundle', <?= $bundle['id'] ?>, this)">
+                                                onclick="event.preventDefault(); window.shop.cart.addItem('bundle', <?= $bundle['id'] ?>, this)">
                                             Add to cart
                                         </button>
                                     </div>
@@ -1148,9 +1244,10 @@ $selectedTags = !empty($filters['tags'])
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
                                     <button class="plan-card__btn plan-card__btn--cart"
+                                            data-plan-id="<?= $plan->id ?>"
                                             data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
                                             title="Add to cart"
-                                            onclick="addToCart('plan', <?= $plan->id ?>, this)">
+                                            onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
                                         🛒
                                     </button>
                                 </div>
@@ -1191,10 +1288,11 @@ $selectedTags = !empty($filters['tags'])
     </main>
 </div>
 
+<!-- ── Mini Cart ─────────────────────────────────────────────────── -->
 <div class="mini-cart" id="mini-cart">
     <div class="mini-cart-header">
         <h3>Your Cart (<span id="cart-count">0</span>)</h3>
-        <button class="close-cart" onclick="closeMiniCart()" aria-label="Close cart">×</button>
+        <button class="close-cart" onclick="window.shop.cart.close()" aria-label="Close cart">×</button>
     </div>
     <div class="mini-cart-items" id="cart-items">
         <p style="text-align:center; color:#64748b; padding:2rem;">Your cart is empty</p>
@@ -1204,545 +1302,213 @@ $selectedTags = !empty($filters['tags'])
             <span>Total:</span>
             <span id="mini-cart-total">£0.00</span>
         </div>
-        <button class="btn btn-primary" onclick="goToCheckout()">Proceed to Checkout</button>
+        <button class="clear-cart-btn" id="clear-cart-btn" onclick="window.shop.cart.clear()" style="display:none;">
+            🗑 Clear cart
+        </button>
+        <button class="btn btn-primary" onclick="window.shop.cart.checkout()">Proceed to Checkout</button>
     </div>
 </div>
 
-<div class="cart-overlay" id="cart-overlay" onclick="closeMiniCart()"></div>
+<div class="cart-overlay" id="cart-overlay" onclick="window.shop.cart.close()"></div>
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
 <script>
-    const FORM = document.getElementById('filter-form');
-    const SORT_SELECT = document.getElementById('sort-select');
-    const PLANS_WRAP = document.getElementById('plans-wrap');
-    let cartData = {items: [], total: 0, count: 0};
+    // ── Bootstrap constants ───────────────────────────────────────────────
     const SITE = 'press-stack';
     const API_BASE = '/api/press-stack';
-    CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
+    let CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
-    let selectedCategories = new Set(<?= json_encode($selectedCategories) ?>);
-    let selectedTags = new Set(<?= json_encode($selectedTags) ?>);
-    let currentSort = <?= json_encode($filters['sort'] ?? '') ?>;
-    let isLoading = false;
-
-    /* ── Escape helper ──────────────────────────────────────── */
+    // ── Utilities ─────────────────────────────────────────────────────────
     function escHtml(s) {
         return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    /* ── Cart ───────────────────────────────────────────────── */
-    async function loadCart() {
-        try {
-            const r = await fetch(`${API_BASE}/cart`);
-            cartData = await r.json();
-            updateCartDisplay();
-        } catch (e) {
-            console.error('Cart load error:', e);
+    // ═══════════════════════════════════════════════════════════════════════
+    // CartService
+    // Owns all cart state and API interactions.
+    // Notifies listeners after every mutation via _notify().
+    // ═══════════════════════════════════════════════════════════════════════
+    class CartService {
+        constructor(apiBase) {
+            this.apiBase = apiBase;
+            this._data = {items: [], total: 0, count: 0};
+            this._listeners = [];
         }
-    }
 
-    function updateCartDisplay() {
-        const count = cartData.count || 0;
-        document.getElementById('cart-count').textContent = count;
-        document.getElementById('cart-total').textContent = CURRENCY_SYMBOL + +(cartData.total || 0).toFixed(2);
-        document.getElementById('mini-cart-total').textContent = CURRENCY_SYMBOL + +(cartData.total || 0).toFixed(2);
-        const badge = document.getElementById('header-cart-count');
-        badge.textContent = count;
-        badge.style.display = count > 0 ? 'flex' : 'none';
-
-        const container = document.getElementById('cart-items');
-        if (!cartData.items?.length) {
-            container.innerHTML = '<p style="text-align:center;color:#64748b;padding:2rem;">Your cart is empty</p>';
-            return;
+        // ── Derived state ────────────────────────────────────────────────
+        get items() {
+            return this._data.items || [];
         }
-        container.innerHTML = cartData.items.map(item => `
-        <div class="cart-item">
-            <div class="cart-item-name">${item.product_name || item.options?.plan_name || 'Subscription'}</div>
-            <div class="cart-item-details">${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months</div>
-            <div class="cart-item-price">${CURRENCY_SYMBOL}${(item.price || 0).toFixed(2)}</div>
-        </div>`).join('');
-    }
 
-    function openMiniCart() {
-        document.getElementById('mini-cart').classList.add('open');
-        document.getElementById('cart-overlay').classList.add('show');
-    }
-
-    function closeMiniCart() {
-        document.getElementById('mini-cart').classList.remove('open');
-        document.getElementById('cart-overlay').classList.remove('show');
-    }
-
-    function goToCheckout() {
-        window.location.href = '/' + SITE + '/checkout?type=subscription';
-    }
-
-    /* ── Card / pagination renderers (unchanged) ────────────── */
-    function deliveryPills(plan) {
-        const hasPrint = plan.print_shipping_required || plan.delivery_type === 'print' || plan.delivery_type === 'both';
-        const hasDigital = !!plan.digital_download_url || plan.delivery_type === 'digital' || plan.delivery_type === 'both';
-        const pills = [];
-        if (hasPrint) pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
-        if (hasDigital) pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
-        if (!pills.length) {
-            if (plan.delivery_type === 'print') pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
-            if (plan.delivery_type === 'digital') pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
+        get total() {
+            return this._data.total || 0;
         }
-        return pills.join('');
-    }
 
-    function renderBadge(plan) {
-        if (plan.is_featured && plan.savings_pct) return `<div class="plan-card__badge plan-card__badge--featured">⭐ Featured</div>`;
-        if (plan.has_sale && plan.savings_pct) return `<div class="plan-card__badge plan-card__badge--sale">SAVE ${plan.savings_pct}%</div>`;
-        if (plan.is_limited_offer) return `<div class="plan-card__badge plan-card__badge--offer">Limited offer</div>`;
-        return '';
-    }
-
-    function renderPlanCard(plan) {
-        const price = parseFloat(plan.has_sale ? plan.sale_price : plan.price) || 0;
-        const wasLine = (plan.has_sale && plan.original_price) ? `<div class="plan-card__price-was">${CURRENCY_SYMBOL}${parseFloat(plan.original_price).toFixed(2)}</div>` : '';
-        const saleNote = plan.has_sale ? `<div class="plan-card__price-note">🔥 Sale price</div>` : '';
-        const btnClass = plan.has_sale ? 'plan-card__btn plan-card__btn--sale' : 'plan-card__btn';
-        const btnLabel = plan.has_sale ? '🔥 View deal' : 'View details';
-        const priceClass = plan.has_sale ? 'plan-card__price plan-card__price--sale' : 'plan-card__price';
-        const desc = plan.description ? `<p class="plan-card__desc">${escHtml(plan.description.substring(0, 110))}${plan.description.length > 110 ? '…' : ''}</p>` : '';
-        const featuresHtml = (plan.features && plan.features.length)
-            ? `<ul class="plan-card__features">${plan.features.slice(0, 3).map(f => `<li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>${escHtml(f)}</li>`).join('')}${plan.features.length > 3 ? `<li class="plan-card__features-more">+${plan.features.length - 3} more</li>` : ''}</ul>` : '';
-        const releaseHtml = (plan.release_date && new Date(plan.release_date) > new Date())
-            ? `<div class="plan-card__release">🗓 Coming ${new Date(plan.release_date).toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric'
-            })}</div>` : '';
-        const site = plan.site_name ? `<div class="plan-card__site">${escHtml(plan.site_name)}</div>` : '';
-        const catPills = (plan.categories || []).slice(0, 2).map(c => `<span class="meta-pill meta-pill--tag">${escHtml(c.charAt(0).toUpperCase() + c.slice(1))}</span>`).join('');
-        const tagPills = (plan.tags || []).slice(0, 2).map(t => `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
-        const cartDt = escHtml(plan.delivery_type || 'digital');
-        const coverUrl = plan.print_image_url || plan.digital_image_url || null;
-        const coverHtml = coverUrl
-            ? `<div class="plan-card__cover"><img src="${escHtml(coverUrl)}" alt="${escHtml(plan.name)}" loading="lazy"></div>`
-            : `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
-        return `<article class="plan-card">${renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-delivery_type="${cartDt}" title="Add to cart" onclick="addToCart('plan',${plan.id},this)">🛒</button></div></div></article>`;
-    }
-
-    function renderPagination(p) {
-        if (p.total_pages <= 1) return '';
-        const {current_page: cur, total_pages: tot} = p;
-        const start = Math.max(1, cur - 2), end = Math.min(tot, cur + 2);
-        let h = `<nav class="pagination" id="pagination">`;
-        h += `<button class="pagination__btn ${cur <= 1 ? 'disabled' : ''}" data-page="${cur - 1}">←</button>`;
-        if (start > 1) h += `<button class="pagination__btn" data-page="1">1</button>`;
-        if (start > 2) h += `<span class="pagination__ellipsis">…</span>`;
-        for (let i = start; i <= end; i++) h += `<button class="pagination__btn ${i === cur ? 'active' : ''}" data-page="${i}">${i}</button>`;
-        if (end < tot - 1) h += `<span class="pagination__ellipsis">…</span>`;
-        if (end < tot) h += `<button class="pagination__btn" data-page="${tot}">${tot}</button>`;
-        h += `<button class="pagination__btn ${cur >= tot ? 'disabled' : ''}" data-page="${cur + 1}">→</button></nav>`;
-        return h;
-    }
-
-    /* ── Params / chips ─────────────────────────────────────── */
-    function buildParams(page) {
-        const fd = new FormData(FORM), p = new URLSearchParams();
-        for (const [k, v] of fd.entries()) {
-            if (!v || k === 'categories[]' || k === 'tags[]') continue;
-            p.set(k, v);
+        get count() {
+            return this._data.count || 0;
         }
-        selectedCategories.forEach(c => p.append('categories[]', c));
-        selectedTags.forEach(t => p.append('tags[]', t));
-        p.set('page', page);
-        if (currentSort) p.set('sort', currentSort);
-        return p;
-    }
 
-    function countActiveFilters() {
-        const fd = new FormData(FORM);
-        let n = 0;
-        for (const [k, v] of fd.entries()) {
-            if (v && k !== 'categories[]' && k !== 'tags[]') n++;
+        /** Set of plan IDs currently in the cart (for button state sync) */
+        get planIds() {
+            return new Set(
+                this.items
+                    .filter(i => i.subscription_plan_id)
+                    .map(i => String(i.subscription_plan_id))
+            );
         }
-        return n + selectedCategories.size + selectedTags.size;
-    }
 
-    function updateMobileFilterBadge() {
-        const n = countActiveFilters();
-        const countEl = document.getElementById('mobile-filter-count');
-        const toggleEl = document.getElementById('mobile-filter-toggle');
-        if (!countEl || !toggleEl) return;
-        countEl.textContent = n;
-        countEl.classList.toggle('visible', n > 0);
-        toggleEl.classList.toggle('has-active', n > 0);
-    }
-
-    function renderActiveChips() {
-        const chips = [], fd = new FormData(FORM);
-        const labels = {
-            search: 'Search',
-            site_id: 'Publication',
-            delivery_type: 'Delivery',
-            special_filter: 'Offers',
-            price_min: 'Min £',
-            price_max: 'Max £'
-        };
-        for (const [k, v] of fd.entries()) {
-            if (!v || !labels[k]) continue;
-            chips.push(`<div class="active-chip">${labels[k]}: ${escHtml(v)}<button onclick="removeChip('${k}')">×</button></div>`);
+        // ── Pub/sub ──────────────────────────────────────────────────────
+        subscribe(fn) {
+            this._listeners.push(fn);
         }
-        selectedCategories.forEach(c => chips.push(`<div class="active-chip">📂 ${escHtml(c)}<button onclick="removeCategory('${escHtml(c)}')">×</button></div>`));
-        selectedTags.forEach(t => chips.push(`<div class="active-chip">🏷 ${escHtml(t.replace(/-/g, ' '))}<button onclick="removeTag('${escHtml(t)}')">×</button></div>`));
-        document.getElementById('active-chips').innerHTML = chips.join('');
-        updateMobileFilterBadge();
-    }
 
-    window.removeChip = k => {
-        const el = FORM.querySelector(`[name="${k}"]`);
-        if (el) el.value = '';
-        fetchPlans(1);
-    };
-    window.removeCategory = c => {
-        selectedCategories.delete(c);
-        syncCategoryUI();
-        fetchPlans(1);
-    };
-    window.removeTag = t => {
-        selectedTags.delete(t);
-        const cb = FORM.querySelector(`input[name="tags[]"][value="${t}"]`);
-        if (cb) cb.checked = false;
-        fetchPlans(1);
-    };
+        _notify() {
+            this._listeners.forEach(fn => fn(this));
+        }
 
-    /* ── Fetch ──────────────────────────────────────────────── */
-    async function fetchPlans(page = 1) {
-        if (isLoading) return;
-        isLoading = true;
-        PLANS_WRAP.classList.add('is-loading');
-        const params = buildParams(page);
-        history.replaceState(null, '', '?' + params.toString());
-        renderActiveChips();
-        try {
-            const res = await fetch('/subscriptions/onetime/search?' + params.toString(), {
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Accept': 'application/json'
-                }
-            });
-            const data = await res.json();
-            if (!data.success) return;
-            const result = data.data;
-            const countEl = document.getElementById('results-count');
-            if (countEl) countEl.innerHTML = `Showing <strong>${result.plans.length}</strong> of <strong>${result.pagination.total.toLocaleString()}</strong> subscriptions`;
-            PLANS_WRAP.querySelector('.plans-grid, .empty-state')?.remove();
-            document.getElementById('pagination')?.remove();
-            if (result.plans.length === 0) {
-                PLANS_WRAP.insertAdjacentHTML('afterbegin', `<div class="empty-state"><div class="empty-state__icon">📭</div><div class="empty-state__title">No subscriptions found</div><p>Try adjusting your filters.</p></div>`);
-            } else {
-                PLANS_WRAP.insertAdjacentHTML('afterbegin', `<div class="plans-grid">${result.plans.map(renderPlanCard).join('')}</div>`);
-                PLANS_WRAP.insertAdjacentHTML('beforeend', renderPagination(result.pagination));
-                bindPagination();
+        // ── Remote calls ─────────────────────────────────────────────────
+        async load() {
+            try {
+                const res = await fetch(`${this.apiBase}/cart`);
+                this._data = await res.json();
+                this._notify();
+            } catch (e) {
+                console.error('Cart load error:', e);
             }
-        } catch (e) {
-            console.error(e);
-        } finally {
-            isLoading = false;
-            PLANS_WRAP.classList.remove('is-loading');
+        }
+
+        /**
+         * Add a plan or bundle to the cart.
+         * Returns true on success, false on failure.
+         */
+        async addItem(type, id, deliveryType) {
+            const endpoint = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle';
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({type, bundle_id: id, plan_id: id, quantity: 1, delivery_type: deliveryType}),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Add to cart error:', e);
+                return false;
+            }
+        }
+
+        /**
+         * Update quantity for a cart item.
+         * Quantity of 0 removes the item.
+         */
+        async updateQuantity(itemId, quantity) {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/${itemId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({quantity}),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Update quantity error:', e);
+                return false;
+            }
+        }
+
+        async removeItem(itemId) {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/${itemId}`, {
+                    method: 'DELETE',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Remove item error:', e);
+                return false;
+            }
+        }
+
+        async clear() {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/clear`, {
+                    method: 'DELETE',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Clear cart error:', e);
+                return false;
+            }
         }
     }
 
-    function bindPagination() {
-        document.querySelectorAll('#pagination .pagination__btn:not(.disabled)').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const p = parseInt(btn.dataset.page);
-                if (p > 0) fetchPlans(p);
-            });
-        });
-    }
-
-    /* ── Category / tag toggles ─────────────────────────────── */
-    window.toggleCategory = cat => {
-        selectedCategories.has(cat) ? selectedCategories.delete(cat) : selectedCategories.add(cat);
-        syncCategoryUI();
-        fetchPlans(1);
-    };
-
-    function syncCategoryUI() {
-        document.querySelectorAll('[data-category]').forEach(el => {
-            const on = selectedCategories.has(el.dataset.category);
-            el.classList.toggle('active', on);
-            el.classList.toggle('selected', on);
-        });
-    }
-
-    document.querySelectorAll('#tag-list input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-            cb.checked ? selectedTags.add(cb.value) : selectedTags.delete(cb.value);
-            cb.closest('.tag-item').classList.toggle('checked', cb.checked);
-            fetchPlans(1);
-        });
-    });
-
-    /* ── Desktop inputs ─────────────────────────────────────── */
-    let searchTimer;
-    document.getElementById('search').addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => fetchPlans(1), 450);
-    });
-    FORM.querySelectorAll('select').forEach(s => s.addEventListener('change', () => fetchPlans(1)));
-    FORM.querySelectorAll('input[name="price_min"],input[name="price_max"]').forEach(i => i.addEventListener('change', () => fetchPlans(1)));
-    FORM.addEventListener('submit', e => {
-        e.preventDefault();
-        fetchPlans(1);
-    });
-    SORT_SELECT.addEventListener('change', () => {
-        currentSort = SORT_SELECT.value;
-        fetchPlans(1);
-    });
-
-    window.clearFilters = () => {
-        FORM.querySelectorAll('input[type="text"],input[type="number"]').forEach(i => i.value = '');
-        FORM.querySelectorAll('select').forEach(s => s.value = '');
-        FORM.querySelectorAll('input[type="checkbox"]').forEach(c => {
-            c.checked = false;
-            c.closest('.tag-item')?.classList.remove('checked');
-        });
-        selectedCategories.clear();
-        selectedTags.clear();
-        syncCategoryUI();
-        fetchPlans(1);
-    };
-
-    /* ── SEARCH CLEAR BUTTON (desktop sidebar) ──────────────── */
-    (function initSidebarSearchClear() {
-        const input = document.getElementById('search');
-        const wrapper = document.getElementById('sidebar-search-wrap');
-        if (!input || !wrapper) return;
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'search-clear-btn';
-        btn.setAttribute('aria-label', 'Clear search');
-        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-        wrapper.appendChild(btn);
-
-        const sync = () => {
-            btn.style.display = input.value ? 'block' : 'none';
-        };
-        input.addEventListener('input', sync);
-        sync();
-
-        btn.addEventListener('click', () => {
-            input.value = '';
-            sync();
-            clearTimeout(searchTimer);
-            fetchPlans(1);
-            input.focus();
-        });
-    })();
-
-    /* ── MOBILE SEARCH (mirrors desktop search field) ───────── */
-    (function initMobileSearch() {
-        const mobileInput = document.getElementById('mobile-search');
-        const clearBtn = document.getElementById('mobile-search-clear');
-        const desktopInput = document.getElementById('search');
-        if (!mobileInput) return;
-
-        const syncClear = () => {
-            clearBtn.style.display = mobileInput.value ? 'block' : 'none';
-        };
-        mobileInput.addEventListener('input', syncClear);
-        syncClear();
-
-        let timer;
-        mobileInput.addEventListener('input', () => {
-            // Keep the desktop (form) field in sync so buildParams() picks it up
-            desktopInput.value = mobileInput.value;
-            clearTimeout(timer);
-            timer = setTimeout(() => fetchPlans(1), 450);
-        });
-
-        clearBtn.addEventListener('click', () => {
-            mobileInput.value = '';
-            desktopInput.value = '';
-            syncClear();
-            fetchPlans(1);
-            mobileInput.focus();
-        });
-    })();
-
-    /* ── MOBILE FILTER DRAWER ───────────────────────────────── */
-    /*
-     * Strategy: deep-clone the sidebar__body content into the drawer on first
-     * open. The clone contains a separate <form> whose inputs we read when
-     * "Apply" is pressed in the drawer — at that point we copy the values back
-     * to the canonical #filter-form and call fetchPlans().
-     *
-     * We never modify the canonical form from the drawer directly to keep a
-     * single source of truth and avoid double-event-listener issues.
-     */
-    let drawerInitialised = false;
-    let drawerForm = null;   // the cloned form inside the drawer
-
-    function openFilterDrawer() {
-        if (!drawerInitialised) buildDrawer();
-        syncDrawerFromSidebar();
-
-        document.getElementById('filter-drawer').classList.add('filter-drawer--open');
-        document.getElementById('filter-drawer-overlay').classList.add('show');
-        document.body.style.overflow = 'hidden';
-    }
-
-    function closeFilterDrawer() {
-        document.getElementById('filter-drawer').classList.remove('filter-drawer--open');
-        document.getElementById('filter-drawer-overlay').classList.remove('show');
-        document.body.style.overflow = '';
-    }
-
-    function buildDrawer() {
-        const body = document.getElementById('filter-drawer-body');
-        const sidebarEl = document.querySelector('#desktop-sidebar .sidebar__body');
-
-        // Clone the sidebar body (which contains the canonical form)
-        const clone = sidebarEl.cloneNode(true);
-
-        // The clone has a second copy of #filter-form — give it a unique id
-        // so it doesn't conflict, and remove the duplicate submit / clear buttons
-        // (the drawer has its own footer buttons).
-        const clonedForm = clone.querySelector('form');
-        if (clonedForm) {
-            clonedForm.id = 'drawer-filter-form';
-            clonedForm.querySelectorAll('.filter-btn').forEach(btn => btn.remove());
-            drawerForm = clonedForm;
+    // ═══════════════════════════════════════════════════════════════════════
+    // MiniCartUI
+    // Renders the cart sidebar and keeps all button states in sync.
+    // Depends on CartService for state; never fetches directly.
+    // ═══════════════════════════════════════════════════════════════════════
+    class MiniCartUI {
+        constructor(cartService) {
+            this.cartService = cartService;
+            // Subscribe to cart changes — single render path
+            this.cartService.subscribe(() => this._render());
         }
 
-        // Remove IDs from cloned inputs to avoid duplicates; use name only
-        clone.querySelectorAll('[id]').forEach(el => {
-            el.removeAttribute('id');
-        });
-
-        body.appendChild(clone);
-
-        // Category pills inside the drawer should use the same toggleCategory()
-        clone.querySelectorAll('[data-category]').forEach(el => {
-            el.onclick = null; // remove cloned inline handler
-            el.addEventListener('click', () => toggleCategory(el.dataset.category));
-        });
-
-        // Tag checkboxes
-        clone.querySelectorAll('input[type="checkbox"][name="tags[]"]').forEach(cb => {
-            cb.addEventListener('change', () => {
-                cb.checked ? selectedTags.add(cb.value) : selectedTags.delete(cb.value);
-                cb.closest('.tag-item')?.classList.toggle('checked', cb.checked);
-                // Don't auto-fetch; user presses Apply
-            });
-        });
-
-        drawerInitialised = true;
-    }
-
-    /** Copy current canonical form values into the drawer form */
-    function syncDrawerFromSidebar() {
-        if (!drawerForm) return;
-        const fd = new FormData(FORM);
-
-        drawerForm.querySelectorAll('input[type="text"],input[type="number"]').forEach(el => {
-            const v = fd.get(el.name);
-            if (v !== null) el.value = v;
-        });
-
-        drawerForm.querySelectorAll('select').forEach(el => {
-            const v = fd.get(el.name);
-            if (v !== null) el.value = v;
-        });
-
-        // Sync category pills
-        drawerForm.closest('.filter-drawer__body')?.querySelectorAll('[data-category]').forEach(el => {
-            const on = selectedCategories.has(el.dataset.category);
-            el.classList.toggle('active', on);
-            el.classList.toggle('selected', on);
-        });
-
-        // Sync tag checkboxes
-        drawerForm.querySelectorAll('input[type="checkbox"][name="tags[]"]').forEach(cb => {
-            cb.checked = selectedTags.has(cb.value);
-            cb.closest('.tag-item')?.classList.toggle('checked', cb.checked);
-        });
-    }
-
-    /** Copy drawer form values back to the canonical form and fetch */
-    window.drawerApplyFilters = function () {
-        if (!drawerForm) return;
-
-        const copyField = name => {
-            const src = drawerForm.querySelector(`[name="${name}"]`);
-            const dest = FORM.querySelector(`[name="${name}"]`);
-            if (src && dest) dest.value = src.value;
-        };
-
-        ['search', 'special_filter', 'site_id', 'delivery_type', 'price_min', 'price_max'].forEach(copyField);
-
-        // Tags: drawerForm checkboxes drive selectedTags (via the change
-        // listeners wired in buildDrawer); nothing extra needed here.
-
-        closeFilterDrawer();
-        fetchPlans(1);
-    };
-
-    window.drawerClearFilters = function () {
-        if (drawerForm) {
-            drawerForm.querySelectorAll('input[type="text"],input[type="number"]').forEach(i => i.value = '');
-            drawerForm.querySelectorAll('select').forEach(s => s.value = '');
-            drawerForm.querySelectorAll('input[type="checkbox"]').forEach(c => {
-                c.checked = false;
-                c.closest('.tag-item')?.classList.remove('checked');
-            });
+        open() {
+            document.getElementById('mini-cart').classList.add('open');
+            document.getElementById('cart-overlay').classList.add('show');
         }
-        selectedCategories.clear();
-        selectedTags.clear();
-        syncCategoryUI();
-        closeFilterDrawer();
-        clearFilters();   // also resets canonical form + fetches
-    };
 
-    /* Touch swipe-down to close the drawer */
-    (function () {
-        const drawer = document.getElementById('filter-drawer');
-        let touchY = 0;
-        drawer.addEventListener('touchstart', e => {
-            touchY = e.touches[0].clientY;
-        }, {passive: true});
-        drawer.addEventListener('touchend', e => {
-            if (e.changedTouches[0].clientY - touchY > 60) closeFilterDrawer();
-        }, {passive: true});
-    })();
+        close() {
+            document.getElementById('mini-cart').classList.remove('open');
+            document.getElementById('cart-overlay').classList.remove('show');
+        }
 
-    /* ── Add to cart ────────────────────────────────────────── */
-    async function addToCart(type, id, btn) {
-        const original = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '⏳';
-        const endpoint = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle';
-        try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({
-                    type,
-                    bundle_id: id,
-                    plan_id: id,
-                    quantity: 1,
-                    delivery_type: btn.dataset.delivery_type
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
+        checkout() {
+            window.location.href = '/' + SITE + '/checkout?type=subscription';
+        }
+
+        // ── Add item (delegates to CartService, manages button state) ────
+        async addItem(type, id, btn) {
+            const original = btn.innerHTML;
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+            btn.innerHTML = '⏳';
+
+            const deliveryType = btn.dataset.delivery_type;
+            const success = await this.cartService.addItem(type, id, deliveryType);
+
+            btn.classList.remove('is-loading');
+
+            if (success) {
+                // Cart state already updated via subscription — buttons will
+                // be synced by _syncCardButtons(). Give brief visual feedback.
                 btn.innerHTML = '✓';
-                btn.style.background = 'var(--green-light)';
-                btn.style.color = 'var(--green)';
                 setTimeout(() => {
+                    // Restore label then let _syncCardButtons set final state
                     btn.innerHTML = original;
-                    btn.style.background = '';
-                    btn.style.color = '';
                     btn.disabled = false;
-                    loadCart();
-                }, 2000);
+                    this._syncCardButtons();
+                }, 1500);
             } else {
                 btn.innerHTML = '✗';
                 btn.style.background = 'var(--red-light)';
@@ -1752,128 +1518,761 @@ $selectedTags = !empty($filters['tags'])
                     btn.disabled = false;
                 }, 2000);
             }
-        } catch (e) {
-            console.error(e);
-            btn.innerHTML = '✗';
-            setTimeout(() => {
-                btn.innerHTML = original;
-                btn.style.background = '';
-                btn.disabled = false;
-            }, 2000);
         }
-    }
 
-    /* ── Bundle carousel (unchanged) ───────────────────────── */
-    document.querySelectorAll('[data-carousel]').forEach(section => {
-        const track = section.querySelector('[data-track]');
-        const viewport = section.querySelector('.carousel-viewport');
-        const dotsEl = section.querySelector('[data-dots]');
-        const prevBtn = section.querySelector('[data-prev]');
-        const nextBtn = section.querySelector('[data-next]');
-        const progress = section.querySelector('[data-progress]');
-        if (!track) return;
+        // ── Remove item ───────────────────────────────────────────────────
+        async removeItem(itemId) {
+            await this.cartService.removeItem(itemId);
+            // Re-render triggered by CartService subscription
+        }
 
-        const slides = Array.from(track.children);
-        let current = 0, autoTimer = null, isDragging = false, dragStartX = 0, dragDelta = 0;
-
-        const visibleCount = () => Math.round(viewport.offsetWidth / (slides[0]?.offsetWidth || viewport.offsetWidth));
-        const maxIndex = () => Math.max(0, slides.length - visibleCount());
-
-        function buildDots() {
-            dotsEl.innerHTML = '';
-            for (let i = 0; i <= maxIndex(); i++) {
-                const d = document.createElement('button');
-                d.className = 'carousel-dot' + (i === current ? ' active' : '');
-                d.addEventListener('click', () => goTo(i));
-                dotsEl.appendChild(d);
+        // ── Update quantity ───────────────────────────────────────────────
+        async updateQuantity(itemId, quantity) {
+            if (quantity < 1) {
+                await this.cartService.removeItem(itemId);
+            } else {
+                await this.cartService.updateQuantity(itemId, quantity);
             }
         }
 
-        function updateUI() {
-            const w = slides[0]?.offsetWidth || 0;
-            track.style.transform = `translateX(-${current * (w + 16)}px)`;
-            prevBtn.disabled = current === 0;
-            nextBtn.disabled = current >= maxIndex();
-            dotsEl.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === current));
-            progress.style.width = (maxIndex() === 0 ? 100 : (current / maxIndex()) * 100) + '%';
+        // ── Clear cart ────────────────────────────────────────────────────
+        async clear() {
+            await this.cartService.clear();
         }
 
-        function goTo(i) {
-            current = Math.max(0, Math.min(i, maxIndex()));
-            updateUI();
+        // ── Private: render ───────────────────────────────────────────────
+        _render() {
+            this._renderHeader();
+            this._renderItems();
+            this._renderFooter();
+            this._syncCardButtons();
         }
 
-        const startAuto = () => {
-            clearInterval(autoTimer);
-            autoTimer = setInterval(() => goTo(current >= maxIndex() ? 0 : current + 1), 4500);
-        };
-        const stopAuto = () => clearInterval(autoTimer);
+        _renderHeader() {
+            const count = this.cartService.count;
+            document.getElementById('cart-count').textContent = count;
 
-        section.addEventListener('mouseenter', stopAuto);
-        section.addEventListener('mouseleave', startAuto);
-        prevBtn.addEventListener('click', () => {
-            stopAuto();
-            goTo(current - 1);
-            startAuto();
-        });
-        nextBtn.addEventListener('click', () => {
-            stopAuto();
-            goTo(current + 1);
-            startAuto();
-        });
+            const badge = document.getElementById('header-cart-count');
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'flex' : 'none';
 
-        const onDragStart = x => {
-            isDragging = true;
-            dragStartX = x;
-            dragDelta = 0;
-            track.classList.add('is-dragging');
-            stopAuto();
-        };
-        const onDragMove = x => {
-            if (!isDragging) return;
-            dragDelta = x - dragStartX;
-            track.style.transform = `translateX(${-(current * ((slides[0]?.offsetWidth || 0) + 16)) + dragDelta}px)`;
-        };
-        const onDragEnd = () => {
-            if (!isDragging) return;
-            isDragging = false;
-            track.classList.remove('is-dragging');
-            if (dragDelta < -60) goTo(current + 1); else if (dragDelta > 60) goTo(current - 1); else updateUI();
-            startAuto();
-        };
+            document.getElementById('cart-total').textContent =
+                CURRENCY_SYMBOL + this.cartService.total.toFixed(2);
+        }
 
-        track.addEventListener('mousedown', e => onDragStart(e.clientX));
-        window.addEventListener('mousemove', e => {
-            if (isDragging) onDragMove(e.clientX);
-        });
-        window.addEventListener('mouseup', onDragEnd);
-        track.addEventListener('touchstart', e => onDragStart(e.touches[0].clientX), {passive: true});
-        track.addEventListener('touchmove', e => onDragMove(e.touches[0].clientX), {passive: true});
-        track.addEventListener('touchend', onDragEnd);
-        track.querySelectorAll('a').forEach(a => a.addEventListener('click', e => {
-            if (Math.abs(dragDelta) > 8) e.preventDefault();
-        }));
+        _renderItems() {
+            const container = document.getElementById('cart-items');
+            const items = this.cartService.items;
 
-        let resizeTimer;
-        window.addEventListener('resize', () => {
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(() => {
-                current = Math.min(current, maxIndex());
-                buildDots();
-                updateUI();
-            }, 150);
-        });
+            if (!items.length) {
+                container.innerHTML = '<p style="text-align:center;color:#64748b;padding:2rem;">Your cart is empty</p>';
+                return;
+            }
 
-        buildDots();
-        updateUI();
-        startAuto();
-    });
+            container.innerHTML = items.map(item => {
+                const name = escHtml(item.product_name || item.options?.plan_name || 'Subscription');
+                const details = escHtml(item.options?.delivery_type || 'Print') + ' • ' + (item.options?.duration_months || 12) + ' months';
+                const price = CURRENCY_SYMBOL + (item.price || 0).toFixed(2);
+                const qty = item.quantity || 1;
+                const itemId = item.id;
 
-    /* ── Init ───────────────────────────────────────────────── */
-    syncCategoryUI();
-    renderActiveChips();
-    bindPagination();
-    loadCart();
+                return `
+                <div class="cart-item" data-item-id="${itemId}">
+                    <div class="cart-item-top">
+                        <div class="cart-item-name">${name}</div>
+                        <button class="cart-item-remove"
+                                onclick="window.shop.cart.removeItem(${itemId})"
+                                aria-label="Remove ${name}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="cart-item-details">${details}</div>
+                    <div class="cart-item-bottom">
+                        <div class="qty-controls">
+                            <button class="qty-btn"
+                                    onclick="window.shop.cart.updateQuantity(${itemId}, ${qty - 1})"
+                                    ${qty <= 1 ? 'disabled' : ''}
+                                    aria-label="Decrease quantity">−</button>
+                            <span class="qty-value">${qty}</span>
+                            <button class="qty-btn"
+                                    onclick="window.shop.cart.updateQuantity(${itemId}, ${qty + 1})"
+                                    aria-label="Increase quantity">+</button>
+                        </div>
+                        <div class="cart-item-price">${price}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        _renderFooter() {
+            document.getElementById('mini-cart-total').textContent =
+                CURRENCY_SYMBOL + this.cartService.total.toFixed(2);
+
+            const clearBtn = document.getElementById('clear-cart-btn');
+            if (clearBtn) {
+                clearBtn.style.display = this.cartService.count > 0 ? 'block' : 'none';
+            }
+        }
+
+        /**
+         * Sync the add-to-cart button state on every plan card so the user
+         * can see at a glance which plans are already in their cart.
+         */
+        _syncCardButtons() {
+            const inCart = this.cartService.planIds;
+            document.querySelectorAll('[data-plan-id]').forEach(btn => {
+                const planId = btn.dataset.planId;
+                if (inCart.has(planId)) {
+                    btn.classList.add('is-in-cart');
+                    btn.title = 'Already in cart';
+                    btn.innerHTML = '✓';
+                } else {
+                    btn.classList.remove('is-in-cart');
+                    btn.title = 'Add to cart';
+                    btn.innerHTML = '🛒';
+                }
+            });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // FilterManager
+    // Owns filter/search state, URL sync, chip rendering, and the mobile
+    // filter drawer. Delegates fetching to PlanListing.
+    // ═══════════════════════════════════════════════════════════════════════
+    class FilterManager {
+        constructor({form, sortSelect, onFetch}) {
+            this.form = form;
+            this.sortSelect = sortSelect;
+            this.onFetch = onFetch;
+            this.selectedCategories = new Set(<?= json_encode($selectedCategories) ?>);
+            this.selectedTags = new Set(<?= json_encode($selectedTags) ?>);
+            this.currentSort = <?= json_encode($filters['sort'] ?? '') ?>;
+
+            // Mobile drawer state
+            this._drawerInitialised = false;
+            this._drawerForm = null;
+
+            this._bindEvents();
+        }
+
+        // ── Public ────────────────────────────────────────────────────────
+        toggleCategory(cat) {
+            this.selectedCategories.has(cat)
+                ? this.selectedCategories.delete(cat)
+                : this.selectedCategories.add(cat);
+            this._syncCategoryUI();
+            this.onFetch(1);
+        }
+
+        clear() {
+            this.form.querySelectorAll('input[type="text"],input[type="number"]').forEach(i => i.value = '');
+            this.form.querySelectorAll('select').forEach(s => s.value = '');
+            this.form.querySelectorAll('input[type="checkbox"]').forEach(c => {
+                c.checked = false;
+                c.closest('.tag-item')?.classList.remove('checked');
+            });
+            this.selectedCategories.clear();
+            this.selectedTags.clear();
+            this._syncCategoryUI();
+            this.onFetch(1);
+        }
+
+        buildParams(page) {
+            const fd = new FormData(this.form);
+            const p = new URLSearchParams();
+            for (const [k, v] of fd.entries()) {
+                if (!v || k === 'categories[]' || k === 'tags[]') continue;
+                p.set(k, v);
+            }
+            this.selectedCategories.forEach(c => p.append('categories[]', c));
+            this.selectedTags.forEach(t => p.append('tags[]', t));
+            p.set('page', page);
+            if (this.currentSort) p.set('sort', this.currentSort);
+            return p;
+        }
+
+        renderActiveChips() {
+            const chips = [];
+            const fd = new FormData(this.form);
+            const labels = {
+                search: 'Search',
+                site_id: 'Publication',
+                delivery_type: 'Delivery',
+                special_filter: 'Offers',
+                price_min: 'Min £',
+                price_max: 'Max £',
+            };
+            for (const [k, v] of fd.entries()) {
+                if (!v || !labels[k]) continue;
+                chips.push(`<div class="active-chip">${labels[k]}: ${escHtml(v)}<button onclick="window.shop.filters._removeChip('${k}')">×</button></div>`);
+            }
+            this.selectedCategories.forEach(c =>
+                chips.push(`<div class="active-chip">📂 ${escHtml(c)}<button onclick="window.shop.filters.removeCategory('${escHtml(c)}')">×</button></div>`)
+            );
+            this.selectedTags.forEach(t =>
+                chips.push(`<div class="active-chip">🏷 ${escHtml(t.replace(/-/g, ' '))}<button onclick="window.shop.filters.removeTag('${escHtml(t)}')">×</button></div>`)
+            );
+            document.getElementById('active-chips').innerHTML = chips.join('');
+            this._updateMobileFilterBadge();
+        }
+
+        removeCategory(cat) {
+            this.selectedCategories.delete(cat);
+            this._syncCategoryUI();
+            this.onFetch(1);
+        }
+
+        removeTag(tag) {
+            this.selectedTags.delete(tag);
+            const cb = this.form.querySelector(`input[name="tags[]"][value="${tag}"]`);
+            if (cb) cb.checked = false;
+            this.onFetch(1);
+        }
+
+        // ── Mobile drawer ─────────────────────────────────────────────────
+        openDrawer() {
+            if (!this._drawerInitialised) this._buildDrawer();
+            this._syncDrawerFromSidebar();
+            document.getElementById('filter-drawer').classList.add('filter-drawer--open');
+            document.getElementById('filter-drawer-overlay').classList.add('show');
+            document.body.style.overflow = 'hidden';
+        }
+
+        closeDrawer() {
+            document.getElementById('filter-drawer').classList.remove('filter-drawer--open');
+            document.getElementById('filter-drawer-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        drawerApply() {
+            if (!this._drawerForm) return;
+            ['search', 'special_filter', 'site_id', 'delivery_type', 'price_min', 'price_max'].forEach(name => {
+                const src = this._drawerForm.querySelector(`[name="${name}"]`);
+                const dest = this.form.querySelector(`[name="${name}"]`);
+                if (src && dest) dest.value = src.value;
+            });
+            this.closeDrawer();
+            this.onFetch(1);
+        }
+
+        drawerClear() {
+            if (this._drawerForm) {
+                this._drawerForm.querySelectorAll('input[type="text"],input[type="number"]').forEach(i => i.value = '');
+                this._drawerForm.querySelectorAll('select').forEach(s => s.value = '');
+                this._drawerForm.querySelectorAll('input[type="checkbox"]').forEach(c => {
+                    c.checked = false;
+                    c.closest('.tag-item')?.classList.remove('checked');
+                });
+            }
+            this.selectedCategories.clear();
+            this.selectedTags.clear();
+            this._syncCategoryUI();
+            this.closeDrawer();
+            this.clear();
+        }
+
+        // ── Private ───────────────────────────────────────────────────────
+        _removeChip(key) {
+            const el = this.form.querySelector(`[name="${key}"]`);
+            if (el) el.value = '';
+            this.onFetch(1);
+        }
+
+        _bindEvents() {
+            // Desktop search (debounced)
+            let searchTimer;
+            document.getElementById('search')?.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => this.onFetch(1), 450);
+            });
+
+            // Desktop selects
+            this.form.querySelectorAll('select').forEach(s => s.addEventListener('change', () => this.onFetch(1)));
+
+            // Desktop price range
+            this.form.querySelectorAll('input[name="price_min"],input[name="price_max"]').forEach(i =>
+                i.addEventListener('change', () => this.onFetch(1))
+            );
+
+            // Desktop form submit
+            this.form.addEventListener('submit', e => {
+                e.preventDefault();
+                this.onFetch(1);
+            });
+
+            // Sort
+            this.sortSelect?.addEventListener('change', () => {
+                this.currentSort = this.sortSelect.value;
+                this.onFetch(1);
+            });
+
+            // Tag checkboxes
+            this.form.querySelectorAll('#tag-list input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    cb.checked ? this.selectedTags.add(cb.value) : this.selectedTags.delete(cb.value);
+                    cb.closest('.tag-item')?.classList.toggle('checked', cb.checked);
+                    this.onFetch(1);
+                });
+            });
+
+            // Sidebar search clear button
+            this._initSidebarSearchClear();
+
+            // Mobile search
+            this._initMobileSearch();
+
+            // Drawer swipe-to-close
+            const drawer = document.getElementById('filter-drawer');
+            if (drawer) {
+                let touchY = 0;
+                drawer.addEventListener('touchstart', e => {
+                    touchY = e.touches[0].clientY;
+                }, {passive: true});
+                drawer.addEventListener('touchend', e => {
+                    if (e.changedTouches[0].clientY - touchY > 60) this.closeDrawer();
+                }, {passive: true});
+            }
+        }
+
+        _syncCategoryUI() {
+            document.querySelectorAll('[data-category]').forEach(el => {
+                const on = this.selectedCategories.has(el.dataset.category);
+                el.classList.toggle('active', on);
+                el.classList.toggle('selected', on);
+            });
+        }
+
+        _countActiveFilters() {
+            const fd = new FormData(this.form);
+            let n = 0;
+            for (const [k, v] of fd.entries()) {
+                if (v && k !== 'categories[]' && k !== 'tags[]') n++;
+            }
+            return n + this.selectedCategories.size + this.selectedTags.size;
+        }
+
+        _updateMobileFilterBadge() {
+            const n = this._countActiveFilters();
+            const countEl = document.getElementById('mobile-filter-count');
+            const toggleEl = document.getElementById('mobile-filter-toggle');
+            if (!countEl || !toggleEl) return;
+            countEl.textContent = n;
+            countEl.classList.toggle('visible', n > 0);
+            toggleEl.classList.toggle('has-active', n > 0);
+        }
+
+        _initSidebarSearchClear() {
+            const input = document.getElementById('search');
+            const wrapper = document.getElementById('sidebar-search-wrap');
+            if (!input || !wrapper) return;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'search-clear-btn';
+            btn.setAttribute('aria-label', 'Clear search');
+            btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+            wrapper.appendChild(btn);
+
+            const sync = () => {
+                btn.style.display = input.value ? 'block' : 'none';
+            };
+            input.addEventListener('input', sync);
+            sync();
+
+            btn.addEventListener('click', () => {
+                input.value = '';
+                sync();
+                this.onFetch(1);
+                input.focus();
+            });
+        }
+
+        _initMobileSearch() {
+            const mobileInput = document.getElementById('mobile-search');
+            const clearBtn = document.getElementById('mobile-search-clear');
+            const desktopInput = document.getElementById('search');
+            if (!mobileInput) return;
+
+            const syncClear = () => {
+                clearBtn.style.display = mobileInput.value ? 'block' : 'none';
+            };
+            mobileInput.addEventListener('input', syncClear);
+            syncClear();
+
+            let timer;
+            mobileInput.addEventListener('input', () => {
+                desktopInput.value = mobileInput.value;
+                clearTimeout(timer);
+                timer = setTimeout(() => this.onFetch(1), 450);
+            });
+
+            clearBtn.addEventListener('click', () => {
+                mobileInput.value = '';
+                desktopInput.value = '';
+                syncClear();
+                this.onFetch(1);
+                mobileInput.focus();
+            });
+        }
+
+        _buildDrawer() {
+            const body = document.getElementById('filter-drawer-body');
+            const sidebarEl = document.querySelector('#desktop-sidebar .sidebar__body');
+            const clone = sidebarEl.cloneNode(true);
+
+            const clonedForm = clone.querySelector('form');
+            if (clonedForm) {
+                clonedForm.id = 'drawer-filter-form';
+                clonedForm.querySelectorAll('.filter-btn').forEach(btn => btn.remove());
+                this._drawerForm = clonedForm;
+            }
+
+            clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+            body.appendChild(clone);
+
+            clone.querySelectorAll('[data-category]').forEach(el => {
+                el.onclick = null;
+                el.addEventListener('click', () => this.toggleCategory(el.dataset.category));
+            });
+
+            clone.querySelectorAll('input[type="checkbox"][name="tags[]"]').forEach(cb => {
+                cb.addEventListener('change', () => {
+                    cb.checked ? this.selectedTags.add(cb.value) : this.selectedTags.delete(cb.value);
+                    cb.closest('.tag-item')?.classList.toggle('checked', cb.checked);
+                });
+            });
+
+            this._drawerInitialised = true;
+        }
+
+        _syncDrawerFromSidebar() {
+            if (!this._drawerForm) return;
+            const fd = new FormData(this.form);
+
+            this._drawerForm.querySelectorAll('input[type="text"],input[type="number"]').forEach(el => {
+                const v = fd.get(el.name);
+                if (v !== null) el.value = v;
+            });
+            this._drawerForm.querySelectorAll('select').forEach(el => {
+                const v = fd.get(el.name);
+                if (v !== null) el.value = v;
+            });
+
+            this._drawerForm.closest('.filter-drawer__body')?.querySelectorAll('[data-category]').forEach(el => {
+                const on = this.selectedCategories.has(el.dataset.category);
+                el.classList.toggle('active', on);
+                el.classList.toggle('selected', on);
+            });
+
+            this._drawerForm.querySelectorAll('input[type="checkbox"][name="tags[]"]').forEach(cb => {
+                cb.checked = this.selectedTags.has(cb.value);
+                cb.closest('.tag-item')?.classList.toggle('checked', cb.checked);
+            });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PlanListing
+    // Owns the plan grid: fetching, rendering cards, and pagination.
+    // ═══════════════════════════════════════════════════════════════════════
+    class PlanListing {
+        constructor({plansWrap, filterManager}) {
+            this.plansWrap = plansWrap;
+            this.filterManager = filterManager;
+            this._isLoading = false;
+        }
+
+        async fetch(page = 1) {
+            if (this._isLoading) return;
+            this._isLoading = true;
+            this.plansWrap.classList.add('is-loading');
+
+            const params = this.filterManager.buildParams(page);
+            history.replaceState(null, '', '?' + params.toString());
+            this.filterManager.renderActiveChips();
+
+            try {
+                const res = await fetch('/subscriptions/onetime/search?' + params.toString(), {
+                    headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'},
+                });
+                const data = await res.json();
+                if (!data.success) return;
+
+                const result = data.data;
+                const countEl = document.getElementById('results-count');
+                if (countEl) {
+                    countEl.innerHTML = `Showing <strong>${result.plans.length}</strong> of <strong>${result.pagination.total.toLocaleString()}</strong> subscriptions`;
+                }
+
+                this.plansWrap.querySelector('.plans-grid, .empty-state')?.remove();
+                document.getElementById('pagination')?.remove();
+
+                if (result.plans.length === 0) {
+                    this.plansWrap.insertAdjacentHTML('afterbegin', `<div class="empty-state"><div class="empty-state__icon">📭</div><div class="empty-state__title">No subscriptions found</div><p>Try adjusting your filters.</p></div>`);
+                } else {
+                    this.plansWrap.insertAdjacentHTML('afterbegin', `<div class="plans-grid">${result.plans.map(p => this._renderCard(p)).join('')}</div>`);
+                    this.plansWrap.insertAdjacentHTML('beforeend', this._renderPagination(result.pagination));
+                    this._bindPagination();
+                }
+
+                // Re-sync cart button states after new cards are injected
+                window.shop?.cart?._syncCardButtons?.();
+
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this._isLoading = false;
+                this.plansWrap.classList.remove('is-loading');
+            }
+        }
+
+        // ── Private: card rendering ───────────────────────────────────────
+        _deliveryPills(plan) {
+            const hasPrint = plan.print_shipping_required || plan.delivery_type === 'print' || plan.delivery_type === 'both';
+            const hasDigital = !!plan.digital_download_url || plan.delivery_type === 'digital' || plan.delivery_type === 'both';
+            const pills = [];
+            if (hasPrint) pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
+            if (hasDigital) pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
+            if (!pills.length) {
+                if (plan.delivery_type === 'print') pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
+                if (plan.delivery_type === 'digital') pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
+            }
+            return pills.join('');
+        }
+
+        _renderBadge(plan) {
+            if (plan.is_featured && plan.savings_pct) return `<div class="plan-card__badge plan-card__badge--featured">⭐ Featured</div>`;
+            if (plan.has_sale && plan.savings_pct) return `<div class="plan-card__badge plan-card__badge--sale">SAVE ${plan.savings_pct}%</div>`;
+            if (plan.is_limited_offer) return `<div class="plan-card__badge plan-card__badge--offer">Limited offer</div>`;
+            return '';
+        }
+
+        _renderCard(plan) {
+            const price = parseFloat(plan.has_sale ? plan.sale_price : plan.price) || 0;
+            const wasLine = (plan.has_sale && plan.original_price) ? `<div class="plan-card__price-was">${CURRENCY_SYMBOL}${parseFloat(plan.original_price).toFixed(2)}</div>` : '';
+            const saleNote = plan.has_sale ? `<div class="plan-card__price-note">🔥 Sale price</div>` : '';
+            const btnClass = plan.has_sale ? 'plan-card__btn plan-card__btn--sale' : 'plan-card__btn';
+            const btnLabel = plan.has_sale ? '🔥 View deal' : 'View details';
+            const priceClass = plan.has_sale ? 'plan-card__price plan-card__price--sale' : 'plan-card__price';
+            const desc = plan.description ? `<p class="plan-card__desc">${escHtml(plan.description.substring(0, 110))}${plan.description.length > 110 ? '…' : ''}</p>` : '';
+            const featuresHtml = (plan.features?.length)
+                ? `<ul class="plan-card__features">${plan.features.slice(0, 3).map(f => `<li><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>${escHtml(f)}</li>`).join('')}${plan.features.length > 3 ? `<li class="plan-card__features-more">+${plan.features.length - 3} more</li>` : ''}</ul>` : '';
+            const releaseHtml = (plan.release_date && new Date(plan.release_date) > new Date())
+                ? `<div class="plan-card__release">🗓 Coming ${new Date(plan.release_date).toLocaleDateString('en-GB', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                })}</div>` : '';
+            const site = plan.site_name ? `<div class="plan-card__site">${escHtml(plan.site_name)}</div>` : '';
+            const catPills = (plan.categories || []).slice(0, 2).map(c => `<span class="meta-pill meta-pill--tag">${escHtml(c.charAt(0).toUpperCase() + c.slice(1))}</span>`).join('');
+            const tagPills = (plan.tags || []).slice(0, 2).map(t => `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
+            const cartDt = escHtml(plan.delivery_type || 'digital');
+            const coverUrl = plan.print_image_url || plan.digital_image_url || null;
+            const coverHtml = coverUrl
+                ? `<div class="plan-card__cover"><img src="${escHtml(coverUrl)}" alt="${escHtml(plan.name)}" loading="lazy"></div>`
+                : `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
+
+            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
+        }
+
+        _renderPagination(p) {
+            if (p.total_pages <= 1) return '';
+            const {current_page: cur, total_pages: tot} = p;
+            const start = Math.max(1, cur - 2), end = Math.min(tot, cur + 2);
+            let h = `<nav class="pagination" id="pagination">`;
+            h += `<button class="pagination__btn ${cur <= 1 ? 'disabled' : ''}" data-page="${cur - 1}">←</button>`;
+            if (start > 1) h += `<button class="pagination__btn" data-page="1">1</button>`;
+            if (start > 2) h += `<span class="pagination__ellipsis">…</span>`;
+            for (let i = start; i <= end; i++) h += `<button class="pagination__btn ${i === cur ? 'active' : ''}" data-page="${i}">${i}</button>`;
+            if (end < tot - 1) h += `<span class="pagination__ellipsis">…</span>`;
+            if (end < tot) h += `<button class="pagination__btn" data-page="${tot}">${tot}</button>`;
+            h += `<button class="pagination__btn ${cur >= tot ? 'disabled' : ''}" data-page="${cur + 1}">→</button></nav>`;
+            return h;
+        }
+
+        _bindPagination() {
+            document.querySelectorAll('#pagination .pagination__btn:not(.disabled)').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const p = parseInt(btn.dataset.page);
+                    if (p > 0) this.fetch(p);
+                });
+            });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BundleCarousel
+    // Self-contained; no dependencies on other classes.
+    // ═══════════════════════════════════════════════════════════════════════
+    class BundleCarousel {
+        constructor(section) {
+            this.section = section;
+            this.track = section.querySelector('[data-track]');
+            this.viewport = section.querySelector('.carousel-viewport');
+            this.dotsEl = section.querySelector('[data-dots]');
+            this.prevBtn = section.querySelector('[data-prev]');
+            this.nextBtn = section.querySelector('[data-next]');
+            this.progress = section.querySelector('[data-progress]');
+            if (!this.track) return;
+
+            this.slides = Array.from(this.track.children);
+            this.current = 0;
+            this.autoTimer = null;
+            this.isDragging = false;
+            this.dragStartX = 0;
+            this.dragDelta = 0;
+
+            this._buildDots();
+            this._updateUI();
+            this._startAuto();
+            this._bindEvents();
+        }
+
+        // ── Private ────────────────────────────────────────────────────────
+        _visibleCount() {
+            return Math.round(this.viewport.offsetWidth / (this.slides[0]?.offsetWidth || this.viewport.offsetWidth));
+        }
+
+        _maxIndex() {
+            return Math.max(0, this.slides.length - this._visibleCount());
+        }
+
+        _buildDots() {
+            this.dotsEl.innerHTML = '';
+            for (let i = 0; i <= this._maxIndex(); i++) {
+                const d = document.createElement('button');
+                d.className = 'carousel-dot' + (i === this.current ? ' active' : '');
+                d.addEventListener('click', () => this._goTo(i));
+                this.dotsEl.appendChild(d);
+            }
+        }
+
+        _updateUI() {
+            const w = this.slides[0]?.offsetWidth || 0;
+            this.track.style.transform = `translateX(-${this.current * (w + 16)}px)`;
+            this.prevBtn.disabled = this.current === 0;
+            this.nextBtn.disabled = this.current >= this._maxIndex();
+            this.dotsEl.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === this.current));
+            this.progress.style.width = (this._maxIndex() === 0 ? 100 : (this.current / this._maxIndex()) * 100) + '%';
+        }
+
+        _goTo(i) {
+            this.current = Math.max(0, Math.min(i, this._maxIndex()));
+            this._updateUI();
+        }
+
+        _startAuto() {
+            clearInterval(this.autoTimer);
+            this.autoTimer = setInterval(() => this._goTo(this.current >= this._maxIndex() ? 0 : this.current + 1), 4500);
+        }
+
+        _stopAuto() {
+            clearInterval(this.autoTimer);
+        }
+
+        _onDragStart(x) {
+            this.isDragging = true;
+            this.dragStartX = x;
+            this.dragDelta = 0;
+            this.track.classList.add('is-dragging');
+            this._stopAuto();
+        }
+
+        _onDragMove(x) {
+            if (!this.isDragging) return;
+            this.dragDelta = x - this.dragStartX;
+            this.track.style.transform = `translateX(${-(this.current * ((this.slides[0]?.offsetWidth || 0) + 16)) + this.dragDelta}px)`;
+        }
+
+        _onDragEnd() {
+            if (!this.isDragging) return;
+            this.isDragging = false;
+            this.track.classList.remove('is-dragging');
+            if (this.dragDelta < -60) this._goTo(this.current + 1);
+            else if (this.dragDelta > 60) this._goTo(this.current - 1);
+            else this._updateUI();
+            this._startAuto();
+        }
+
+        _bindEvents() {
+            this.section.addEventListener('mouseenter', () => this._stopAuto());
+            this.section.addEventListener('mouseleave', () => this._startAuto());
+            this.prevBtn.addEventListener('click', () => {
+                this._stopAuto();
+                this._goTo(this.current - 1);
+                this._startAuto();
+            });
+            this.nextBtn.addEventListener('click', () => {
+                this._stopAuto();
+                this._goTo(this.current + 1);
+                this._startAuto();
+            });
+
+            this.track.addEventListener('mousedown', e => this._onDragStart(e.clientX));
+            window.addEventListener('mousemove', e => {
+                if (this.isDragging) this._onDragMove(e.clientX);
+            });
+            window.addEventListener('mouseup', () => this._onDragEnd());
+            this.track.addEventListener('touchstart', e => this._onDragStart(e.touches[0].clientX), {passive: true});
+            this.track.addEventListener('touchmove', e => this._onDragMove(e.touches[0].clientX), {passive: true});
+            this.track.addEventListener('touchend', () => this._onDragEnd());
+            this.track.querySelectorAll('a').forEach(a => a.addEventListener('click', e => {
+                if (Math.abs(this.dragDelta) > 8) e.preventDefault();
+            }));
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    this.current = Math.min(this.current, this._maxIndex());
+                    this._buildDots();
+                    this._updateUI();
+                }, 150);
+            });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ShopApp  —  top-level composition root
+    // Wires all services/UI classes together and exposes a minimal public API.
+    // ═══════════════════════════════════════════════════════════════════════
+    class ShopApp {
+        constructor() {
+            const cartService = new CartService(API_BASE);
+            const miniCartUI = new MiniCartUI(cartService);
+
+            const filterManager = new FilterManager({
+                form: document.getElementById('filter-form'),
+                sortSelect: document.getElementById('sort-select'),
+                onFetch: (page) => listing.fetch(page),
+            });
+
+            const listing = new PlanListing({
+                plansWrap: document.getElementById('plans-wrap'),
+                filterManager,
+            });
+
+            // Initialise bundle carousels
+            document.querySelectorAll('[data-carousel]').forEach(el => new BundleCarousel(el));
+
+            // Expose public API used by inline onclick handlers in the template
+            this.cart = miniCartUI;
+            this.filters = filterManager;
+            this.listing = listing;
+
+            // Boot
+            filterManager._syncCategoryUI();
+            filterManager.renderActiveChips();
+            listing._bindPagination();
+            cartService.load();
+        }
+    }
+
+    // ── Bootstrap ─────────────────────────────────────────────────────────
+    window.shop = new ShopApp();
 </script>
 </body>
 </html>

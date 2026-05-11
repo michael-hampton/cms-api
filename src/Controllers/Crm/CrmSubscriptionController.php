@@ -169,11 +169,41 @@ class CrmSubscriptionController extends Controller
         $reason = trim((string)$request->input('reason', ''));
         $issueRefund = !$cancelAtPeriodEnd && (bool)$request->input('issue_refund', false);
 
-        $result = $this->cancellationService->cancelSubscription($subscriptionId, [
+        $options = [
             'cancel_at_period_end' => $cancelAtPeriodEnd,
             'reason' => $reason ?: null,
             'create_refund' => $issueRefund,
-        ]);
+            'refund_type' => $request->input('refund_type', 'pro_rated'),
+        ];
+
+        // A specific override amount may be supplied by the CRM agent.
+        // Presence of refund_amount causes ManualRefundStrategy to be used regardless
+        // of refund_type — validated as a positive float before forwarding.
+        $rawAmount = $request->input('refund_amount');
+        if ($rawAmount !== null) {
+            $refundAmount = (float)$rawAmount;
+            if ($refundAmount <= 0) {
+                return $this->errorResponse('refund_amount must be greater than zero.',
+                    422
+                );
+            }
+            $options['refund_amount'] = $refundAmount;
+            // Treat an explicit amount as an implicit instruction to issue a refund.
+            $options['create_refund'] = true;
+        }
+
+        try {
+            $result = $this->cancellationService->cancelSubscription($subscriptionId, $options);
+        } catch (\InvalidArgumentException $e) {
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Logger::error('Failed to cancel subscription', [
+                'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
+                'error' => $e->getMessage(),
+            ]);
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+        }
 
         if (!$result['success']) {
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to cancel subscription.'], 500);
@@ -189,7 +219,7 @@ class CrmSubscriptionController extends Controller
             'success' => true,
             'message' => $cancelAtPeriodEnd
                 ? 'Subscription will be cancelled at the end of the billing period.'
-                : 'Subscription cancelled successfully.',
+                : 'Subscription cancelled immediately.',
             'subscription' => $result['subscription'],
         ]);
     }
@@ -485,8 +515,8 @@ class CrmSubscriptionController extends Controller
             return $this->errorResponse('payment_method_id is required.', 422);
         }
 
-        if ($amount <= 0) {
-            return $this->errorResponse('amount must be greater than zero.', 422);
+        if ($switchMode === 'fresh' && $amount <= 0) {
+            return $this->errorResponse('amount must be greater than zero for fresh switches.', 422);
         }
 
         $agentId = (int)Auth::id();

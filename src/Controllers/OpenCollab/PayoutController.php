@@ -59,6 +59,8 @@ class PayoutController extends Controller
             'currency' => $payout->currency,
             'status' => $payout->status,
             'method' => $payout->method,
+            'provider_status' => $payout->provider_status,
+            'provider_response_json' => $payout->provider_response_json,
             'reference' => $payout->reference,
             'notes' => $payout->notes,
             'approved_at' => $payout->approved_at,
@@ -202,6 +204,27 @@ class PayoutController extends Controller
             return $this->jsonResponse([
                 'payout' => $this->formatPayout($payout),
                 'message' => 'Payout rejected.',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/payouts/{id}/retry
+     */
+    public function retry(int $id): JsonResponse
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Not logged in', 422);
+        }
+
+        try {
+            $payout = $this->payoutService->retryStripeFailedPayout($id, Auth::id());
+
+            return $this->jsonResponse([
+                'payout' => $this->formatPayout($payout),
+                'message' => 'Stripe payout retry queued.',
             ]);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);

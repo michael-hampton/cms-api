@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Repositories\OpenCollab;
 
+use App\Models\ContributorPayoutAccount;
 use App\Models\ContributorProfile;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
@@ -22,7 +23,7 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $profile = $this->repository->findByUserId($this->user->id);
 
         $this->assertNotNull($profile);
-        $this->assertEquals(1, $profile->user_id);
+        $this->assertEquals($this->user->id, $profile->user_id);
     }
 
     public function test_find_by_user_id_returns_null_when_not_found(): void
@@ -46,7 +47,7 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $profile = $this->repository->createOrUpdate($this->user->id, ['bio' => 'New bio']);
 
         $this->assertEquals('New bio', $profile->bio);
-        $this->assertDatabaseCount('oc_contributor_profiles', $this->user->id);
+        $this->assertDatabaseCount('oc_contributor_profiles', 1);
     }
 
     public function test_mark_payment_setup_stores_stripe_token(): void
@@ -62,9 +63,14 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $this->assertNotNull($profile->payment_details);
     }
 
-    public function test_is_payment_setup_returns_true_when_details_present(): void
+    public function test_is_payment_setup_returns_true_when_payouts_enabled(): void
     {
-        ContributorProfile::create(['user_id' => $this->user->id, 'payment_details' => 'tok_abc']);
+        ContributorPayoutAccount::create([
+            'user_id' => $this->user->id,
+            'provider' => 'stripe',
+            'stripe_account_id' => 'acct_test_1',
+            'payouts_enabled' => true,
+        ]);
 
         $this->assertTrue($this->repository->isPaymentSetup($this->user->id));
     }
@@ -74,9 +80,14 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $this->assertFalse($this->repository->isPaymentSetup(999));
     }
 
-    public function test_is_payment_setup_returns_false_when_details_null(): void
+    public function test_is_payment_setup_returns_false_when_payouts_disabled(): void
     {
-        ContributorProfile::create(['user_id' => $this->user->id, 'payment_details' => null]);
+        ContributorPayoutAccount::create([
+            'user_id' => $this->user->id,
+            'provider' => 'stripe',
+            'stripe_account_id' => 'acct_test_2',
+            'payouts_enabled' => false,
+        ]);
 
         $this->assertFalse($this->repository->isPaymentSetup($this->user->id));
     }

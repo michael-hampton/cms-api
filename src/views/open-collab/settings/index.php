@@ -44,6 +44,20 @@ $pageClass = '';
     </div>
 
     <!-- Payment details section -->
+    <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .42s ease;" id="stripe-connect">
+        <div class="oc-card__header">
+            <span class="oc-card__title">Stripe Connect Payouts</span>
+        </div>
+        <div class="oc-card__body">
+            <div id="stripe-connect-status" class="oc-alert oc-alert--info">Checking Stripe onboarding status…</div>
+            <div id="stripe-connect-requirements" style="margin:10px 0;color:var(--slate);font-size:.85rem;"></div>
+            <button type="button" class="oc-btn oc-btn--primary" id="stripe-connect-btn"
+                    onclick="startStripeOnboarding()">
+                Connect Stripe account
+            </button>
+        </div>
+    </div>
+
     <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .45s ease;" id="payment">
         <div class="oc-card__header">
             <span class="oc-card__title">Payment & Tax</span>
@@ -589,6 +603,7 @@ $pageClass = '';
 
         init() {
             this.#notif.load();
+            this.#loadStripeConnectStatus();
         }
 
         // Delegated public surface for inline handlers
@@ -615,6 +630,68 @@ $pageClass = '';
         submitCloseAccount() {
             this.#closure.submit();
         }
+
+        async #loadStripeConnectStatus() {
+            const token = localStorage.getItem('oc_token') || '';
+            const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/status`, {
+                headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
+            });
+
+            if (!res.ok) {
+                document.getElementById('stripe-connect-status').textContent = 'Unable to load Stripe onboarding status.';
+                return;
+            }
+
+            const status = await res.json();
+            const box = document.getElementById('stripe-connect-status');
+            const req = document.getElementById('stripe-connect-requirements');
+            const btn = document.getElementById('stripe-connect-btn');
+
+            if (!status.connected) {
+                box.textContent = 'Stripe is not connected. Connect your account to receive payouts.';
+                btn.textContent = 'Connect Stripe account';
+                return;
+            }
+
+            if (status.status === 'enabled') {
+                box.textContent = 'Payouts enabled. Your Stripe account is ready.';
+                btn.textContent = 'Refresh onboarding link';
+            } else if (status.status === 'incomplete') {
+                box.textContent = 'Onboarding incomplete. Resume onboarding to finish setup.';
+                btn.textContent = 'Resume onboarding';
+            } else if (status.status === 'restricted') {
+                box.textContent = 'Payouts disabled or restricted. Review required verification steps.';
+                btn.textContent = 'Fix verification';
+            } else {
+                box.textContent = 'Verification is pending. Stripe may require more details.';
+                btn.textContent = 'Refresh onboarding link';
+            }
+
+            if (Array.isArray(status.verification_required) && status.verification_required.length > 0) {
+                req.textContent = 'Verification required: ' + status.verification_required.join(', ');
+            } else {
+                req.textContent = '';
+            }
+        }
+
+        async startStripeOnboarding() {
+            const token = localStorage.getItem('oc_token') || '';
+            const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/onboard`, {
+                method: 'POST',
+                headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
+            });
+
+            if (!res.ok) {
+                alert('Unable to create Stripe onboarding link right now.');
+                return;
+            }
+
+            const data = await res.json();
+            const url = data.data?.onboarding_url || data.onboarding_url;
+            if (url) {
+                window.location.href = url;
+            }
+        }
     }
 
     const settingsManager = new SettingsManager({
@@ -630,6 +707,7 @@ $pageClass = '';
     const notifManager = settingsManager; // updateNotifState called directly on settingsManager
     const saveNotifPreferences = () => settingsManager.saveNotifPreferences();
     const savePaymentDetails = () => settingsManager.savePaymentDetails();
+    const startStripeOnboarding = () => settingsManager.startStripeOnboarding();
     const showCloseAccountModal = () => settingsManager.showCloseAccountModal();
     const hideCloseAccountModal = () => settingsManager.hideCloseAccountModal();
     const submitCloseAccount = () => settingsManager.submitCloseAccount();

@@ -15,6 +15,12 @@ class Payout extends Model
         'currency',
         'status',
         'method',
+        'provider',
+        'provider_payout_id',
+        'provider_transfer_id',
+        'provider_status',
+        'provider_response_json',
+        'processing_attempts',
         'reference',
         'notes',
         'approved_by',
@@ -24,15 +30,19 @@ class Payout extends Model
         'rejected_by',
         'rejected_at',
         'rejection_reason',
-        'created_at'
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
         'amount' => 'integer',
+        'processing_attempts' => 'integer',
+        'provider_response_json' => 'json',
         'approved_at' => 'datetime',
         'processed_at' => 'datetime',
         'rejected_at' => 'datetime',
         'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function isPending(): bool
@@ -53,6 +63,11 @@ class Payout extends Model
     public function isRejected(): bool
     {
         return $this->status === PayoutStatus::Rejected->value;
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === PayoutStatus::Failed->value;
     }
 
     public function user($relation = false)
