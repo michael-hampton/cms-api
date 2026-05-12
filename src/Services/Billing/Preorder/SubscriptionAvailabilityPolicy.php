@@ -36,6 +36,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
 
         // Print (released)
         $nextIssue = $this->plan->getNextIssue();
+
         return $nextIssue?->availabilityPolicy()->canPurchase() ?? false;
     }
 

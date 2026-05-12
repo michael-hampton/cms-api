@@ -163,7 +163,18 @@ class SubscriptionPlanRepository extends Repository
     }
 
     /**
-     * Build base query for catalog with eager loading
+     * Build base query for catalog with eager loading.
+     *
+     * Adds a `lowest_effective_price` computed column so the catalog can sort
+     * by real tier prices rather than the (potentially stale) plan-level price.
+     *
+     * Logic per plan:
+     *   - If active pricing tiers exist → MIN(COALESCE(sale_price, price))
+     *   - If no active tiers exist      → fall back to the plan's own `price`
+     *
+     * The outer COALESCE handles the no-tiers case cleanly without any PHP-side
+     * branching; the subquery simply returns NULL when no rows match, and
+     * COALESCE replaces that NULL with subscription_plans.price.
      */
     public function buildCatalogQuery()
     {
@@ -172,7 +183,19 @@ class SubscriptionPlanRepository extends Repository
             ->where(function ($q) {
                 $q->where('plan_type', 'onetime')
                     ->orWhere('plan_type', 'recurring');
-            });
+            })
+            ->selectRaw('
+                subscription_plans.*,
+                COALESCE(
+                    (
+                        SELECT MIN(COALESCE(spp.sale_price, spp.price))
+                        FROM subscription_plan_pricing spp
+                        WHERE spp.plan_id = subscription_plans.id
+                          AND spp.is_active = 1
+                    ),
+                    subscription_plans.price
+                ) AS lowest_effective_price
+            ');
     }
 
     /**
@@ -286,8 +309,6 @@ class SubscriptionPlanRepository extends Repository
         $configuration = SearchConfigurationFactory::create('subscription_plan');
         $engine = new SearchEngine($configuration);
 
-        // Replace with however your repository accesses its base query builder,
-        // e.g. Campaign::query() or $this->model->newQuery()
         return $engine->search($this->query(), $criteria);
     }
 }

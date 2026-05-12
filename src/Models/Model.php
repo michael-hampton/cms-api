@@ -31,13 +31,12 @@ abstract class Model
 
     protected static $observers = [];
     protected static $globalEvents = [];
-
-    protected array $defaults = [];
     /**
      * @var mixed|null
      */
     private static array $scopes;
     private static array $eagerLoad = [];
+    protected array $defaults = [];
     protected $table;
     protected $fillable = [];
     protected $guarded = [];
@@ -152,6 +151,10 @@ abstract class Model
             return true;
         }
 
+        if (!empty($this->visible) && in_array($key, $this->visible)) {
+            return true;
+        }
+
         if (!empty($this->fillable)) {
             return in_array($key, $this->fillable);
         }
@@ -230,6 +233,96 @@ abstract class Model
         return $result;
     }
 
+    public static function find(int $id, array $relations = []): ?self
+    {
+        $instance = new static();
+        $result = !empty($relations) ?
+            $instance->newQuery()->with($relations)->find($id) :
+            $instance->newQuery()->find($id);
+
+        if (!$result) {
+            return null;
+        }
+
+        if (!$result instanceof Model) {
+            return $instance->hydrateFromArray($result);
+        }
+
+        return $result;
+    }
+
+    public static function with(string|array $relations): QueryBuilder
+    {
+        $instance = new static();
+        return $instance->newQuery()->with($relations);
+    }
+
+    public function newQuery(): QueryBuilder
+    {
+        $query = new QueryBuilder($this->table, $this->relationManager, $this->database);
+
+        // Apply global scopes (like soft deletes)
+        if ($this->usesSoftDeletes()) {
+            $query->whereNull('deleted_at');
+        }
+
+        // Apply default eager loading
+        if (!empty($this->with)) {
+            $query->eagerLoad = $this->with;
+        }
+
+        return $query;
+    }
+
+    protected function usesSoftDeletes(): bool
+    {
+        return in_array('deleted_at', $this->fillable) ||
+            method_exists($this, 'bootSoftDeletes');
+    }
+
+    private function hydrateFromArray(array $data): self
+    {
+        $model = new static($data);
+        $model->exists = true;
+        $model->original = $model->attributes;
+        $model->fireModelEvent('retrieved');
+        return $model;
+    }
+
+    protected function fireModelEvent(string $event): bool
+    {
+        $modelClass = static::class;
+
+        // Fire observers first
+        if (isset(static::$observers[$modelClass])) {
+            foreach (static::$observers[$modelClass] as $observer) {
+                if (method_exists($observer, $event)) {
+                    $result = $observer->$event($this);
+                    if ($result === false) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // Fire global events
+        if (isset(static::$globalEvents[$modelClass][$event])) {
+            foreach (static::$globalEvents[$modelClass][$event] as $callback) {
+                $result = $callback($this);
+                if ($result === false) {
+                    return false;
+                }
+            }
+        }
+
+        // Fire application events
+        if (isset($this->dispatchesEvents[$event])) {
+            Event::fire($this->dispatchesEvents[$event], [$this]);
+        }
+
+        return true;
+    }
+
     public static function createMany(array $records): array
     {
         if (empty($records)) {
@@ -254,6 +347,271 @@ abstract class Model
         $model->save();
         $model->exists = true;
         return $model;
+    }
+
+    public function save(): bool
+    {
+        // Fire saving event
+        if ($this->fireModelEvent('saving') === false) {
+            return false;
+        }
+
+        if ($this->exists) {
+            if ($this->fireModelEvent('updating') === false) {
+                return false;
+            }
+
+            // Check for dirty attributes BEFORE adding timestamp
+            $dirty = array_diff_assoc(
+                $this->attributes,
+                $this->original ?? []
+            );
+
+            // Only set updated_at if there are actual changes
+            if ($this->timestamps && !empty($dirty)) {
+                $this->setAttribute('updated_at', date($this->dateFormat));
+            }
+
+            $result = $this->performUpdate();
+
+            if ($result) {
+                $this->fireModelEvent('updated');
+                $this->fireModelEvent('saved');
+            }
+
+            return $result;
+        }
+
+        // For new models, set both timestamps
+        if ($this->timestamps) {
+            $now = date($this->dateFormat);
+            $this->setAttribute('created_at', $now);
+            $this->setAttribute('updated_at', $now);
+        }
+
+        // Fire creating event
+        if ($this->fireModelEvent('creating') === false) {
+            return false;
+        }
+
+        $result = $this->performInsert();
+
+        if ($result) {
+            $this->fireModelEvent('created');
+            $this->fireModelEvent('saved');
+        }
+
+        return $result;
+    }
+
+    protected function performUpdate(): bool
+    {
+        $primaryKeyValue = $this->getAttribute($this->primaryKey);
+
+        if (!$primaryKeyValue) {
+            return false;
+        }
+
+        // Determine dirty attributes (only changed values)
+        $dirty = array_diff_assoc(
+            $this->attributes,
+            $this->original ?? []
+        );
+
+        if (empty($dirty)) {
+            // No changes, return success without DB call
+            return true;
+        }
+
+        // Cast dirty attributes for DB storage
+        foreach ($dirty as $key => $value) {
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                continue;
+            }
+
+            $dirty[$key] = $this->castAttributeForDb($key, $value);
+        }
+
+        // Perform database update
+        $affectedRows = $this->database->update(
+            $this->table,
+            $dirty,
+            [$this->primaryKey => $primaryKeyValue]
+        );
+
+        if ($affectedRows >= 0) {
+            // Update original snapshot
+            $this->original = $this->attributes;
+            return true;
+        }
+
+        return false;
+    }
+
+    public function getAttribute(string $key)
+    {
+        // Check if it's a relationship
+        if (array_key_exists($key, $this->relations)) {
+            return $this->relations[$key];
+        }
+
+        // Check if it's an appended attribute with a mutator
+        if (in_array($key, $this->appends) && $this->hasGetMutator($key)) {
+            return $this->callGetMutator($key);
+        }
+
+        // Check if there's a mutator
+        $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+
+        if (method_exists($this, $mutatorMethod)) {
+            $value = $this->$mutatorMethod();
+            return $this->castAttribute($key, $value);
+        }
+
+        $value = $this->attributes[$key] ?? null;
+        return $this->castAttribute($key, $value);
+    }
+
+    /**
+     * Check if a get mutator exists for an attribute
+     */
+    protected function hasGetMutator(string $key): bool
+    {
+        $mutatorMethod = $this->getGetMutatorMethod($key);
+        return method_exists($this, $mutatorMethod);
+    }
+
+// Add scope for soft deletes
+
+    /**
+     * Get the get mutator method name
+     */
+    protected function getGetMutatorMethod(string $key): string
+    {
+        return 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+    }
+
+    /**
+     * Call a get mutator
+     */
+    protected function callGetMutator(string $key)
+    {
+        $mutatorMethod = $this->getGetMutatorMethod($key);
+        // Don't pass raw value, let the mutator access what it needs from $this
+        return $this->$mutatorMethod();
+    }
+
+    // Override where to exclude soft deleted by default
+
+    protected function castAttribute(string $key, $value)
+    {
+        if (!isset($this->casts[$key]) || $value === null) {
+            return $value;
+        }
+
+        switch ($this->casts[$key]) {
+            case 'int':
+            case 'integer':
+                return (int)$value;
+            case 'float':
+            case 'double':
+                return (float)$value;
+            case 'string':
+                return (string)$value;
+            case 'bool':
+            case 'boolean':
+                return (bool)$value;
+            case 'array':
+            case 'json':
+                // IMPORTANT: Handle both string and array inputs
+                if (is_string($value)) {
+                    $decoded = json_decode($value, true);
+                    return $decoded === null ? [] : $decoded;
+                }
+                return is_array($value) ? $value : [];
+            case 'date':
+            case 'datetime':
+            case 'timestamp':
+                return $value instanceof \DateTime ? $value : new \DateTime($value);
+            default:
+                return $value;
+        }
+    }
+
+    /**
+     * Cast an attribute before saving to database
+     */
+    protected function castAttributeForDb(string $key, $value)
+    {
+        if (isset($this->casts[$key])) {
+            switch ($this->casts[$key]) {
+                case 'date':
+                case 'datetime':
+                case 'timestamp':
+                    if ($value instanceof \DateTimeInterface) {
+                        return $value->format($this->dateFormat);
+                    } elseif (is_string($value)) {
+                        return (new \DateTime($value))->format($this->dateFormat);
+                    }
+                    break;
+
+                case 'array':
+                case 'json':
+                    if (is_array($value)) {
+                        return json_encode($value);
+                    }
+                    break;
+
+                case 'int':
+                case 'boolean':
+                case 'bool':
+                case 'integer':
+                    return (int)$value;
+                case 'float':
+                case 'double':
+                    return (float)$value;
+                case 'string':
+                    if ($value instanceof \UnitEnum) {
+                        return $value instanceof \BackedEnum ? (string)$value->value : $value->name;
+                    }
+                    return (string)$value;
+                default:
+                    if ($value instanceof \UnitEnum) {
+                        return $value instanceof \BackedEnum ? $value->value : $value->name;
+                    }
+            }
+        }
+
+        if ($value instanceof \UnitEnum) {
+            return $value instanceof \BackedEnum ? $value->value : $value->name;
+        }
+
+        // No casting, return raw value
+        return $value;
+    }
+
+    public function update(array $attributes): bool
+    {
+        // Update model's attributes
+        foreach ($attributes as $key => $value) {
+            $this->setAttribute($key, $value);
+        }
+
+        return $this->performUpdate();
+    }
+
+    protected function performInsert(): bool
+    {
+        $id = $this->database->insert($this->table, $this->attributes);
+
+        if ($id > 0) {
+            $this->setAttribute($this->primaryKey, $id);
+            $this->exists = true;
+            $this->original = $this->attributes;
+            return true;
+        }
+
+        return false;
     }
 
     public static function all(): Collection
@@ -292,6 +650,12 @@ abstract class Model
         return $instance->newQuery()->$method(...$arguments);
     }
 
+    protected function hasScope(string $method): bool
+    {
+        $scopeMethod = 'scope' . ucfirst($method);
+        return method_exists($this, $scopeMethod);
+    }
+
     /**
      * Call a scope method statically
      */
@@ -322,6 +686,8 @@ abstract class Model
         static::$observers[$modelClass][] = $observer;
     }
 
+    // Automatic relation loading for serialization
+
     public static function creating(callable $callback): void
     {
         static::registerModelEvent('creating', $callback);
@@ -347,8 +713,6 @@ abstract class Model
         static::registerModelEvent('created', $callback);
     }
 
-// Add scope for soft deletes
-
     public static function updating(callable $callback): void
     {
         static::registerModelEvent('updating', $callback);
@@ -358,8 +722,6 @@ abstract class Model
     {
         static::registerModelEvent('updated', $callback);
     }
-
-    // Override where to exclude soft deleted by default
 
     public static function saving(callable $callback): void
     {
@@ -521,6 +883,19 @@ abstract class Model
         }
     }
 
+    public static function where($column, $operator = null, $value = null): QueryBuilder
+    {
+        $instance = new static();
+        $query = new QueryBuilder($instance->table, $instance->relationManager, $instance->database);
+
+        // Automatically exclude soft deleted records
+        if ($instance->usesSoftDeletes()) {
+            $query->whereNull('deleted_at');
+        }
+
+        return $query->where($column, $operator, $value);
+    }
+
     /**
      * Update an existing record matching the attributes, or create a new one.
      *
@@ -586,568 +961,6 @@ abstract class Model
         }
 
         return new static($conditions);
-    }
-
-    // Automatic relation loading for serialization
-
-    public function forceFill(array $attributes): self
-    {
-        foreach ($attributes as $key => $value) {
-            $this->setAttribute($key, $value);
-        }
-
-        return $this;
-    }
-
-    public function update(array $attributes): bool
-    {
-        // Update model's attributes
-        foreach ($attributes as $key => $value) {
-            $this->setAttribute($key, $value);
-        }
-
-        return $this->performUpdate();
-    }
-
-    protected function performUpdate(): bool
-    {
-        $primaryKeyValue = $this->getAttribute($this->primaryKey);
-
-        if (!$primaryKeyValue) {
-            return false;
-        }
-
-        // Determine dirty attributes (only changed values)
-        $dirty = array_diff_assoc(
-            $this->attributes,
-            $this->original ?? []
-        );
-
-        if (empty($dirty)) {
-            // No changes, return success without DB call
-            return true;
-        }
-
-        // Cast dirty attributes for DB storage
-        foreach ($dirty as $key => $value) {
-            if ($value === null || (is_string($value) && trim($value) === '')) {
-                continue;
-            }
-
-            $dirty[$key] = $this->castAttributeForDb($key, $value);
-        }
-
-        // Perform database update
-        $affectedRows = $this->database->update(
-            $this->table,
-            $dirty,
-            [$this->primaryKey => $primaryKeyValue]
-        );
-
-        if ($affectedRows >= 0) {
-            // Update original snapshot
-            $this->original = $this->attributes;
-            return true;
-        }
-
-        return false;
-    }
-
-    public function getAttribute(string $key)
-    {
-        // Check if it's a relationship
-        if (array_key_exists($key, $this->relations)) {
-            return $this->relations[$key];
-        }
-
-        // Check if it's an appended attribute with a mutator
-        if (in_array($key, $this->appends) && $this->hasGetMutator($key)) {
-            return $this->callGetMutator($key);
-        }
-
-        // Check if there's a mutator
-        $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
-
-        if (method_exists($this, $mutatorMethod)) {
-            $value = $this->$mutatorMethod();
-            return $this->castAttribute($key, $value);
-        }
-
-        $value = $this->attributes[$key] ?? null;
-        return $this->castAttribute($key, $value);
-    }
-
-    /**
-     * Check if a get mutator exists for an attribute
-     */
-    protected function hasGetMutator(string $key): bool
-    {
-        $mutatorMethod = $this->getGetMutatorMethod($key);
-        return method_exists($this, $mutatorMethod);
-    }
-
-    /**
-     * Get the get mutator method name
-     */
-    protected function getGetMutatorMethod(string $key): string
-    {
-        return 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
-    }
-
-    /**
-     * Call a get mutator
-     */
-    protected function callGetMutator(string $key)
-    {
-        $mutatorMethod = $this->getGetMutatorMethod($key);
-        // Don't pass raw value, let the mutator access what it needs from $this
-        return $this->$mutatorMethod();
-    }
-
-    protected function castAttribute(string $key, $value)
-    {
-        if (!isset($this->casts[$key]) || $value === null) {
-            return $value;
-        }
-
-        switch ($this->casts[$key]) {
-            case 'int':
-            case 'integer':
-                return (int)$value;
-            case 'float':
-            case 'double':
-                return (float)$value;
-            case 'string':
-                return (string)$value;
-            case 'bool':
-            case 'boolean':
-                return (bool)$value;
-            case 'array':
-            case 'json':
-                // IMPORTANT: Handle both string and array inputs
-                if (is_string($value)) {
-                    $decoded = json_decode($value, true);
-                    return $decoded === null ? [] : $decoded;
-                }
-                return is_array($value) ? $value : [];
-            case 'date':
-            case 'datetime':
-            case 'timestamp':
-                return $value instanceof \DateTime ? $value : new \DateTime($value);
-            default:
-                return $value;
-        }
-    }
-
-    /**
-     * Cast an attribute before saving to database
-     */
-    protected function castAttributeForDb(string $key, $value)
-    {
-        if (isset($this->casts[$key])) {
-            switch ($this->casts[$key]) {
-                case 'date':
-                case 'datetime':
-                case 'timestamp':
-                    if ($value instanceof \DateTimeInterface) {
-                        return $value->format($this->dateFormat);
-                    } elseif (is_string($value)) {
-                        return (new \DateTime($value))->format($this->dateFormat);
-                    }
-                    break;
-
-                case 'array':
-                case 'json':
-                    if (is_array($value)) {
-                        return json_encode($value);
-                    }
-                    break;
-
-                case 'int':
-                case 'boolean':
-                case 'bool':
-                case 'integer':
-                    return (int)$value;
-                case 'float':
-                case 'double':
-                    return (float)$value;
-                case 'string':
-                    if ($value instanceof \UnitEnum) {
-                        return $value instanceof \BackedEnum ? (string)$value->value : $value->name;
-                    }
-                    return (string)$value;
-                default:
-                    if ($value instanceof \UnitEnum) {
-                        return $value instanceof \BackedEnum ? $value->value : $value->name;
-                    }
-            }
-        }
-
-        if ($value instanceof \UnitEnum) {
-            return $value instanceof \BackedEnum ? $value->value : $value->name;
-        }
-
-        // No casting, return raw value
-        return $value;
-    }
-
-    public function fresh(array $relations = []): ?self
-    {
-        $id = $this->getAttribute($this->primaryKey);
-        if (!$id) {
-            return null;
-        }
-
-        return static::find($id, $relations);
-    }
-
-    public static function find(int $id, array $relations = []): ?self
-    {
-        $instance = new static();
-        $result = !empty($relations) ?
-            $instance->newQuery()->with($relations)->find($id) :
-            $instance->newQuery()->find($id);
-
-        if (!$result) {
-            return null;
-        }
-
-        if (!$result instanceof Model) {
-            return $instance->hydrateFromArray($result);
-        }
-
-        return $result;
-    }
-
-    public static function with(string|array $relations): QueryBuilder
-    {
-        $instance = new static();
-        return $instance->newQuery()->with($relations);
-    }
-
-    public function newQuery(): QueryBuilder
-    {
-        $query = new QueryBuilder($this->table, $this->relationManager, $this->database);
-
-        // Apply global scopes (like soft deletes)
-        if ($this->usesSoftDeletes()) {
-            $query->whereNull('deleted_at');
-        }
-
-        // Apply default eager loading
-        if (!empty($this->with)) {
-            $query->eagerLoad = $this->with;
-        }
-
-        return $query;
-    }
-
-    protected function usesSoftDeletes(): bool
-    {
-        return in_array('deleted_at', $this->fillable) ||
-            method_exists($this, 'bootSoftDeletes');
-    }
-
-    private function hydrateFromArray(array $data): self
-    {
-        $model = new static($data);
-        $model->exists = true;
-        $model->original = $model->attributes;
-        $model->fireModelEvent('retrieved');
-        return $model;
-    }
-
-    protected function fireModelEvent(string $event): bool
-    {
-        $modelClass = static::class;
-
-        // Fire observers first
-        if (isset(static::$observers[$modelClass])) {
-            foreach (static::$observers[$modelClass] as $observer) {
-                if (method_exists($observer, $event)) {
-                    $result = $observer->$event($this);
-                    if ($result === false) {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        // Fire global events
-        if (isset(static::$globalEvents[$modelClass][$event])) {
-            foreach (static::$globalEvents[$modelClass][$event] as $callback) {
-                $result = $callback($this);
-                if ($result === false) {
-                    return false;
-                }
-            }
-        }
-
-        // Fire application events
-        if (isset($this->dispatchesEvents[$event])) {
-            Event::fire($this->dispatchesEvents[$event], [$this]);
-        }
-
-        return true;
-    }
-
-    public function refresh(): static
-    {
-        if (!$this->exists) {
-            return $this;
-        }
-
-        $primaryKeyValue = $this->getAttribute($this->primaryKey);
-
-        $fresh = $this->database
-            ->table($this->getTable())
-            ->where($this->primaryKey, $primaryKeyValue)
-            ->first();
-
-        if (!$fresh) {
-            throw new \RuntimeException('Model not found during refresh.');
-        }
-
-        // Replace attributes
-        $this->attributes = (array)$fresh->getAttributes();
-        // Keep the "original" snapshot in sync so subsequent update() calls
-        // correctly detect dirtiness against the freshly loaded state.
-        $this->original = $this->attributes;
-
-        return $this;
-    }
-
-    public static function where($column, $operator = null, $value = null): QueryBuilder
-    {
-        $instance = new static();
-        $query = new QueryBuilder($instance->table, $instance->relationManager, $instance->database);
-
-        // Automatically exclude soft deleted records
-        if ($instance->usesSoftDeletes()) {
-            $query->whereNull('deleted_at');
-        }
-
-        return $query->where($column, $operator, $value);
-    }
-
-    /**
-     * @return mixed
-     */
-    public function getTable()
-    {
-        return $this->table;
-    }
-
-    public function getAttributes(): array
-    {
-        return $this->attributes;
-    }
-
-    public function delete(): bool
-    {
-        if (!$this->exists) {
-            return false;
-        }
-
-        // Fire deleting event
-        if ($this->fireModelEvent('deleting') === false) {
-            return false;
-        }
-
-        // Check for soft deletes
-        if ($this->usesSoftDeletes()) {
-            return $this->performSoftDelete();
-        }
-
-        return $this->performHardDelete();
-    }
-
-    protected function performSoftDelete(): bool
-    {
-        $this->setAttribute('deleted_at', date($this->dateFormat));
-        $result = $this->save();
-
-        if ($result) {
-            $this->fireModelEvent('deleted');
-        }
-
-        return $result;
-    }
-
-    public function save(): bool
-    {
-        // Fire saving event
-        if ($this->fireModelEvent('saving') === false) {
-            return false;
-        }
-
-        if ($this->exists) {
-            if ($this->fireModelEvent('updating') === false) {
-                return false;
-            }
-
-            // Check for dirty attributes BEFORE adding timestamp
-            $dirty = array_diff_assoc(
-                $this->attributes,
-                $this->original ?? []
-            );
-
-            // Only set updated_at if there are actual changes
-            if ($this->timestamps && !empty($dirty)) {
-                $this->setAttribute('updated_at', date($this->dateFormat));
-            }
-
-            $result = $this->performUpdate();
-
-            if ($result) {
-                $this->fireModelEvent('updated');
-                $this->fireModelEvent('saved');
-            }
-
-            return $result;
-        }
-
-        // For new models, set both timestamps
-        if ($this->timestamps) {
-            $now = date($this->dateFormat);
-            $this->setAttribute('created_at', $now);
-            $this->setAttribute('updated_at', $now);
-        }
-
-        // Fire creating event
-        if ($this->fireModelEvent('creating') === false) {
-            return false;
-        }
-
-        $result = $this->performInsert();
-
-        if ($result) {
-            $this->fireModelEvent('created');
-            $this->fireModelEvent('saved');
-        }
-
-        return $result;
-    }
-
-    protected function performInsert(): bool
-    {
-        $id = $this->database->insert($this->table, $this->attributes);
-
-        if ($id > 0) {
-            $this->setAttribute($this->primaryKey, $id);
-            $this->exists = true;
-            $this->original = $this->attributes;
-            return true;
-        }
-
-        return false;
-    }
-
-    protected function performHardDelete(): bool
-    {
-        $primaryKeyValue = $this->getAttribute($this->primaryKey);
-        if (!$primaryKeyValue) {
-            return false;
-        }
-
-        $affectedRows = $this->database->delete($this->table, [$this->primaryKey => $primaryKeyValue]);
-
-        if ($affectedRows > 0) {
-            $this->exists = false;
-            $this->fireModelEvent('deleted');
-            return true;
-        }
-
-        return false;
-    }
-
-    public function forceDelete(): bool
-    {
-        if (!$this->exists) {
-            return false;
-        }
-
-        return $this->performHardDelete();
-    }
-
-    public function restore(): bool
-    {
-        if (!$this->usesSoftDeletes()) {
-            return false;
-        }
-
-        $this->setAttribute('deleted_at', null);
-        return $this->save();
-    }
-
-    public function trashed(): bool
-    {
-        return $this->usesSoftDeletes() && !empty($this->getAttribute('deleted_at'));
-    }
-
-    public function load(array|string $relations): self
-    {
-        if (is_string($relations)) {
-            $relations = [$relations];
-        }
-        foreach ($relations as $relation) {
-            if (method_exists($this, $relation)) {
-                $this->eagerLoaded[$relation] = $this->$relation();
-            }
-        }
-        return $this;
-    }
-
-    /**
-     * Make an attribute visible (override hidden)
-     */
-    public function makeVisible($attributes): self
-    {
-        $attributes = is_array($attributes) ? $attributes : func_get_args();
-
-        $this->hidden = array_diff($this->hidden, $attributes);
-
-        if (!empty($this->visible)) {
-            $this->visible = array_unique(array_merge($this->visible, $attributes));
-        }
-
-        return $this;
-    }
-
-    /**
-     * Make an attribute hidden
-     */
-    public function makeHidden($attributes): self
-    {
-        $this->hidden = array_merge(
-            $this->hidden,
-            is_array($attributes) ? $attributes : func_get_args()
-        );
-
-        return $this;
-    }
-
-    /**
-     * Set the visible attributes for the model
-     */
-    public function setVisible(array $visible): self
-    {
-        $this->visible = $visible;
-        return $this;
-    }
-
-    /**
-     * Set the hidden attributes for the model
-     */
-    public function setHidden(array $hidden): self
-    {
-        $this->hidden = $hidden;
-        return $this;
-    }
-
-    public function toJson(): string
-    {
-        return json_encode($this->toArray());
     }
 
     public function toArray(): array
@@ -1275,6 +1088,202 @@ abstract class Model
         return true;
     }
 
+    public function forceFill(array $attributes): self
+    {
+        foreach ($attributes as $key => $value) {
+            $this->setAttribute($key, $value);
+        }
+
+        return $this;
+    }
+
+    public function fresh(array $relations = []): ?self
+    {
+        $id = $this->getAttribute($this->primaryKey);
+        if (!$id) {
+            return null;
+        }
+
+        return static::find($id, $relations);
+    }
+
+    public function refresh(): static
+    {
+        if (!$this->exists) {
+            return $this;
+        }
+
+        $primaryKeyValue = $this->getAttribute($this->primaryKey);
+
+        $fresh = $this->database
+            ->table($this->getTable())
+            ->where($this->primaryKey, $primaryKeyValue)
+            ->first();
+
+        if (!$fresh) {
+            throw new \RuntimeException('Model not found during refresh.');
+        }
+
+        // Replace attributes
+        $this->attributes = (array)$fresh->getAttributes();
+        // Keep the "original" snapshot in sync so subsequent update() calls
+        // correctly detect dirtiness against the freshly loaded state.
+        $this->original = $this->attributes;
+
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getTable()
+    {
+        return $this->table;
+    }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function delete(): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        // Fire deleting event
+        if ($this->fireModelEvent('deleting') === false) {
+            return false;
+        }
+
+        // Check for soft deletes
+        if ($this->usesSoftDeletes()) {
+            return $this->performSoftDelete();
+        }
+
+        return $this->performHardDelete();
+    }
+
+    protected function performSoftDelete(): bool
+    {
+        $this->setAttribute('deleted_at', date($this->dateFormat));
+        $result = $this->save();
+
+        if ($result) {
+            $this->fireModelEvent('deleted');
+        }
+
+        return $result;
+    }
+
+    protected function performHardDelete(): bool
+    {
+        $primaryKeyValue = $this->getAttribute($this->primaryKey);
+        if (!$primaryKeyValue) {
+            return false;
+        }
+
+        $affectedRows = $this->database->delete($this->table, [$this->primaryKey => $primaryKeyValue]);
+
+        if ($affectedRows > 0) {
+            $this->exists = false;
+            $this->fireModelEvent('deleted');
+            return true;
+        }
+
+        return false;
+    }
+
+    public function forceDelete(): bool
+    {
+        if (!$this->exists) {
+            return false;
+        }
+
+        return $this->performHardDelete();
+    }
+
+    public function restore(): bool
+    {
+        if (!$this->usesSoftDeletes()) {
+            return false;
+        }
+
+        $this->setAttribute('deleted_at', null);
+        return $this->save();
+    }
+
+    public function trashed(): bool
+    {
+        return $this->usesSoftDeletes() && !empty($this->getAttribute('deleted_at'));
+    }
+
+    public function load(array|string $relations): self
+    {
+        if (is_string($relations)) {
+            $relations = [$relations];
+        }
+        foreach ($relations as $relation) {
+            if (method_exists($this, $relation)) {
+                $this->eagerLoaded[$relation] = $this->$relation();
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * Make an attribute visible (override hidden)
+     */
+    public function makeVisible($attributes): self
+    {
+        $attributes = is_array($attributes) ? $attributes : func_get_args();
+
+        $this->hidden = array_diff($this->hidden, $attributes);
+
+        if (!empty($this->visible)) {
+            $this->visible = array_unique(array_merge($this->visible, $attributes));
+        }
+
+        return $this;
+    }
+
+    /**
+     * Make an attribute hidden
+     */
+    public function makeHidden($attributes): self
+    {
+        $this->hidden = array_merge(
+            $this->hidden,
+            is_array($attributes) ? $attributes : func_get_args()
+        );
+
+        return $this;
+    }
+
+    /**
+     * Set the visible attributes for the model
+     */
+    public function setVisible(array $visible): self
+    {
+        $this->visible = $visible;
+        return $this;
+    }
+
+    /**
+     * Set the hidden attributes for the model
+     */
+    public function setHidden(array $hidden): self
+    {
+        $this->hidden = $hidden;
+        return $this;
+    }
+
+    public function toJson(): string
+    {
+        return json_encode($this->toArray());
+    }
+
     public function scopeWhere(QueryBuilder $query, ...$args): QueryBuilder
     {
         return $query->where(...$args);
@@ -1336,12 +1345,6 @@ abstract class Model
     {
         $this->eagerLoaded[$relation] = $value;
         return $this;
-    }
-
-    protected function hasScope(string $method): bool
-    {
-        $scopeMethod = 'scope' . ucfirst($method);
-        return method_exists($this, $scopeMethod);
     }
 
     /**

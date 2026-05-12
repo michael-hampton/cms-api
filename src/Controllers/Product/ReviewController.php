@@ -4,12 +4,14 @@ namespace App\Controllers\Product;
 
 use App\Controllers\Controller;
 use App\Framework\Http\Request;
+use App\Services\Reviews\ReviewQueryService;
 use App\Services\Reviews\ReviewService;
 
 class ReviewController extends Controller
 {
     public function __construct(
-        private readonly ReviewService $reviewService
+        private readonly ReviewService      $reviewService,
+        private readonly ReviewQueryService $reviewQueryService,
     ) {
         parent::__construct();
     }
@@ -36,6 +38,27 @@ class ReviewController extends Controller
 
         $statusCode = $result->success ? 200 : 400;
         return $this->resourceResponse($result->toArray(), $statusCode);
+    }
+
+    public function getPlanReview(Request $request, int $planId)
+    {
+        $reviews = $this->reviewQueryService->getPaginatedPlanReviews(
+            $planId,
+            $request->input('page', 1),
+            5
+        );
+
+        $reviewStats = $this->reviewService->getPlanReviewSummary($planId);
+
+        $canReview = $this->reviewService->canUserReviewPlan($planId);
+
+        return $this->resourceResponse([
+            'data' => [
+                ...$reviews,
+                'stats' => $reviewStats,
+                'can_review_data' => $canReview,
+            ]
+        ]);
     }
 
     public function store(Request $request, int $productId)

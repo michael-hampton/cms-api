@@ -48,7 +48,8 @@ class SubscriptionCatalogService
             $query = $this->applyDeliveryTypeFilter($query, $filters['delivery_type']);
         }
 
-        // Price range
+        // Price range — filters against active tier prices (COALESCE(sale_price, price)),
+        // falling back to the plan-level price for plans without tiers.
         if (!empty($filters['price_min']) || !empty($filters['price_max'])) {
             $query = $query->whereHas('pricingTiers', function ($q) use ($filters) {
                 if (!empty($filters['price_min'])) {
@@ -84,7 +85,8 @@ class SubscriptionCatalogService
             $query->whereJsonContains('categories', $filters['categories']);
         }
 
-        // Sorting
+        // Sorting — price sorts use the `lowest_effective_price` computed column
+        // added by buildCatalogQuery(); non-price sorts use plan columns directly.
         $sortOption = !empty($filters['sort'])
             ? SubscriptionSortOption::from($filters['sort'])
             : SubscriptionSortOption::PRICE_LOW_TO_HIGH;
@@ -167,32 +169,52 @@ class SubscriptionCatalogService
         return $this->planRepository->getDistinctTags($siteId);
     }
 
+    /**
+     * Return the lowest effective price for a plan broken down by delivery type.
+     *
+     * For plans with pricing tiers the plan-level `price` field is stale and
+     * must be ignored. Each tier carries its own print price (sale_price ?? price)
+     * and optionally a separate digital price (digital_price, with the same
+     * sale_price ?? price fallback when digital_price is absent).
+     *
+     * For plans without any pricing tiers callers should use the plan's `price`
+     * field directly; this method returns nulls in that case so the caller can
+     * decide how to render the fallback.
+     */
     public function getLowestPriceForPlan($plan): array
     {
         $lowestPrint = null;
         $lowestDigital = null;
 
         foreach ($plan->pricingTiers as $tier) {
-            $effectivePrice = $tier->sale_price ?? $tier->price;
+            // Effective print price for this tier.
+            $effectivePrintPrice = $tier->sale_price ?? $tier->price;
 
             if ($plan->hasPrintOption()) {
-                if ($lowestPrint === null || $effectivePrice < $lowestPrint) {
-                    $lowestPrint = $effectivePrice;
+                if ($lowestPrint === null || $effectivePrintPrice < $lowestPrint) {
+                    $lowestPrint = $effectivePrintPrice;
                 }
             }
 
             if ($plan->hasDigitalOption()) {
-                $digitalPrice = $tier->digital_price ?? $effectivePrice;
-                if ($lowestDigital === null || $digitalPrice < $lowestDigital) {
-                    $lowestDigital = $digitalPrice;
+                $effectiveDigitalPrice =
+                    $tier->digital_sale_price
+                    ?? $tier->digital_price
+                    ?? $tier->sale_price
+                    ?? $tier->price;
+
+                if ($lowestDigital === null || $effectiveDigitalPrice < $lowestDigital) {
+                    $lowestDigital = $effectiveDigitalPrice;
                 }
             }
         }
 
+        $candidates = array_filter([$lowestPrint, $lowestDigital], fn($v) => $v !== null);
+
         return [
             SubscriptionType::PRINTED->value => $lowestPrint,
             SubscriptionType::DIGITAL->value => $lowestDigital,
-            'lowest' => min(array_filter([$lowestPrint, $lowestDigital]))
+            'lowest' => !empty($candidates) ? min($candidates) : null,
         ];
     }
 }

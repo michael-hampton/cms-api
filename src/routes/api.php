@@ -1467,6 +1467,7 @@ $router->get('/api/{site}/product-list/search', [ProductListController::class, '
 $router->get('/api/{site}/products/{productId}/reviews', ReviewController::class, 'index');
 $router->post('/api/{site}/products/{productId}/reviews', [ReviewController::class, 'store']);
 $router->post('/api/{site}/plans/{planId}/reviews', [ReviewController::class, 'storePlanReview']);
+$router->get('/api/{site}/plans/{planId}/reviews', [ReviewController::class, 'getPlanReview']);
 $router->put('/api/{site}/reviews/{reviewId}', ReviewController::class, 'update');
 $router->delete('/api/{site}/reviews/{reviewId}', ReviewController::class, 'destroy');
 $router->post('/api/{site}/reviews/{reviewId}/helpful', ReviewController::class, 'markHelpful');

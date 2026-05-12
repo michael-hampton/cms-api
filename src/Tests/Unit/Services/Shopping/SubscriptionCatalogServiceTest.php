@@ -18,39 +18,35 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
     /**
      * Test that getCatalog applies basic filters and returns paginated results.
      */
-    public function test_get_catalog_applies_basic_filters_and_returns_paginated_results()
+    public function test_get_catalog_applies_basic_filters_and_returns_paginated_results(): void
     {
         $filters = [
             'site_id' => 1,
             'search' => 'Magazine',
             'per_page' => 10,
-            'page' => 1
+            'page' => 1,
         ];
 
-        // 1. Setup the initial query build
         $this->repository->shouldReceive('buildCatalogQuery')
             ->once()
             ->andReturn($this->queryMock);
 
-        // 2. Expect search filter (applySearch uses a closure)
         $this->queryMock->shouldReceive('where')
             ->once()
             ->with(Mockery::on(fn($closure) => is_callable($closure)))
             ->andReturnSelf();
 
-        // 3. Expect site_id filter
         $this->queryMock->shouldReceive('where')
             ->once()
             ->with('site_id', 1)
             ->andReturnSelf();
 
-        // 4. Expect default sorting (Price Low to High)
+        // Price sorts now order by the computed column, not raw 'price'.
         $this->queryMock->shouldReceive('orderBy')
             ->once()
-            ->with('price', 'asc') // Assuming these are the default values from Enum
+            ->with('lowest_effective_price', 'asc')
             ->andReturnSelf();
 
-        // 5. Expect pagination
         $this->queryMock->shouldReceive('paginate')
             ->once()
             ->with(10, 1)
@@ -236,29 +232,29 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
     /**
      * Test that multiple filters can be applied simultaneously to the query.
      */
-    public function test_get_catalog_applies_combined_filters()
+    public function test_get_catalog_applies_combined_filters(): void
     {
         $filters = [
             'search' => 'Scientific',
             'site_id' => 5,
             'featured' => 'true',
-            'sort' => SubscriptionSortOption::PRICE_HIGH_TO_LOW->value
+            'sort' => SubscriptionSortOption::PRICE_HIGH_TO_LOW->value,
         ];
 
         $this->repository->shouldReceive('buildCatalogQuery')->once()->andReturn($this->queryMock);
 
-        // Chain expectations
-        $this->queryMock->shouldReceive('where')->once()->with(Mockery::on(fn($q) => is_callable($q)))->andReturnSelf(); // Search
+        $this->queryMock->shouldReceive('where')->once()->with(Mockery::on(fn($q) => is_callable($q)))->andReturnSelf();
         $this->queryMock->shouldReceive('where')->once()->with('site_id', 5)->andReturnSelf();
         $this->queryMock->shouldReceive('where')->once()->with('is_featured', true)->andReturnSelf();
 
-        // Verify sorting changes based on input
-        // Assuming PRICE_HIGH_TO_LOW returns ['price', 'desc']
-        $this->queryMock->shouldReceive('orderBy')->once()->with('price', 'desc')->andReturnSelf();
+        // Price sorts now reference the computed column.
+        $this->queryMock->shouldReceive('orderBy')->once()->with('lowest_effective_price', 'desc')->andReturnSelf();
 
         $this->queryMock->shouldReceive('paginate')->once()->andReturn([]);
 
         $this->service->getCatalog($filters);
+
+        $this->assertTrue(true);
     }
 
     /**
@@ -286,6 +282,147 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
 
         $this->service->getCatalog($filters);
         $this->assertTrue(true);
+    }
+
+    /**
+     * A tier with a sale_price uses sale_price as the effective print price.
+     * Its digital_price is used as-is when present.
+     * A second tier with no sale and no digital_price falls back to its own price.
+     */
+    public function test_get_lowest_price_for_plan_with_tiers(): void
+    {
+        $plan = Mockery::mock();
+
+        $plan->pricingTiers = [
+            // Tier A: print effective = 80 (sale), digital explicit = 75
+            (object)['price' => 100, 'sale_price' => 80, 'digital_price' => 75],
+            // Tier B: print effective = 50 (no sale), digital fallback = 50
+            (object)['price' => 50, 'sale_price' => null, 'digital_price' => null],
+        ];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(true);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        // Lowest print: min(80, 50) = 50
+        $this->assertSame(50, $result[SubscriptionType::PRINTED->value]);
+        // Lowest digital: min(75, 50) = 50
+        $this->assertSame(50, $result[SubscriptionType::DIGITAL->value]);
+        // Overall lowest: 50
+        $this->assertSame(50, $result['lowest']);
+    }
+
+    /**
+     * When a tier carries a dedicated digital_price that is lower than its
+     * print effective price, the digital lowest must reflect the digital_price
+     * — not the print effective price.
+     */
+    public function test_get_lowest_price_prefers_dedicated_digital_price_over_print_effective(): void
+    {
+        $plan = Mockery::mock();
+
+        $plan->pricingTiers = [
+            // Print effective = 100, dedicated digital = 60 (cheaper than print)
+            (object)['price' => 100, 'sale_price' => null, 'digital_price' => 60],
+        ];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(true);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        $this->assertSame(100, $result[SubscriptionType::PRINTED->value]);
+        $this->assertSame(60, $result[SubscriptionType::DIGITAL->value]);
+        $this->assertSame(60, $result['lowest']);
+    }
+
+    /**
+     * When no digital_price is set on a tier, the digital effective price falls
+     * back to that tier's own sale_price ?? price — not a different tier's value.
+     */
+    public function test_get_lowest_price_digital_fallback_uses_tiers_own_effective_price(): void
+    {
+        $plan = Mockery::mock();
+
+        $plan->pricingTiers = [
+            // Tier A: sale = 40, no digital_price → digital fallback = 40
+            (object)['price' => 100, 'sale_price' => 40, 'digital_price' => null],
+            // Tier B: no sale, no digital_price → digital fallback = 90
+            (object)['price' => 90, 'sale_price' => null, 'digital_price' => null],
+        ];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(true);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        // Lowest print: min(40, 90) = 40
+        $this->assertSame(40, $result[SubscriptionType::PRINTED->value]);
+        // Lowest digital: min(40, 90) = 40 (each tier falls back to its own effective)
+        $this->assertSame(40, $result[SubscriptionType::DIGITAL->value]);
+        $this->assertSame(40, $result['lowest']);
+    }
+
+    /**
+     * A plan with no pricing tiers should return null for all price buckets.
+     * Callers are expected to fall back to the plan-level price field themselves.
+     */
+    public function test_get_lowest_price_returns_nulls_when_no_tiers_exist(): void
+    {
+        $plan = Mockery::mock();
+        $plan->pricingTiers = [];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(true);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        $this->assertNull($result[SubscriptionType::PRINTED->value]);
+        $this->assertNull($result[SubscriptionType::DIGITAL->value]);
+        $this->assertNull($result['lowest']);
+    }
+
+    /**
+     * A print-only plan should never populate the digital bucket.
+     */
+    public function test_get_lowest_price_print_only_plan(): void
+    {
+        $plan = Mockery::mock();
+
+        $plan->pricingTiers = [
+            (object)['price' => 30, 'sale_price' => null, 'digital_price' => null],
+        ];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(true);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(false);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        $this->assertSame(30, $result[SubscriptionType::PRINTED->value]);
+        $this->assertNull($result[SubscriptionType::DIGITAL->value]);
+        $this->assertSame(30, $result['lowest']);
+    }
+
+    /**
+     * A digital-only plan should never populate the print bucket.
+     */
+    public function test_get_lowest_price_digital_only_plan(): void
+    {
+        $plan = Mockery::mock();
+
+        $plan->pricingTiers = [
+            (object)['price' => 20, 'sale_price' => null, 'digital_price' => 15],
+        ];
+
+        $plan->shouldReceive('hasPrintOption')->andReturn(false);
+        $plan->shouldReceive('hasDigitalOption')->andReturn(true);
+
+        $result = $this->service->getLowestPriceForPlan($plan);
+
+        $this->assertNull($result[SubscriptionType::PRINTED->value]);
+        $this->assertSame(15, $result[SubscriptionType::DIGITAL->value]);
+        $this->assertSame(15, $result['lowest']);
     }
 
     protected function setUp(): void

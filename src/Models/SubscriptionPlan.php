@@ -46,6 +46,10 @@ class SubscriptionPlan extends Model
         'updated_at'
     ];
 
+    protected $visible = [
+        'lowest_effective_price'
+    ];
+
     protected $casts = [
         'price' => 'float',
         'trial_days' => 'integer',

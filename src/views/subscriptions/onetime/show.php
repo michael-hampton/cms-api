@@ -1,10 +1,13 @@
 <?php
 /*
  * View: subscriptions/onetime/show.php
- * Changes from original:
- *   - Trial banner added inside the subscription card (after card-title)
- *   - "Add to Cart" button label changes to "Start Free N-Day Trial" when plan has trial
- *   - delivery tab / duration option blocks unchanged
+ *
+ * JS refactored to match index.php class/state architecture:
+ *   - CartService  — owns cart state + all API calls
+ *   - MiniCartUI   — renders the cart sidebar, syncs button states
+ *   - ShowPageApp  — composition root; wires delivery/duration UI + reviews
+ *
+ * Mini cart now matches index.php: qty controls, remove per-item, clear cart.
  */
 
 foreach ($plan->pricingTiers as $tier) {
@@ -44,6 +47,7 @@ $pagination = $reviewData['pagination'] ?? [];
             --blue-light: #eff6ff;
             --green: #10b981;
             --red: #ef4444;
+            --red-light: #fef2f2;
             --gold: #f59e0b;
             --border: #e2e8f0;
             --bg: #f8fafc;
@@ -65,7 +69,7 @@ $pagination = $reviewData['pagination'] ?? [];
             line-height: 1.6;
         }
 
-        /* ── Page shell ───────────────────────────────────────────── */
+        /* ── Page shell ───────────────────────────────────────────────── */
         .page {
             max-width: 1100px;
             margin: 0 auto;
@@ -80,6 +84,7 @@ $pagination = $reviewData['pagination'] ?? [];
             font-size: .875rem;
             color: var(--ink-muted);
         }
+
         .breadcrumb a {
             color: var(--blue);
             text-decoration: none;
@@ -92,7 +97,7 @@ $pagination = $reviewData['pagination'] ?? [];
             text-decoration: underline;
         }
 
-        /* ── Two-column layout ────────────────────────────────────── */
+        /* ── Two-column layout ────────────────────────────────────────── */
         .plan-layout {
             display: grid;
             grid-template-columns: 260px 1fr;
@@ -101,7 +106,7 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-bottom: 2.5rem;
         }
 
-        /* LEFT COLUMN */
+        /* LEFT */
         .plan-left {
             position: sticky;
             top: 1.5rem;
@@ -161,10 +166,7 @@ $pagination = $reviewData['pagination'] ?? [];
             color: var(--blue);
         }
 
-        /* RIGHT COLUMN */
-        .plan-right {
-        }
-
+        /* RIGHT */
         .plan-title {
             font-family: 'Playfair Display', serif;
             font-size: 2.25rem;
@@ -181,7 +183,7 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-bottom: 1.5rem;
         }
 
-        /* ── Card (white box) ─────────────────────────────────────── */
+        /* ── Card ─────────────────────────────────────────────────────── */
         .card {
             background: var(--white);
             border-radius: var(--radius-lg);
@@ -200,7 +202,7 @@ $pagination = $reviewData['pagination'] ?? [];
             border-bottom: 1px solid var(--border);
         }
 
-        /* ── Delivery tabs ────────────────────────────────────────── */
+        /* ── Delivery tabs ────────────────────────────────────────────── */
         .delivery-tabs {
             display: flex;
             gap: .75rem;
@@ -253,7 +255,7 @@ $pagination = $reviewData['pagination'] ?? [];
             color: var(--blue);
         }
 
-        /* ── Duration options ─────────────────────────────────────── */
+        /* ── Duration options ─────────────────────────────────────────── */
         .duration-option {
             border: 2px solid var(--border);
             border-radius: var(--radius);
@@ -271,10 +273,12 @@ $pagination = $reviewData['pagination'] ?? [];
         .duration-option:hover {
             border-color: var(--blue);
         }
+
         .duration-option.selected {
             border-color: var(--blue);
             background: var(--blue-light);
         }
+
         .duration-option input[type="radio"] {
             position: absolute;
             opacity: 0;
@@ -310,9 +314,6 @@ $pagination = $reviewData['pagination'] ?? [];
             align-items: center;
             gap: .875rem;
             flex: 1;
-        }
-
-        .duration-option__info {
         }
 
         .duration-option__label {
@@ -365,7 +366,7 @@ $pagination = $reviewData['pagination'] ?? [];
             display: inline-block;
         }
 
-        /* ── Add to cart button ───────────────────────────────────── */
+        /* ── Add to cart button ───────────────────────────────────────── */
         .btn-add-cart {
             width: 100%;
             padding: .95rem;
@@ -391,10 +392,18 @@ $pagination = $reviewData['pagination'] ?? [];
             transform: translateY(0);
         }
 
-        /* ── Features card ────────────────────────────────────────── */
+        .btn-add-cart:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* ── Features card ────────────────────────────────────────────── */
         .features-list {
             list-style: none;
         }
+
         .features-list li {
             display: flex;
             align-items: center;
@@ -408,6 +417,7 @@ $pagination = $reviewData['pagination'] ?? [];
         .features-list li:last-child {
             border-bottom: none;
         }
+
         .check-icon {
             width: 22px;
             height: 22px;
@@ -418,6 +428,7 @@ $pagination = $reviewData['pagination'] ?? [];
             justify-content: center;
             flex-shrink: 0;
         }
+
         .check-icon svg {
             width: 12px;
             height: 12px;
@@ -425,7 +436,7 @@ $pagination = $reviewData['pagination'] ?? [];
             stroke-width: 3;
         }
 
-        /* ── Reviews ──────────────────────────────────────────────── */
+        /* ── Reviews ──────────────────────────────────────────────────── */
         .reviews-compliance-notice {
             background: #f0f9ff;
             border: 1px solid #bae6fd;
@@ -457,6 +468,7 @@ $pagination = $reviewData['pagination'] ?? [];
             text-align: center;
             min-width: 110px;
         }
+
         .reviews-score__avg {
             font-family: 'Playfair Display', serif;
             font-size: 3rem;
@@ -464,6 +476,7 @@ $pagination = $reviewData['pagination'] ?? [];
             line-height: 1;
             color: var(--ink);
         }
+
         .reviews-score__stars {
             display: flex;
             justify-content: center;
@@ -491,12 +504,14 @@ $pagination = $reviewData['pagination'] ?? [];
             color: var(--ink-muted);
             text-align: right;
         }
+
         .rating-bar-track {
             height: 7px;
             background: var(--border);
             border-radius: 4px;
             overflow: hidden;
         }
+
         .rating-bar-fill {
             height: 100%;
             background: var(--gold);
@@ -514,6 +529,7 @@ $pagination = $reviewData['pagination'] ?? [];
             flex-direction: column;
             margin-top: 1.5rem;
         }
+
         .review-card {
             padding: 1.25rem 0;
             border-bottom: 1px solid var(--border);
@@ -522,6 +538,7 @@ $pagination = $reviewData['pagination'] ?? [];
         .review-card:last-child {
             border-bottom: none;
         }
+
         .review-card__header {
             display: flex;
             align-items: flex-start;
@@ -530,6 +547,7 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-bottom: .5rem;
             flex-wrap: wrap;
         }
+
         .review-card__meta {
             display: flex;
             align-items: center;
@@ -546,6 +564,7 @@ $pagination = $reviewData['pagination'] ?? [];
             font-size: .8rem;
             color: var(--ink-muted);
         }
+
         .review-card__verified {
             font-size: .7rem;
             font-weight: 600;
@@ -568,6 +587,7 @@ $pagination = $reviewData['pagination'] ?? [];
             color: var(--ink-soft);
             line-height: 1.65;
         }
+
         .review-card__helpful {
             display: flex;
             align-items: center;
@@ -576,6 +596,7 @@ $pagination = $reviewData['pagination'] ?? [];
             font-size: .8rem;
             color: var(--ink-muted);
         }
+
         .helpful-btn {
             background: none;
             border: 1px solid var(--border);
@@ -612,12 +633,13 @@ $pagination = $reviewData['pagination'] ?? [];
             color: var(--gold);
         }
 
-        /* ── Write review form ────────────────────────────────────── */
+        /* ── Write review form ────────────────────────────────────────── */
         .write-review-section {
             margin-top: 2rem;
             padding-top: 1.5rem;
             border-top: 1px solid var(--border);
         }
+
         .write-review-section h3 {
             font-size: 1.1rem;
             font-weight: 700;
@@ -629,6 +651,7 @@ $pagination = $reviewData['pagination'] ?? [];
             flex-direction: column;
             gap: 1rem;
         }
+
         .form-group label {
             display: block;
             font-size: .8rem;
@@ -638,6 +661,7 @@ $pagination = $reviewData['pagination'] ?? [];
             text-transform: uppercase;
             letter-spacing: .05em;
         }
+
         .form-group input[type="text"],
         .form-group textarea {
             width: 100%;
@@ -650,6 +674,7 @@ $pagination = $reviewData['pagination'] ?? [];
             transition: border-color .2s;
             outline: none;
         }
+
         .form-group input:focus,
         .form-group textarea:focus {
             border-color: var(--blue);
@@ -670,12 +695,14 @@ $pagination = $reviewData['pagination'] ?? [];
             opacity: 0;
             width: 0;
         }
+
         .star-rating-input label {
             font-size: 1.75rem;
             cursor: pointer;
             color: #d1d5db;
             transition: color .15s;
         }
+
         .star-rating-input label:hover,
         .star-rating-input label.selected,
         .star-rating-input input:checked ~ label {
@@ -692,6 +719,7 @@ $pagination = $reviewData['pagination'] ?? [];
             line-height: 1.65;
             margin-bottom: 1rem;
         }
+
         .review-login-prompt {
             text-align: center;
             padding: 1.75rem;
@@ -705,6 +733,7 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-bottom: 1rem;
             color: var(--ink-soft);
         }
+
         .reviews-empty {
             text-align: center;
             padding: 2rem;
@@ -724,6 +753,7 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-top: 1.5rem;
             flex-wrap: wrap;
         }
+
         .review-pagination__btn {
             min-width: 34px;
             height: 34px;
@@ -740,10 +770,12 @@ $pagination = $reviewData['pagination'] ?? [];
             transition: all .2s;
             font-family: inherit;
         }
+
         .review-pagination__btn:hover:not(.active):not(.disabled) {
             border-color: var(--blue);
             color: var(--blue);
         }
+
         .review-pagination__btn.active {
             background: var(--blue);
             color: white;
@@ -756,7 +788,7 @@ $pagination = $reviewData['pagination'] ?? [];
             pointer-events: none;
         }
 
-        /* ── Buttons ──────────────────────────────────────────────── */
+        /* ── Buttons ──────────────────────────────────────────────────── */
         .btn {
             display: inline-block;
             padding: .75rem 1.5rem;
@@ -795,7 +827,7 @@ $pagination = $reviewData['pagination'] ?? [];
             font-size: .875rem;
         }
 
-        /* ── Cart badge ───────────────────────────────────────────── */
+        /* ── Cart badge ───────────────────────────────────────────────── */
         .cart-badge {
             position: fixed;
             top: 1.5rem;
@@ -846,7 +878,7 @@ $pagination = $reviewData['pagination'] ?? [];
             font-size: 1rem;
         }
 
-        /* ── Mini cart ────────────────────────────────────────────── */
+        /* ── Mini cart ────────────────────────────────────────────────── */
         .mini-cart {
             position: fixed;
             top: 0;
@@ -893,27 +925,107 @@ $pagination = $reviewData['pagination'] ?? [];
             padding: 1.25rem;
         }
 
+        /* ── Cart item (matches index.php) ────────────────────────────── */
         .cart-item {
             padding: .875rem 0;
             border-bottom: 1px solid var(--border);
         }
 
+        .cart-item:last-child {
+            border-bottom: none;
+        }
+
+        .cart-item-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: .5rem;
+            margin-bottom: .5rem;
+        }
+
         .cart-item-name {
             font-weight: 600;
-            margin-bottom: .3rem;
-            font-size: .95rem;
+            font-size: .9rem;
+            flex: 1;
+        }
+
+        .cart-item-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--ink-muted);
+            padding: 2px;
+            line-height: 0;
+            border-radius: 4px;
+            transition: color .2s, background .2s;
+            flex-shrink: 0;
+        }
+
+        .cart-item-remove:hover {
+            color: var(--red);
+            background: var(--red-light);
         }
 
         .cart-item-details {
-            font-size: .85rem;
+            font-size: .8rem;
             color: var(--ink-muted);
-            margin-bottom: .3rem;
+            margin-bottom: .5rem;
+        }
+
+        .cart-item-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .cart-item-price {
-            font-weight: 600;
+            font-weight: 700;
             color: var(--blue);
             font-size: .95rem;
+        }
+
+        /* ── Quantity controls (matches index.php) ────────────────────── */
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .qty-btn {
+            background: #f8fafc;
+            border: none;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #475569;
+            transition: background .15s, color .15s;
+            line-height: 1;
+        }
+
+        .qty-btn:hover:not(:disabled) {
+            background: var(--border);
+            color: var(--ink);
+        }
+
+        .qty-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .qty-value {
+            min-width: 28px;
+            text-align: center;
+            font-size: .875rem;
+            font-weight: 600;
+            color: var(--ink);
+            padding: 0 4px;
         }
 
         .mini-cart-footer {
@@ -927,6 +1039,27 @@ $pagination = $reviewData['pagination'] ?? [];
             margin-bottom: 1rem;
             font-size: 1rem;
             font-weight: 700;
+        }
+
+        /* ── Clear cart button (matches index.php) ────────────────────── */
+        .clear-cart-btn {
+            background: none;
+            border: 1.5px solid var(--border);
+            border-radius: 6px;
+            padding: .5rem 1rem;
+            font-size: .8rem;
+            font-weight: 600;
+            color: var(--ink-muted);
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: .75rem;
+            transition: all .2s;
+        }
+
+        .clear-cart-btn:hover {
+            border-color: var(--red);
+            color: var(--red);
+            background: var(--red-light);
         }
 
         .cart-overlay {
@@ -944,7 +1077,7 @@ $pagination = $reviewData['pagination'] ?? [];
             display: block;
         }
 
-        /* ── Toast ────────────────────────────────────────────────── */
+        /* ── Toast ────────────────────────────────────────────────────── */
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -984,7 +1117,39 @@ $pagination = $reviewData['pagination'] ?? [];
             }
         }
 
-        /* ── Responsive ───────────────────────────────────────────── */
+        /* ── Trial banner ─────────────────────────────────────────────── */
+        .trial-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: .875rem;
+            background: #f0fdf4;
+            border: 1.5px solid #6ee7b7;
+            border-radius: var(--radius);
+            padding: 1rem 1.1rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .trial-banner__icon {
+            font-size: 1.5rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: .1rem;
+        }
+
+        .trial-banner__title {
+            font-weight: 700;
+            font-size: .95rem;
+            color: #065f46;
+        }
+
+        .trial-banner__body {
+            font-size: .8rem;
+            color: #047857;
+            margin-top: .2rem;
+            line-height: 1.6;
+        }
+
+        /* ── Responsive ───────────────────────────────────────────────── */
         @media (max-width: 768px) {
             .plan-layout {
                 grid-template-columns: 1fr;
@@ -1026,37 +1191,6 @@ $pagination = $reviewData['pagination'] ?? [];
                 grid-template-columns: 1fr;
             }
         }
-
-        .trial-banner {
-            display: flex;
-            align-items: flex-start;
-            gap: .875rem;
-            background: #f0fdf4;
-            border: 1.5px solid #6ee7b7;
-            border-radius: var(--radius);
-            padding: 1rem 1.1rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .trial-banner__icon {
-            font-size: 1.5rem;
-            line-height: 1;
-            flex-shrink: 0;
-            margin-top: .1rem;
-        }
-
-        .trial-banner__title {
-            font-weight: 700;
-            font-size: .95rem;
-            color: #065f46;
-        }
-
-        .trial-banner__body {
-            font-size: .8rem;
-            color: #047857;
-            margin-top: .2rem;
-            line-height: 1.6;
-        }
     </style>
 </head>
 <body>
@@ -1074,7 +1208,7 @@ $pagination = $reviewData['pagination'] ?? [];
 
     <?php $coverImage = $plan->print_image_url ?? $plan->digital_image_url ?? null; ?>
 
-    <!-- ── Two-column layout ──────────────────────────────────────────────── -->
+    <!-- ── Two-column layout ─────────────────────────────────────────── -->
     <div class="plan-layout">
 
         <!-- LEFT: cover image + trust badges -->
@@ -1151,7 +1285,6 @@ $pagination = $reviewData['pagination'] ?? [];
                         </div>
                     </div>
                 <?php endif; ?>
-                <!-- ── End trial banner ───────────────────────────────── -->
 
                 <?php
                 $deliveryOptions = $plan->getDeliveryOptions();
@@ -1207,10 +1340,10 @@ $pagination = $reviewData['pagination'] ?? [];
                             <input type="radio" name="duration_<?= $plan->id ?>"
                                    value="<?= $pricing->duration_months ?>"
                                    data-pricing-id="<?= $pricing->id ?>"
-                                   data-price="<?= $pricing->price ?>"
-                                   data-digital="<?= $pricing->digital_price ?? 0 ?>"
-                                   data-original-price="<?= $pricing->sale_price ?? $pricing->price ?>"
-                                   data-original-digital="<?= $pricing->digital_sale_price ?? $pricing->digital_price ?>"
+                                   data-base-print="<?= $pricing->price ?>"
+                                   data-base-digital="<?= $pricing->digital_price ?? 0 ?>"
+                                   data-eff-print="<?= $pricing->sale_price > 0 ? $pricing->sale_price : $pricing->price ?>"
+                                   data-eff-digital="<?= $pricing->digital_sale_price > 0 ? $pricing->digital_sale_price : $pricing->digital_price ?>"
                                    data-issues="<?= $pricing->issue_count ?>"
                                     <?= $index === 0 ? 'checked' : '' ?>>
 
@@ -1241,7 +1374,7 @@ $pagination = $reviewData['pagination'] ?? [];
                     <?php endforeach; ?>
                 </div>
 
-                <button class="btn-add-cart" onclick="addToCart(<?= $plan->id ?>)">
+                <button class="btn-add-cart" id="btn-add-cart" onclick="window.showPage.addToCart()">
                     <?php if ($plan->hasTrial()): ?>
                         Start <?= $plan->trial_days ?>-Day Free Trial
                     <?php else: ?>
@@ -1249,12 +1382,11 @@ $pagination = $reviewData['pagination'] ?? [];
                     <?php endif; ?>
                 </button>
             </div>
-            <!-- /subscription card -->
 
         </div><!-- /.plan-right -->
     </div><!-- /.plan-layout -->
 
-    <!-- ── What's Included ───────────────────────────────────────────────── -->
+    <!-- ── What's Included ──────────────────────────────────────────── -->
     <?php if (!empty($plan->features)): ?>
         <div class="card">
             <div class="card-title">What's Included</div>
@@ -1273,9 +1405,9 @@ $pagination = $reviewData['pagination'] ?? [];
         </div>
     <?php endif; ?>
 
-    <!-- ════════════════════════════════════════════════════════════════════
+    <!-- ══════════════════════════════════════════════════════════════════
          REVIEWS — DMCC Act 2024 compliant
-         ════════════════════════════════════════════════════════════════════ -->
+         ══════════════════════════════════════════════════════════════════ -->
     <div class="card" id="reviews-section">
         <div class="card-title">Customer Reviews</div>
 
@@ -1295,96 +1427,102 @@ $pagination = $reviewData['pagination'] ?? [];
             </span>
         </div>
 
-        <?php if ($totalReviews > 0): ?>
-            <div class="reviews-summary">
-                <div class="reviews-score">
-                    <div class="reviews-score__avg"><?= number_format($averageRating, 1) ?></div>
-                    <div class="reviews-score__stars"
-                         aria-label="<?= number_format($averageRating, 1) ?> out of 5 stars">
-                        <?php for ($s = 1; $s <= 5; $s++): ?>
-                            <span aria-hidden="true"><?= $s <= round($averageRating) ? '★' : '☆' ?></span>
-                        <?php endfor; ?>
+        <div id="reviews-dynamic-container">
+            <?php if ($totalReviews > 0): ?>
+                <div class="reviews-summary">
+                    <div class="reviews-score">
+                        <div class="reviews-score__avg"><?= number_format($averageRating, 1) ?></div>
+                        <div class="reviews-score__stars"
+                             aria-label="<?= number_format($averageRating, 1) ?> out of 5 stars">
+                            <?php for ($s = 1; $s <= 5; $s++): ?>
+                                <span aria-hidden="true"><?= $s <= round($averageRating) ? '★' : '☆' ?></span>
+                            <?php endfor; ?>
+                        </div>
+                        <div class="reviews-score__count">
+                            <?= number_format($totalReviews) ?> review<?= $totalReviews !== 1 ? 's' : '' ?>
+                        </div>
                     </div>
-                    <div class="reviews-score__count"><?= number_format($totalReviews) ?>
-                        review<?= $totalReviews !== 1 ? 's' : '' ?></div>
+
+                    <div class="rating-bars" aria-label="Rating breakdown">
+                        <?php foreach ([5, 4, 3, 2, 1] as $r): ?>
+                            <div class="rating-bar-row">
+                                <span class="rating-bar-label" aria-hidden="true"><?= $r ?>★</span>
+                                <div class="rating-bar-track" role="progressbar"
+                                     aria-valuenow="<?= $percentages[$r] ?? 0 ?>" aria-valuemin="0" aria-valuemax="100">
+                                    <div class="rating-bar-fill" style="width:<?= $percentages[$r] ?? 0 ?>%"></div>
+                                </div>
+                                <span class="rating-bar-pct"><?= $percentages[$r] ?? 0 ?>%</span>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
                 </div>
 
-                <div class="rating-bars" aria-label="Rating breakdown">
-                    <?php foreach ([5, 4, 3, 2, 1] as $r): ?>
-                        <div class="rating-bar-row">
-                            <span class="rating-bar-label" aria-hidden="true"><?= $r ?>★</span>
-                            <div class="rating-bar-track" role="progressbar"
-                                 aria-valuenow="<?= $percentages[$r] ?? 0 ?>" aria-valuemin="0" aria-valuemax="100">
-                                <div class="rating-bar-fill" style="width:<?= $percentages[$r] ?? 0 ?>%"></div>
+                <div class="review-list" id="review-list">
+                    <?php foreach ($reviewList as $review): ?>
+                        <article class="review-card" data-review-id="<?= (int)$review['id'] ?>">
+                            <div class="review-card__header">
+                                <div class="review-card__meta">
+                                    <span class="review-card__author"><?= htmlspecialchars($review['author_name'] ?? 'Anonymous') ?></span>
+                                    <?php if ($review['is_verified_purchase']): ?>
+                                        <span class="review-card__verified">✓ Verified</span>
+                                    <?php endif; ?>
+                                    <span class="review-card__date"><?= htmlspecialchars($review['formatted_date'] ?? '') ?></span>
+                                </div>
+                                <div class="stars" aria-label="<?= (int)$review['rating'] ?> out of 5 stars">
+                                    <?php for ($s = 1; $s <= 5; $s++): ?>
+                                        <span class="star <?= $s <= $review['rating'] ? 'filled' : '' ?>"
+                                              aria-hidden="true">★</span>
+                                    <?php endfor; ?>
+                                </div>
                             </div>
-                            <span class="rating-bar-pct"><?= $percentages[$r] ?? 0 ?>%</span>
-                        </div>
+                            <?php if (!empty($review['title'])): ?>
+                                <div class="review-card__title"><?= htmlspecialchars($review['title']) ?></div>
+                            <?php endif; ?>
+                            <div class="review-card__comment"><?= htmlspecialchars($review['comment']) ?></div>
+                            <div class="review-card__helpful">
+                                <span>Helpful?</span>
+                                <button class="helpful-btn"
+                                        onclick="window.showPage.voteHelpful(<?= (int)$review['id'] ?>, true, this)"
+                                        aria-label="Mark as helpful">
+                                    👍 <?= (int)($review['helpful_count'] ?? 0) ?>
+                                </button>
+                                <button class="helpful-btn"
+                                        onclick="window.showPage.voteHelpful(<?= (int)$review['id'] ?>, false, this)"
+                                        aria-label="Mark as not helpful">
+                                    👎 <?= (int)($review['unhelpful_count'] ?? 0) ?>
+                                </button>
+                            </div>
+                        </article>
                     <?php endforeach; ?>
                 </div>
-            </div>
 
-            <div class="review-list" id="review-list">
-                <?php foreach ($reviewList as $review): ?>
-                    <article class="review-card" data-review-id="<?= (int)$review['id'] ?>">
-                        <div class="review-card__header">
-                            <div class="review-card__meta">
-                                <span class="review-card__author"><?= htmlspecialchars($review['author_name'] ?? 'Anonymous') ?></span>
-                                <?php if ($review['is_verified_purchase']): ?>
-                                    <span class="review-card__verified">✓ Verified</span>
-                                <?php endif; ?>
-                                <span class="review-card__date"><?= htmlspecialchars($review['formatted_date'] ?? '') ?></span>
-                            </div>
-                            <div class="stars" aria-label="<?= (int)$review['rating'] ?> out of 5 stars">
-                                <?php for ($s = 1; $s <= 5; $s++): ?>
-                                    <span class="star <?= $s <= $review['rating'] ? 'filled' : '' ?>"
-                                          aria-hidden="true">★</span>
-                                <?php endfor; ?>
-                            </div>
-                        </div>
-                        <?php if (!empty($review['title'])): ?>
-                            <div class="review-card__title"><?= htmlspecialchars($review['title']) ?></div>
-                        <?php endif; ?>
-                        <div class="review-card__comment"><?= htmlspecialchars($review['comment']) ?></div>
-                        <div class="review-card__helpful">
-                            <span>Helpful?</span>
-                            <button class="helpful-btn" onclick="voteHelpful(<?= (int)$review['id'] ?>, true, this)"
-                                    aria-label="Mark as helpful">
-                                👍 <?= (int)($review['helpful_count'] ?? 0) ?>
-                            </button>
-                            <button class="helpful-btn" onclick="voteHelpful(<?= (int)$review['id'] ?>, false, this)"
-                                    aria-label="Mark as not helpful">
-                                👎 <?= (int)($review['unhelpful_count'] ?? 0) ?>
-                            </button>
-                        </div>
-                    </article>
-                <?php endforeach; ?>
-            </div>
-
-            <?php if (!empty($pagination) && ($pagination['total_pages'] ?? 1) > 1): ?>
-                <nav class="review-pagination" aria-label="Review pages" id="review-pagination">
-                    <?php $cur = $pagination['current_page'];
-                    $tot = $pagination['total_pages']; ?>
-                    <button class="review-pagination__btn <?= $cur <= 1 ? 'disabled' : '' ?>"
-                            onclick="loadReviews(<?= $cur - 1 ?>)" aria-label="Previous page">←
-                    </button>
-                    <?php for ($p = 1; $p <= $tot; $p++): ?>
-                        <button class="review-pagination__btn <?= $p === $cur ? 'active' : '' ?>"
-                                onclick="loadReviews(<?= $p ?>)" <?= $p === $cur ? 'aria-current="page"' : '' ?>><?= $p ?></button>
-                    <?php endfor; ?>
-                    <button class="review-pagination__btn <?= $cur >= $tot ? 'disabled' : '' ?>"
-                            onclick="loadReviews(<?= $cur + 1 ?>)" aria-label="Next page">→
-                    </button>
+                <nav class="review-pagination" id="review-pagination">
+                    <?php if (!empty($pagination) && ($pagination['total_pages'] ?? 1) > 1): ?>
+                        <?php $cur = $pagination['current_page'];
+                        $tot = $pagination['total_pages']; ?>
+                        <button class="review-pagination__btn <?= $cur <= 1 ? 'disabled' : '' ?>"
+                                onclick="window.showPage.loadReviews(<?= $cur - 1 ?>)">←
+                        </button>
+                        <?php for ($p = 1; $p <= $tot; $p++): ?>
+                            <button class="review-pagination__btn <?= $p === $cur ? 'active' : '' ?>"
+                                    onclick="window.showPage.loadReviews(<?= $p ?>)"><?= $p ?></button>
+                        <?php endfor; ?>
+                        <button class="review-pagination__btn <?= $cur >= $tot ? 'disabled' : '' ?>"
+                                onclick="window.showPage.loadReviews(<?= $cur + 1 ?>)">→
+                        </button>
+                    <?php endif; ?>
                 </nav>
+
+            <?php else: ?>
+                <div class="review-list" id="review-list"></div>
+                <div class="reviews-empty" id="reviews-empty-placeholder">
+                    <div class="reviews-empty__icon">⭐</div>
+                    <p>No reviews yet. Be the first to share your experience.</p>
+                </div>
+                <nav class="review-pagination" id="review-pagination"></nav>
             <?php endif; ?>
+        </div>
 
-        <?php else: ?>
-            <div class="reviews-empty">
-                <div class="reviews-empty__icon">⭐</div>
-                <p>No reviews yet. Be the first to share your experience.</p>
-            </div>
-        <?php endif; ?>
-
-        <!-- ── Write a review ──────────────────────────────────────────── -->
         <div class="write-review-section">
             <h3>Write a Review</h3>
 
@@ -1396,7 +1534,7 @@ $pagination = $reviewData['pagination'] ?? [];
                     Competition and Consumers Act 2024.
                 </div>
 
-                <form class="review-form" id="review-form" onsubmit="submitReview(event)">
+                <form class="review-form" id="review-form" onsubmit="window.showPage.submitReview(event)">
                     <input type="hidden" name="plan_id" value="<?= (int)$plan->id ?>">
 
                     <div class="form-group">
@@ -1440,12 +1578,12 @@ $pagination = $reviewData['pagination'] ?? [];
             <?php endif; ?>
         </div>
     </div>
-    <!-- ── END REVIEWS ──────────────────────────────────────────────────── -->
+    <!-- ── END REVIEWS ─────────────────────────────────────────────────── -->
 
 </div><!-- /.page -->
 
-<!-- Cart Badge -->
-<div class="cart-badge" onclick="openMiniCart()">
+<!-- ── Cart Badge ──────────────────────────────────────────────────── -->
+<div class="cart-badge" onclick="window.showPage.cart.open()">
     <div class="cart-info">
         <div class="cart-icon">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1459,11 +1597,11 @@ $pagination = $reviewData['pagination'] ?? [];
     </div>
 </div>
 
-<!-- Mini Cart -->
+<!-- ── Mini Cart ────────────────────────────────────────────────────── -->
 <div class="mini-cart" id="mini-cart">
     <div class="mini-cart-header">
         <h3>Your Cart (<span id="cart-count">0</span>)</h3>
-        <button class="close-cart" onclick="closeMiniCart()" aria-label="Close cart">×</button>
+        <button class="close-cart" onclick="window.showPage.cart.close()" aria-label="Close cart">×</button>
     </div>
     <div class="mini-cart-items" id="cart-items">
         <p style="text-align:center;color:var(--ink-muted);padding:2rem;">Your cart is empty</p>
@@ -1473,303 +1611,28 @@ $pagination = $reviewData['pagination'] ?? [];
             <span>Total:</span>
             <span id="mini-cart-total">£0.00</span>
         </div>
-        <button class="btn btn-primary" style="width:100%;" onclick="goToCheckout()">Proceed to Checkout</button>
+        <button class="clear-cart-btn" id="clear-cart-btn" onclick="window.showPage.cart.clear()" style="display:none;">
+            🗑 Clear cart
+        </button>
+        <button class="btn btn-primary" style="width:100%;" onclick="window.showPage.cart.checkout()">
+            Proceed to Checkout
+        </button>
     </div>
 </div>
 
-<div class="cart-overlay" id="cart-overlay" onclick="closeMiniCart()"></div>
+<div class="cart-overlay" id="cart-overlay" onclick="window.showPage.cart.close()"></div>
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
 <script>
+    // ── Bootstrap constants ───────────────────────────────────────────────
     const API_BASE = '/api/<?= \App\Framework\Support\SiteContext::slug() ?? 'default' ?>';
     const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?? 'default' ?>';
     const PLAN_ID = <?= (int)$plan->id ?>;
-    let cartData = {items: [], total: 0, count: 0};
     const CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadCart();
-        initializeSelections();
-        initStarRatingInput();
-    });
-
-    function initializeSelections() {
-        document.querySelectorAll('.duration-option').forEach(option => {
-            option.addEventListener('click', function () {
-                document.querySelectorAll(`.duration-option[data-plan="${PLAN_ID}"]`)
-                    .forEach(o => o.classList.remove('selected'));
-                this.classList.add('selected');
-                this.querySelector('input[type="radio"]').checked = true;
-                updatePricingDisplay();
-            });
-        });
-
-        document.querySelectorAll('.delivery-tab').forEach(option => {
-            option.addEventListener('click', function () {
-                document.querySelectorAll(`.delivery-tab[data-plan="${PLAN_ID}"]`)
-                    .forEach(o => o.classList.remove('selected'));
-                this.classList.add('selected');
-                this.querySelector('input[type="radio"]').checked = true;
-                updatePricingDisplay();
-            });
-        });
-
-        document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
-            const p = radio.closest('.duration-option') || radio.closest('.delivery-tab');
-            if (p) p.classList.add('selected');
-        });
-    }
-
-    function updatePricingDisplay() {
-        const deliveryRadio = document.querySelector(`input[name="delivery_${PLAN_ID}"]:checked`);
-        const isDigital = deliveryRadio && deliveryRadio.value === 'digital';
-
-        document.querySelectorAll(`.duration-option[data-plan="${PLAN_ID}"]`).forEach(opt => {
-            const radio = opt.querySelector('input[type="radio"]');
-            const priceEl = opt.querySelector('.duration-option__price');
-            const wasEl = opt.querySelector('.duration-option__was');
-            const dPrice = parseFloat(radio.dataset.digital);
-            const pPrice = parseFloat(radio.dataset.price);
-            const dSale = parseFloat(radio.dataset.originalDigital);
-            const pSale = parseFloat(radio.dataset.originalPrice);
-
-            if (isDigital && dPrice > 0) {
-                priceEl.textContent = CURRENCY_SYMBOL + dSale.toFixed(2);
-                if (wasEl && dSale < dPrice) wasEl.textContent = CURRENCY_SYMBOL + dPrice.toFixed(2);
-            } else {
-                priceEl.textContent = CURRENCY_SYMBOL + pSale.toFixed(2);
-                if (wasEl && pSale < pPrice) wasEl.textContent = CURRENCY_SYMBOL + pPrice.toFixed(2);
-            }
-        });
-    }
-
-    async function loadCart() {
-        try {
-            const r = await fetch(`${API_BASE}/cart`);
-            cartData = await r.json();
-            updateCartDisplay();
-        } catch (e) {
-            console.error('Cart load error:', e);
-        }
-    }
-
-    function updateCartDisplay() {
-        const count = cartData.count || 0;
-        document.getElementById('cart-count').textContent = count;
-        document.getElementById('cart-total').textContent = CURRENCY_SYMBOL + (cartData.total || 0).toFixed(2);
-        document.getElementById('mini-cart-total').textContent = CURRENCY_SYMBOL + (cartData.total || 0).toFixed(2);
-        const badge = document.getElementById('header-cart-count');
-        badge.textContent = count;
-        badge.style.display = count > 0 ? 'flex' : 'none';
-
-        const container = document.getElementById('cart-items');
-        if (!cartData.items?.length) {
-            container.innerHTML = '<p style="text-align:center;color:var(--ink-muted);padding:2rem;">Your cart is empty</p>';
-            return;
-        }
-        container.innerHTML = cartData.items.map(item => `
-            <div class="cart-item">
-                <div class="cart-item-name">${item.product_name || item.options?.plan_name || 'Subscription'}</div>
-                <div class="cart-item-details">${item.options?.delivery_type || 'Print'} • ${item.options?.duration_months || 12} months</div>
-                <div class="cart-item-price">${CURRENCY_SYMBOL}${(item.price || 0).toFixed(2)}</div>
-            </div>`).join('');
-    }
-
-    async function addToCart(planId) {
-        const durationRadio = document.querySelector(`input[name="duration_${planId}"]:checked`);
-        const deliveryRadio = document.querySelector(`input[name="delivery_${planId}"]:checked`);
-
-        if (!durationRadio) {
-            showToast('Please select a subscription duration', 'error');
-            return;
-        }
-        if (!deliveryRadio) {
-            showToast('Please select a delivery type', 'error');
-            return;
-        }
-
-        const deliveryType = deliveryRadio.value;
-        const digitalPrice = parseFloat(durationRadio.dataset.digital);
-        const printPrice = parseFloat(durationRadio.dataset.price);
-        const price = (deliveryType === 'digital' && digitalPrice > 0) ? digitalPrice : printPrice;
-
-        try {
-            const res = await fetch(`${API_BASE}/cart/subscription`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    plan_id: planId,
-                    pricing_id: parseInt(durationRadio.dataset.pricingId),
-                    delivery_type: deliveryType,
-                    duration_months: parseInt(durationRadio.value),
-                    price: parseFloat(price),
-                    issues: parseInt(durationRadio.dataset.issues),
-                }),
-            });
-            const result = await res.json();
-            if (result.success) {
-                cartData = result;
-                updateCartDisplay();
-                openMiniCart();
-                showToast('Added to cart!', 'success');
-            } else {
-                showToast(result.message || 'Failed to add to cart', 'error');
-            }
-        } catch (e) {
-            showToast('An error occurred', 'error');
-        }
-    }
-
-    function openMiniCart() {
-        document.getElementById('mini-cart').classList.add('open');
-        document.getElementById('cart-overlay').classList.add('show');
-    }
-    function closeMiniCart() {
-        document.getElementById('mini-cart').classList.remove('open');
-        document.getElementById('cart-overlay').classList.remove('show');
-    }
-    function goToCheckout() {
-        window.location.href = '/' + SITE + '/checkout?type=subscription';
-    }
-
-    function initStarRatingInput() {
-        const labels = document.querySelectorAll('.star-rating-input label');
-        labels.forEach((label, i) => {
-            label.addEventListener('mouseover', () => {
-                labels.forEach((l, j) => l.classList.toggle('selected', j <= i));
-            });
-            label.addEventListener('mouseout', () => {
-                const checked = document.querySelector('.star-rating-input input:checked');
-                const checkedIdx = checked ? parseInt(checked.value) - 1 : -1;
-                labels.forEach((l, j) => l.classList.toggle('selected', j <= checkedIdx));
-            });
-            label.addEventListener('click', () => {
-                labels.forEach((l, j) => l.classList.toggle('selected', j <= i));
-            });
-        });
-    }
-
-    async function submitReview(e) {
-        e.preventDefault();
-        const form = document.getElementById('review-form');
-        const btn = document.getElementById('review-submit-btn');
-        const rating = form.querySelector('input[name="rating"]:checked')?.value;
-
-        if (!rating) {
-            showToast('Please select a star rating', 'error');
-            return;
-        }
-
-        const payload = {
-            plan_id: PLAN_ID,
-            rating: parseInt(rating),
-            title: form.querySelector('[name="title"]').value.trim(),
-            comment: form.querySelector('[name="comment"]').value.trim(),
-        };
-
-        btn.disabled = true;
-        btn.textContent = 'Submitting…';
-
-        try {
-            const res = await fetch(`${API_BASE}/plans/${PLAN_ID}/reviews`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json();
-            if (data.success) {
-                showToast('Review submitted — thank you!', 'success');
-                form.reset();
-                document.querySelectorAll('.star-rating-input label').forEach(l => l.classList.remove('selected'));
-                setTimeout(() => loadReviews(1), 1200);
-            } else {
-                showToast(data.message || 'Could not submit your review', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Submit Review';
-            }
-        } catch (err) {
-            showToast('Network error — please try again', 'error');
-            btn.disabled = false;
-            btn.textContent = 'Submit Review';
-        }
-    }
-
-    async function loadReviews(page) {
-        try {
-            const res = await fetch(`${API_BASE}/plans/${PLAN_ID}/reviews?page=${page}`, {
-                headers: {'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json'},
-            });
-            const data = await res.json();
-            if (!data.success) return;
-            const r = data.data;
-            const list = document.getElementById('review-list');
-            if (list) list.innerHTML = r.reviews.map(renderReviewCard).join('');
-            const pag = document.getElementById('review-pagination');
-            if (pag) pag.innerHTML = renderReviewPagination(r.pagination, page);
-            document.getElementById('reviews-section').scrollIntoView({behavior: 'smooth', block: 'start'});
-        } catch (err) {
-            console.error('Review load error:', err);
-        }
-    }
-
-    function renderReviewCard(review) {
-        const stars = [1, 2, 3, 4, 5].map(s =>
-            `<span class="star ${s <= review.rating ? 'filled' : ''}" aria-hidden="true">★</span>`
-        ).join('');
-        const verified = review.is_verified_purchase
-            ? '<span class="review-card__verified">✓ Verified</span>' : '';
-        const title = review.title
-            ? `<div class="review-card__title">${escHtml(review.title)}</div>` : '';
-        return `
-        <article class="review-card" data-review-id="${review.id}">
-            <div class="review-card__header">
-                <div class="review-card__meta">
-                    <span class="review-card__author">${escHtml(review.author_name || 'Anonymous')}</span>
-                    ${verified}
-                    <span class="review-card__date">${escHtml(review.formatted_date || '')}</span>
-                </div>
-                <div class="stars" aria-label="${review.rating} out of 5 stars">${stars}</div>
-            </div>
-            ${title}
-            <div class="review-card__comment">${escHtml(review.comment)}</div>
-            <div class="review-card__helpful">
-                <span>Helpful?</span>
-                <button class="helpful-btn" onclick="voteHelpful(${review.id}, true, this)">👍 ${review.helpful_count || 0}</button>
-                <button class="helpful-btn" onclick="voteHelpful(${review.id}, false, this)">👎 ${review.unhelpful_count || 0}</button>
-            </div>
-        </article>`;
-    }
-
-    function renderReviewPagination(pagination, currentPage) {
-        if (!pagination || pagination.total_pages <= 1) return '';
-        const {total_pages: tot} = pagination;
-        let html = '';
-        html += `<button class="review-pagination__btn ${currentPage <= 1 ? 'disabled' : ''}" onclick="loadReviews(${currentPage - 1})">←</button>`;
-        for (let p = 1; p <= tot; p++) {
-            html += `<button class="review-pagination__btn ${p === currentPage ? 'active' : ''}" onclick="loadReviews(${p})">${p}</button>`;
-        }
-        html += `<button class="review-pagination__btn ${currentPage >= tot ? 'disabled' : ''}" onclick="loadReviews(${currentPage + 1})">→</button>`;
-        return html;
-    }
-
-    async function voteHelpful(reviewId, isHelpful, btn) {
-        try {
-            const res = await fetch(`${API_BASE}/reviews/${reviewId}/helpful`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({is_helpful: isHelpful}),
-            });
-            const data = await res.json();
-            if (data.success) {
-                btn.classList.add('voted');
-                const card = btn.closest('.review-card');
-                const btns = card.querySelectorAll('.helpful-btn');
-                if (data.helpful_count != null) btns[0].innerHTML = `👍 ${data.helpful_count}`;
-                if (data.unhelpful_count != null) btns[1].innerHTML = `👎 ${data.unhelpful_count}`;
-            }
-        } catch (e) {
-            console.error('Vote error:', e);
-        }
+    // ── Utilities ─────────────────────────────────────────────────────────
+    function escHtml(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function showToast(message, type = 'success') {
@@ -1779,9 +1642,650 @@ $pagination = $reviewData['pagination'] ?? [];
         setTimeout(() => toast.classList.remove('show'), 3500);
     }
 
-    function escHtml(s) {
-        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // ═══════════════════════════════════════════════════════════════════════
+    // CartService
+    // Identical contract to index.php: owns state + API, notifies listeners.
+    // ═══════════════════════════════════════════════════════════════════════
+    class CartService {
+        constructor(apiBase) {
+            this.apiBase = apiBase;
+            this._data = {items: [], total: 0, count: 0};
+            this._listeners = [];
+        }
+
+        get items() {
+            return this._data.items || [];
+        }
+
+        get total() {
+            return this._data.total || 0;
+        }
+
+        get count() {
+            return this._data.count || 0;
+        }
+
+        /** Set of plan IDs in the cart — used by MiniCartUI to tint the add button */
+        get planIds() {
+            return new Set(
+                this.items
+                    .filter(i => i.subscription_plan_id)
+                    .map(i => String(i.subscription_plan_id))
+            );
+        }
+
+        subscribe(fn) {
+            this._listeners.push(fn);
+        }
+
+        _notify() {
+            this._listeners.forEach(fn => fn(this));
+        }
+
+        async load() {
+            try {
+                const res = await fetch(`${this.apiBase}/cart`);
+                this._data = await res.json();
+                this._notify();
+            } catch (e) {
+                console.error('Cart load error:', e);
+            }
+        }
+
+        /**
+         * Generic add — used by the show-page addToCart with full payload.
+         * The caller builds the body; this method just POSTs and reloads.
+         */
+        async addSubscription(payload) {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/subscription`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return {success: true};
+                }
+                return {success: false, message: data.message};
+            } catch (e) {
+                console.error('Add to cart error:', e);
+                return {success: false, message: 'An error occurred'};
+            }
+        }
+
+        async updateQuantity(itemId, quantity) {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/${itemId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({quantity}),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Update quantity error:', e);
+                return false;
+            }
+        }
+
+        async removeItem(itemId) {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/${itemId}`, {
+                    method: 'DELETE',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Remove item error:', e);
+                return false;
+            }
+        }
+
+        async clear() {
+            try {
+                const res = await fetch(`${this.apiBase}/cart/clear`, {
+                    method: 'DELETE',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await this.load();
+                    return true;
+                }
+                return false;
+            } catch (e) {
+                console.error('Clear cart error:', e);
+                return false;
+            }
+        }
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MiniCartUI
+    // Mirrors index.php: single _render() triggered by CartService subscription,
+    // full qty controls, per-item remove, clear cart button.
+    // ═══════════════════════════════════════════════════════════════════════
+    class MiniCartUI {
+        constructor(cartService) {
+            this.cartService = cartService;
+            this.cartService.subscribe(() => this._render());
+        }
+
+        open() {
+            document.getElementById('mini-cart').classList.add('open');
+            document.getElementById('cart-overlay').classList.add('show');
+        }
+
+        close() {
+            document.getElementById('mini-cart').classList.remove('open');
+            document.getElementById('cart-overlay').classList.remove('show');
+        }
+
+        checkout() {
+            window.location.href = '/' + SITE + '/checkout?type=subscription';
+        }
+
+        async removeItem(itemId) {
+            await this.cartService.removeItem(itemId);
+        }
+
+        async updateQuantity(itemId, quantity) {
+            if (quantity < 1) {
+                await this.cartService.removeItem(itemId);
+            } else {
+                await this.cartService.updateQuantity(itemId, quantity);
+            }
+        }
+
+        async clear() {
+            await this.cartService.clear();
+        }
+
+        // ── Private: single render path ───────────────────────────────────
+        _render() {
+            this._renderHeader();
+            this._renderItems();
+            this._renderFooter();
+            this._syncAddButton();
+        }
+
+        _renderHeader() {
+            const count = this.cartService.count;
+            document.getElementById('cart-count').textContent = count;
+            document.getElementById('cart-total').textContent = CURRENCY_SYMBOL + this.cartService.total.toFixed(2);
+
+            const badge = document.getElementById('header-cart-count');
+            badge.textContent = count;
+            badge.style.display = count > 0 ? 'flex' : 'none';
+        }
+
+        _renderItems() {
+            const container = document.getElementById('cart-items');
+            const items = this.cartService.items;
+
+            if (!items.length) {
+                container.innerHTML = '<p style="text-align:center;color:var(--ink-muted);padding:2rem;">Your cart is empty</p>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const name = escHtml(item.product_name || item.options?.plan_name || 'Subscription');
+                const details = escHtml(item.options?.delivery_type || 'Print') + ' • ' + (item.options?.duration_months || 12) + ' months';
+                const price = CURRENCY_SYMBOL + (item.price || 0).toFixed(2);
+                const qty = item.quantity || 1;
+                const itemId = item.id;
+
+                return `
+                <div class="cart-item" data-item-id="${itemId}">
+                    <div class="cart-item-top">
+                        <div class="cart-item-name">${name}</div>
+                        <button class="cart-item-remove"
+                                onclick="window.showPage.cart.removeItem(${itemId})"
+                                aria-label="Remove ${name}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="cart-item-details">${details}</div>
+                    <div class="cart-item-bottom">
+                        <div class="qty-controls">
+                            <button class="qty-btn"
+                                    onclick="window.showPage.cart.updateQuantity(${itemId}, ${qty - 1})"
+                                    ${qty <= 1 ? 'disabled' : ''}
+                                    aria-label="Decrease quantity">−</button>
+                            <span class="qty-value">${qty}</span>
+                            <button class="qty-btn"
+                                    onclick="window.showPage.cart.updateQuantity(${itemId}, ${qty + 1})"
+                                    aria-label="Increase quantity">+</button>
+                        </div>
+                        <div class="cart-item-price">${price}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        _renderFooter() {
+            document.getElementById('mini-cart-total').textContent = CURRENCY_SYMBOL + this.cartService.total.toFixed(2);
+
+            const clearBtn = document.getElementById('clear-cart-btn');
+            if (clearBtn) clearBtn.style.display = this.cartService.count > 0 ? 'block' : 'none';
+        }
+
+        /**
+         * Tint the "Add to Cart" / "Start Trial" button green when this plan
+         * is already in the cart — consistent with the index.php card button
+         * behaviour, adapted to a single full-width button.
+         */
+        _syncAddButton() {
+            const btn = document.getElementById('btn-add-cart');
+            if (!btn) return;
+            const inCart = this.cartService.planIds.has(String(PLAN_ID));
+            btn.style.background = inCart ? '#059669' : '';
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DeliveryUI
+    // Self-contained: owns delivery-tab and duration-option interactions
+    // and the pricing display update logic.
+    // ═══════════════════════════════════════════════════════════════════════
+    class DeliveryUI {
+        constructor(planId) {
+            this.planId = planId;
+            this._bindEvents();
+            this._syncSelectedState();
+            this._updatePricingDisplay();
+        }
+
+        getSelections() {
+            const durationRadio = document.querySelector(`input[name="duration_${this.planId}"]:checked`);
+            const deliveryRadio = document.querySelector(`input[name="delivery_${this.planId}"]:checked`);
+            return {durationRadio, deliveryRadio};
+        }
+
+        _bindEvents() {
+            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(opt => {
+                opt.addEventListener('click', () => {
+                    document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`)
+                        .forEach(o => o.classList.remove('selected'));
+                    opt.classList.add('selected');
+                    opt.querySelector('input[type="radio"]').checked = true;
+                    this._updatePricingDisplay();
+                });
+            });
+
+            document.querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`).forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll(`.delivery-tab[data-plan="${this.planId}"]`)
+                        .forEach(o => o.classList.remove('selected'));
+                    tab.classList.add('selected');
+                    tab.querySelector('input[type="radio"]').checked = true;
+                    this._updatePricingDisplay();
+                });
+            });
+        }
+
+        _syncSelectedState() {
+            document.querySelectorAll('input[type="radio"]:checked').forEach(radio => {
+                const parent = radio.closest('.duration-option') || radio.closest('.delivery-tab');
+                if (parent) parent.classList.add('selected');
+            });
+        }
+
+        _updatePricingDisplay() {
+            const {deliveryRadio} = this.getSelections();
+            const isDigital = deliveryRadio?.value === 'digital';
+
+            document.querySelectorAll(`.duration-option[data-plan="${this.planId}"]`).forEach(opt => {
+                const radio = opt.querySelector('input[type="radio"]');
+                const priceEl = opt.querySelector('.duration-option__price');
+                const wasEl = opt.querySelector('.duration-option__was');
+
+                // 1. Determine which values to use based on delivery type
+                const basePrice = isDigital ? parseFloat(radio.dataset.baseDigital) : parseFloat(radio.dataset.basePrint);
+                const effPrice = isDigital ? parseFloat(radio.dataset.effDigital) : parseFloat(radio.dataset.effPrint);
+
+                // 2. Update the main display price (always the effective price)
+                if (priceEl) {
+                    priceEl.textContent = CURRENCY_SYMBOL + effPrice.toFixed(2);
+                }
+
+                // 3. Handle the "Was" price (the strikethrough)
+                if (wasEl) {
+                    // Only show if the effective price is actually lower than the base price
+                    if (effPrice < basePrice && basePrice > 0) {
+                        wasEl.textContent = CURRENCY_SYMBOL + basePrice.toFixed(2);
+                        wasEl.style.display = 'block';
+                    } else {
+                        wasEl.textContent = '';
+                        wasEl.style.display = 'none';
+                    }
+                }
+
+                // 4. Optional: Update "Save Badge" visibility if it exists
+                const saveBadge = opt.querySelector('.save-badge');
+                if (saveBadge) {
+                    saveBadge.style.display = (effPrice < basePrice) ? 'inline-block' : 'none';
+                }
+            });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ReviewManager
+    // Self-contained: owns review loading, submission, helpful votes,
+    // and star rating input UX.
+    // ═══════════════════════════════════════════════════════════════════════
+    class ReviewManager {
+        constructor(planId, apiBase) {
+            this.planId = planId;
+            this.apiBase = apiBase;
+            this._initStarRatingInput();
+        }
+
+        async loadReviews(page) {
+            try {
+                const res = await fetch(`${this.apiBase}/plans/${this.planId}/reviews?page=${page}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                });
+
+                const data = await res.json();
+                if (!data.success) return;
+
+                const r = data.data;
+                const container = document.getElementById('reviews-dynamic-container');
+                const emptyPlaceholder = document.getElementById('reviews-empty-placeholder');
+                const paginationContainer = document.getElementById('review-pagination');
+
+                // --- 1. Update Stats & List ---
+                if (r.reviews.length > 0) {
+                    let summary = document.querySelector('.reviews-summary');
+                    if (!summary) {
+                        container.insertAdjacentHTML('afterbegin', this._renderSummary(r.stats));
+                    } else {
+                        summary.outerHTML = this._renderSummary(r.stats);
+                    }
+
+                    const list = document.getElementById('review-list');
+                    if (list) {
+                        list.innerHTML = r.reviews.map(rev => this._renderReviewCard(rev)).join('');
+                        if (emptyPlaceholder) emptyPlaceholder.style.display = 'none';
+                    }
+                }
+
+                // --- 2. Update Pagination ---
+                if (paginationContainer) {
+                    paginationContainer.innerHTML = this._renderPagination(r.pagination, page);
+                }
+
+                // --- 3. FIX: Handle the Form Visibility ---
+                // We look for the write-review-section to see if we should swap the form for a message
+                const writeSection = document.querySelector('.write-review-section');
+                if (writeSection && r.can_review_data) {
+                    const status = r.can_review_data; // This needs to be returned by your Controller
+
+                    if (!status.can_review) {
+                        // User just reviewed, so replace the form with the "already reviewed" notice
+                        writeSection.innerHTML = `
+                    <h3>Write a Review</h3>
+                    <div class="review-login-prompt">
+                        <p>${status.reason || 'You have already reviewed this plan.'}</p>
+                    </div>
+                `;
+                    }
+                }
+
+                // --- 4. UI Clean up ---
+                const submitBtn = document.getElementById('review-submit-btn');
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Review';
+                }
+
+            } catch (err) {
+                console.error('Review load error:', err);
+            }
+        }
+
+        _renderSummary(stats) {
+            const avg = parseFloat(stats.average_rating || 0).toFixed(1);
+            const total = stats.total_reviews || 0;
+            const percentages = stats.rating_percentages || {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
+
+            let barsHtml = '';
+            [5, 4, 3, 2, 1].forEach(num => {
+                const pct = percentages[num] || 0;
+                barsHtml += `
+            <div class="rating-bar-row">
+                <span class="rating-bar-label">${num}★</span>
+                <div class="rating-bar-track">
+                    <div class="rating-bar-fill" style="width:${pct}%"></div>
+                </div>
+                <span class="rating-bar-pct">${pct}%</span>
+            </div>`;
+            });
+
+            return `
+        <div class="reviews-summary">
+            <div class="reviews-score">
+                <div class="reviews-score__avg">${avg}</div>
+                <div class="reviews-score__stars">
+                    ${[1, 2, 3, 4, 5].map(s => `<span>${s <= Math.round(avg) ? '★' : '☆'}</span>`).join('')}
+                </div>
+                <div class="reviews-score__count">${total} review${total !== 1 ? 's' : ''}</div>
+            </div>
+            <div class="rating-bars">${barsHtml}</div>
+        </div>`;
+        }
+
+        async submitReview(e) {
+            e.preventDefault();
+            const form = document.getElementById('review-form');
+            const btn = document.getElementById('review-submit-btn');
+            const rating = form.querySelector('input[name="rating"]:checked')?.value;
+
+            if (!rating) {
+                showToast('Please select a star rating', 'error');
+                return;
+            }
+
+            const payload = {
+                plan_id: this.planId,
+                rating: parseInt(rating),
+                title: form.querySelector('[name="title"]').value.trim(),
+                comment: form.querySelector('[name="comment"]').value.trim(),
+            };
+
+            btn.disabled = true;
+            btn.textContent = 'Submitting…';
+
+            try {
+                const res = await fetch(`${this.apiBase}/plans/${this.planId}/reviews`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast('Review submitted — thank you!', 'success');
+                    form.reset();
+                    document.querySelectorAll('.star-rating-input label').forEach(l => l.classList.remove('selected'));
+                    setTimeout(() => this.loadReviews(1), 1200);
+                } else {
+                    showToast(data.message || 'Could not submit your review', 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Submit Review';
+                }
+            } catch (err) {
+                showToast('Network error — please try again', 'error');
+                btn.disabled = false;
+                btn.textContent = 'Submit Review';
+            }
+        }
+
+        async voteHelpful(reviewId, isHelpful, btn) {
+            try {
+                const res = await fetch(`${this.apiBase}/reviews/${reviewId}/helpful`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({is_helpful: isHelpful}),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    btn.classList.add('voted');
+                    const btns = btn.closest('.review-card').querySelectorAll('.helpful-btn');
+                    if (data.helpful_count != null) btns[0].innerHTML = `👍 ${data.helpful_count}`;
+                    if (data.unhelpful_count != null) btns[1].innerHTML = `👎 ${data.unhelpful_count}`;
+                }
+            } catch (e) {
+                console.error('Vote error:', e);
+            }
+        }
+
+        // ── Private ───────────────────────────────────────────────────────
+        _initStarRatingInput() {
+            const labels = document.querySelectorAll('.star-rating-input label');
+            labels.forEach((label, i) => {
+                label.addEventListener('mouseover', () => labels.forEach((l, j) => l.classList.toggle('selected', j <= i)));
+                label.addEventListener('mouseout', () => {
+                    const checked = document.querySelector('.star-rating-input input:checked');
+                    const checkedIdx = checked ? parseInt(checked.value) - 1 : -1;
+                    labels.forEach((l, j) => l.classList.toggle('selected', j <= checkedIdx));
+                });
+                label.addEventListener('click', () => labels.forEach((l, j) => l.classList.toggle('selected', j <= i)));
+            });
+        }
+
+        _renderReviewCard(review) {
+            const stars = [1, 2, 3, 4, 5].map(s => `<span class="star ${s <= review.rating ? 'filled' : ''}" aria-hidden="true">★</span>`).join('');
+            const verified = review.is_verified_purchase ? '<span class="review-card__verified">✓ Verified</span>' : '';
+            const title = review.title ? `<div class="review-card__title">${escHtml(review.title)}</div>` : '';
+            return `
+            <article class="review-card" data-review-id="${review.id}">
+                <div class="review-card__header">
+                    <div class="review-card__meta">
+                        <span class="review-card__author">${escHtml(review.author_name || 'Anonymous')}</span>
+                        ${verified}
+                        <span class="review-card__date">${escHtml(review.formatted_date || '')}</span>
+                    </div>
+                    <div class="stars" aria-label="${review.rating} out of 5 stars">${stars}</div>
+                </div>
+                ${title}
+                <div class="review-card__comment">${escHtml(review.comment)}</div>
+                <div class="review-card__helpful">
+                    <span>Helpful?</span>
+                    <button class="helpful-btn" onclick="window.showPage.voteHelpful(${review.id}, true, this)">👍 ${review.helpful_count || 0}</button>
+                    <button class="helpful-btn" onclick="window.showPage.voteHelpful(${review.id}, false, this)">👎 ${review.unhelpful_count || 0}</button>
+                </div>
+            </article>`;
+        }
+
+        _renderPagination(pagination, currentPage) {
+            if (!pagination || pagination.total_pages <= 1) return '';
+            const tot = pagination.total_pages;
+            let html = `<button class="review-pagination__btn ${currentPage <= 1 ? 'disabled' : ''}" onclick="window.showPage.loadReviews(${currentPage - 1})">←</button>`;
+            for (let p = 1; p <= tot; p++) {
+                html += `<button class="review-pagination__btn ${p === currentPage ? 'active' : ''}" onclick="window.showPage.loadReviews(${p})">${p}</button>`;
+            }
+            html += `<button class="review-pagination__btn ${currentPage >= tot ? 'disabled' : ''}" onclick="window.showPage.loadReviews(${currentPage + 1})">→</button>`;
+            return html;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ShowPageApp  —  composition root
+    // Wires CartService + MiniCartUI + DeliveryUI + ReviewManager.
+    // Exposes a minimal public API for inline onclick handlers in the template.
+    // ═══════════════════════════════════════════════════════════════════════
+    class ShowPageApp {
+        constructor() {
+            const cartService = new CartService(API_BASE);
+            this.cart = new MiniCartUI(cartService);
+            this._cartService = cartService;
+            this._delivery = new DeliveryUI(PLAN_ID);
+            this._reviews = new ReviewManager(PLAN_ID, API_BASE);
+
+            // Boot
+            cartService.load();
+        }
+
+        /**
+         * Builds the show-page-specific payload (pricing_id, issues, etc.)
+         * and delegates the actual POST to CartService.
+         */
+        async addToCart() {
+            const {durationRadio, deliveryRadio} = this._delivery.getSelections();
+
+            if (!durationRadio) {
+                showToast('Please select a subscription duration', 'error');
+                return;
+            }
+            if (!deliveryRadio) {
+                showToast('Please select a delivery type', 'error');
+                return;
+            }
+
+            const deliveryType = deliveryRadio.value;
+            const digitalPrice = parseFloat(durationRadio.dataset.digital);
+            const printPrice = parseFloat(durationRadio.dataset.price);
+            const price = (deliveryType === 'digital' && digitalPrice > 0) ? digitalPrice : printPrice;
+
+            const btn = document.getElementById('btn-add-cart');
+            const originalLabel = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Adding…';
+
+            const result = await this._cartService.addSubscription({
+                plan_id: PLAN_ID,
+                pricing_id: parseInt(durationRadio.dataset.pricingId),
+                delivery_type: deliveryType,
+                duration_months: parseInt(durationRadio.value),
+                price: price,
+                issues: parseInt(durationRadio.dataset.issues),
+            });
+
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+
+            if (result.success) {
+                this.cart.open();
+                showToast('Added to cart!', 'success');
+            } else {
+                showToast(result.message || 'Failed to add to cart', 'error');
+            }
+        }
+
+        // ── Review proxy methods (for inline onclick handlers) ────────────
+        loadReviews(page) {
+            this._reviews.loadReviews(page);
+        }
+
+        submitReview(e) {
+            this._reviews.submitReview(e);
+        }
+
+        voteHelpful(reviewId, isHelpful, btn) {
+            this._reviews.voteHelpful(reviewId, isHelpful, btn);
+        }
+    }
+
+    // ── Bootstrap ─────────────────────────────────────────────────────────
+    window.showPage = new ShowPageApp();
 </script>
 </body>
 </html>

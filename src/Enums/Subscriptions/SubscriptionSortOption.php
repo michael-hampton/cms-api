@@ -26,8 +26,12 @@ enum SubscriptionSortOption: string
     public function orderByClause(): array
     {
         return match ($this) {
-            self::PRICE_LOW_TO_HIGH => ['price', 'asc'],
-            self::PRICE_HIGH_TO_LOW => ['price', 'desc'],
+            // Price sorts use the computed column added by buildCatalogQuery().
+            // This reflects the lowest effective tier price (COALESCE(sale_price, price))
+            // for plans with pricing tiers, falling back to the plan's own price column
+            // for plans without tiers.
+            self::PRICE_LOW_TO_HIGH => ['lowest_effective_price', 'asc'],
+            self::PRICE_HIGH_TO_LOW => ['lowest_effective_price', 'desc'],
             self::NAME_A_TO_Z => ['name', 'asc'],
             self::NAME_Z_TO_A => ['name', 'desc'],
             self::NEWEST_FIRST => ['created_at', 'desc'],
