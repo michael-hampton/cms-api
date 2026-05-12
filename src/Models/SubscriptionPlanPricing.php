@@ -88,4 +88,41 @@ class SubscriptionPlanPricing extends Model
     {
         return $query->where('subscription_plan_pricing.site_id', $siteId);
     }
+
+    private function resolveEffectivePrice(float $price, mixed $sale): float
+    {
+        $sale = is_numeric($sale) ? (float)$sale : null;
+
+        return ($sale !== null && $sale > 0 && $sale < $price)
+            ? $sale
+            : $price;
+    }
+
+    public function getEffectivePrintPrice(): float
+    {
+        return $this->resolveEffectivePrice(
+            (float)($this->price ?? 0),
+            $this->sale_price
+        );
+    }
+
+    public function getEffectiveDigitalPrice(): float
+    {
+        $price = is_numeric($this->digital_price)
+            ? (float)$this->digital_price
+            : (float)($this->price ?? 0);
+
+        $sale = is_numeric($this->digital_sale_price)
+            ? $this->digital_sale_price
+            : $this->sale_price;
+
+        return $this->resolveEffectivePrice($price, $sale);
+    }
+
+    public function getEffectivePrice(string $type = 'digital'): float
+    {
+        return $type === 'print'
+            ? $this->getEffectivePrintPrice()
+            : $this->getEffectiveDigitalPrice();
+    }
 }

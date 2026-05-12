@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Services\Shopping\OneTimeSubscriptionService;
+use App\Services\Subscriptions\MemberResolver;
 use App\Services\Subscriptions\SubscriptionBatchFactory;
 use App\Services\Subscriptions\SubscriptionPricingService;
 use Mockery;
@@ -19,6 +20,7 @@ class SubscriptionBatchFactoryTest extends TestCase
     private OneTimeSubscriptionService&MockInterface $subscriptionService;
     private SubscriptionPricingService&MockInterface $pricingCalculator;
     private SubscriptionBatchFactory $factory;
+    private MemberResolver $memberResolver;
 
     protected function setUp(): void
     {
@@ -26,10 +28,12 @@ class SubscriptionBatchFactoryTest extends TestCase
 
         $this->subscriptionService = Mockery::mock(OneTimeSubscriptionService::class);
         $this->pricingCalculator = Mockery::mock(SubscriptionPricingService::class);
+        $this->memberResolver = Mockery::mock(MemberResolver::class);
 
         $this->factory = new SubscriptionBatchFactory(
             $this->subscriptionService,
-            $this->pricingCalculator
+            $this->pricingCalculator,
+            $this->memberResolver
         );
     }
 
@@ -118,9 +122,20 @@ class SubscriptionBatchFactoryTest extends TestCase
                 $pricing->voucherId,
                 $pricing,
                 SubscriptionStatus::PENDING,
-                $startDate
+                $startDate,
+                null
             )
             ->andReturn($subscription);
+    }
+
+    /**
+     * Wire MemberResolver to return the buyer for all items (non-gift default).
+     */
+    private function defaultNonGiftResolver(Member $buyer): void
+    {
+        $this->memberResolver
+            ->allows('resolve')
+            ->andReturn($buyer);
     }
 
     // -------------------------------------------------------------------------
@@ -133,6 +148,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
         $item = $this->makeCartItem(1);
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -160,6 +177,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $subscription = $this->makeSubscription(42);
         $item = $this->makeCartItem(7);
 
+        $this->defaultNonGiftResolver($member);
+
         $this->expectPricingCalculated($item, null, $member, [], $pricing);
         $this->expectSubscriptionCreated($member, 7, $pricing, $subscription);
 
@@ -182,6 +201,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         $s1 = $this->makeSubscription(1);
         $s2 = $this->makeSubscription(2);
 
+        $this->defaultNonGiftResolver($member);
         $this->expectPricingCalculated($item1, null, $member, [], $p1);
         $this->expectPricingCalculated($item2, null, $member, [], $p2);
         $this->expectSubscriptionCreated($member, 1, $p1, $s1);
@@ -205,6 +225,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing(voucherId: null); // voucher not consumed
         $subscription = $this->makeSubscription();
         $checkoutData = ['voucher_code' => 'SAVE10'];
+
+        $this->defaultNonGiftResolver($member);
 
         // Voucher MUST be passed to the first item
         $this->pricingCalculator
@@ -231,6 +253,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $s1 = $this->makeSubscription(1);
         $s2 = $this->makeSubscription(2);
         $checkoutData = ['voucher_code' => 'SAVE10'];
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -261,6 +285,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $s2 = $this->makeSubscription(2);
         $checkoutData = ['voucher_code' => 'SAVE10'];
 
+        $this->defaultNonGiftResolver($member);
+
         $this->pricingCalculator
             ->expects('calculateForCartItem')
             ->with($item1, 'SAVE10', $member, $checkoutData)
@@ -287,6 +313,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $subscription = $this->makeSubscription();
         $checkoutData = ['voucher_code' => 'SAVE10'];
 
+        $this->defaultNonGiftResolver($member);
+
         // Bundle item must receive null voucher regardless
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -307,6 +335,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing(voucherId: null);
         $subscription = $this->makeSubscription();
         $checkoutData = ['voucher_code' => 'SAVE10'];
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -330,6 +360,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $s1 = $this->makeSubscription(1);
         $s2 = $this->makeSubscription(2);
         $checkoutData = ['voucher_code' => 'FIRST'];
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -361,6 +393,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
+
         $this->pricingCalculator
             ->expects('calculateForCartItem')
             ->with($item, null, $member, [])
@@ -384,6 +418,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
+
         $this->pricingCalculator
             ->expects('calculateForCartItem')
             ->andReturn($pricing);
@@ -398,7 +434,8 @@ class SubscriptionBatchFactoryTest extends TestCase
                 $pricing->voucherId,
                 $pricing,
                 SubscriptionStatus::PENDING,
-                '2025-01-01'
+                '2025-01-01',
+                null
             )
             ->andReturn($subscription);
 
@@ -414,6 +451,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
+
         $this->pricingCalculator
             ->expects('calculateForCartItem')
             ->andReturn($pricing);
@@ -428,6 +467,7 @@ class SubscriptionBatchFactoryTest extends TestCase
                 $pricing->voucherId,
                 $pricing,
                 SubscriptionStatus::PENDING,
+                null,
                 null
             )
             ->andReturn($subscription);
@@ -451,6 +491,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
         $this->pricingCalculator->expects('calculateForCartItem')->andReturn($pricing);
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
 
@@ -467,6 +508,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
         $this->pricingCalculator->expects('calculateForCartItem')->andReturn($pricing);
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
 
@@ -490,6 +532,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
+
         $this->pricingCalculator->expects('calculateForCartItem')->andReturn($pricing);
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
 
@@ -511,6 +555,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $item = $this->makeCartItem(1);
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -540,6 +586,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
         $this->pricingCalculator->expects('calculateForCartItem')->andReturn($pricing);
         $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
 
@@ -563,6 +610,8 @@ class SubscriptionBatchFactoryTest extends TestCase
         $item = $this->makeCartItem();
         $pricing = $this->makePricing(voucherId: null, taxCents: 0);
         $subscription = $this->makeSubscription();
+
+        $this->defaultNonGiftResolver($member);
 
         $this->pricingCalculator
             ->expects('calculateForCartItem')
@@ -592,6 +641,7 @@ class SubscriptionBatchFactoryTest extends TestCase
 
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
         $this->pricingCalculator
             ->allows('calculateForCartItem')
             ->andReturn($pricing);
@@ -627,6 +677,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         $pricing = $this->makePricing();
         $subscription = $this->makeSubscription();
 
+        $this->defaultNonGiftResolver($member);
         $this->pricingCalculator
             ->allows('calculateForCartItem')
             ->andReturn($pricing);
@@ -655,6 +706,173 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->assertEquals('2025-06-01', $meta['release_date']);
         $this->assertEquals(42, $meta['next_issue_id']);
         $this->assertEquals('Summer Edition', $meta['next_issue_title']);
+    }
+
+    public function testNonGiftItemUsesResolvedBuyerMember(): void
+    {
+        $buyer = $this->makeMember(1);
+        $item = $this->makeCartItem(1);
+        $pricing = $this->makePricing();
+        $subscription = $this->makeSubscription();
+
+        // Resolver returns buyer (no gift_email in $checkoutData)
+        $this->memberResolver
+            ->expects('resolve')
+            ->andReturn($buyer);
+
+        $this->pricingCalculator->allows('calculateForCartItem')->andReturn($pricing);
+
+        // Subscription must be owned by buyer; giftedByMemberId must be null
+        $this->subscriptionService
+            ->expects('createOneTimeSubscription')
+            ->with(
+                $buyer->id,
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                null,           // no gifted_by_member_id
+            )
+            ->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], [], $buyer, 1, null);
+
+        $this->assertSame($subscription, $result[0]['subscription']);
+    }
+
+    public function testGiftItemUsesRecipientMemberIdForSubscriptionOwnership(): void
+    {
+        $buyer = $this->makeMember(1);
+        $recipient = $this->makeMember(99);
+        $item = $this->makeCartItem(1);
+        $pricing = $this->makePricing();
+        $subscription = $this->makeSubscription();
+
+        $checkoutData = [
+            'is_gift' => '1',
+            'recipient_email' => 'gift@example.com',
+            'recipient_first_name' => 'Jane',
+            'recipient_last_name' => 'Doe',
+        ];
+
+        // Resolver returns recipient because gift fields are present
+        $this->memberResolver
+            ->expects('resolve')
+            ->andReturn($recipient);
+
+        $this->pricingCalculator->allows('calculateForCartItem')->andReturn($pricing);
+
+        // Subscription must be owned by recipient; buyer tracked via gifted_by
+        $this->subscriptionService
+            ->expects('createOneTimeSubscription')
+            ->with(
+                $recipient->id,     // <-- recipient owns the subscription
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                Mockery::any(),
+                $buyer->id,         // <-- buyer recorded for audit
+            )
+            ->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 1, null);
+
+        $this->assertSame($subscription, $result[0]['subscription']);
+    }
+
+    public function testGiftFieldsFromCheckoutDataAreForwardedToMemberResolver(): void
+    {
+        $buyer = $this->makeMember(1);
+        $recipient = $this->makeMember(50);
+        $item = $this->makeCartItem(1);
+        $pricing = $this->makePricing();
+        $subscription = $this->makeSubscription();
+
+        $checkoutData = [
+            'is_gift' => '1',
+            'recipient_email' => 'recv@example.com',
+            'recipient_first_name' => 'Alice',
+            'recipient_last_name' => 'Smith',
+            'recipient_mobile' => '07700900000',
+        ];
+
+        // Assert that resolver receives the normalised gift_* fields
+        $this->memberResolver
+            ->expects('resolve')
+            ->withArgs(function (array $itemData, Member $passedBuyer) use ($buyer) {
+                return $passedBuyer->id === $buyer->id
+                    && ($itemData['gift_email'] ?? null) === 'recv@example.com'
+                    && ($itemData['gift_first_name'] ?? null) === 'Alice'
+                    && ($itemData['gift_last_name'] ?? null) === 'Smith'
+                    && ($itemData['gift_mobile'] ?? null) === '07700900000';
+            })
+            ->andReturn($recipient);
+
+        $this->pricingCalculator->allows('calculateForCartItem')->andReturn($pricing);
+        $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 1, null);
+
+        $this->assertCount(1, $result);
+    }
+
+    public function testPricingAlwaysUsesBuyerMemberRegardlessOfGiftStatus(): void
+    {
+        $buyer = $this->makeMember(1);
+        $recipient = $this->makeMember(88);
+        $item = $this->makeCartItem(1);
+        $pricing = $this->makePricing();
+        $subscription = $this->makeSubscription();
+
+        $checkoutData = ['is_gift' => '1', 'recipient_email' => 'g@example.com'];
+
+        $this->memberResolver->allows('resolve')->andReturn($recipient);
+
+        // Pricing must always be called with the buyer (not the recipient)
+        $this->pricingCalculator
+            ->expects('calculateForCartItem')
+            ->with($item, null, $buyer, $checkoutData)
+            ->andReturn($pricing);
+
+        $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 1, null);
+
+        $this->assertCount(1, $result);
+    }
+
+    public function testNoGiftFieldsForwardedToResolverWhenIsGiftAbsent(): void
+    {
+        $buyer = $this->makeMember(1);
+        $item = $this->makeCartItem(1);
+        $pricing = $this->makePricing();
+        $subscription = $this->makeSubscription();
+
+        $checkoutData = [
+            // is_gift deliberately absent
+            'recipient_email' => 'should@not.flow',
+        ];
+
+        // When is_gift is absent, resolver receives item data without gift_* keys
+        $this->memberResolver
+            ->expects('resolve')
+            ->withArgs(function (array $itemData) {
+                return !array_key_exists('gift_email', $itemData);
+            })
+            ->andReturn($buyer);
+
+        $this->pricingCalculator->allows('calculateForCartItem')->andReturn($pricing);
+        $this->subscriptionService->allows('createOneTimeSubscription')->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], $checkoutData, $buyer, 1, null);
+
+        $this->assertCount(1, $result);
     }
 
 }

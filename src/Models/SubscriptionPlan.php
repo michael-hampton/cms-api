@@ -46,7 +46,7 @@ class SubscriptionPlan extends Model
         'updated_at'
     ];
 
-    protected $visible = [
+    protected $appends = [
         'lowest_effective_price'
     ];
 
@@ -168,6 +168,65 @@ class SubscriptionPlan extends Model
     public function hasPrintOption(): bool
     {
         return $this->print_shipping_required;
+    }
+
+    public function getLowestEffectivePrice(): float
+    {
+        $min = null;
+
+        foreach ($this->pricingTiers as $tier) {
+
+            if ($this->hasDigitalOption()) {
+                $price = $tier->getEffectiveDigitalPrice();
+                $min = $min === null ? $price : min($min, $price);
+            }
+
+            if ($this->hasPrintOption()) {
+                $price = $tier->getEffectivePrintPrice();
+                $min = $min === null ? $price : min($min, $price);
+            }
+        }
+
+        return $min ?? 0;
+    }
+
+    public function getBestSale(): ?array
+    {
+        $best = null;
+
+        foreach ($this->pricingTiers as $tier) {
+
+            foreach (['print', 'digital'] as $type) {
+
+                $price = $type === 'print'
+                    ? $tier->price
+                    : $tier->digital_price;
+
+                $sale = $type === 'print'
+                    ? $tier->sale_price
+                    : $tier->digital_sale_price;
+
+                if (!is_numeric($price)) continue;
+
+                $price = (float)$price;
+                $sale = is_numeric($sale) ? (float)$sale : null;
+
+                if ($sale !== null && $sale > 0 && $sale < $price) {
+
+                    $pct = (int)round((($price - $sale) / $price) * 100);
+
+                    if ($best === null || $pct > $best['savingPct']) {
+                        $best = [
+                            'original' => $price,
+                            'sale' => $sale,
+                            'savingPct' => $pct,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return $best;
     }
 
     public function getDeliveryOptions(): array

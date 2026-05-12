@@ -378,9 +378,9 @@ class OneTimeSubscriptionsController extends Controller
      * falls back to the site-level config. This allows a GBP plan to show £
      * even on a site whose default currency is USD.
      */
-    public function show(int $id, Request $request)
+    public function show(string $slug, Request $request)
     {
-        $plan = $this->subscriptionService->getPlanWithPricingTiers($id);
+        $plan = $this->subscriptionService->findBySlugWithPricingTiers($slug);
 
         if (!$plan || !$plan->is_active) {
             return $this->redirect('/subscriptions');
@@ -403,9 +403,9 @@ class OneTimeSubscriptionsController extends Controller
             ], $subscriptionDetails));
         }
 
-        $reviewData = $this->reviewService->getPlanReviews($id, 1, 5);
-        $reviewStats = $this->reviewService->getPlanReviewSummary($id);
-        $canReview = $this->reviewService->canUserReviewPlan($id);
+        $reviewData = $this->reviewService->getPlanReviews($plan->id, 1, 5);
+        $reviewStats = $this->reviewService->getPlanReviewSummary($plan->id);
+        $canReview = $this->reviewService->canUserReviewPlan($plan->id);
 
         return $this->view('subscriptions/onetime/show', [
             'plan' => $plan,

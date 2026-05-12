@@ -1,6 +1,7 @@
 <?php
 
 use App\Controllers\Admin\AdminSubscriptionPlansController;
+use App\Controllers\Admin\BadgeController;
 use App\Controllers\Adverts\AdvertTrackingController;
 use App\Controllers\Billing\PaymentController;
 use App\Controllers\Boost\BoostController;
@@ -29,6 +30,7 @@ use App\Controllers\Legal\LegalController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\Members\AccountActivationController;
+use App\Controllers\Members\Api\MemberAddressApiController;
 use App\Controllers\Members\GiftedArticlesController;
 use App\Controllers\Members\MemberActivityController;
 use App\Controllers\Members\MemberAddressController;
@@ -53,6 +55,7 @@ use App\Controllers\Members\Subscriptions\MemberSubscriptionsController;
 use App\Controllers\Members\Subscriptions\MemberSubscriptionUpgradeController;
 use App\Controllers\Members\Subscriptions\SingleContentAccessController;
 use App\Controllers\MerchantPortal\MerchantDashboardController;
+use App\Controllers\MerchantPortal\MerchantPortalRegistrationController;
 use App\Controllers\Newsletter\NewsletterController;
 use App\Controllers\Newsletter\NewsletterWebController;
 use App\Controllers\Offers\BundleListController;
@@ -76,10 +79,13 @@ use App\Controllers\OpenCollab\ArticlePageController;
 use App\Controllers\OpenCollab\ContributorAccountPageController;
 use App\Controllers\OpenCollab\ContributorDisputePageController;
 use App\Controllers\OpenCollab\ContributorEarningsPageController;
+use App\Controllers\OpenCollab\ContributorLoginPageController;
+use App\Controllers\OpenCollab\ContributorRequestPageController;
 use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
 use App\Controllers\OpenCollab\OnboardingPageController;
 use App\Controllers\OpenCollab\PayoutPageController;
+use App\Controllers\OpenCollab\ResendInvitationPageController;
 use App\Controllers\Product\ProductComparisonController;
 use App\Controllers\Shopping\CartController;
 use App\Controllers\Shopping\OneTimeSubscriptionsController;
@@ -97,6 +103,7 @@ use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireAdminRole;
 use App\Framework\Middleware\RequireContributorAuth;
 use App\Framework\Middleware\RequireMemberAuth;
+use App\Framework\Middleware\VerifyCsrfToken;
 
 /*
 |--------------------------------------------------------------------------
@@ -132,8 +139,8 @@ $router->post('/crm/logout', [App\Controllers\Auth\PortalLoginController::class,
 $router->get('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'showLoginForm'], null, []);
 $router->post('/merchant/login/{portal}', [App\Controllers\Auth\PortalLoginController::class, 'login'], null, []);
 $router->post('/merchant/logout', [App\Controllers\Auth\PortalLoginController::class, 'logout'], null, []);
-$router->get('/merchant/register', [\App\Controllers\MerchantPortal\MerchantPortalRegistrationController::class, 'showRegistrationForm']);
-$router->post('/merchant/register', [\App\Controllers\MerchantPortal\MerchantPortalRegistrationController::class, 'register']);
+$router->get('/merchant/register', [MerchantPortalRegistrationController::class, 'showRegistrationForm']);
+$router->post('/merchant/register', [MerchantPortalRegistrationController::class, 'register']);
 
 // crm
 $router->group(['middleware' => [AuthenticateCrmPortal::class]], function ($router) {
@@ -252,7 +259,7 @@ $router->get('/member/reset-password', [MemberAuthController::class, 'showResetP
     ->name('member.reset-password');
 
 
-$router->group(['middleware' => [\App\Framework\Middleware\VerifyCsrfToken::class]], function ($router) {
+$router->group(['middleware' => [VerifyCsrfToken::class]], function ($router) {
     $router->post('/member/forgot-password', [MemberAuthController::class, 'sendPasswordResetEmail'])
         ->name('member.forgot-password.send');
 
@@ -347,7 +354,7 @@ $router->get('/api/{site}/wishlist', [WishlistController::class, 'index']);
 $router->post('/api/{site}/wishlist', [WishlistController::class, 'add']);
 $router->delete('/api/{site}/wishlist/{productId}', [WishlistController::class, 'remove']);
 
-$router->get('/api/{site}/{memberId}/addresses', [\App\Controllers\Members\Api\MemberAddressApiController::class, 'search']);
+$router->get('/api/{site}/{memberId}/addresses', [MemberAddressApiController::class, 'search']);
 
 $router->get('/order-confirmation', [CartController::class, 'orderConfirmation']);
 $router->get('/subscription-confirmation', [SubscriptionConfirmationController::class, 'show']);
@@ -384,12 +391,12 @@ $router->get('/{site}/member/subscriptions/manage/{token}', [MemberSubscriptions
 $router->post('/{site}/member/subscriptions/manage/{token}', [MemberSubscriptionsController::class, 'updateByToken']);
 
 $router->get('/{site}/member/subscription-plans', [MemberSubscriptionPlansController::class, 'index']);
-$router->get('/{site}/member/subscription-plans/{slug}', [MemberSubscriptionPlansController::class, 'show']);;
-$router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubscriptionPlansController::class, 'subscribe']);;
+$router->get('/{site}/member/subscription-plans/{slug}', [MemberSubscriptionPlansController::class, 'show']);
+$router->post('/{site}/member/subscription-plans/{slug}/subscribe', [MemberSubscriptionPlansController::class, 'subscribe']);
 
 $router->get('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'index']);
-$router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);;
-$router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);;
+$router->post('/{site}/member/payment-methods', [MemberPaymentMethodsController::class, 'store']);
+$router->post('/{site}/member/payment-methods/{paymentMethodId}/set-default', [MemberPaymentMethodsController::class, 'setDefault']);
 $router->delete('/{site}/member/payment-methods/{paymentMethodId}', [MemberPaymentMethodsController::class, 'destroy']);
 $router->post('/{site}/member/payment-methods/{id}/update', [MemberPaymentMethodsController::class, 'update']);
 
@@ -411,11 +418,11 @@ $router->post('/{siteSlug}/member/hub/polls/vote', [MemberHubApiController::clas
 
 $router->get('/{site}/member/subscription-payments', [MemberSubscriptionPaymentsController::class, 'index']);
 
-$router->get('/{site}/admin/badges', [\App\Controllers\Admin\BadgeController::class, 'index']);
+$router->get('/{site}/admin/badges', [BadgeController::class, 'index']);
 
 $router->get('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'index']);
 $router->get('/{site}/admin/subscription-plans/create', [AdminSubscriptionPlansController::class, 'create']);
-$router->post('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'store']);;
+$router->post('/{site}/admin/subscription-plans', [AdminSubscriptionPlansController::class, 'store']);
 $router->get('/{site}/admin/subscription-plans/{id}/edit', [AdminSubscriptionPlansController::class, 'edit']);
 $router->put('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansController::class, 'update']);
 $router->delete('/{site}/admin/subscription-plans/{id}', [AdminSubscriptionPlansController::class, 'destroy']);
@@ -484,7 +491,7 @@ $router->post('/{site}/default/newsletter/signup', NewsletterController::class, 
 // Press stack site
 $router->get('/press-stack', [OneTimeSubscriptionsController::class, 'index']);
 $router->get('/subscriptions/onetime/search', [OneTimeSubscriptionsController::class, 'search']);
-$router->get('/press-stack/{id}', [OneTimeSubscriptionsController::class, 'show']);
+$router->get('/press-stack/{slug}', [OneTimeSubscriptionsController::class, 'show']);
 $router->get('/press-stack/deals', [SubscriptionDealsController::class, 'index']);
 $router->get('/subscriptions/onetime/deals/search', [SubscriptionDealsController::class, 'search']);
 $router->get('/{site}/subscriptions/link-subscription', [SubscriptionLinkStepController::class, 'showLinkStep']);
@@ -623,13 +630,13 @@ $router->group(['middleware' => [RequireContributorAuth::class]], function ($rou
 // Guest-accessible Web route
 $router->get('/{site}/open-collab/invitations/{token}/accept', [InvitationPageController::class, 'showAcceptForm'])
     ->name('invitations.accept');
-$router->get('/{site}/open-collab/login', [\App\Controllers\OpenCollab\ContributorLoginPageController::class, 'login'])->name('contributor.login');
+$router->get('/{site}/open-collab/login', [ContributorLoginPageController::class, 'login'])->name('contributor.login');
 
 $router->get('/{site}/open-collab/request-access',
-    [\App\Controllers\OpenCollab\ContributorRequestPageController::class, 'show'])
+    [ContributorRequestPageController::class, 'show'])
     ->name('contributor.request-access');
 
 $router->get('/{site}/open-collab/resend-invitation',
-    [\App\Controllers\OpenCollab\ResendInvitationPageController::class, 'show'])
+    [ResendInvitationPageController::class, 'show'])
     ->name('contributor.resend-invitation');
 

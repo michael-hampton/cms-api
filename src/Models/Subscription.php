@@ -7,6 +7,7 @@ use App\Enums\Newsletters\PremiumAccessType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\QueryBuilder;
+use DateTime;
 
 class Subscription extends Model
 {
@@ -73,6 +74,7 @@ class Subscription extends Model
         'is_linked',
         'territory_id',
         'territory_override_flag',
+        'gifted_by_member_id'
     ];
 
     protected $casts = [
@@ -110,7 +112,7 @@ class Subscription extends Model
             return false;
         }
 
-        $now = new \DateTime();
+        $now = new DateTime();
 
         if ($this->start_date && $this->start_date > $now) {
             return false;
@@ -130,13 +132,13 @@ class Subscription extends Model
 
     public function isCancellationScheduled(): bool
     {
-        return $this->cancelled_at !== null && $this->cancelled_at > new \DateTime();
+        return $this->cancelled_at !== null && $this->cancelled_at > new DateTime();
     }
 
     public function isExpired(): bool
     {
         return $this->status === SubscriptionStatus::EXPIRED->value ||
-            ($this->end_date !== null && $this->end_date <= new \DateTime());
+            ($this->end_date !== null && $this->end_date <= new DateTime());
     }
 
     // =========================================================================
@@ -159,7 +161,7 @@ class Subscription extends Model
             return false;
         }
 
-        return $this->trial_ends_at > new \DateTime();
+        return $this->trial_ends_at > new DateTime();
     }
 
     /**
@@ -167,10 +169,10 @@ class Subscription extends Model
      * no trial.  Prefer this over the computed trialEndsAt() for any logic
      * that runs after subscription creation.
      */
-    public function getTrialEndsAt(): ?\DateTime
+    public function getTrialEndsAt(): ?DateTime
     {
         return $this->trial_ends_at
-            ? \DateTime::createFromInterface($this->trial_ends_at)
+            ? DateTime::createFromInterface($this->trial_ends_at)
             : null;
     }
 
@@ -178,7 +180,7 @@ class Subscription extends Model
      * @deprecated Use getTrialEndsAt() — this computes from the plan relation
      *             and breaks if the plan is later modified.
      */
-    public function trialEndsAt(): ?\DateTime
+    public function trialEndsAt(): ?DateTime
     {
         if (!$this->plan || $this->plan->trial_days <= 0) {
             return null;
@@ -193,7 +195,7 @@ class Subscription extends Model
             return false;
         }
 
-        return $this->trial_ends_at <= new \DateTime();
+        return $this->trial_ends_at <= new DateTime();
     }
 
     public function getDaysRemainingInTrial(): ?int
@@ -202,8 +204,8 @@ class Subscription extends Model
             return null;
         }
 
-        $now = new \DateTime();
-        $diff = $now->diff(\DateTime::createFromInterface($this->trial_ends_at));
+        $now = new DateTime();
+        $diff = $now->diff(DateTime::createFromInterface($this->trial_ends_at));
 
         return $diff->invert ? 0 : $diff->days;
     }
@@ -253,7 +255,7 @@ class Subscription extends Model
             return false;
         }
 
-        return $this->next_billing_date <= new \DateTime();
+        return $this->next_billing_date <= new DateTime();
     }
 
     public function getDaysUntilRenewal(): ?int
@@ -262,7 +264,7 @@ class Subscription extends Model
             return null;
         }
 
-        $now = new \DateTime();
+        $now = new DateTime();
         $interval = $now->diff($this->next_billing_date);
 
         return $interval->invert ? 0 : $interval->days;
@@ -319,14 +321,14 @@ class Subscription extends Model
             return false;
         }
 
-        return $this->download_expires_at > new \DateTime();
+        return $this->download_expires_at > new DateTime();
     }
 
     public function generateDownloadUrl(string $baseUrl): void
     {
         if ($this->isDigital() && $this->plan && $this->plan->digital_download_url) {
             $this->download_url = $this->plan->digital_download_url;
-            $this->download_expires_at = (new \DateTime())->modify('+30 days')->format('Y-m-d H:i:s');
+            $this->download_expires_at = (new DateTime())->modify('+30 days')->format('Y-m-d H:i:s');
             $this->save();
         }
     }
@@ -403,7 +405,7 @@ class Subscription extends Model
             return false;
         }
 
-        $now = new \DateTime();
+        $now = new DateTime();
 
         if ($this->delivery_pause_start && $this->delivery_pause_start > $now) {
             return false;
@@ -422,7 +424,7 @@ class Subscription extends Model
             return null;
         }
 
-        $now = new \DateTime();
+        $now = new DateTime();
         $interval = $now->diff($this->delivery_pause_end);
 
         return $interval->invert ? 0 : $interval->days;
@@ -541,7 +543,7 @@ class Subscription extends Model
             ->exists();
     }
 
-    public function grantPremiumAccess(string $type, string $identifier, ?\DateTime $expiresAt = null): SubscriptionPremiumAccess
+    public function grantPremiumAccess(string $type, string $identifier, ?DateTime $expiresAt = null): SubscriptionPremiumAccess
     {
         return SubscriptionPremiumAccess::updateOrCreate(
             [
@@ -641,7 +643,7 @@ class Subscription extends Model
             return false;
         }
 
-        $now = new \DateTime();
+        $now = new DateTime();
 
         if ($this->start_date && $this->start_date > $now) {
             return false;
@@ -709,7 +711,7 @@ class Subscription extends Model
         }
 
         if ($newsletter->hasTimeWindow()) {
-            $now = new \DateTime();
+            $now = new DateTime();
 
             if (!$newsletter->isWithinAccessWindow($now, $this)) {
                 $start = $newsletter->access_window_start?->format('Y-m-d H:i:s') ?? 'N/A';
@@ -776,5 +778,10 @@ class Subscription extends Model
     public function lastPayment()
     {
         return $this->payments()->last();
+    }
+
+    public function giftedBy()
+    {
+        return $this->belongsTo(Member::class, 'gifted_by_member_id', 'id');
     }
 }

@@ -4,14 +4,21 @@ namespace App\Services\Billing\PaymentProviders;
 
 use App\Enums\Vouchers\VoucherType;
 use App\Framework\Support\Logger;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Payment;
+use App\Models\Refund;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
+use App\Repositories\Billing\RefundRepository;
+use DateTime;
+use Exception;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
+use Stripe\Webhook;
 
 class StripePaymentProcessor
 {
@@ -39,8 +46,9 @@ class StripePaymentProcessor
     {
         try {
 
+            $subscriber = !empty($subscription->gifted_by_member_id) ? $subscription->giftedBy : $subscription->member;
             // Create or retrieve customer
-            $customerId = $this->getOrCreateCustomer($subscription->member, $data);
+            $customerId = $this->getOrCreateCustomer($subscriber, $data);
 
             // Attach payment method to customer (from Stripe.js)
             if (!empty($data['payment_method_id'])) {
@@ -161,7 +169,7 @@ class StripePaymentProcessor
                 'message' => $this->getUserFriendlyMessage($e),
                 'error_code' => $e->getStripeCode()
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Stripe Payment Error: ' . $e->getMessage());
 
             return [
@@ -502,7 +510,7 @@ class StripePaymentProcessor
         $webhookSecret = $_ENV['STRIPE_WEBHOOK_SECRET'] ?? config('payment.stripe.webhook_secret');
 
         try {
-            $event = \Stripe\Webhook::constructEvent(
+            $event = Webhook::constructEvent(
                 json_encode($payload),
                 $signature,
                 $webhookSecret
@@ -516,7 +524,7 @@ class StripePaymentProcessor
                 'charge.refunded' => $this->handleChargeRefunded($event->data->object),
                 default => ['success' => true, 'message' => 'Event not handled']
             };
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'success' => false,
                 'message' => $e->getMessage()
@@ -625,7 +633,7 @@ class StripePaymentProcessor
             }
 
             return ['success' => true];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Logger::error('Failed to handle charge refunded webhook', [
                 'charge_id' => $charge->id,
                 'error' => $e->getMessage()
@@ -702,7 +710,7 @@ class StripePaymentProcessor
                 'error_code' => $e->getStripeCode()
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Logger::error('Refund processing error', [
                 'transaction_id' => $transactionId,
                 'amount' => $amount,
@@ -847,7 +855,7 @@ class StripePaymentProcessor
             }
 
             return ['success' => true];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error adding payment method: ' . $e->getMessage());
 
             return [
@@ -870,7 +878,7 @@ class StripePaymentProcessor
             ]);
 
             return ['success' => true];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error setting default payment method: ' . $e->getMessage());
 
             return [
@@ -901,7 +909,7 @@ class StripePaymentProcessor
             $this->stripe->paymentMethods->detach($paymentMethodId);
 
             return ['success' => true];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error removing payment method: ' . $e->getMessage());
 
             return [
@@ -1058,7 +1066,7 @@ class StripePaymentProcessor
                 'message' => $this->getUserFriendlyMessage($e),
                 'error_code' => $e->getStripeCode()
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Stripe Payment Error: ' . $e->getMessage());
 
             return [
@@ -1075,7 +1083,7 @@ class StripePaymentProcessor
             try {
                 $this->stripe->coupons->retrieve($voucher->stripe_coupon_id);
                 return $voucher->stripe_coupon_id;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Coupon doesn't exist, create new one
             }
         }
@@ -1176,7 +1184,7 @@ class StripePaymentProcessor
                             'default_payment_method' => $paymentIntent->payment_method
                         ]
                     ]);
-                } catch (\Exception $e) {
+                } catch (Exception $e) {
                     // Log but don't fail the payment if saving payment method fails
                     error_log('Failed to save payment method: ' . $e->getMessage());
                 }
@@ -1240,7 +1248,7 @@ class StripePaymentProcessor
                 'customer_id' => $customer->id,
                 'email' => $customer->email
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error updating Stripe customer email: ' . $e->getMessage());
 
             return [
@@ -1318,7 +1326,7 @@ class StripePaymentProcessor
                 'payment_methods' => $paymentMethods,
                 'default_payment_method_id' => $defaultPaymentMethodId
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Error fetching payment methods: ' . $e->getMessage());
 
             return [
@@ -1340,10 +1348,10 @@ class StripePaymentProcessor
         }
 
         $card = $paymentMethod->card;
-        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate = new DateTime("{$card->exp_year}-{$card->exp_month}-01");
         $expiryDate->modify('last day of this month');
 
-        return $expiryDate < new \DateTime();
+        return $expiryDate < new DateTime();
     }
 
     /**
@@ -1356,10 +1364,10 @@ class StripePaymentProcessor
         }
 
         $card = $paymentMethod->card;
-        $expiryDate = new \DateTime("{$card->exp_year}-{$card->exp_month}-01");
+        $expiryDate = new DateTime("{$card->exp_year}-{$card->exp_month}-01");
         $expiryDate->modify('last day of this month');
 
-        $now = new \DateTime();
+        $now = new DateTime();
         $threshold = (clone $now)->modify("+{$monthsThreshold} months");
 
         return $expiryDate <= $threshold && $expiryDate >= $now;
@@ -1389,9 +1397,9 @@ class StripePaymentProcessor
             }
 
             // Calculate next target billing date
-            $now = new \DateTime();
+            $now = new DateTime();
 
-            $targetDate = new \DateTime();
+            $targetDate = new DateTime();
             $targetDate->setDate(
                 (int)$targetDate->format('Y'),
                 (int)$targetDate->format('m'),
@@ -1465,7 +1473,7 @@ class StripePaymentProcessor
                 'message' => 'Billing date updated successfully'
             ];
 
-        } catch (\Stripe\Exception\ApiErrorException $e) {
+        } catch (ApiErrorException $e) {
             error_log('Stripe billing date update error: ' . $e->getMessage());
 
             return [
@@ -1473,7 +1481,7 @@ class StripePaymentProcessor
                 'message' => $e->getMessage(),
                 'error_code' => $e->getStripeCode()
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             error_log('Billing date update error: ' . $e->getMessage());
 
             return [
@@ -1498,12 +1506,12 @@ class StripePaymentProcessor
             $periodStart = $subscription->items->data[0]->current_period_start;
             $periodEnd = $subscription->items->data[0]->current_period_end;
 
-            $now = new \DateTime();
-            $currentPeriodEnd = new \DateTime();
+            $now = new DateTime();
+            $currentPeriodEnd = new DateTime();
             $currentPeriodEnd->setTimestamp($periodEnd);
 
             // Calculate target date
-            $targetDate = new \DateTime();
+            $targetDate = new DateTime();
             $targetDate->setDate(
                 $targetDate->format('Y'),
                 $targetDate->format('m'),
@@ -1549,7 +1557,7 @@ class StripePaymentProcessor
                 'days_difference' => $daysToNewDate - $daysInCurrentPeriod
             ];
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'success' => false,
                 'message' => $e->getMessage()
@@ -1581,7 +1589,7 @@ class StripePaymentProcessor
                 'success' => true,
                 'stripe_subscription_id' => $stripeSubscriptionId,
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Logger::error("Failed to update Stripe subscription", [
                 'stripe_subscription_id' => $stripeSubscriptionId,
                 'error' => $e->getMessage()
@@ -1656,7 +1664,7 @@ class StripePaymentProcessor
                 'message' => $this->getUserFriendlyMessage($e),
                 'error_code' => $e->getStripeCode(),
             ];
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return [
                 'success' => false,
                 'message' => 'An unexpected error occurred during off-session charge.',
@@ -1669,10 +1677,10 @@ class StripePaymentProcessor
      */
     private function createRefundRecord(Payment $payment, float $refundAmount, string $stripeRefundId): void
     {
-        $refundRepo = new \App\Repositories\Billing\RefundRepository();
+        $refundRepo = new RefundRepository();
 
         // Check if refund already exists for this charge
-        $existingRefund = \App\Models\Refund::where('site_id', $payment->site_id)
+        $existingRefund = Refund::where('site_id', $payment->site_id)
             ->where('order_id', $payment->order_id)
             ->whereRaw("JSON_EXTRACT(internal_notes, '$.stripe_refund_id') = ?", [$stripeRefundId])
             ->first();
@@ -1681,7 +1689,7 @@ class StripePaymentProcessor
             return; // Already processed
         }
 
-        $order = \App\Models\Order::find($payment->order_id);
+        $order = Order::find($payment->order_id);
         if (!$order) {
             return;
         }
@@ -1715,7 +1723,7 @@ class StripePaymentProcessor
         $refund = $refundRepo->create($refundData);
 
         // Create refund items based on order items
-        $orderItems = \App\Models\OrderItem::where('order_id', $order->id)->get();
+        $orderItems = OrderItem::where('order_id', $order->id)->get();
 
         foreach ($orderItems as $orderItem) {
             // Calculate proportional refund for each item
@@ -1739,7 +1747,7 @@ class StripePaymentProcessor
         $totalRefunded = $refundRepo->getTotalRefundedAmount($order->id);
         $orderStatus = $totalRefunded >= $order->total ? 'refunded' : 'partially_refunded';
 
-        \App\Models\Order::where('id', $order->id)->update([
+        Order::where('id', $order->id)->update([
             'status' => $orderStatus,
             'payment_status' => 'refunded'
         ]);
@@ -1755,7 +1763,7 @@ class StripePaymentProcessor
             }
 
             return $invoice->payment_intent ?? null;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
     }

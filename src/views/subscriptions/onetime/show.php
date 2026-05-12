@@ -10,6 +10,8 @@
  * Mini cart now matches index.php: qty controls, remove per-item, clear cart.
  */
 
+use App\Framework\Support\SiteContext;
+
 foreach ($plan->pricingTiers as $tier) {
     $tier->effective_print_price = $tier->sale_price ?? $tier->price;
     $tier->effective_digital_price = $tier->digital_sale_price ?? $tier->digital_price ?? $tier->sale_price ?? $tier->price;
@@ -1197,7 +1199,7 @@ $pagination = $reviewData['pagination'] ?? [];
 <div class="page">
 
     <div class="breadcrumb">
-        <a href="/subscriptions">
+        <a href="/press-stack">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                  stroke-linecap="round">
                 <polyline points="15 18 9 12 15 6"/>
@@ -1332,43 +1334,72 @@ $pagination = $reviewData['pagination'] ?? [];
 
                 <div class="duration-options">
                     <?php foreach ($plan->pricingTiers as $index => $pricing):
-                        $actualPrice = $pricing->sale_price && $pricing->sale_price < $pricing->price
-                                ? $pricing->sale_price : $pricing->price;
-                        $originalPrice = $pricing->price;
+
+                        $actualPrice = $pricing->getEffectivePrintPrice();
+
+                        $originalPrice = (float)($pricing->price ?? 0);
+
+                        $baseDigitalPrice = is_numeric($pricing->digital_price)
+                                ? (float)$pricing->digital_price
+                                : (float)($pricing->price ?? 0);
+
                         ?>
-                        <div class="duration-option<?= $index === 0 ? ' selected' : '' ?>" data-plan="<?= $plan->id ?>">
-                            <input type="radio" name="duration_<?= $plan->id ?>"
+                        <div class="duration-option<?= $index === 0 ? ' selected' : '' ?>"
+                             data-plan="<?= $plan->id ?>">
+
+                            <input type="radio"
+                                   name="duration_<?= $plan->id ?>"
                                    value="<?= $pricing->duration_months ?>"
                                    data-pricing-id="<?= $pricing->id ?>"
-                                   data-base-print="<?= $pricing->price ?>"
-                                   data-base-digital="<?= $pricing->digital_price ?? 0 ?>"
-                                   data-eff-print="<?= $pricing->sale_price > 0 ? $pricing->sale_price : $pricing->price ?>"
-                                   data-eff-digital="<?= $pricing->digital_sale_price > 0 ? $pricing->digital_sale_price : $pricing->digital_price ?>"
+
+                                   data-base-print="<?= (float)($pricing->price ?? 0) ?>"
+                                   data-base-digital="<?= $baseDigitalPrice ?>"
+
+                                   data-eff-print="<?= $pricing->getEffectivePrintPrice() ?>"
+                                   data-eff-digital="<?= $pricing->getEffectiveDigitalPrice() ?>"
+
                                    data-issues="<?= $pricing->issue_count ?>"
                                     <?= $index === 0 ? 'checked' : '' ?>>
 
                             <div class="duration-option__left">
                                 <div class="duration-option__radio"></div>
+
                                 <div class="duration-option__info">
-                                    <div class="duration-option__label"><?= htmlspecialchars($pricing->label) ?></div>
-                                    <div class="duration-option__period"><?= htmlspecialchars($pricing->period_description) ?></div>
+                                    <div class="duration-option__label">
+                                        <?= htmlspecialchars($pricing->label) ?>
+                                    </div>
+
+                                    <div class="duration-option__period">
+                                        <?= htmlspecialchars($pricing->period_description) ?>
+                                    </div>
                                 </div>
                             </div>
 
                             <div class="duration-option__right">
+
                                 <?php if ($pricing->hasDiscount()): ?>
-                                    <div class="duration-option__was"><?= $currencySymbol ?><?= number_format($originalPrice, 2) ?></div>
+                                    <div class="duration-option__was">
+                                        <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
+                                    </div>
                                 <?php endif; ?>
-                                <div class="duration-option__price"><?= $currencySymbol ?><?= number_format($actualPrice, 2) ?></div>
+
+                                <div class="duration-option__price">
+                                    <?= $currencySymbol ?><?= number_format($actualPrice, 2) ?>
+                                </div>
+
                                 <?php if ($pricing->issue_count > 0): ?>
                                     <div class="duration-option__per-issue">
                                         <?= $currencySymbol ?><?= number_format($pricing->getPricePerIssue(), 2) ?>
                                         /issue
                                     </div>
                                 <?php endif; ?>
+
                                 <?php if ($pricing->getSavingsText()): ?>
-                                    <div class="save-badge"><?= $pricing->getSavingsText() ?></div>
+                                    <div class="save-badge">
+                                        <?= $pricing->getSavingsText() ?>
+                                    </div>
                                 <?php endif; ?>
+
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -1625,8 +1656,8 @@ $pagination = $reviewData['pagination'] ?? [];
 
 <script>
     // ── Bootstrap constants ───────────────────────────────────────────────
-    const API_BASE = '/api/<?= \App\Framework\Support\SiteContext::slug() ?? 'default' ?>';
-    const SITE = '<?= \App\Framework\Support\SiteContext::slug() ?? 'default' ?>';
+    const API_BASE = '/api/<?= SiteContext::slug() ?? 'default' ?>';
+    const SITE = '<?= SiteContext::slug() ?? 'default' ?>';
     const PLAN_ID = <?= (int)$plan->id ?>;
     const CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 

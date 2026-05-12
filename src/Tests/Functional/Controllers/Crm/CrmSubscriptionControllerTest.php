@@ -589,7 +589,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
         $this->assertTrue($data['success']);
-        $this->assertStringContainsString('cancelled successfully', $data['message']);
+        $this->assertStringContainsString('Subscription cancelled immediately.', $data['message']);
     }
 
     // ── pause delivery ────────────────────────────────────────────────────────
@@ -1195,7 +1195,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
     public function test_switch_product_returns_422_when_amount_is_zero(): void
     {
-        $payload = array_merge($this->validSwitchPayload(), ['amount' => 0]);
+        $payload = array_merge($this->validSwitchPayload(), ['amount' => 0, 'switch_mode' => 'fresh']);
 
         $response = $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/switch',
@@ -1446,7 +1446,10 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'name' => 'Upgraded Plan',
             'price' => 19.99,
             'is_active' => true,
+            'print_shipping_required' => true,
         ]);
+
+        $this->createIssueDelivery(['subscription_plan_id' => $this->newPlan->id, 'stock_quantity' => 100]);
 
         Container::getInstance()->bind(
             StripePaymentProcessor::class,

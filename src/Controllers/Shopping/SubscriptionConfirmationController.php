@@ -67,7 +67,7 @@ class SubscriptionConfirmationController extends Controller
         if (MemberAuth::check()) {
             $memberId = (int)MemberAuth::getMember()->id;
             foreach ($subscriptions as $subscription) {
-                if ((int)$subscription['member_id'] !== $memberId) {
+                if ((int)$subscription['member_id'] !== $memberId && $subscription['gifted_by_member_id'] !== $memberId) {
                     return $this->redirect('/');
                 }
             }

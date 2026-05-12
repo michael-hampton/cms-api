@@ -4,6 +4,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanRegionSet;
@@ -203,7 +204,7 @@ class SubscriptionPlanRepository extends Repository
      */
     public function getSitesWithActivePlans(): Collection
     {
-        return \App\Models\Site::whereHas('subscriptionPlans', function ($q) {
+        return Site::whereHas('subscriptionPlans', function ($q) {
             $q->where('is_active', true)
                 ->where('plan_type', 'onetime');
         })
@@ -239,6 +240,13 @@ class SubscriptionPlanRepository extends Repository
     {
         return SubscriptionPlan::with(['pricingTiers'])
             ->where('id', $planId)
+            ->first();
+    }
+
+    public function findBySlugWithPricingTiers(string $slug): ?SubscriptionPlan
+    {
+        return SubscriptionPlan::with(['pricingTiers'])
+            ->where('slug', $slug)
             ->first();
     }
 

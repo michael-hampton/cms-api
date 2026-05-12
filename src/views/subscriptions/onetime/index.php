@@ -14,6 +14,8 @@
  *   $sort_options         – SortOption[]
  */
 
+use App\Framework\Support\SiteContext;
+
 $selectedCategories = !empty($filters['categories'])
         ? (is_array($filters['categories']) ? $filters['categories'] : explode(',', $filters['categories']))
         : [];
@@ -769,9 +771,9 @@ $selectedTags = !empty($filters['tags'])
     <div class="header-sep"></div>
 
     <nav class="header-nav">
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions"
+        <a href="/<?= SiteContext::slug() ?>/subscriptions"
            class="header-nav-link active">Publications</a>
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/deals"
+        <a href="/<?= SiteContext::slug() ?>/subscriptions/deals"
            class="header-nav-link header-nav-link--deals">🔥 Deals</a>
     </nav>
 
@@ -789,7 +791,7 @@ $selectedTags = !empty($filters['tags'])
                 <span class="cart-total" id="cart-total">£0.00</span>
             </div>
         </div>
-        <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/subscriptions/onetime/account"
+        <a href="/<?= SiteContext::slug() ?>/subscriptions/onetime/account"
            class="header-account-btn">
             <?= strtoupper(substr(auth()->user()?->name ?? 'A', 0, 1)) ?>
         </a>
@@ -1146,18 +1148,45 @@ $selectedTags = !empty($filters['tags'])
                         $isLimitedOffer = $plan->end_date && $plan->end_date->diffInDays(now()) <= 30;
                         $displayPrice = $hasSale ? $salePrice : ($plan->price ?? 0);
                         $letter = strtoupper(substr($plan->name, 0, 1));
-                        $detailUrl = url('/press-stack/' . $plan->id);
+                        $detailUrl = url('/press-stack/' . $plan->slug);
                         ?>
                         <article class="plan-card">
+
+                            {{$plan->id}}
+
+                            <?php
+                            $hasSale = $plan->getBestSale() !== null;
+                            $bestSale = $plan->getBestSale();
+
+                            $displayPrice = $plan->getLowestEffectivePrice();
+
+                            $salePrice = $bestSale['sale'] ?? null;
+                            $originalPrice = $bestSale['original'] ?? null;
+                            $savingPct = $bestSale['savingPct'] ?? null;
+
+                            $isLimitedOffer = $plan->end_date && $plan->end_date->diffInDays(now()) <= 30;
+
+                            $letter = strtoupper(substr($plan->name, 0, 1));
+                            $detailUrl = url('/press-stack/' . $plan->slug);
+
+                            $coverImage = $plan->print_image_url ?? $plan->digital_image_url ?? null;
+                            ?>
+
                             <?php if ($plan->is_featured): ?>
                                 <div class="plan-card__badge plan-card__badge--featured">⭐ Featured</div>
+
                             <?php elseif ($hasSale): ?>
-                                <div class="plan-card__badge plan-card__badge--sale">SAVE <?= $savingPct ?>%</div>
+                                <div class="plan-card__badge plan-card__badge--sale">
+                                    SAVE <?= $savingPct ?>%
+                                </div>
+
                             <?php elseif ($isLimitedOffer): ?>
-                                <div class="plan-card__badge plan-card__badge--offer">Limited offer</div>
+                                <div class="plan-card__badge plan-card__badge--offer">
+                                    Limited offer
+                                </div>
                             <?php endif; ?>
 
-                            <?php $coverImage = $plan->print_image_url ?? $plan->digital_image_url ?? null; ?>
+
                             <?php if ($coverImage): ?>
                                 <div class="plan-card__cover">
                                     <img src="<?= htmlspecialchars($coverImage) ?>"
@@ -1168,24 +1197,41 @@ $selectedTags = !empty($filters['tags'])
                                 <div class="plan-card__image"><?= $letter ?></div>
                             <?php endif; ?>
 
+
                             <div class="plan-card__body">
-                                <div class="plan-card__site"><?= htmlspecialchars($plan->site->name ?? $plan->site_name ?? '') ?></div>
-                                <div class="plan-card__name"><?= htmlspecialchars($plan->name) ?></div>
+
+                                <div class="plan-card__site">
+                                    <?= htmlspecialchars($plan->site->name ?? $plan->site_name ?? '') ?>
+                                </div>
+
+                                <div class="plan-card__name">
+                                    <?= htmlspecialchars($plan->name) ?>
+                                </div>
+
 
                                 <div class="plan-card__meta">
-                                    <?php if ($plan->delivery_type === 'digital' || $plan->hasDigitalOption()): ?>
+
+                                    <?php if ($plan->hasDigitalOption()): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if ($plan->delivery_type === 'print' || $plan->hasPrintOption()): ?>
+
+                                    <?php if ($plan->hasPrintOption()): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
+
                                     <?php foreach (array_slice((array)($plan->categories ?? []), 0, 2) as $cat): ?>
-                                        <span class="meta-pill meta-pill--tag"><?= htmlspecialchars(ucfirst($cat)) ?></span>
+                                        <span class="meta-pill meta-pill--tag">
+                                            <?= htmlspecialchars(ucfirst($cat)) ?>
+                                        </span>
                                     <?php endforeach; ?>
+
                                     <?php foreach (array_slice((array)($plan->tags ?? []), 0, 2) as $tag): ?>
-                                        <span class="meta-pill meta-pill--tag"><?= htmlspecialchars(ucwords(str_replace('-', ' ', $tag))) ?></span>
+                                        <span class="meta-pill meta-pill--tag">
+                                            <?= htmlspecialchars(ucwords(str_replace('-', ' ', $tag))) ?>
+                                        </span>
                                     <?php endforeach; ?>
                                 </div>
+
 
                                 <?php if ($plan->release_date && $plan->release_date > new DateTime()): ?>
                                     <div class="plan-card__release">
@@ -1193,14 +1239,18 @@ $selectedTags = !empty($filters['tags'])
                                     </div>
                                 <?php endif; ?>
 
+
                                 <?php if (!empty($plan->description)): ?>
                                     <p class="plan-card__desc">
-                                        <?= htmlspecialchars(mb_substr($plan->description, 0, 110)) ?><?= mb_strlen($plan->description) > 110 ? '…' : '' ?>
+                                        <?= htmlspecialchars(mb_substr($plan->description, 0, 110)) ?>
+                                        <?= mb_strlen($plan->description) > 110 ? '…' : '' ?>
                                     </p>
                                 <?php endif; ?>
 
+
                                 <?php if ($plan->features): ?>
                                     <ul class="plan-card__features">
+
                                         <?php foreach (array_slice($plan->features, 0, 3) as $feature): ?>
                                             <li>
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
@@ -1210,39 +1260,54 @@ $selectedTags = !empty($filters['tags'])
                                                 <?= htmlspecialchars($feature) ?>
                                             </li>
                                         <?php endforeach; ?>
+
                                         <?php if (count($plan->features) > 3): ?>
-                                            <li class="plan-card__features-more">+<?= count($plan->features) - 3 ?>
-                                                more
+                                            <li class="plan-card__features-more">
+                                                +<?= count($plan->features) - 3 ?> more
                                             </li>
                                         <?php endif; ?>
+
                                     </ul>
                                 <?php endif; ?>
 
+
                                 <div class="plan-card__pricing">
+
                                     <div>
                                         <div class="plan-card__from">from</div>
+
                                         <?php if ($hasSale && $originalPrice): ?>
-                                            <div class="plan-card__price-was"><?= $currencySymbol ?><?= number_format($originalPrice, 2) ?></div>
+                                            <div class="plan-card__price-was">
+                                                <?= $currencySymbol ?><?= number_format($originalPrice, 2) ?>
+                                            </div>
                                         <?php endif; ?>
+
                                         <div class="plan-card__price <?= $hasSale ? 'plan-card__price--sale' : '' ?>">
                                             <?= $currencySymbol ?><?= number_format($displayPrice, 2) ?>
                                         </div>
                                     </div>
+
                                     <div>
                                         <div class="plan-card__price-period">
-                                            / <?= htmlspecialchars($plan->billing_period ?? 'month') ?></div>
+                                            / <?= htmlspecialchars($plan->billing_period ?? 'month') ?>
+                                        </div>
+
                                         <?php if ($hasSale): ?>
                                             <div class="plan-card__price-note">🔥 Sale price</div>
                                         <?php endif; ?>
                                     </div>
+
                                 </div>
 
+
                                 <div style="display:flex; gap:8px;">
+
                                     <a href="<?= $detailUrl ?>"
                                        class="plan-card__btn <?= $hasSale ? 'plan-card__btn--sale' : '' ?>"
                                        style="flex:1;">
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
+
                                     <button class="plan-card__btn plan-card__btn--cart"
                                             data-plan-id="<?= $plan->id ?>"
                                             data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
@@ -1250,7 +1315,9 @@ $selectedTags = !empty($filters['tags'])
                                             onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
                                         🛒
                                     </button>
+
                                 </div>
+
                             </div>
                         </article>
                     <?php endforeach; ?>

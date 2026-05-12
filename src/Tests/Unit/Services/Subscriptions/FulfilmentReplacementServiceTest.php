@@ -9,6 +9,7 @@ use App\Models\Subscription;
 use App\Repositories\Subscriptions\FulfilmentReplacementRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\FulfilmentReplacementService;
+use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -20,7 +21,7 @@ class FulfilmentReplacementServiceTest extends TestCase
 
     public function test_throws_exception_when_reason_is_empty(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Reason is required for issue replacement.');
 
         $this->service->requestReplacement(
@@ -40,7 +41,7 @@ class FulfilmentReplacementServiceTest extends TestCase
             ->with(1)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Subscription #1 not found.');
 
         $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
@@ -55,7 +56,7 @@ class FulfilmentReplacementServiceTest extends TestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Subscription does not belong to this site.');
 
         $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
@@ -85,7 +86,7 @@ class FulfilmentReplacementServiceTest extends TestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Only active subscriptions can have issues replaced.');
 
         $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
@@ -100,7 +101,7 @@ class FulfilmentReplacementServiceTest extends TestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Issue replacement is only available for print subscriptions.');
 
         $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
@@ -121,7 +122,7 @@ class FulfilmentReplacementServiceTest extends TestCase
             ->with(100, 1)
             ->andReturn(false);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Issue #100 does not belong to subscription #1.');
 
         $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
@@ -156,8 +157,7 @@ class FulfilmentReplacementServiceTest extends TestCase
                 1,
                 100,
                 'Missing issue',
-                5,
-                'pending',
+                5
             )
             ->andReturn($replacement);
 

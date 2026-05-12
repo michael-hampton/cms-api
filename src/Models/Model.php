@@ -23,7 +23,15 @@ use App\Framework\Database\Relations\RelationshipHandler;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Event;
 use App\Framework\Support\Serializable;
+use BackedEnum;
 use BadMethodCallException;
+use DateTime;
+use DateTimeInterface;
+use Exception;
+use ReflectionException;
+use ReflectionMethod;
+use RuntimeException;
+use UnitEnum;
 
 abstract class Model
 {
@@ -136,7 +144,7 @@ abstract class Model
     public function fill(array $attributes): self
     {
         foreach ($attributes as $key => $value) {
-            if ($key === $this->primaryKey || $this->isFillable($key)) {
+            if ($key === $this->primaryKey || $this->isFillable($key) || in_array($key, $this->appends)) {
                 $this->setAttribute($key, $value);
             }
         }
@@ -148,10 +156,6 @@ abstract class Model
         $keywords = ['count', 'total', 'avg', 'units_sold', 'day', 'revenue', 'territory_id'];
 
         if (collect($keywords)->contains(fn($keyword) => str_contains($key, $keyword))) {
-            return true;
-        }
-
-        if (!empty($this->visible) && in_array($key, $this->visible)) {
             return true;
         }
 
@@ -172,13 +176,13 @@ abstract class Model
 
         // Handle datetime casting FIRST - convert to formatted string
         if (isset($this->casts[$key]) && in_array($this->casts[$key], ['date', 'datetime', 'timestamp'])) {
-            if ($value instanceof \DateTimeInterface) {
+            if ($value instanceof DateTimeInterface) {
                 $this->attributes[$key] = $value->format($this->dateFormat);
                 return;
             }
 
             if (is_string($value)) {
-                $this->attributes[$key] = (new \DateTime($value))->format($this->dateFormat);
+                $this->attributes[$key] = (new DateTime($value))->format($this->dateFormat);
                 return;
             }
         }
@@ -227,7 +231,7 @@ abstract class Model
         $result = $this->find($id);
 
         if (!$result) {
-            throw new \Exception("No record found in {$this->table} with ID {$id}");
+            throw new Exception("No record found in {$this->table} with ID {$id}");
         }
 
         return $result;
@@ -532,7 +536,7 @@ abstract class Model
             case 'date':
             case 'datetime':
             case 'timestamp':
-                return $value instanceof \DateTime ? $value : new \DateTime($value);
+            return $value instanceof DateTime ? $value : new DateTime($value);
             default:
                 return $value;
         }
@@ -548,10 +552,10 @@ abstract class Model
                 case 'date':
                 case 'datetime':
                 case 'timestamp':
-                    if ($value instanceof \DateTimeInterface) {
+                if ($value instanceof DateTimeInterface) {
                         return $value->format($this->dateFormat);
                     } elseif (is_string($value)) {
-                        return (new \DateTime($value))->format($this->dateFormat);
+                    return (new DateTime($value))->format($this->dateFormat);
                     }
                     break;
 
@@ -571,19 +575,19 @@ abstract class Model
                 case 'double':
                     return (float)$value;
                 case 'string':
-                    if ($value instanceof \UnitEnum) {
-                        return $value instanceof \BackedEnum ? (string)$value->value : $value->name;
+                    if ($value instanceof UnitEnum) {
+                        return $value instanceof BackedEnum ? (string)$value->value : $value->name;
                     }
                     return (string)$value;
                 default:
-                    if ($value instanceof \UnitEnum) {
-                        return $value instanceof \BackedEnum ? $value->value : $value->name;
+                    if ($value instanceof UnitEnum) {
+                        return $value instanceof BackedEnum ? $value->value : $value->name;
                     }
             }
         }
 
-        if ($value instanceof \UnitEnum) {
-            return $value instanceof \BackedEnum ? $value->value : $value->name;
+        if ($value instanceof UnitEnum) {
+            return $value instanceof BackedEnum ? $value->value : $value->name;
         }
 
         // No casting, return raw value
@@ -1121,7 +1125,7 @@ abstract class Model
             ->first();
 
         if (!$fresh) {
-            throw new \RuntimeException('Model not found during refresh.');
+            throw new RuntimeException('Model not found during refresh.');
         }
 
         // Replace attributes
@@ -1510,7 +1514,7 @@ abstract class Model
             $relation = $this->$relationName();
             $this->setRelation($relationName, $relation);
             return $relation;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Return appropriate empty value if relation loading fails
             return $this->getEmptyRelationValue($relationName);
         }
@@ -1593,7 +1597,7 @@ abstract class Model
     protected function methodReturnsRelationshipHandler(string $method): bool
     {
         try {
-            $reflection = new \ReflectionMethod($this, $method);
+            $reflection = new ReflectionMethod($this, $method);
             $returnType = $reflection->getReturnType();
 
             if ($returnType) {
@@ -1606,7 +1610,7 @@ abstract class Model
 
             // Fallback to analyzing method content for relationship calls
             return $this->methodContainsRelationshipCalls($method);
-        } catch (\ReflectionException $e) {
+        } catch (ReflectionException $e) {
             return false;
         }
     }
@@ -1614,7 +1618,7 @@ abstract class Model
     protected function methodContainsRelationshipCalls(string $method): bool
     {
         try {
-            $reflection = new \ReflectionMethod($this, $method);
+            $reflection = new ReflectionMethod($this, $method);
             $filename = $reflection->getFileName();
             $startLine = $reflection->getStartLine();
             $endLine = $reflection->getEndLine();
@@ -1623,7 +1627,7 @@ abstract class Model
                 $source = implode("", array_slice(file($filename), $startLine - 1, $endLine - $startLine + 1));
                 return preg_match('/\$this->(hasOne|hasMany|belongsTo|belongsToMany)\s*\(/', $source);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Continue with fallback
         }
 
@@ -1646,6 +1650,19 @@ abstract class Model
         // This would ideally check the actual table schema
         // For now, return true and let the database handle invalid columns
         return true;
+    }
+
+    public function __isset(string $key): bool
+    {
+        if (array_key_exists($key, $this->attributes)) {
+            return $this->attributes[$key] !== null;
+        }
+
+        if (array_key_exists($key, $this->relations)) {
+            return $this->relations[$key] !== null;
+        }
+
+        return false;
     }
 
 }

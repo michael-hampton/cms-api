@@ -16,6 +16,7 @@ use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingCalculator;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
 use App\Services\ValueObjects\Money;
+use InvalidArgumentException;
 
 class OneTimeSubscriptionService
 {
@@ -82,6 +83,7 @@ class OneTimeSubscriptionService
         ?SubscriptionPricing $pricing = null,
         ?SubscriptionStatus $status = null,
         ?string             $selectedStartDate = null,
+        ?int $giftedByMemberId = null
     ): Subscription
     {
         return $this->database->transaction(function () use (
@@ -92,7 +94,8 @@ class OneTimeSubscriptionService
             $voucherId,
             $status,
             $selectedStartDate,
-            $pricing
+            $pricing,
+            $giftedByMemberId
         ) {
             $plan = $this->planRepository->find($planId);
 
@@ -150,6 +153,7 @@ class OneTimeSubscriptionService
                 'currency' => $plan->currency,
                 'auto_renew' => false,
                 'delivery_type' => $deliveryType,
+                'gifted_by_member_id' => $giftedByMemberId,
             ];
 
             $subscription = $this->subscriptionRepository->create($subscriptionData);
@@ -175,7 +179,7 @@ class OneTimeSubscriptionService
             // this method.  TRIALING subscriptions are activated by the
             // TrialConversionService after the first real charge succeeds.
             if (!in_array($subscription->status, [SubscriptionStatus::PENDING->value])) {
-                throw new \InvalidArgumentException(
+                throw new InvalidArgumentException(
                     "Cannot activate subscription with status: {$subscription->status}"
                 );
             }
@@ -263,5 +267,10 @@ class OneTimeSubscriptionService
     public function getPlanWithPricingTiers(int $planId): ?Model
     {
         return $this->planRepository->findWithPricingTiers($planId);
+    }
+
+    public function findBySlugWithPricingTiers(string $slug): ?Model
+    {
+        return $this->planRepository->findBySlugWithPricingTiers($slug);
     }
 }

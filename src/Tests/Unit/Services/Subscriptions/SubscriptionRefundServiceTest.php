@@ -8,6 +8,8 @@ use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\SubscriptionRefundService;
+use DateTime;
+use Exception;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -109,7 +111,7 @@ class SubscriptionRefundServiceTest extends TestCase
             ->with($subscription->id)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('No payment found for refund');
 
         $this->service->createFullRefund($subscription);
@@ -140,7 +142,7 @@ class SubscriptionRefundServiceTest extends TestCase
                 'message' => 'Payment already refunded'
             ]);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Provider refund failed: Payment already refunded');
 
         $this->service->createFullRefund($subscription);
@@ -233,9 +235,20 @@ class SubscriptionRefundServiceTest extends TestCase
     public function testCreateProRatedRefundFailsWithNoUnusedTime()
     {
         $subscription = $this->createMockSubscriptionWithDates();
+
         // Set dates so there's no unused time
-        $subscription->last_payment_date = new \DateTime('-60 days');
-        $subscription->end_date = new \DateTime('-30 days');
+        $subscription->last_payment_date = new DateTime('-60 days');
+        $subscription->end_date = new DateTime('-30 days');
+
+        $payment = Mockery::mock(Payment::class)->makePartial();
+        $payment->amount = 100;
+        $payment->transaction_id = 'txn_123';
+
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->with($subscription->id)
+            ->andReturn($payment);
 
         $result = $this->service->createProRatedRefund($subscription);
 
@@ -249,7 +262,7 @@ class SubscriptionRefundServiceTest extends TestCase
         $subscription = $this->createMockSubscription();
         $subscription->end_date = null;
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Cannot calculate pro-rated refund: missing dates');
 
         $this->service->createProRatedRefund($subscription);
@@ -312,8 +325,8 @@ class SubscriptionRefundServiceTest extends TestCase
     private function createMockSubscriptionWithDates()
     {
         $subscription = $this->createMockSubscription();
-        $subscription->last_payment_date = new \DateTime('-15 days');
-        $subscription->end_date = new \DateTime('+15 days');
+        $subscription->last_payment_date = new DateTime('-15 days');
+        $subscription->end_date = new DateTime('+15 days');
         return $subscription;
     }
 

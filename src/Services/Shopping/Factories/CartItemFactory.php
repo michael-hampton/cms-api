@@ -131,7 +131,7 @@ class CartItemFactory
         return new CartItemData(
             session_id: $sessionId,
             user_id: $userId,
-            product_id: $product->id,
+            product_id: null,
             quantity: $quantity,
             price: $price,
             subtotal: $price * $quantity,

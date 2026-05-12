@@ -9,6 +9,8 @@ use App\Framework\Events\EventDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use DateTimeImmutable;
+use RuntimeException;
 
 /**
  * SubscriptionPauseService
@@ -48,7 +50,7 @@ class SubscriptionPauseService
      *
      * @param string|null $pauseUntil ISO-8601 date. Null = indefinite (member must resume manually).
      *
-     * @throws \RuntimeException  If subscription not found, wrong member, or not pausable.
+     * @throws RuntimeException  If subscription not found, wrong member, or not pausable.
      */
     public function pause(int $subscriptionId, int $memberId, ?string $pauseUntil = null): Subscription
     {
@@ -56,7 +58,7 @@ class SubscriptionPauseService
             $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
             if (!in_array($subscription->status, self::PAUSABLE_STATUSES, true)) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     "Subscription cannot be paused from status: {$subscription->status}"
                 );
             }
@@ -91,12 +93,12 @@ class SubscriptionPauseService
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription) {
-            throw new \RuntimeException("Subscription not found: {$subscriptionId}");
+            throw new RuntimeException("Subscription not found: {$subscriptionId}");
         }
 
         if ((int)$subscription->member_id !== $memberId) {
             // Intentionally same message — don't leak existence to wrong member
-            throw new \RuntimeException("Subscription not found: {$subscriptionId}");
+            throw new RuntimeException("Subscription not found: {$subscriptionId}");
         }
 
         return $subscription;
@@ -111,8 +113,8 @@ class SubscriptionPauseService
             return null;
         }
 
-        $requested = new \DateTimeImmutable($pauseUntil);
-        $maxDate = new \DateTimeImmutable('+' . self::MAX_PAUSE_DAYS . ' days');
+        $requested = new DateTimeImmutable($pauseUntil);
+        $maxDate = new DateTimeImmutable('+' . self::MAX_PAUSE_DAYS . ' days');
         $resolved = $requested > $maxDate ? $maxDate : $requested;
 
         return $resolved->format('Y-m-d');
@@ -125,7 +127,7 @@ class SubscriptionPauseService
      * of days the subscription was paused, so the member is not charged immediately
      * for a period they could not use.
      *
-     * @throws \RuntimeException If subscription not found, wrong member, or not paused.
+     * @throws RuntimeException If subscription not found, wrong member, or not paused.
      */
     public function resume(int $subscriptionId, int $memberId): Subscription
     {
@@ -133,7 +135,7 @@ class SubscriptionPauseService
             $subscription = $this->loadAndAuthorize($subscriptionId, $memberId);
 
             if (!in_array($subscription->status, self::RESUMABLE_STATUSES, true)) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     "Subscription cannot be resumed from status: {$subscription->status}"
                 );
             }
@@ -173,16 +175,16 @@ class SubscriptionPauseService
      */
     private function calculateResumedBillingDate(Subscription $subscription): string
     {
-        $now = new \DateTimeImmutable();
+        $now = new DateTimeImmutable();
         $pausedAt = !empty($subscription->paused_at)
-            ? new \DateTimeImmutable((string)$subscription->paused_at)
+            ? new DateTimeImmutable((string)$subscription->paused_at)
             : $now;
 
         $pausedDays = (int)$pausedAt->diff($now)->days;
         $pausedDays = max(0, min($pausedDays, self::MAX_PAUSE_DAYS));
 
-        $base = !empty($subscription->next_billing_date)
-            ? new \DateTimeImmutable((string)$subscription->next_billing_date)
+        $base = $subscription->next_billing_date
+            ? DateTimeImmutable::createFromInterface($subscription->next_billing_date)
             : $now;
 
         return $base->modify("+{$pausedDays} days")->format('Y-m-d H:i:s');

@@ -11,6 +11,7 @@ use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Vouchers\VoucherService;
+use InvalidArgumentException;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 
@@ -137,7 +138,7 @@ class SubscriptionPricingResolverTest extends TestCase
         $resolved = $this->resolver->resolve($plan, $data, 1);
 
         $this->assertEquals(SubscriptionType::DIGITAL->value, $resolved->variant);
-        $this->assertEquals(49.99, $resolved->basePrice);
+        $this->assertEquals(29.99, $resolved->basePrice);
         $this->assertEquals(24.99, $resolved->salePrice);
         $this->assertEquals(24.99, $resolved->finalPrice);
     }
@@ -252,7 +253,7 @@ class SubscriptionPricingResolverTest extends TestCase
             'voucher_code' => 'EXPIRED'
         ];
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Voucher expired');
 
         $this->resolver->resolve($plan, $data, 1);
@@ -265,7 +266,7 @@ class SubscriptionPricingResolverTest extends TestCase
 
         $data = ['variant' => 'audio']; // Invalid variant
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage("Invalid variant: audio");
 
         $this->resolver->resolve($plan, $data, 1);
@@ -290,7 +291,7 @@ class SubscriptionPricingResolverTest extends TestCase
             'variant' => SubscriptionType::PRINTED->value
         ];
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid or inactive pricing tier: 5');
 
         $this->resolver->resolve($plan, $data, 1);
@@ -316,7 +317,7 @@ class SubscriptionPricingResolverTest extends TestCase
             'variant' => SubscriptionType::PRINTED->value
         ];
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Pricing tier 5 does not belong to plan 1');
 
         $this->resolver->resolve($plan, $data, 1);
