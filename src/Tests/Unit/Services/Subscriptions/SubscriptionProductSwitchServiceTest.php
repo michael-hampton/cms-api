@@ -13,10 +13,12 @@ use App\Models\SubscriptionPlan;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
+use DateTimeImmutable;
+use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -28,13 +30,13 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     private $memberRepository;
     private $cartService;
     private $checkoutService;
-    private $stripeProcessor;
+    private $subscriptionPaymentService;
     private $memberAuth;
     private $database;
 
     public function test_invalid_switch_mode_throws_exception(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 200, 'invalid', 'pm_123', 10.0, 0, 1, 10
@@ -49,7 +51,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->with(1)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 200, 'fresh', 'pm_123', 10.0, 0, 1, 10
@@ -65,7 +67,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->shouldReceive('find')
             ->andReturn($sub);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 200, 'fresh', 'pm_123', 10.0, 0, 1, 10
@@ -104,7 +106,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->shouldReceive('find')
             ->andReturn($sub);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 200, 'fresh', 'pm_123', 10.0, 0, 1, 10
@@ -123,7 +125,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->with(200)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 200, 'fresh', 'pm_123', 10.0, 0, 1, 10
@@ -139,7 +141,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1, 100, 'fresh', 'pm_123', 10.0, 0, 1, 10
@@ -200,8 +202,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
                 'order_id' => 500,
             ]);
 
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -212,7 +214,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->shouldReceive('clear')
             ->once();
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
 
         $this->service->switch(
             1,
@@ -236,7 +238,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -260,7 +262,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -289,7 +291,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->with(200)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -320,7 +322,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->once()
             ->andReturn($plan);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -354,7 +356,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->once()
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -394,7 +396,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             ->once()
             ->andReturn(true);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->switch(
             1,
@@ -515,8 +517,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
                 'order_id' => 500,
             ]);
 
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->andReturn([
                 'success' => true,
                 'subscription_id' => 'stripe_sub_123',
@@ -552,8 +554,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     {
         $subscription = (object)[
             'price' => 0,
-            'start_date' => new \DateTimeImmutable('-15 days'),
-            'end_date' => new \DateTimeImmutable('+15 days'),
+            'start_date' => new DateTimeImmutable('-15 days'),
+            'end_date' => new DateTimeImmutable('+15 days'),
         ];
 
         $result = $this->service->calculateCarriedOverCredit(
@@ -582,8 +584,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     {
         $subscription = (object)[
             'price' => 100,
-            'start_date' => new \DateTimeImmutable('-60 days'),
-            'end_date' => new \DateTimeImmutable('-1 day'),
+            'start_date' => new DateTimeImmutable('-60 days'),
+            'end_date' => new DateTimeImmutable('-1 day'),
         ];
 
         $result = $this->service->calculateCarriedOverCredit(
@@ -597,8 +599,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     {
         $subscription = (object)[
             'price' => 30.00,
-            'start_date' => new \DateTimeImmutable('2026-01-01 00:00:00'),
-            'end_date' => new \DateTimeImmutable('2026-01-31 00:00:00'),
+            'start_date' => new DateTimeImmutable('2026-01-01 00:00:00'),
+            'end_date' => new DateTimeImmutable('2026-01-31 00:00:00'),
         ];
 
         /**
@@ -722,8 +724,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
                 'order_id' => 500,
             ]);
 
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn([
                 'success' => true,
@@ -794,8 +796,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             OneTimeSubscriptionCheckoutService::class
         );
 
-        $this->stripeProcessor = Mockery::mock(
-            StripePaymentProcessor::class
+        $this->subscriptionPaymentService = Mockery::mock(
+            SubscriptionPaymentService::class
         );
 
         $this->memberAuth = Mockery::mock(
@@ -812,7 +814,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             $this->memberRepository,
             $this->cartService,
             $this->checkoutService,
-            $this->stripeProcessor,
+            $this->subscriptionPaymentService,
             $this->memberAuth,
             $this->database,
         );

@@ -12,9 +12,9 @@ use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Vouchers\VoucherService;
+use DateTime;
 use Exception;
 
 class SubscriptionCheckoutService
@@ -23,7 +23,7 @@ class SubscriptionCheckoutService
         private readonly SubscriptionPlanRepository $planRepository,
         private readonly SubscriptionRepository     $subscriptionRepository,
         private readonly PaymentMethodRepository    $paymentMethodRepository,
-        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly PayPalPaymentProcessor     $paypalProcessor,
         private readonly VoucherService $voucherService,
         private readonly SubscriptionEligibilityService $eligibilityService,
@@ -178,7 +178,7 @@ class SubscriptionCheckoutService
     ): Model
     {
         // Use domain date (subscription start) as basis for all calculations
-        $startDate = new \DateTime();
+        $startDate = new DateTime();
         $startDate->setTime(0, 0, 0); // Normalize to midnight
 
         $endDate = $this->calculateEndDate($startDate, $plan->billing_period);
@@ -193,6 +193,7 @@ class SubscriptionCheckoutService
             'end_date' => $endDate?->format('Y-m-d H:i:s'),
             'next_billing_date' => $endDate?->format('Y-m-d H:i:s'),
             'price' => $finalPrice ?? $plan->price,
+            'price_paid_cents' => (int)round((($finalPrice ?? $plan->price) * 100)),
             'original_price' => $plan->price,
             'discount_amount' => $discountAmount,
             'voucher_id' => $voucherId,
@@ -230,7 +231,7 @@ class SubscriptionCheckoutService
         }
     }
 
-    private function calculateEndDate(\DateTime $startDate, string $billingPeriod): ?\DateTime
+    private function calculateEndDate(DateTime $startDate, string $billingPeriod): ?DateTime
     {
         if ($billingPeriod === 'lifetime') {
             return null;
@@ -255,12 +256,19 @@ class SubscriptionCheckoutService
     ): array
     {
         $processor = match ($data['payment_method']) {
-            'stripe' => $this->stripeProcessor,
+            'stripe' => $this->subscriptionPaymentService,
             'paypal' => $this->paypalProcessor,
             default => throw new Exception('Unsupported payment method')
         };
 
-        // Use the new method that handles vouchers
+        if ($data['payment_method'] === 'stripe') {
+            return $processor->processStripeSubscriptionPayment(
+                $subscription,
+                $plan,
+                $data
+            );
+        }
+
         if ($voucher) {
             return $processor->processSubscriptionPaymentWithVoucher(
                 $subscription,

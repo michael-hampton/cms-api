@@ -10,6 +10,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Contract;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContractTemplateRepository;
 use App\Services\OpenCollab\ContractService;
@@ -101,6 +102,14 @@ class AdminContractController extends Controller
             return $this->errorResponse('Contract not found.', 404);
         }
 
+        // Guard: do not allow editing a signed contract
+        if ($this->contractRepository->hasAnySigned($id)) {
+            return $this->errorResponse(
+                'This contract version has been signed and cannot be edited. Create a new version instead.',
+                409
+            );
+        }
+
         $content = trim($request->input('content', ''));
 
         if (empty($content)) {
@@ -132,6 +141,13 @@ class AdminContractController extends Controller
         $latest = $this->contractRepository->latestForSite(SiteContext::getId());
         if (!$latest || $latest->id !== $contract->id) {
             return $this->errorResponse('Only the latest contract version can be deleted.', 409);
+        }
+
+        if ($this->contractRepository->hasAnySigned($id)) {
+            return $this->errorResponse(
+                'This contract version has been signed and cannot be deleted.',
+                409
+            );
         }
 
         try {
@@ -220,9 +236,22 @@ class AdminContractController extends Controller
         ], 201);
     }
 
+    public function fromTemplate(Request $request): JsonResponse
+    {
+        $template = $this->templateRepository->find($request->input('template_id'));
+        if (!$template) return $this->errorResponse('Template not found', 404);
+
+        $contract = $this->contractTemplateService->createDraftFromTemplate(
+            $template,
+            SiteContext::getId(),
+            Auth::id()
+        );
+        return $this->jsonResponse(['contract' => $this->formatContract($contract)], 201);
+    }
+
     // ── Formatting ────────────────────────────────────────────────────────────
 
-    private function formatContract(\App\Models\Contract $contract): array
+    private function formatContract(Contract $contract): array
     {
         return [
             'id' => $contract->id,

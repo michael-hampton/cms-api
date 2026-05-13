@@ -3,9 +3,11 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Enums\OpenCollab\AgeVerificationMethod;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
@@ -17,6 +19,7 @@ use App\Requests\OpenCollab\StoreOnboardingProfileRequest;
 use App\Requests\OpenCollab\StorePaymentDetailsRequest;
 use App\Resources\OpenCollab\OnboardingStatusResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use RuntimeException;
 
 /**
  * Handles contributor onboarding steps.
@@ -39,6 +42,7 @@ class OnboardingController extends Controller
         private readonly ContributorProfileRepository $profileRepository,
         private readonly ContractRepository           $contractRepository,
         private readonly GuidelinesRepository         $guidelinesRepository,
+        private readonly ContributorProfileRepository $contributorProfileRepository
     )
     {
         parent::__construct();
@@ -154,6 +158,22 @@ class OnboardingController extends Controller
         }
     }
 
+    public function updateAgeVerification(Request $request): JsonResponse
+    {
+        try {
+            $data = $request->all();
+            $userId = Auth::id();
+
+            $this->contributorProfileRepository->updateDob($userId, $data['date_of_birth']);
+
+            $this->contributorProfileRepository->markAgeVerified($userId, AgeVerificationMethod::SelfDeclared);
+
+            return $this->successResponse('Profile saved.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        }
+    }
+
     /**
      * POST /api/{site}/open-collab/onboarding/guidelines
      */
@@ -192,7 +212,7 @@ class OnboardingController extends Controller
         $site = Site::find(SiteContext::getId());
 
         if (!$site) {
-            throw new \RuntimeException('Site not found in context.');
+            throw new RuntimeException('Site not found in context.');
         }
 
         return $site;

@@ -6,9 +6,15 @@ use App\Enums\Subscriptions\BillingPeriod;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Payment;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Order\OrderStateManager;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Payments\PaymentRecorder;
 use App\Services\Billing\PaymentService;
+use DateTime;
 use Exception;
 
 class SubscriptionPaymentService
@@ -19,10 +25,64 @@ class SubscriptionPaymentService
         private readonly PaymentRepository      $paymentRepository,
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly PaymentService         $paymentService,
+        private readonly StripePaymentProcessor   $stripePaymentProcessor,
+        private readonly PaymentRecorder          $paymentRecorder,
+        private readonly SubscriptionStateManager $subscriptionStateManager,
+        private readonly OrderStateManager        $orderStateManager,
         ?Database                               $database = null
     )
     {
         $this->database = $database ?? Database::getInstance();
+    }
+
+    public function processStripeSubscriptionPayment(
+        Subscription     $subscription,
+        SubscriptionPlan $plan,
+        array            $data
+    ): array
+    {
+        $stripeResult = $this->stripePaymentProcessor->processSubscriptionPayment(
+            $subscription,
+            $plan,
+            $data
+        );
+
+        if (!($stripeResult['success'] ?? false)) {
+            return $stripeResult;
+        }
+
+        $payment = $this->paymentRecorder->recordSubscriptionStripePayment(
+            $subscription,
+            $plan,
+            [
+                'transaction_id' => $stripeResult['payment_intent_id'] ?? $stripeResult['subscription_id'],
+                'payment_intent_id' => $stripeResult['payment_intent_id'] ?? null,
+                'status' => $this->mapStripeStatusToPaymentStatus($stripeResult['status'] ?? 'pending'),
+                'stripe_subscription_id' => $stripeResult['subscription_id'] ?? null,
+                'stripe_customer_id' => $stripeResult['customer_id'] ?? null,
+                'order_id' => $data['order_id'] ?? null,
+                'amount_cents' => isset($data['amount_cents'])
+                    ? (int)$data['amount_cents']
+                    : (isset($data['amount']) ? (int)round(((float)$data['amount']) * 100) : null),
+            ]
+        );
+
+        if (($stripeResult['status'] ?? null) === 'active' && !($stripeResult['requires_action'] ?? false)) {
+            $this->paymentRecorder->markCompleted($payment);
+            $this->subscriptionStateManager->markActiveFromStripe(
+                $subscription,
+                $stripeResult['current_period_start'] ?? null,
+                $stripeResult['current_period_end'] ?? null,
+            );
+
+            if (!empty($data['order_id'])) {
+                $this->orderStateManager->markPaid((int)$data['order_id']);
+            }
+        }
+
+        return array_merge($stripeResult, [
+            'payment_id' => $payment->id,
+        ]);
     }
 
     /**
@@ -99,12 +159,12 @@ class SubscriptionPaymentService
                 // Update last payment date
                 $this->subscriptionRepository->updateLastPaymentDate(
                     $subscription->id,
-                    new \DateTime()
+                    new DateTime()
                 );
 
                 // Calculate and update next billing date
                 if ($subscription->auto_renew && $subscription->plan) {
-                    $baseDate = $subscription->end_date ?? new \DateTime();
+                    $baseDate = $subscription->end_date ?? new DateTime();
                     $nextBillingDate = $this->calculateNextBillingDate(
                         $subscription->plan->billing_period,
                         $baseDate
@@ -141,9 +201,9 @@ class SubscriptionPaymentService
     /**
      * Calculate next billing date based on billing period
      */
-    private function calculateNextBillingDate(string|BillingPeriod $billingPeriod, ?\DateTime $baseDate = null): \DateTime
+    private function calculateNextBillingDate(string|BillingPeriod $billingPeriod, ?DateTime $baseDate = null): DateTime
     {
-        $nextDate = clone($baseDate ?? new \DateTime());
+        $nextDate = clone($baseDate ?? new DateTime());
 
         $period = is_string($billingPeriod) ? BillingPeriod::from($billingPeriod) : $billingPeriod;
 
@@ -154,6 +214,20 @@ class SubscriptionPaymentService
 
         $nextDate->modify($modifier);
         return $nextDate;
+    }
+
+    private function mapStripeStatusToPaymentStatus(string $status): string
+    {
+        return match ($status) {
+            'active' => 'completed',
+            'trialing' => 'completed',
+            'incomplete' => 'processing',
+            'incomplete_expired' => 'failed',
+            'past_due' => 'failed',
+            'canceled' => 'cancelled',
+            'unpaid' => 'pending',
+            default => 'pending'
+        };
     }
 
     /**
@@ -271,7 +345,7 @@ class SubscriptionPaymentService
             }
 
             // NEW: Check for existing pending payment for this billing cycle
-            $billingDate = $subscription->next_billing_date ?? new \DateTime();
+            $billingDate = $subscription->next_billing_date ?? new DateTime();
             if ($this->subscriptionRepository->hasPendingPaymentForCycle($subscriptionId, $billingDate)) {
                 throw new Exception('Pending payment already exists for this billing cycle');
             }

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
+use App\Enums\OpenCollab\GuidelineStatus;
 use App\Models\Guideline;
 use App\Models\Site;
 use App\Models\UserGuidelinesAcknowledgement;
@@ -14,8 +15,8 @@ class AdminGuidelinesControllerTest extends FunctionalTestCase
 
     public function test_index_returns_all_guideline_versions_for_site(): void
     {
-        Guideline::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'First guidelines version content for testing.', 'created_at' => date('Y-m-d H:i:s')]);
-        Guideline::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Second guidelines version content for testing.', 'created_at' => date('Y-m-d H:i:s')]);
+        Guideline::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'First guidelines version content for testing.', 'created_at' => date('Y-m-d H:i:s'), 'status' => GuidelineStatus::Published->value]);
+        Guideline::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Second guidelines version content for testing.', 'created_at' => date('Y-m-d H:i:s'), 'status' => GuidelineStatus::Published->value]);
 
         $response = $this->getForSite('/api/open-collab/admin/guidelines');
         $data = json_decode($response->getContent(), true);
@@ -28,8 +29,8 @@ class AdminGuidelinesControllerTest extends FunctionalTestCase
 
     public function test_latest_returns_highest_version_guideline(): void
     {
-        Guideline::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Original brand guidelines content here.', 'created_at' => date('Y-m-d H:i:s')]);
-        Guideline::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Updated brand guidelines content here.', 'created_at' => date('Y-m-d H:i:s')]);
+        Guideline::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Original brand guidelines content here.', 'created_at' => date('Y-m-d H:i:s'), 'status' => GuidelineStatus::Published->value]);
+        Guideline::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Updated brand guidelines content here.', 'created_at' => date('Y-m-d H:i:s'), 'status' => GuidelineStatus::Published->value]);
 
         $response = $this->getForSite('/api/open-collab/admin/guidelines/latest');
         $data = json_decode($response->getContent(), true);

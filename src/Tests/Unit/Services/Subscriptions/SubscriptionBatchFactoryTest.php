@@ -187,8 +187,10 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->assertArrayHasKey('subscription', $result[0]);
         $this->assertArrayHasKey('pricing', $result[0]);
         $this->assertArrayHasKey('meta', $result[0]);
+        $this->assertArrayHasKey('price_paid_cents', $result[0]);
         $this->assertSame($subscription, $result[0]['subscription']);
         $this->assertSame($pricing, $result[0]['pricing']);
+        $this->assertSame($pricing->totalCents, $result[0]['price_paid_cents']);
     }
 
     public function testCreatePendingSubscriptionsCreatesSubscriptionsForMultipleItems(): void
@@ -659,6 +661,7 @@ class SubscriptionBatchFactoryTest extends TestCase
         );
 
         $this->assertSame(4000, $result[0]['pricing']->totalCents);
+        $this->assertSame(4000, $result[0]['price_paid_cents']);
     }
 
     public function testMetadataFromCartItemIsPreserved(): void

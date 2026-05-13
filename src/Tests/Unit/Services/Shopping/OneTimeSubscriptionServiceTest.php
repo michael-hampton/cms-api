@@ -21,6 +21,9 @@ use App\Services\Subscriptions\Calculators\SubscriptionPricingCalculator;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
 use App\Services\ValueObjects\Money;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use DateTime;
+use DateTimeImmutable;
+use InvalidArgumentException;
 use Mockery as m;
 
 class OneTimeSubscriptionServiceTest extends FunctionalTestCase
@@ -70,8 +73,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->andReturn(Money::fromDecimal(10.0, 'USD'))
             ->byDefault();
 
-        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn(new \DateTimeImmutable())->byDefault();
-        $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable())->byDefault();
+        $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn(new DateTimeImmutable())->byDefault();
+        $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new DateTimeImmutable())->byDefault();
     }
 
     protected function tearDown(): void
@@ -138,8 +141,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn(BillingPeriod::YEARLY);
 
-        $startDate = new \DateTimeImmutable('2024-01-01 00:00:00');
-        $endDate = new \DateTimeImmutable('2025-01-01 00:00:00');
+        $startDate = new DateTimeImmutable('2024-01-01 00:00:00');
+        $endDate = new DateTimeImmutable('2025-01-01 00:00:00');
 
         $this->dateCalculator->shouldReceive('normalizeStartDate')
             ->with(null)
@@ -168,6 +171,9 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('create')
             ->once()
+            ->with(m::on(function ($data) {
+                return isset($data['price_paid_cents']) && $data['price_paid_cents'] === 20;
+            }))
             ->andReturn($subscription);
 
         $subscription->shouldReceive('generateDownloadUrl')->once();
@@ -278,8 +284,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validatePlanForSubscription')->once();
         $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
 
-        $startDate = new \DateTimeImmutable();
-        $endDate = new \DateTimeImmutable('+1 year');
+        $startDate = new DateTimeImmutable();
+        $endDate = new DateTimeImmutable('+1 year');
 
         $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn($endDate);
@@ -296,6 +302,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('create')
             ->with(m::on(function ($data) {
                 return $data['price'] == 89.99
+                    && $data['price_paid_cents'] == 20
                     && $data['discount_amount'] == 10
                     && $data['original_price'] == 99.99;
             }))
@@ -332,16 +339,16 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
 
         $this->dateCalculator->shouldReceive('normalizeStartDate')
-            ->andReturn(new \DateTimeImmutable());
+            ->andReturn(new DateTimeImmutable());
         $this->dateCalculator->shouldReceive('calculateEndDate')
-            ->andReturn(new \DateTimeImmutable('+1 year'));
+            ->andReturn(new DateTimeImmutable('+1 year'));
 
         $this->pricingCalculator->shouldReceive('validateDiscount')
-            ->andThrow(new \InvalidArgumentException('Discount amount cannot be negative'));
+            ->andThrow(new InvalidArgumentException('Discount amount cannot be negative'));
 
         $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Discount amount cannot be negative');
 
         $pricing = new SubscriptionPricing(
@@ -424,7 +431,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Cannot activate subscription with status: active');
 
         $this->service->activateSubscription(1, 1);
@@ -486,7 +493,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validatePlanForSubscription')->once();
         $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
 
-        $startDate = new \DateTimeImmutable('2024-06-01 00:00:00');
+        $startDate = new DateTimeImmutable('2024-06-01 00:00:00');
         $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
 
         // calculateEndDate must NOT be called for trialing subscriptions
@@ -548,8 +555,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validatePlanForSubscription')->once();
         $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
 
-        $startDate = new \DateTimeImmutable('2024-01-01');
-        $endDate = new \DateTimeImmutable('2025-01-01');
+        $startDate = new DateTimeImmutable('2024-01-01');
+        $endDate = new DateTimeImmutable('2025-01-01');
         $this->dateCalculator->shouldReceive('normalizeStartDate')->andReturn($startDate);
         $this->dateCalculator->shouldReceive('calculateEndDate')
             ->with($startDate, BillingPeriod::YEARLY)
@@ -605,7 +612,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->validator->shouldReceive('validatePlanForSubscription')->once();
         $this->validator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::MONTHLY);
         $this->dateCalculator->shouldReceive('normalizeStartDate')
-            ->andReturn(new \DateTimeImmutable('2024-03-01'));
+            ->andReturn(new DateTimeImmutable('2024-03-01'));
         $this->dateCalculator->shouldNotReceive('calculateEndDate');
 
         $this->pricingCalculator->shouldReceive('validateDiscount')->once();
@@ -650,7 +657,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('find')->with(5)->once()->andReturn($subscription);
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Cannot activate subscription with status: trialing');
 
         $this->service->activateSubscription(5, 99);
@@ -662,7 +669,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
      */
     public function testGetSubscriptionSummaryIncludesTrialFields(): void
     {
-        $trialEndsAt = (new \DateTime('+20 days'));
+        $trialEndsAt = (new DateTime('+20 days'));
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;

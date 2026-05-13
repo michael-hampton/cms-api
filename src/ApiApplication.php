@@ -228,7 +228,10 @@ use App\Services\Vouchers\Providers\OfferDiscountProvider;
 use App\Services\Vouchers\Providers\RewardDiscountProvider;
 use App\Services\Vouchers\Providers\TieredDiscountProvider;
 use App\Services\Vouchers\Providers\VoucherDiscountProvider;
+use DateTimeInterface;
+use Error;
 use Exception;
+use Throwable;
 
 require_once __DIR__ . '/bootstrap.php';
 
@@ -250,7 +253,7 @@ class ApiApplication
 
         $this->container->instance(Router::class, $this->router);
         $this->container->bind(ContributorPolicy::class, ContributorPolicyService::class);
-        $this->container->bind(\DateTimeInterface::class, Date::class);
+        $this->container->bind(DateTimeInterface::class, Date::class);
         $this->container->bind(RequestContext::class, WebRequestContext::class);
         $this->container->bind(SessionStore::class, NativeSessionStore::class);
         $this->container->bind(DeliveryEstimatorInterface::class, InternalBusinessDayEstimator::class);
@@ -474,7 +477,7 @@ class ApiApplication
         try {
             $request = $this->container->resolve(Request::class);
             return $this->router->dispatch($method, $path, $request);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             return $this->handleException($e);
         }
     }
@@ -482,7 +485,7 @@ class ApiApplication
     /**
      * Handle exceptions with proper error responses
      */
-    private function handleException(Exception|\Error $e): Response
+    private function handleException(Exception|Error $e): Response
     {
         $data = [
             'error' => 'Internal Server Error',
@@ -558,7 +561,6 @@ class ApiApplication
         $eventDispatcher->listen(AllFulfilmentsCreated::class, [AllFulfilmentsCreatedListener::class, 'handle']);
         $eventDispatcher->listen(LabelRunFailed::class, [LabelRunFailedListener::class, 'handle']);
         $eventDispatcher->listen(LabelRunGenerated::class, [LabelRunGeneratedListener::class, 'handle']);
-
 
         $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [InvalidateContributorOnboardingListener::class, 'onGuidelinesBumped']);
         $eventDispatcher->listen(ContractPublishedEvent::class, [InvalidateContributorOnboardingListener::class, 'onContractPublished']);

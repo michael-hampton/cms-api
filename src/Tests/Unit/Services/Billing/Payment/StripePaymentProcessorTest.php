@@ -8,11 +8,18 @@ use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\Voucher;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use DateTime;
+use Exception;
 use Mockery as m;
+use ReflectionClass;
+use stdClass;
+use Stripe\Exception\CardException;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\Service\CouponService;
 use Stripe\Service\CustomerService;
 use Stripe\Service\InvoiceService;
@@ -20,6 +27,7 @@ use Stripe\Service\PaymentIntentService;
 use Stripe\Service\PaymentMethodService;
 use Stripe\Service\PriceService;
 use Stripe\Service\ProductService;
+use Stripe\Service\RefundService;
 use Stripe\Service\SubscriptionService;
 use Stripe\StripeClient;
 
@@ -88,21 +96,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $customer = $this->expectCustomerCreation($member);
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
-        $this->expectPriceCreation($plan);
 
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 2499);
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
-
-        $payment = $this->expectPaymentCreation($subscription->id);
-        $this->expectPaymentUpdate($payment->id, 'completed');
-
-        $subscription->shouldReceive('update')
-            ->once()
-            ->with([
-                'status' => 'active',
-                'current_period_start' => now_datetime()->format('Y-m-d H:i:s'),
-                'current_period_end' => now_datetime()->format('Y-m-d H:i:s'),
-            ]);
 
         $member->shouldReceive('update')
             ->once()
@@ -139,6 +135,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $subscription->id = 1;
         $subscription->member_id = $member->id;
         $subscription->site_id = 1;
+        $subscription->price = 24.99;
+        $subscription->price_paid_cents = 2499;
+        $subscription->currency = 'USD';
         $subscription->member = $member;
 
         return $subscription;
@@ -159,9 +158,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         return $plan;
     }
 
-    private function expectCustomerCreation(Member $member): \stdClass
+    private function expectCustomerCreation(Member $member): stdClass
     {
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
 
         $this->customerServiceMock->shouldReceive('create')
@@ -177,7 +176,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     private function expectPaymentMethodAttachment(string $paymentMethodId, string $customerId): void
     {
-        $paymentMethod = new \stdClass();
+        $paymentMethod = new stdClass();
         $paymentMethod->id = $paymentMethodId;
 
         $this->paymentMethodServiceMock->shouldReceive('attach')
@@ -186,7 +185,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($paymentMethod);
     }
 
-    private function expectCustomerUpdate(string $customerId, \stdClass $customer): void
+    private function expectCustomerUpdate(string $customerId, stdClass $customer): void
     {
         $this->customerServiceMock->shouldReceive('update')
             ->once()
@@ -201,7 +200,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         }
 
         // Create product
-        $product = new \stdClass();
+        $product = new stdClass();
         $product->id = 'prod_test123';
 
         $this->productServiceMock->shouldReceive('create')
@@ -214,7 +213,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($product);
 
         // Create price
-        $price = new \stdClass();
+        $price = new stdClass();
         $price->id = 'price_test123';
 
         $this->priceServiceMock->shouldReceive('create')
@@ -236,7 +235,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     private function expectSubscriptionCreation(
         string $subscriptionId,
         string $status,
-        string $invoiceId
+        string $invoiceId,
+        ?int   $expectedAmount = null
     ): \Stripe\Subscription
     {
         $stripeSubscription = \Stripe\Subscription::constructFrom([
@@ -247,10 +247,12 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->subscriptionServiceMock->shouldReceive('create')
             ->once()
-            ->with(m::on(function ($data) {
+            ->with(m::on(function ($data) use ($expectedAmount) {
                 return isset($data['customer'])
                     && isset($data['items'])
-                    && isset($data['metadata']);
+                    && isset($data['metadata'])
+                    && isset($data['items'][0]['price_data']['unit_amount'])
+                    && ($expectedAmount === null || $data['items'][0]['price_data']['unit_amount'] === $expectedAmount);
             }))
             ->andReturn($stripeSubscription);
 
@@ -259,7 +261,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     private function expectInvoiceRetrieval(string $invoiceId, ?string $paymentIntentId): void
     {
-        $invoice = new \stdClass();
+        $invoice = new stdClass();
         $invoice->id = $invoiceId;
         $invoice->payment_intent = $paymentIntentId;
 
@@ -269,7 +271,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($invoice);
     }
 
-    private function expectPaymentCreation(int $subscriptionId): Payment
+    private function expectPaymentCreation(int $subscriptionId, ?float $expectedAmount = null): Payment
     {
         $payment = m::mock(Payment::class)->makePartial();
         $payment->id = 1;
@@ -277,6 +279,10 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->paymentRepository->shouldReceive('create')
             ->once()
+            ->with(m::on(function ($data) use ($subscriptionId, $expectedAmount) {
+                return $data['subscription_id'] === $subscriptionId
+                    && ($expectedAmount === null || $data['amount'] === $expectedAmount);
+            }))
             ->andReturn($payment);
 
         return $payment;
@@ -373,15 +379,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $customer = $this->expectCustomerRetrieval('cus_existing123');
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
-        $this->expectPriceCreation($plan);
 
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 2499);
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
-
-        $payment = $this->expectPaymentCreation($subscription->id);
-        $this->expectPaymentUpdate($payment->id, 'completed');
-
-        $subscription->shouldReceive('update')->once();
 
         $result = $this->processor->processSubscriptionPayment(
             $subscription,
@@ -392,9 +392,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
-    private function expectCustomerRetrieval(string $customerId): \stdClass
+    private function expectCustomerRetrieval(string $customerId): stdClass
     {
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = $customerId;
 
         $this->customerServiceMock->shouldReceive('retrieve')
@@ -415,15 +415,14 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $customer = $this->expectCustomerRetrieval('cus_test123');
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
-        $this->expectPriceCreation($plan);
 
         // Create subscription that requires action
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'requires_action';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
-        $invoice = new \stdClass();
+        $invoice = new stdClass();
         $invoice->payment_intent = $paymentIntent;
 
         $stripeSubscription = \Stripe\Subscription::constructFrom([
@@ -435,11 +434,6 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->subscriptionServiceMock->shouldReceive('create')
             ->once()
             ->andReturn($stripeSubscription);
-
-        $payment = $this->expectPaymentCreation($subscription->id);
-
-        // Should NOT update payment when requires_action
-        $this->paymentRepository->shouldReceive('update')->never();
 
         $result = $this->processor->processSubscriptionPayment(
             $subscription,
@@ -463,7 +457,6 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $customer = $this->expectCustomerRetrieval('cus_test123');
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
-        $this->expectPriceCreation($plan);
 
         // Expect subscription with trial period
         $stripeSubscription = \Stripe\Subscription::constructFrom([
@@ -481,17 +474,12 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($stripeSubscription);
 
         // Mock invoice with no payment intent (trial)
-        $invoice = new \stdClass();
+        $invoice = new stdClass();
         $invoice->payment_intent = null;
 
         $this->invoiceServiceMock->shouldReceive('retrieve')
             ->once()
             ->andReturn($invoice);
-
-        $payment = $this->expectPaymentCreation($subscription->id);
-        $this->paymentRepository->shouldReceive('update')->never();
-
-        $subscription->shouldReceive('update')->never();
 
         $result = $this->processor->processSubscriptionPayment(
             $subscription,
@@ -502,53 +490,21 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
-    public function testProcessSubscriptionPaymentCreatesStripePrice(): void
+    public function testProcessSubscriptionPaymentUsesSubscriptionPricePaidCentsForStripeAmount(): void
     {
         $member = $this->createMockMember('cus_test123');
         $subscription = $this->createMockSubscription($member);
         $plan = $this->createMockPlan();
-        $plan->stripe_price_id = null; // No existing price
 
         // Setup expectations
         $customer = $this->expectCustomerRetrieval('cus_test123');
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
+        $subscription->price_paid_cents = 1599;
+        $subscription->price = 15.99;
 
-        // Expect product and price creation
-        $product = new \stdClass();
-        $product->id = 'prod_test123';
-
-        $this->productServiceMock->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) use ($plan) {
-                return $data['name'] === $plan->name
-                    && isset($data['metadata']['plan_id']);
-            }))
-            ->andReturn($product);
-
-        $price = new \stdClass();
-        $price->id = 'price_test123';
-
-        $this->priceServiceMock->shouldReceive('create')
-            ->once()
-            ->with(m::on(function ($data) use ($plan) {
-                return $data['product'] === 'prod_test123'
-                    && $data['unit_amount'] === (int)($plan->price * 100)
-                    && isset($data['recurring']);
-            }))
-            ->andReturn($price);
-
-        $plan->shouldReceive('update')
-            ->once()
-            ->with(['stripe_price_id' => 'price_test123']);
-
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 1599);
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
-
-        $payment = $this->expectPaymentCreation($subscription->id);
-        $this->expectPaymentUpdate($payment->id, 'completed');
-
-        $subscription->shouldReceive('update')->once();
 
         $result = $this->processor->processSubscriptionPayment(
             $subscription,
@@ -568,7 +524,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $customer = $this->expectCustomerRetrieval('cus_test123');
 
         // Mock payment method attachment failure
-        $exception = m::mock(\Stripe\Exception\CardException::class);
+        $exception = m::mock(CardException::class);
         $exception->shouldReceive('getMessage')->andReturn('Your card was declined');
         $exception->shouldReceive('getStripeCode')->andReturn('card_declined');
 
@@ -588,7 +544,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCreatePaymentIntent(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
@@ -623,7 +579,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with(['stripe_customer_id' => $customer->id])
             ->andReturn(true);
 
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
@@ -659,7 +615,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $customer = $this->expectCustomerRetrieval('cus_existing123');
 
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
@@ -684,7 +640,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCreatePaymentIntentWithCustomerWorksWithoutMember(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
@@ -707,7 +663,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testHandleOneTimeSubscriptionPaymentSavesPaymentMethod(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'succeeded';
         $paymentIntent->amount = 9999;
@@ -721,7 +677,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($paymentIntent);
 
         // Expect payment method retrieval
-        $paymentMethod = new \stdClass();
+        $paymentMethod = new stdClass();
         $paymentMethod->id = 'pm_test123';
         $paymentMethod->customer = null; // Not yet attached
 
@@ -737,7 +693,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($paymentMethod);
 
         // Expect customer update to set default payment method
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
 
         $this->customerServiceMock->shouldReceive('update')
@@ -774,7 +730,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testHandleOneTimeSubscriptionPaymentContinuesIfSavingPaymentMethodFails(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'succeeded';
         $paymentIntent->amount = 9999;
@@ -791,7 +747,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         // Payment method retrieval fails
         $this->paymentMethodServiceMock->shouldReceive('retrieve')
             ->once()
-            ->andThrow(new \Exception('Payment method not found'));
+            ->andThrow(new Exception('Payment method not found'));
 
         $payment = m::mock(Payment::class)->makePartial();
         $payment->id = 1;
@@ -813,7 +769,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testProcessOneTimePaymentWithPaymentMethodId(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'succeeded';
         $paymentIntent->client_secret = 'pi_test123_secret';
@@ -840,7 +796,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCancelSubscription(): void
     {
-        $stripeSubscription = new \stdClass();
+        $stripeSubscription = new stdClass();
         $stripeSubscription->status = 'canceled';
 
         $this->subscriptionServiceMock->shouldReceive('cancel')
@@ -856,7 +812,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCancelSubscriptionImmediately(): void
     {
-        $canceledSubscription = new \stdClass();
+        $canceledSubscription = new stdClass();
         $canceledSubscription->id = 'sub_test123';
         $canceledSubscription->status = 'canceled';
         $canceledSubscription->cancel_at_period_end = false;
@@ -877,7 +833,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCancelSubscriptionAtPeriodEnd(): void
     {
-        $subscription = new \stdClass();
+        $subscription = new stdClass();
         $subscription->id = 'sub_test123';
         $subscription->status = 'active';
         $subscription->cancel_at_period_end = true;
@@ -898,7 +854,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testReactivateSubscription(): void
     {
-        $subscription = new \stdClass();
+        $subscription = new stdClass();
         $subscription->id = 'sub_test123';
         $subscription->status = 'active';
         $subscription->cancel_at_period_end = true;
@@ -922,13 +878,13 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCreateRefund(): void
     {
-        $refund = new \stdClass();
+        $refund = new stdClass();
         $refund->id = 'ref_test123';
         $refund->amount = 5000; // cents
         $refund->status = 'succeeded';
         $refund->created = time();
 
-        $refundServiceMock = m::mock(\Stripe\Service\RefundService::class);
+        $refundServiceMock = m::mock(RefundService::class);
         $this->stripeMock->refunds = $refundServiceMock;
 
         $refundServiceMock->shouldReceive('create')
@@ -949,7 +905,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testReactivateSubscriptionSucceeds(): void
     {
-        $subscription = new \stdClass();
+        $subscription = new stdClass();
         $subscription->id = 'sub_test123';
         $subscription->status = 'active';
         $subscription->cancel_at_period_end = true; // Set to cancel at period end
@@ -961,7 +917,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($subscription);
 
         // Then update to remove cancellation
-        $updatedSubscription = new \stdClass();
+        $updatedSubscription = new stdClass();
         $updatedSubscription->id = 'sub_test123';
         $updatedSubscription->status = 'active';
         $updatedSubscription->cancel_at_period_end = false;
@@ -980,7 +936,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testReactivateSubscriptionFailsIfAlreadyCanceled(): void
     {
-        $subscription = new \stdClass();
+        $subscription = new stdClass();
         $subscription->id = 'sub_test123';
         $subscription->status = 'canceled'; // Already fully canceled
 
@@ -998,7 +954,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testReactivateSubscriptionFailsIfNotScheduledForCancellation(): void
     {
-        $subscription = new \stdClass();
+        $subscription = new stdClass();
         $subscription->id = 'sub_test123';
         $subscription->status = 'active';
         $subscription->cancel_at_period_end = false; // Not scheduled for cancellation
@@ -1018,8 +974,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     {
         $member = $this->createMockMember('cus_test123');
 
-        $customer = new \stdClass();
-        $customer->invoice_settings = new \stdClass();
+        $customer = new stdClass();
+        $customer->invoice_settings = new stdClass();
         $customer->invoice_settings->default_payment_method = 'pm_default123';
 
         $this->customerServiceMock->shouldReceive('retrieve')
@@ -1027,12 +983,12 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with('cus_test123')
             ->andReturn($customer);
 
-        $paymentMethod1 = new \stdClass();
+        $paymentMethod1 = new stdClass();
         $paymentMethod1->id = 'pm_test123';
-        $paymentMethod2 = new \stdClass();
+        $paymentMethod2 = new stdClass();
         $paymentMethod2->id = 'pm_test456';
 
-        $paymentMethodsData = new \stdClass();
+        $paymentMethodsData = new stdClass();
         $paymentMethodsData->data = [$paymentMethod1, $paymentMethod2];
 
         $this->paymentMethodServiceMock->shouldReceive('all')
@@ -1096,7 +1052,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->expectPaymentMethodAttachment('pm_test123', 'cus_test123');
 
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
 
         $this->customerServiceMock->shouldReceive('update')
@@ -1115,7 +1071,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testSetDefaultPaymentMethod(): void
     {
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
 
         $this->customerServiceMock->shouldReceive('update')
@@ -1136,7 +1092,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     {
         $member = $this->createMockMember('cus_test123');
 
-        $paymentMethod = new \stdClass();
+        $paymentMethod = new stdClass();
         $paymentMethod->id = 'pm_test123';
         $paymentMethod->customer = 'cus_test123';
 
@@ -1145,7 +1101,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with('pm_test123')
             ->andReturn($paymentMethod);
 
-        $detachedPaymentMethod = new \stdClass();
+        $detachedPaymentMethod = new stdClass();
         $detachedPaymentMethod->id = 'pm_test123';
 
         $this->paymentMethodServiceMock->shouldReceive('detach')
@@ -1162,7 +1118,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     {
         $member = $this->createMockMember('cus_test123');
 
-        $paymentMethod = new \stdClass();
+        $paymentMethod = new stdClass();
         $paymentMethod->id = 'pm_test123';
         $paymentMethod->customer = 'cus_different456'; // Different customer
 
@@ -1185,7 +1141,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $subscription = $this->createMockSubscription($member);
         $plan = $this->createMockPlan();
 
-        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';
         $voucher->type = VoucherType::Percentage->value;
@@ -1247,7 +1203,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponCreatesNewCoupon(): void
     {
-        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';
         $voucher->name = '10% Off';
@@ -1257,7 +1213,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher->duration_in_months = null;
         $voucher->maximum_discount = null;
 
-        $stripeCoupon = new \stdClass();
+        $stripeCoupon = new stdClass();
         $stripeCoupon->id = 'coupon_test123';
 
         $plan = $this->createMockPlan();
@@ -1278,7 +1234,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with(['stripe_coupon_id' => 'coupon_test123']);
 
         // Use reflection to test private method
-        $reflection = new \ReflectionClass($this->processor);
+        $reflection = new ReflectionClass($this->processor);
         $method = $reflection->getMethod('getOrCreateStripeCoupon');
         $method->setAccessible(true);
 
@@ -1289,9 +1245,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponUsesExisting(): void
     {
-        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->stripe_coupon_id = 'coupon_existing123';
-        $stripeCoupon = new \stdClass();
+        $stripeCoupon = new stdClass();
         $stripeCoupon->id = 'coupon_existing123';
 
         $this->couponServiceMock->shouldReceive('retrieve')
@@ -1299,7 +1255,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->with('coupon_existing123')
             ->andReturn($stripeCoupon);
 
-        $reflection = new \ReflectionClass($this->processor);
+        $reflection = new ReflectionClass($this->processor);
         $method = $reflection->getMethod('getOrCreateStripeCoupon');
         $method->setAccessible(true);
 
@@ -1313,7 +1269,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponWithFixedAmount(): void
     {
-        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB15';
         $voucher->name = '$15 Off';
@@ -1321,7 +1277,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher->value = 15;
         $voucher->stripe_coupon_id = null;
         $voucher->duration_in_months = null;
-        $stripeCoupon = new \stdClass();
+        $stripeCoupon = new stdClass();
         $stripeCoupon->id = 'coupon_test123';
 
         $this->couponServiceMock->shouldReceive('create')
@@ -1334,7 +1290,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $voucher->shouldReceive('update')->once();
 
-        $reflection = new \ReflectionClass($this->processor);
+        $reflection = new ReflectionClass($this->processor);
         $method = $reflection->getMethod('getOrCreateStripeCoupon');
         $method->setAccessible(true);
 
@@ -1348,7 +1304,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testGetOrCreateStripeCouponWithDuration(): void
     {
-        $voucher = m::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher = m::mock(Voucher::class)->makePartial();
         $voucher->id = 1;
         $voucher->code = 'SUB10';
         $voucher->name = '10% Off';
@@ -1356,7 +1312,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $voucher->value = 10;
         $voucher->stripe_coupon_id = null;
         $voucher->duration_in_months = 3;
-        $stripeCoupon = new \stdClass();
+        $stripeCoupon = new stdClass();
         $stripeCoupon->id = 'coupon_test123';
 
         $this->couponServiceMock->shouldReceive('create')
@@ -1369,7 +1325,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $voucher->shouldReceive('update')->once();
 
-        $reflection = new \ReflectionClass($this->processor);
+        $reflection = new ReflectionClass($this->processor);
         $method = $reflection->getMethod('getOrCreateStripeCoupon');
         $method->setAccessible(true);
 
@@ -1384,9 +1340,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 // Helper methods
     private function expectCouponCreation($voucher): void
     {
-        $stripeCoupon = new \stdClass();
+        $stripeCoupon = new stdClass();
         $stripeCoupon->id = 'coupon_test123';
-        $couponServiceMock = m::mock(\Stripe\Service\CouponService::class);
+        $couponServiceMock = m::mock(CouponService::class);
         $this->stripeMock->coupons = $couponServiceMock;
 
         $couponServiceMock->shouldReceive('create')
@@ -1437,7 +1393,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testCreatePaymentIntentForOneTimeSubscription(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->client_secret = 'pi_test123_secret_abc';
 
@@ -1465,7 +1421,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testHandleOneTimeSubscriptionPaymentSuccess(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'succeeded';
         $paymentIntent->amount = 9999;
@@ -1507,7 +1463,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testHandleOneTimeSubscriptionPaymentFailsWhenNotSucceeded(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'requires_action';
 
@@ -1529,7 +1485,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testConfirmPaymentIntentSuccess(): void
     {
-        $paymentIntent = new \stdClass();
+        $paymentIntent = new stdClass();
         $paymentIntent->id = 'pi_test123';
         $paymentIntent->status = 'succeeded';
         $paymentIntent->amount = 9999;
@@ -1550,7 +1506,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testUpdateCustomerEmail(): void
     {
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
         $customer->email = 'new@example.com';
 
@@ -1571,7 +1527,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $member = $this->createMockMember('cus_test123');
 
         // Mock removing old payment method
-        $oldPaymentMethod = new \stdClass();
+        $oldPaymentMethod = new stdClass();
         $oldPaymentMethod->id = 'pm_old123';
         $oldPaymentMethod->customer = 'cus_test123';
 
@@ -1588,7 +1544,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         // Mock adding new payment method
         $this->expectPaymentMethodAttachment('pm_new456', 'cus_test123');
 
-        $customer = new \stdClass();
+        $customer = new stdClass();
         $customer->id = 'cus_test123';
 
         $this->customerServiceMock->shouldReceive('update')
@@ -1613,7 +1569,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     {
         $member = $this->createMockMember('cus_test123');
 
-        $oldPaymentMethod = new \stdClass();
+        $oldPaymentMethod = new stdClass();
         $oldPaymentMethod->id = 'pm_old123';
         $oldPaymentMethod->customer = 'cus_different456'; // Different customer
 
@@ -1630,11 +1586,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testIsPaymentMethodExpiring(): void
     {
-        $paymentMethod = new \stdClass();
-        $paymentMethod->card = new \stdClass();
+        $paymentMethod = new stdClass();
+        $paymentMethod->card = new stdClass();
 
         // Card expiring in 1 month
-        $nextMonth = new \DateTime('+1 month');
+        $nextMonth = new DateTime('+1 month');
         $paymentMethod->card->exp_month = (int)$nextMonth->format('m');
         $paymentMethod->card->exp_year = (int)$nextMonth->format('Y');
 
@@ -1645,11 +1601,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
     public function testIsPaymentMethodExpired(): void
     {
-        $paymentMethod = new \stdClass();
-        $paymentMethod->card = new \stdClass();
+        $paymentMethod = new stdClass();
+        $paymentMethod->card = new stdClass();
 
         // Card expired last month
-        $lastMonth = new \DateTime('-1 month');
+        $lastMonth = new DateTime('-1 month');
         $paymentMethod->card->exp_month = (int)$lastMonth->format('m');
         $paymentMethod->card->exp_year = (int)$lastMonth->format('Y');
 
@@ -1662,8 +1618,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     {
         $member = $this->createMockMember('cus_test123');
 
-        $customer = new \stdClass();
-        $customer->invoice_settings = new \stdClass();
+        $customer = new stdClass();
+        $customer->invoice_settings = new stdClass();
         $customer->invoice_settings->default_payment_method = 'pm_test123';
 
         $this->customerServiceMock->shouldReceive('retrieve')
@@ -1671,16 +1627,16 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($customer);
 
         // Expiring card
-        $expiringCard = new \stdClass();
+        $expiringCard = new stdClass();
         $expiringCard->id = 'pm_test123';
-        $expiringCard->card = new \stdClass();
-        $nextMonth = new \DateTime('+1 month');
+        $expiringCard->card = new stdClass();
+        $nextMonth = new DateTime('+1 month');
         $expiringCard->card->exp_month = (int)$nextMonth->format('m');
         $expiringCard->card->exp_year = (int)$nextMonth->format('Y');
         $expiringCard->card->brand = 'visa';
         $expiringCard->card->last4 = '4242';
 
-        $paymentMethodsData = new \stdClass();
+        $paymentMethodsData = new stdClass();
         $paymentMethodsData->data = [$expiringCard];
 
         $this->paymentMethodServiceMock->shouldReceive('all')
@@ -1700,11 +1656,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $chargeId = 'ch_' . uniqid();
         $amount = 99.99;
 
-        $mockRefund = new \stdClass();
+        $mockRefund = new stdClass();
         $mockRefund->id = 'refund_' . uniqid();
         $mockRefund->status = 'succeeded';
 
-        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $this->createMock(RefundService::class);
         $this->stripeMock->refunds
             ->expects($this->once())
             ->method('create')
@@ -1727,11 +1683,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $paymentIntentId = 'pi_' . uniqid();
         $amount = 150.00;
 
-        $mockRefund = new \stdClass();
+        $mockRefund = new stdClass();
         $mockRefund->id = 'refund_' . uniqid();
         $mockRefund->status = 'succeeded';
 
-        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $this->createMock(RefundService::class);
         $this->stripeMock->refunds
             ->expects($this->once())
             ->method('create')
@@ -1754,11 +1710,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $reason = 'customer_request';
         $metadata = ['order_id' => '12345', 'user_id' => '67890'];
 
-        $mockRefund = new \stdClass();
+        $mockRefund = new stdClass();
         $mockRefund->id = 'refund_' . uniqid();
         $mockRefund->status = 'succeeded';
 
-        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $this->createMock(RefundService::class);
         $this->stripeMock->refunds
             ->expects($this->once())
             ->method('create')
@@ -1781,11 +1737,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $chargeId = 'ch_invalid';
         $amount = 100.00;
 
-        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $this->createMock(RefundService::class);
         $this->stripeMock->refunds
             ->expects($this->once())
             ->method('create')
-            ->willThrowException(new \Stripe\Exception\InvalidRequestException(
+            ->willThrowException(new InvalidRequestException(
                 'Charge not found',
                 null,
                 null,
@@ -1803,11 +1759,11 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $chargeId = 'ch_' . uniqid();
         $amount = 123.45;
 
-        $mockRefund = new \stdClass();
+        $mockRefund = new stdClass();
         $mockRefund->id = 'refund_' . uniqid();
         $mockRefund->status = 'succeeded';
 
-        $this->stripeMock->refunds = $this->createMock(\Stripe\Service\RefundService::class);
+        $this->stripeMock->refunds = $this->createMock(RefundService::class);
         $this->stripeMock->refunds
             ->expects($this->once())
             ->method('create')

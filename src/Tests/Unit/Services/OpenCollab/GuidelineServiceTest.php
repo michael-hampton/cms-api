@@ -3,9 +3,6 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\GuidelineStatus;
-use App\Events\OpenCollab\GuidelineArchivedEvent;
-use App\Events\OpenCollab\GuidelineDraftCreatedEvent;
-use App\Events\OpenCollab\GuidelinePublishedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
@@ -18,6 +15,7 @@ use App\Services\OpenCollab\GuidelineService;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class GuidelineServiceTest extends TestCase
 {
@@ -32,7 +30,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_create_draft_persists_and_emits_event(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => GuidelineStatus::Draft]);
+        $guideline = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => GuidelineStatus::Draft->value]);
 
         $this->guidelinesRepository
             ->shouldReceive('createVersion')
@@ -53,8 +51,8 @@ class GuidelineServiceTest extends TestCase
 
     public function test_update_draft_content_succeeds_for_draft(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Draft]);
-        $updated = $this->makeGuideline(['id' => 1, 'content' => 'new content', 'status' => GuidelineStatus::Draft]);
+        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Draft->value]);
+        $updated = $this->makeGuideline(['id' => 1, 'content' => 'new content', 'status' => GuidelineStatus::Draft->value]);
 
         $guideline->shouldReceive('update')->once()->with(['content' => 'new content']);
         $guideline->shouldReceive('fresh')->once()->andReturn($updated);
@@ -68,7 +66,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_update_draft_content_throws_for_published_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 5, 'status' => GuidelineStatus::Published]);
+        $guideline = $this->makeGuideline(['id' => 5, 'status' => GuidelineStatus::Published->value]);
 
         $this->expectException(GuidelineNotEditableException::class);
 
@@ -77,7 +75,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_update_draft_content_throws_for_archived_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 5, 'status' => GuidelineStatus::Archived]);
+        $guideline = $this->makeGuideline(['id' => 5, 'status' => GuidelineStatus::Archived->value]);
 
         $this->expectException(GuidelineNotEditableException::class);
 
@@ -88,8 +86,8 @@ class GuidelineServiceTest extends TestCase
 
     public function test_publish_version_transitions_draft_to_published_and_updates_site(): void
     {
-        $draft = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Draft]);
-        $published = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Published]);
+        $draft = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Draft->value]);
+        $published = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Published->value]);
 
         $site = Mockery::mock(Site::class)->makePartial();
         $site->id = 10;
@@ -121,9 +119,9 @@ class GuidelineServiceTest extends TestCase
 
     public function test_publish_auto_archives_previous_published_guideline(): void
     {
-        $previous = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => GuidelineStatus::Published]);
-        $draft = $this->makeGuideline(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Draft]);
-        $published = $this->makeGuideline(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Published]);
+        $previous = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => GuidelineStatus::Published->value]);
+        $draft = $this->makeGuideline(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Draft->value]);
+        $published = $this->makeGuideline(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => GuidelineStatus::Published->value]);
 
         $site = Mockery::mock(Site::class)->makePartial();
         $site->id = 10;
@@ -159,7 +157,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_publish_throws_for_already_published_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Published]);
+        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Published->value]);
 
         $this->expectException(GuidelineNotPublishableException::class);
 
@@ -168,7 +166,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_publish_throws_for_archived_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Archived]);
+        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Archived->value]);
 
         $this->expectException(GuidelineNotPublishableException::class);
 
@@ -179,8 +177,8 @@ class GuidelineServiceTest extends TestCase
 
     public function test_archive_version_transitions_published_to_archived(): void
     {
-        $published = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Published]);
-        $archived = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Archived]);
+        $published = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Published->value]);
+        $archived = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Archived->value]);
 
         $this->guidelinesRepository
             ->shouldReceive('archive')
@@ -199,7 +197,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_archive_throws_for_draft_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Draft]);
+        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Draft->value]);
 
         $this->expectException(GuidelineNotArchivableException::class);
 
@@ -208,7 +206,7 @@ class GuidelineServiceTest extends TestCase
 
     public function test_archive_throws_for_already_archived_guideline(): void
     {
-        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Archived]);
+        $guideline = $this->makeGuideline(['id' => 1, 'status' => GuidelineStatus::Archived->value]);
 
         $this->expectException(GuidelineNotArchivableException::class);
 
@@ -224,14 +222,14 @@ class GuidelineServiceTest extends TestCase
             'site_id' => 10,
             'version' => 3,
             'content' => 'original content',
-            'status' => GuidelineStatus::Published,
+            'status' => GuidelineStatus::Published->value,
         ]);
         $draft = $this->makeGuideline([
             'id' => 4,
             'site_id' => 10,
             'version' => 4,
             'content' => 'original content',
-            'status' => GuidelineStatus::Draft,
+            'status' => GuidelineStatus::Draft->value,
         ]);
 
         $this->guidelinesRepository
@@ -268,24 +266,24 @@ class GuidelineServiceTest extends TestCase
             'site_id' => 10,
             'version' => 3,
             'content' => 'original content',
-            'status' => GuidelineStatus::Published,
+            'status' => GuidelineStatus::Published->value,
         ]);
 
         $this->guidelinesRepository->shouldReceive('nextVersionNumber')->andReturn(4);
         $this->guidelinesRepository->shouldReceive('create')
-            ->andReturn($this->makeGuideline(['id' => 4, 'status' => GuidelineStatus::Draft, 'site_id' => 10]));
+            ->andReturn($this->makeGuideline(['id' => 4, 'status' => GuidelineStatus::Draft->value, 'site_id' => 10]));
 
         $this->runInFakeTransaction(fn() => $this->service->cloneToDraft($source, 99));
 
         $this->assertEquals('original content', $source->content);
-        $this->assertEquals(GuidelineStatus::Published, $source->status);
+        $this->assertEquals(GuidelineStatus::Published->value, $source->status);
     }
 
     // ── Transaction rollback on failure ───────────────────────────────────────
 
     public function test_publish_rolls_back_on_repository_failure(): void
     {
-        $draft = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Draft]);
+        $draft = $this->makeGuideline(['id' => 1, 'site_id' => 10, 'status' => GuidelineStatus::Draft->value]);
 
         $this->guidelinesRepository
             ->shouldReceive('latestPublishedForSite')
@@ -293,9 +291,9 @@ class GuidelineServiceTest extends TestCase
 
         $this->guidelinesRepository
             ->shouldReceive('publish')
-            ->andThrow(new \RuntimeException('DB failure'));
+            ->andThrow(new RuntimeException('DB failure'));
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
 
         $this->runInFakeTransaction(
             fn() => $this->service->publishVersion($draft, 99)

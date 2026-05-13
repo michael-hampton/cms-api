@@ -6,6 +6,7 @@ use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
 use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
+use App\Models\PaymentMethod;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Voucher;
@@ -13,10 +14,10 @@ use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
 use App\Services\Subscriptions\SubscriptionEligibilityService;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -26,7 +27,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
     private $planRepository;
     private $subscriptionRepository;
     private $paymentMethodRepository;
-    private $stripeProcessor;
+    private $subscriptionPaymentService;
     private $paypalProcessor;
     private $voucherService;
     private $service;
@@ -40,7 +41,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $this->planRepository = m::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->paymentMethodRepository = m::mock(PaymentMethodRepository::class);
-        $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
+        $this->subscriptionPaymentService = m::mock(SubscriptionPaymentService::class);
         $this->paypalProcessor = m::mock(PayPalPaymentProcessor::class);
         $this->voucherService = m::mock(VoucherService::class);
         $this->eligibilityService = m::mock(SubscriptionEligibilityService::class);
@@ -50,7 +51,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             $this->planRepository,
             $this->subscriptionRepository,
             $this->paymentMethodRepository,
-            $this->stripeProcessor,
+            $this->subscriptionPaymentService,
             $this->paypalProcessor,
             $this->voucherService,
             $this->eligibilityService,
@@ -74,7 +75,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
 
-        $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();;
+        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
 
         $this->setPricingResolverExpectations($plan);
@@ -114,7 +115,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             ->andReturn($subscription);
 
 
-        $this->stripeProcessor->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn([
                 'success' => true,
@@ -148,7 +149,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->setEligibilityServiceMock(true);
 
-        $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
+        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
 
         $voucher = m::mock(Voucher::class)->makePartial();
@@ -209,9 +210,9 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
             ->with(1, ['payment_intent_id' => 'pi_123', 'payment_subscription_id' => 'sub_123', 'status' => 'active'])
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('processSubscriptionPaymentWithVoucher')
+        $this->subscriptionPaymentService->shouldReceive('processStripeSubscriptionPayment')
             ->once()
-            ->with($subscription, $plan, $voucher, m::type('array'))
+            ->with($subscription, $plan, m::type('array'))
             ->andReturn([
                 'success' => true,
                 'payment_intent_id' => 'pi_123',
@@ -243,7 +244,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->is_active = true;
         $plan->price = 22.99;
 
-        $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
+        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
 
         $this->setPricingResolverExpectations($plan, 'INVALID');
@@ -405,7 +406,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
 
-        $paymentMethod = m::mock(\App\Models\PaymentMethod::class)->makePartial();
+        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
         $paymentMethod->is_active = true;
 
         $this->setPricingResolverExpectations($plan);
@@ -422,7 +423,7 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('create')->once()->andReturn($subscription);
 
         // Payment fails
-        $this->stripeProcessor->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn(['success' => false, 'message' => 'Card declined']);
 

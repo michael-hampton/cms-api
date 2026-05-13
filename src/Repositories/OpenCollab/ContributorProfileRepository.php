@@ -4,19 +4,33 @@ namespace App\Repositories\OpenCollab;
 
 use App\Enums\OpenCollab\AgeVerificationMethod;
 use App\Models\ContributorProfile;
+use App\Models\Model;
 use App\Repositories\Repository;
 
+/**
+ * Data-access layer for oc_contributor_profiles.
+ *
+ * Thin wrapper so controllers and services never build queries directly,
+ * and unit tests can swap in a mock.
+ */
 class ContributorProfileRepository extends Repository
 {
     public function __construct(
-        ?ContributorPayoutAccountRepository $payoutAccountRepository = null,
+        private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
     )
     {
-        $this->payoutAccountRepository = $payoutAccountRepository ?? new ContributorPayoutAccountRepository();
         parent::__construct();
     }
 
-    private readonly ContributorPayoutAccountRepository $payoutAccountRepository;
+    /**
+     * Find a contributor's profile for a specific site.
+     */
+    public function findByUserAndSite(int $userId, int $siteId): ?ContributorProfile
+    {
+        return ContributorProfile::where('user_id', $userId)
+            ->where('site_id', $siteId)
+            ->first();
+    }
 
     public function markPaymentSetup(int $userId, string $stripeToken): void
     {
@@ -78,6 +92,19 @@ class ContributorProfileRepository extends Repository
             'age_verification_method' => $method->value,
             'minimum_age_confirmed' => true,
         ]);
+    }
+
+    /**
+     * Create a new profile row for the given user + site combination.
+     *
+     * @param array<string, mixed> $extra Additional columns to set on creation.
+     */
+    public function createForUser(int $userId, int $siteId, array $extra = []): Model
+    {
+        return ContributorProfile::create(array_merge([
+            'user_id' => $userId,
+            'site_id' => $siteId,
+        ], $extra));
     }
 
     protected function getModelClass(): string

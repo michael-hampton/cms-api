@@ -5,21 +5,25 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
+use DateTimeImmutable;
+use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class SubscriptionRenewalServiceTest extends TestCase
 {
     private $subscriptionRepository;
     private $planRepository;
-    private $stripeProcessor;
+    private $subscriptionPaymentService;
     private $dateCalculator;
     private $database;
 
@@ -33,7 +37,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             ->with(1)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
     }
@@ -45,7 +49,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
     }
@@ -72,11 +76,11 @@ class SubscriptionRenewalServiceTest extends TestCase
             ->andReturn($sub);
 
         // 🔥 IMPORTANT: prevent Stripe from interfering with validation test
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->never();
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->expectExceptionMessage(
             "Subscription cannot be renewed from status: replaced."
@@ -104,7 +108,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             ->with(200)
             ->andReturn(null);
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidArgumentException::class);
 
         $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
     }
@@ -117,15 +121,15 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
 
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn([
                 'success' => false,
                 'message' => 'card declined',
             ]);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
 
         $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
     }
@@ -154,8 +158,8 @@ class SubscriptionRenewalServiceTest extends TestCase
             ->shouldReceive('find')
             ->andReturn($plan);
 
-        $this->stripeProcessor
-            ->shouldReceive('processSubscriptionPayment')
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn([
                 'success' => true,
@@ -171,9 +175,9 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->dateCalculator
             ->shouldReceive('calculateEndDate')
-            ->andReturn(new \DateTimeImmutable('+1 month'));
+            ->andReturn(new DateTimeImmutable('+1 month'));
 
-        $mockModel = Mockery::mock(\App\Models\Model::class)->makePartial();
+        $mockModel = Mockery::mock(Model::class)->makePartial();
         $mockModel->id = 1;
 
         $this->subscriptionRepository
@@ -210,14 +214,14 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
         $this->planRepository = Mockery::mock(SubscriptionPlanRepository::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->dateCalculator = Mockery::mock(SubscriptionDateCalculator::class);
         $this->database = Mockery::mock(Database::class);
 
         $this->service = new SubscriptionRenewalService(
             $this->subscriptionRepository,
             $this->planRepository,
-            $this->stripeProcessor,
+            $this->subscriptionPaymentService,
             $this->dateCalculator,
             $this->database,
         );

@@ -2,7 +2,9 @@
 
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
+use App\Enums\OpenCollab\ContractStatus;
 use App\Models\Contract;
+use App\Models\Site;
 use App\Models\UserContractSignature;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -27,10 +29,11 @@ class AdminContractControllerTest extends FunctionalTestCase
 
     public function test_latest_returns_highest_version_contract(): void
     {
-        Contract::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Old contract version content.', 'created_at' => date('Y-m-d H:i:s')]);
-        Contract::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Newest contract version content.', 'created_at' => date('Y-m-d H:i:s')]);
+        Contract::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Old contract version content.', 'created_at' => date('Y-m-d H:i:s'), 'status' => ContractStatus::Published->value]);
+        Contract::create(['site_id' => $this->siteId, 'version' => 2, 'content' => 'Newest contract version content.', 'created_at' => date('Y-m-d H:i:s'), 'status' => ContractStatus::Published->value]);
 
         $response = $this->getForSite('/api/open-collab/admin/contracts/latest');
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -57,7 +60,7 @@ class AdminContractControllerTest extends FunctionalTestCase
 
     public function test_show_returns_404_for_contract_on_different_site(): void
     {
-        $otherSite = \App\Models\Site::create(['name' => 'Other', 'slug' => 'other-contract-test', 'is_default' => false]);
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-contract-test', 'is_default' => false]);
         $contract = Contract::create(['site_id' => $otherSite->id, 'version' => 1, 'content' => 'Other site contract.', 'created_at' => date('Y-m-d H:i:s')]);
 
         $response = $this->getForSite("/api/open-collab/admin/contracts/{$contract->id}");
@@ -145,7 +148,7 @@ class AdminContractControllerTest extends FunctionalTestCase
 
     public function test_update_returns_404_for_wrong_site(): void
     {
-        $otherSite = \App\Models\Site::create(['name' => 'Other', 'slug' => 'other-contract-upd', 'is_default' => false]);
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-contract-upd', 'is_default' => false]);
         $contract = Contract::create(['site_id' => $otherSite->id, 'version' => 1, 'content' => 'Other site content.', 'created_at' => date('Y-m-d H:i:s')]);
 
         $response = $this->putForSite("/api/open-collab/admin/contracts/{$contract->id}", [
@@ -193,7 +196,7 @@ class AdminContractControllerTest extends FunctionalTestCase
 
     public function test_destroy_returns_404_for_wrong_site(): void
     {
-        $otherSite = \App\Models\Site::create(['name' => 'Other', 'slug' => 'other-contract-del', 'is_default' => false]);
+        $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-contract-del', 'is_default' => false]);
         $contract = Contract::create(['site_id' => $otherSite->id, 'version' => 1, 'content' => 'Other site contract content here.', 'created_at' => date('Y-m-d H:i:s')]);
 
         $response = $this->deleteForSite("/api/open-collab/admin/contracts/{$contract->id}");

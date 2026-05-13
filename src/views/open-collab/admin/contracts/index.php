@@ -1,6 +1,6 @@
 @section('logic')
 <?php
-$pageTitle = 'Contributor Contracts';
+$pageTitle = 'Contract Templates';
 $activeNav = 'contracts';
 $breadcrumbs = [['label' => 'Contracts']];
 ?>
@@ -14,121 +14,148 @@ $breadcrumbs = [['label' => 'Contracts']];
      style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
             background:var(--navy);color:#fff;padding:9px 20px;border-radius:20px;
             font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;
-            z-index:300;pointer-events:none;"></div>
+            z-index:9999;pointer-events:none;white-space:nowrap;"></div>
 
-<!-- Edit modal -->
-<div id="edit-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
-     onclick="if(event.target===this)closeEditModal()">
-    <div style="background:#fff;border-radius:12px;max-width:680px;width:94%;max-height:80vh;
-                display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-        <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:700;color:var(--navy);" id="edit-modal-title">Edit Contract v—</span>
-            <button onclick="closeEditModal()"
-                    style="background:none;border:none;cursor:pointer;color:var(--slate);font-size:1.2rem;">✕
-            </button>
+<div id="edit-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeEditModal()">
+    <div class="oc-modal" style="max-width:680px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title" id="edit-modal-title">Edit Contract v—</span>
+            <button class="oc-modal__close" onclick="manager.closeEditModal()">✕</button>
         </div>
-        <div style="padding:20px 24px;flex:1;overflow-y:auto;">
-            <div class="oc-alert oc-alert--info" style="margin-bottom:16px;font-size:.8rem;">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                    <path fill-rule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clip-rule="evenodd"/>
-                </svg>
-                Editing is only permitted for versions that have not yet been signed. If contributors have already
-                signed, create a new version instead.
-            </div>
+        <div class="oc-modal__body">
             <div id="edit-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
             <input type="hidden" id="edit-contract-id">
             <div class="oc-form-group" style="margin-bottom:0;">
-                <label class="oc-label" for="edit-content">Contract content</label>
+                <label class="oc-label" for="edit-content">Contract Body</label>
                 <textarea class="oc-textarea" id="edit-content" rows="14"
                           style="min-height:260px;font-family:monospace;font-size:.82rem;"></textarea>
             </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
-            <button onclick="closeEditModal()" class="oc-btn oc-btn--ghost">Cancel</button>
-            <button onclick="saveEdit()" class="oc-btn oc-btn--amber" id="save-edit-btn">Save changes</button>
+        <div class="oc-modal__footer">
+            <button onclick="manager.closeEditModal()" class="oc-btn oc-btn--ghost">Cancel</button>
+            <button onclick="manager.saveEdit()" class="oc-btn oc-btn--amber" id="save-edit-btn">Save changes</button>
         </div>
     </div>
 </div>
 
-<!-- View modal -->
-<div id="view-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
-     onclick="if(event.target===this)closeViewModal()">
-    <div style="background:#fff;border-radius:12px;max-width:680px;width:94%;max-height:80vh;
-                display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:700;color:var(--navy);" id="view-modal-title">Contract v—</span>
-            <button onclick="closeViewModal()"
-                    style="background:none;border:none;cursor:pointer;color:var(--slate);font-size:1.2rem;">✕
-            </button>
+<div id="view-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeViewModal()">
+    <div class="oc-modal" style="max-width:720px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title" id="view-modal-title">Contract v—</span>
+            <button class="oc-modal__close" onclick="manager.closeViewModal()">✕</button>
         </div>
+        <div id="view-modal-meta"
+             style="padding:0 24px 12px;font-size:.75rem;color:var(--slate);display:flex;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);"></div>
         <div id="view-modal-content"
-             style="padding:24px;overflow-y:auto;font-size:.875rem;line-height:1.75;color:var(--navy);"></div>
+             style="padding:24px;overflow-y:auto;font-size:.875rem;line-height:1.75;color:var(--navy);max-height:60vh;"></div>
+        <div class="oc-modal__footer" id="view-modal-actions"></div>
+    </div>
+</div>
+
+<div id="template-modal" class="oc-modal-backdrop" onclick="if(event.target===this)templateManager.close()">
+    <div class="oc-modal" style="max-width:760px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title">Contract Templates Library</span>
+            <button class="oc-modal__close" onclick="templateManager.close()">✕</button>
+        </div>
+
+        <div id="template-form-wrap"
+             style="display:none;padding:20px 24px;border-bottom:1px solid var(--border);background:var(--cream);">
+            <div id="template-form-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
+            <input type="hidden" id="template-id">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                <div class="oc-form-group" style="margin-bottom:0;"><label class="oc-label">Template Name</label><input
+                            class="oc-input" id="template-name" type="text" placeholder="Standard NDA"></div>
+                <div class="oc-form-group" style="margin-bottom:0; margin-top: 0;"><label class="oc-label">Unique
+                        Slug</label><input class="oc-input" id="template-slug" type="text" placeholder="standard-nda">
+                </div>
+            </div>
+            <div class="oc-form-group" style="margin-bottom:12px;"><label class="oc-label">Description</label><input
+                        class="oc-input" id="template-description" type="text"></div>
+            <div class="oc-form-group" style="margin-bottom:12px;"><label class="oc-label">Content</label><textarea
+                        class="oc-textarea" id="template-content" rows="6" style="font-family:monospace;"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="templateManager.hideForm()" class="oc-btn oc-btn--ghost oc-btn--sm">Cancel</button>
+                <button onclick="templateManager.save()" class="oc-btn oc-btn--amber oc-btn--sm" id="template-save-btn">
+                    Save Template
+                </button>
+            </div>
+        </div>
+
+        <div class="oc-modal__body" style="padding:0;">
+            <div id="template-header-actions"
+                 style="padding:16px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
+                <span style="font-size:.8rem;color:var(--slate);">Select a template to generate a new contract draft.</span>
+                <button onclick="templateManager.showForm()" class="oc-btn oc-btn--amber oc-btn--sm">+ New Template
+                </button>
+            </div>
+            <div id="templates-loading" style="text-align:center;padding:40px;color:var(--slate);">
+                <div class="oc-spinner"></div>
+            </div>
+            <div id="templates-list" style="display:none;max-height:400px;overflow-y:auto;"></div>
+            <div id="templates-empty" style="display:none;padding:40px;text-align:center;">No templates found.</div>
+        </div>
+        <div class="oc-modal__footer">
+            <button onclick="templateManager.close()" class="oc-btn oc-btn--ghost">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeConfirm()">
+    <div class="oc-modal" style="max-width:420px;">
+        <div class="oc-modal__header"><span class="oc-modal__title" id="confirm-title">Confirm Action</span></div>
+        <div class="oc-modal__body">
+            <p id="confirm-message" style="font-size:.875rem;color:var(--slate);line-height:1.6;"></p>
+        </div>
+        <div class="oc-modal__footer">
+            <button onclick="manager.closeConfirm()" class="oc-btn oc-btn--ghost">Cancel</button>
+            <button id="confirm-ok-btn" class="oc-btn oc-btn--amber">Confirm</button>
+        </div>
     </div>
 </div>
 
 <div class="oc-grid-sidebar" style="align-items:start;gap:24px;">
-
-    <!-- Versions list -->
     <div>
         <div class="oc-card">
             <div class="oc-card__header">
                 <span class="oc-card__title">Contract Versions</span>
-                <span id="contract-count"
+                <span id="version-count"
                       style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);padding:2px 8px;border-radius:10px;font-weight:600;">—</span>
             </div>
-
-            <div id="contracts-loading" style="padding:40px;text-align:center;color:var(--slate);font-size:.875rem;">
-                <div class="oc-spinner" style="margin:0 auto 12px;"></div>
-                Loading contracts…
+            <div id="list-loading" style="padding:40px;text-align:center;">
+                <div class="oc-spinner"></div>
             </div>
-            <div id="contracts-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="32"
-                     style="opacity:.2;display:block;margin:0 auto 12px;">
-                    <path fill-rule="evenodd"
-                          d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                          clip-rule="evenodd"/>
-                </svg>
-                <div style="font-weight:500;margin-bottom:6px;">No contracts yet</div>
-                <div style="font-size:.85rem;">Create the first version using the form.</div>
+            <div id="contracts-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">No
+                contracts created yet.
             </div>
             <div id="contracts-list" style="display:none;"></div>
         </div>
     </div>
 
-    <!-- Create new version -->
-    <div style="position:sticky;top:calc(var(--header-h,64px) + 20px);">
+    <div style="position:sticky;top:84px;">
         <div class="oc-card">
-            <div class="oc-card__header">
-                <span class="oc-card__title" style="font-size:.95rem;">New Contract Version</span>
-            </div>
+            <div class="oc-card__header"><span class="oc-card__title">Create New Draft</span></div>
             <div class="oc-card__body">
-                <div class="oc-alert oc-alert--info" style="margin-bottom:16px;font-size:.8rem;">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                        <path fill-rule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    Each new version auto-increments. Existing signed contributors are unaffected until they re-onboard.
-                </div>
                 <div id="create-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="contract-content">Contract content</label>
-                    <textarea class="oc-textarea" id="contract-content" rows="12"
-                              placeholder="Enter the full contributor agreement text…"
-                              style="min-height:220px;font-family:monospace;font-size:.82rem;"></textarea>
-                    <div class="oc-help">Minimum 50 characters.</div>
+                <textarea class="oc-textarea" id="quick-contract-content" rows="12"
+                          placeholder="Paste contract text here..."
+                          style="font-family:monospace;font-size:.82rem;margin-bottom:12px;"></textarea>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="manager.createDraft()" class="oc-btn oc-btn--amber" style="flex:1;"
+                            id="create-btn">Save as draft
+                    </button>
+                    <button onclick="templateManager.open()" class="oc-btn oc-btn--ghost" id="template-btn"
+                            title="Use Template">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="15">
+                            <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/>
+                            <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                        </svg>
+                    </button>
                 </div>
-                <button onclick="createContract()" class="oc-btn oc-btn--amber oc-btn--block" id="create-btn">
-                    Publish new version
-                </button>
             </div>
         </div>
     </div>
-
 </div>
 
 @endsection
@@ -137,6 +164,178 @@ $breadcrumbs = [['label' => 'Contracts']];
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
 
+    class ContractTemplateManager {
+        #site;
+        #token;
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+
+            this.initSlugListener();
+        }
+
+        async open() {
+            document.getElementById('template-modal').classList.add('is-open');
+            this.hideForm();
+            await this.load();
+        }
+
+        close() {
+            document.getElementById('template-modal').classList.remove('is-open');
+        }
+
+        async load() {
+            const list = document.getElementById('templates-list');
+            const loader = document.getElementById('templates-loading');
+            const empty = document.getElementById('templates-empty');
+
+            // 1. Reset state: hide list and empty message, show loader
+            list.style.display = 'none';
+            empty.style.display = 'none';
+            loader.style.display = 'block';
+
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/contract-templates`);
+            const items = await res.json().then(d => Array.isArray(d) ? d : (d.data ?? []));
+
+            loader.style.display = 'none';
+
+            // 2. Only show the one that is relevant
+            if (!items.length) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            list.style.display = 'block';
+            list.innerHTML = '';
+            items.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'template-row';
+                div.innerHTML = `
+            <div style="min-width:0;">
+                <div style="font-weight:600;color:var(--navy);">${this.#esc(t.name)}</div>
+                <div style="font-size:.7rem;color:var(--slate);">${this.#esc(t.slug)}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+                <button onclick="templateManager.use(${t.id}, this)" class="oc-btn oc-btn--sm oc-btn--amber">Use</button>
+                <button onclick="templateManager.edit(${JSON.stringify(t).replace(/"/g, '&quot;')})" class="oc-btn oc-btn--sm oc-btn--ghost">Edit</button>
+                <button onclick="templateManager.deactivate(${t.id})" class="oc-btn oc-btn--sm oc-btn--ghost" style="color:var(--red);">×</button>
+            </div>`;
+                list.appendChild(div);
+            });
+        }
+
+        initSlugListener() {
+            const nameInput = document.getElementById('template-name');
+            const slugInput = document.getElementById('template-slug');
+
+            nameInput.addEventListener('input', () => {
+                // Only auto-populate if the slug is empty or matches a slugified version of the old name
+                slugInput.value = nameInput.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)+/g, '');
+            });
+        }
+
+        showForm(t = null) {
+            // 1. Fill fields
+            document.getElementById('template-id').value = t?.id || '';
+            document.getElementById('template-name').value = t?.name || '';
+            document.getElementById('template-slug').value = t?.slug || '';
+            document.getElementById('template-description').value = t?.description || '';
+            document.getElementById('template-content').value = t?.content || '';
+
+            // 2. Toggle Visibility
+            document.getElementById('template-form-wrap').style.display = 'block';
+            document.getElementById('template-header-actions').style.display = 'none'; // Hide the + button header
+            document.getElementById('templates-list').style.display = 'none';           // Hide the list
+            document.getElementById('templates-empty').style.display = 'none';
+
+            // 3. Focus
+            document.getElementById('template-name').focus();
+        }
+
+        hideForm() {
+            document.getElementById('template-form-wrap').style.display = 'none';
+            document.getElementById('template-header-actions').style.display = 'flex'; // Show + button header
+
+            // Only show the list if there's actually content there
+            const list = document.getElementById('templates-list');
+            if (list.children.length > 0) {
+                list.style.display = 'block';
+            } else {
+                document.getElementById('templates-empty').style.display = 'block';
+            }
+        }
+
+        async save() {
+            const btn = document.getElementById('template-save-btn');
+            this.#setLoading(btn, 'Saving...');
+            const id = document.getElementById('template-id').value;
+            const payload = {
+                name: document.getElementById('template-name').value,
+                slug: document.getElementById('template-slug').value,
+                description: document.getElementById('template-description').value,
+                content: document.getElementById('template-content').value,
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/${this.#site}/open-collab/admin/contract-templates/${id}` : `/api/${this.#site}/open-collab/admin/contract-templates`;
+
+            await this.#fetch(url, {method, body: JSON.stringify(payload)});
+            this.#clearLoading(btn, 'Save Template');
+            this.hideForm();
+            this.load();
+        }
+
+        async use(id, btn) {
+            this.#setLoading(btn, '...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/from-template`, {
+                method: 'POST',
+                body: JSON.stringify({template_id: id})
+            });
+            this.close();
+            manager.reload();
+        }
+
+        edit(t) {
+            this.showForm(t);
+        }
+
+        async deactivate(id) {
+            if (confirm('Delete this template?')) {
+                await this.#fetch(`/api/${this.#site}/open-collab/admin/contract-templates/${id}`, {method: 'DELETE'});
+                this.load();
+            }
+        }
+
+        #fetch(url, opts = {}) {
+            return fetch(url, {
+                ...opts,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json', ...(opts.headers ?? {})
+                }
+            });
+        }
+
+        #esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        #setLoading(btn, label) {
+            btn.disabled = true;
+            btn.innerHTML = `<div class="oc-spinner"></div> ${label}`;
+        }
+
+        #clearLoading(btn, label) {
+            btn.disabled = false;
+            btn.textContent = label;
+        }
+    }
+
     class ContractsManager {
         #site;
         #token;
@@ -144,223 +343,212 @@ $breadcrumbs = [['label' => 'Contracts']];
         constructor(site, token) {
             this.#site = site;
             this.#token = token;
-            this.#loadContracts();
+            this.reload();
         }
 
-        async #loadContracts() {
-            try {
-                const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts`, {
-                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
-                });
-                const data = await res.json();
-                const items = Array.isArray(data) ? data : (data.data ?? []);
-
-                document.getElementById('contracts-loading').style.display = 'none';
-                document.getElementById('contract-count').textContent = items.length;
-
-                if (!items.length) {
-                    document.getElementById('contracts-empty').style.display = 'block';
-                    return;
-                }
-
-                const list = document.getElementById('contracts-list');
-                list.style.display = 'block';
-                list.innerHTML = '';
-
-                items.forEach((c, i) => {
-                    const isLatest = i === 0;
-                    const created = c.created_at
-                        ? new Date(c.created_at).toLocaleDateString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                        })
-                        : '—';
-                    const preview = c.content ? c.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
-
-                    const div = document.createElement('div');
-                    div.id = `contract-row-${c.id}`;
-                    div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
-                    div.innerHTML = `
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-                            <span style="font-weight:600;color:var(--navy);">Version ${c.version}</span>
-                            ${isLatest ? '<span class="oc-badge oc-badge--published" style="font-size:.65rem;">Current</span>' : ''}
-                        </div>
-                        <div style="font-size:.75rem;color:var(--slate);">Created ${created} · ${preview}</div>
-                    </div>
-                    <div style="display:flex;gap:6px;flex-shrink:0;">
-                        <button onclick="manager.viewContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                        ${isLatest ? `<button onclick="manager.editContract(${c.id}, ${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                        ${isLatest ? `<button onclick="manager.deleteContract(${c.id}, ${c.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
-                    </div>`;
-                    list.appendChild(div);
-                });
-            } catch {
-                document.getElementById('contracts-loading').innerHTML =
-                    '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
-            }
+        reload() {
+            this.#load();
         }
 
-        async createContract() {
-            const content = document.getElementById('contract-content').value.trim();
-            const errBox = document.getElementById('create-errors');
-            const btn = document.getElementById('create-btn');
-            errBox.style.display = 'none';
-
-            if (!content || content.length < 50) {
-                errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
-                errBox.style.display = 'block';
+        async #load() {
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts`);
+            const data = await res.json();
+            const items = Array.isArray(data) ? data : (data.data ?? []);
+            document.getElementById('list-loading').style.display = 'none';
+            document.getElementById('version-count').textContent = items.length;
+            const listEl = document.getElementById('contracts-list');
+            if (!items.length) {
+                document.getElementById('contracts-empty').style.display = 'block';
                 return;
             }
+            listEl.style.display = 'block';
+            listEl.innerHTML = '';
+            items.forEach((c, i) => listEl.appendChild(this.#buildRow(c, i === 0)));
+        }
 
-            btn.disabled = true;
-            btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
+        #buildRow(c, isLatest) {
+            const status = (c.status?.value ?? c.status ?? 'draft').toLowerCase();
+            const badgeClass = {draft: 'badge-draft', published: 'badge-published', archived: 'badge-archived'}[status];
+            const div = document.createElement('div');
+            div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
+            div.innerHTML = `
+                <div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+                        <span style="font-weight:600;color:var(--navy);">Version ${c.version}</span>
+                        <span class="oc-status-badge ${badgeClass}">${status}</span>
+                        ${isLatest && status === 'published' ? '<span class="oc-status-badge" style="background:#fef9c3;color:#a16207;">Active</span>' : ''}
+                    </div>
+                    <div style="font-size:.75rem;color:var(--slate);">Created ${new Date(c.created_at).toLocaleDateString()}</div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="manager.viewContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
+                    ${status === 'draft' ? `<button onclick="manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                    ${status === 'draft' ? `<button onclick="manager.publishContract(${c.id},${c.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
+                    ${status === 'draft' && isLatest ? `<button onclick="manager.deleteContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
+                    ${status !== 'draft' ? `<button onclick="manager.cloneContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
+                </div>`;
+            return div;
+        }
 
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({content}),
-            });
-            const data = await res.json();
-            if (res.ok) {
-                document.getElementById('contract-content').value = '';
-                this.#showToast('✓ Contract version published');
-                this.#reloadList();
-            } else {
-                errBox.textContent = data.error || data.message || 'Failed.';
-                errBox.style.display = 'block';
+        async createDraft() {
+            const btn = document.getElementById('create-btn');
+            const err = document.getElementById('create-errors');
+            const content = document.getElementById('quick-contract-content').value.trim();
+            if (content.length < 50) {
+                err.textContent = 'Minimum 50 characters required.';
+                err.style.display = 'block';
+                return;
             }
-            btn.disabled = false;
-            btn.textContent = 'Publish new version';
+            err.style.display = 'none';
+            this.#setLoading(btn, 'Saving...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts`, {
+                method: 'POST',
+                body: JSON.stringify({content})
+            });
+            this.#clearLoading(btn, 'Save as draft');
+            document.getElementById('quick-contract-content').value = '';
+            this.reload();
+            this.#toast('✓ Draft saved');
         }
 
         async viewContract(id, version) {
-            document.getElementById('view-modal-title').textContent = `Contract v${version}`;
-            document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
-            document.getElementById('view-modal').style.display = 'grid';
-            try {
-                const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
-                    headers: {Authorization: `Bearer ${this.#token()}`},
-                });
-                const data = await res.json();
-                document.getElementById('view-modal-content').innerHTML =
-                    (data.data?.contract ?? data.contract)?.content || '<em>No content</em>';
-            } catch {
-                document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed to load.</span>';
-            }
-        }
-
-        closeViewModal() {
-            document.getElementById('view-modal').style.display = 'none';
-        }
-
-        async editContract(id, version) {
-            document.getElementById('edit-modal-title').textContent = `Edit Contract v${version}`;
-            document.getElementById('edit-contract-id').value = id;
-            document.getElementById('edit-content').value = '';
-            document.getElementById('edit-errors').style.display = 'none';
-            document.getElementById('edit-modal').style.display = 'grid';
-
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
-                headers: {Authorization: `Bearer ${this.#token()}`},
-            });
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`);
             const data = await res.json();
-            document.getElementById('edit-content').value =
-                (data.data?.contract ?? data.contract)?.content ?? '';
+            const c = data.data?.contract ?? data.contract;
+            const status = (c.status?.value ?? c.status ?? 'draft').toLowerCase();
+            document.getElementById('view-modal-title').textContent = `Contract v${version}`;
+            document.getElementById('view-modal-content').innerHTML = c.content || 'No content';
+            const meta = [`Created ${new Date(c.created_at).toLocaleDateString()}`];
+            if (c.published_at) meta.push(`Published ${new Date(c.published_at).toLocaleDateString()}`);
+            if (c.source_template_id) meta.push(`From template #${c.source_template_id}`);
+            document.getElementById('view-modal-meta').innerHTML = meta.join(' · ');
+            const btns = [`<button onclick="manager.closeViewModal()" class="oc-btn oc-btn--ghost">Close</button>`];
+            if (status === 'draft') btns.push(`<button onclick="manager.closeViewModal();manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
+            document.getElementById('view-modal-actions').innerHTML = btns.join('');
+            document.getElementById('view-modal').classList.add('is-open');
         }
 
-        closeEditModal() {
-            document.getElementById('edit-modal').style.display = 'none';
+        async editContract(id, v) {
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`);
+            const data = await res.json();
+            const c = data.data?.contract ?? data.contract;
+            document.getElementById('edit-modal-title').textContent = `Edit Contract v${v}`;
+            document.getElementById('edit-contract-id').value = id;
+            document.getElementById('edit-content').value = c.content;
+            document.getElementById('edit-modal').classList.add('is-open');
         }
 
         async saveEdit() {
+            const btn = document.getElementById('save-edit-btn');
+            const err = document.getElementById('edit-errors');
             const id = document.getElementById('edit-contract-id').value;
             const content = document.getElementById('edit-content').value.trim();
-            const errBox = document.getElementById('edit-errors');
-            const btn = document.getElementById('save-edit-btn');
-            errBox.style.display = 'none';
-
-            if (!content || content.length < 50) {
-                errBox.textContent = content ? 'Content must be at least 50 characters.' : 'Content is required.';
-                errBox.style.display = 'block';
+            if (content.length < 50) {
+                err.textContent = 'Minimum 50 characters required.';
+                err.style.display = 'block';
                 return;
             }
-
-            btn.disabled = true;
-            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
+            err.style.display = 'none';
+            this.#setLoading(btn, 'Saving...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
                 method: 'PUT',
+                body: JSON.stringify({content})
+            });
+            this.#clearLoading(btn, 'Save changes');
+            this.closeEditModal();
+            this.reload();
+            this.#toast('✓ Updated');
+        }
+
+        publishContract(id, v) {
+            this.confirm({
+                title: 'Publish Contract', message: `Make v${v} the active contract?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}/publish`, {method: 'POST'});
+                    this.reload();
+                    this.#toast('✓ Published');
+                }
+            });
+        }
+
+        cloneContract(id, v) {
+            this.confirm({
+                title: 'Clone to Draft', message: `Create new draft from v${v}?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}/clone`, {method: 'POST'});
+                    this.reload();
+                    this.#toast('✓ Cloned');
+                }
+            });
+        }
+
+        deleteContract(id, v) {
+            this.confirm({
+                title: 'Delete Draft', message: `Delete draft v${v}?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {method: 'DELETE'});
+                    this.reload();
+                    this.#toast('Draft deleted', false);
+                }
+            });
+        }
+
+        closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('is-open');
+        }
+
+        closeViewModal() {
+            document.getElementById('view-modal').classList.remove('is-open');
+        }
+
+        confirm({title, message, onOk}) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            document.getElementById('confirm-ok-btn').onclick = () => {
+                this.closeConfirm();
+                onOk();
+            };
+            document.getElementById('confirm-modal').classList.add('is-open');
+        }
+
+        closeConfirm() {
+            document.getElementById('confirm-modal').classList.remove('is-open');
+        }
+
+        #fetch(url, opts = {}) {
+            return fetch(url, {
+                ...opts,
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json',
-                },
-                body: JSON.stringify({content}),
+                    Accept: 'application/json', ...(opts.headers ?? {})
+                }
             });
-            const data = await res.json();
-            if (res.ok) {
-                this.closeEditModal();
-                this.#showToast('✓ Contract updated');
-                this.#reloadList();
-            } else {
-                errBox.textContent = data.error || data.message || 'Failed.';
-                errBox.style.display = 'block';
-            }
-            btn.disabled = false;
-            btn.textContent = 'Save changes';
         }
 
-        async deleteContract(id, version, btn) {
-            if (!confirm(`Delete contract v${version}? This cannot be undone.`)) return;
+        #esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        #setLoading(btn, label) {
             btn.disabled = true;
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/contracts/${id}`, {
-                method: 'DELETE',
-                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
-            });
-            const data = await res.json();
-            if (res.ok) {
-                this.#showToast('Contract deleted');
-                document.getElementById(`contract-row-${id}`)?.remove();
-                this.#reloadList();
-            } else {
-                this.#showToast(data.error || data.message || 'Cannot delete.', false);
-                btn.disabled = false;
-            }
+            btn.innerHTML = `<div class="oc-spinner"></div> ${label}`;
         }
 
-        #reloadList() {
-            document.getElementById('contracts-list').style.display = 'none';
-            const loading = document.getElementById('contracts-loading');
-            loading.style.display = 'block';
-            loading.innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
-            this.#loadContracts();
+        #clearLoading(btn, label) {
+            btn.disabled = false;
+            btn.textContent = label;
         }
 
-        #showToast(msg, ok = true) {
+        #toast(msg, ok = true) {
             const el = document.getElementById('status-toast');
             el.textContent = msg;
             el.style.background = ok ? 'var(--navy)' : 'var(--red)';
             el.style.opacity = '1';
-            setTimeout(() => {
-                el.style.opacity = '0';
-            }, 2800);
+            setTimeout(() => el.style.opacity = '0', 3000);
         }
     }
 
-    const manager = new ContractsManager(
-        SITE,
-        () => localStorage.getItem('oc_token') || ''
-    );
-    const createContract = () => manager.createContract();
-    const closeViewModal = () => manager.closeViewModal();
-    const closeEditModal = () => manager.closeEditModal();
-    const saveEdit = () => manager.saveEdit();
-
+    const manager = new ContractsManager(SITE, () => localStorage.getItem('oc_token') || '');
+    const templateManager = new ContractTemplateManager(SITE, () => localStorage.getItem('oc_token') || '');
 </script>
 @endsection

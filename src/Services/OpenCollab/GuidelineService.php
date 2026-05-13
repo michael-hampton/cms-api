@@ -161,25 +161,29 @@ class GuidelineService
 
     public function assertEditable(Guideline $guideline): void
     {
-        if ($guideline->status === GuidelineStatus::Published) {
+        if ($guideline->status === GuidelineStatus::Published->value) {
             throw GuidelineNotEditableException::alreadyPublished($guideline->id);
         }
-        if ($guideline->status === GuidelineStatus::Archived) {
+        if ($guideline->status === GuidelineStatus::Archived->value) {
             throw GuidelineNotEditableException::alreadyArchived($guideline->id);
         }
     }
 
     public function assertPublishable(Guideline $guideline): void
     {
-        if (!$guideline->status->isPublishable()) {
-            throw GuidelineNotPublishableException::notDraft($guideline->id, $guideline->status->value);
+        $status = GuidelineStatus::from($guideline->status);
+
+        if (!$status->isPublishable()) {
+            throw GuidelineNotPublishableException::notDraft($guideline->id, $status->value);
         }
     }
 
     public function assertArchivable(Guideline $guideline): void
     {
-        if (!$guideline->status->isArchivable()) {
-            throw GuidelineNotArchivableException::notPublished($guideline->id, $guideline->status->value);
+        $status = GuidelineStatus::from($guideline->status);
+
+        if (!$status->isArchivable()) {
+            throw GuidelineNotArchivableException::notPublished($guideline->id, $status->value);
         }
     }
 }

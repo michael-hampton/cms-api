@@ -33,7 +33,9 @@ class Site extends Model
         'guidelines_version',
         'require_payment_setup',
         'require_contracts',
-        'require_guidelines_ack'
+        'require_guidelines_ack',
+        'require_age_verification',
+        'minimum_contributor_age'
     ];
 
     protected $casts = [
@@ -41,7 +43,11 @@ class Site extends Model
         'is_default' => 'boolean',
         'settings' => 'json',
         'created_at' => 'date',
-        'updated_at' => 'date'
+        'updated_at' => 'date',
+        'require_payment_setup' => 'boolean',
+        'require_contracts' => 'boolean',
+        'require_guidelines_ack' => 'boolean',
+        'require_age_verification' => 'boolean',
     ];
 
     public static function resolveSite(string $siteSlug): int

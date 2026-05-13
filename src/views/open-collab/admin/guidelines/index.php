@@ -14,30 +14,15 @@ $breadcrumbs = [['label' => 'Guidelines']];
      style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
             background:var(--navy);color:#fff;padding:9px 20px;border-radius:20px;
             font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;
-            z-index:300;pointer-events:none;"></div>
+            z-index:9999;pointer-events:none;white-space:nowrap;"></div>
 
-<!-- Edit modal -->
-<div id="edit-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
-     onclick="if(event.target===this)closeEditModal()">
-    <div style="background:#fff;border-radius:12px;max-width:680px;width:94%;max-height:80vh;
-                display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-        <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:700;color:var(--navy);" id="edit-modal-title">Edit Guidelines v—</span>
-            <button onclick="closeEditModal()"
-                    style="background:none;border:none;cursor:pointer;color:var(--slate);font-size:1.2rem;">✕
-            </button>
+<div id="edit-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeEditModal()">
+    <div class="oc-modal" style="max-width:680px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title" id="edit-modal-title">Edit Guidelines v—</span>
+            <button class="oc-modal__close" onclick="manager.closeEditModal()">✕</button>
         </div>
-        <div style="padding:20px 24px;flex:1;overflow-y:auto;">
-            <div class="oc-alert oc-alert--info" style="margin-bottom:16px;font-size:.8rem;">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                    <path fill-rule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clip-rule="evenodd"/>
-                </svg>
-                Editing is only permitted for versions no contributor has acknowledged. If acknowledged, create a new
-                version instead.
-            </div>
+        <div class="oc-modal__body">
             <div id="edit-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
             <input type="hidden" id="edit-guideline-id">
             <div class="oc-form-group" style="margin-bottom:0;">
@@ -46,80 +31,130 @@ $breadcrumbs = [['label' => 'Guidelines']];
                           style="min-height:260px;font-family:monospace;font-size:.82rem;"></textarea>
             </div>
         </div>
-        <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;">
-            <button onclick="closeEditModal()" class="oc-btn oc-btn--ghost">Cancel</button>
-            <button onclick="saveEdit()" class="oc-btn oc-btn--amber" id="save-edit-btn">Save changes</button>
+        <div class="oc-modal__footer">
+            <button onclick="manager.closeEditModal()" class="oc-btn oc-btn--ghost">Cancel</button>
+            <button onclick="manager.saveEdit()" class="oc-btn oc-btn--amber" id="save-edit-btn">Save changes</button>
         </div>
     </div>
 </div>
 
-<!-- View modal -->
-<div id="view-modal"
-     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
-     onclick="if(event.target===this)closeViewModal()">
-    <div style="background:#fff;border-radius:12px;max-width:680px;width:94%;max-height:80vh;
-                display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2);">
-        <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-weight:700;color:var(--navy);" id="view-modal-title">Guidelines v—</span>
-            <button onclick="closeViewModal()"
-                    style="background:none;border:none;cursor:pointer;color:var(--slate);font-size:1.2rem;">✕
-            </button>
+<div id="view-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeViewModal()">
+    <div class="oc-modal" style="max-width:720px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title" id="view-modal-title">Guidelines v—</span>
+            <button class="oc-modal__close" onclick="manager.closeViewModal()">✕</button>
         </div>
+        <div id="view-modal-meta"
+             style="padding:0 24px 12px;font-size:.75rem;color:var(--slate);display:flex;gap:16px;flex-wrap:wrap;border-bottom:1px solid var(--border);"></div>
         <div id="view-modal-content"
-             style="padding:24px;overflow-y:auto;font-size:.875rem;line-height:1.75;color:var(--navy);"></div>
+             style="padding:24px;overflow-y:auto;font-size:.875rem;line-height:1.75;color:var(--navy);max-height:60vh;"></div>
+        <div class="oc-modal__footer" id="view-modal-actions"></div>
+    </div>
+</div>
+
+<div id="template-modal" class="oc-modal-backdrop" onclick="if(event.target===this)templateManager.close()">
+    <div class="oc-modal" style="max-width:760px;">
+        <div class="oc-modal__header">
+            <span class="oc-modal__title">Guideline Templates Library</span>
+            <button class="oc-modal__close" onclick="templateManager.close()">✕</button>
+        </div>
+
+        <div id="template-form-wrap"
+             style="display:none;padding:20px 24px;border-bottom:1px solid var(--border);background:var(--cream);">
+            <div id="template-form-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
+            <input type="hidden" id="template-id">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                <div class="oc-form-group" style="margin-bottom:0;"><label class="oc-label">Template Name</label><input
+                            class="oc-input" id="template-name" type="text"></div>
+                <div class="oc-form-group" style="margin-bottom:0; margin-top: 0;"><label class="oc-label">Unique
+                        Slug</label><input class="oc-input" id="template-slug" type="text"></div>
+            </div>
+            <div class="oc-form-group" style="margin-bottom:12px;"><label class="oc-label">Description</label><input
+                        class="oc-input" id="template-description" type="text"></div>
+            <div class="oc-form-group" style="margin-bottom:12px;"><label class="oc-label">Content</label><textarea
+                        class="oc-textarea" id="template-content" rows="6" style="font-family:monospace;"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button onclick="templateManager.hideForm()" class="oc-btn oc-btn--ghost oc-btn--sm">Cancel</button>
+                <button onclick="templateManager.save()" class="oc-btn oc-btn--amber oc-btn--sm" id="template-save-btn">
+                    Save Template
+                </button>
+            </div>
+        </div>
+
+        <div class="oc-modal__body" style="padding:0;">
+            <div id="template-header-actions"
+                 style="padding:16px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#fafafa;">
+                <span style="font-size:.8rem;color:var(--slate);">Select a template to generate a new guidelines draft.</span>
+                <button onclick="templateManager.showForm()" class="oc-btn oc-btn--amber oc-btn--sm">+ New Template
+                </button>
+            </div>
+            <div id="templates-loading" style="text-align:center;padding:40px;color:var(--slate);">
+                <div class="oc-spinner"></div>
+            </div>
+            <div id="templates-list" style="display:none;max-height:400px;overflow-y:auto;"></div>
+            <div id="templates-empty" style="display:none;padding:40px;text-align:center;">No templates found.</div>
+        </div>
+        <div class="oc-modal__footer">
+            <button onclick="templateManager.close()" class="oc-btn oc-btn--ghost">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="oc-modal-backdrop" onclick="if(event.target===this)manager.closeConfirm()">
+    <div class="oc-modal" style="max-width:420px;">
+        <div class="oc-modal__header"><span class="oc-modal__title" id="confirm-title">Confirm Action</span></div>
+        <div class="oc-modal__body">
+            <p id="confirm-message" style="font-size:.875rem;color:var(--slate);line-height:1.6;"></p>
+        </div>
+        <div class="oc-modal__footer">
+            <button onclick="manager.closeConfirm()" class="oc-btn oc-btn--ghost">Cancel</button>
+            <button id="confirm-ok-btn" class="oc-btn oc-btn--amber">Confirm</button>
+        </div>
     </div>
 </div>
 
 <div class="oc-grid-sidebar" style="align-items:start;gap:24px;">
-
     <div>
         <div class="oc-card">
             <div class="oc-card__header">
                 <span class="oc-card__title">Guideline Versions</span>
-                <span id="guideline-count"
+                <span id="version-count"
                       style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);padding:2px 8px;border-radius:10px;font-weight:600;">—</span>
             </div>
-            <div id="guidelines-loading" style="padding:40px;text-align:center;color:var(--slate);font-size:.875rem;">
-                <div class="oc-spinner" style="margin:0 auto 12px;"></div>
-                Loading guidelines…
+            <div id="list-loading" style="padding:40px;text-align:center;">
+                <div class="oc-spinner"></div>
             </div>
-            <div id="guidelines-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">
-                <div style="font-weight:500;margin-bottom:6px;">No guidelines yet</div>
-                <div style="font-size:.85rem;">Create the first version to get started.</div>
+            <div id="guidelines-empty" style="display:none;padding:48px 24px;text-align:center;color:var(--slate);">No
+                guidelines found.
             </div>
             <div id="guidelines-list" style="display:none;"></div>
         </div>
     </div>
 
-    <div style="position:sticky;top:calc(var(--header-h,64px) + 20px);">
+    <div style="position:sticky;top:84px;">
         <div class="oc-card">
-            <div class="oc-card__header">
-                <span class="oc-card__title" style="font-size:.95rem;">New Guidelines Version</span>
-            </div>
+            <div class="oc-card__header"><span class="oc-card__title">Create New Draft</span></div>
             <div class="oc-card__body">
-                <div class="oc-alert oc-alert--info" style="margin-bottom:16px;font-size:.8rem;">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                        <path fill-rule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    Publishing a new version prompts all contributors to re-acknowledge before submitting.
-                </div>
                 <div id="create-errors" class="oc-form-errors" style="display:none;margin-bottom:12px;"></div>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="guideline-content">Guidelines content</label>
-                    <textarea class="oc-textarea" id="guideline-content" rows="12"
-                              placeholder="Enter your brand and editorial guidelines…"
-                              style="min-height:220px;font-family:monospace;font-size:.82rem;"></textarea>
-                    <div class="oc-help">Minimum 50 characters.</div>
+                <textarea class="oc-textarea" id="quick-guideline-content" rows="12"
+                          placeholder="Enter guideline text..."
+                          style="font-family:monospace;font-size:.82rem;margin-bottom:12px;"></textarea>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="manager.createDraft()" class="oc-btn oc-btn--amber" style="flex:1;"
+                            id="create-btn">Save as draft
+                    </button>
+                    <button onclick="templateManager.open()" class="oc-btn oc-btn--ghost" id="template-btn"
+                            title="Use Template">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="15">
+                            <path d="M9 2a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V6.414A2 2 0 0016.414 5L14 2.586A2 2 0 0012.586 2H9z"/>
+                            <path d="M3 8a2 2 0 012-2v10h8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                        </svg>
+                    </button>
                 </div>
-                <button onclick="createGuideline()" class="oc-btn oc-btn--amber oc-btn--block" id="create-btn">
-                    Publish new version
-                </button>
             </div>
         </div>
     </div>
-
 </div>
 
 @endsection
@@ -128,6 +163,179 @@ $breadcrumbs = [['label' => 'Guidelines']];
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
 
+    class GuidelinesTemplateManager {
+        #site;
+        #token;
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+
+            this.initSlugListener();
+        }
+
+        async open() {
+            document.getElementById('template-modal').classList.add('is-open');
+            this.hideForm();
+            await this.load();
+        }
+
+        close() {
+            document.getElementById('template-modal').classList.remove('is-open');
+        }
+
+        async load() {
+            const list = document.getElementById('templates-list');
+            const loader = document.getElementById('templates-loading');
+            const empty = document.getElementById('templates-empty');
+
+            // 1. Reset state: hide list and empty message, show loader
+            list.style.display = 'none';
+            empty.style.display = 'none';
+            loader.style.display = 'block';
+
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/guideline-templates`);
+            const items = await res.json().then(d => Array.isArray(d) ? d : (d.data ?? []));
+
+            loader.style.display = 'none';
+
+            // 2. Only show the one that is relevant
+            if (!items.length) {
+                empty.style.display = 'block';
+                return;
+            }
+
+            list.style.display = 'block';
+            list.innerHTML = '';
+
+            items.forEach(t => {
+                const div = document.createElement('div');
+                div.className = 'template-row';
+                div.innerHTML = `
+                    <div style="min-width:0;">
+                        <div style="font-weight:600;color:var(--navy);">${this.#esc(t.name)}</div>
+                        <div style="font-size:.7rem;color:var(--slate);">${this.#esc(t.slug)}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="templateManager.use(${t.id}, this)" class="oc-btn oc-btn--sm oc-btn--amber">Use</button>
+                        <button onclick="templateManager.edit(${JSON.stringify(t).replace(/"/g, '&quot;')})" class="oc-btn oc-btn--sm oc-btn--ghost">Edit</button>
+                        <button onclick="templateManager.deactivate(${t.id})" class="oc-btn oc-btn--sm oc-btn--ghost" style="color:var(--red);">×</button>
+                    </div>`;
+                list.appendChild(div);
+            });
+        }
+
+        initSlugListener() {
+            const nameInput = document.getElementById('template-name');
+            const slugInput = document.getElementById('template-slug');
+
+            nameInput.addEventListener('input', () => {
+                // Only auto-populate if the slug is empty or matches a slugified version of the old name
+                slugInput.value = nameInput.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/(^-|-$)+/g, '');
+            });
+        }
+
+        showForm(t = null) {
+            // 1. Fill fields
+            document.getElementById('template-id').value = t?.id || '';
+            document.getElementById('template-name').value = t?.name || '';
+            document.getElementById('template-slug').value = t?.slug || '';
+            document.getElementById('template-description').value = t?.description || '';
+            document.getElementById('template-content').value = t?.content || '';
+
+            // 2. Toggle Visibility
+            document.getElementById('template-form-wrap').style.display = 'block';
+            document.getElementById('template-header-actions').style.display = 'none'; // Hide the + button header
+            document.getElementById('templates-list').style.display = 'none';           // Hide the list
+            document.getElementById('templates-empty').style.display = 'none';
+
+            // 3. Focus
+            document.getElementById('template-name').focus();
+        }
+
+        hideForm() {
+            document.getElementById('template-form-wrap').style.display = 'none';
+            document.getElementById('template-header-actions').style.display = 'flex'; // Show + button header
+
+            // Only show the list if there's actually content there
+            const list = document.getElementById('templates-list');
+            if (list.children.length > 0) {
+                list.style.display = 'block';
+            } else {
+                document.getElementById('templates-empty').style.display = 'block';
+            }
+        }
+
+        async save() {
+            const btn = document.getElementById('template-save-btn');
+            this.#setLoading(btn, 'Saving...');
+            const id = document.getElementById('template-id').value;
+            const payload = {
+                name: document.getElementById('template-name').value,
+                slug: document.getElementById('template-slug').value,
+                description: document.getElementById('template-description').value,
+                content: document.getElementById('template-content').value,
+            };
+            const method = id ? 'PUT' : 'POST';
+            const url = id ? `/api/${this.#site}/open-collab/admin/guideline-templates/${id}` : `/api/${this.#site}/open-collab/admin/guideline-templates`;
+
+            await this.#fetch(url, {method, body: JSON.stringify(payload)});
+            this.#clearLoading(btn, 'Save Template');
+            this.hideForm();
+            this.load();
+        }
+
+        async use(id, btn) {
+            this.#setLoading(btn, '...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/from-template`, {
+                method: 'POST',
+                body: JSON.stringify({template_id: id})
+            });
+            this.close();
+            manager.reload();
+        }
+
+        edit(t) {
+            this.showForm(t);
+        }
+
+        async deactivate(id) {
+            if (confirm('Delete this template?')) {
+                await this.#fetch(`/api/${this.#site}/open-collab/admin/guideline-templates/${id}`, {method: 'DELETE'});
+                this.load();
+            }
+        }
+
+        #fetch(url, opts = {}) {
+            return fetch(url, {
+                ...opts,
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${this.#token()}`,
+                    Accept: 'application/json', ...(opts.headers ?? {})
+                }
+            });
+        }
+
+        #esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        #setLoading(btn, label) {
+            btn.disabled = true;
+            btn.innerHTML = `<div class="oc-spinner"></div> ${label}`;
+        }
+
+        #clearLoading(btn, label) {
+            btn.disabled = false;
+            btn.textContent = label;
+        }
+    }
+
     class GuidelinesManager {
         #site;
         #token;
@@ -135,216 +343,212 @@ $breadcrumbs = [['label' => 'Guidelines']];
         constructor(site, token) {
             this.#site = site;
             this.#token = token;
+            this.reload();
+        }
+
+        reload() {
             this.#load();
         }
 
         async #load() {
-            try {
-                const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines`, {
-                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
-                });
-                const data = await res.json();
-                const items = Array.isArray(data) ? data : (data.data ?? []);
-
-                document.getElementById('guidelines-loading').style.display = 'none';
-                document.getElementById('guideline-count').textContent = items.length;
-
-                if (!items.length) {
-                    document.getElementById('guidelines-empty').style.display = 'block';
-                    return;
-                }
-
-                const list = document.getElementById('guidelines-list');
-                list.style.display = 'block';
-                list.innerHTML = '';
-
-                items.forEach((g, i) => {
-                    const isLatest = i === 0;
-                    const created = g.created_at
-                        ? new Date(g.created_at).toLocaleDateString('en-GB', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                        })
-                        : '—';
-                    const preview = g.content ? g.content.replace(/<[^>]+>/g, '').slice(0, 55) + '…' : '—';
-                    const div = document.createElement('div');
-                    div.id = `guideline-row-${g.id}`;
-                    div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;';
-                    div.innerHTML = `
-                    <div>
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-                            <span style="font-weight:600;color:var(--navy);">Version ${g.version}</span>
-                            ${isLatest ? '<span class="oc-badge oc-badge--published" style="font-size:.65rem;">Current</span>' : ''}
-                        </div>
-                        <div style="font-size:.75rem;color:var(--slate);">Created ${created} · ${preview}</div>
-                    </div>
-                    <div style="display:flex;gap:6px;flex-shrink:0;">
-                        <button onclick="manager.view(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                        ${isLatest ? `<button onclick="manager.edit(${g.id}, ${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                        ${isLatest ? `<button onclick="manager.delete(${g.id}, ${g.version}, this)" class="oc-btn oc-btn--ghost oc-btn--sm" style="border-color:#fecaca;color:var(--red);">Delete</button>` : ''}
-                    </div>`;
-                    list.appendChild(div);
-                });
-            } catch {
-                document.getElementById('guidelines-loading').innerHTML =
-                    '<div style="color:var(--red);font-size:.85rem;padding:20px;">Failed to load.</div>';
-            }
-        }
-
-        async create() {
-            const content = document.getElementById('guideline-content').value.trim();
-            const errBox = document.getElementById('create-errors');
-            const btn = document.getElementById('create-btn');
-            errBox.style.display = 'none';
-
-            if (!content || content.length < 50) {
-                errBox.textContent = content ? 'Minimum 50 characters.' : 'Content is required.';
-                errBox.style.display = 'block';
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines`);
+            const data = await res.json();
+            const items = Array.isArray(data) ? data : (data.data ?? []);
+            document.getElementById('list-loading').style.display = 'none';
+            document.getElementById('version-count').textContent = items.length;
+            const listEl = document.getElementById('guidelines-list');
+            if (!items.length) {
+                document.getElementById('guidelines-empty').style.display = 'block';
                 return;
             }
+            listEl.style.display = 'block';
+            listEl.innerHTML = '';
+            items.forEach((g, i) => listEl.appendChild(this.#buildRow(g, i === 0)));
+        }
 
-            btn.disabled = true;
-            btn.innerHTML = '<div class="oc-spinner"></div> Publishing…';
+        #buildRow(g, isLatest) {
+            const status = (g.status?.value ?? g.status ?? 'draft').toLowerCase();
+            const badgeClass = {draft: 'badge-draft', published: 'badge-published', archived: 'badge-archived'}[status];
+            const div = document.createElement('div');
+            div.style.cssText = 'padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;';
+            div.innerHTML = `
+                <div>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">
+                        <span style="font-weight:600;color:var(--navy);">Version ${g.version}</span>
+                        <span class="oc-status-badge ${badgeClass}">${status}</span>
+                        ${isLatest && status === 'published' ? '<span class="oc-status-badge" style="background:#fef9c3;color:#a16207;">Active</span>' : ''}
+                    </div>
+                    <div style="font-size:.75rem;color:var(--slate);">Created ${new Date(g.created_at).toLocaleDateString()}</div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="manager.viewGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
+                    ${status === 'draft' ? `<button onclick="manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                    ${status === 'draft' ? `<button onclick="manager.publishGuideline(${g.id},${g.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
+                    ${status === 'draft' && isLatest ? `<button onclick="manager.deleteGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
+                    ${status !== 'draft' ? `<button onclick="manager.cloneGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
+                </div>`;
+            return div;
+        }
 
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines`, {
+        async createDraft() {
+            const btn = document.getElementById('create-btn');
+            const err = document.getElementById('create-errors');
+            const content = document.getElementById('quick-guideline-content').value.trim();
+            if (content.length < 50) {
+                err.textContent = 'Minimum 50 characters required.';
+                err.style.display = 'block';
+                return;
+            }
+            err.style.display = 'none';
+            this.#setLoading(btn, 'Saving...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json'
-                },
-                body: JSON.stringify({content}),
+                body: JSON.stringify({content})
             });
-            const data = await res.json();
-            if (res.ok) {
-                document.getElementById('guideline-content').value = '';
-                this.#showToast('✓ Guidelines version published');
-                this.#reload();
-            } else {
-                errBox.textContent = data.error || data.message || 'Failed.';
-                errBox.style.display = 'block';
-            }
-            btn.disabled = false;
-            btn.textContent = 'Publish new version';
+            this.#clearLoading(btn, 'Save as draft');
+            document.getElementById('quick-guideline-content').value = '';
+            this.reload();
+            this.#toast('✓ Draft saved');
         }
 
-        async view(id, version) {
+        async viewGuideline(id, version) {
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`);
+            const data = await res.json();
+            const g = data.data?.guideline ?? data.guideline;
+            const status = (g.status?.value ?? g.status ?? 'draft').toLowerCase();
             document.getElementById('view-modal-title').textContent = `Guidelines v${version}`;
-            document.getElementById('view-modal-content').innerHTML = '<div class="oc-spinner" style="margin:20px auto;"></div>';
-            document.getElementById('view-modal').style.display = 'grid';
-            try {
-                const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
-                    headers: {Authorization: `Bearer ${this.#token()}`},
-                });
-                const data = await res.json();
-                document.getElementById('view-modal-content').innerHTML =
-                    (data.data?.guideline ?? data.guideline)?.content || '<em>No content</em>';
-            } catch {
-                document.getElementById('view-modal-content').innerHTML = '<span style="color:var(--red)">Failed.</span>';
-            }
+            document.getElementById('view-modal-content').innerHTML = g.content || 'No content';
+            const meta = [`Created ${new Date(g.created_at).toLocaleDateString()}`];
+            if (g.published_at) meta.push(`Published ${new Date(g.published_at).toLocaleDateString()}`);
+            if (g.source_template_id) meta.push(`From template #${g.source_template_id}`);
+            document.getElementById('view-modal-meta').innerHTML = meta.join(' · ');
+            const btns = [`<button onclick="manager.closeViewModal()" class="oc-btn oc-btn--ghost">Close</button>`];
+            if (status === 'draft') btns.push(`<button onclick="manager.closeViewModal();manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
+            document.getElementById('view-modal-actions').innerHTML = btns.join('');
+            document.getElementById('view-modal').classList.add('is-open');
         }
 
-        closeViewModal() {
-            document.getElementById('view-modal').style.display = 'none';
-        }
-
-        async edit(id, version) {
-            document.getElementById('edit-modal-title').textContent = `Edit Guidelines v${version}`;
-            document.getElementById('edit-guideline-id').value = id;
-            document.getElementById('edit-content').value = '';
-            document.getElementById('edit-errors').style.display = 'none';
-            document.getElementById('edit-modal').style.display = 'grid';
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
-                headers: {Authorization: `Bearer ${this.#token()}`},
-            });
+        async editGuideline(id, v) {
+            const res = await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`);
             const data = await res.json();
-            document.getElementById('edit-content').value =
-                (data.data?.guideline ?? data.guideline)?.content ?? '';
-        }
-
-        closeEditModal() {
-            document.getElementById('edit-modal').style.display = 'none';
+            const g = data.data?.guideline ?? data.guideline;
+            document.getElementById('edit-modal-title').textContent = `Edit Guidelines v${v}`;
+            document.getElementById('edit-guideline-id').value = id;
+            document.getElementById('edit-content').value = g.content;
+            document.getElementById('edit-modal').classList.add('is-open');
         }
 
         async saveEdit() {
+            const btn = document.getElementById('save-edit-btn');
+            const err = document.getElementById('edit-errors');
             const id = document.getElementById('edit-guideline-id').value;
             const content = document.getElementById('edit-content').value.trim();
-            const errBox = document.getElementById('edit-errors');
-            const btn = document.getElementById('save-edit-btn');
-            errBox.style.display = 'none';
-
-            if (!content || content.length < 50) {
-                errBox.textContent = content ? 'Minimum 50 characters.' : 'Content required.';
-                errBox.style.display = 'block';
+            if (content.length < 50) {
+                err.textContent = 'Minimum 50 characters required.';
+                err.style.display = 'block';
                 return;
             }
-
-            btn.disabled = true;
-            btn.innerHTML = '<div class="oc-spinner"></div> Saving…';
-
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
+            err.style.display = 'none';
+            this.#setLoading(btn, 'Saving...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
                 method: 'PUT',
+                body: JSON.stringify({content})
+            });
+            this.#clearLoading(btn, 'Save changes');
+            this.closeEditModal();
+            this.reload();
+            this.#toast('✓ Updated');
+        }
+
+        publishGuideline(id, v) {
+            this.confirm({
+                title: 'Publish Guidelines', message: `Make v${v} the active guidelines?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}/publish`, {method: 'POST'});
+                    this.reload();
+                    this.#toast('✓ Published');
+                }
+            });
+        }
+
+        cloneGuideline(id, v) {
+            this.confirm({
+                title: 'Clone to Draft', message: `Create new draft from v${v}?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}/clone`, {method: 'POST'});
+                    this.reload();
+                    this.#toast('✓ Cloned');
+                }
+            });
+        }
+
+        deleteGuideline(id, v) {
+            this.confirm({
+                title: 'Delete Draft', message: `Delete draft v${v}?`, onOk: async () => {
+                    await this.#fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {method: 'DELETE'});
+                    this.reload();
+                    this.#toast('Draft deleted', false);
+                }
+            });
+        }
+
+        closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('is-open');
+        }
+
+        closeViewModal() {
+            document.getElementById('view-modal').classList.remove('is-open');
+        }
+
+        confirm({title, message, onOk}) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            document.getElementById('confirm-ok-btn').onclick = () => {
+                this.closeConfirm();
+                onOk();
+            };
+            document.getElementById('confirm-modal').classList.add('is-open');
+        }
+
+        closeConfirm() {
+            document.getElementById('confirm-modal').classList.remove('is-open');
+        }
+
+        #fetch(url, opts = {}) {
+            return fetch(url, {
+                ...opts,
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json'
-                },
-                body: JSON.stringify({content}),
+                    Accept: 'application/json', ...(opts.headers ?? {})
+                }
             });
-            const data = await res.json();
-            if (res.ok) {
-                this.closeEditModal();
-                this.#showToast('✓ Guidelines updated');
-                this.#reload();
-            } else {
-                errBox.textContent = data.error || data.message || 'Failed.';
-                errBox.style.display = 'block';
-            }
-            btn.disabled = false;
-            btn.textContent = 'Save changes';
         }
 
-        async delete(id, version, btn) {
-            if (!confirm(`Delete guidelines v${version}? This cannot be undone.`)) return;
+        #esc(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        #setLoading(btn, label) {
             btn.disabled = true;
-            const res = await fetch(`/api/${this.#site}/open-collab/admin/guidelines/${id}`, {
-                method: 'DELETE',
-                headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
-            });
-            const data = await res.json();
-            if (res.ok) {
-                this.#showToast('Guidelines deleted');
-                this.#reload();
-            } else {
-                this.#showToast(data.error || data.message || 'Cannot delete.', false);
-                btn.disabled = false;
-            }
+            btn.innerHTML = `<div class="oc-spinner"></div> ${label}`;
         }
 
-        #reload() {
-            document.getElementById('guidelines-list').style.display = 'none';
-            const loading = document.getElementById('guidelines-loading');
-            loading.style.display = 'block';
-            loading.innerHTML = '<div class="oc-spinner" style="margin:0 auto 12px;"></div>Loading…';
-            this.#load();
+        #clearLoading(btn, label) {
+            btn.disabled = false;
+            btn.textContent = label;
         }
 
-        #showToast(msg, ok = true) {
+        #toast(msg, ok = true) {
             const el = document.getElementById('status-toast');
             el.textContent = msg;
             el.style.background = ok ? 'var(--navy)' : 'var(--red)';
             el.style.opacity = '1';
-            setTimeout(() => {
-                el.style.opacity = '0';
-            }, 2800);
+            setTimeout(() => el.style.opacity = '0', 3000);
         }
     }
 
     const manager = new GuidelinesManager(SITE, () => localStorage.getItem('oc_token') || '');
-    const createGuideline = () => manager.create();
-    const closeViewModal = () => manager.closeViewModal();
-    const closeEditModal = () => manager.closeEditModal();
-    const saveEdit = () => manager.saveEdit();
+    const templateManager = new GuidelinesTemplateManager(SITE, () => localStorage.getItem('oc_token') || '');
 </script>
 @endsection

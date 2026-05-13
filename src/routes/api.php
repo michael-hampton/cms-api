@@ -40,9 +40,11 @@ use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
+use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\MemberInsights\CampaignAnalyticsApiController;
 use App\Controllers\Members\Api\BadgeAdminApiController;
+use App\Controllers\Members\Api\ConsentTypeAdminApiController;
 use App\Controllers\Members\Api\MemberActivityApiController;
 use App\Controllers\Members\Api\MemberAddressApiController;
 use App\Controllers\Members\Api\MemberApiController;
@@ -55,6 +57,9 @@ use App\Controllers\Members\Api\MemberNewslettersApiController;
 use App\Controllers\Members\Api\MemberOrdersApiController;
 use App\Controllers\Members\Api\MemberReadingHistoryApiController;
 use App\Controllers\Members\Api\MemberRewardsApiController;
+use App\Controllers\Members\Api\MemberStatsApiController;
+use App\Controllers\Members\Api\NewsletterRecommendationsController;
+use App\Controllers\Members\Api\SegmentAdminApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPaymentsApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPlansApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionsApiController;
@@ -75,8 +80,11 @@ use App\Controllers\Offers\ProductOfferBundleController;
 use App\Controllers\Offers\ProductOfferController;
 use App\Controllers\OpenCollab\ActivityFeedController;
 use App\Controllers\OpenCollab\Admin\AdminContractController;
+use App\Controllers\OpenCollab\Admin\AdminContractTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
+use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
+use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticleCommentController;
 use App\Controllers\OpenCollab\ArticleHistoryController;
@@ -85,6 +93,8 @@ use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorNotificationPreferenceController;
 use App\Controllers\OpenCollab\ContributorPageController;
+use App\Controllers\OpenCollab\ContributorRequestController;
+use App\Controllers\OpenCollab\ContributorSettingsController;
 use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
@@ -92,6 +102,8 @@ use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\OnboardingDashboardController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
+use App\Controllers\OpenCollab\PayoutStatementController;
+use App\Controllers\OpenCollab\ResendInvitationController;
 use App\Controllers\OpenCollab\StripeConnectController;
 use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\OpenCollab\ViolationController;
@@ -121,11 +133,13 @@ use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
 use App\Controllers\Subscription\WorkflowRunController;
 use App\Controllers\Vouchers\VoucherController;
+use App\Controllers\WorkflowController;
 use App\Framework\Authorization\AuthenticateWithToken;
+use App\Framework\Http\Router;
 use App\Framework\Middleware\AuthenticateMemberWithToken;
 
 /**
- * @var $router \App\Framework\Http\Router
+ * @var $router Router
  */
 $router->get('/api/boosts', [BoostController::class, 'index']);
 $router->get('/api/boosts/{id}', [BoostController::class, 'show']);
@@ -146,33 +160,33 @@ $router->get('/api/merchants/{merchantId}/products/search', [BoostController::cl
 $router->get('/api/merchants/{merchantId}/offers/search', [BoostController::class, 'searchMerchantOffers']);
 $router->get('/boosts/aggregate', [BoostController::class, 'aggregateStats']);
 $router->post('/api/{site}/boost/click', [BoostController::class, 'recordClick']);
-$router->post('/api/{site}/internal/workflow/run', [\App\Controllers\WorkflowController::class, 'run']);
-$router->get('/api/{site}/internal/workflow/logs', [\App\Controllers\WorkflowController::class, 'logs']);
-$router->get('/api/{site}/internal/workflow/classes', [\App\Controllers\WorkflowController::class, 'classes']);
-$router->get('/api/{site}/internal/workflow/listen', [\App\Controllers\WorkflowController::class, 'listen']);
+$router->post('/api/{site}/internal/workflow/run', [WorkflowController::class, 'run']);
+$router->get('/api/{site}/internal/workflow/logs', [WorkflowController::class, 'logs']);
+$router->get('/api/{site}/internal/workflow/classes', [WorkflowController::class, 'classes']);
+$router->get('/api/{site}/internal/workflow/listen', [WorkflowController::class, 'listen']);
 
 $router->put('/api/sites/{id}/toggle-status', [SiteController::class, 'toggleStatus']);
 
 
-$router->post('/api/{site}/member/auth/login', [\App\Controllers\MemberAuthController::class, 'apiLogin']);
+$router->post('/api/{site}/member/auth/login', [MemberAuthController::class, 'apiLogin']);
 
 $router->get('/api/{site}/admin/badges', [BadgeAdminApiController::class, 'index']);
 $router->get('/api/{site}/admin/badges/{id}', [BadgeAdminApiController::class, 'show']);
-$router->post('/api/{site}/admin/badges', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'store']);
-$router->put('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'update']);
-$router->delete('/api/{site}/admin/badges/{id}', [\App\Controllers\Members\Api\BadgeAdminApiController::class, 'destroy']);
+$router->post('/api/{site}/admin/badges', [BadgeAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/badges/{id}', [BadgeAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/badges/{id}', [BadgeAdminApiController::class, 'destroy']);
 
-$router->get('/api/{site}/admin/consent-types', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'index']);
-$router->get('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'show']);
-$router->post('/api/{site}/admin/consent-types', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'store']);
-$router->put('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'update']);
-$router->delete('/api/{site}/admin/consent-types/{id}', [\App\Controllers\Members\Api\ConsentTypeAdminApiController::class, 'destroy']);
+$router->get('/api/{site}/admin/consent-types', [ConsentTypeAdminApiController::class, 'index']);
+$router->get('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiController::class, 'show']);
+$router->post('/api/{site}/admin/consent-types', [ConsentTypeAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/consent-types/{id}', [ConsentTypeAdminApiController::class, 'destroy']);
 
-$router->get('/api/{site}/admin/segments', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'index']);
-$router->get('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'show']);
-$router->post('/api/{site}/admin/segments', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'store']);
-$router->put('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'update']);
-$router->delete('/api/{site}/admin/segments/{id}', [\App\Controllers\Members\Api\SegmentAdminApiController::class, 'destroy']);
+$router->get('/api/{site}/admin/segments', [SegmentAdminApiController::class, 'index']);
+$router->get('/api/{site}/admin/segments/{id}', [SegmentAdminApiController::class, 'show']);
+$router->post('/api/{site}/admin/segments', [SegmentAdminApiController::class, 'store']);
+$router->put('/api/{site}/admin/segments/{id}', [SegmentAdminApiController::class, 'update']);
+$router->delete('/api/{site}/admin/segments/{id}', [SegmentAdminApiController::class, 'destroy']);
 
 
 $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMemberWithToken::class]], function ($router) {
@@ -183,7 +197,7 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->get('/dashboard/newsletters', [MemberDashboardApiController::class, 'newsletters']);
     $router->get('/dashboard/rewards', [MemberDashboardApiController::class, 'rewards']);
     $router->get('/dashboard/subscriptions', [MemberDashboardApiController::class, 'subscriptions']);
-    $router->get('/dashboard/stats', [\App\Controllers\Members\Api\MemberStatsApiController::class, 'stats']);
+    $router->get('/dashboard/stats', [MemberStatsApiController::class, 'stats']);
 
     // Member Activity & Badges API
     $router->get('/activity', [MemberActivityApiController::class, 'index']);
@@ -250,7 +264,7 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->get('/newsletters', [MemberNewslettersApiController::class, 'index']);
     $router->post('/newsletters/unsubscribe', [MemberNewslettersApiController::class, 'unsubscribe']);
     $router->post('/newsletter/signup', [MemberNewslettersApiController::class, 'subscribe']);
-    $router->get('/newsletters/recommendations', [\App\Controllers\Members\Api\NewsletterRecommendationsController::class, '__invoke']);
+    $router->get('/newsletters/recommendations', [NewsletterRecommendationsController::class, '__invoke']);
     $router->post('/newsletters/bulk-subscribe', [MemberNewslettersApiController::class, 'bulkSubscribe']);
 // In the member newsletters section
     $router->post('/newsletters/upgrade-options', [MemberNewslettersApiController::class, 'getUpgradeOptions']);
@@ -327,6 +341,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [InvitationController::class, 'store']
         );
 
+        $router->post(
+            '/open-collab/contributor/expertise',
+            [ContributorSettingsController::class, 'saveExpertise']
+        );
+
+        $router->post(
+            '/open-collab/contributor/avatar',
+            [ContributorSettingsController::class, 'uploadAvatar']
+        );
+
         $router->get(
             '/open-collab/dashboard',
             [ContributorDashboardController::class, 'show']
@@ -357,6 +381,31 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/open-collab/admin/contributors',
             [AdminContributorController::class, 'index']
         );
+
+        $router->post(
+            '/open-collab/admin/contract-templates',
+            [AdminContractController::class, '']
+        );
+
+        $router->post('/open-collab/admin/contracts/{id}/publish', [AdminContractController::class, 'publish']);
+        $router->post('/open-collab/admin/contracts/{id}/clone', [AdminContractController::class, 'clone']);
+        $router->post('/open-collab/admin/contracts/from-template', [AdminContractController::class, 'storeFromTemplate']);
+
+        $router->get('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'index']);
+        $router->post('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'store']);
+        $router->put('/open-collab/admin/contract-templates/{id}', [AdminContractTemplateController::class, 'update']);
+        $router->delete('/open-collab/admin/contract-templates/{id}', [AdminContractTemplateController::class, 'destroy']);
+
+        // Specialized Guideline Actions
+        $router->post('/open-collab/admin/guidelines/{id}/publish', [AdminGuidelinesController::class, 'publish']);
+        $router->post('/open-collab/admin/guidelines/{id}/clone', [AdminGuidelinesController::class, 'clone']);
+        $router->post('/open-collab/admin/guidelines/from-template', [AdminGuidelinesController::class, 'storeFromTemplate']);
+
+        // ─── Guideline Templates ──────────────────────────────────────────────
+        $router->get('/open-collab/admin/guideline-templates', [AdminGuidelineTemplateController::class, 'index']);
+        $router->post('/open-collab/admin/guideline-templates', [AdminGuidelineTemplateController::class, 'store']);
+        $router->put('/open-collab/admin/guideline-templates/{id}', [AdminGuidelineTemplateController::class, 'update']);
+        $router->delete('/open-collab/admin/guideline-templates/{id}', [AdminGuidelineTemplateController::class, 'destroy']);
 
         $router->get(
             '/open-collab/admin/contributors/{id}',
@@ -500,28 +549,28 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->post(
             '/api/{site}/open-collab/contributor-requests',
-            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'store']
+            [ContributorRequestController::class, 'store']
         );
 
 // ── Invitation self-service resend (public — no auth) ────────────────
         $router->post(
             '/api/{site}/open-collab/invitations/resend',
-            [\App\Controllers\OpenCollab\ResendInvitationController::class, 'resend']
+            [ResendInvitationController::class, 'resend']
         );
 
 // ── Admin: contributor request queue ─────────────────────────────────
 // (add inside the authenticated admin group)
         $router->get(
             '/open-collab/admin/contributor-requests',
-            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'index']
+            [ContributorRequestController::class, 'index']
         );
         $router->post(
             '/open-collab/admin/contributor-requests/{id}/approve',
-            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'approve']
+            [ContributorRequestController::class, 'approve']
         );
         $router->post(
             '/open-collab/admin/contributor-requests/{id}/reject',
-            [\App\Controllers\OpenCollab\ContributorRequestController::class, 'reject']
+            [ContributorRequestController::class, 'reject']
         );
 
         // crm
@@ -685,9 +734,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/briefs/{id}/archive', [BriefController::class, 'archive']);
 
         // Brief Templates
-        $router->get('/briefs/templates', [BriefController::class, 'getTemplates']);;
+        $router->get('/briefs/templates', [BriefController::class, 'getTemplates']);
         $router->post('/briefs/templates/{templateId}/create', [BriefController::class, 'createFromTemplate']);
-        $router->post('/briefs/{id}/save-template', [BriefController::class, 'saveAsTemplate']);;
+        $router->post('/briefs/{id}/save-template', [BriefController::class, 'saveAsTemplate']);
 
 // Collaborators
         $router->get('/briefs/{id}/collaborators', [BriefController::class, 'getCollaborators']);
@@ -697,7 +746,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
 // Tasks
         $router->get('/briefs/{id}/tasks', [BriefController::class, 'getTasks']);
-        $router->post('/briefs/{id}/tasks', [BriefController::class, 'createTask']);;
+        $router->post('/briefs/{id}/tasks', [BriefController::class, 'createTask']);
         $router->put('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'updateTask']);
         $router->delete('/briefs/{id}/tasks/{taskId}', [BriefController::class, 'deleteTask']);
         $router->get('/brief-subtask', [BriefController::class, 'searchTasks']);
@@ -758,7 +807,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/bulk-delete', PageController::class, 'bulkDelete');
         $router->post('/pages/bulk-update-status', PageController::class, 'bulkUpdateStatus');
         $router->post('/pages/{id}/clone-to-site', PageController::class, 'cloneToSite');
-        $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);;
+        $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
         $router->put('/pages/{id}/schedule', [PageController::class, 'updateSchedule']);
 
@@ -827,12 +876,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/email-themes/active', [EmailThemeController::class, 'getActive']);
         $router->post('/email-themes', [EmailThemeController::class, 'store']);
         $router->get('/email-themes/{id}', [EmailThemeController::class, 'show']);
-        $router->put('/email-themes/{id}', [EmailThemeController::class, 'update']);;
-        $router->delete('/email-themes/{id}', [EmailThemeController::class, 'destroy']);;
+        $router->put('/email-themes/{id}', [EmailThemeController::class, 'update']);
+        $router->delete('/email-themes/{id}', [EmailThemeController::class, 'destroy']);
         $router->post('/email-themes/{id}/set-default', [EmailThemeController::class, 'setDefault']);
         $router->get('/email-themes/{id}/alternatives', [EmailThemeController::class, 'alternatives']);
         $router->post('/email-themes/{id}/duplicate', [EmailThemeController::class, 'duplicate']);
-        $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);;
+        $router->post('/email-themes/bulk-delete', [EmailThemeController::class, 'bulkDelete']);
 
         $router->get('/email-templates/{id}/versions', [EmailTemplateController::class, 'versions']);
         $router->get('/email-templates/{id}/versions/{id}', [EmailTemplateController::class, 'index']);
@@ -931,7 +980,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/pages/bulk-update-regions', [PageController::class, 'bulkUpdateRegions']);
         $router->post('/pages/bulk-clone', [PageController::class, 'bulkClone']);
 
-        $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');;
+        $router->get('/pages/{pageId}/custom-fields/grouped', CustomFieldDefinitionController::class, 'getCustomFieldsGrouped');
 
         // Categories API
         $router->get('/categories', CategoryController::class, 'index');
@@ -1151,7 +1200,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         // Product merchants
         $router->get('/products/merchants', [ProductController::class, 'merchants']);
 
-        $router->get('/specification-groups', [ProductController::class, 'specificationGroups']);;
+        $router->get('/specification-groups', [ProductController::class, 'specificationGroups']);
 
 
         $router->get('/users', UserController::class, 'index');
@@ -1296,7 +1345,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/newsletters/{id}/subscribers', [NewsletterController::class, 'getNewsletterSubscribers']);
         $router->post('/newsletters/{id}/send', [NewsletterController::class, 'send']);
         $router->post('/newsletters/{id}/pause', [NewsletterController::class, 'togglePause']);
-        $router->delete('/newsletters/{id}', [NewsletterController::class, 'delete']);;
+        $router->delete('/newsletters/{id}', [NewsletterController::class, 'delete']);
         $router->put('/newsletters/{id}', [NewsletterController::class, 'update']);
         $router->get('/newsletters/{id}', [NewsletterController::class, 'show']);
         $router->get('/newsletters/statistics', [NewsletterController::class, 'statistics']);
@@ -1424,7 +1473,7 @@ $router->post('/api/{site}/newsletter/web/signup', [NewsletterController::class,
 
 $router->get('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'getCustomFields');
 
-$router->put('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'updateCustomFields');;
+$router->put('/api/pages/{pageId}/custom-fields', CustomFieldDefinitionController::class, 'updateCustomFields');
 
 
 // Blocks API
@@ -1523,6 +1572,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);
+        $router->post('/age-verification', [OnboardingController::class, 'updateAgeVerification']);
     });
 
     $router->group(['prefix' => 'notifications'], function () use ($router) {
@@ -1602,19 +1652,19 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     $router->get('/admin/violations', [ViolationController::class, 'siteIndex']);
 
-    $router->post('/admin/payment-terms', [\App\Controllers\OpenCollab\Admin\AdminPaymentTermsController::class, 'save']);
+    $router->post('/admin/payment-terms', [AdminPaymentTermsController::class, 'save']);
 
     $router->post('/invitations/{token}/accept', [InvitationController::class, 'accept']);
 
     $router->post(
         '/contributor-requests',
-        [\App\Controllers\OpenCollab\ContributorRequestController::class, 'store']
+        [ContributorRequestController::class, 'store']
     );
 
     $router->post(
         '/invitations/resend',
-        [\App\Controllers\OpenCollab\ResendInvitationController::class, 'resend']
+        [ResendInvitationController::class, 'resend']
     );
 });
 
-$router->get('/api/{site}/open-collab/payouts/{id}/statement', [\App\Controllers\OpenCollab\PayoutStatementController::class, 'download']);
+$router->get('/api/{site}/open-collab/payouts/{id}/statement', [PayoutStatementController::class, 'download']);

@@ -97,6 +97,7 @@ class SubscriptionBatchFactory
             $subscriptions[] = [
                 'subscription' => $subscription,
                 'pricing' => $pricing,
+                'price_paid_cents' => $pricing->totalCents,
                 'meta' => $this->mergeMetaData($item),
                 'selected_start_date' => $item['options']['start_date'] ?? null,
             ];

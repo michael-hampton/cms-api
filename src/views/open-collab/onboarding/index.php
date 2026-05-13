@@ -263,6 +263,59 @@
                         </button>
                     </form>
 
+                    <!-- ── AGE VERIFICATION STEP ────────────────── -->
+                <?php elseif ($vm->currentStepName() === 'age_verification'): ?>
+                    <?php $meta = $vm->currentStepMeta(); ?>
+                    <form id="onboarding-form" novalidate>
+                        <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
+                            You must be at least <?= (int)($meta['minimum_age'] ?? 18) ?> years old to contribute to
+                            this platform. Please enter your date of birth to confirm you meet this requirement.
+                        </p>
+
+                        <div class="oc-alert oc-alert--info" style="margin-bottom:20px;">
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="16">
+                                <path fill-rule="evenodd"
+                                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Your date of birth is used only to verify your eligibility. It is stored securely and
+                            never shared with third parties.
+                        </div>
+
+                        <div class="oc-form-group">
+                            <label class="oc-label" for="dob">Date of birth</label>
+                            <input class="oc-input" type="date" id="dob" name="date_of_birth"
+                                   required
+                                   max="<?= date('Y-m-d') ?>"
+                                   min="<?= date('Y-m-d', strtotime('-100 years')) ?>"
+                                   style="max-width:220px;">
+                            <div class="oc-help">
+                                You must be <?= (int)($meta['minimum_age'] ?? 18) ?> or older to continue.
+                            </div>
+                            <div class="oc-error-msg" id="dob-error"></div>
+                        </div>
+
+                        <div class="oc-toggle-row" style="margin-bottom:20px;">
+                            <label class="oc-toggle">
+                                <input type="checkbox" id="dob-confirmed" name="dob_confirmed" required>
+                                <span class="oc-toggle__slider"></span>
+                            </label>
+                            <div class="oc-toggle-label">
+                                <strong>I confirm this is my correct date of birth</strong>
+                                <span>Providing a false date of birth may result in account suspension.</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="oc-btn oc-btn--amber oc-btn--block" id="submit-btn">
+                            Confirm age &amp; continue
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="16">
+                                <path fill-rule="evenodd"
+                                      d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </form>
+
                 <?php endif; ?>
 
             </div>
@@ -483,6 +536,49 @@
         }
     }
 
+    class AgeVerificationStep extends OnboardingStepBase {
+        async _submit() {
+            this._clearError();
+
+            const dob = document.getElementById('dob')?.value;
+            const confirmed = document.getElementById('dob-confirmed')?.checked;
+            const dobError = document.getElementById('dob-error');
+
+            dobError.textContent = '';
+            dobError.classList.remove('visible');
+
+            if (!dob) {
+                dobError.textContent = 'Please enter your date of birth.';
+                dobError.classList.add('visible');
+                return;
+            }
+
+            // Client-side sanity check — server re-validates authoritatively.
+            // We parse the date as UTC to avoid timezone boundary issues matching
+            // the server-side ContributorAgeValidationService behaviour.
+            const parts = dob.split('-').map(Number); // [YYYY, MM, DD]
+            const dobDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+            const today = new Date();
+            const todayUtc = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+
+            if (dobDate >= todayUtc) {
+                dobError.textContent = 'Date of birth cannot be in the future.';
+                dobError.classList.add('visible');
+                return;
+            }
+
+            if (!confirmed) {
+                this._showError('Please confirm that this is your correct date of birth.');
+                return;
+            }
+
+            const btn = this._setButtonLoading('Verifying…');
+            const res = await this._post('age-verification', {date_of_birth: dob});
+
+            await this._handleResponse(res, btn, 'Confirm age &amp; continue');
+        }
+    }
+
     class OnboardingManager {
         #step;
 
@@ -500,6 +596,8 @@
                     return new ContractStep(site, token);
                 case 'guidelines':
                     return new GuidelinesStep(site, token);
+                case 'age_verification':
+                    return new AgeVerificationStep(site, token);
                 default:
                     return null;
             }

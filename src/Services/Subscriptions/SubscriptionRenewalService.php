@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Subscriptions;
 
+use App\Enums\Subscriptions\BillingPeriod;
 use App\Enums\Subscriptions\SubscriptionEndReason;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
@@ -11,8 +12,10 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
+use DateTimeImmutable;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Handles subscription renewal via the hard-replace model.
@@ -43,7 +46,7 @@ class SubscriptionRenewalService
     public function __construct(
         private readonly SubscriptionRepository     $subscriptionRepository,
         private readonly SubscriptionPlanRepository $planRepository,
-        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly SubscriptionDateCalculator $dateCalculator,
         private readonly Database                   $database,
     )
@@ -62,8 +65,8 @@ class SubscriptionRenewalService
      *
      * @return array{ old_subscription: object, new_subscription: object }
      *
-     * @throws \InvalidArgumentException  For business-rule violations.
-     * @throws \RuntimeException          For payment or persistence failures.
+     * @throws InvalidArgumentException  For business-rule violations.
+     * @throws RuntimeException          For payment or persistence failures.
      */
     public function renew(
         int    $subscriptionId,
@@ -78,21 +81,21 @@ class SubscriptionRenewalService
         $oldSubscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$oldSubscription) {
-            throw new \InvalidArgumentException("Subscription #{$subscriptionId} not found.");
+            throw new InvalidArgumentException("Subscription #{$subscriptionId} not found.");
         }
 
         if ($oldSubscription->site_id !== $siteId) {
-            throw new \InvalidArgumentException("Subscription does not belong to this site.");
+            throw new InvalidArgumentException("Subscription does not belong to this site.");
         }
 
         if (in_array($oldSubscription->status, self::NON_RENEWABLE_STATUSES, true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 "Subscription cannot be renewed from status: {$oldSubscription->status}."
             );
         }
 
         if (!in_array($oldSubscription->status, self::renewableStatuses(), true)) {
-            throw new \InvalidArgumentException(
+            throw new InvalidArgumentException(
                 "Subscription must be active or paused to renew. Current status: {$oldSubscription->status}."
             );
         }
@@ -100,15 +103,15 @@ class SubscriptionRenewalService
         $plan = $this->planRepository->find($planId);
 
         if (!$plan || !$plan->is_active) {
-            throw new \InvalidArgumentException("Plan #{$planId} not found or inactive.");
+            throw new InvalidArgumentException("Plan #{$planId} not found or inactive.");
         }
 
         if ($plan->site_id !== $siteId) {
-            throw new \InvalidArgumentException("Plan does not belong to this site.");
+            throw new InvalidArgumentException("Plan does not belong to this site.");
         }
 
         // ── Charge payment BEFORE any DB mutation ─────────────────────────
-        $paymentResult = $this->stripeProcessor->processSubscriptionPayment(
+        $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
             $oldSubscription,
             $plan,
             [
@@ -123,7 +126,7 @@ class SubscriptionRenewalService
         );
 
         if (!($paymentResult['success'] ?? false)) {
-            throw new \RuntimeException(
+            throw new RuntimeException(
                 'Payment failed: ' . ($paymentResult['message'] ?? 'Unknown error')
             );
         }
@@ -147,11 +150,11 @@ class SubscriptionRenewalService
             ]);
 
             // Step 2 — Calculate new subscription dates (start = now)
-            $startDate = new \DateTimeImmutable($now->format('Y-m-d H:i:s'));
+            $startDate = new DateTimeImmutable($now->format('Y-m-d H:i:s'));
             $endDate = $plan->billing_period !== 'lifetime'
                 ? $this->dateCalculator->calculateEndDate(
                     $startDate,
-                    \App\Enums\Subscriptions\BillingPeriod::from($plan->billing_period)
+                    BillingPeriod::from($plan->billing_period)
                 )
                 : null;
 

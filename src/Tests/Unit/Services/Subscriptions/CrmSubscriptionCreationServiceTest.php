@@ -12,10 +12,10 @@ use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 use InvalidArgumentException;
 use Mockery;
 use Mockery\MockInterface;
@@ -29,7 +29,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
     private CartService&MockInterface $cartService;
     private OneTimeSubscriptionCheckoutService&MockInterface $checkoutService;
     private MemberAuthWrapper&MockInterface $memberAuth;
-    private StripePaymentProcessor&MockInterface $stripeProcessor;
+    private SubscriptionPaymentService&MockInterface $subscriptionPaymentService;
     private AddressRepository&MockInterface $addressRepository;
 
     private CrmSubscriptionCreationService $service;
@@ -164,7 +164,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
 
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
 
-        $this->stripeProcessor->expects('processSubscriptionPayment')
+        $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->once()
             ->andReturn(['subscription_id' => 'sub_stripe_123']);
 
@@ -239,7 +239,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             ->andReturn($checkoutResult);
 
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
-        $this->stripeProcessor->expects('processSubscriptionPayment')
+        $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->andReturn(['subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
@@ -273,7 +273,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             ->andReturn($checkoutResult);
 
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
-        $this->stripeProcessor->expects('processSubscriptionPayment')
+        $this->subscriptionPaymentService->expects('processStripeSubscriptionPayment')
             ->andReturn(['subscription_id' => 'sub_stripe_123']);
         $subscription->expects('update')->once();
         $this->subscriptionRepository->expects('find')->with(42)->andReturn($subscription);
@@ -293,7 +293,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $this->cartService = Mockery::mock(CartService::class);
         $this->checkoutService = Mockery::mock(OneTimeSubscriptionCheckoutService::class);
         $this->memberAuth = Mockery::mock(MemberAuthWrapper::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->addressRepository = Mockery::mock(AddressRepository::class);
 
         $this->service = new CrmSubscriptionCreationService(
@@ -303,7 +303,7 @@ class CrmSubscriptionCreationServiceTest extends TestCase
             cartService: $this->cartService,
             checkoutService: $this->checkoutService,
             memberAuth: $this->memberAuth,
-            stripeProcessor: $this->stripeProcessor,
+            subscriptionPaymentService: $this->subscriptionPaymentService,
             addressRepository: $this->addressRepository,
         );
     }

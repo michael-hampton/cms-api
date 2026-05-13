@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing\PaymentProviders;
 
+use App\DTO\Payments\StripeSubscriptionResult;
 use App\Enums\Vouchers\VoucherType;
 use App\Framework\Support\Logger;
 use App\Models\Order;
@@ -71,7 +72,9 @@ class StripePaymentProcessor
             $stripeSubscription = $this->createStripeSubscription(
                 $customerId,
                 $plan,
-                $subscription
+                $subscription,
+                false,
+                $data
             );
 
             // Get the latest invoice and payment intent
@@ -104,78 +107,41 @@ class StripePaymentProcessor
                 }
             }
 
-            // Create payment record
-            $payment = $this->paymentRepository->create(
-                [
-                    'subscription_id' => $subscription->id,
-                    'site_id' => $subscription->site_id,
-                    'payment_method' => 'stripe',
-                    'payment_provider' => 'stripe',
-                    'transaction_id' => is_string($latestInvoice) ? $latestInvoice : $latestInvoice->id,
-                    'payment_intent_id' => $paymentIntentId,
-                    'status' => $this->mapStripeStatus($stripeSubscription->status),
-                    'amount' => $plan->price,
-                    'currency' => strtoupper($plan->currency),
-                    'metadata' => [
-                        'subscription_id' => $subscription->id,
-                        'plan_id' => $plan->id,
-                        'billing_period' => $plan->billing_period,
-                        'stripe_subscription_id' => $stripeSubscription->id,
-                        'stripe_customer_id' => $customerId
-                    ],
-                    'order_id' => $data['order_id']
-                ]
-            );
-
-            // Update payment status based on subscription status
-            if ($stripeSubscription->status === 'active' && !$requiresAction) {
-                $this->paymentRepository->update($payment->id, [
-                    'status' => 'completed',
-                    'paid_at' => date('Y-m-d H:i:s')
-                ]);
-
-                // Update subscription status
-                $subscription->update([
-                    'status' => 'active',
-                    'current_period_start' => date('Y-m-d H:i:s', $stripeSubscription->current_period_start),
-                    'current_period_end' => date('Y-m-d H:i:s', $stripeSubscription->current_period_end)
-                ]);
-
-                if (!empty($data['order_id'])) {
-                    $this->orderRepository->update($data['order_id'], [
-                        'status' => 'completed',
-                        'payment_status' => 'paid'
-                    ]);
-                }
-            }
-
-            return [
-                'success' => true,
-                'payment_intent_id' => $paymentIntentId,
-                'subscription_id' => $stripeSubscription->id,
-                'status' => $stripeSubscription->status,
-                'customer_id' => $customerId,
-                'requires_action' => $requiresAction,
-                'payment_intent_client_secret' => $clientSecret,
-                'payment_id' => $payment->id,
-            ];
+            return (new StripeSubscriptionResult(
+                success: true,
+                subscriptionId: $stripeSubscription->id,
+                status: $stripeSubscription->status,
+                customerId: $customerId,
+                paymentIntentId: $paymentIntentId,
+                requiresAction: $requiresAction,
+                paymentIntentClientSecret: $clientSecret,
+                currentPeriodStart: isset($stripeSubscription->current_period_start)
+                    ? (int)$stripeSubscription->current_period_start
+                    : null,
+                currentPeriodEnd: isset($stripeSubscription->current_period_end)
+                    ? (int)$stripeSubscription->current_period_end
+                    : null,
+            ))->toArray();
 
         } catch (ApiErrorException $e) {
 
             error_log('Stripe API Error: ' . $e->getMessage());
 
-            return [
-                'success' => false,
-                'message' => $this->getUserFriendlyMessage($e),
-                'error_code' => $e->getStripeCode()
-            ];
+            echo $e->getMessage();
+            die;
+
+            return (new StripeSubscriptionResult(
+                success: false,
+                message: $this->getUserFriendlyMessage($e),
+                errorCode: $e->getStripeCode()
+            ))->toArray();
         } catch (Exception $e) {
             error_log('Stripe Payment Error: ' . $e->getMessage());
 
-            return [
-                'success' => false,
-                'message' => 'An unexpected error occurred. Please try again.'
-            ];
+            return (new StripeSubscriptionResult(
+                success: false,
+                message: 'An unexpected error occurred. Please try again.'
+            ))->toArray();
         }
     }
 
@@ -239,39 +205,18 @@ class StripePaymentProcessor
         return $this->stripe->subscriptions->create($subscriptionData);
     }
 
-    private function getOrCreatePrice(SubscriptionPlan $plan): string
+    private function resolveSubscriptionAmountCents(Subscription $subscription, array $data = []): int
     {
-        // Check if price already exists
-        if (!empty($plan->stripe_price_id)) {
-            return $plan->stripe_price_id;
+        if (isset($data['amount_cents'])) {
+            return (int)$data['amount_cents'];
         }
 
-        // Create product first
-        $product = $this->stripe->products->create([
-            'name' => $plan->name,
-            'description' => $plan->description,
-            'metadata' => [
-                'plan_id' => $plan->id
-            ]
-        ]);
+        if (isset($data['amount'])) {
+            return (int)round(((float)$data['amount']) * 100);
+        }
 
-        // Create price
-        $price = $this->stripe->prices->create([
-            'product' => $product->id,
-            'unit_amount' => (int)($plan->price * 100), // Convert to cents
-            'currency' => strtolower($plan->currency),
-            'recurring' => [
-                'interval' => $this->mapBillingPeriodToInterval($plan->billing_period)
-            ],
-            'metadata' => [
-                'plan_id' => $plan->id
-            ]
-        ]);
-
-        // Store price ID on plan
-        $plan->update(['stripe_price_id' => $price->id]);
-
-        return $price->id;
+        return $subscription->price_paid_cents
+            ?? (int)round(((float)$subscription->price) * 100);
     }
 
     private function mapBillingPeriodToInterval(string $billingPeriod): string
@@ -751,6 +696,8 @@ class StripePaymentProcessor
                 'payment_intent_id' => $paymentIntent->id
             ];
         } catch (ApiErrorException $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e)
@@ -810,6 +757,9 @@ class StripePaymentProcessor
             return $result;
         } catch (ApiErrorException $e) {
             error_log('Stripe Payment Intent Error: ' . $e->getMessage());
+
+            echo $e->getMessage();
+            die;
 
             return [
                 'success' => false,
@@ -1061,12 +1011,17 @@ class StripePaymentProcessor
         } catch (ApiErrorException $e) {
             error_log('Stripe API Error: ' . $e->getMessage());
 
+            echo $e->getMessage();
+            die;
+
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e),
                 'error_code' => $e->getStripeCode()
             ];
         } catch (Exception $e) {
+            echo $e->getMessage();
+            die;
             error_log('Stripe Payment Error: ' . $e->getMessage());
 
             return [
@@ -1074,6 +1029,41 @@ class StripePaymentProcessor
                 'message' => 'An unexpected error occurred. Please try again.'
             ];
         }
+    }
+
+    private function getOrCreatePrice(SubscriptionPlan $plan): string
+    {
+        // Check if price already exists
+        if (!empty($plan->stripe_price_id)) {
+            return $plan->stripe_price_id;
+        }
+
+        // Create product first
+        $product = $this->stripe->products->create([
+            'name' => $plan->name,
+            'description' => $plan->description,
+            'metadata' => [
+                'plan_id' => $plan->id
+            ]
+        ]);
+
+        // Create price
+        $price = $this->stripe->prices->create([
+            'product' => $product->id,
+            'unit_amount' => (int)($plan->price * 100), // Convert to cents
+            'currency' => strtolower($plan->currency),
+            'recurring' => [
+                'interval' => $this->mapBillingPeriodToInterval($plan->billing_period)
+            ],
+            'metadata' => [
+                'plan_id' => $plan->id
+            ]
+        ]);
+
+        // Store price ID on plan
+        $plan->update(['stripe_price_id' => $price->id]);
+
+        return $price->id;
     }
 
     private function getOrCreateStripeCoupon(Voucher $voucher, SubscriptionPlan $plan): string
@@ -1135,6 +1125,10 @@ class StripePaymentProcessor
                 'currency' => $paymentIntent->currency,
             ];
         } catch (ApiErrorException $e) {
+
+            echo $e->getMessage();
+            die;
+
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e),
@@ -1225,6 +1219,8 @@ class StripePaymentProcessor
             ];
 
         } catch (ApiErrorException $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e),

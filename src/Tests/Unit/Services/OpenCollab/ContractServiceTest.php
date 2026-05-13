@@ -3,9 +3,6 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ContractStatus;
-use App\Events\OpenCollab\ContractArchivedEvent;
-use App\Events\OpenCollab\ContractDraftCreatedEvent;
-use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Exceptions\OpenCollab\ContractNotArchivableException;
 use App\Exceptions\OpenCollab\ContractNotEditableException;
 use App\Exceptions\OpenCollab\ContractNotPublishableException;
@@ -16,6 +13,7 @@ use App\Services\OpenCollab\ContractService;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 class ContractServiceTest extends TestCase
 {
@@ -29,7 +27,7 @@ class ContractServiceTest extends TestCase
 
     public function test_create_draft_persists_and_emits_event(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => ContractStatus::Draft]);
+        $contract = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => ContractStatus::Draft->value]);
 
         $this->contractRepository
             ->shouldReceive('nextVersionNumber')
@@ -56,8 +54,8 @@ class ContractServiceTest extends TestCase
 
     public function test_update_draft_content_succeeds_for_draft(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft]);
-        $updated = $this->makeContract(['id' => 1, 'content' => 'new content', 'status' => ContractStatus::Draft]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft->value]);
+        $updated = $this->makeContract(['id' => 1, 'content' => 'new content', 'status' => ContractStatus::Draft->value]);
 
         $contract->shouldReceive('update')->once()->with(['content' => 'new content']);
         $contract->shouldReceive('fresh')->once()->andReturn($updated);
@@ -71,7 +69,7 @@ class ContractServiceTest extends TestCase
 
     public function test_update_draft_content_throws_for_published_contract(): void
     {
-        $contract = $this->makeContract(['id' => 5, 'status' => ContractStatus::Published]);
+        $contract = $this->makeContract(['id' => 5, 'status' => ContractStatus::Published->value]);
 
         $this->expectException(ContractNotEditableException::class);
 
@@ -80,7 +78,7 @@ class ContractServiceTest extends TestCase
 
     public function test_update_draft_content_throws_for_archived_contract(): void
     {
-        $contract = $this->makeContract(['id' => 5, 'status' => ContractStatus::Archived]);
+        $contract = $this->makeContract(['id' => 5, 'status' => ContractStatus::Archived->value]);
 
         $this->expectException(ContractNotEditableException::class);
 
@@ -91,8 +89,8 @@ class ContractServiceTest extends TestCase
 
     public function test_publish_version_transitions_draft_to_published(): void
     {
-        $draft = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Draft]);
-        $published = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Published]);
+        $draft = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Draft->value]);
+        $published = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Published->value]);
 
         $this->contractRepository
             ->shouldReceive('latestPublishedForSite')
@@ -117,9 +115,9 @@ class ContractServiceTest extends TestCase
 
     public function test_publish_auto_archives_previous_published_version(): void
     {
-        $previous = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => ContractStatus::Published]);
-        $draft = $this->makeContract(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Draft]);
-        $published = $this->makeContract(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Published]);
+        $previous = $this->makeContract(['id' => 1, 'site_id' => 10, 'version' => 1, 'status' => ContractStatus::Published->value]);
+        $draft = $this->makeContract(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Draft->value]);
+        $published = $this->makeContract(['id' => 2, 'site_id' => 10, 'version' => 2, 'status' => ContractStatus::Published->value]);
 
         $this->contractRepository
             ->shouldReceive('latestPublishedForSite')
@@ -151,7 +149,7 @@ class ContractServiceTest extends TestCase
 
     public function test_publish_throws_for_already_published_contract(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Published]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Published->value]);
 
         $this->expectException(ContractNotPublishableException::class);
 
@@ -160,7 +158,7 @@ class ContractServiceTest extends TestCase
 
     public function test_publish_throws_for_archived_contract(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Archived]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Archived->value]);
 
         $this->expectException(ContractNotPublishableException::class);
 
@@ -171,8 +169,8 @@ class ContractServiceTest extends TestCase
 
     public function test_archive_version_transitions_published_to_archived(): void
     {
-        $published = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Published]);
-        $archived = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Archived]);
+        $published = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Published->value]);
+        $archived = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Archived->value]);
 
         $this->contractRepository
             ->shouldReceive('archive')
@@ -191,7 +189,7 @@ class ContractServiceTest extends TestCase
 
     public function test_archive_throws_for_draft_contract(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft->value]);
 
         $this->expectException(ContractNotArchivableException::class);
 
@@ -200,7 +198,7 @@ class ContractServiceTest extends TestCase
 
     public function test_archive_throws_for_already_archived_contract(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Archived]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Archived->value]);
 
         $this->expectException(ContractNotArchivableException::class);
 
@@ -216,14 +214,14 @@ class ContractServiceTest extends TestCase
             'site_id' => 10,
             'version' => 3,
             'content' => 'original content',
-            'status' => ContractStatus::Published,
+            'status' => ContractStatus::Published->value,
         ]);
         $draft = $this->makeContract([
             'id' => 4,
             'site_id' => 10,
             'version' => 4,
             'content' => 'original content',
-            'status' => ContractStatus::Draft,
+            'status' => ContractStatus::Draft->value,
         ]);
 
         $this->contractRepository
@@ -260,7 +258,7 @@ class ContractServiceTest extends TestCase
             'site_id' => 10,
             'version' => 3,
             'content' => 'original content',
-            'status' => ContractStatus::Published,
+            'status' => ContractStatus::Published->value,
         ]);
 
         $this->contractRepository
@@ -268,20 +266,20 @@ class ContractServiceTest extends TestCase
 
         $this->contractRepository
             ->shouldReceive('create')
-            ->andReturn($this->makeContract(['id' => 4, 'status' => ContractStatus::Draft, 'site_id' => 10]));
+            ->andReturn($this->makeContract(['id' => 4, 'status' => ContractStatus::Draft->value, 'site_id' => 10]));
 
         $this->runInFakeTransaction(fn() => $this->service->cloneToDraft($source, 99));
 
         // Source model attributes unchanged (no update() called on it)
         $this->assertEquals('original content', $source->content);
-        $this->assertEquals(ContractStatus::Published, $source->status);
+        $this->assertEquals(ContractStatus::Published->value, $source->status);
     }
 
     // ── assertEditable / assertPublishable / assertArchivable ─────────────────
 
     public function test_assert_editable_passes_for_draft(): void
     {
-        $contract = $this->makeContract(['status' => ContractStatus::Draft]);
+        $contract = $this->makeContract(['status' => ContractStatus::Draft->value]);
 
         $this->service->assertEditable($contract); // no exception
 
@@ -290,7 +288,7 @@ class ContractServiceTest extends TestCase
 
     public function test_assert_publishable_passes_for_draft(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Draft->value]);
 
         $this->service->assertPublishable($contract);
 
@@ -299,7 +297,7 @@ class ContractServiceTest extends TestCase
 
     public function test_assert_archivable_passes_for_published(): void
     {
-        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Published]);
+        $contract = $this->makeContract(['id' => 1, 'status' => ContractStatus::Published->value]);
 
         $this->service->assertArchivable($contract);
 
@@ -310,7 +308,7 @@ class ContractServiceTest extends TestCase
 
     public function test_publish_rolls_back_on_repository_failure(): void
     {
-        $draft = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Draft]);
+        $draft = $this->makeContract(['id' => 1, 'site_id' => 10, 'status' => ContractStatus::Draft->value]);
 
         $this->contractRepository
             ->shouldReceive('latestPublishedForSite')
@@ -318,9 +316,9 @@ class ContractServiceTest extends TestCase
 
         $this->contractRepository
             ->shouldReceive('publish')
-            ->andThrow(new \RuntimeException('DB failure'));
+            ->andThrow(new RuntimeException('DB failure'));
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('DB failure');
 
         $this->runInFakeTransaction(

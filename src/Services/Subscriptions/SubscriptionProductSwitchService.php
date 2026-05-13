@@ -14,9 +14,9 @@ use App\Framework\Support\Logger;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
+use DateTimeImmutable;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -28,7 +28,7 @@ class SubscriptionProductSwitchService
         private readonly MemberRepository                   $memberRepository,
         private readonly CartService                        $cartService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly MemberAuthWrapper                  $memberAuth,
         private readonly Database                           $database,
     )
@@ -178,8 +178,8 @@ class SubscriptionProductSwitchService
              * but recurring Stripe subscription creation still happens
              * separately via StripePaymentProcessor.
              */
-            $paymentResult = $this->stripeProcessor
-                ->processSubscriptionPayment(
+            $paymentResult = $this->subscriptionPaymentService
+                ->processStripeSubscriptionPayment(
                     $newSubscription,
                     $newPlan,
                     [
@@ -310,7 +310,7 @@ class SubscriptionProductSwitchService
         $start = $startDate;
         $end = $endDate;
 
-        $now = new \DateTimeImmutable();
+        $now = new DateTimeImmutable();
 
         if ($now >= $end) {
             return 0.00;

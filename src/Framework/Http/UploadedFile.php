@@ -2,6 +2,8 @@
 
 namespace App\Framework\Http;
 
+use finfo;
+
 class UploadedFile
 {
     private array $fileInfo;
@@ -45,11 +47,13 @@ class UploadedFile
     public function getMimeType(): string
     {
         if ($this->isValid()) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mimeType = finfo_file($finfo, $this->tmpName);
-            finfo_close($finfo);
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+
+            $mimeType = $finfo->file($this->tmpName);
+
             return $mimeType ?: $this->type;
         }
+
         return $this->type;
     }
 

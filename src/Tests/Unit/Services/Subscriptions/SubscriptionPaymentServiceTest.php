@@ -3,15 +3,21 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Framework\Support\Collection;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Billing\Order\OrderStateManager;
+use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Payments\PaymentRecorder;
 use App\Services\Billing\PaymentService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
+use App\Services\Subscriptions\SubscriptionStateManager;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Exception;
 use Mockery as m;
 
 class SubscriptionPaymentServiceTest extends FunctionalTestCase
@@ -22,7 +28,97 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
     private $subscriptionRepository;
     private $paymentService;
     private $databaseMock;
+    private $stripePaymentProcessor;
+    private $paymentRecorder;
+    private $subscriptionStateManager;
+    private $orderStateManager;
     private SubscriptionPaymentService $service;
+
+    public function testProcessStripeSubscriptionPaymentCompletesLocalStateForActiveSubscription(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->site_id = 1;
+        $subscription->price_paid_cents = 2499;
+        $subscription->currency = 'USD';
+
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 10;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'monthly';
+
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 99;
+
+        $this->stripePaymentProcessor->shouldReceive('processSubscriptionPayment')
+            ->once()
+            ->with($subscription, $plan, ['order_id' => 7])
+            ->andReturn([
+                'success' => true,
+                'subscription_id' => 'sub_123',
+                'status' => 'active',
+                'customer_id' => 'cus_123',
+                'payment_intent_id' => 'pi_123',
+                'requires_action' => false,
+                'current_period_start' => 100,
+                'current_period_end' => 200,
+            ]);
+
+        $this->paymentRecorder->shouldReceive('recordSubscriptionStripePayment')
+            ->once()
+            ->andReturn($payment);
+
+        $this->paymentRecorder->shouldReceive('markCompleted')
+            ->once()
+            ->with($payment);
+
+        $this->subscriptionStateManager->shouldReceive('markActiveFromStripe')
+            ->once()
+            ->with($subscription, 100, 200);
+
+        $this->orderStateManager->shouldReceive('markPaid')
+            ->once()
+            ->with(7);
+
+        $result = $this->service->processStripeSubscriptionPayment($subscription, $plan, ['order_id' => 7]);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(99, $result['payment_id']);
+    }
+
+    public function testProcessStripeSubscriptionPaymentLeavesPendingStateWhenActionRequired(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 42;
+
+        $this->stripePaymentProcessor->shouldReceive('processSubscriptionPayment')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'subscription_id' => 'sub_123',
+                'status' => 'incomplete',
+                'customer_id' => 'cus_123',
+                'payment_intent_id' => 'pi_123',
+                'requires_action' => true,
+                'payment_intent_client_secret' => 'secret_123',
+            ]);
+
+        $this->paymentRecorder->shouldReceive('recordSubscriptionStripePayment')
+            ->once()
+            ->andReturn($payment);
+
+        $this->paymentRecorder->shouldNotReceive('markCompleted');
+        $this->subscriptionStateManager->shouldNotReceive('markActiveFromStripe');
+        $this->orderStateManager->shouldNotReceive('markPaid');
+
+        $result = $this->service->processStripeSubscriptionPayment($subscription, $plan, []);
+
+        $this->assertTrue($result['success']);
+        $this->assertTrue($result['requires_action']);
+        $this->assertSame(42, $result['payment_id']);
+    }
 
     public function testCreateInitialSubscriptionPaymentSuccessfully(): void
     {
@@ -78,7 +174,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
             ->with(999)
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Subscription not found');
 
         $this->service->createInitialSubscriptionPayment(999, 1);
@@ -99,7 +195,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($mockSubscription);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Subscription does not belong to member');
 
         $this->service->createInitialSubscriptionPayment(1, 999);
@@ -167,7 +263,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($mockSubscription);
 
-        $this->expectException(\Exception::class);
+        $this->expectException(Exception::class);
         $this->expectExceptionMessage('Subscription is not due for renewal');
 
         $this->service->createRecurringPayment(1);
@@ -338,7 +434,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $mockSubscription = m::mock(Subscription::class)->makePartial();
         $mockSubscription->id = $subscriptionId;
 
-        $mockPayments = m::mock(\App\Framework\Support\Collection::class);
+        $mockPayments = m::mock(Collection::class);
         $mockPayments->shouldReceive('where')
             ->with('status', 'completed')
             ->andReturnSelf();
@@ -380,11 +476,19 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->paymentService = m::mock(PaymentService::class);
         $this->databaseMock = m::mock(Database::class);
+        $this->stripePaymentProcessor = m::mock(StripePaymentProcessor::class);
+        $this->paymentRecorder = m::mock(PaymentRecorder::class);
+        $this->subscriptionStateManager = m::mock(SubscriptionStateManager::class);
+        $this->orderStateManager = m::mock(OrderStateManager::class);
 
         $this->service = new SubscriptionPaymentService(
             $this->paymentRepository,
             $this->subscriptionRepository,
             $this->paymentService,
+            $this->stripePaymentProcessor,
+            $this->paymentRecorder,
+            $this->subscriptionStateManager,
+            $this->orderStateManager,
             $this->databaseMock
         );
     }

@@ -2411,3 +2411,93 @@ body {
     border-color: #3b82f6;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
+
+.oc-modal-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 25, 41, .55);
+    z-index: 500;
+    place-items: center;
+}
+
+.oc-modal-backdrop.is-open {
+    display: grid;
+}
+
+.oc-modal {
+    background: #fff;
+    border-radius: 12px;
+    width: 94%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .2);
+}
+
+.oc-modal__header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.oc-modal__title {
+    font-weight: 700;
+    color: var(--navy);
+}
+
+.oc-modal__close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--slate);
+    font-size: 1.2rem;
+}
+
+.oc-modal__body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.oc-modal__footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.template-row {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.oc-status-badge {
+    font-size: .65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.badge-draft {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.badge-published {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.badge-archived {
+    background: #f3f4f6;
+    color: #6b7280;
+}

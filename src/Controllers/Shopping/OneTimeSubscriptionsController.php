@@ -18,18 +18,20 @@ use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Shopping\SubscriptionCatalogService;
+use App\Services\Subscriptions\SubscriptionPaymentService;
 
 class OneTimeSubscriptionsController extends Controller
 {
     public function __construct(
         private readonly OneTimeSubscriptionService         $subscriptionService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly SubscriptionCatalogService         $catalogService,
         private readonly SubscriptionBundleRepository       $bundleRepository,
         private readonly ReviewService                      $reviewService,
         private readonly CurrencyResolver                   $currencyResolver,
         private readonly OrderRepository $orderRepository,
+        private readonly StripePaymentProcessor     $stripeProcessor
 
     )
     {
@@ -308,7 +310,7 @@ class OneTimeSubscriptionsController extends Controller
 
             $paymentData['order_id'] = $orderId;
 
-            $paymentResult = $this->stripeProcessor->processSubscriptionPayment(
+            $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
                 $subscription,
                 $subscription->plan,
                 $paymentData
@@ -332,7 +334,8 @@ class OneTimeSubscriptionsController extends Controller
             event(new PaymentSucceeded(
                 subscriptionId: $subscription->id,
                 paymentId: $paymentResult['payment_id'],
-                amountCents: (int)round($subscription->plan->price * 100),
+                amountCents: $subscription->price_paid_cents
+                ?? (int)round($subscription->price * 100),
                 currency: strtoupper($subscription->plan->currency),
             ));
         }

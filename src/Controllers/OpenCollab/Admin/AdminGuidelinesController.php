@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
@@ -10,6 +11,8 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
+use App\Models\Guideline;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Repositories\OpenCollab\GuidelineTemplateRepository;
 use App\Services\OpenCollab\GuidelineService;
@@ -101,6 +104,13 @@ class AdminGuidelinesController extends Controller
             return $this->errorResponse('Guidelines not found.', 404);
         }
 
+        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
+            return $this->errorResponse(
+                'This guidelines version has been acknowledged and cannot be edited. Create a new version instead.',
+                409
+            );
+        }
+
         $content = $request->input('content', '');
 
         if (empty($content)) {
@@ -112,6 +122,7 @@ class AdminGuidelinesController extends Controller
 
         try {
             $updated = $this->guidelineService->updateDraftContent($guideline, $content);
+            dispatch(GuidelineUpdatedFanoutJob::for($guideline->id, SiteContext::getId()));
         } catch (GuidelineNotEditableException $e) {
             return $this->errorResponse($e->getMessage(), 409);
         }
@@ -132,6 +143,13 @@ class AdminGuidelinesController extends Controller
         $latest = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
         if (!$latest || $latest->id !== $guideline->id) {
             return $this->errorResponse('Only the latest guidelines version can be deleted.', 409);
+        }
+
+        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
+            return $this->errorResponse(
+                'This guidelines version has been acknowledged and cannot be deleted.',
+                409
+            );
         }
 
         try {
@@ -155,6 +173,7 @@ class AdminGuidelinesController extends Controller
 
         try {
             $published = $this->guidelineService->publishVersion($guideline, Auth::id());
+            event(new GuidelinesVersionBumpedEvent($published, SiteContext::getId(), $published->version));
         } catch (GuidelineNotPublishableException $e) {
             return $this->errorResponse($e->getMessage(), 409);
         }
@@ -222,7 +241,7 @@ class AdminGuidelinesController extends Controller
 
     // ── Formatting ────────────────────────────────────────────────────────────
 
-    private function formatGuideline(\App\Models\Guideline $guideline): array
+    private function formatGuideline(Guideline $guideline): array
     {
         return [
             'id' => $guideline->id,

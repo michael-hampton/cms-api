@@ -4,7 +4,7 @@ namespace App\Models;
 
 class ContributorPayoutAccount extends Model
 {
-    protected $table = 'contributor_payout_accounts';
+    protected $table = 'oc_contributor_payout_accounts';
 
     protected $fillable = [
         'user_id',

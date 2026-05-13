@@ -10,7 +10,6 @@ use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use InvalidArgumentException;
@@ -37,7 +36,7 @@ class CrmSubscriptionCreationService
         private readonly CartService                        $cartService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
         private readonly MemberAuthWrapper                  $memberAuth,
-        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly AddressRepository $addressRepository,
     )
     {
@@ -140,7 +139,7 @@ class CrmSubscriptionCreationService
 
             $subscription = $this->subscriptionRepository->find($result['subscription_id']);
 
-            $paymentResult = $this->stripeProcessor->processSubscriptionPayment(
+            $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
                 $subscription,
                 $subscription->plan,
                 [

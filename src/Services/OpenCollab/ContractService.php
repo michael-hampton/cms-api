@@ -172,25 +172,31 @@ class ContractService
 
     public function assertEditable(Contract $contract): void
     {
-        if ($contract->status === ContractStatus::Published) {
+        if ($contract->status === ContractStatus::Published->value) {
             throw ContractNotEditableException::alreadyPublished($contract->id);
         }
-        if ($contract->status === ContractStatus::Archived) {
+        if ($contract->status === ContractStatus::Archived->value) {
             throw ContractNotEditableException::alreadyArchived($contract->id);
         }
     }
 
     public function assertPublishable(Contract $contract): void
     {
-        if (!$contract->status->isPublishable()) {
-            throw ContractNotPublishableException::notDraft($contract->id, $contract->status->value);
+        // Convert raw string to Enum instance
+        $status = ContractStatus::from($contract->status);
+
+        if (!$status->isPublishable()) {
+            throw ContractNotPublishableException::notDraft($contract->id, $status->value);
         }
     }
 
     public function assertArchivable(Contract $contract): void
     {
-        if (!$contract->status->isArchivable()) {
-            throw ContractNotArchivableException::notPublished($contract->id, $contract->status->value);
+        // Convert raw string to Enum instance
+        $status = ContractStatus::from($contract->status);
+
+        if (!$status->isArchivable()) {
+            throw ContractNotArchivableException::notPublished($contract->id, $status->value);
         }
     }
 }

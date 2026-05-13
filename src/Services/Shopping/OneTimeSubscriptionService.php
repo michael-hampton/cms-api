@@ -147,6 +147,7 @@ class OneTimeSubscriptionService
                 'end_date' => $endDate->format('Y-m-d H:i:s'),
                 'trial_ends_at' => $trialEndsAt?->format('Y-m-d H:i:s'),
                 'price' => $finalPrice->toDecimal(),
+                'price_paid_cents' => $pricing->totalCents,
                 'original_price' => $pricing->originalAmount ?: $plan->price,
                 'discount_amount' => $discount->toDecimal(),
                 'voucher_id' => $voucherId,

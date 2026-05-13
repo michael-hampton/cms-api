@@ -42,6 +42,7 @@ class Subscription extends Model
         'trial_ends_at',       // ← added: persisted trial expiry, source of truth for conversion job
         'auto_renew',
         'price',
+        'price_paid_cents',
         'currency',
         'plan_id',
         'next_billing_date',
@@ -74,7 +75,11 @@ class Subscription extends Model
         'is_linked',
         'territory_id',
         'territory_override_flag',
-        'gifted_by_member_id'
+        'gifted_by_member_id',
+        'replaced_by_subscription_id',
+        'replacement_reason',
+        'carried_over_credit',
+        'renewed_from_subscription_id'
     ];
 
     protected $casts = [
@@ -83,6 +88,7 @@ class Subscription extends Model
         'trial_ends_at' => 'datetime',   // ← added
         'auto_renew' => 'boolean',
         'price' => 'float',
+        'price_paid_cents' => 'integer',
         'next_billing_date' => 'datetime',
         'last_payment_date' => 'datetime',
         'download_expires_at' => 'datetime',
