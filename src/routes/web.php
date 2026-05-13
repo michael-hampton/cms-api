@@ -83,6 +83,7 @@ use App\Controllers\OpenCollab\ContributorLoginPageController;
 use App\Controllers\OpenCollab\ContributorRequestPageController;
 use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
+use App\Controllers\OpenCollab\OnboardingDashboardController;
 use App\Controllers\OpenCollab\OnboardingPageController;
 use App\Controllers\OpenCollab\PayoutPageController;
 use App\Controllers\OpenCollab\ResendInvitationPageController;
@@ -616,6 +617,7 @@ $router->group(['middleware' => [RequireAdminRole::class]], function ($router) {
 
 $router->group(['middleware' => [RequireContributorAuth::class]], function ($router) {
     $router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show']);
+    $router->get('/{site}/open-collab/onboarding/dashboard', [OnboardingDashboardController::class, 'index']);
     $router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index']);
     $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index']);
     $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings']);

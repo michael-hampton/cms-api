@@ -2,6 +2,8 @@
 
 namespace App\Repositories\OpenCollab;
 
+use App\Enums\OpenCollab\GuidelineStatus;
+use App\Framework\Support\Collection;
 use App\Models\Guideline;
 use App\Models\Model;
 use App\Models\UserGuidelinesAcknowledgement;
@@ -12,15 +14,39 @@ use App\Repositories\Repository;
  */
 class GuidelinesContentRepository extends Repository
 {
+    // ── Version Resolution ────────────────────────────────────────────────────
+
     public function findVersion(int $siteId, int $version): ?Guideline
     {
         return Guideline::where('site_id', $siteId)->where('version', $version)->first();
     }
 
-    public function allForSite(int $siteId): \App\Framework\Support\Collection
+    public function allForSite(int $siteId): Collection
     {
         return Guideline::where('site_id', $siteId)->orderByDesc('version')->get();
     }
+
+    /**
+     * Highest version regardless of status. Used by admin listing.
+     */
+    public function latestForSite(int $siteId): ?Guideline
+    {
+        return Guideline::where('site_id', $siteId)->orderByDesc('version')->first();
+    }
+
+    /**
+     * Latest published version. Used by compliance/onboarding resolution.
+     * Drafts and archived versions are intentionally excluded.
+     */
+    public function latestPublishedForSite(int $siteId): ?Guideline
+    {
+        return Guideline::where('site_id', $siteId)
+            ->where('status', GuidelineStatus::Published->value)
+            ->orderByDesc('version')
+            ->first();
+    }
+
+    // ── Lifecycle Writes ──────────────────────────────────────────────────────
 
     public function createVersion(int $siteId, string $content): Model
     {
@@ -31,19 +57,44 @@ class GuidelinesContentRepository extends Repository
             'site_id' => $siteId,
             'version' => $nextVersion,
             'content' => $content,
+            'status' => GuidelineStatus::Draft->value,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
     }
 
-    public function latestForSite(int $siteId): ?Guideline
+    public function publish(Guideline $guideline, int $publishedByUserId): Guideline
     {
-        return Guideline::where('site_id', $siteId)->orderByDesc('version')->first();
+        $guideline->update([
+            'status' => GuidelineStatus::Published->value,
+            'published_at' => date('Y-m-d H:i:s'),
+            'published_by' => $publishedByUserId,
+        ]);
+
+        return $guideline->fresh();
     }
 
-    /**
-     * Returns true if ANY contributor has acknowledged this guidelines version.
-     * Used to guard against editing/deleting acknowledged guidelines.
-     */
+    public function archive(Guideline $guideline, int $archivedByUserId): Guideline
+    {
+        $guideline->update([
+            'status' => GuidelineStatus::Archived->value,
+            'archived_at' => date('Y-m-d H:i:s'),
+            'archived_by' => $archivedByUserId,
+        ]);
+
+        return $guideline->fresh();
+    }
+
+    // ── Version Sequencing ────────────────────────────────────────────────────
+
+    public function nextVersionNumber(int $siteId): int
+    {
+        $latest = $this->latestForSite($siteId);
+
+        return $latest ? $latest->version + 1 : 1;
+    }
+
+    // ── Acknowledgement Guards ────────────────────────────────────────────────
+
     public function hasAnyAcknowledged(int $guidelineId): bool
     {
         $guideline = $this->find($guidelineId);

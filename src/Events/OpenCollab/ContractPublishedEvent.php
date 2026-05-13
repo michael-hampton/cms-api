@@ -14,12 +14,13 @@ use App\Models\Contract;
  * This event is the trigger for the compliance loop:
  *   Contract published → users become incomplete → user fixes → complete again.
  */
-class ContractPublishedEvent
+final class ContractPublishedEvent
 {
     public function __construct(
         public readonly Contract $contract,
         public readonly int      $siteId,
-        public readonly int $userId
+        public readonly int $version,
+        public readonly int $publishedByUserId,
     )
     {
     }

@@ -3,39 +3,40 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
-use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
+use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
+use App\Exceptions\OpenCollab\GuidelineNotEditableException;
+use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
+use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\SiteContext;
-use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
-use App\Jobs\Subscriptions\BuildPrintBatchesJob;
-use App\Models\Site;
-use App\Repositories\Cms\UserRepository;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
-use App\Services\OpenCollab\Notifications\GuidelineUpdatedNotification;
-use App\Services\OpenCollab\Notifications\ViolationRecordedNotification;
+use App\Repositories\OpenCollab\GuidelineTemplateRepository;
+use App\Services\OpenCollab\GuidelineService;
+use App\Services\OpenCollab\GuidelineTemplateService;
 
 /**
- * Admin CRUD for contributor brand guidelines.
+ * Admin CRUD and lifecycle management for brand guidelines.
  *
  * Routes:
- *   GET    /api/{site}/open-collab/admin/guidelines           — list all versions
- *   GET    /api/{site}/open-collab/admin/guidelines/latest    — latest version
- *   POST   /api/{site}/open-collab/admin/guidelines           — create new version
- *   GET    /api/{site}/open-collab/admin/guidelines/{id}      — show one
- *   PUT    /api/{site}/open-collab/admin/guidelines/{id}      — update content (unsigned only)
- *   DELETE /api/{site}/open-collab/admin/guidelines/{id}      — delete latest version only
+ *   GET    /api/{site}/open-collab/admin/guidelines                  — list all
+ *   GET    /api/{site}/open-collab/admin/guidelines/latest           — latest published
+ *   POST   /api/{site}/open-collab/admin/guidelines                  — create draft
+ *   GET    /api/{site}/open-collab/admin/guidelines/{id}             — show one
+ *   PUT    /api/{site}/open-collab/admin/guidelines/{id}             — update draft content
+ *   DELETE /api/{site}/open-collab/admin/guidelines/{id}             — delete latest draft only
+ *   POST   /api/{site}/open-collab/admin/guidelines/{id}/publish     — publish draft
+ *   POST   /api/{site}/open-collab/admin/guidelines/{id}/archive     — archive published
+ *   POST   /api/{site}/open-collab/admin/guidelines/{id}/clone       — clone to new draft
+ *   POST   /api/{site}/open-collab/admin/guidelines/from-template    — draft from template
  */
 class AdminGuidelinesController extends Controller
 {
     public function __construct(
         private readonly GuidelinesContentRepository $guidelinesContentRepository,
-        private readonly NotificationDispatcher $notificationDispatcher,
-        private readonly UserSiteRepository     $userSiteRepository,
-        private readonly UserRepository         $userRepository
-
+        private readonly GuidelineTemplateRepository $templateRepository,
+        private readonly GuidelineService            $guidelineService,
+        private readonly GuidelineTemplateService    $guidelineTemplateService,
     )
     {
         parent::__construct();
@@ -44,28 +45,19 @@ class AdminGuidelinesController extends Controller
     public function index(): JsonResponse
     {
         $guidelines = $this->guidelinesContentRepository->allForSite(SiteContext::getId());
+
         return $this->jsonResponse(
             $guidelines->map(fn($g) => $this->formatGuideline($g))->toArray()
         );
     }
 
-    private function formatGuideline(\App\Models\Guideline $guideline): array
-    {
-        return [
-            'id' => $guideline->id,
-            'site_id' => $guideline->site_id,
-            'version' => $guideline->version,
-            'content' => $guideline->content,
-            'created_at' => $guideline->created_at,
-        ];
-    }
-
     public function latest(): JsonResponse
     {
-        $guideline = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
+        $guideline = $this->guidelinesContentRepository->latestPublishedForSite(SiteContext::getId());
         if (!$guideline) {
-            return $this->errorResponse('No guidelines found for this site.', 404);
+            return $this->errorResponse('No published guidelines found for this site.', 404);
         }
+
         return $this->jsonResponse(['guideline' => $this->formatGuideline($guideline)]);
     }
 
@@ -75,6 +67,7 @@ class AdminGuidelinesController extends Controller
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
         }
+
         return $this->jsonResponse(['guideline' => $this->formatGuideline($guideline)]);
     }
 
@@ -89,38 +82,23 @@ class AdminGuidelinesController extends Controller
             return $this->errorResponse('Guidelines content must be at least 50 characters.', 422);
         }
 
-        $siteId = SiteContext::getId();
-        $guideline = $this->guidelinesContentRepository->createVersion($siteId, $content);
-
-        $site = Site::find($siteId);
-        if ($site) {
-            $site->update(['guidelines_version' => $guideline->version]);
-        }
-
-        event(new GuidelinesVersionBumpedEvent($guideline, $siteId, $guideline->version));
+        $guideline = $this->guidelineService->createDraft(
+            siteId: SiteContext::getId(),
+            content: $content,
+            createdByUserId: Auth::id(),
+        );
 
         return $this->jsonResponse([
             'guideline' => $this->formatGuideline($guideline),
-            'message' => "Guidelines version {$guideline->version} created.",
+            'message' => "Guidelines draft version {$guideline->version} created.",
         ], 201);
     }
 
-    /**
-     * PUT /api/{site}/open-collab/admin/guidelines/{id}
-     * Updates content. Only allowed if no contributor has acknowledged this version.
-     */
     public function update(Request $request, int $id): JsonResponse
     {
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
-        }
-
-        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
-            return $this->errorResponse(
-                'This guidelines version has been acknowledged and cannot be edited. Create a new version instead.',
-                409
-            );
         }
 
         $content = $request->input('content', '');
@@ -132,20 +110,18 @@ class AdminGuidelinesController extends Controller
             return $this->errorResponse('Guidelines content must be at least 50 characters.', 422);
         }
 
-        $guideline->update(['content' => $content]);
-
-        dispatch(GuidelineUpdatedFanoutJob::for($guideline->id, SiteContext::getId()));
+        try {
+            $updated = $this->guidelineService->updateDraftContent($guideline, $content);
+        } catch (GuidelineNotEditableException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
+        }
 
         return $this->jsonResponse([
-            'guideline' => $this->formatGuideline($guideline->fresh()),
-            'message' => "Guidelines version {$guideline->version} updated.",
+            'guideline' => $this->formatGuideline($updated),
+            'message' => "Guidelines version {$updated->version} updated.",
         ]);
     }
 
-    /**
-     * DELETE /api/{site}/open-collab/admin/guidelines/{id}
-     * Only the latest version can be deleted, and only if unacknowledged.
-     */
     public function destroy(int $id): JsonResponse
     {
         $guideline = $this->guidelinesContentRepository->find($id);
@@ -158,23 +134,110 @@ class AdminGuidelinesController extends Controller
             return $this->errorResponse('Only the latest guidelines version can be deleted.', 409);
         }
 
-        if ($this->guidelinesContentRepository->hasAnyAcknowledged($id)) {
-            return $this->errorResponse(
-                'This guidelines version has been acknowledged and cannot be deleted.',
-                409
-            );
+        try {
+            $this->guidelineService->assertEditable($guideline);
+        } catch (GuidelineNotEditableException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
         }
 
         $version = $guideline->version;
         $guideline->delete();
 
-        // Roll back site guidelines_version pointer
-        $site = Site::find(SiteContext::getId());
-        $newLatest = $this->guidelinesContentRepository->latestForSite(SiteContext::getId());
-        if ($site) {
-            $site->update(['guidelines_version' => $newLatest ? $newLatest->version : 0]);
+        return $this->successResponse("Guidelines version {$version} deleted.");
+    }
+
+    public function publish(int $id): JsonResponse
+    {
+        $guideline = $this->guidelinesContentRepository->find($id);
+        if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Guidelines not found.', 404);
         }
 
-        return $this->successResponse("Guidelines version {$version} deleted.");
+        try {
+            $published = $this->guidelineService->publishVersion($guideline, Auth::id());
+        } catch (GuidelineNotPublishableException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
+        }
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($published),
+            'message' => "Guidelines version {$published->version} published.",
+        ]);
+    }
+
+    public function archive(int $id): JsonResponse
+    {
+        $guideline = $this->guidelinesContentRepository->find($id);
+        if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Guidelines not found.', 404);
+        }
+
+        try {
+            $archived = $this->guidelineService->archiveVersion($guideline, Auth::id());
+        } catch (GuidelineNotArchivableException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
+        }
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($archived),
+            'message' => "Guidelines version {$archived->version} archived.",
+        ]);
+    }
+
+    public function clone(int $id): JsonResponse
+    {
+        $guideline = $this->guidelinesContentRepository->find($id);
+        if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Guidelines not found.', 404);
+        }
+
+        $draft = $this->guidelineService->cloneToDraft($guideline, Auth::id());
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($draft),
+            'message' => "Draft version {$draft->version} created from version {$guideline->version}.",
+        ], 201);
+    }
+
+    public function storeFromTemplate(Request $request): JsonResponse
+    {
+        $templateId = (int)$request->input('template_id', 0);
+        $template = $this->templateRepository->find($templateId);
+
+        if (!$template || !$template->is_active) {
+            return $this->errorResponse('Template not found or inactive.', 404);
+        }
+
+        $guideline = $this->guidelineTemplateService->createDraftFromTemplate(
+            $template,
+            SiteContext::getId(),
+            Auth::id(),
+        );
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($guideline),
+            'message' => "Draft version {$guideline->version} created from template.",
+        ], 201);
+    }
+
+    // ── Formatting ────────────────────────────────────────────────────────────
+
+    private function formatGuideline(\App\Models\Guideline $guideline): array
+    {
+        return [
+            'id' => $guideline->id,
+            'site_id' => $guideline->site_id,
+            'version' => $guideline->version,
+            'content' => $guideline->content,
+            'status' => $guideline->status,
+            'status_label' => $guideline->status,
+            'published_at' => $guideline->published_at,
+            'published_by' => $guideline->published_by,
+            'archived_at' => $guideline->archived_at,
+            'archived_by' => $guideline->archived_by,
+            'source_template_id' => $guideline->source_template_id,
+            'cloned_from_version_id' => $guideline->cloned_from_version_id,
+            'created_at' => $guideline->created_at,
+        ];
     }
 }

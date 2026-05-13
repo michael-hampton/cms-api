@@ -245,13 +245,13 @@
 
 <script>
     // Auto-dismiss flash messages
-    document.querySelectorAll('.oc-alert').forEach(el => {
-        setTimeout(() => {
-            el.style.transition = 'opacity .4s';
-            el.style.opacity = '0';
-            setTimeout(() => el.remove(), 400);
-        }, 4500);
-    });
+    // document.querySelectorAll('.oc-alert').forEach(el => {
+    //     setTimeout(() => {
+    //         el.style.transition = 'opacity .4s';
+    //         el.style.opacity = '0';
+    //         setTimeout(() => el.remove(), 400);
+    //     }, 4500);
+    // });
 
     // Mobile nav
     const mq = window.matchMedia('(max-width: 900px)');

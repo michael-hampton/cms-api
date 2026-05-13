@@ -31,9 +31,10 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
 class ContributorOnboardingService
 {
     public function __construct(
-        private readonly ContributorProfileRepository $profileRepository,
-        private readonly ContractRepository           $contractRepository,
-        private readonly GuidelinesRepository         $guidelinesRepository,
+        private readonly ContributorProfileRepository    $profileRepository,
+        private readonly ContractRepository              $contractRepository,
+        private readonly GuidelinesRepository            $guidelinesRepository,
+        private readonly ContributorAgeValidationService $ageValidationService,
     )
     {
     }
@@ -127,7 +128,6 @@ class ContributorOnboardingService
             ->where('site_id', $site->id)
             ->first();
 
-        // Lazy init — create the record if missing so syncStatus is always safe to call.
         if (!$record) {
             $this->start($userId, $site->id);
 
@@ -168,6 +168,8 @@ class ContributorOnboardingService
             requireContracts: (bool)($site->require_contracts ?? true),
             requireGuidelines: (bool)($site->require_guidelines_ack ?? true),
             guidelinesVersion: (int)($site->guidelines_version ?? 1),
+            requireAgeVerification: (bool)($site->require_age_verification ?? true),
+            minimumContributorAge: (int)($site->minimum_contributor_age ?? 18),
         );
     }
 
@@ -193,6 +195,10 @@ class ContributorOnboardingService
             $steps[] = 'guidelines';
         }
 
+        if ($req->requireAgeVerification) {
+            $steps[] = 'age_verification';
+        }
+
         return $steps;
     }
 
@@ -203,6 +209,7 @@ class ContributorOnboardingService
     {
         $pending = [];
 
+        // ── Profile ───────────────────────────────────────────────────────────
         $profile = $this->profileRepository->findByUserId($userId);
 
         if (!$profile || !$profile->bio) {
@@ -213,6 +220,7 @@ class ContributorOnboardingService
             ];
         }
 
+        // ── Payment ───────────────────────────────────────────────────────────
         if ($req->requirePaymentSetup && !$this->profileRepository->isPaymentSetup($userId)) {
             $pending[] = [
                 'step' => 'payment',
@@ -221,6 +229,7 @@ class ContributorOnboardingService
             ];
         }
 
+        // ── Contract ──────────────────────────────────────────────────────────
         if ($req->requireContracts) {
             $contract = $this->contractRepository->latestForSite($req->siteId);
 
@@ -236,6 +245,7 @@ class ContributorOnboardingService
             }
         }
 
+        // ── Guidelines ────────────────────────────────────────────────────────
         if ($req->requireGuidelines) {
             $ack = $this->guidelinesRepository->latestAcknowledgedVersion($userId, $req->siteId);
 
@@ -247,6 +257,29 @@ class ContributorOnboardingService
                         'required_version' => $req->guidelinesVersion,
                         'acknowledged_version' => $ack,
                     ],
+                ];
+            }
+        }
+
+        // ── Age verification ──────────────────────────────────────────────────
+        if ($req->requireAgeVerification) {
+            $profile = $profile ?? $this->profileRepository->findByUserId($userId);
+
+            $dobString = $profile?->date_of_birth;
+
+            $dob = $this->ageValidationService->parseDob($dobString);
+
+            if ($dob === null) {
+                $pending[] = [
+                    'step' => 'age_verification',
+                    'reason' => 'You must meet the minimum contributor age requirement before contributing.',
+                    'meta' => ['minimum_age' => $req->minimumContributorAge],
+                ];
+            } elseif (!$this->ageValidationService->meetsMinimumAge($dob, $req->minimumContributorAge)) {
+                $pending[] = [
+                    'step' => 'age_verification',
+                    'reason' => 'You must meet the minimum contributor age requirement before contributing.',
+                    'meta' => ['minimum_age' => $req->minimumContributorAge],
                 ];
             }
         }

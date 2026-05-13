@@ -27,6 +27,73 @@ $pageClass = '';
             <div id="profile-errors" class="oc-form-errors" style="display:none;"></div>
 
             <form id="profile-form" novalidate>
+
+                <!-- Avatar upload -->
+                <div class="oc-form-group" style="margin-bottom:24px;">
+                    <label class="oc-label">Profile picture</label>
+                    <div style="display:flex;align-items:center;gap:20px;">
+                        <!-- Avatar preview -->
+                        <div id="avatar-preview-wrap" style="position:relative;flex-shrink:0;">
+                            <div id="avatar-preview"
+                                 style="width:80px;height:80px;border-radius:50%;background:var(--slate-pale);border:2px solid var(--border);overflow:hidden;display:grid;place-items:center;cursor:pointer;"
+                                 onclick="document.getElementById('avatar-file-input').click()"
+                                 title="Click to change photo">
+                                <?php if (!empty($profile?->avatar)): ?>
+                                    <img id="avatar-img"
+                                         src="<?= htmlspecialchars($profile->avatar) ?>"
+                                         alt="Your avatar"
+                                         style="width:100%;height:100%;object-fit:cover;">
+                                <?php else: ?>
+                                    <span id="avatar-initials"
+                                          style="font-family:var(--font-display);font-size:1.5rem;color:var(--slate);user-select:none;">
+                                        <?= strtoupper(substr($currentUser->name ?? 'U', 0, 1)) ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <!-- Edit badge -->
+                            <div onclick="document.getElementById('avatar-file-input').click()"
+                                 style="position:absolute;bottom:0;right:0;width:24px;height:24px;background:var(--navy);border-radius:50%;display:grid;place-items:center;cursor:pointer;border:2px solid #fff;"
+                                 title="Change photo">
+                                <svg viewBox="0 0 20 20" fill="#fff" width="11">
+                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Upload controls -->
+                        <div style="flex:1;">
+                            <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp"
+                                   style="display:none;" onchange="avatarManager.onFileSelected(this)">
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
+                                    onclick="document.getElementById('avatar-file-input').click()">
+                                Choose photo
+                            </button>
+                            <?php if (!empty($profile?->avatar)): ?>
+                                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
+                                        style="margin-left:8px;color:var(--red);"
+                                        onclick="avatarManager.remove()">
+                                    Remove
+                                </button>
+                            <?php endif; ?>
+                            <div class="oc-help" style="margin-top:6px;">
+                                JPG, PNG or WebP · Max 2 MB · Square images work best
+                            </div>
+                            <div id="avatar-error"
+                                 style="font-size:.75rem;color:var(--red);margin-top:4px;display:none;"></div>
+                            <!-- Upload progress -->
+                            <div id="avatar-progress-wrap" style="display:none;margin-top:8px;">
+                                <div style="height:4px;background:var(--slate-pale);border-radius:99px;overflow:hidden;width:180px;">
+                                    <div id="avatar-progress-bar"
+                                         style="height:100%;width:0%;background:var(--navy);border-radius:99px;transition:width .2s ease;"></div>
+                                </div>
+                                <div style="font-size:.72rem;color:var(--slate);margin-top:3px;"
+                                     id="avatar-progress-label">Uploading…
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="oc-form-group">
                     <label class="oc-label" for="display-name">Display name</label>
                     <input class="oc-input" type="text" id="display-name" name="name"
@@ -40,6 +107,61 @@ $pageClass = '';
                 </div>
                 <button type="submit" class="oc-btn oc-btn--primary" id="profile-save-btn">Save profile</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Expertise section -->
+    <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .41s ease;" id="expertise">
+        <div class="oc-card__header">
+            <span class="oc-card__title">Areas of expertise</span>
+        </div>
+        <div class="oc-card__body">
+            <div id="expertise-success" class="oc-alert oc-alert--success" style="display:none;"></div>
+            <div id="expertise-errors" class="oc-form-errors" style="display:none;"></div>
+
+            <div class="oc-help" style="margin-bottom:16px;">
+                Add up to 8 topics that describe your writing focus. These help editors match you with relevant briefs.
+            </div>
+
+            <!-- Tag list -->
+            <div id="expertise-tags"
+                 style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:16px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:#fff;cursor:text;"
+                 onclick="document.getElementById('expertise-input').focus()">
+                <!-- Tags injected by JS -->
+            </div>
+
+            <!-- Input row -->
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+                <div style="flex:1;position:relative;">
+                    <input class="oc-input" type="text" id="expertise-input"
+                           placeholder="e.g. Technology, Climate, Finance…"
+                           maxlength="40"
+                           autocomplete="off"
+                           onkeydown="expertiseManager.onKeyDown(event)"
+                           oninput="expertiseManager.onInput(this.value)">
+                    <!-- Suggestions dropdown -->
+                    <div id="expertise-suggestions"
+                         style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);z-index:50;overflow:hidden;">
+                    </div>
+                </div>
+                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
+                        onclick="expertiseManager.addFromInput()"
+                        style="flex-shrink:0;margin-top:1px;">
+                    Add
+                </button>
+            </div>
+            <div class="oc-help" style="margin-top:6px;" id="expertise-hint">
+                Press <kbd
+                        style="font-size:.7rem;padding:1px 5px;border:1px solid var(--border);border-radius:4px;background:var(--slate-pale);">Enter</kbd>
+                or comma to add · Click a tag to remove it
+            </div>
+
+            <div style="margin-top:16px;">
+                <button type="button" class="oc-btn oc-btn--primary" id="expertise-save-btn"
+                        onclick="expertiseManager.save()" disabled>
+                    Save expertise
+                </button>
+            </div>
         </div>
     </div>
 
@@ -278,6 +400,7 @@ $pageClass = '';
     const CURRENT_USER_EMAIL = '<?= htmlspecialchars($currentUser->email ?? '') ?>';
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
+    const INITIAL_EXPERTISE = <?= json_encode(array_filter(array_map('trim', explode(',', $profile?->expertise ?? ''))) ?: []) ?>;
 
     class NotificationPreferencesManager {
         #site;
@@ -396,6 +519,340 @@ $pageClass = '';
         }
     }
 
+    // ── AvatarManager ─────────────────────────────────────────────────────────
+    class AvatarManager {
+        #site;
+        #token;
+        #pendingUrl = null; // URL returned from upload API, not yet saved to profile
+        #removing = false;
+
+        static MAX_BYTES = 2 * 1024 * 1024; // 2 MB
+        static ALLOWED = ['image/jpeg', 'image/png', 'image/webp'];
+
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+        }
+
+        onFileSelected(input) {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            const errEl = document.getElementById('avatar-error');
+            errEl.style.display = 'none';
+
+            if (!AvatarManager.ALLOWED.includes(file.type)) {
+                errEl.textContent = 'Only JPG, PNG, and WebP images are accepted.';
+                errEl.style.display = 'block';
+                input.value = '';
+                return;
+            }
+
+            if (file.size > AvatarManager.MAX_BYTES) {
+                errEl.textContent = 'Image must be under 2 MB.';
+                errEl.style.display = 'block';
+                input.value = '';
+                return;
+            }
+
+            // Local preview
+            const reader = new FileReader();
+            reader.onload = (e) => this.#setPreview(e.target.result);
+            reader.readAsDataURL(file);
+
+            this.#upload(file);
+        }
+
+        /**
+         * Called by the profile form before submitting — returns the URL to
+         * include in the profile save payload, or null if unchanged.
+         */
+        getPendingUrl() {
+            if (this.#removing) return '';   // explicit removal
+            return this.#pendingUrl;          // null = no change
+        }
+
+        remove() {
+            this.#removing = true;
+            this.#pendingUrl = null;
+            const preview = document.getElementById('avatar-preview');
+            preview.innerHTML = `<span style="font-family:var(--font-display);font-size:1.5rem;color:var(--slate);user-select:none;">
+                ${(document.getElementById('display-name')?.value || 'U').trim().charAt(0).toUpperCase()}
+            </span>`;
+            // Mark the profile form dirty so the user knows to save
+            document.getElementById('profile-save-btn').disabled = false;
+        }
+
+        // ── Private ─────────────────────────────────────────────────────────
+
+        #setPreview(src) {
+            const preview = document.getElementById('avatar-preview');
+            let img = document.getElementById('avatar-img');
+            if (!img) {
+                preview.innerHTML = '';
+                img = document.createElement('img');
+                img.id = 'avatar-img';
+                img.alt = 'Your avatar';
+                img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+                preview.appendChild(img);
+            }
+            img.src = src;
+        }
+
+        async #upload(file) {
+            const progressWrap = document.getElementById('avatar-progress-wrap');
+            const progressBar = document.getElementById('avatar-progress-bar');
+            const progressLabel = document.getElementById('avatar-progress-label');
+            const errEl = document.getElementById('avatar-error');
+
+            progressWrap.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressLabel.textContent = 'Uploading…';
+
+            try {
+                const formData = new FormData();
+                formData.append('avatar', file);
+
+                const xhr = new XMLHttpRequest();
+                const url = `/api/${this.#site}/open-collab/contributor/avatar`;
+
+                await new Promise((resolve, reject) => {
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const pct = Math.round((e.loaded / e.total) * 100);
+                            progressBar.style.width = `${pct}%`;
+                            progressLabel.textContent = `Uploading… ${pct}%`;
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            resolve(JSON.parse(xhr.responseText));
+                        } else {
+                            reject(new Error(xhr.responseText));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('Network error'));
+                    xhr.open('POST', url);
+                    xhr.setRequestHeader('Authorization', `Bearer ${this.#token}`);
+                    xhr.send(formData);
+                }).then((data) => {
+                    this.#pendingUrl = data.url || data.data?.url || null;
+                    progressLabel.textContent = '✓ Ready — save your profile to apply';
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = 'var(--green)';
+                    document.getElementById('profile-save-btn').disabled = false;
+                });
+            } catch {
+                progressWrap.style.display = 'none';
+                errEl.textContent = 'Upload failed. Please try again.';
+                errEl.style.display = 'block';
+                // Revert preview to server state
+                const existingAvatar = '<?= htmlspecialchars($profile?->avatar ?? '') ?>';
+                if (existingAvatar) this.#setPreview(existingAvatar);
+            }
+        }
+    }
+
+    // ── ExpertiseManager ──────────────────────────────────────────────────────
+    class ExpertiseManager {
+        #site;
+        #token;
+        #tags = [];
+        #dirty = false;
+
+        static MAX_TAGS = 8;
+        static SUGGESTIONS = [
+            'Technology', 'Climate', 'Finance', 'Politics', 'Health',
+            'Culture', 'Science', 'Sports', 'Travel', 'Food',
+            'Education', 'Business', 'Entertainment', 'Lifestyle',
+            'Environment', 'Law', 'Economics', 'Art', 'History',
+        ];
+
+        constructor(site, token, initialTags = []) {
+            this.#site = site;
+            this.#token = token;
+            this.#tags = [...initialTags];
+            this.#render();
+        }
+
+        onKeyDown(event) {
+            if (event.key === 'Enter' || event.key === ',') {
+                event.preventDefault();
+                this.addFromInput();
+            } else if (event.key === 'Backspace' && event.target.value === '' && this.#tags.length > 0) {
+                this.#removeTag(this.#tags.length - 1);
+            } else if (event.key === 'Escape') {
+                this.#hideSuggestions();
+            }
+        }
+
+        onInput(value) {
+            const trimmed = value.trim().replace(/,+$/, '');
+            if (!trimmed) {
+                this.#hideSuggestions();
+                return;
+            }
+            const lower = trimmed.toLowerCase();
+            const matches = ExpertiseManager.SUGGESTIONS.filter(
+                s => s.toLowerCase().startsWith(lower) && !this.#tags.includes(s)
+            ).slice(0, 5);
+
+            if (matches.length > 0) {
+                this.#showSuggestions(matches, trimmed);
+            } else {
+                this.#hideSuggestions();
+            }
+        }
+
+        addFromInput() {
+            const input = document.getElementById('expertise-input');
+            const raw = input.value.trim().replace(/,+$/, '');
+            if (!raw) return;
+            this.#addTag(raw);
+            input.value = '';
+            this.#hideSuggestions();
+        }
+
+        async save() {
+            const btn = document.getElementById('expertise-save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
+
+            const succEl = document.getElementById('expertise-success');
+            const errEl = document.getElementById('expertise-errors');
+            succEl.style.display = 'none';
+            errEl.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/contributor/expertise`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                    body: JSON.stringify({expertise: this.#tags}),
+                });
+
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.message || 'Save failed.');
+                }
+
+                this.#dirty = false;
+                succEl.textContent = '✓ Expertise saved';
+                succEl.style.display = 'flex';
+                setTimeout(() => {
+                    succEl.style.display = 'none';
+                }, 3000);
+            } catch (err) {
+                errEl.textContent = err.message;
+                errEl.style.display = 'block';
+                btn.disabled = false;
+            }
+
+            btn.textContent = 'Save expertise';
+        }
+
+        // ── Private ─────────────────────────────────────────────────────────
+
+        #addTag(value) {
+            const trimmed = value.trim();
+            if (!trimmed || this.#tags.length >= ExpertiseManager.MAX_TAGS) return;
+            if (this.#tags.map(t => t.toLowerCase()).includes(trimmed.toLowerCase())) return;
+
+            this.#tags.push(trimmed);
+            this.#render();
+            this.#markDirty();
+        }
+
+        #removeTag(index) {
+            this.#tags.splice(index, 1);
+            this.#render();
+            this.#markDirty();
+        }
+
+        #render() {
+            const container = document.getElementById('expertise-tags');
+            container.innerHTML = '';
+
+            for (let i = 0; i < this.#tags.length; i++) {
+                const tag = document.createElement('span');
+                tag.style.cssText = `
+                    display:inline-flex;align-items:center;gap:5px;
+                    padding:4px 10px 4px 12px;border-radius:99px;
+                    background:var(--navy);color:#fff;font-size:.78rem;font-weight:500;
+                    cursor:pointer;transition:background .15s;user-select:none;
+                `;
+                tag.title = 'Click to remove';
+                tag.innerHTML = `${this.#esc(this.#tags[i])}
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="12" style="opacity:.65;flex-shrink:0;">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>`;
+                tag.addEventListener('click', () => this.#removeTag(i));
+                tag.addEventListener('mouseenter', () => {
+                    tag.style.background = '#0f1929cc';
+                });
+                tag.addEventListener('mouseleave', () => {
+                    tag.style.background = 'var(--navy)';
+                });
+                container.appendChild(tag);
+            }
+
+            // Capacity hint
+            const hint = document.getElementById('expertise-hint');
+            if (this.#tags.length >= ExpertiseManager.MAX_TAGS) {
+                hint.innerHTML = `<span style="color:var(--amber);">Maximum of ${ExpertiseManager.MAX_TAGS} topics reached.</span>`;
+                document.getElementById('expertise-input').disabled = true;
+            } else {
+                hint.innerHTML = `Press <kbd style="font-size:.7rem;padding:1px 5px;border:1px solid var(--border);border-radius:4px;background:var(--slate-pale);">Enter</kbd> or comma to add · Click a tag to remove it`;
+                document.getElementById('expertise-input').disabled = false;
+            }
+        }
+
+        #showSuggestions(items, typed) {
+            const box = document.getElementById('expertise-suggestions');
+            box.innerHTML = '';
+            box.style.display = 'block';
+
+            for (const item of items) {
+                const row = document.createElement('div');
+                row.style.cssText = 'padding:9px 14px;font-size:.85rem;cursor:pointer;color:var(--navy);';
+                // Bold-match the typed portion
+                const idx = item.toLowerCase().indexOf(typed.toLowerCase());
+                row.innerHTML = idx >= 0
+                    ? item.slice(0, idx) + `<strong>${item.slice(idx, idx + typed.length)}</strong>` + item.slice(idx + typed.length)
+                    : this.#esc(item);
+                row.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.#addTag(item);
+                    document.getElementById('expertise-input').value = '';
+                    this.#hideSuggestions();
+                });
+                row.addEventListener('mouseenter', () => {
+                    row.style.background = 'var(--slate-pale)';
+                });
+                row.addEventListener('mouseleave', () => {
+                    row.style.background = '';
+                });
+                box.appendChild(row);
+            }
+        }
+
+        #hideSuggestions() {
+            document.getElementById('expertise-suggestions').style.display = 'none';
+        }
+
+        #markDirty() {
+            this.#dirty = true;
+            const btn = document.getElementById('expertise-save-btn');
+            if (btn) btn.disabled = false;
+        }
+
+        #esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+    }
+
+    // ── ProfileManager ────────────────────────────────────────────────────────
     class ProfileManager {
         #site;
         #token;
@@ -418,10 +875,18 @@ $pageClass = '';
             btn.disabled = true;
             btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
 
+            const payload = {bio: document.getElementById('bio').value};
+
+            // Include avatar URL if the AvatarManager has a pending change
+            const pendingAvatar = window.avatarManager?.getPendingUrl();
+            if (pendingAvatar !== null && pendingAvatar !== undefined) {
+                payload.avatar = pendingAvatar; // '' = remove, string = new URL
+            }
+
             const res = await fetch(`/api/${this.#site}/open-collab/onboarding/profile`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
-                body: JSON.stringify({bio: document.getElementById('bio').value}),
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json();
@@ -429,6 +894,9 @@ $pageClass = '';
                 const ok = document.getElementById('profile-success');
                 ok.textContent = '✓ Profile updated';
                 ok.style.display = 'flex';
+                // Reset avatar progress indicator after successful save
+                const progressWrap = document.getElementById('avatar-progress-wrap');
+                if (progressWrap) progressWrap.style.display = 'none';
                 setTimeout(() => {
                     ok.style.display = 'none';
                 }, 3000);
@@ -593,12 +1061,20 @@ $pageClass = '';
         #payment;
         #closure;
         #notif;
+        #avatar;
+        #expertise;
 
-        constructor({site, token, stripeKey, expectedEmail}) {
+        constructor({site, token, stripeKey, expectedEmail, initialExpertise}) {
             this.#notif = new NotificationPreferencesManager(site, token);
             this.#profile = new ProfileManager(site, token);
             this.#payment = new PaymentDetailsManager(site, token, stripeKey);
             this.#closure = new AccountClosureManager(site, token, expectedEmail);
+            this.#avatar = new AvatarManager(site, token);
+            this.#expertise = new ExpertiseManager(site, token, initialExpertise);
+
+            // Expose avatarManager globally for inline HTML handlers
+            window.avatarManager = this.#avatar;
+            window.expertiseManager = this.#expertise;
         }
 
         init() {
@@ -699,6 +1175,7 @@ $pageClass = '';
         token: localStorage.getItem('oc_token') || '',
         stripeKey: STRIPE_KEY,
         expectedEmail: CURRENT_USER_EMAIL,
+        initialExpertise: INITIAL_EXPERTISE,
     });
 
     settingsManager.init();

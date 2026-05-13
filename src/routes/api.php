@@ -89,6 +89,7 @@ use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
+use App\Controllers\OpenCollab\OnboardingDashboardController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
 use App\Controllers\OpenCollab\StripeConnectController;
@@ -311,6 +312,8 @@ $router->post(
     '/api/{site}/open-collab/stripe/webhook',
     [StripeWebhookController::class, 'handle']
 );
+
+$router->get('/api/{site}/open-collab/onboarding-status', [OnboardingDashboardController::class, 'status']);
 
 
 $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class], function ($router) {

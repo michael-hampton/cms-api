@@ -10,6 +10,8 @@ class OnboardingRequirements
         public readonly bool $requireContracts = true,
         public readonly bool $requireGuidelines = true,
         public readonly int  $guidelinesVersion = 1,
+        public bool $requireAgeVerification = false,
+        public int  $minimumContributorAge = 18,
     )
     {
     }
