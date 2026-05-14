@@ -64,4 +64,43 @@ class UserRepository extends Repository implements UserRepositoryInterface
 
         return $this->update($id, $data);
     }
+
+    /**
+     * Search active users by name or email, excluding users already assigned
+     * to the given site.
+     *
+     * Results are ordered by name and capped at $limit to keep the dropdown
+     * responsive. The caller is responsible for access-checking before
+     * exposing results.
+     *
+     * @param int[] $excludeUserIds User IDs to omit (i.e. already on the site)
+     * @return User[]
+     */
+    public function searchForSiteAssignment(
+        string $query,
+        array  $excludeUserIds = [],
+        int    $limit = 10,
+    ): array
+    {
+        $q = User::where('is_active', true)
+            ->where(function ($builder) use ($query) {
+                $term = '%' . $this->escapeLike($query) . '%';
+                $builder->where('name', 'like', $term)
+                    ->orWhere('email', 'like', $term);
+            });
+
+        if (!empty($excludeUserIds)) {
+            $q->whereNotIn('id', $excludeUserIds);
+        }
+
+        return $q->orderBy('name')
+            ->limit($limit)
+            ->get(['id', 'name', 'email'])
+            ->all();
+    }
+
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
 }

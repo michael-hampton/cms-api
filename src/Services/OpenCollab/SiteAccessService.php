@@ -34,6 +34,16 @@ class SiteAccessService
     }
 
     /**
+     * Returns the IDs of all users who currently have access to this site.
+     *
+     * @return int[]
+     */
+    public function getUserIdsForSite(int $siteId): array
+    {
+        return $this->userSiteRepository->userIdsForSite($siteId);
+    }
+
+    /**
      * Grants a user access to every site in the provided list.
      * Used by UserSiteSeeder to back-fill all existing users.
      */

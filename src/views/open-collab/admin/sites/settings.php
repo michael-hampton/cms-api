@@ -102,6 +102,46 @@
                 </label>
             </div>
 
+            <div class="oc-toggle-row">
+                <div class="oc-toggle-row__body">
+                    <span class="oc-toggle-row__label">Require age verification</span>
+                    <span class="oc-toggle-row__description">
+                        Contributors must confirm their date of birth and meet the minimum
+                        contributor age before submitting.
+                    </span>
+                </div>
+                <label class="oc-toggle" aria-label="Require age verification">
+                    <input
+                            type="checkbox"
+                            name="require_age_verification"
+                            value="1"
+                            id="require_age_verification"
+                            <?= $currentSite->require_age_verification ? 'checked' : '' ?>>
+                    <span class="oc-toggle__track"></span>
+                </label>
+            </div>
+
+            <!-- Minimum age — shown only when age verification is enabled -->
+            <div id="minimum-age-row"
+                 style="padding:16px 0 4px 0;<?= $currentSite->require_age_verification ? '' : 'display:none;' ?>">
+                <label class="oc-label" for="minimum_contributor_age">
+                    Minimum contributor age
+                    <span class="oc-label__hint">Must be between 13 and 100.</span>
+                </label>
+                <input
+                        type="number"
+                        id="minimum_contributor_age"
+                        name="minimum_contributor_age"
+                        class="oc-input <?= $errors['minimum_contributor_age'] ?? false ? 'oc-input--error' : '' ?>"
+                        value="<?= htmlspecialchars((string)($currentSite->minimum_contributor_age ?? 18)) ?>"
+                        min="13"
+                        max="100"
+                        style="max-width:100px;">
+                <?php if (!empty($errors['minimum_contributor_age'])): ?>
+                    <span class="oc-field-error"><?= htmlspecialchars($errors['minimum_contributor_age']) ?></span>
+                <?php endif; ?>
+            </div>
+
         </fieldset>
 
         <div class="oc-form-actions" style="margin-top:32px;">
@@ -117,9 +157,127 @@
 
 </div>
 
+<!-- ── User Assignment ─────────────────────────────────────────────────── -->
+<div class="oc-card" style="max-width:640px;margin-top:28px;" id="site-users-card">
+
+    <div class="oc-card__header">
+        <span class="oc-card__title">Site Users</span>
+        <span class="oc-card__subtitle">
+            Users assigned here can access this site as contributors.
+        </span>
+    </div>
+
+    <div class="oc-card__body">
+
+        <div id="users-banner" style="display:none;margin-bottom:16px;"></div>
+
+        <!-- Search & add -->
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:20px;">
+            <div style="flex:1;position:relative;">
+                <input
+                        class="oc-input"
+                        type="search"
+                        id="user-search-input"
+                        placeholder="Search by name or email…"
+                        autocomplete="off"
+                        oninput="siteUsersManager.onSearchInput(this.value)">
+                <!-- Autocomplete dropdown -->
+                <div id="user-search-results"
+                     style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+                            background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);
+                            box-shadow:var(--shadow);z-index:50;overflow:hidden;max-height:220px;overflow-y:auto;">
+                </div>
+            </div>
+            <button
+                    type="button"
+                    class="oc-btn oc-btn--primary"
+                    id="user-add-btn"
+                    disabled
+                    onclick="siteUsersManager.addSelected()"
+                    style="flex-shrink:0;">
+                Add user
+            </button>
+        </div>
+
+        <!-- Assigned users list -->
+        <div id="assigned-users-list">
+            <?php if (empty($assignedUsers) || count($assignedUsers) === 0): ?>
+                <div id="no-users-msg"
+                     style="font-size:.85rem;color:var(--slate);padding:12px 0;">
+                    No users have been assigned to this site yet.
+                </div>
+            <?php else: ?>
+                <?php foreach ($assignedUsers as $u): ?>
+                    <div class="oc-user-row" data-user-id="<?= $u['id'] ?>">
+                        <div class="oc-user-row__avatar">
+                            <?= strtoupper(substr($u['name'], 0, 1)) ?>
+                        </div>
+                        <div class="oc-user-row__body">
+                            <span class="oc-user-row__name"><?= htmlspecialchars($u['name']) ?></span>
+                            <span class="oc-user-row__email"><?= htmlspecialchars($u['email']) ?></span>
+                        </div>
+                        <button
+                                type="button"
+                                class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger"
+                                onclick="siteUsersManager.removeUser(<?= $u['id'] ?>, this)"
+                                aria-label="Remove <?= htmlspecialchars($u['name']) ?>">
+                            Remove
+                        </button>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
+<style>
+    .oc-user-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .oc-user-row:last-child {
+        border-bottom: none;
+    }
+
+    .oc-user-row__avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--slate-pale);
+        display: grid;
+        place-items: center;
+        font-size: .8rem;
+        font-weight: 700;
+        color: var(--navy);
+        flex-shrink: 0;
+    }
+
+    .oc-user-row__body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .oc-user-row__name {
+        display: block;
+        font-size: .875rem;
+        font-weight: 600;
+        color: var(--navy);
+    }
+
+    .oc-user-row__email {
+        display: block;
+        font-size: .78rem;
+        color: var(--slate);
+    }
+</style>
 <script>
     /**
      * SiteSettingsForm
@@ -157,7 +315,7 @@
 
             try {
                 const res = await fetch(this.apiUrl, {
-                    method: 'PATCH',
+                    method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -194,6 +352,10 @@
                 require_payment_setup: fd.has('require_payment_setup'),
                 require_contracts: fd.has('require_contracts'),
                 require_guidelines_ack: fd.has('require_guidelines_ack'),
+                require_age_verification: fd.has('require_age_verification'),
+                minimum_contributor_age: fd.has('require_age_verification')
+                    ? parseInt(fd.get('minimum_contributor_age'), 10) || 18
+                    : null,
             };
         }
 
@@ -239,6 +401,253 @@
     }
 
     new SiteSettingsForm('site-settings-form');
+
+    // Show/hide minimum age input when age verification toggle changes
+    document.getElementById('require_age_verification')?.addEventListener('change', function () {
+        const row = document.getElementById('minimum-age-row');
+        if (row) row.style.display = this.checked ? '' : 'none';
+    });
+
+    // ── SiteUsersManager ──────────────────────────────────────────────────────
+    class SiteUsersManager {
+        #site;
+        #token;
+        #searchTimer = null;
+        #selectedUser = null; // { id, name, email }
+
+        constructor(site, token) {
+            this.#site = site;
+            this.#token = token;
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#user-search-input') &&
+                    !e.target.closest('#user-search-results')) {
+                    this.#hideResults();
+                }
+            });
+        }
+
+        onSearchInput(value) {
+            // Reset selection whenever the input changes
+            this.#selectedUser = null;
+            document.getElementById('user-add-btn').disabled = true;
+
+            clearTimeout(this.#searchTimer);
+
+            if (value.trim().length < 2) {
+                this.#hideResults();
+                return;
+            }
+
+            this.#searchTimer = setTimeout(() => this.#search(value.trim()), 300);
+        }
+
+        async addSelected() {
+            if (!this.#selectedUser) return;
+
+            const btn = document.getElementById('user-add-btn');
+            btn.disabled = true;
+            btn.textContent = 'Adding…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/sites/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(this.#token ? {Authorization: `Bearer ${this.#token}`} : {}),
+                    },
+                    body: JSON.stringify({user_id: this.#selectedUser.id}),
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+
+                this.#appendUserRow(data.user);
+                this.#showBanner('success', data.message);
+                document.getElementById('user-search-input').value = '';
+                this.#selectedUser = null;
+                this.#hideResults();
+
+            } catch (err) {
+                this.#showBanner('danger', err.message || 'Could not add user.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Add user';
+        }
+
+        async removeUser(userId, triggerBtn) {
+            if (!confirm('Remove this user from the site?')) return;
+
+            triggerBtn.disabled = true;
+            triggerBtn.textContent = 'Removing…';
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/sites/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(this.#token ? {Authorization: `Bearer ${this.#token}`} : {}),
+                    },
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
+
+                // Remove the row from the DOM
+                document.querySelector(`.oc-user-row[data-user-id="${userId}"]`)?.remove();
+
+                // Show empty state if no rows remain
+                if (document.querySelectorAll('.oc-user-row').length === 0) {
+                    const list = document.getElementById('assigned-users-list');
+                    list.innerHTML = `<div id="no-users-msg" style="font-size:.85rem;color:var(--slate);padding:12px 0;">
+                        No users have been assigned to this site yet.
+                    </div>`;
+                }
+
+                this.#showBanner('success', data.message || 'User removed.');
+
+            } catch (err) {
+                this.#showBanner('danger', err.message || 'Could not remove user.');
+                triggerBtn.disabled = false;
+                triggerBtn.textContent = 'Remove';
+            }
+        }
+
+        // ── Private ─────────────────────────────────────────────────────────
+
+        async #search(query) {
+            try {
+                const url = `/api/${this.#site}/open-collab/admin/users/search?q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(this.#token ? {Authorization: `Bearer ${this.#token}`} : {}),
+                    },
+                });
+
+                if (!res.ok) return;
+
+                const data = await res.json();
+                this.#renderResults(data.users || []);
+
+            } catch {
+                // Search failure is non-critical — don't surface an error banner
+            }
+        }
+
+        #renderResults(users) {
+            const box = document.getElementById('user-search-results');
+            box.innerHTML = '';
+
+            if (users.length === 0) {
+                box.innerHTML = `<div style="padding:10px 14px;font-size:.85rem;color:var(--slate);">No users found.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            for (const user of users) {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;';
+                row.innerHTML = `
+                    <div style="width:30px;height:30px;border-radius:50%;background:var(--slate-pale);
+                                display:grid;place-items:center;font-size:.75rem;font-weight:700;
+                                color:var(--navy);flex-shrink:0;">
+                        ${this.#esc(user.name.charAt(0).toUpperCase())}
+                    </div>
+                    <div style="min-width:0;">
+                        <div style="font-size:.85rem;font-weight:600;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${this.#esc(user.name)}
+                        </div>
+                        <div style="font-size:.75rem;color:var(--slate);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${this.#esc(user.email)}
+                        </div>
+                    </div>`;
+
+                row.addEventListener('mouseenter', () => {
+                    row.style.background = 'var(--slate-pale)';
+                });
+                row.addEventListener('mouseleave', () => {
+                    row.style.background = '';
+                });
+                row.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    this.#selectUser(user);
+                });
+
+                box.appendChild(row);
+            }
+
+            box.style.display = 'block';
+        }
+
+        #selectUser(user) {
+            this.#selectedUser = user;
+            document.getElementById('user-search-input').value = `${user.name} (${user.email})`;
+            document.getElementById('user-add-btn').disabled = false;
+            this.#hideResults();
+        }
+
+        #appendUserRow(user) {
+            // Remove the empty-state message if present
+            document.getElementById('no-users-msg')?.remove();
+
+            const list = document.getElementById('assigned-users-list');
+            const row = document.createElement('div');
+            row.className = 'oc-user-row';
+            row.dataset.userId = user.id;
+            row.innerHTML = `
+                <div class="oc-user-row__avatar">${this.#esc(user.name.charAt(0).toUpperCase())}</div>
+                <div class="oc-user-row__body">
+                    <span class="oc-user-row__name">${this.#esc(user.name)}</span>
+                    <span class="oc-user-row__email">${this.#esc(user.email)}</span>
+                </div>
+                <button type="button"
+                        class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger"
+                        onclick="siteUsersManager.removeUser(${user.id}, this)"
+                        aria-label="Remove ${this.#esc(user.name)}">
+                    Remove
+                </button>`;
+
+            list.appendChild(row);
+        }
+
+        #hideResults() {
+            const box = document.getElementById('user-search-results');
+            if (box) box.style.display = 'none';
+        }
+
+        #showBanner(type, message) {
+            const el = document.getElementById('users-banner');
+            if (!el) return;
+
+            const isSuccess = type === 'success';
+            el.className = `oc-alert oc-alert--${isSuccess ? 'success' : 'danger'}`;
+            el.textContent = message;
+            el.style.display = 'flex';
+
+            clearTimeout(this._bannerTimer);
+            this._bannerTimer = setTimeout(() => {
+                el.style.display = 'none';
+            }, 4500);
+        }
+
+        #esc(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+    }
+
+    const siteUsersManager = new SiteUsersManager(
+            <?= json_encode($site) ?>,
+        localStorage.getItem('oc_token') || '',
+    );
 </script>
 @endsection
-

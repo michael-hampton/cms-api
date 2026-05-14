@@ -85,6 +85,7 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\SiteSettingsController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticleCommentController;
 use App\Controllers\OpenCollab\ArticleHistoryController;
@@ -1586,7 +1587,10 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         );
     });
 
-
+    $router->get('/admin/users/search', [SiteSettingsController::class, 'searchUsers']);
+    $router->post('/admin/sites/users', [SiteSettingsController::class, 'assignUser']);
+    $router->post('/admin/sites/settings', [SiteSettingsController::class, 'update']);
+    $router->delete('/admin/sites/users/{userId}', [SiteSettingsController::class, 'removeUser']);
     $router->get('/admin/contracts', [AdminContractController::class, 'index']);
     $router->get('/admin/contracts/latest', [AdminContractController::class, 'latest']);
     $router->post('/admin/contracts', [AdminContractController::class, 'store']);
