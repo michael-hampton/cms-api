@@ -86,6 +86,7 @@ final class OnboardingPageViewModel
                 'payment' => (bool)($this->site->require_payment_setup ?? true),
                 'contract' => (bool)($this->site->require_contracts ?? true),
                 'guidelines' => (bool)($this->site->require_guidelines_ack ?? true),
+                'age_verification' => (bool)($this->site->require_age_verification ?? true),
                 default => true, // profile is always required
             },
         ));

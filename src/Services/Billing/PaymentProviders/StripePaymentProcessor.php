@@ -180,7 +180,10 @@ class StripePaymentProcessor
         bool         $fromPaymentIntentFlow = false
     ): \Stripe\Subscription
     {
-        $priceId = $this->getOrCreatePrice($plan);
+        $amount = $subscription->price_paid_cents
+            ?? (int)round(((float)$subscription->price) * 100);
+
+        $priceId = $this->getOrCreatePrice($plan, $amount);
 
         $subscriptionData = [
             'customer' => $customerId,
@@ -899,7 +902,10 @@ class StripePaymentProcessor
                 $couponId = $this->getOrCreateStripeCoupon($voucher, $plan);
             }
 
-            $priceId = $this->getOrCreatePrice($plan);
+            $amount = $subscription->price_paid_cents
+                ?? (int)round(((float)$subscription->price) * 100);
+
+            $priceId = $this->getOrCreatePrice($plan, $amount);
 
             $subscriptionData = [
                 'customer' => $customerId,
@@ -1011,9 +1017,6 @@ class StripePaymentProcessor
         } catch (ApiErrorException $e) {
             error_log('Stripe API Error: ' . $e->getMessage());
 
-            echo $e->getMessage();
-            die;
-
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e),
@@ -1031,7 +1034,7 @@ class StripePaymentProcessor
         }
     }
 
-    private function getOrCreatePrice(SubscriptionPlan $plan): string
+    private function getOrCreatePrice(SubscriptionPlan $plan, float $amount): string
     {
         // Check if price already exists
         if (!empty($plan->stripe_price_id)) {
@@ -1050,7 +1053,7 @@ class StripePaymentProcessor
         // Create price
         $price = $this->stripe->prices->create([
             'product' => $product->id,
-            'unit_amount' => (int)($plan->price * 100), // Convert to cents
+            'unit_amount' => (int)$amount, // Convert to cents
             'currency' => strtolower($plan->currency),
             'recurring' => [
                 'interval' => $this->mapBillingPeriodToInterval($plan->billing_period)

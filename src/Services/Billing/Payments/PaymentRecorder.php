@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing\Payments;
 
+use App\Models\Model;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -19,7 +20,7 @@ class PaymentRecorder
         Subscription     $subscription,
         SubscriptionPlan $plan,
         array            $paymentData,
-    ): Payment
+    ): Model
     {
         $amountCents = $paymentData['amount_cents']
             ?? $subscription->price_paid_cents

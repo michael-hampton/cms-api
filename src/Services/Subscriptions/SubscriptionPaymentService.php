@@ -51,6 +51,15 @@ class SubscriptionPaymentService
             return $stripeResult;
         }
 
+        /**
+         * todo need to get the total from the order as it includes the tax and shipping
+         * <pre>Array
+         * (
+         * [payment_method_id] => pm_1TUSLvGvaZO1S9EXRv73vub6
+         * [order_id] => 124
+         * )
+         */
+
         $payment = $this->paymentRecorder->recordSubscriptionStripePayment(
             $subscription,
             $plan,

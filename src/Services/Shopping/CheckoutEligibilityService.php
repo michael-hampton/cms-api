@@ -17,6 +17,7 @@ class CheckoutEligibilityService
     public function validate(Member $user, array $cartItems): EligibilityResult
     {
         $uniqueness = $this->uniquenessRule->filterInvalidItems($cartItems);
+
         $eligibility = $this->subscriptionRule->filterInvalidItems($user, $uniqueness->valid);
 
         return new EligibilityResult(
