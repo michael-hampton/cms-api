@@ -6,7 +6,9 @@ use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\CartItem;
+use App\Models\IssueDelivery;
 use App\Models\Product;
+use App\Models\ProductOffer;
 use App\Models\ProductOfferBundle;
 use App\Models\ProductOfferBundleItem;
 use App\Models\ProductVariant;
@@ -21,6 +23,7 @@ use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\Factories\CartItemFactory;
@@ -31,6 +34,8 @@ use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
+use ReflectionMethod;
+use RuntimeException;
 
 class CartServiceTest extends FunctionalTestCase
 {
@@ -78,11 +83,14 @@ class CartServiceTest extends FunctionalTestCase
             'product_id' => 1,
             'quantity' => 2,
             'price' => 99.99,
-            'subtotal' => 199.98,  // ADD THIS
+            'subtotal' => 199.98,
             'options' => []
         ]);
 
         $cartItem->setRelation('product', $product);
+
+        // No subscription_plan_id on this item so repository should not be called
+        $this->subscriptionPlanRepository->shouldNotReceive('find');
 
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->once()
@@ -357,6 +365,7 @@ class CartServiceTest extends FunctionalTestCase
     public function testAddOneTimeSubscriptionSuccess(): void
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->is_active = true;
         $plan->shouldReceive('getAttribute')->with('id')->andReturn(1);
         $plan->shouldReceive('getAttribute')->with('isOneTime')->andReturn(true);
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(99.99);
@@ -385,6 +394,7 @@ class CartServiceTest extends FunctionalTestCase
     public function testAddOneTimeSubscriptionFailsWithInvalidDeliveryType(): void
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('getDeliveryOptions')->andReturn(['SubscriptionType::DIGITAL->value']);
 
@@ -399,6 +409,7 @@ class CartServiceTest extends FunctionalTestCase
     public function testAddOneTimeSubscriptionFailsWhenAlreadyInCart(): void
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
 
@@ -894,28 +905,21 @@ class CartServiceTest extends FunctionalTestCase
 
     public function testAddSubscriptionToCartForRegularSubscriptionWithInactiveProduct(): void
     {
-        $product = Mockery::mock(Product::class)->makePartial();
-        $product->is_active = false;
-
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->site_id = $this->siteId;
+        $plan->is_active = false;
         $plan->shouldReceive('isOneTime')->andReturn(false);
         $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
         $plan->shouldReceive('getAttribute')->with('price')->andReturn(29.99);
-        $plan->product = $product;
 
         $this->subscriptionPlanRepository->shouldReceive('find')
             ->with(1, ['pricingTiers'])
             ->andReturn($plan);
 
-        $this->cartRepository->shouldReceive('findBySubscriptionPlan')
-            ->once()
-            ->andReturn(null);
-
         $result = $this->service->addSubscriptionToCart(1, SubscriptionType::DIGITAL->value);
 
         $this->assertFalse($result['success']);
-        $this->assertEquals('Associated product not found or inactive', $result['message']);
+        $this->assertEquals('Subscription plan not found or inactive', $result['message']);
     }
 
     public function testAddSubscriptionToCartForRegularSubscriptionSuccess(): void
@@ -950,12 +954,13 @@ class CartServiceTest extends FunctionalTestCase
 
     public function testGetPriceForSubscriptionUsesDigitalSalePriceWhenCheaper(): void
     {
-        $pricingTier = Mockery::mock()->makePartial();
+        $pricingTier = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
         $pricingTier->digital_price = 20.00;
         $pricingTier->digital_sale_price = 15.00; // cheaper
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
+        $plan->is_active = true;
         $plan->shouldReceive('isOneTime')->andReturn(true);
         $plan->shouldReceive('getDeliveryOptions')->andReturn([SubscriptionType::DIGITAL->value]);
         $plan->pricingTiers = collect([$pricingTier]);
@@ -1092,7 +1097,7 @@ class CartServiceTest extends FunctionalTestCase
         $product = Mockery::mock(Product::class)->makePartial();
         $product->is_active = false;
 
-        $offer = Mockery::mock(\App\Models\ProductOffer::class)->makePartial();
+        $offer = Mockery::mock(ProductOffer::class)->makePartial();
         $offer->is_active = true;
         $offer->product = $product;
 
@@ -1417,13 +1422,13 @@ class CartServiceTest extends FunctionalTestCase
             ->andReturnUsing(function ($cb) use (&$exceptionThrown) {
                 try {
                     return $cb();
-                } catch (\RuntimeException $e) {
+                } catch (RuntimeException $e) {
                     $exceptionThrown = true;
                     throw $e;
                 }
             });
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
 
         $this->service->addSubscriptionBundleToCart($bundle->id);
 
@@ -1453,6 +1458,17 @@ class CartServiceTest extends FunctionalTestCase
         ]);
         $cartItem->setRelation('product', $product);
 
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->name = 'Mag Plan';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        // subscription_plan_id is set so repository WILL be called
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->once()
+            ->with(42)
+            ->andReturn($plan);
+
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->once()
             ->andReturn(collect([$cartItem]));
@@ -1460,10 +1476,11 @@ class CartServiceTest extends FunctionalTestCase
         $items = $this->service->getItems();
 
         $this->assertCount(1, $items);
-        // subscription_plan_id must be set so checkout service picks it up
         $this->assertEquals(42, $items[0]['subscription_plan_id']);
         $this->assertEquals(CartItemType::SUBSCRIPTION_BUNDLE->value, $items[0]['item_type']);
         $this->assertEquals(7, $items[0]['options']['bundle_id'] ?? null);
+        $this->assertEquals('Mag Plan', $items[0]['plan_name']);
+        $this->assertEquals('GBP', $items[0]['currency']);
     }
 
     // -----------------------------------------------------------------------
@@ -1477,6 +1494,16 @@ class CartServiceTest extends FunctionalTestCase
             'options' => json_encode(['bundle_id' => 5, 'delivery_type' => 'digital']),
         ]);
 
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->name = 'Test Plan';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($plan);
+
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
 
@@ -1489,6 +1516,16 @@ class CartServiceTest extends FunctionalTestCase
             'subscription_plan_id' => 1,
             'options' => json_encode(['delivery_type' => 'digital']),
         ]);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->name = 'Test Plan';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($plan);
 
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
@@ -1511,7 +1548,16 @@ class CartServiceTest extends FunctionalTestCase
             'options' => json_encode(['bundle_id' => 3, 'delivery_type' => 'print']),
         ]);
 
-        // options already decoded (array, not JSON string)
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->name = 'Test Plan';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($plan);
+
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
 
@@ -1520,18 +1566,38 @@ class CartServiceTest extends FunctionalTestCase
 
     public function test_contains_subscription_bundle_items_returns_true_when_mixed_cart_has_bundle(): void
     {
-        $cart = new CartItem([
+        $cart1 = new CartItem([
             'subscription_plan_id' => 1,
             'options' => json_encode(['delivery_type' => 'print']),
         ]);
 
         $cart2 = new CartItem([
-            'subscription_plan_id' => 1,
+            'subscription_plan_id' => 2,
             'options' => json_encode(['bundle_id' => 3, 'delivery_type' => 'print']),
         ]);
 
+        $plan1 = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan1->name = 'Plan 1';
+        $plan1->currency = 'GBP';
+        $plan1->pricingTiers = collect([]);
+
+        $plan2 = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan2->name = 'Plan 2';
+        $plan2->currency = 'GBP';
+        $plan2->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($plan1);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')
+            ->with(2)
+            ->once()
+            ->andReturn($plan2);
+
         $this->cartRepository->shouldReceive('findBySessionOrUser')
-            ->andReturn(collect([$cart, $cart2]));
+            ->andReturn(collect([$cart1, $cart2]));
 
         $this->assertTrue($this->service->containsSubscriptionBundleItems());
     }
@@ -1548,7 +1614,7 @@ class CartServiceTest extends FunctionalTestCase
 
     private function callPrivate(string $method, array $args): mixed
     {
-        $ref = new \ReflectionMethod($this->service, $method);
+        $ref = new ReflectionMethod($this->service, $method);
         $ref->setAccessible(true);
         return $ref->invokeArgs($this->service, $args);
     }
@@ -1627,7 +1693,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = false;
 
-        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
 
@@ -1654,7 +1720,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = false;
 
-        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(false);
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
 
@@ -1673,10 +1739,10 @@ class CartServiceTest extends FunctionalTestCase
 
     public function testUpdateQuantityForPrintSubscriptionFailsWhenIssueOutOfStock(): void
     {
-        $issue = Mockery::mock(\App\Models\IssueDelivery::class)->makePartial();
+        $issue = Mockery::mock(IssueDelivery::class)->makePartial();
         $issue->stock_quantity = 1;
 
-        $issuePolicy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
         $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
         $issuePolicy->shouldReceive('isPreOrder')->andReturn(false);
         $issue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
@@ -1684,7 +1750,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
 
-        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
         $plan->shouldReceive('getNextIssue')->andReturn($issue);
@@ -1704,10 +1770,10 @@ class CartServiceTest extends FunctionalTestCase
 
     public function testUpdateQuantityForPrintSubscriptionAllowsPreorderQuantity(): void
     {
-        $issue = Mockery::mock(\App\Models\IssueDelivery::class)->makePartial();
+        $issue = Mockery::mock(IssueDelivery::class)->makePartial();
         $issue->stock_quantity = 0;
 
-        $issuePolicy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $issuePolicy = Mockery::mock(AvailabilityPolicyInterface::class);
         $issuePolicy->shouldReceive('canPurchase')->andReturn(true);
         $issuePolicy->shouldReceive('isPreOrder')->andReturn(true);
         $issue->shouldReceive('availabilityPolicy')->andReturn($issuePolicy);
@@ -1715,7 +1781,7 @@ class CartServiceTest extends FunctionalTestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
 
-        $policy = Mockery::mock(\App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface::class);
+        $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
         $plan->shouldReceive('getNextIssue')->andReturn($issue);

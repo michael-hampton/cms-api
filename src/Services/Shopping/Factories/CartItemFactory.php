@@ -125,7 +125,8 @@ class CartItemFactory
         int     $quantity,
         float   $price,
         int     $subscriptionPlanId,
-        string  $deliveryType
+        string $deliveryType,
+        ?int   $pricingTierId = null
     ): CartItemData
     {
         return new CartItemData(
@@ -138,6 +139,7 @@ class CartItemFactory
             options: [
                 'type' => CartItemType::SUBSCRIPTION->value,
                 'delivery_type' => $deliveryType,
+                'pricing_tier_id' => $pricingTierId,
             ],
             site_id: $product->site_id,
             merchant_id: null,

@@ -11,6 +11,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Auth\OTPRepository;
 use App\Repositories\Billing\OrderRepository;
@@ -34,6 +35,7 @@ use App\Services\Shopping\GiftResolutionService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use DateTimeImmutable;
 use Exception;
+use RuntimeException;
 
 class CartController extends Controller
 {
@@ -101,6 +103,9 @@ class CartController extends Controller
 
         $tax = $this->calculateTax($subtotal, $shipping);
 
+        $currencyCode = $this->currencyResolver->resolveUpperCase();
+        $currencySymbol = $this->currencyResolver->symbol($currencyCode);
+
         $cartData = [
             'items' => $items,
             'total' => $this->cartService->getTotal(),
@@ -111,6 +116,8 @@ class CartController extends Controller
             'tax_rate' => $tax->rate,
             'subtotal' => $subtotal,
             'startOptions' => $startOptions,
+            'currency' => $currencyCode,
+            'currencySymbol' => $currencySymbol,
         ];
 
         return $this->view('cart/index', $cartData);
@@ -381,14 +388,14 @@ class CartController extends Controller
 
             try {
                 $result = $this->identityService->createAnonymous($email, $siteId, $data);
-                $member = \App\Models\Member::find($result->userId);
+                $member = Member::find($result->userId);
                 MemberAuth::login($member);
 
                 // Migrate any session-keyed cart items to the newly created member
                 // so that downstream services can find them by member id.
                 $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
 
-            } catch (\RuntimeException $e) {
+            } catch (RuntimeException $e) {
                 return $this->errorResponse($e->getMessage(), 400);
             }
         }
@@ -550,7 +557,7 @@ class CartController extends Controller
         $requestData = $request->all();
 
         $data = [
-            'pricing_tier_id' => $requestData['pricing_id'] ?? null,
+            'pricing_tier_id' => $requestData['pricing_id'] ?? $requestData['pricing_tier_id'] ?? null,
             'duration_months' => $requestData['duration_months'] ?? null,
             'issue_count' => $requestData['issues'] ?? null,
             'voucher_code' => $requestData['voucher_code'] ?? null,
@@ -672,7 +679,7 @@ class CartController extends Controller
                 'message' => $result->message,
                 'expires_in' => $result->expiresIn,
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 429);
         }
     }
@@ -690,7 +697,7 @@ class CartController extends Controller
         $activeOTP = $this->OTPRepository->getActiveOTP($pendingEmail, $siteId, $sessionId);
 
         if ($activeOTP) {
-            $expiresAt = new \DateTimeImmutable($activeOTP->expires_at);
+            $expiresAt = new DateTimeImmutable($activeOTP->expires_at);
             $now = now_datetime();
             $remainingSeconds = max(0, $expiresAt->getTimestamp() - $now->getTimestamp());
 
@@ -722,7 +729,7 @@ class CartController extends Controller
 
         try {
             $result = $this->identityService->verifyOTP($email, $otp, $sessionId, $siteId);
-            $member = \App\Models\Member::find($result->userId);
+            $member = Member::find($result->userId);
 
             if (!$member) {
                 return $this->errorResponse('Member not found', 404);
@@ -750,7 +757,7 @@ class CartController extends Controller
                     'last_name' => $member->last_name ?? '',
                 ],
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
@@ -792,7 +799,7 @@ class CartController extends Controller
                 'message' => 'New verification code sent',
                 'expires_in' => $result['expires_in'] ?? null,
             ]);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
     }

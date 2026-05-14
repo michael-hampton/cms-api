@@ -22,6 +22,7 @@ use App\Services\Vouchers\DiscountContext\DiscountContext;
 use App\Services\Vouchers\DiscountContext\VoucherContext;
 use App\Services\Vouchers\DiscountResolver;
 use DateTimeImmutable;
+use Exception;
 
 class OneTimeSubscriptionCheckoutService
 {
@@ -69,7 +70,22 @@ class OneTimeSubscriptionCheckoutService
                     $subscriptionItems
                 );
 
-                $eligibility = $this->eligibilityService->validate($member, $subscriptionItems);
+                $giftFields = [];
+                if (!empty($data['is_gift'])) {
+                    $giftFields = array_filter([
+                        'is_gift' => true,
+                        'gift_email' => $data['recipient_email'] ?? null,
+                        'gift_first_name' => $data['recipient_first_name'] ?? null,
+                        'gift_last_name' => $data['recipient_last_name'] ?? null,
+                    ], fn($v) => $v !== null);
+                }
+
+                $eligibility = $this->eligibilityService->validate(
+                    $member,
+                    !empty($giftFields)
+                        ? array_map(fn($item) => array_merge($item, $giftFields), $subscriptionItems)
+                        : $subscriptionItems
+                );
                 $subscriptionItems = $eligibility->valid;
 
                 if (empty($subscriptionItems)) {
@@ -158,7 +174,7 @@ class OneTimeSubscriptionCheckoutService
                 }
             } catch (CheckoutException $e) {
                 throw $e;
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->handlePaymentFailure($order, $subscriptions, $stockReservations);
                 throw $e;
             }

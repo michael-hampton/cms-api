@@ -2284,6 +2284,7 @@ $pagination = $reviewData['pagination'] ?? [];
             const result = await this._cartService.addSubscription({
                 plan_id: PLAN_ID,
                 pricing_id: parseInt(durationRadio.dataset.pricingId),
+                pricing_tier_id: parseInt(durationRadio.dataset.pricingId),
                 delivery_type: deliveryType,
                 duration_months: parseInt(durationRadio.value),
                 price: price,

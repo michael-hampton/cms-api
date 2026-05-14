@@ -465,7 +465,7 @@ abstract class Model
         }
 
         // Check if there's a mutator
-        $mutatorMethod = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', $key))) . 'Attribute';
+        $mutatorMethod = $this->resolveMutatorMethod($key);
 
         if (method_exists($this, $mutatorMethod)) {
             $value = $this->$mutatorMethod();
@@ -474,6 +474,15 @@ abstract class Model
 
         $value = $this->attributes[$key] ?? null;
         return $this->castAttribute($key, $value);
+    }
+
+    private function resolveMutatorMethod(string $key): ?string
+    {
+        $studlyKey = str_replace(' ', '', ucwords(
+            str_replace(['-', '_'], ' ', preg_replace('/([a-z])([A-Z])/', '$1 $2', $key))
+        ));
+
+        return 'get' . $studlyKey . 'Attribute';
     }
 
     /**

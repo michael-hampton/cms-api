@@ -12,6 +12,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
+use Exception;
 use InvalidArgumentException;
 
 /**
@@ -115,7 +116,7 @@ class CrmSubscriptionCreationService
         Session::put('member_id', $memberId);
 
         try {
-            $this->cartService->addSubscriptionToCart($planId);
+            $this->cartService->addSubscriptionToCart($planId, $plan->getDeliveryOptions()[0] ?? null);
 
             // processCheckout() expects the same $data array the frontend POSTs.
             // payment_method_id is the Stripe PM the admin collected.
@@ -151,6 +152,10 @@ class CrmSubscriptionCreationService
             $subscription->update([
                 'payment_subscription_id' => $paymentResult['subscription_id'],
             ]);
+
+        } catch (Exception $exception) {
+            echo $exception->getMessage();
+            die;
 
         } finally {
             // Always restore auth state and clear the injected cart,

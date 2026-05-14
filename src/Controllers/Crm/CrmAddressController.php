@@ -4,6 +4,7 @@ namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
 use App\Enums\Address\AddressType;
+use App\Events\Members\MemberDetailsChanged;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -179,6 +180,10 @@ class CrmAddressController extends Controller
             $originalPostcode = $address->postcode;
 
             $updated = $this->addressRepository->update($id, $data);
+
+            if ($address->is_default) {
+                event(new MemberDetailsChanged($memberId, '', $id));
+            }
 
             if (!empty($data['postcode'])) {
                 event(new MemberPostcodeUpdated($member, $data['postcode'], $originalPostcode));

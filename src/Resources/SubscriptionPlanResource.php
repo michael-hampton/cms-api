@@ -40,6 +40,7 @@ class SubscriptionPlanResource extends JsonResource
             'stripe_product_id' => $this->getAttribute('stripe_product_id'),
             'region_sets' => $this->getRegionSets(),
             'region_set_ids' => $this->getRegionSetIds(),
+            'lowest_effective_price' => $this->getLowestEffectivePrice(),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
         ];
@@ -79,5 +80,24 @@ class SubscriptionPlanResource extends JsonResource
         }
 
         return [];
+    }
+
+    /**
+     * Delegates to the model method when the resource is an object (normal path),
+     * or reads the pre-computed appended attribute when the resource is an array
+     * (e.g. after toArray() serialisation through the repository layer).
+     *
+     * Returns ['min' => float|null, 'tier' => mixed|null].
+     */
+    private function getLowestEffectivePrice(): array
+    {
+        if (is_object($this->resource) && method_exists($this->resource, 'getLowestEffectivePrice')) {
+            return $this->resource->getLowestEffectivePrice();
+        }
+
+        // Array path: the model appends `lowest_effective_price` via lowestEffectivePriceAttribute()
+        $appended = $this->getAttribute('lowest_effective_price');
+
+        return is_array($appended) ? $appended : ['min' => null, 'tier' => null];
     }
 }

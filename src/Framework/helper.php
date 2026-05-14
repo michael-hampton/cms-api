@@ -7,6 +7,7 @@ use App\Framework\Date;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Http\Request;
 use App\Framework\Http\Router;
+use App\Framework\Mail\MailManager;
 use App\Framework\Queue\Dispatcher;
 use App\Framework\Queue\Job;
 use App\Framework\Queue\PendingDispatch;
@@ -14,12 +15,25 @@ use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Site;
 
 if (!function_exists('auth')) {
     function auth(): Auth
     {
         return new Auth();
     }
+}
+
+function clean_backtrace(): array
+{
+    $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+
+    return array_map(function ($item) {
+        return [
+            'file' => $item['file'] ?? null,
+            'function' => $item['function'] ?? null,
+        ];
+    }, $trace);
 }
 
 if (!function_exists('data_get')) {
@@ -325,7 +339,7 @@ if (!function_exists('env')) {
 }
 
 if (!function_exists('site')) {
-    function site(): ?\App\Models\Site
+    function site(): ?Site
     {
         return SiteContext::get();
     }
@@ -439,7 +453,7 @@ if (!function_exists('route')) {
         try {
             $router = Container::getInstance()->resolve(Router::class);
             return $router->route($name, $params);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Fallback: convert route name to a slug URL
             // e.g. 'privacy' => '/privacy', 'data-rights' => '/data-rights'
             $path = '/' . ltrim(str_replace('.', '/', $name), '/');
@@ -463,12 +477,12 @@ if (!function_exists('now_datetime')) {
      * Return the current DateTime instance
      *
      * @param string|null $timezone Optional timezone, e.g., 'UTC' or 'America/New_York'
-     * @return \DateTime
+     * @return DateTime
      */
-    function now_datetime(?string $timezone = null): \DateTime
+    function now_datetime(?string $timezone = null): DateTime
     {
         if ($timezone) {
-            return new Date('now', new \DateTimeZone($timezone));
+            return new Date('now', new DateTimeZone($timezone));
         }
 
         return new Date('now');
@@ -548,9 +562,9 @@ if (!function_exists('class_uses_recursive')) {
     }
 
     if (!function_exists('mail_manager')) {
-        function mail_manager(): \App\Framework\Mail\MailManager
+        function mail_manager(): MailManager
         {
-            return \App\Framework\Mail\MailManager::getInstance();
+            return MailManager::getInstance();
         }
     }
 }
@@ -560,7 +574,7 @@ if (!function_exists('getTimeAgo')) {
     {
         if (is_string($datetime)) {
             $timestamp = strtotime($datetime);
-        } elseif ($datetime instanceof \DateTime || $datetime instanceof \DateTimeImmutable) {
+        } elseif ($datetime instanceof DateTime || $datetime instanceof DateTimeImmutable) {
             $timestamp = $datetime->getTimestamp();
         } else {
             return '';

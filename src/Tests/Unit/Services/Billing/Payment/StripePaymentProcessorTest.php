@@ -20,6 +20,7 @@ use ReflectionClass;
 use stdClass;
 use Stripe\Exception\CardException;
 use Stripe\Exception\InvalidRequestException;
+use Stripe\Price;
 use Stripe\Service\CouponService;
 use Stripe\Service\CustomerService;
 use Stripe\Service\InvoiceService;
@@ -97,7 +98,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
 
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 2499);
+        $this->expectPriceCreation($plan, 2499); // assert correct amount on price
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
 
         $member->shouldReceive('update')
@@ -167,7 +169,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->once()
             ->with(m::on(function ($data) use ($member) {
                 return $data['email'] === $member->email
-                    && isset($data['metadata']['member_id']);
+                    && $data['name'] === $member->full_name
+                    && isset($data['metadata']['member_id'])
+                    && $data['metadata']['member_id'] === $member->id;
             }))
             ->andReturn($customer);
 
@@ -193,13 +197,12 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             ->andReturn($customer);
     }
 
-    private function expectPriceCreation(SubscriptionPlan $plan): void
+    private function expectPriceCreation(SubscriptionPlan $plan, ?int $expectedAmountCents = null): void
     {
         if ($plan->stripe_price_id) {
-            return; // Price already exists
+            return;
         }
 
-        // Create product
         $product = new stdClass();
         $product->id = 'prod_test123';
 
@@ -212,18 +215,17 @@ class StripePaymentProcessorTest extends FunctionalTestCase
             }))
             ->andReturn($product);
 
-        // Create price
         $price = new stdClass();
         $price->id = 'price_test123';
 
         $this->priceServiceMock->shouldReceive('create')
             ->once()
-            ->with(m::on(function ($data) use ($plan) {
+            ->with(m::on(function ($data) use ($expectedAmountCents) {
                 return $data['product'] === 'prod_test123'
-                    && $data['unit_amount'] === (int)($plan->price * 100)
-                    && $data['currency'] === strtolower($plan->currency)
+                    && ($expectedAmountCents === null || $data['unit_amount'] === $expectedAmountCents)
                     && isset($data['recurring'])
-                    && isset($data['metadata']['plan_id']);
+                    && isset($data['metadata']['plan_id'])
+                    && $data['tax_behavior'] === 'exclusive'; // assert Stripe Tax is set
             }))
             ->andReturn($price);
 
@@ -247,12 +249,13 @@ class StripePaymentProcessorTest extends FunctionalTestCase
 
         $this->subscriptionServiceMock->shouldReceive('create')
             ->once()
-            ->with(m::on(function ($data) use ($expectedAmount) {
+            ->with(m::on(function ($data) {
                 return isset($data['customer'])
                     && isset($data['items'])
                     && isset($data['metadata'])
-                    && isset($data['items'][0]['price_data']['unit_amount'])
-                    && ($expectedAmount === null || $data['items'][0]['price_data']['unit_amount'] === $expectedAmount);
+                    && isset($data['items'][0]['price'])  // price ID, not price_data
+                    && isset($data['automatic_tax'])       // Stripe Tax enabled
+                    && $data['automatic_tax']['enabled'] === true;
             }))
             ->andReturn($stripeSubscription);
 
@@ -380,7 +383,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
         $this->expectCustomerUpdate($customer->id, $customer);
 
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 2499);
+        $this->expectPriceCreation($plan, 2499);
+
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
 
         $result = $this->processor->processSubscriptionPayment(
@@ -410,6 +415,8 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $member = $this->createMockMember('cus_test123');
         $subscription = $this->createMockSubscription($member);
         $plan = $this->createMockPlan();
+
+        $this->expectPriceCreation($plan, 2499);
 
         // Setup expectations
         $customer = $this->expectCustomerRetrieval('cus_test123');
@@ -449,45 +456,78 @@ class StripePaymentProcessorTest extends FunctionalTestCase
     public function testProcessSubscriptionPaymentWithTrialPeriod(): void
     {
         $member = $this->createMockMember('cus_test123');
+
         $subscription = $this->createMockSubscription($member);
+        $subscription->price_paid_cents = 1000;
+
         $plan = $this->createMockPlan();
         $plan->trial_days = 14;
+        $plan->currency = 'GBP';
+        $plan->billing_period = 'monthly';
+        $plan->stripe_price_id = 'price_test123';
 
-        // Setup expectations
+        // Existing customer
         $customer = $this->expectCustomerRetrieval('cus_test123');
+
+        // Attach payment method
         $this->expectPaymentMethodAttachment('pm_test123', $customer->id);
+
+        // Set default payment method
         $this->expectCustomerUpdate($customer->id, $customer);
 
-        // Expect subscription with trial period
+        // Existing Stripe price
+        $stripePrice = Price::constructFrom([
+            'id' => 'price_test123',
+            'unit_amount' => 1000,
+        ]);
+
+        $this->priceServiceMock->shouldReceive('retrieve')
+            ->once()
+            ->with('price_test123')
+            ->andReturn($stripePrice);
+
+        // Trial subscription
         $stripeSubscription = \Stripe\Subscription::constructFrom([
             'id' => 'sub_test123',
             'status' => 'trialing',
             'latest_invoice' => 'in_test123',
+            'current_period_start' => time(),
+            'current_period_end' => strtotime('+14 days'),
         ]);
 
         $this->subscriptionServiceMock->shouldReceive('create')
             ->once()
-            ->with(m::on(function ($data) {
+            ->with(m::on(function (array $data) {
                 return isset($data['trial_period_days'])
                     && $data['trial_period_days'] === 14;
             }))
             ->andReturn($stripeSubscription);
 
-        // Mock invoice with no payment intent (trial)
+        // Trial invoice
         $invoice = new stdClass();
         $invoice->payment_intent = null;
+        $invoice->amount_due = 0;
+        $invoice->tax = 0;
 
         $this->invoiceServiceMock->shouldReceive('retrieve')
             ->once()
+            ->with('in_test123', [
+                'expand' => ['payment_intent']
+            ])
             ->andReturn($invoice);
 
         $result = $this->processor->processSubscriptionPayment(
             $subscription,
             $plan,
-            ['payment_method_id' => 'pm_test123']
+            [
+                'payment_method_id' => 'pm_test123'
+            ]
         );
 
         $this->assertTrue($result['success']);
+        $this->assertEquals('trialing', $result['status']);
+        $this->assertEquals('sub_test123', $result['subscription_id']);
+        $this->assertNull($result['paymentIntentId']);
     }
 
     public function testProcessSubscriptionPaymentUsesSubscriptionPricePaidCentsForStripeAmount(): void
@@ -503,7 +543,9 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         $subscription->price_paid_cents = 1599;
         $subscription->price = 15.99;
 
-        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123', 1599);
+        $this->expectPriceCreation($plan, 1599); // 1599 cents from subscription->price_paid_cents
+
+        $stripeSubscription = $this->expectSubscriptionCreation('sub_test123', 'active', 'in_test123');
         $this->expectInvoiceRetrieval('in_test123', 'pi_test123');
 
         $result = $this->processor->processSubscriptionPayment(
@@ -1161,7 +1203,7 @@ class StripePaymentProcessorTest extends FunctionalTestCase
         // Expect coupon creation
         $this->expectCouponCreation($voucher);
 
-        $this->expectPriceCreation($plan);
+        $this->expectPriceCreation($plan, 2499);
 
         $stripeSubscription = $this->expectSubscriptionCreationWithCoupon(
             'sub_test123',

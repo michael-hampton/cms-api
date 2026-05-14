@@ -34,7 +34,7 @@ class AdminGuidelineTemplateController extends Controller
             description: $request->input('description')
         );
 
-        return $this->jsonResponse($template, 201);
+        return $this->resourceResponse($template->toArray(), 201);
     }
 
     public function update(Request $request, int $id): JsonResponse
@@ -50,7 +50,7 @@ class AdminGuidelineTemplateController extends Controller
             description: $request->input('description')
         );
 
-        return $this->jsonResponse($updated);
+        return $this->resourceResponse($updated->toArray());
     }
 
     public function destroy(int $id): JsonResponse

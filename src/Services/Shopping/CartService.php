@@ -7,6 +7,7 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Cart\InsufficientStockException;
 use App\Framework\Database\Database;
 use App\Framework\Session\Session;
+use App\Models\SubscriptionPlan;
 use App\Repositories\Offers\ProductOfferBundleRepository;
 use App\Repositories\Offers\ProductOfferRepository;
 use App\Repositories\Product\ProductRepository;
@@ -20,6 +21,8 @@ use App\Services\Shopping\Resolvers\CartPriceResolver;
 use App\Services\Shopping\Resolvers\CartStockResolver;
 use App\Services\Subscriptions\Calculators\SubscriptionBundlePriceAllocator;
 use App\Services\Vouchers\VoucherService;
+use DateTime;
+use RuntimeException;
 
 class CartService
 {
@@ -315,84 +318,163 @@ class CartService
      * For one-time subscriptions: validates delivery type.
      * For recurring subscriptions: requires associated product.
      */
-    public function addSubscriptionToCart(int $subscriptionPlanId, string $deliveryType = 'print', array $data = []): array
+    public function addSubscriptionToCart(
+        int    $subscriptionPlanId,
+        string $deliveryType = 'print',
+        array  $data = []
+    ): array
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        $subscriptionPlan = $this->subscriptionPlanRepository->find($subscriptionPlanId, ['pricingTiers']);
-
-        if (!$subscriptionPlan) {
-            return ['success' => false, 'message' => 'Subscription plan not found or inactive'];
-        }
-
-        // Validate delivery type
-        $deliveryType = $data['delivery_type'] ?? $deliveryType;
-        $deliveryOptions = $subscriptionPlan->getDeliveryOptions();
-
-        if (!empty($deliveryOptions) && !in_array($deliveryType, $deliveryOptions)) { //todo
-            return ['success' => false, 'message' => 'Invalid delivery type'];
-        }
-
-        // Check if already in cart
-        $existingItem = $this->cartRepository->findBySubscriptionPlan($subscriptionPlanId, $userId, $sessionId);
-        if ($existingItem) {
-            return ['success' => false, 'message' => 'Subscription plan already in cart'];
-        }
-
-        // Determine pricing tier
-        $pricingTierId = $data['pricing_tier_id'] ?? null;
-        $pricingTier = $pricingTierId
-            ? $subscriptionPlan->pricingTiers->where('id', $pricingTierId)->first()
-            : null;
-
-        $price = $this->getPriceForSubscription($subscriptionPlan, $pricingTier, $deliveryType);
-
-
-        // Check if one-time subscription
-        if ($subscriptionPlan->isOneTime()) {
-            // One-time subscriptions don't need a product
-            $cartData = [
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'product_id' => null, // No product for one-time
-                'quantity' => 1,
-                'price' => $price,
-                'subtotal' => $price,
-                'subscription_plan_id' => $subscriptionPlanId,
-                'options' => json_encode(array_merge([
-                    'delivery_type' => $deliveryType,
-                    'pricing_tier_id' => $pricingTierId ?? null,
-                ], $data ?? [])),
-                'site_id' => $subscriptionPlan->site_id,
-                'merchant_id' => null,
-                'variant_id' => null,
-            ];
-
-            $this->cartRepository->create($cartData);
-
-            return ['success' => true, 'message' => 'Subscription added to cart'];
-        }
-
-        // Regular subscription - needs product
-//        $product = $subscriptionPlan->product;
-        if (!$subscriptionPlan || !$subscriptionPlan->is_active) {
-            return ['success' => false, 'message' => 'Associated product not found or inactive'];
-        }
-
-        $cartItemData = $this->itemFactory->fromSubscription(
-            $sessionId,
-            $userId,
-            $subscriptionPlan,
-            1,
-            $price,
+        $subscriptionPlan = $this->subscriptionPlanRepository->find(
             $subscriptionPlanId,
-            $deliveryType
+            ['pricingTiers']
         );
 
-        $this->cartRepository->create($cartItemData->toArray());
+        if (!$subscriptionPlan || !$subscriptionPlan->is_active) {
+            return [
+                'success' => false,
+                'message' => 'Subscription plan not found or inactive',
+            ];
+        }
 
-        return ['success' => true, 'message' => 'Subscription added to cart'];
+        $deliveryType = $data['delivery_type'] ?? $deliveryType;
+
+        if (!$this->isValidDeliveryType($subscriptionPlan, $deliveryType)) {
+            return [
+                'success' => false,
+                'message' => 'Invalid delivery type',
+            ];
+        }
+
+        if ($this->subscriptionAlreadyInCart($subscriptionPlanId, $userId, $sessionId)) {
+            return [
+                'success' => false,
+                'message' => 'Subscription plan already in cart',
+            ];
+        }
+
+        [$pricingTier, $price] = $this->resolveSubscriptionPricing(
+            $subscriptionPlan,
+            $deliveryType,
+            $data['pricing_tier_id'] ?? null
+        );
+
+        $cartData = $subscriptionPlan->isOneTime()
+            ? $this->buildOneTimeSubscriptionCartData(
+                $subscriptionPlan,
+                $sessionId,
+                $userId,
+                $price,
+                $deliveryType,
+                $pricingTier?->id,
+                $data
+            )
+            : $this->itemFactory->fromSubscription(
+                $sessionId,
+                $userId,
+                $subscriptionPlan,
+                1,
+                $price,
+                $subscriptionPlanId,
+                $deliveryType,
+                $pricingTier?->id,
+            )->toArray();
+
+        $this->cartRepository->create($cartData);
+
+        return [
+            'success' => true,
+            'message' => 'Subscription added to cart',
+        ];
+    }
+
+    private function isValidDeliveryType(
+        SubscriptionPlan $subscriptionPlan,
+        string           $deliveryType
+    ): bool
+    {
+        $deliveryOptions = $subscriptionPlan->getDeliveryOptions();
+
+        if (empty($deliveryOptions)) {
+            return true;
+        }
+
+        return in_array($deliveryType, $deliveryOptions, true);
+    }
+
+    private function subscriptionAlreadyInCart(
+        int    $subscriptionPlanId,
+        ?int   $userId,
+        string $sessionId
+    ): bool
+    {
+        return (bool)$this->cartRepository->findBySubscriptionPlan(
+            $subscriptionPlanId,
+            $userId,
+            $sessionId
+        );
+    }
+
+    private function resolveSubscriptionPricing(
+        SubscriptionPlan $subscriptionPlan,
+        string           $deliveryType,
+        ?int             $pricingTierId
+    ): array
+    {
+        $pricingTier = null;
+
+        if ($pricingTierId) {
+            $pricingTier = $subscriptionPlan->pricingTiers
+                ->firstWhere('id', $pricingTierId);
+        }
+
+        if (!$pricingTier && $subscriptionPlan->pricingTiers->isNotEmpty()) {
+            $effectivePrice = $subscriptionPlan->getLowestEffectivePrice();
+
+            return [
+                $effectivePrice['tier'],
+                $effectivePrice['min'],
+            ];
+        }
+
+        return [
+            $pricingTier,
+            $this->getPriceForSubscription(
+                $subscriptionPlan,
+                $pricingTier,
+                $deliveryType
+            ),
+        ];
+    }
+
+    private function buildOneTimeSubscriptionCartData(
+        SubscriptionPlan $subscriptionPlan,
+        string           $sessionId,
+        ?int             $userId,
+        float            $price,
+        string           $deliveryType,
+        ?int             $pricingTierId,
+        array            $data
+    ): array
+    {
+        return [
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'product_id' => null,
+            'quantity' => 1,
+            'price' => $price,
+            'subtotal' => $price,
+            'subscription_plan_id' => $subscriptionPlan->id,
+            'options' => json_encode(array_merge([
+                'delivery_type' => $deliveryType,
+                'pricing_tier_id' => $pricingTierId,
+            ], $data)),
+            'site_id' => $subscriptionPlan->site_id,
+            'merchant_id' => null,
+            'variant_id' => null,
+        ];
     }
 
     /**
@@ -404,18 +486,7 @@ class CartService
             return $subscriptionPlan->price;
         }
 
-        if ($deliveryType === SubscriptionType::DIGITAL->value) {
-            $base = $pricingTier->digital_price ?? $pricingTier->price; // null-safe fallback to print price
-            $sale = $pricingTier->digital_sale_price ?? null;
-
-            return ($sale !== null && $sale < $base) ? (float)$sale : (float)$base;
-        }
-
-        // Print / physical
-        $base = $pricingTier->price;
-        $sale = $pricingTier->sale_price ?? null;
-
-        return ($sale !== null && $sale < $base) ? (float)$sale : (float)$base;
+        return $pricingTier->getEffectivePrice($deliveryType);
     }
 
     public function addOfferToCart(int $offerId): array
@@ -675,8 +746,8 @@ class CartService
             return ['success' => false, 'message' => 'Cart item not found'];
         }
 
-        $startDateTime = new \DateTime($startDate);
-        $now = new \DateTime();
+        $startDateTime = new DateTime($startDate);
+        $now = new DateTime();
 
         $options = $item->options ?? [];
         $options['start_date'] = $startDate;
@@ -737,7 +808,7 @@ class CartService
                 $plan = $bundleItem->subscriptionPlan;
 
                 if (!$plan) {
-                    throw new \RuntimeException(
+                    throw new RuntimeException(
                         "Subscription plan {$bundleItem->subscription_plan_id} not found in bundle {$bundleId}"
                     );
                 }
@@ -778,7 +849,7 @@ class CartService
                     $product = $plan->product;
 
                     if (!$product || !$product->is_active) {
-                        throw new \RuntimeException(
+                        throw new RuntimeException(
                             "Associated product for plan '{$plan->name}' is not available"
                         );
                     }
@@ -860,9 +931,32 @@ class CartService
                 'subscription_plan_id' => $item->subscription_plan_id,
             ];
 
+            if ($item->subscription_plan_id) {
+                $plan = $this->subscriptionPlanRepository->find($item->subscription_plan_id);
+
+                $options = is_string($item->options)
+                    ? json_decode($item->options, true)
+                    : ($item->options ?? []);
+
+                $pricingTierId = $options['pricing_tier_id'] ?? null;
+
+                $pricingTier = $pricingTierId && $plan
+                    ? $plan->pricingTiers->where('id', $pricingTierId)->first()
+                    : null;
+
+                $itemData['product_name'] = $plan?->name ?? 'Subscription';
+                $itemData['plan_name'] = $plan?->name ?? 'Subscription';
+                $itemData['currency'] = $plan?->currency ?? 'GBP';
+                $itemData['tier_label'] = $pricingTier?->label ?? null;
+                $itemData['tier_duration_months'] = $pricingTier?->duration_months ?? null;
+                $itemData['tier_issue_count'] = $pricingTier?->issue_count ?? null;
+                $itemData['price'] = $pricingTier?->getEffectivePrice($options['delivery_type']) ?? $plan->price ?? null;
+            }
+
+            //dd($itemData);
+
             if ($item->variant_id) {
                 $variant = $this->productRepository->getVariantById($item->variant_id);
-
                 $itemData['variant_options'] = $item->variant->options;
                 $itemData['sku'] = $variant->sku;
             }

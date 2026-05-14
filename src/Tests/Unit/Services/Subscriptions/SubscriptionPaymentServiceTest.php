@@ -4,9 +4,11 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\Order;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderStateManager;
@@ -33,6 +35,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
     private $subscriptionStateManager;
     private $orderStateManager;
     private SubscriptionPaymentService $service;
+    private $orderRepository;
 
     public function testProcessStripeSubscriptionPaymentCompletesLocalStateForActiveSubscription(): void
     {
@@ -46,6 +49,9 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $plan->id = 10;
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
+
+        $order = m::mock(Order::class)->makePartial();
+        $order->total = 29.99;
 
         $payment = m::mock(Payment::class)->makePartial();
         $payment->id = 99;
@@ -64,8 +70,21 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
                 'current_period_end' => 200,
             ]);
 
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with(7)
+            ->andReturn($order);
+
         $this->paymentRecorder->shouldReceive('recordSubscriptionStripePayment')
             ->once()
+            ->with(
+                $subscription,
+                $plan,
+                m::on(fn($data) => $data['amount_cents'] === 2999
+                    && $data['order_id'] === 7
+                    && $data['transaction_id'] === 'pi_123'
+                )
+            )
             ->andReturn($payment);
 
         $this->paymentRecorder->shouldReceive('markCompleted')
@@ -105,8 +124,16 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
                 'payment_intent_client_secret' => 'secret_123',
             ]);
 
+        // No order_id in data so repository should not be called
+        $this->orderRepository->shouldNotReceive('find');
+
         $this->paymentRecorder->shouldReceive('recordSubscriptionStripePayment')
             ->once()
+            ->with(
+                $subscription,
+                $plan,
+                m::on(fn($data) => $data['amount_cents'] === null)
+            )
             ->andReturn($payment);
 
         $this->paymentRecorder->shouldNotReceive('markCompleted');
@@ -468,6 +495,69 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->assertEquals(1, $result['failed_count']);
     }
 
+    public function testProcessStripeSubscriptionPaymentUsesOrderTotalWhenInvoiceIsZeroForTrial(): void
+    {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->site_id = 1;
+        $subscription->price_paid_cents = 2999;
+        $subscription->currency = 'GBP';
+
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 10;
+        $plan->currency = 'GBP';
+        $plan->billing_period = 'monthly';
+
+        $order = m::mock(Order::class)->makePartial();
+        $order->total = 29.99;
+
+        $payment = m::mock(Payment::class)->makePartial();
+        $payment->id = 55;
+
+        $this->stripePaymentProcessor->shouldReceive('processSubscriptionPayment')
+            ->once()
+            ->andReturn([
+                'success' => true,
+                'subscription_id' => 'sub_trial',
+                'status' => 'trialing',
+                'customer_id' => 'cus_123',
+                'payment_intent_id' => null,
+                'requires_action' => false,
+                'current_period_start' => 100,
+                'current_period_end' => 200,
+                'invoice_amount_cents' => 0,   // trial — first invoice is free
+                'invoice_tax_cents' => 0,
+            ]);
+
+        // Invoice is zero so falls back to order total
+        $this->orderRepository->shouldReceive('find')
+            ->once()
+            ->with(7)
+            ->andReturn($order);
+
+        $this->paymentRecorder->shouldReceive('recordSubscriptionStripePayment')
+            ->once()
+            ->with(
+                $subscription,
+                $plan,
+                m::on(fn($data) => $data['amount_cents'] === 2999      // order total used
+                    && $data['invoice_tax_cents'] === 0 // zero tax recorded from Stripe
+                    && $data['order_id'] === 7
+                )
+            )
+            ->andReturn($payment);
+
+        // trialing status — should not mark active or paid
+        $this->paymentRecorder->shouldNotReceive('markCompleted');
+        $this->subscriptionStateManager->shouldNotReceive('markActiveFromStripe');
+        $this->orderStateManager->shouldNotReceive('markPaid');
+
+        $result = $this->service->processStripeSubscriptionPayment($subscription, $plan, ['order_id' => 7]);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(55, $result['payment_id']);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -480,6 +570,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->paymentRecorder = m::mock(PaymentRecorder::class);
         $this->subscriptionStateManager = m::mock(SubscriptionStateManager::class);
         $this->orderStateManager = m::mock(OrderStateManager::class);
+        $this->orderRepository = m::mock(OrderRepository::class);
 
         $this->service = new SubscriptionPaymentService(
             $this->paymentRepository,
@@ -489,6 +580,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
             $this->paymentRecorder,
             $this->subscriptionStateManager,
             $this->orderStateManager,
+            $this->orderRepository,
             $this->databaseMock
         );
     }

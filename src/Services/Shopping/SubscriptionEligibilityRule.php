@@ -16,9 +16,14 @@ class SubscriptionEligibilityRule
 
     public function filterInvalidItems(Member $user, array $cartItems): EligibilityResult
     {
+        $nonGiftItems = array_filter(
+            $cartItems,
+            fn($item) => empty($item['gift_email']) && empty($item['is_gift'])
+        );
+
         $subscriptionPlanIds = array_unique(
             array_filter(
-                array_column($cartItems, 'subscription_plan_id')
+                array_column($nonGiftItems, 'subscription_plan_id')
             )
         );
 
@@ -37,7 +42,10 @@ class SubscriptionEligibilityRule
         $removed = [];
 
         foreach ($cartItems as $item) {
+            $isGift = !empty($item['gift_email']) || !empty($item['is_gift']);
+
             if (
+                !$isGift &&
                 !empty($item['subscription_plan_id']) &&
                 isset($activePlanIds[$item['subscription_plan_id']])
             ) {

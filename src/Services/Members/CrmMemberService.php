@@ -4,6 +4,7 @@ namespace App\Services\Members;
 
 use App\Enums\Member\MemberStatus;
 use App\Events\Members\MemberAssigned;
+use App\Events\Members\MemberDetailsChanged;
 use App\Events\Members\MemberStatusChanged;
 use App\Framework\Database\Database;
 use App\Models\Member;
@@ -36,7 +37,7 @@ class CrmMemberService
 
         $this->guardEmailUniqueness($data['email'] ?? null, $memberId);
 
-        return $this->database->transaction(function () use ($member, $data) {
+        return $this->database->transaction(function () use ($member, $data, $memberId) {
             $previousStatus = MemberStatus::fromBool((bool)$member->is_active);
             $previousAgentId = $member->assigned_agent_id;
 
@@ -86,6 +87,8 @@ class CrmMemberService
 
                 event(new MemberAssigned($updated, $agent, $previousAgentId));
             }
+
+            event(new MemberDetailsChanged($memberId));
 
             return $updated;
         });

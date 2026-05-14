@@ -237,6 +237,113 @@ class SubscriptionEligibilityRuleTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_removes_item_when_buyer_already_has_plan(): void
+    {
+        $items = [
+            ['subscription_plan_id' => 10],
+        ];
+
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->once()
+            ->with($this->member->id, [10])
+            ->andReturn([10]);
+
+        $result = $this->rule->filterInvalidItems($this->member, $items);
+
+        $this->assertEmpty($result->valid);
+        $this->assertCount(1, $result->removed);
+    }
+
+    public function test_keeps_item_when_buyer_does_not_have_plan(): void
+    {
+        $items = [
+            ['subscription_plan_id' => 10],
+        ];
+
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->once()
+            ->with($this->member->id, [10])
+            ->andReturn([]);
+
+        $result = $this->rule->filterInvalidItems($this->member, $items);
+
+        $this->assertCount(1, $result->valid);
+        $this->assertEmpty($result->removed);
+    }
+
+    public function test_gift_item_is_never_removed_even_when_buyer_has_plan(): void
+    {
+        $items = [
+            [
+                'subscription_plan_id' => 10,
+                'is_gift' => true,
+                'gift_email' => 'recipient@example.com',
+            ],
+        ];
+
+        // Repository should not be called — gift items are excluded from
+        // the active plan check entirely.
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->never();
+
+        $result = $this->rule->filterInvalidItems($this->member, $items);
+
+        $this->assertCount(1, $result->valid);
+        $this->assertEmpty($result->removed);
+    }
+
+    public function test_gift_item_passes_through_while_non_gift_duplicate_is_removed(): void
+    {
+        $items = [
+            [
+                'subscription_plan_id' => 10,
+                'is_gift' => true,
+                'gift_email' => 'recipient@example.com',
+            ],
+            [
+                'subscription_plan_id' => 10, // buyer already has this
+            ],
+        ];
+
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->once()
+            ->with($this->member->id, [10])
+            ->andReturn([10]);
+
+        $result = $this->rule->filterInvalidItems($this->member, $items);
+
+        $this->assertCount(1, $result->valid);
+        $this->assertEquals('recipient@example.com', $result->valid[0]['gift_email']);
+        $this->assertCount(1, $result->removed);
+    }
+
+    public function test_non_subscription_items_always_pass_through(): void
+    {
+        $items = [
+            ['product_id' => 5],
+        ];
+
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->never();
+
+        $result = $this->rule->filterInvalidItems($this->member, $items);
+
+        $this->assertCount(1, $result->valid);
+        $this->assertEmpty($result->removed);
+    }
+
+    public function test_empty_cart_returns_empty_result(): void
+    {
+        $this->repository->shouldReceive('getActivePlanIds')
+            ->never();
+
+        $result = $this->rule->filterInvalidItems($this->member, []);
+
+        $this->assertEmpty($result->valid);
+        $this->assertEmpty($result->removed);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

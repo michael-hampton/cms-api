@@ -3,8 +3,11 @@
 namespace App\Services\Billing\PaymentProviders;
 
 use App\DTO\Payments\StripeSubscriptionResult;
+use App\Enums\Address\AddressType;
 use App\Enums\Vouchers\VoucherType;
 use App\Framework\Support\Logger;
+use App\Models\Address;
+use App\Models\Member;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Payment;
@@ -47,9 +50,15 @@ class StripePaymentProcessor
     {
         try {
 
+            $address = $this->resolveCustomerAddress($subscription->member);
+
+//            if (empty($address)) {
+//                throw new Exception('Address is required');
+//            }
+
             $subscriber = !empty($subscription->gifted_by_member_id) ? $subscription->giftedBy : $subscription->member;
             // Create or retrieve customer
-            $customerId = $this->getOrCreateCustomer($subscriber, $data);
+            $customerId = $this->getOrCreateCustomer($subscriber, $data, $address);
 
             // Attach payment method to customer (from Stripe.js)
             if (!empty($data['payment_method_id'])) {
@@ -97,6 +106,10 @@ class StripePaymentProcessor
                         $clientSecret = $paymentIntent->client_secret;
                     }
                 }
+
+                $invoiceAmountCents = $invoice->amount_due ?? null;
+                $invoiceTaxCents = $invoice->tax ?? null;
+
             } elseif (is_object($latestInvoice) && isset($latestInvoice->payment_intent)) {
                 $paymentIntent = $latestInvoice->payment_intent;
                 $paymentIntentId = is_string($paymentIntent) ? $paymentIntent : $paymentIntent->id;
@@ -105,7 +118,11 @@ class StripePaymentProcessor
                     $requiresAction = $paymentIntent->status === 'requires_action';
                     $clientSecret = $paymentIntent->client_secret;
                 }
+
+                $invoiceAmountCents = $latestInvoice->amount_due ?? null;
+                $invoiceTaxCents = $latestInvoice->tax ?? null;
             }
+
 
             return (new StripeSubscriptionResult(
                 success: true,
@@ -121,14 +138,13 @@ class StripePaymentProcessor
                 currentPeriodEnd: isset($stripeSubscription->current_period_end)
                     ? (int)$stripeSubscription->current_period_end
                     : null,
+                invoiceAmountCents: $invoiceAmountCents ?? null,
+                invoiceTaxCents: $invoiceTaxCents ?? null,
             ))->toArray();
 
         } catch (ApiErrorException $e) {
 
             error_log('Stripe API Error: ' . $e->getMessage());
-
-            echo $e->getMessage();
-            die;
 
             return (new StripeSubscriptionResult(
                 success: false,
@@ -145,32 +161,97 @@ class StripePaymentProcessor
         }
     }
 
-    private function getOrCreateCustomer($member, array $data): string
+    private function resolveCustomerAddress(Member $member): ?Address
     {
-        // Check if customer already exists in metadata
-        if ($member->stripe_customer_id && is_string($member->stripe_customer_id)) {
+        $addresses = $member->addresses;
+
+        return
+            $addresses->first(fn($a) => $a->is_default &&
+                $a->type === AddressType::Billing->value
+            )
+
+            ?? $addresses->first(fn($a) => $a->type === AddressType::Billing->value
+        )
+
+            ?? $addresses->first(fn($a) => $a->is_default &&
+            $a->type === AddressType::Shipping->value
+        )
+
+            ?? $addresses->first(fn($a) => $a->type === AddressType::Shipping->value
+        )
+
+            ?? $addresses->first(fn($a) => $a->is_default
+        )
+
+            ?? $addresses->first();
+    }
+
+    private function getOrCreateCustomer($member, array $data = [], ?Address $address = null): string
+    {
+        $stripe = $this->stripe;
+
+        $stripeAddress = $this->buildStripeAddress($member, $address);
+
+        // If we already have a Stripe customer ID, try to reuse it
+        if (!empty($member->stripe_customer_id) && is_string($member->stripe_customer_id)) {
             try {
-                $customer = $this->stripe->customers->retrieve($member->stripe_customer_id);
+                $customer = $stripe->customers->retrieve($member->stripe_customer_id);
+
+                // Only update address if we have real new data
+                if ($address) {
+                    /*$stripe->customers->update($customer->id, [
+                        'email' => $member->email,
+                        'name' => $member->full_name,
+                        'address' => $stripeAddress,
+                        'metadata' => [
+                            'member_id' => $member->id,
+                            'site_id' => $member->site_id,
+                        ],
+                    ]);*/
+                }
+
                 return $customer->id;
             } catch (ApiErrorException $e) {
-                // Customer not found, create new one
+                // fall through and recreate customer
             }
         }
 
         // Create new customer
-        $customer = $this->stripe->customers->create([
+        $customer = $stripe->customers->create([
             'email' => $member->email,
             'name' => $member->full_name,
+            'address' => $stripeAddress,
             'metadata' => [
                 'member_id' => $member->id,
-                'site_id' => $member->site_id
-            ]
+                'site_id' => $member->site_id,
+            ],
         ]);
 
-        // Store customer ID on member
-        $member->update(['stripe_customer_id' => $customer->id]);
+        $member->update([
+            'stripe_customer_id' => $customer->id,
+        ]);
 
         return $customer->id;
+    }
+
+    private function buildStripeAddress($member, ?Address $address): array
+    {
+        // Full address available → use it
+        if ($address) {
+            return [
+                'line1' => $address->address_line_1,
+                'line2' => $address->address_line_2,
+                'city' => $address->city,
+                'state' => $address->state,
+                'postal_code' => $address->postcode,
+                'country' => $address->country,
+            ];
+        }
+
+        // No address yet → safe minimal fallback for Stripe Tax
+        return [
+            'country' => $member->country ?? 'GB',
+        ];
     }
 
     public function createStripeSubscription(
@@ -183,7 +264,7 @@ class StripePaymentProcessor
         $amount = $subscription->price_paid_cents
             ?? (int)round(((float)$subscription->price) * 100);
 
-        $priceId = $this->getOrCreatePrice($plan, $amount);
+        $priceId = $this->getOrCreatePriceForSubscription($plan, $subscription);
 
         $subscriptionData = [
             'customer' => $customerId,
@@ -199,6 +280,7 @@ class StripePaymentProcessor
 
             'expand' => ['latest_invoice.payment_intent'],
             'collection_method' => 'charge_automatically',
+            'automatic_tax' => ['enabled' => true],
         ];
 
         if ($plan->trial_days > 0) {
@@ -208,18 +290,75 @@ class StripePaymentProcessor
         return $this->stripe->subscriptions->create($subscriptionData);
     }
 
-    private function resolveSubscriptionAmountCents(Subscription $subscription, array $data = []): int
+    private function getOrCreatePriceForSubscription(
+        SubscriptionPlan $plan,
+        Subscription     $subscription
+    ): string
     {
-        if (isset($data['amount_cents'])) {
-            return (int)$data['amount_cents'];
+        // Amount the customer is actually paying — subtotal + shipping − discount,
+        // tax-exclusive (Stripe Tax adds tax on top).
+        $amountCents = $subscription->price_paid_cents
+            ?? (int)round((float)$subscription->price * 100);
+
+        $deliveryType = $subscription->delivery_type;
+
+        // Look for a cached price on the matching pricing tier first.
+        $pricingTier = $plan->pricingTiers  // use the already-loaded relation
+        ->first(fn($tier) => (int)round($tier->getEffectivePrice($deliveryType) * 100) === $amountCents);
+
+        if ($pricingTier?->stripe_price_id) {
+            try {
+                $this->stripe->prices->retrieve($pricingTier->stripe_price_id);
+                return $pricingTier->stripe_price_id;
+            } catch (ApiErrorException) {
+                // Price no longer exists in Stripe — fall through to create.
+            }
         }
 
-        if (isset($data['amount'])) {
-            return (int)round(((float)$data['amount']) * 100);
+        // Fall back to plan-level cache for plans with a single price point.
+        if ($plan->stripe_price_id) {
+            try {
+                $existing = $this->stripe->prices->retrieve($plan->stripe_price_id);
+                if ((int)$existing->unit_amount === $amountCents) {
+                    return $plan->stripe_price_id;
+                }
+            } catch (ApiErrorException) {
+                // Price gone — fall through to create.
+            }
         }
 
-        return $subscription->price_paid_cents
-            ?? (int)round(((float)$subscription->price) * 100);
+        // Create Stripe product if needed.
+        $product = $this->stripe->products->create([
+            'name' => $plan->name,
+            'metadata' => ['plan_id' => $plan->id],
+        ]);
+
+        $interval = $this->mapBillingPeriodToInterval($plan->billing_period);
+        $intervalCount = $plan->billing_period === 'quarterly' ? 3 : 1;
+
+        $stripePrice = $this->stripe->prices->create([
+            'product' => $product->id,
+            'unit_amount' => $amountCents,
+            'currency' => strtolower($plan->currency),
+            'recurring' => [
+                'interval' => $interval,
+                'interval_count' => $intervalCount,
+            ],
+            'tax_behavior' => 'exclusive', // Stripe Tax adds on top
+            'metadata' => [
+                'plan_id' => $plan->id,
+                'delivery_type' => $deliveryType,
+            ],
+        ]);
+
+        // Cache on the pricing tier if we matched one, otherwise on the plan.
+        if ($pricingTier) {
+            $pricingTier->update(['stripe_price_id' => $stripePrice->id]);
+        } else {
+            $plan->update(['stripe_price_id' => $stripePrice->id]);
+        }
+
+        return $stripePrice->id;
     }
 
     private function mapBillingPeriodToInterval(string $billingPeriod): string
@@ -229,20 +368,6 @@ class StripePaymentProcessor
             'quarterly' => 'month', // Stripe doesn't have quarterly, use interval_count
             'yearly' => 'year',
             default => 'month'
-        };
-    }
-
-    private function mapStripeStatus(string $status): string
-    {
-        return match ($status) {
-            'active' => 'completed',
-            'trialing' => 'completed',
-            'incomplete' => 'processing',
-            'incomplete_expired' => 'failed',
-            'past_due' => 'failed',
-            'canceled' => 'cancelled',
-            'unpaid' => 'pending',
-            default => 'pending'
         };
     }
 
@@ -451,7 +576,6 @@ class StripePaymentProcessor
             ];
         }
     }
-
 
     public function handleWebhook(array $payload, string $signature): array
     {
@@ -699,8 +823,6 @@ class StripePaymentProcessor
                 'payment_intent_id' => $paymentIntent->id
             ];
         } catch (ApiErrorException $e) {
-            echo $e->getMessage();
-            die;
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e)
@@ -760,9 +882,6 @@ class StripePaymentProcessor
             return $result;
         } catch (ApiErrorException $e) {
             error_log('Stripe Payment Intent Error: ' . $e->getMessage());
-
-            echo $e->getMessage();
-            die;
 
             return [
                 'success' => false,
@@ -1023,8 +1142,6 @@ class StripePaymentProcessor
                 'error_code' => $e->getStripeCode()
             ];
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             error_log('Stripe Payment Error: ' . $e->getMessage());
 
             return [
@@ -1032,41 +1149,6 @@ class StripePaymentProcessor
                 'message' => 'An unexpected error occurred. Please try again.'
             ];
         }
-    }
-
-    private function getOrCreatePrice(SubscriptionPlan $plan, float $amount): string
-    {
-        // Check if price already exists
-        if (!empty($plan->stripe_price_id)) {
-            return $plan->stripe_price_id;
-        }
-
-        // Create product first
-        $product = $this->stripe->products->create([
-            'name' => $plan->name,
-            'description' => $plan->description,
-            'metadata' => [
-                'plan_id' => $plan->id
-            ]
-        ]);
-
-        // Create price
-        $price = $this->stripe->prices->create([
-            'product' => $product->id,
-            'unit_amount' => (int)$amount, // Convert to cents
-            'currency' => strtolower($plan->currency),
-            'recurring' => [
-                'interval' => $this->mapBillingPeriodToInterval($plan->billing_period)
-            ],
-            'metadata' => [
-                'plan_id' => $plan->id
-            ]
-        ]);
-
-        // Store price ID on plan
-        $plan->update(['stripe_price_id' => $price->id]);
-
-        return $price->id;
     }
 
     private function getOrCreateStripeCoupon(Voucher $voucher, SubscriptionPlan $plan): string
@@ -1116,6 +1198,56 @@ class StripePaymentProcessor
         return $stripeCoupon->id;
     }
 
+    private function getOrCreatePrice(SubscriptionPlan $plan, float $amount): string
+    {
+        // Check if price already exists
+        if (!empty($plan->stripe_price_id)) {
+            return $plan->stripe_price_id;
+        }
+
+        // Create product first
+        $product = $this->stripe->products->create([
+            'name' => $plan->name,
+            'description' => $plan->description,
+            'metadata' => [
+                'plan_id' => $plan->id
+            ]
+        ]);
+
+        // Create price
+        $price = $this->stripe->prices->create([
+            'product' => $product->id,
+            'unit_amount' => (int)$amount, // Convert to cents
+            'currency' => strtolower($plan->currency),
+            'tax_behavior' => 'exclusive',
+            'recurring' => [
+                'interval' => $this->mapBillingPeriodToInterval($plan->billing_period)
+            ],
+            'metadata' => [
+                'plan_id' => $plan->id
+            ]
+        ]);
+
+        // Store price ID on plan
+        $plan->update(['stripe_price_id' => $price->id]);
+
+        return $price->id;
+    }
+
+    private function mapStripeStatus(string $status): string
+    {
+        return match ($status) {
+            'active' => 'completed',
+            'trialing' => 'completed',
+            'incomplete' => 'processing',
+            'incomplete_expired' => 'failed',
+            'past_due' => 'failed',
+            'canceled' => 'cancelled',
+            'unpaid' => 'pending',
+            default => 'pending'
+        };
+    }
+
     public function confirmPaymentIntent(string $paymentIntentId): array
     {
         try {
@@ -1128,9 +1260,6 @@ class StripePaymentProcessor
                 'currency' => $paymentIntent->currency,
             ];
         } catch (ApiErrorException $e) {
-
-            echo $e->getMessage();
-            die;
 
             return [
                 'success' => false,
@@ -1222,8 +1351,6 @@ class StripePaymentProcessor
             ];
 
         } catch (ApiErrorException $e) {
-            echo $e->getMessage();
-            die;
             return [
                 'success' => false,
                 'message' => $this->getUserFriendlyMessage($e),
@@ -1671,6 +1798,20 @@ class StripePaymentProcessor
         }
     }
 
+    private function resolveSubscriptionAmountCents(Subscription $subscription, array $data = []): int
+    {
+        if (isset($data['amount_cents'])) {
+            return (int)$data['amount_cents'];
+        }
+
+        if (isset($data['amount'])) {
+            return (int)round(((float)$data['amount']) * 100);
+        }
+
+        return $subscription->price_paid_cents
+            ?? (int)round(((float)$subscription->price) * 100);
+    }
+
     /**
      * Create a refund record in the refunds table
      */
@@ -1764,6 +1905,31 @@ class StripePaymentProcessor
             return $invoice->payment_intent ?? null;
         } catch (Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * Update arbitrary customer fields in Stripe (email, name, address, ...).
+     *
+     * The $fields array is passed directly to the Stripe customers->update
+     * call so keys must match the Stripe API schema.
+     */
+    public function updateCustomerDetails(string $customerId, array $fields): array
+    {
+        try {
+            $customer = $this->stripe->customers->update($customerId, $fields);
+
+            return [
+                'success' => true,
+                'customer_id' => $customer->id,
+            ];
+        } catch (Exception $e) {
+            error_log('Error updating Stripe customer details: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => 'Failed to update customer details in Stripe: ' . $e->getMessage(),
+            ];
         }
     }
 }

@@ -1136,29 +1136,30 @@ $selectedTags = !empty($filters['tags'])
                         $salePrice = null;
                         $originalPrice = null;
                         $savingPct = null;
-                        foreach ($plan->pricingTiers as $tier) {
+                        $tierId = null;
+                        /*foreach ($plan->pricingTiers as $tier) {
                             if ($tier->sale_price && $tier->sale_price < $tier->price) {
                                 $hasSale = true;
                                 $salePrice = $tier->sale_price;
                                 $originalPrice = $tier->price;
                                 $savingPct = (int)round((($tier->price - $tier->sale_price) / $tier->price) * 100);
+                                $tierId = $tier->id;
                                 break;
                             }
-                        }
+                        }*/
                         $isLimitedOffer = $plan->end_date && $plan->end_date->diffInDays(now()) <= 30;
                         $displayPrice = $hasSale ? $salePrice : ($plan->price ?? 0);
                         $letter = strtoupper(substr($plan->name, 0, 1));
                         $detailUrl = url('/press-stack/' . $plan->slug);
                         ?>
                         <article class="plan-card">
-
-                            {{$plan->id}}
-
                             <?php
-                            $hasSale = $plan->getBestSale() !== null;
                             $bestSale = $plan->getBestSale();
+                            $hasSale = !empty($bestSale);
 
-                            $displayPrice = $plan->getLowestEffectivePrice();
+                            $tierPrice = $plan->getLowestEffectivePrice();
+                            $displayPrice = $tierPrice['min'];
+                            $tierId = $tierPrice['tier']->id;
 
                             $salePrice = $bestSale['sale'] ?? null;
                             $originalPrice = $bestSale['original'] ?? null;
@@ -1310,6 +1311,7 @@ $selectedTags = !empty($filters['tags'])
 
                                     <button class="plan-card__btn plan-card__btn--cart"
                                             data-plan-id="<?= $plan->id ?>"
+                                            data-pricing-tier-id="<?= $tierId ?>"
                                             data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
                                             title="Add to cart"
                                             onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
@@ -1408,6 +1410,7 @@ $selectedTags = !empty($filters['tags'])
         }
 
         get total() {
+            console.log(this._data)
             return this._data.total || 0;
         }
 
@@ -1448,13 +1451,17 @@ $selectedTags = !empty($filters['tags'])
          * Add a plan or bundle to the cart.
          * Returns true on success, false on failure.
          */
-        async addItem(type, id, deliveryType) {
+        async addItem(type, id, deliveryType, pricingTierId = null) {
             const endpoint = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle';
             try {
+                const payload = {type, bundle_id: id, plan_id: id, quantity: 1, delivery_type: deliveryType};
+                if (pricingTierId) {
+                    payload.pricing_tier_id = pricingTierId;
+                }
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                    body: JSON.stringify({type, bundle_id: id, plan_id: id, quantity: 1, delivery_type: deliveryType}),
+                    body: JSON.stringify(payload),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -1562,7 +1569,8 @@ $selectedTags = !empty($filters['tags'])
             btn.innerHTML = '⏳';
 
             const deliveryType = btn.dataset.delivery_type;
-            const success = await this.cartService.addItem(type, id, deliveryType);
+            const pricingTierId = btn.dataset.pricingTierId ? parseInt(btn.dataset.pricingTierId) : null;
+            const success = await this.cartService.addItem(type, id, deliveryType, pricingTierId);
 
             btn.classList.remove('is-loading');
 
@@ -2142,7 +2150,7 @@ $selectedTags = !empty($filters['tags'])
                 ? `<div class="plan-card__cover"><img src="${escHtml(coverUrl)}" alt="${escHtml(plan.name)}" loading="lazy"></div>`
                 : `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
 
-            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
+            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" data-pricing-tier-id="${plan.pricing_tier_id || ''}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
         }
 
         _renderPagination(p) {

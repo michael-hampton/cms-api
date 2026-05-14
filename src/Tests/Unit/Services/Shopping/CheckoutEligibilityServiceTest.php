@@ -168,6 +168,33 @@ class CheckoutEligibilityServiceTest extends TestCase
         $this->member->id = 1;
     }
 
+    public function test_gift_items_pass_through_eligibility_even_when_buyer_has_plan(): void
+    {
+        $giftItem = [
+            'subscription_plan_id' => 10,
+            'is_gift' => true,
+            'gift_email' => 'recipient@example.com',
+        ];
+
+        // Uniqueness rule passes it through — it's not a duplicate
+        $this->uniquenessRule->shouldReceive('filterInvalidItems')
+            ->once()
+            ->with([$giftItem])
+            ->andReturn(new EligibilityResult(valid: [$giftItem], removed: []));
+
+        // Eligibility rule also passes it through — gift items skip buyer check
+        $this->subscriptionRule->shouldReceive('filterInvalidItems')
+            ->once()
+            ->with($this->member, [$giftItem])
+            ->andReturn(new EligibilityResult(valid: [$giftItem], removed: []));
+
+        $result = $this->service->validate($this->member, [$giftItem]);
+
+        $this->assertCount(1, $result->valid);
+        $this->assertEmpty($result->removed);
+        $this->assertEquals('recipient@example.com', $result->valid[0]['gift_email']);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

@@ -123,6 +123,7 @@ $apiBase = '/api/' . $site;
         gap: .5rem;
         margin-top: .5rem;
     }
+
     .qty-btn {
         width: 32px;
         height: 32px;
@@ -354,7 +355,7 @@ $apiBase = '/api/' . $site;
                                     <?php
                                     $opts = $item['options'] ?? [];
                                     $deliveryType = $opts['delivery_type'] ?? SubscriptionType::DIGITAL->value;
-                                    $planName = $opts['plan_name'] ?? 'Subscription';
+                                    $planName = $item['plan_name'] ?? ($opts['plan_name'] ?? 'Subscription');
                                     $planId = $item['subscription_plan_id'];
                                     ?>
                                     <div style="width:120px;height:120px;border-radius:.5rem;border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;background:var(--bg-light);position:relative;">
@@ -390,16 +391,30 @@ $apiBase = '/api/' . $site;
                                                 <span style="color:#10b981;font-weight:700;">FREE</span>
                                                 <span style="display:inline-block;background:#d1fae5;color:#065f46;font-size:.75rem;font-weight:600;padding:.2rem .6rem;border-radius:.375rem;border:1px solid #6ee7b7;margin-left:.5rem;">Complimentary</span>
                                             <?php else: ?>
-                                                <span class="sale-price">$<?= number_format((float)$item['price'], 2) ?></span>
+                                                <span class="sale-price">
+                                                    <?= htmlspecialchars($currencySymbol) ?><?= number_format((float)$item['price'], 2) ?>
+                                                </span>
                                             <?php endif; ?>
                                         </div>
+
+                                        <?php if (!empty($item['tier_label'])): ?>
+                                            <div style="font-size:.75rem;color:var(--text-secondary);">
+                                                <?= htmlspecialchars($item['tier_label']) ?>
+                                                <?php if (!empty($item['tier_issue_count'])): ?>
+                                                    &bull; <?= (int)$item['tier_issue_count'] ?> issues
+                                                <?php endif; ?>
+                                                <?php if (!empty($item['tier_duration_months'])): ?>
+                                                    &bull; <?= (int)$item['tier_duration_months'] ?> months
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
 
                                     <div class="item-actions">
                                         <div class="item-subtotal">
                                             <?= $isFreeGift
                                                     ? '<span style="color:#10b981;font-weight:700;">FREE</span>'
-                                                    : '$' . number_format((float)$item['subtotal'], 2) ?>
+                                                    : htmlspecialchars($currencySymbol) . number_format((float)$item['subtotal'], 2) ?>
                                         </div>
                                         <button class="remove-btn" onclick="removeItem(<?= (int)$item['id'] ?>)"
                                                 aria-label="Remove item">
@@ -471,7 +486,9 @@ $apiBase = '/api/' . $site;
                                             <?php if ($isFreeGift): ?>
                                                 <span style="color:#10b981;font-weight:700;font-size:1rem;">FREE</span>
                                             <?php else: ?>
-                                                <span class="sale-price">$<?= number_format((float)$item['price'], 2) ?></span>
+                                                <span class="sale-price">
+                                                    <?= htmlspecialchars($currencySymbol) ?><?= number_format((float)$item['price'], 2) ?>
+                                                </span>
                                             <?php endif; ?>
                                         </div>
                                         <div class="quantity-controls">
@@ -499,7 +516,7 @@ $apiBase = '/api/' . $site;
                                         <div class="item-subtotal">
                                             <?= $isFreeGift
                                                     ? '<span style="color:#10b981;font-weight:700;">FREE</span>'
-                                                    : '$' . number_format((float)$item['subtotal'], 2) ?>
+                                                    : htmlspecialchars($currencySymbol) . number_format((float)$item['subtotal'], 2) ?>
                                         </div>
                                         <button class="remove-btn" onclick="removeItem(<?= (int)$item['id'] ?>)"
                                                 aria-label="Remove item">

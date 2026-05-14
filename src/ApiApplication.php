@@ -22,6 +22,7 @@ use App\Events\Boost\BoostResumedEvent;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Members\CommentPostedByMember;
 use App\Events\Members\MemberAddressImported;
+use App\Events\Members\MemberDetailsChanged;
 use App\Events\Members\MemberPostcodeUpdated;
 use App\Events\Members\OrderCreatedByMember;
 use App\Events\Members\PageLikedByMember;
@@ -109,6 +110,8 @@ use App\Listeners\GiftCreatedListener;
 use App\Listeners\Members\MemberPostcodeUpdatedListener;
 use App\Listeners\Members\RecordMemberEngagementMetric;
 use App\Listeners\Members\SendAccountActivationEmailListener;
+use App\Listeners\Members\SyncMemberToStripeJob;
+use App\Listeners\Members\SyncMemberToStripeListener;
 use App\Listeners\OpenCollab\InvalidateContributorOnboardingListener;
 use App\Listeners\OpenCollab\SendArticleApprovedNotification;
 use App\Listeners\OpenCollab\SendArticleNeedsChangesNotification;
@@ -595,7 +598,7 @@ class ApiApplication
         $eventDispatcher->listen(PaymentSucceeded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentSucceeded']);
         $eventDispatcher->listen(PaymentFailed::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentFailed']);
         $eventDispatcher->listen(PaymentRefunded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentRefunded']);
-
+        $eventDispatcher->listen(MemberDetailsChanged::class, [SyncMemberToStripeListener::class, 'handle']);
 
     }
 }

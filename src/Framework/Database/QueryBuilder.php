@@ -1099,6 +1099,12 @@ class QueryBuilder
         $model->setExists(true);
         $model->original = $model->attributes;
 
+        if (!empty($model->appends)) {
+            foreach ($model->appends as $append) {
+                $model->getAttribute($append);
+            }
+        }
+
         // Set relations
         foreach ($relations as $relationName => $relationData) {
             $model->setRelation($relationName, $relationData);
@@ -1541,7 +1547,7 @@ class QueryBuilder
         $modelClass = $this->getModelClassFromTable($this->table);
 
         if (!$modelClass) {
-            throw new \Exception("No model class found for table: {$this->table}");
+            throw new Exception("No model class found for table: {$this->table}");
         }
 
         $parentModel = new $modelClass(); // This should be Page
@@ -1798,7 +1804,7 @@ class QueryBuilder
 
         $modelClass = $this->getModelClassFromTable($this->table);
         if (!$modelClass) {
-            throw new \Exception("No model class found for table: {$this->table}");
+            throw new Exception("No model class found for table: {$this->table}");
         }
 
         $tempModel = new $modelClass();

@@ -8,6 +8,7 @@ use App\Framework\Support\Logger;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderStateManager;
@@ -29,6 +30,7 @@ class SubscriptionPaymentService
         private readonly PaymentRecorder          $paymentRecorder,
         private readonly SubscriptionStateManager $subscriptionStateManager,
         private readonly OrderStateManager        $orderStateManager,
+        private readonly OrderRepository $orderRepository,
         ?Database                               $database = null
     )
     {
@@ -51,14 +53,22 @@ class SubscriptionPaymentService
             return $stripeResult;
         }
 
-        /**
-         * todo need to get the total from the order as it includes the tax and shipping
-         * <pre>Array
-         * (
-         * [payment_method_id] => pm_1TUSLvGvaZO1S9EXRv73vub6
-         * [order_id] => 124
-         * )
-         */
+        // Prefer the authoritative invoice amount from Stripe (includes Stripe Tax).
+        // Fall back to order total when invoice amount is unavailable (trialing,
+        // requires_action) or zero (free trial first invoice).
+        $invoiceAmountCents = $stripeResult['invoice_amount_cents'] ?? null;
+        $invoiceTaxCents = $stripeResult['invoice_tax_cents'] ?? null;
+
+        $amountCents = null;
+
+        if ($invoiceAmountCents !== null && $invoiceAmountCents > 0) {
+            $amountCents = $invoiceAmountCents;
+        } elseif (!empty($data['order_id'])) {
+            $order = $this->orderRepository->find((int)$data['order_id']);
+            if ($order) {
+                $amountCents = (int)round($order->total * 100);
+            }
+        }
 
         $payment = $this->paymentRecorder->recordSubscriptionStripePayment(
             $subscription,
@@ -70,9 +80,8 @@ class SubscriptionPaymentService
                 'stripe_subscription_id' => $stripeResult['subscription_id'] ?? null,
                 'stripe_customer_id' => $stripeResult['customer_id'] ?? null,
                 'order_id' => $data['order_id'] ?? null,
-                'amount_cents' => isset($data['amount_cents'])
-                    ? (int)$data['amount_cents']
-                    : (isset($data['amount']) ? (int)round(((float)$data['amount']) * 100) : null),
+                'amount_cents' => $amountCents,
+                'invoice_tax_cents' => $invoiceTaxCents,
             ]
         );
 

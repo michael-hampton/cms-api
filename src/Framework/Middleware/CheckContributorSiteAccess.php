@@ -1,0 +1,91 @@
+<?php
+
+namespace App\Framework\Middleware;
+
+use App\Framework\Authorization\Auth;
+use App\Framework\Http\Request;
+use App\Framework\Http\Response;
+use App\Framework\Support\SiteContext;
+use App\Repositories\OpenCollab\UserSiteRepository;
+
+/**
+ * Guards non-admin OpenCollab contributor routes.
+ *
+ * Ensures the authenticated user:
+ *   1. Is logged in (redirects to contributor login otherwise).
+ *   2. Has been granted access to the current site via the user_sites table.
+ *
+ * This is intentionally separate from RequireAdminRole — admin routes
+ * already carry their own middleware, and contributors must not be
+ * implicitly treated as site-admins even if they hold 'agent' role.
+ *
+ * Register in web.php (replaces RequireContributorAuth where site-scoping
+ * is needed):
+ *
+ *   $router->group(['middleware' => [CheckContributorSiteAccess::class]], function ($router) {
+ *       $router->get('/{site}/open-collab/dashboard', [...]);
+ *       ...
+ *   });
+ */
+class CheckContributorSiteAccess
+{
+    public function __construct(
+        private readonly UserSiteRepository $userSiteRepository,
+    )
+    {
+    }
+
+    public function handle(Request $request, callable $next): Response
+    {
+        // 1. Must be authenticated.
+        if (!Auth::check()) {
+            $loginPath = $this->buildLoginPath($request);
+
+            if ($request->wantsJson()) {
+                return Response::json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            return Response::redirect($loginPath);
+        }
+
+        $user = Auth::user();
+        $siteId = (int)SiteContext::getId();
+
+        // 2. Must have explicit access to the current site.
+        if (!$this->userSiteRepository->hasAccess($user->id, $siteId)) {
+            if ($request->wantsJson()) {
+                return Response::json([
+                    'success' => false,
+                    'message' => 'You do not have access to this site.',
+                ], 403);
+            }
+
+            // Redirect back to login with a descriptive error so the
+            // contributor knows why they were rejected rather than seeing
+            // a blank page.
+            $loginPath = $this->buildLoginPath($request);
+            return Response::redirect($loginPath . '?error=no_site_access');
+        }
+
+        return $next($request);
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────
+
+    /**
+     * Build the contributor login URL for the current site slug.
+     *
+     * Falls back to a generic path so the redirect never hard-errors even
+     * if the site context is somehow missing.
+     */
+    private function buildLoginPath(Request $request): string
+    {
+        $site = $request->getSite();
+        $slug = $site?->slug ?? SiteContext::slug() ?? 'open-collab';
+
+        return '/' . $slug . '/open-collab/login';
+    }
+}

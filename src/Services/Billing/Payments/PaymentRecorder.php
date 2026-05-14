@@ -44,6 +44,10 @@ class PaymentRecorder
                 'billing_period' => $plan->billing_period,
                 'stripe_subscription_id' => $paymentData['stripe_subscription_id'],
                 'stripe_customer_id' => $paymentData['stripe_customer_id'],
+                'invoice_tax_cents' => $paymentData['invoice_tax_cents'] ?? null,
+                'invoice_tax' => isset($paymentData['invoice_tax_cents'])
+                    ? $paymentData['invoice_tax_cents'] / 100
+                    : null,
             ],
             'order_id' => $paymentData['order_id'] ?? null,
         ]);

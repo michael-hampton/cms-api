@@ -46,7 +46,7 @@ class SubscriptionPlan extends Model
         'updated_at'
     ];
 
-    protected $appends = [
+    public $appends = [
         'lowest_effective_price'
     ];
 
@@ -170,24 +170,45 @@ class SubscriptionPlan extends Model
         return $this->print_shipping_required;
     }
 
-    public function getLowestEffectivePrice(): float
+    public function getLowestEffectivePrice(): array
     {
         $min = null;
+        $minTier = null;
 
         foreach ($this->pricingTiers as $tier) {
 
             if ($this->hasDigitalOption()) {
                 $price = $tier->getEffectiveDigitalPrice();
-                $min = $min === null ? $price : min($min, $price);
+
+                if ($min === null || $price < $min) {
+                    $min = $price;
+                    $minTier = $tier;
+                }
             }
 
             if ($this->hasPrintOption()) {
                 $price = $tier->getEffectivePrintPrice();
-                $min = $min === null ? $price : min($min, $price);
+
+                if ($min === null || $price < $min) {
+                    $min = $price;
+                    $minTier = $tier;
+                }
             }
         }
 
-        return $min ?? 0;
+        if ($min === null) {
+            return ['min' => null, 'tier' => null];
+        }
+
+        return [
+            'min' => $min,
+            'tier' => $minTier,
+        ];
+    }
+
+    public function getLowestEffectivePriceAttribute()
+    {
+        return $this->getLowestEffectivePrice();
     }
 
     public function getBestSale(): ?array
@@ -220,6 +241,7 @@ class SubscriptionPlan extends Model
                             'original' => $price,
                             'sale' => $sale,
                             'savingPct' => $pct,
+                            'tierId' => $tier->getId(),
                         ];
                     }
                 }

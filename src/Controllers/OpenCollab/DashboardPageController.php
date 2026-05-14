@@ -36,6 +36,7 @@ class DashboardPageController extends Controller
             ],
             'activity' => $this->activityRepository->forContributor($userId, 10),
             'currentUser' => Auth::user(),
+            'site' => SiteContext::slug(),
         ]);
     }
 

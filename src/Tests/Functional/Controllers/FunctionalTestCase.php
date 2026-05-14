@@ -5,6 +5,7 @@ namespace App\Tests\Functional\Controllers;
 use App\ApiApplication;
 use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\MemberAuth;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Http\Response;
 use App\Framework\Http\TestResponse;
@@ -16,26 +17,51 @@ use App\Framework\Session\Session;
 use App\Models\Member;
 use App\Models\Site;
 use App\Models\User;
+use Exception;
+use PDO;
 use PHPUnit\Framework\TestCase;
 
 abstract class FunctionalTestCase extends TestCase
 {
-    protected Database $database;
     protected static array $httpMocks = [];
+    protected Database $database;
     protected ApiApplication $app;
     protected $siteSlug = '';
     protected int $siteId;
     protected ?User $authenticatedUser = null;
     protected ?string $authToken = null;
-    private int $currentUserId;
     protected mixed $authenticatedMemberUser;
+    private int $currentUserId;
     private string $memberAuthToken;
+
+    public static function setUpBeforeClass(): void
+    {
+        // Use test database configuration
+        $testConfig = [
+            'driver' => 'mysql',
+            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
+            'port' => getenv('TEST_DB_PORT') ?: '3306',
+            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
+            'username' => getenv('TEST_DB_USER') ?: 'root',
+            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
+            'charset' => 'utf8mb4',
+        ];
+
+        $database = Database::getInstance($testConfig);
+
+        // Create application with test database
+        new ApiApplication($testConfig, $database);
+
+        $migrationRunner = new MigrationRunner($database, 'migrations');
+        $migrationRunner->run();
+
+    }
 
     protected function setUp(): void
     {
         // Ensure each test starts with a clean container so mocks/bindings from
         // previous tests cannot leak across the suite.
-        \App\Framework\Container::getInstance()->flush();
+        Container::getInstance()->flush();
 
         $this->cleanupServerGlobals();
 
@@ -64,180 +90,6 @@ abstract class FunctionalTestCase extends TestCase
 
         $this->actingAs();
 
-    }
-
-    public static function setUpBeforeClass(): void
-    {
-        // Use test database configuration
-        $testConfig = [
-            'driver' => 'mysql',
-            'host' => getenv('TEST_DB_HOST') ?: '127.0.0.1',
-            'port' => getenv('TEST_DB_PORT') ?: '3306',
-            'database' => getenv('TEST_DB_NAME') ?: 'test_db',
-            'username' => getenv('TEST_DB_USER') ?: 'root',
-            'password' => getenv('TEST_DB_PASS') ?: 'rootsecret',
-            'charset' => 'utf8mb4',
-        ];
-
-        $database = Database::getInstance($testConfig);
-
-        // Create application with test database
-        new ApiApplication($testConfig, $database);
-
-        $migrationRunner = new MigrationRunner($database, 'migrations');
-        $migrationRunner->run();
-
-    }
-
-    protected function ensureSiteExists()
-    {
-        if (!empty($this->siteId) && Site::find($this->siteId)) {
-            return;
-        }
-
-        $sites = Site::all();
-        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
-        $this->siteSlug = $site->slug;
-        $this->siteId = $site->id;
-    }
-
-    protected function actingAsMember(Member $member): void
-    {
-        $this->authenticatedMemberUser = $member;
-        MemberAuth::login($member);
-
-        // Generate a test token (you may need to adjust based on your token generation logic)
-        $this->memberAuthToken = $this->generateTestTokenForMember($member);
-
-        Session::put('member_id', $member->id);
-        Session::put('member_authenticated', true);
-    }
-
-    protected function unauthenticateMember(): void
-    {
-        MemberAuth::$member = null;
-        Session::forget('member_id');
-        Session::forget('member_authenticated');
-    }
-
-    /**
-     * Authenticate as a test user and get token
-     */
-    protected function actingAs(?User $user = null): self
-    {
-        Auth::$user = null;
-
-        if ($user === null) {
-
-            // Create or get a test user
-            $user = User::where('email', 'test@example.com')->first();
-            if (!$user) {
-                //$this->ensureSiteExists();
-                $user = User::create([
-                    'name' => 'Test User',
-                    'email' => 'test@example.com',
-                    'password' => password_hash('password', PASSWORD_DEFAULT),
-                    'site_id' => $this->siteId,
-                    'role' => 'admin',
-                ]);
-            } else {
-                $user = new User($user);
-            }
-        }
-
-        $this->authenticatedUser = $user;
-        Auth::login($user->toArray());
-
-        // Generate a test token (you may need to adjust based on your token generation logic)
-        $this->authToken = $this->generateTestToken($user);
-
-        return $this;
-    }
-
-    private function createUser()
-    {
-
-    }
-
-    /**
-     * Generate a test authentication token
-     */
-    protected function generateTestToken(User $user): string
-    {
-        // Option 1: Use your actual token generation logic
-        // return $user->createToken('test-token');
-
-        // Option 2: Create a simple test token
-        // You'll need a tokens table or similar mechanism
-        $rawToken = bin2hex(random_bytes(32));
-        $hashedToken = hash('sha256', $rawToken);
-
-        // Store token in database (adjust based on your auth implementation)
-        $this->database->query(
-            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
-             VALUES (?, ?, ?, ?, NOW(), ?)",
-            ['App\\Models\\User', $user->id, 'test-token', $hashedToken, $this->siteId]
-        );
-
-        return $rawToken;
-    }
-
-    protected function generateTestTokenForMember(Member $user): string
-    {
-        // Option 1: Use your actual token generation logic
-        // return $user->createToken('test-token');
-
-        // Option 2: Create a simple test token
-        // You'll need a tokens table or similar mechanism
-        $rawToken = bin2hex(random_bytes(32));
-        $hashedToken = hash('sha256', $rawToken);
-
-        // Store token in database (adjust based on your auth implementation)
-        $this->database->query(
-            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
-             VALUES (?, ?, ?, ?, NOW(), ?)",
-            ['App\\Models\\Member', $user->id, 'test-token', $hashedToken, $this->siteId]
-        );
-
-        return $rawToken;
-    }
-
-    /**
-     * Clear authentication
-     */
-    protected function unauthenticate(): self
-    {
-        $this->authenticatedUser = null;
-        Auth::$user = null;
-        $this->authToken = null;
-        Auth::logout();
-        return $this;
-    }
-
-    /**
-     * Get default headers including auth token if set
-     */
-    protected function getDefaultHeaders(array $additionalHeaders = [], bool $forMember = false): array
-    {
-        $headers = $additionalHeaders;
-
-        if ($forMember === true && !empty($this->memberAuthToken)) {
-            $headers['Authorization'] = 'Bearer ' . $this->memberAuthToken;
-        } elseif ($this->authToken) {
-            $headers['Authorization'] = 'Bearer ' . $this->authToken;
-        }
-
-        $headers['X-Site-Id'] = $this->siteId;
-
-        return $headers;
-    }
-
-    protected function tearDown(): void
-    {
-        $this->cleanupDatabase();
-        $this->cleanupServerGlobals();
-        ArrayMailer::clear();
-        parent::tearDown();
     }
 
     /**
@@ -286,225 +138,105 @@ abstract class FunctionalTestCase extends TestCase
         }
     }
 
-    protected function runMigrations(): void
+    protected function ensureSiteExists()
     {
-        $migrationRunner = new MigrationRunner($this->database, 'migrations');
-        $migrationRunner->run();
+        if (!empty($this->siteId) && Site::find($this->siteId)) {
+            return;
+        }
+
+        $sites = Site::all();
+        $site = !$sites->isEmpty() ? $sites->first() : Site::create(['name' => 'Test Site', 'slug' => 'test-site', 'is_default' => true]);
+        $this->siteSlug = $site->slug;
+        $this->siteId = $site->id;
     }
 
-    protected function cleanupDatabase(): void
+    /**
+     * Authenticate as a test user and get token
+     */
+    protected function actingAs(?User $user = null): self
     {
-        try {
-            // Get all tables
-            $stmt = $this->database->query("SHOW TABLES");
-            $tables = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        Auth::$user = null;
 
-            if (empty($tables)) {
-                return;
+        if ($user === null) {
+
+            // Create or get a test user
+            $user = User::where('email', 'test@example.com')->first();
+            if (!$user) {
+                //$this->ensureSiteExists();
+                $user = User::create([
+                    'name' => 'Test User',
+                    'email' => 'test@example.com',
+                    'password' => password_hash('password', PASSWORD_DEFAULT),
+                    'site_id' => $this->siteId,
+                    'role' => 'admin',
+                ]);
+            } else {
+                $user = new User($user);
             }
-
-            // Disable foreign key checks
-            $this->database->query('SET FOREIGN_KEY_CHECKS = 0');
-
-            // Truncate all tables
-            foreach ($tables as $table) {
-
-                if ($table === 'migrations') {
-                    continue;
-                }
-
-                $this->database->query("TRUNCATE TABLE `$table`");
-            }
-
-            // Re-enable foreign key checks
-            $this->database->query('SET FOREIGN_KEY_CHECKS = 1');
-
-            $this->ensureSiteExists();
-
-        } catch (\Exception $e) {
-            // Silently fail on cleanup - tests may have already cleaned up
         }
+
+        $this->authenticatedUser = $user;
+        Auth::login($user->toArray());
+
+        // Generate a test token (you may need to adjust based on your token generation logic)
+        $this->authToken = $this->generateTestToken($user);
+
+        return $this;
     }
 
-    protected function get(string $uri, array $headers = []): Response
+    /**
+     * Generate a test authentication token
+     */
+    protected function generateTestToken(User $user): string
     {
-        return $this->makeRequest('GET', $uri, [], $this->getDefaultHeaders($headers));
-    }
+        // Option 1: Use your actual token generation logic
+        // return $user->createToken('test-token');
 
-    private function generateUrl(string $uri): string
-    {
-        $siteSlug = $this->siteSlug;
+        // Option 2: Create a simple test token
+        // You'll need a tokens table or similar mechanism
+        $rawToken = bin2hex(random_bytes(32));
+        $hashedToken = hash('sha256', $rawToken);
 
-        // Parse URL (works for both absolute and relative URIs)
-        $parsed = parse_url($uri);
-
-        // path fallback: if parse_url returned nothing for path (rare), treat whole uri as path
-        $path = $parsed['path'] ?? $uri;
-        $query = $parsed['query'] ?? '';
-        $fragment = $parsed['fragment'] ?? '';
-
-        // Split into segments but only drop empty strings (preserve "0")
-        $rawSegments = explode('/', trim($path, '/'));
-        $segments = array_values(array_filter($rawSegments, function ($seg) {
-            return $seg !== '';
-        }));
-
-        // Insert site slug after 'api' or prepend
-        if (isset($segments[0]) && $segments[0] === 'api') {
-            array_splice($segments, 1, 0, [$siteSlug]);
-        } else {
-            array_unshift($segments, $siteSlug);
-        }
-
-        $newPath = '/' . implode('/', $segments);
-
-        // Rebuild full URL if original had a scheme/host, otherwise return path-based result
-        if (isset($parsed['scheme']) || isset($parsed['host'])) {
-            $result = '';
-
-            if (isset($parsed['scheme'])) {
-                $result .= $parsed['scheme'] . '://';
-            }
-
-            if (isset($parsed['user'])) {
-                $result .= $parsed['user'];
-                if (isset($parsed['pass'])) {
-                    $result .= ':' . $parsed['pass'];
-                }
-                $result .= '@';
-            }
-
-            $result .= $parsed['host'] ?? '';
-
-            if (isset($parsed['port'])) {
-                $result .= ':' . $parsed['port'];
-            }
-
-            $result .= $newPath;
-        } else {
-            // relative path
-            $result = $newPath;
-        }
-
-        if ($query !== '') {
-            $result .= '?' . $query;
-        }
-        if ($fragment !== '') {
-            $result .= '#' . $fragment;
-        }
-
-        return $result;
-    }
-
-
-    protected function getForSite(string $uri, array $headers = [], bool $forMember = false): Response
-    {
-        return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
-    }
-
-    protected function getForSiteUnauthenticated(string $uri, array $headers = []): Response
-    {
-        return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
-    }
-
-    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false, bool $forMember = false): Response
-    {
-        if (!empty($files)) {
-            $_FILES = $files;
-        }
-
-        if ($productionMode) {
-            $_ENV['APP_ENV'] = 'production';
-        }
-
-        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
-
-        $response = new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
+        // Store token in database (adjust based on your auth implementation)
+        $this->database->query(
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
+             VALUES (?, ?, ?, ?, NOW(), ?)",
+            ['App\\Models\\User', $user->id, 'test-token', $hashedToken, $this->siteId]
         );
 
-        if ($productionMode) {
-            $_ENV['APP_ENV'] = 'testing';
-        }
-
-        return $response;
+        return $rawToken;
     }
 
-    protected function postForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    protected function actingAsMember(Member $member): void
     {
-        $this->unauthenticate();
+        $this->authenticatedMemberUser = $member;
+        MemberAuth::login($member);
 
-        if (!empty($files)) {
-            $_FILES = $files;
-        }
+        // Generate a test token (you may need to adjust based on your token generation logic)
+        $this->memberAuthToken = $this->generateTestTokenForMember($member);
 
-        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $headers, $files);
+        Session::put('member_id', $member->id);
+        Session::put('member_authenticated', true);
+    }
 
-        return new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
+    protected function generateTestTokenForMember(Member $user): string
+    {
+        // Option 1: Use your actual token generation logic
+        // return $user->createToken('test-token');
+
+        // Option 2: Create a simple test token
+        // You'll need a tokens table or similar mechanism
+        $rawToken = bin2hex(random_bytes(32));
+        $hashedToken = hash('sha256', $rawToken);
+
+        // Store token in database (adjust based on your auth implementation)
+        $this->database->query(
+            "INSERT INTO personal_access_tokens (tokenable_type, tokenable_id, name, token, created_at, site_id) 
+             VALUES (?, ?, ?, ?, NOW(), ?)",
+            ['App\\Models\\Member', $user->id, 'test-token', $hashedToken, $this->siteId]
         );
-    }
 
-    protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = [], bool $forMember = false): Response
-    {
-        if (!empty($files)) {
-            $_FILES = $files;
-        }
-        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
-
-        return new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
-        );
-    }
-
-    protected function putForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
-    {
-        if (!empty($files)) {
-            $_FILES = $files;
-        }
-        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $headers, $files);
-
-        return new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
-        );
-    }
-
-    protected function deleteForSite(string $uri, array $headers = [], bool $forMember = false): Response
-    {
-        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
-
-        return new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
-        );
-    }
-
-    protected function deleteForSiteUnauthenticated(string $uri, array $headers = []): Response
-    {
-        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $headers);
-
-        return new TestResponse(
-            $response->getContent(),
-            $response->getStatusCode(),
-            $response->getHeaders()
-        );
-    }
-
-    protected function post(string $uri, array $data = [], array $files = [], array $headers = []): Response
-    {
-        if (!empty($files)) {
-            $_FILES = $files;
-        }
-        return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders($headers), $files);
+        return $rawToken;
     }
 
     protected function put(string $uri, array $data = [], array $files = [], array $headers = []): Response
@@ -513,16 +245,6 @@ abstract class FunctionalTestCase extends TestCase
             $_FILES = $files;
         }
         return $this->makeRequest('PUT', $uri, $data, $this->getDefaultHeaders($headers), $files);
-    }
-
-    protected function patch(string $uri, array $data = [], array $headers = []): Response
-    {
-        return $this->makeRequest('PATCH', $uri, $data, $this->getDefaultHeaders($headers));
-    }
-
-    protected function delete(string $uri, array $data = [], array $headers = []): Response
-    {
-        return $this->makeRequest('DELETE', $uri, $data, $this->getDefaultHeaders($headers));
     }
 
     protected function makeRequest(
@@ -595,6 +317,285 @@ abstract class FunctionalTestCase extends TestCase
         }
     }
 
+    /**
+     * Get default headers including auth token if set
+     */
+    protected function getDefaultHeaders(array $additionalHeaders = [], bool $forMember = false): array
+    {
+        $headers = $additionalHeaders;
+
+        if ($forMember === true && !empty($this->memberAuthToken)) {
+            $headers['Authorization'] = 'Bearer ' . $this->memberAuthToken;
+        } elseif (!empty($this->authToken)) {
+            $headers['Authorization'] = 'Bearer ' . $this->authToken;
+        }
+
+        $headers['X-Site-Id'] = $this->siteId;
+
+        return $headers;
+    }
+
+    protected function unauthenticateMember(): void
+    {
+        MemberAuth::$member = null;
+        Session::forget('member_id');
+        Session::forget('member_authenticated');
+    }
+
+    protected function tearDown(): void
+    {
+        $this->cleanupDatabase();
+        $this->cleanupServerGlobals();
+        ArrayMailer::clear();
+        parent::tearDown();
+    }
+
+    protected function cleanupDatabase(): void
+    {
+        try {
+            // Get all tables
+            $stmt = $this->database->query("SHOW TABLES");
+            $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+            if (empty($tables)) {
+                return;
+            }
+
+            // Disable foreign key checks
+            $this->database->query('SET FOREIGN_KEY_CHECKS = 0');
+
+            // Truncate all tables
+            foreach ($tables as $table) {
+
+                if ($table === 'migrations') {
+                    continue;
+                }
+
+                $this->database->query("TRUNCATE TABLE `$table`");
+            }
+
+            // Re-enable foreign key checks
+            $this->database->query('SET FOREIGN_KEY_CHECKS = 1');
+
+            $this->ensureSiteExists();
+
+        } catch (Exception $e) {
+            // Silently fail on cleanup - tests may have already cleaned up
+        }
+    }
+
+    protected function runMigrations(): void
+    {
+        $migrationRunner = new MigrationRunner($this->database, 'migrations');
+        $migrationRunner->run();
+    }
+
+    protected function get(string $uri, array $headers = []): Response
+    {
+        return $this->makeRequest('GET', $uri, [], $this->getDefaultHeaders($headers));
+    }
+
+    protected function getForSite(string $uri, array $headers = [], bool $forMember = false): Response
+    {
+        return $this->makeRequest('GET', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
+    }
+
+    private function generateUrl(string $uri): string
+    {
+        $siteSlug = $this->siteSlug;
+
+        // Parse URL (works for both absolute and relative URIs)
+        $parsed = parse_url($uri);
+
+        // path fallback: if parse_url returned nothing for path (rare), treat whole uri as path
+        $path = $parsed['path'] ?? $uri;
+        $query = $parsed['query'] ?? '';
+        $fragment = $parsed['fragment'] ?? '';
+
+        // Split into segments but only drop empty strings (preserve "0")
+        $rawSegments = explode('/', trim($path, '/'));
+        $segments = array_values(array_filter($rawSegments, function ($seg) {
+            return $seg !== '';
+        }));
+
+        // Insert site slug after 'api' or prepend
+        if (isset($segments[0]) && $segments[0] === 'api') {
+            array_splice($segments, 1, 0, [$siteSlug]);
+        } else {
+            array_unshift($segments, $siteSlug);
+        }
+
+        $newPath = '/' . implode('/', $segments);
+
+        // Rebuild full URL if original had a scheme/host, otherwise return path-based result
+        if (isset($parsed['scheme']) || isset($parsed['host'])) {
+            $result = '';
+
+            if (isset($parsed['scheme'])) {
+                $result .= $parsed['scheme'] . '://';
+            }
+
+            if (isset($parsed['user'])) {
+                $result .= $parsed['user'];
+                if (isset($parsed['pass'])) {
+                    $result .= ':' . $parsed['pass'];
+                }
+                $result .= '@';
+            }
+
+            $result .= $parsed['host'] ?? '';
+
+            if (isset($parsed['port'])) {
+                $result .= ':' . $parsed['port'];
+            }
+
+            $result .= $newPath;
+        } else {
+            // relative path
+            $result = $newPath;
+        }
+
+        if ($query !== '') {
+            $result .= '?' . $query;
+        }
+        if ($fragment !== '') {
+            $result .= '#' . $fragment;
+        }
+
+        return $result;
+    }
+
+    protected function getForSiteUnauthenticated(string $uri, array $headers = []): Response
+    {
+        return $this->makeRequest('GET', $this->generateUrl($uri), [], $headers);
+    }
+
+    protected function postForSite(string $uri, array $data = [], array $files = [], array $headers = [], $productionMode = false, bool $forMember = false): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+
+        if ($productionMode) {
+            $_ENV['APP_ENV'] = 'production';
+        }
+
+        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
+
+        $response = new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+
+        if ($productionMode) {
+            $_ENV['APP_ENV'] = 'testing';
+        }
+
+        return $response;
+    }
+
+    protected function postForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        $this->unauthenticate();
+
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+
+        $response = $this->makeRequest('POST', $this->generateUrl($uri), $data, $headers, $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    /**
+     * Clear authentication
+     */
+    protected function unauthenticate(): self
+    {
+        $this->authenticatedUser = null;
+        Auth::$user = null;
+        $this->authToken = null;
+        Auth::logout();
+        return $this;
+    }
+
+    protected function putForSite(string $uri, array $data = [], array $files = [], array $headers = [], bool $forMember = false): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $this->getDefaultHeaders($headers, $forMember), $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function putForSiteUnauthenticated(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+
+        $this->cleanupServerGlobals();
+
+        $response = $this->makeRequest('PUT', $this->generateUrl($uri), $data, $headers, $files);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function deleteForSite(string $uri, array $headers = [], bool $forMember = false): Response
+    {
+        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function deleteForSiteUnauthenticated(string $uri, array $headers = []): Response
+    {
+        $this->cleanupServerGlobals();
+
+        $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $headers);
+
+        return new TestResponse(
+            $response->getContent(),
+            $response->getStatusCode(),
+            $response->getHeaders()
+        );
+    }
+
+    protected function post(string $uri, array $data = [], array $files = [], array $headers = []): Response
+    {
+        if (!empty($files)) {
+            $_FILES = $files;
+        }
+        return $this->makeRequest('POST', $uri, $data, $this->getDefaultHeaders($headers), $files);
+    }
+
+    protected function patch(string $uri, array $data = [], array $headers = []): Response
+    {
+        return $this->makeRequest('PATCH', $uri, $data, $this->getDefaultHeaders($headers));
+    }
+
+    protected function delete(string $uri, array $data = [], array $headers = []): Response
+    {
+        return $this->makeRequest('DELETE', $uri, $data, $this->getDefaultHeaders($headers));
+    }
 
     protected function createUploadedFile(string $filename, string $mimeType): array
     {
@@ -615,7 +616,6 @@ abstract class FunctionalTestCase extends TestCase
             'size' => filesize($tmpFile)
         ];
     }
-
 
     protected function assertResponseOk(Response $response): void
     {
@@ -664,14 +664,14 @@ abstract class FunctionalTestCase extends TestCase
         $seeder->run();
     }
 
-    protected function json(string $method, string $uri, array $data = []): Response
-    {
-        return $this->makeRequest($method, $uri, $data, ['Content-Type' => 'application/json']);
-    }
-
     protected function getJson(string $uri): Response
     {
         return $this->json('GET', $uri);
+    }
+
+    protected function json(string $method, string $uri, array $data = []): Response
+    {
+        return $this->makeRequest($method, $uri, $data, ['Content-Type' => 'application/json']);
     }
 
     protected function postJson(string $uri, array $data = []): Response
@@ -734,19 +734,6 @@ abstract class FunctionalTestCase extends TestCase
     }
 
     /**
-     * Assert record does not exist in database
-     */
-    protected function assertDatabaseMissing(string $table, array $attributes): void
-    {
-        $count = $this->countRecords($table, $attributes);
-        $this->assertEquals(
-            0,
-            $count,
-            "Failed asserting that table [{$table}] does not contain record with attributes: " . json_encode($attributes)
-        );
-    }
-
-    /**
      * Count records in a table
      */
     protected function countRecords(string $table, array $where = []): int
@@ -769,6 +756,19 @@ abstract class FunctionalTestCase extends TestCase
 
         $stmt = $this->database->query($sql, $bindings);
         return (int)$stmt->fetch()['count'];
+    }
+
+    /**
+     * Assert record does not exist in database
+     */
+    protected function assertDatabaseMissing(string $table, array $attributes): void
+    {
+        $count = $this->countRecords($table, $attributes);
+        $this->assertEquals(
+            0,
+            $count,
+            "Failed asserting that table [{$table}] does not contain record with attributes: " . json_encode($attributes)
+        );
     }
 
     protected function assertSoftDeleted(string $table, array $attributes): void
@@ -836,7 +836,7 @@ abstract class FunctionalTestCase extends TestCase
 
                 if ($mock === null) {
                     // No mock found, call parent (real request) or throw exception
-                    throw new \Exception("No mock configured for URL: {$url}");
+                    throw new Exception("No mock configured for URL: {$url}");
                 }
 
                 return new HttpClientResponse(
@@ -848,6 +848,11 @@ abstract class FunctionalTestCase extends TestCase
         };
     }
 
+    public static function getHttpMock(string $url): ?array
+    {
+        return self::$httpMocks[$url] ?? null;
+    }
+
     protected function mockHttpResponse(string $url, string $content, int $statusCode = 200, array $headers = []): void
     {
         self::$httpMocks[$url] = [
@@ -855,11 +860,6 @@ abstract class FunctionalTestCase extends TestCase
             'status' => $statusCode,
             'headers' => $headers
         ];
-    }
-
-    public static function getHttpMock(string $url): ?array
-    {
-        return self::$httpMocks[$url] ?? null;
     }
 
     protected function assertObjectHasAttribute(string $attribute, object $object): void
@@ -890,7 +890,7 @@ abstract class FunctionalTestCase extends TestCase
         return true;
     }
 
-    protected function decodeJson(\App\Framework\Http\Response $response)
+    protected function decodeJson(Response $response)
     {
         return json_decode($response->getContent(), true);
     }
@@ -903,6 +903,11 @@ abstract class FunctionalTestCase extends TestCase
             'name' => $name,
             'slug' => strtolower($name),
         ]);
+    }
+
+    private function createUser()
+    {
+
     }
 
 }

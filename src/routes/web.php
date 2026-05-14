@@ -100,6 +100,7 @@ use App\Controllers\Subscription\SubscriptionLinkStepController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Framework\Middleware\AuthenticateCrmPortal;
 use App\Framework\Middleware\AuthenticateMerchantPortal;
+use App\Framework\Middleware\CheckContributorSiteAccess;
 use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireAdminRole;
 use App\Framework\Middleware\RequireContributorAuth;
@@ -615,7 +616,7 @@ $router->group(['middleware' => [RequireAdminRole::class]], function ($router) {
 
 });
 
-$router->group(['middleware' => [RequireContributorAuth::class]], function ($router) {
+$router->group(['middleware' => [RequireContributorAuth::class, CheckContributorSiteAccess::class]], function ($router) {
     $router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show']);
     $router->get('/{site}/open-collab/onboarding/dashboard', [OnboardingDashboardController::class, 'index']);
     $router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index']);
