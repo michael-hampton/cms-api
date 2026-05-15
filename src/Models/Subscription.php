@@ -79,7 +79,9 @@ class Subscription extends Model
         'replaced_by_subscription_id',
         'replacement_reason',
         'carried_over_credit',
-        'renewed_from_subscription_id'
+        'renewed_from_subscription_id',
+        'cancel_at_period_end',
+        'stripe_customer_id'
     ];
 
     protected $casts = [

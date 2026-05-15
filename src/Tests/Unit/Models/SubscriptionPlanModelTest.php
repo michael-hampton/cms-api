@@ -7,9 +7,11 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\IssueDelivery;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Models\SubscriptionPlanRegionSet;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Mockery;
 
 class SubscriptionPlanModelTest extends FunctionalTestCase
 {
@@ -983,6 +985,165 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         ]);
 
         $this->assertTrue($plan->isVisibleToMember(null));
+    }
+
+    public function testGetDefaultLowestEffectivePriceReturnsDefaultTierDigitalPrice(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 0,
+            'site_id' => $this->siteId,
+            'name' => 'Any Plan',
+            'slug' => 'any-plan',
+            'digital_download_url' => 'test'
+        ]);
+
+        $tier = SubscriptionPlanPricing::create([
+            'subscription_plan_id' => $plan->id,
+            'price' => 29.99,
+            'digital_price' => 19.99,
+            'digital_sale_price' => 0,
+            'sale_price' => null,
+            'is_default' => true,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'duration_months' => 12,
+            'issue_count' => 0,
+            'label' => 'test',
+            'period_description' => 'test',
+        ]);
+
+        $plan->setRelation('pricingTiers', collect([$tier]));
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(19.99, $result['min']);
+        $this->assertEquals($tier->id, $result['tier']->id);
+    }
+
+    public function testGetDefaultEffectivePriceFallsBackToPlanPriceWhenNoDefaultTier(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 29.99,
+            'site_id' => $this->siteId,
+            'name' => 'No Tier Plan',
+            'slug' => 'no-tier-plan',
+        ]);
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(29.99, $result['min']);
+        $this->assertNull($result['tier']);
+    }
+
+    public function testGetDefaultEffectivePriceReturnsLowestAcrossDeliveryOptions(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 0,
+            'site_id' => $this->siteId,
+            'name' => 'Mixed Plan',
+            'slug' => 'mixed-plan',
+            'digital_download_url' => 'test',
+            'print_shipping_required' => true,
+        ]);
+
+        $tier = SubscriptionPlanPricing::create([
+            'subscription_plan_id' => $plan->id,
+            'price' => 29.99,
+            'digital_price' => 19.99,
+            'print_price' => 29.99,
+            'is_default' => true,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'duration_months' => 12,
+            'issue_count' => 0,
+            'label' => 'tier',
+            'period_description' => 'tier',
+        ]);
+
+        $plan->load('pricingTiers');
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(19.99, $result['min']);
+    }
+
+    public function testGetDefaultEffectivePriceReturnsOnlyPrintWhenNoDigital(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 0,
+            'site_id' => $this->siteId,
+            'name' => 'Print Only',
+            'slug' => 'print-only',
+            'digital_download_url' => null,
+            'print_shipping_required' => true,
+        ]);
+
+        $tier = SubscriptionPlanPricing::create([
+            'subscription_plan_id' => $plan->id,
+            'price' => 29.99,
+            'print_price' => 29.99,
+            'digital_price' => null,
+            'is_default' => true,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'duration_months' => 12,
+            'issue_count' => 0,
+            'label' => 'tier',
+            'period_description' => 'tier',
+        ]);
+
+        $plan->load('pricingTiers');
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(29.99, $result['min']);
+    }
+
+    public function testGetDefaultEffectivePriceReturnsOnlyDigitalWhenNoPrint(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 0,
+            'site_id' => $this->siteId,
+            'name' => 'Digital Only',
+            'slug' => 'digital-only',
+            'digital_download_url' => 'test',
+            'print_shipping_required' => false,
+        ]);
+
+        $tier = SubscriptionPlanPricing::create([
+            'subscription_plan_id' => $plan->id,
+            'price' => 0,
+            'digital_price' => 19.99,
+            'print_price' => null,
+            'is_default' => true,
+            'site_id' => $this->siteId,
+            'plan_id' => $plan->id,
+            'duration_months' => 12,
+            'issue_count' => 0,
+            'label' => 'tier',
+            'period_description' => 'tier',
+        ]);
+
+        $plan->load('pricingTiers');
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(19.99, $result['min']);
+    }
+
+    public function testGetDefaultEffectivePriceReturnsPlanPriceWhenNoDeliveryOptions(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'price' => 15.00,
+            'site_id' => $this->siteId,
+            'name' => 'Basic Plan',
+            'slug' => 'basic-plan',
+        ]);
+
+        $result = $plan->getDefaultEffectivePrice();
+
+        $this->assertEquals(15.00, $result['min']);
+        $this->assertNull($result['tier']);
     }
 
 }

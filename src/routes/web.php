@@ -306,6 +306,7 @@ $router->post('/{site}/member/consent/accept-banner', [MemberConsentController::
 $router->get('/{site}/member/consent/check/{consentCode}', [MemberConsentController::class, 'checkConsent']);
 $router->get('/api/{siteName}/consent/types/optional', [MemberConsentController::class, 'getOptionalConsentTypes']);
 
+$router->post('/api/stripe/webhook', [\App\Controllers\Webhooks\StripeWebhookController::class, 'handle']);
 
 $router->get('/cart', [CartController::class, 'page']);
 $router->get('/wishlist', [WishlistController::class, 'page']);

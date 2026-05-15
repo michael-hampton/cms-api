@@ -540,9 +540,16 @@
             const data = await res.json();
 
             if (data.success && data.token) {
-                alert(SITE_SLUG)
-                localStorage.setItem(`member_api_token:${SITE_SLUG}`, data.token);
-                window.location.href = `/${SITE_SLUG}/member/dashboard`;
+                alert('mike ' + SITE_SLUG)
+                try {
+                    localStorage.setItem(`member_api_token:${SITE_SLUG}`, data.token);
+
+                    console.log('stored', localStorage.getItem(`member_api_token:${SITE_SLUG}`));
+
+                    window.location.href = `/${SITE_SLUG}/member/dashboard`;
+                } catch (e) {
+                    console.error(e);
+                }
             } else {
                 errorEl.textContent = data.message || 'Invalid credentials. Please try again.';
                 errorEl.style.display = 'flex';

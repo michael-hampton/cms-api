@@ -24,7 +24,10 @@ class Payment extends Model
         'failed_at',
         'created_at',
         'updated_at',
-        'subscription_id'
+        'subscription_id',
+        'stripe_invoice_id',
+        'hosted_invoice_url',
+        'raw_payload'
     ];
 
     protected $casts = [

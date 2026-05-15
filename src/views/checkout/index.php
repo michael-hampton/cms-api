@@ -1059,6 +1059,8 @@ $apiBase = '/api/' . $site;
             const result = await this.api.createRecurringSubscriptionCheckout(data);
             if (!result.success) throw new Error(result.message || 'Checkout failed');
 
+            console.log('result', result)
+
             const subscriptionIds = this.normalizeSubscriptionIds(
                 result.data.subscription_ids || result.data.subscription_id
             );

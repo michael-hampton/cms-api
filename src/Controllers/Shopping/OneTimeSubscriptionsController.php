@@ -8,30 +8,41 @@ use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Subscriptions\PaymentSucceeded;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
+use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
+use App\Models\Member;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
+use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Reviews\ReviewService;
+use App\Services\Shopping\CartMigrationService;
+use App\Services\Shopping\CartPersistenceService;
+use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Shopping\SubscriptionCatalogService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
+use RuntimeException;
 
 class OneTimeSubscriptionsController extends Controller
 {
     public function __construct(
         private readonly OneTimeSubscriptionService         $subscriptionService,
         private readonly OneTimeSubscriptionCheckoutService $checkoutService,
-        private readonly SubscriptionPaymentService $subscriptionPaymentService,
+        private readonly SubscriptionPaymentService         $subscriptionPaymentService,
         private readonly SubscriptionCatalogService         $catalogService,
         private readonly SubscriptionBundleRepository       $bundleRepository,
         private readonly ReviewService                      $reviewService,
         private readonly CurrencyResolver                   $currencyResolver,
-        private readonly OrderRepository $orderRepository,
-        private readonly StripePaymentProcessor     $stripeProcessor
+        private readonly OrderRepository                    $orderRepository,
+        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly CheckoutIdentityService            $identityService,
+        private readonly CartPersistenceService             $cartPersistence,
+        private readonly CartService                        $cartService,
+        private readonly CartMigrationService               $cartMigration,
 
     )
     {
@@ -211,10 +222,62 @@ class OneTimeSubscriptionsController extends Controller
     {
         $data = $request->all();
         $siteId = SiteContext::getId();
+        $member = MemberAuth::getMember();
+
+        if (!$member && !empty($data['email'])) {
+            $email = $data['email'];
+            $sessionId = $this->cartService->getSessionId();
+
+            try {
+                $result = $this->identityService->createAnonymous($email, $siteId, $data);
+                $member = Member::find($result->userId);
+                MemberAuth::login($member);
+
+                // Migrate any session-keyed cart items to the newly created member
+                // so that downstream services can find them by member id.
+                $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
+
+            } catch (RuntimeException $e) {
+                return $this->errorResponse($e->getMessage(), 400);
+            }
+        }
+
+        if (!$member) {
+            return $this->errorResponse('Authentication required', 401);
+        }
+
+        // Persist contact fields that createAnonymous may not have written.
+        // Only fill blanks — never overwrite data already on the member record.
+        $contactUpdates = array_filter([
+            'first_name' => empty($member->first_name) ? ($data['first_name'] ?? null) : null,
+            'last_name' => empty($member->last_name) ? ($data['last_name'] ?? null) : null,
+            'phone' => empty($member->phone) ? ($data['phone'] ?? null) : null,
+        ]);
+
+        if (!empty($contactUpdates)) {
+            $member->fill($contactUpdates);
+            $member->save();
+        }
+
+        $items = $this->cartService->getItems();
+
+        if (!$items) {
+            return $this->errorResponse('No items in cart', 400);
+        }
 
         $result = $this->checkoutService->processCheckout($data, $siteId);
 
-        return $this->jsonResponse($result, $result['success'] ? 200 : 400);
+        $this->clearCheckoutSession();
+        $statusCode = $result['success'] ? 200 : 400;
+        return $this->jsonResponse($result, $statusCode);
+
+    }
+
+    private function clearCheckoutSession(): void
+    {
+        Session::forget('applied_voucher_code');
+        Session::forget('checkout_token');
+        Session::forget('pending_otp_email');
     }
 
     public function confirmPayment(Request $request)

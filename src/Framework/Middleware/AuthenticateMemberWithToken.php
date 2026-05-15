@@ -47,7 +47,7 @@ class AuthenticateMemberWithToken
         }
 
         $member = Member::where('id', $accessToken->getTokenableId())
-            ->where('site_id', $siteId)
+            //->where('site_id', $siteId)
             ->first();
 
         if (!$member || !$member->isActive()) {

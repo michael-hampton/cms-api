@@ -21,7 +21,7 @@ class MemberAuth
             return false;
         }
 
-        $member = Member::findByEmail($email, $siteId);
+        $member = Member::findByEmail($email, null);
 
         if (!$member) {
             return false;

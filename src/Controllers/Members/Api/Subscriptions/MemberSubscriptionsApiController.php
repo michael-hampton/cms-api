@@ -45,7 +45,7 @@ class MemberSubscriptionsApiController extends Controller
         $subscriptionHistory = $this->subscriptionRepository->getSubscriptionHistory($member->id, $siteId);
         $subscriptionSummary = $this->subscriptionService->getSubscriptionSummary($member->id, $siteId);
         $plans = $this->planService->getActivePlansForSite($siteId);
-
+        
         return $this->resourceResponse([
             'success' => true,
             'activeSubscription' => !empty($activeSubscription) ? array_merge(

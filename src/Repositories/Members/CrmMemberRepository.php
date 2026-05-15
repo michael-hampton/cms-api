@@ -13,6 +13,14 @@ use App\Repositories\Repository;
 
 class CrmMemberRepository extends Repository
 {
+    /**
+     * @param string  $search              Legacy broad search (name / email / order number).
+     * @param ?string $orderNumber         Exact / partial order-number search.
+     * @param ?string $lastName            Exact / partial last-name search.
+     * @param ?string $postcode            Exact / partial postcode (zip) search.
+     * @param ?string $email               Exact / partial email search.
+     * @param ?string $phone               Exact / partial phone search.
+     */
     public function searchMembers(
         int     $siteId,
         string  $search = '',
@@ -22,11 +30,16 @@ class CrmMemberRepository extends Repository
         int     $page = 1,
         ?string $country = null,
         ?string $subscriptionStatus = null,
-    ): array
-    {
-        $query = Member::where('site_id', $siteId)
+        ?string $orderNumber = null,
+        ?string $lastName = null,
+        ?string $postcode = null,
+        ?string $email = null,
+        ?string $phone = null,
+    ): array {
+        $query = Member::with(['addresses'])->where('site_id', $siteId)
             ->where('anonymous', false);
 
+        // ── Legacy broad search ───────────────────────────────────────────────
         if (!empty($search)) {
             $orderMemberIds = Order::where('site_id', $siteId)
                 ->where('order_number', 'LIKE', "%{$search}%")
@@ -47,6 +60,40 @@ class CrmMemberRepository extends Repository
             });
         }
 
+        // ── Advanced field-level search ───────────────────────────────────────
+        if (!empty($orderNumber)) {
+            $memberIds = Order::where('site_id', $siteId)
+                ->where('order_number', 'LIKE', "%{$orderNumber}%")
+                ->get()
+                ->pluck('user_id')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            // If no orders match, force zero results for this filter
+            $query->whereIn('id', empty($memberIds) ? [0] : $memberIds);
+        }
+
+        if (!empty($lastName)) {
+            $query->where('last_name', 'LIKE', "%{$lastName}%");
+        }
+
+        if (!empty($email)) {
+            $query->where('email', 'LIKE', "%{$email}%");
+        }
+
+        if (!empty($phone)) {
+            $query->where('phone', 'LIKE', "%{$phone}%");
+        }
+
+        if (!empty($postcode)) {
+            $query->whereExists(
+                $this->buildAddressPostcodeExistsQuery($postcode)
+            );
+        }
+
+        // ── Standard filters ─────────────────────────────────────────────────
         if ($status !== null && $status !== 'all') {
             $query->where('is_active', $status === 'active');
         }
@@ -57,13 +104,9 @@ class CrmMemberRepository extends Repository
             );
         }
 
-        // ── NEW: subscription_status filter ───────────────────────────────
         if ($subscriptionStatus !== null && $subscriptionStatus !== '') {
             $query->whereExists(
-                $this->buildSubscriptionStatusExistsQuery(
-                    $siteId,
-                    $subscriptionStatus
-                )
+                $this->buildSubscriptionStatusExistsQuery($siteId, $subscriptionStatus)
             );
         }
 
@@ -82,19 +125,18 @@ class CrmMemberRepository extends Repository
             ->get();
 
         return [
-            'data' => $members,
-            'total' => $total,
-            'per_page' => $perPage,
+            'data'         => $members,
+            'total'        => $total,
+            'per_page'     => $perPage,
             'current_page' => $page,
-            'last_page' => (int)ceil($total / $perPage),
+            'last_page'    => (int) ceil($total / $perPage),
         ];
     }
 
     private function buildSubscriptionStatusExistsQuery(
         int    $siteId,
         string $subscriptionStatus
-    ): QueryBuilder
-    {
+    ): QueryBuilder {
         return Subscription::query()
             ->selectRaw('1')
             ->whereColumn('subscriptions.member_id', 'members.id')
@@ -109,9 +151,16 @@ class CrmMemberRepository extends Repository
             ->where('addresses.country', $country);
     }
 
+    private function buildAddressPostcodeExistsQuery(string $postcode): QueryBuilder
+    {
+        return Address::query()->selectRaw('1')
+            ->whereColumn('addresses.member_id', 'members.id')
+            ->where('addresses.postcode', 'LIKE', "%{$postcode}%");
+    }
+
     public function findForSite(int $memberId, int $siteId, array $relations = []): ?Member
     {
-        return Member::where('id', $siteId === 0 ? $memberId : $memberId)
+        return Member::where('id', $memberId)
             ->where('site_id', $siteId)
             ->where('anonymous', false)
             ->first();
@@ -149,7 +198,7 @@ class CrmMemberRepository extends Repository
 
         return [
             'count' => (clone $query)->count(),
-            'total' => (float)((clone $query)->sum('total') ?? 0),
+            'total' => (float) ((clone $query)->sum('total') ?? 0),
         ];
     }
 

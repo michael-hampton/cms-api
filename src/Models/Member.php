@@ -58,7 +58,7 @@ class Member extends Model
         'show_badges' => 'boolean'
     ];
 
-    public static function findByEmail(string $email, int $siteId): ?self
+    public static function findByEmail(string $email, ?int $siteId): ?self
     {
         return self::where('email', $email)
             ->when(!empty($siteId), function ($query) use ($siteId) {

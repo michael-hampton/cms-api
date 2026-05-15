@@ -98,7 +98,7 @@ $apiBase = '/api/' . $site;
                          data-plan-id="<?= (int)$plan->id ?>"
                          data-plan-slug="<?= htmlspecialchars($plan->slug) ?>"
                          data-plan-name="<?= htmlspecialchars($plan->name) ?>"
-                         data-plan-price="<?= (float)$plan->price ?>"
+                         data-plan-price="<?= (float)($plan->getLowestEffectivePrice()['min'] ?? $plan->price) ?>"
                          data-plan-currency="<?= htmlspecialchars($plan->currency) ?>"
                          data-plan-period="<?= htmlspecialchars($plan->billing_period) ?>"
                          data-plan-trial="<?= (int)($plan->trial_days ?? 0) ?>"
@@ -118,7 +118,9 @@ $apiBase = '/api/' . $site;
 
                         <div class="sub-plan-price">
                             <span class="sub-price-currency"><?= htmlspecialchars($plan->currency) ?></span>
-                            <span class="sub-price-amount"><?= number_format((float)$plan->price, 2) ?></span>
+                            <span class="sub-price-amount">
+                                <?= number_format((float)($plan->getLowestEffectivePrice()['min'] ?? $plan->price), 2) ?>
+                            </span>
                             <span class="sub-price-period">/<?= $plan->billing_period === 'month' ? 'mo' : 'yr' ?></span>
                         </div>
 
@@ -1509,7 +1511,7 @@ $apiBase = '/api/' . $site;
 
                 const total = plan.trial > 0 ? 0 : Math.max(0, plan.price - discount);
                 document.getElementById('sub-summary-total').textContent = plan.trial > 0
-                    ? 'FREE (then ' + plan.currency + plan.price.toFixed(2) + '/' + (plan.period === 'month' ? 'mo' : 'yr') + ')'
+                    ? 'FREE (then ' + plan.currency + (plan.lowest_effective_price?.min ?? plan).price.toFixed(2) + '/' + (plan.period === 'month' ? 'mo' : 'yr') + ')'
                     : plan.currency + total.toFixed(2);
             }
 

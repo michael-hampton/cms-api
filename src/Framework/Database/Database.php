@@ -523,7 +523,6 @@ class Database
             $this->query($sql, $processedData);
             $insertId = (int)$this->connection->lastInsertId();
 
-            Logger::debug('Record inserted', ['table' => $table, 'insert_id' => $insertId]);
             return $insertId;
 
         } catch (Exception $e) {

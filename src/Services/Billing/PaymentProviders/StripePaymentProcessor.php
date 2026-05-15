@@ -274,8 +274,9 @@ class StripePaymentProcessor
 
             'metadata' => [
                 'subscription_id' => $subscription->id,
-                'plan_id' => $plan->id,
-                'member_id' => $subscription->member_id
+                'plan_id'         => $plan->id,
+                'member_id'       => $subscription->member_id,
+                'site_id'         => $subscription->site_id,
             ],
 
             'expand' => ['latest_invoice.payment_intent'],
@@ -1273,7 +1274,7 @@ class StripePaymentProcessor
         string $paymentIntentId,
         int    $orderId,
         int $siteId,
-            $subscriptionIds = null, // Can be single ID or array of IDs
+               $subscriptionIds = null, // Can be single ID or array of IDs
     ): array
     {
         try {

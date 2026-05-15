@@ -404,6 +404,19 @@ class CartController extends Controller
             return $this->errorResponse('Authentication required', 401);
         }
 
+        // Persist contact fields that createAnonymous may not have written.
+        // Only fill blanks — never overwrite data already on the member record.
+        $contactUpdates = array_filter([
+            'first_name' => empty($member->first_name) ? ($data['first_name'] ?? null) : null,
+            'last_name'  => empty($member->last_name)  ? ($data['last_name']  ?? null) : null,
+            'phone'      => empty($member->phone)      ? ($data['phone']      ?? null) : null,
+        ]);
+
+        if (!empty($contactUpdates)) {
+            $member->fill($contactUpdates);
+            $member->save();
+        }
+
         $items = $this->cartService->getItems();
 
         if (!$items) {

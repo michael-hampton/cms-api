@@ -47,7 +47,8 @@ class SubscriptionPlan extends Model
     ];
 
     public $appends = [
-        'lowest_effective_price'
+        'lowest_effective_price',
+        'default_lowest_effective_price',
     ];
 
     protected $casts = [
@@ -167,11 +168,19 @@ class SubscriptionPlan extends Model
 
     public function hasPrintOption(): bool
     {
-        return $this->print_shipping_required;
+        return $this->print_shipping_required ?? false;
     }
 
     public function getLowestEffectivePrice(): array
     {
+        // 1. Try default-based logic first (new source of truth)
+        $default = $this->getDefaultEffectivePrice();
+
+        if ($default['tier']) {
+            return $default;
+        }
+
+        // 2. Fallback to legacy cheapest logic
         $min = null;
         $minTier = null;
 
@@ -196,14 +205,51 @@ class SubscriptionPlan extends Model
             }
         }
 
-        if ($min === null) {
-            return ['min' => null, 'tier' => null];
+        return [
+            'min'  => $min,
+            'tier' => $minTier,
+        ];
+    }
+
+    public function getDefaultEffectivePrice(): array
+    {
+        $defaultTier = $this->pricingTiers()
+            ->where('is_default', true)
+            ->first();
+
+        if (!$defaultTier) {
+            return [
+                'min'  => $this->price,
+                'tier' => null,
+            ];
+        }
+
+        $candidates = [];
+
+        if ($this->hasDigitalOption()) {
+            $candidates[] = $defaultTier->getEffectiveDigitalPrice();
+        }
+
+        if ($this->hasPrintOption()) {
+            $candidates[] = $defaultTier->getEffectivePrintPrice();
+        }
+
+        if (!$candidates) {
+            return [
+                'min'  => $this->price,
+                'tier' => null,
+            ];
         }
 
         return [
-            'min' => $min,
-            'tier' => $minTier,
+            'min'  => min($candidates),
+            'tier' => $defaultTier,
         ];
+    }
+
+    public function getDefaultLowestEffectivePriceAttribute(): array
+    {
+        return $this->getDefaultEffectivePrice();
     }
 
     public function getLowestEffectivePriceAttribute()

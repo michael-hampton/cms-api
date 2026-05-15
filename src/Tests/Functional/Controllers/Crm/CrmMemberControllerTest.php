@@ -72,6 +72,145 @@ class CrmMemberControllerTest extends FunctionalTestCase
         $this->assertStringNotContainsString('other-member@example.com', $content);
     }
 
+    public function test_index_advanced_search_by_order_number(): void
+    {
+        $target = $this->createMember(['first_name' => 'OrderTarget', 'email' => 'ordertarget@example.com', 'anonymous' => false]);
+        $other  = $this->createMember(['first_name' => 'OrderOther',  'email' => 'orderother@example.com',  'anonymous' => false]);
+
+        $this->createOrder(['user_id' => $target->id, 'site_id' => $this->siteId, 'order_number' => 'ADV-77777']);
+        $this->createOrder(['user_id' => $other->id,  'site_id' => $this->siteId, 'order_number' => 'ADV-88888']);
+
+        $response = $this->getForSite('/api/crm/members?order_number=77777');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('ordertarget@example.com', $content);
+        $this->assertStringNotContainsString('orderother@example.com', $content);
+    }
+
+    public function test_index_advanced_search_by_order_number_returns_empty_when_no_match(): void
+    {
+        $this->createMember(['first_name' => 'SomeMember', 'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?order_number=DOESNOTEXIST999');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(0, $data['items']);
+    }
+
+    public function test_index_advanced_search_by_last_name(): void
+    {
+        $this->createMember(['first_name' => 'Jane', 'last_name' => 'Findme',  'anonymous' => false]);
+        $this->createMember(['first_name' => 'John', 'last_name' => 'Hideme',  'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?last_name=Findme');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('Findme', $content);
+        $this->assertStringNotContainsString('Hideme', $content);
+    }
+
+    public function test_index_advanced_search_by_last_name_is_partial(): void
+    {
+        $this->createMember(['first_name' => 'Alice', 'last_name' => 'Smithwick', 'anonymous' => false]);
+        $this->createMember(['first_name' => 'Bob',   'last_name' => 'Jones',     'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?last_name=Smith');
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('Smithwick', $content);
+        $this->assertStringNotContainsString('Jones', $content);
+    }
+
+    public function test_index_advanced_search_by_email(): void
+    {
+        $this->createMember(['first_name' => 'EmailTarget', 'email' => 'findme@domain.com',  'anonymous' => false]);
+        $this->createMember(['first_name' => 'EmailOther',  'email' => 'hideme@domain.com',  'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?email=findme');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('findme@domain.com', $content);
+        $this->assertStringNotContainsString('hideme@domain.com', $content);
+    }
+
+    public function test_index_advanced_search_by_phone(): void
+    {
+        $this->createMember(['first_name' => 'PhoneTarget', 'phone' => '+447700900001', 'anonymous' => false]);
+        $this->createMember(['first_name' => 'PhoneOther',  'phone' => '+447700900002', 'anonymous' => false]);
+
+        $response = $this->getForSite('/api/crm/members?phone=900001');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('PhoneTarget', $content);
+        $this->assertStringNotContainsString('PhoneOther', $content);
+    }
+
+    public function test_index_advanced_search_by_postcode(): void
+    {
+        $target = $this->createMember(['first_name' => 'ZipTarget', 'anonymous' => false]);
+        $other  = $this->createMember(['first_name' => 'ZipOther',  'anonymous' => false]);
+
+        $this->createAddress(['member_id' => $target->id, 'postcode' => 'SW1A 1AA']);
+        $this->createAddress(['member_id' => $other->id,  'postcode' => 'EC1A 1BB']);
+
+        $response = $this->getForSite('/api/crm/members?postcode=SW1A');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('ZipTarget', $content);
+        $this->assertStringNotContainsString('ZipOther', $content);
+    }
+
+    public function test_index_advanced_search_by_postcode_is_partial(): void
+    {
+        $target = $this->createMember(['first_name' => 'PartialZip', 'anonymous' => false]);
+        $this->createAddress(['member_id' => $target->id, 'postcode' => 'SW1A 2BB']);
+
+        $response = $this->getForSite('/api/crm/members?postcode=SW1A');
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('PartialZip', $content);
+    }
+
+    public function test_index_advanced_search_fields_can_be_combined(): void
+    {
+        $target = $this->createMember(['first_name' => 'CombineTarget', 'last_name' => 'Findme', 'email' => 'combo@example.com', 'anonymous' => false]);
+        $other  = $this->createMember(['first_name' => 'CombineOther',  'last_name' => 'Findme', 'email' => 'other@example.com',  'anonymous' => false]);
+
+        // Both share the last_name but only target has the matching email
+        $response = $this->getForSite('/api/crm/members?last_name=Findme&email=combo');
+
+        $this->assertResponseStatus(200, $response);
+
+        $content = $response->getContent();
+        $this->assertStringContainsString('combo@example.com', $content);
+        $this->assertStringNotContainsString('other@example.com', $content);
+    }
+
+    public function test_index_advanced_search_ignores_empty_fields(): void
+    {
+        $this->createMember(['first_name' => 'AlwaysVisible', 'anonymous' => false]);
+
+        // All advanced params are empty strings — should behave like no filter
+        $response = $this->getForSite('/api/crm/members?last_name=&email=&phone=&postcode=&order_number=');
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertNotEmpty($data['items']);
+    }
+
     public function test_index_filters_by_status_active(): void
     {
         $this->createMember(['first_name' => 'ActiveMember', 'is_active' => true]);

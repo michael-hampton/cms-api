@@ -1206,7 +1206,7 @@
         _infoRows(sub) {
             const rows = [
                 infoRow('Status', badge('Active', 'success')),
-                infoRow('Price', fmt(sub.price, sub.currency)),
+                infoRow('Price', fmt(sub.lowest_effective_price?.min ?? sub.price, sub.currency)),
                 infoRow('Start Date', UI.formatDate(sub.start_date)),
             ];
 
@@ -1578,7 +1578,7 @@
                                     fontSize: '24px',
                                     color: '#667eea'
                                 }
-                            }, [fmt(plan.price, plan.currency)]),
+                            }, [fmt(plan.lowest_effective_price?.min ?? plan.price, plan.currency)]),
                             UI.el('div', {style: {fontSize: '12px', color: '#64748b', fontWeight: '600'}},
                                 [`per ${plan.billing_period_label ?? 'period'}`]),
                         ]),
@@ -1685,7 +1685,7 @@
                     )]),
                     UI.el('td', {}, [UI.formatDate(sub.start_date)]),
                     UI.el('td', {}, [sub.end_date ? UI.formatDate(sub.end_date) : '—']),
-                    UI.el('td', {style: {fontWeight: '600'}}, [fmt(sub.price, sub.currency)]),
+                    UI.el('td', {style: {fontWeight: '600'}}, [fmt(sub.lowest_efective_price?.min ?? sub.price, sub.currency)]),
                 ])
             ));
 

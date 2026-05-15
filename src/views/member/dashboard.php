@@ -2988,8 +2988,9 @@
 
         async _load() {
             try {
-                const token = getMemberApiToken?.() ?? null;
-                const headers = token ? {Authorization: `Bearer ${token}`} : {};
+                 const token = getMemberApiToken?.() ?? null;
+
+                 const headers = token ? {Authorization: `Bearer ${token}`} : {};
 
                 const [overviewRes, activityRes, discoveryRes, newslettersRes, rewardsRes, subscriptionsRes, statsRes] = await Promise.all([
                     fetch(`/api/${this.siteSlug}/member/dashboard/overview`, {headers}),

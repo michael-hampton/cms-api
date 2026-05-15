@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // -----------------------------
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
+
 $data   = json_decode(file_get_contents('php://input'), true) ?: [];
 $queryParams = $_GET;
 $data = array_merge($queryParams, $data); // include query parameters
@@ -41,6 +42,8 @@ try {
     $response->send();
     exit;
 } catch (Throwable $e) {
+
+    file_put_contents(__DIR__.'/hit.log', 'mike', FILE_APPEND);
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([
