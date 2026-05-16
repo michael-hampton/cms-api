@@ -54,8 +54,6 @@ class StripeWebhookService
         // ── 3. Route to handler ──────────────────────────────────────────────
         $handlerClass = self::HANDLERS[$event->type] ?? null;
 
-        file_put_contents(__DIR__.'/hit.log','good1', FILE_APPEND);
-
         if ($handlerClass === null) {
             $webhookEvent->status = 'ignored';
             $webhookEvent->save();

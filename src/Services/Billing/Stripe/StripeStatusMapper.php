@@ -2,28 +2,29 @@
 
 namespace App\Services\Billing\Stripe;
 
+use App\Enums\Subscriptions\SubscriptionStatus;
+
 /**
- * Maps Stripe subscription/invoice statuses to internal values.
+ * Maps Stripe subscription/invoice statuses to internal SubscriptionStatus values.
  *
- * Centralising the mapping here means action classes never contain raw
- * string literals and the mapping is easy to extend.
+ * Rules:
+ * - trialing is preserved as its own status (not collapsed into active)
+ * - past_due is preserved for payment retry logic
+ * - Everything else maps to a safe fallback
  */
 class StripeStatusMapper
 {
-    /**
-     * Map a Stripe subscription status to our local SubscriptionStatus value.
-     *
-     * Stripe statuses: active | trialing | past_due | canceled | unpaid |
-     *                  incomplete | incomplete_expired | paused
-     */
     public static function subscriptionStatus(string $stripeStatus): string
     {
         return match ($stripeStatus) {
-            'active', 'trialing'           => 'active',
-            'past_due'                     => 'past_due',
-            'canceled', 'incomplete_expired' => 'cancelled',
-            'unpaid'                       => 'unpaid',
-            default                        => 'canceled',
+            'active'               => SubscriptionStatus::ACTIVE->value,
+            'trialing'             => SubscriptionStatus::TRIALING->value,
+            'past_due'             => SubscriptionStatus::PAST_DUE->value,
+            'canceled',
+            'incomplete_expired'   => SubscriptionStatus::CANCELLED->value,
+            'unpaid'               => SubscriptionStatus::UNPAID->value,
+            'incomplete'           => SubscriptionStatus::INCOMPLETE->value,
+            default                => SubscriptionStatus::CANCELLED->value,
         };
     }
 }

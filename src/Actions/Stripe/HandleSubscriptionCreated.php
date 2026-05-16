@@ -50,6 +50,9 @@ class HandleSubscriptionCreated
                 'plan_name'               => $planName,
                 'stripe_customer_id'      => $stripeSub->customer,
                 'payment_subscription_id' => $stripeSub->id,
+                'stripe_schedule_id' => $stripeSub->schedule
+                    ? (is_string($stripeSub->schedule) ? $stripeSub->schedule : $stripeSub->schedule->id)
+                    : null,
                 'status'                  => StripeStatusMapper::subscriptionStatus($stripeSub->status),
                 'current_period_start'    => $stripeSub->current_period_start
                     ? date('Y-m-d H:i:s', $stripeSub->current_period_start)

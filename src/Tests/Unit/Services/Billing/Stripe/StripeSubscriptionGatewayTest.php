@@ -1,0 +1,171 @@
+<?php
+
+namespace App\Tests\Unit\Services\Billing\Stripe;
+
+use App\DTO\Stripe\CreateStripeSubscriptionDto;
+use App\DTO\Stripe\StripeSubscriptionResultDto;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use Mockery as m;
+use PHPUnit\Framework\TestCase;
+use Stripe\Collection;
+use Stripe\Invoice;
+use Stripe\PaymentIntent;
+use Stripe\Service\SubscriptionService;
+use Stripe\Subscription;
+use Stripe\StripeClient;
+
+class StripeSubscriptionGatewayTest extends TestCase
+{
+    private StripeClient            $stripeClient;
+    private SubscriptionService     $subscriptions;
+    private StripeSubscriptionGateway $gateway;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->subscriptions = m::mock(SubscriptionService::class);
+
+        $this->stripeClient = m::mock(StripeClient::class)->makePartial();
+        $this->stripeClient->subscriptions = $this->subscriptions;
+
+        $this->gateway = new StripeSubscriptionGateway($this->stripeClient);
+    }
+
+    protected function tearDown(): void
+    {
+        m::close();
+        parent::tearDown();
+    }
+
+    public function test_create_calls_stripe_with_correct_payload(): void
+    {
+        $dto = $this->makeDto();
+
+        $this->subscriptions
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(function (array $params) {
+                return $params['customer']          === 'cus_test'
+                    && $params['items'][0]['price']  === 'price_test'
+                    && $params['metadata']['plan_id'] === 1
+                    && !isset($params['trial_period_days']);
+            }))
+            ->andReturn($this->makeStripeSubscription('active'));
+
+        $result = $this->gateway->create($dto);
+
+        $this->assertInstanceOf(StripeSubscriptionResultDto::class, $result);
+        $this->assertSame('sub_test', $result->stripeSubscriptionId);
+        $this->assertSame('active', $result->status);
+        $this->assertNull($result->stripeScheduleId);
+    }
+
+    public function test_create_with_trial_includes_trial_period_days(): void
+    {
+        $dto = $this->makeDto(trialDays: 14);
+
+        $this->subscriptions
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(fn (array $p) => $p['trial_period_days'] === 14))
+            ->andReturn($this->makeStripeSubscription('trialing'));
+
+        $result = $this->gateway->createWithTrial($dto);
+
+        $this->assertSame('trialing', $result->status);
+    }
+
+    public function test_create_with_trial_throws_when_trial_days_null(): void
+    {
+        $dto = $this->makeDto(trialDays: null);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('createWithTrial requires a trialDays value');
+
+        $this->gateway->createWithTrial($dto);
+    }
+
+    public function test_create_with_trial_throws_when_trial_days_zero(): void
+    {
+        $dto = $this->makeDto(trialDays: 0);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->gateway->createWithTrial($dto);
+    }
+
+    public function test_create_maps_requires_action_from_payment_intent(): void
+    {
+        $dto = $this->makeDto();
+
+        $this->subscriptions
+            ->shouldReceive('create')
+            ->once()
+            ->andReturn($this->makeStripeSubscription('active', requiresAction: true));
+
+        $result = $this->gateway->create($dto);
+
+        $this->assertTrue($result->requiresAction);
+        $this->assertNotNull($result->paymentIntentClientSecret);
+    }
+
+    public function test_create_wraps_stripe_api_exception(): void
+    {
+        $dto = $this->makeDto();
+
+        $this->subscriptions
+            ->shouldReceive('create')
+            ->andThrow(
+                new \Stripe\Exception\CardException(
+                    'card_declined',
+                    null
+                )
+            );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Stripe subscription creation failed');
+
+        $this->gateway->create($dto);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private function makeDto(?int $trialDays = null): CreateStripeSubscriptionDto
+    {
+        return new CreateStripeSubscriptionDto(
+            stripeCustomerId: 'cus_test',
+            stripePriceId:    'price_test',
+            subscriptionId:   1,
+            planId:           1,
+            memberId:         1,
+            siteId:           1,
+            trialDays:        $trialDays,
+        );
+    }
+
+    private function makeStripeSubscription(
+        string $status,
+        bool $requiresAction = false,
+    ): Subscription {
+        $paymentIntent = PaymentIntent::constructFrom([
+            'id' => 'pi_test',
+            'status' => $requiresAction ? 'requires_action' : 'succeeded',
+            'client_secret' => $requiresAction ? 'secret_test' : null,
+        ]);
+
+        $invoice = Invoice::constructFrom([
+            'id' => 'in_test',
+            'payment_intent' => $paymentIntent,
+        ]);
+
+        return Subscription::constructFrom([
+            'id' => 'sub_test',
+            'status' => $status,
+            'customer' => 'cus_test',
+            'current_period_start' => time(),
+            'current_period_end' => time() + 2592000,
+            'latest_invoice' => $invoice,
+        ]);
+    }
+}

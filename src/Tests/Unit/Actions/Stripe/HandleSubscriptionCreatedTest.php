@@ -152,7 +152,7 @@ class HandleSubscriptionCreatedTest extends FunctionalTestCase
 
         $this->assertDatabaseHas('subscriptions', [
             'payment_subscription_id' => 'sub_trial',
-            'status'                 => 'active',
+            'status'                 => 'trialing',
         ]);
     }
 

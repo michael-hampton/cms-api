@@ -81,7 +81,8 @@ class Subscription extends Model
         'carried_over_credit',
         'renewed_from_subscription_id',
         'cancel_at_period_end',
-        'stripe_customer_id'
+        'stripe_customer_id',
+        'stripe_schedule_id'
     ];
 
     protected $casts = [
@@ -116,6 +117,8 @@ class Subscription extends Model
 
     public function isActive(): bool
     {
+        // isActive() is intentionally strict — only ACTIVE, not trialing or grace.
+        // Use SubscriptionStatus::isEntitled() for access decisions.
         if ($this->status !== SubscriptionStatus::ACTIVE->value) {
             return false;
         }
@@ -640,14 +643,11 @@ class Subscription extends Model
             return false;
         }
 
-        $allowedStates = ['active', 'grace_period', 'retrying'];
-
-        // Trialing subscriptions also get newsletter access
         if ($this->isTrialing()) {
             return true;
         }
 
-        if (!in_array($this->status, $allowedStates)) {
+        if (!SubscriptionStatus::isEntitled($this->status)) {
             return false;
         }
 
@@ -657,7 +657,7 @@ class Subscription extends Model
             return false;
         }
 
-        if (in_array($this->status, ['grace_period', 'retrying'])) {
+        if (in_array($this->status, [SubscriptionStatus::GRACE_PERIOD->value], true)) {
             if ($this->end_date && $this->end_date < $now) {
                 return false;
             }

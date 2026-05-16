@@ -2,10 +2,20 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Stripe\CreateStripeSubscriptionDto;
+use App\DTO\Stripe\CreateStripeSubscriptionScheduleDto;
+use App\DTO\Stripe\StripeSubscriptionResultDto;
+use App\DTO\Subscriptions\SubscriptionPricingStrategyData;
+use App\Enums\Subscriptions\SubscriptionStrategyType;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
+use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
 use App\Services\Subscriptions\SubscriptionBillingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -16,6 +26,10 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
     private $stripeProcessor;
     private $databaseMock;
     private SubscriptionBillingService $service;
+
+    private SubscriptionPricingStrategyResolver        $strategyResolver;
+    private StripeSubscriptionGatewayInterface         $subscriptionGateway;
+    private StripeSubscriptionScheduleGatewayInterface $scheduleGateway;
 
     public function test_update_billing_date_throws_exception_when_subscription_not_found(): void
     {
@@ -310,11 +324,225 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
         $this->databaseMock = m::mock(Database::class);
+        $this->strategyResolver    = m::mock(SubscriptionPricingStrategyResolver::class);
+        $this->subscriptionGateway = m::mock(StripeSubscriptionGatewayInterface::class);
+        $this->scheduleGateway     = m::mock(StripeSubscriptionScheduleGatewayInterface::class);
 
         $this->service = new SubscriptionBillingService(
             $this->subscriptionRepository,
             $this->stripeProcessor,
-            $this->databaseMock
+            $this->databaseMock,
+            $this->strategyResolver,
+            $this->subscriptionGateway,
+            $this->scheduleGateway,
+        );
+    }
+
+    // ── STANDARD ─────────────────────────────────────────────────────────────
+
+    public function test_standard_strategy_calls_subscription_gateway_create(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(stripePriceId: 'price_std');
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->with($pricing)
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::STANDARD));
+
+        $this->subscriptionGateway
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(fn (CreateStripeSubscriptionDto $dto) =>
+                $dto->stripePriceId    === 'price_std'
+                && $dto->stripeCustomerId === 'cus_test'
+                && $dto->trialDays        === null
+            ))
+            ->andReturn($this->makeResult());
+
+        $this->scheduleGateway->shouldNotReceive('create');
+
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+
+        $this->assertSame('sub_test', $result->stripeSubscriptionId);
+    }
+
+    // ── TRIAL ─────────────────────────────────────────────────────────────────
+
+    public function test_trial_strategy_calls_create_with_trial_and_passes_trial_days(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(stripePriceId: 'price_std');
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::TRIAL, trialDays: 14));
+
+        $this->subscriptionGateway
+            ->shouldReceive('createWithTrial')
+            ->once()
+            ->with(m::on(fn (CreateStripeSubscriptionDto $dto) =>
+                $dto->stripePriceId === 'price_std'
+                && $dto->trialDays  === 14
+            ))
+            ->andReturn($this->makeResult('trialing'));
+
+        $this->subscriptionGateway->shouldNotReceive('create');
+        $this->scheduleGateway->shouldNotReceive('create');
+
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+
+        $this->assertSame('trialing', $result->status);
+    }
+
+    // ── INTRO ─────────────────────────────────────────────────────────────────
+
+    public function test_intro_strategy_calls_schedule_gateway_with_both_price_ids(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(
+            stripePriceId:      'price_std',
+            stripeIntroPriceId: 'price_intro',
+            introCycles:        1,
+        );
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::INTRO));
+
+        $this->scheduleGateway
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(fn (CreateStripeSubscriptionScheduleDto $dto) =>
+                $dto->recurringPriceId === 'price_std'
+                && $dto->introPriceId  === 'price_intro'
+                && $dto->introCycles   === 1
+                && $dto->trialDays     === null
+            ))
+            ->andReturn($this->makeResult(scheduleId: 'sched_test'));
+
+        $this->subscriptionGateway->shouldNotReceive('create');
+        $this->subscriptionGateway->shouldNotReceive('createWithTrial');
+
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+
+        $this->assertSame('sched_test', $result->stripeScheduleId);
+    }
+
+    // ── TRIAL_INTRO ───────────────────────────────────────────────────────────
+
+    public function test_trial_intro_strategy_calls_schedule_gateway_with_trial_days(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(
+            stripePriceId:      'price_std',
+            stripeIntroPriceId: 'price_intro',
+            introCycles:        3,
+        );
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::TRIAL_INTRO, trialDays: 7));
+
+        $this->scheduleGateway
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(fn (CreateStripeSubscriptionScheduleDto $dto) =>
+                $dto->trialDays    === 7
+                && $dto->introCycles === 3
+            ))
+            ->andReturn($this->makeResult(scheduleId: 'sched_test'));
+
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+
+        $this->assertSame('sched_test', $result->stripeScheduleId);
+    }
+
+    // ── Missing price ID guards ───────────────────────────────────────────────
+
+    public function test_throws_when_stripe_price_id_missing_for_standard(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(stripePriceId: null);
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::STANDARD));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('no stripe_price_id');
+
+        $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+    }
+
+    public function test_throws_when_stripe_intro_price_id_missing_for_intro(): void
+    {
+        [$subscription, $plan, $pricing] = $this->makeModels(
+            stripePriceId:      'price_std',
+            stripeIntroPriceId: null,   // not synced yet
+            introCycles:        1,
+        );
+
+        $this->strategyResolver
+            ->shouldReceive('resolve')
+            ->andReturn($this->makeStrategy(SubscriptionStrategyType::INTRO));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('no stripe_intro_price_id');
+
+        $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+    }
+
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function makeModels(
+        ?string $stripePriceId      = 'price_std',
+        ?string $stripeIntroPriceId = null,
+        ?int    $introCycles        = null,
+    ): array {
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id        = 1;
+        $subscription->plan_id   = 1;
+        $subscription->member_id = 1;
+        $subscription->site_id   = 1;
+
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+
+        $pricing = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $pricing->id                    = 1;
+        $pricing->stripe_price_id       = $stripePriceId;
+        $pricing->stripe_intro_price_id = $stripeIntroPriceId;
+        $pricing->intro_cycles          = $introCycles;
+
+        return [$subscription, $plan, $pricing];
+    }
+
+    private function makeStrategy(
+        SubscriptionStrategyType $type,
+        ?int                     $trialDays = null,
+    ): SubscriptionPricingStrategyData {
+        return new SubscriptionPricingStrategyData(
+            type:            $type,
+            hasTrial:        $trialDays !== null,
+            trialDays:       $trialDays,
+            hasIntroPricing: in_array($type, [SubscriptionStrategyType::INTRO, SubscriptionStrategyType::TRIAL_INTRO]),
+            introPrice:      null,
+            introCycles:     null,
+        );
+    }
+
+    private function makeResult(
+        string  $status     = 'active',
+        ?string $scheduleId = null,
+    ): StripeSubscriptionResultDto {
+        return new StripeSubscriptionResultDto(
+            stripeSubscriptionId:      'sub_test',
+            stripeScheduleId:          $scheduleId,
+            status:                    $status,
+            stripeCustomerId:          'cus_test',
+            currentPeriodStart:        time(),
+            currentPeriodEnd:          time() + 2592000,
+            latestInvoiceId:           'in_test',
+            paymentIntentId:           'pi_test',
+            paymentIntentClientSecret: null,
+            requiresAction:            false,
         );
     }
 

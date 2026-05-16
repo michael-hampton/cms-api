@@ -23,7 +23,11 @@ class SubscriptionPlanPricing extends Model
         'currency',
         'stripe_price_id',
         'replaced_by_price_id',
-        'site_id'
+        'site_id',
+        'trial_days',
+        'intro_price',
+        'intro_cycles',
+        'stripe_intro_price_id'
     ];
 
     protected $casts = [
@@ -38,6 +42,8 @@ class SubscriptionPlanPricing extends Model
         'is_default' => 'boolean',
         'is_active' => 'boolean',
         'replaced_by_price_id' => 'integer',
+        'trial_days'   => 'integer',
+        'intro_cycles' => 'integer',
     ];
 
     public function plan()
@@ -124,5 +130,17 @@ class SubscriptionPlanPricing extends Model
         return $type === 'print'
             ? $this->getEffectivePrintPrice()
             : $this->getEffectiveDigitalPrice();
+    }
+
+    public function hasTrial(): bool
+    {
+        return $this->trial_days !== null && $this->trial_days > 0;
+    }
+
+    public function hasIntroPricing(): bool
+    {
+        return $this->intro_price !== null
+            && $this->intro_cycles !== null
+            && $this->intro_cycles > 0;
     }
 }

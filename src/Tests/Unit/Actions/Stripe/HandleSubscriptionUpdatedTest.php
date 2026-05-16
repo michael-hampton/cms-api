@@ -65,7 +65,7 @@ class HandleSubscriptionUpdatedTest extends FunctionalTestCase
 
         $subscription->refresh();
 
-        $this->assertSame('active', $subscription->status);
+        $this->assertSame('trialing', $subscription->status);
     }
 
     public function test_it_sets_cancel_at_period_end_flag(): void

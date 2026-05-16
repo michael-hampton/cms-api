@@ -42,8 +42,6 @@ try {
     $response->send();
     exit;
 } catch (Throwable $e) {
-
-    file_put_contents(__DIR__.'/hit.log', 'mike', FILE_APPEND);
     http_response_code(500);
     header('Content-Type: application/json');
     echo json_encode([

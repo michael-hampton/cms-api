@@ -20,6 +20,28 @@ class CreatePricingTierRequest extends FormRequest
             'is_default' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer'],
+            'trial_days' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:365',
+            ],
+//            'intro_price' => [ //todo
+//                'nullable',
+//                'numeric',
+//                'min:0',
+//                Rule::when(
+//                    fn ($input) => $input->intro_price !== null,
+//                    ['lt:price']   // intro price must be less than the standard recurring price
+//                ),
+//            ],
+//            'intro_cycles' => [ //todo
+//                'nullable',
+//                'integer',
+//                'min:1',
+//                // intro_cycles requires intro_price — enforce at the validator level
+//                Rule::requiredIf(fn ($input) => $input->intro_price !== null),
+//            ],
         ];
     }
 }
