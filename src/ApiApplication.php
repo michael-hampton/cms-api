@@ -153,10 +153,15 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
 use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway;
+use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
+use App\Services\Billing\Stripe\StripeRefundGateway;
 use App\Services\Members\AddressLookupService;
 use App\Services\Members\AddressLookupServiceInterface;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
@@ -254,6 +259,10 @@ class ApiApplication
 
         $this->registerMiddleware();
 
+        $this->container->bind(StripePaymentIntentGatewayInterface::class, StripePaymentIntentGateway::class);
+        $this->container->bind(StripeCustomerGatewayInterface::class, StripeCustomerGateway::class);
+        $this->container->bind(StripeRefundGatewayInterface::class, StripeRefundGateway::class);
+
         $this->container->instance(Router::class, $this->router);
         $this->container->bind(ContributorPolicy::class, ContributorPolicyService::class);
         $this->container->bind(DateTimeInterface::class, Date::class);
@@ -274,9 +283,10 @@ class ApiApplication
                 ? NullQueueDriver::class
                 : DatabaseQueueDriver::class
         );
+
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(AddressLookupServiceInterface::class, AddressLookupService::class);
-        $this->container->bind(PaymentIntentGateway::class, StripePaymentIntentGateway::class);
+        //$this->container->bind(PaymentIntentGateway::class, StripePaymentIntentGateway::class);
 
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 

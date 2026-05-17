@@ -95,6 +95,42 @@ class SubscriptionPlanPricingService
         if (empty($data['currency'])) {
             throw new \InvalidArgumentException('currency is required');
         }
+
+        // Intro pricing cross-field rules
+        // These mirror the request validation but defend against direct service calls.
+        $introPrice  = $data['intro_price']  ?? null;
+        $introCycles = $data['intro_cycles'] ?? null;
+
+        if ($introPrice !== null) {
+            if (!is_numeric($introPrice)) {
+                throw new \InvalidArgumentException('intro_price must be numeric');
+            }
+
+            if ((float) $introPrice >= (float) $data['price']) {
+                throw new \InvalidArgumentException(
+                    'intro_price must be less than the standard price'
+                );
+            }
+
+            if ($introCycles === null || !is_numeric($introCycles) || (int) $introCycles < 1) {
+                throw new \InvalidArgumentException(
+                    'intro_cycles is required and must be at least 1 when intro_price is set'
+                );
+            }
+        }
+
+        if ($introCycles !== null && $introPrice === null) {
+            throw new \InvalidArgumentException(
+                'intro_price is required when intro_cycles is set'
+            );
+        }
+
+        if (isset($data['trial_days']) && $data['trial_days'] !== null) {
+            $trialDays = $data['trial_days'];
+            if (!is_numeric($trialDays) || (int) $trialDays < 1 || (int) $trialDays > 365) {
+                throw new \InvalidArgumentException('trial_days must be between 1 and 365');
+            }
+        }
     }
 
     public function setAsDefault(int $pricingId): bool

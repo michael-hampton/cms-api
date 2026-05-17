@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeRefundGateway;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use DateTime;
 use Exception;
@@ -19,6 +20,7 @@ class SubscriptionRefundServiceTest extends TestCase
     private $mockPaymentRepository;
     private $mockStripeProcessor;
     private $mockDatabase;
+    private StripeRefundGateway $stripeRefundGateway;
 
     protected function setUp(): void
     {
@@ -27,10 +29,11 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->mockPaymentRepository = Mockery::mock(PaymentRepository::class);
         $this->mockStripeProcessor = Mockery::mock(StripePaymentProcessor::class);
         $this->mockDatabase = Mockery::mock(Database::class);
+        $this->stripeRefundGateway = Mockery::mock(StripeRefundGateway::class);
 
         $this->service = new SubscriptionRefundService(
             $this->mockPaymentRepository,
-            $this->mockStripeProcessor,
+            $this->stripeRefundGateway,
             $this->mockDatabase
         );
     }
@@ -64,7 +67,7 @@ class SubscriptionRefundServiceTest extends TestCase
             ->andReturn($lastPayment);
 
         // Mock Stripe refund
-        $this->mockStripeProcessor
+        $this->stripeRefundGateway
             ->shouldReceive('refund')
             ->once()
             ->with(
@@ -134,7 +137,7 @@ class SubscriptionRefundServiceTest extends TestCase
             ->once()
             ->andReturn($lastPayment);
 
-        $this->mockStripeProcessor
+        $this->stripeRefundGateway
             ->shouldReceive('refund')
             ->once()
             ->andReturn([
@@ -206,7 +209,7 @@ class SubscriptionRefundServiceTest extends TestCase
 
         $expectedRefundAmount = ($subscription->price / 30) * 15;
 
-        $this->mockStripeProcessor
+        $this->stripeRefundGateway
             ->shouldReceive('refund')
             ->once()
             ->andReturn([
@@ -282,7 +285,7 @@ class SubscriptionRefundServiceTest extends TestCase
             ->shouldReceive('getLastSubscriptionPayment')
             ->andReturn($lastPayment);
 
-        $this->mockStripeProcessor
+        $this->stripeRefundGateway
             ->shouldReceive('refund')
             ->once()
             ->with(

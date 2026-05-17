@@ -14,6 +14,9 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
 
 class SubscriptionBillingService
@@ -23,8 +26,9 @@ class SubscriptionBillingService
         private readonly StripePaymentProcessor $stripeProcessor,
         private readonly Database               $database,
         private readonly SubscriptionPricingStrategyResolver       $strategyResolver,
-        private readonly StripeSubscriptionGatewayInterface        $subscriptionGateway,
-        private readonly StripeSubscriptionScheduleGatewayInterface $scheduleGateway,
+        //private readonly StripeCustomerGateway        $subscriptionGateway,
+        private readonly StripeSubscriptionScheduleGateway $scheduleGateway,
+        private readonly StripeSubscriptionGateway $subscriptionGateway,
     )
     {
     }

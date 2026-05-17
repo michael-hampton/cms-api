@@ -4,6 +4,7 @@ namespace App\Services\Shopping;
 
 use App\Actions\Stock\PurchaseProductAction;
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\Enums\CartItemType;
 use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
@@ -23,9 +24,12 @@ use App\Services\Billing\Order\OrderCreationService;
 use App\Services\Billing\Order\OrderManager;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\PaymentAllocationService;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Preorder\Actions\CalculateSellableStockAction;
 use App\Services\Billing\Preorder\Actions\ResolveAvailabilityAction;
+use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Shipping\FulfilmentResolver;
@@ -43,33 +47,34 @@ use Exception;
 class CheckoutService
 {
     public function __construct(
-        private readonly CartService                $cartService,
-        private readonly OrderCreationService       $orderCreationService,
-        private readonly VoucherService             $voucherService,
-        private readonly ShippingService            $shippingService,
-        private readonly MemberAuthWrapper          $memberAuthWrapper,
-        private readonly OrderCalculationService    $calculationService,
-        private readonly StripePaymentProcessor     $stripeProcessor,
-        private readonly CheckoutSplittingService   $splittingService,
-        private readonly PaymentAllocationService   $allocationService,
-        private readonly MerchantShippingService    $merchantShippingService,
-        private readonly ShipmentRepository         $shipmentRepository,
-        private readonly CurrencyResolver           $currencyResolver,
-        private readonly Database                   $database,
-        private readonly OrderManager               $orderService,
-        private readonly TaxCalculatorService       $taxCalculatorService,
-        private readonly MerchantRepository         $merchantRepository,
-        private readonly DiscountResolver           $discountResolver,
-        private readonly RewardsRepository          $rewardsRepository,
-        private readonly InternalBusinessDayEstimator $deliveryEstimator,
-        private readonly FulfilmentResolver           $fulfilmentResolver,
-        private readonly ProductRepository            $productRepository,
-        private readonly ResolveAvailabilityAction    $resolveAvailabilityAction,
-        private readonly CalculateSellableStockAction $calculateSellableStockAction,
-        private readonly ProductVariantRepository   $productVariantRepository,
-        private readonly CheckoutEligibilityService $eligibilityService,
+        private readonly CartService                         $cartService,
+        private readonly OrderCreationService                $orderCreationService,
+        private readonly VoucherService                      $voucherService,
+        private readonly ShippingService                     $shippingService,
+        private readonly MemberAuthWrapper                   $memberAuthWrapper,
+        private readonly OrderCalculationService             $calculationService,
+        private readonly StripePaymentIntentGateway $paymentIntentGateway,
+        private readonly StripeCustomerGateway      $customerGateway,
+        private readonly CheckoutSplittingService            $splittingService,
+        private readonly PaymentAllocationService            $allocationService,
+        private readonly MerchantShippingService             $merchantShippingService,
+        private readonly ShipmentRepository                  $shipmentRepository,
+        private readonly CurrencyResolver                    $currencyResolver,
+        private readonly Database                            $database,
+        private readonly OrderManager                        $orderService,
+        private readonly TaxCalculatorService                $taxCalculatorService,
+        private readonly MerchantRepository                  $merchantRepository,
+        private readonly DiscountResolver                    $discountResolver,
+        private readonly RewardsRepository                   $rewardsRepository,
+        private readonly InternalBusinessDayEstimator        $deliveryEstimator,
+        private readonly FulfilmentResolver                  $fulfilmentResolver,
+        private readonly ProductRepository                   $productRepository,
+        private readonly ResolveAvailabilityAction           $resolveAvailabilityAction,
+        private readonly CalculateSellableStockAction        $calculateSellableStockAction,
+        private readonly ProductVariantRepository            $productVariantRepository,
+        private readonly CheckoutEligibilityService          $eligibilityService,
         // ── Stock allocation ────────────────────────────────────────────────
-        private readonly PurchaseProductAction $purchaseProductAction,
+        private readonly PurchaseProductAction               $purchaseProductAction,
     )
     {
     }
@@ -170,20 +175,21 @@ class CheckoutService
                     $currency
                 );
 
-                $paymentIntent = $this->stripeProcessor->createPaymentIntent([
-                    'amount' => $totalCents,
-                    'currency' => $currency,
-                    'site_id' => $siteId,
-                    'metadata' => [
-                        'offer_discount_cents' => $discounts->offerDiscountCents,
+                $dto = new CreatePaymentIntentDto(
+                    amountCents: $totalCents,
+                    currency:    $currency,
+                    metadata:    [
+                        'offer_discount_cents'   => $discounts->offerDiscountCents,
                         'voucher_discount_cents' => $discounts->voucherDiscountCents,
-                        'reward_discount_cents' => $discounts->rewardDiscountCents,
-                        'merchant_funded_cents' => $discounts->merchantFundedCents,
-                        'platform_funded_cents' => $discounts->platformFundedCents,
-                        'voucher_code' => $discounts->metadata['voucher']['voucher_code'] ?? null,
-                        'campaign_id' => $discounts->metadata['voucher']['campaign_id'] ?? null
-                    ]
-                ]);
+                        'reward_discount_cents'  => $discounts->rewardDiscountCents,
+                        'merchant_funded_cents'  => $discounts->merchantFundedCents,
+                        'platform_funded_cents'  => $discounts->platformFundedCents,
+                        'voucher_code'           => $discounts->metadata['voucher']['voucher_code'] ?? null,
+                        'campaign_id'            => $discounts->metadata['voucher']['campaign_id'] ?? null,
+                    ],
+                );
+
+                $paymentIntent = $this->paymentIntentGateway->create($dto)->toLegacyArray();
 
                 if (!$paymentIntent['success']) {
                     return [
@@ -260,49 +266,133 @@ class CheckoutService
     // Stock allocation
     // =========================================================================
 
-    /**
-     * Allocate stock for every product-based cart item.
-     *
-     * Subscription items carry no stock on the products table — their stock is
-     * managed by FulfilSubscriptionAction via OneTimeSubscriptionCheckoutService.
-     * Free-gift items with zero price are skipped; their stock is handled by
-     * ApplyGiftPromotionAction at the caller level.
-     *
-     * Called inside the order-creation transaction — any StockException rolls
-     * the whole transaction back automatically.
-     */
-    private function allocateStockForCartItems(array $cartItems): void
+    private function validateCheckoutData(array $data): array
     {
-        foreach ($cartItems as $item) {
-            // Skip subscription lines — no product-table stock to decrement.
-            if (!empty($item['subscription_plan_id'])) {
-                continue;
-            }
+        $requiresShipping = $this->cartService->requiresShipping();
+        $required = $requiresShipping ? ['first_name', 'last_name', 'email'] : [];
 
-            // Skip items that were already validated as pre-orders; their stock
-            // accounting is handled separately when the issue ships.
-            if (($item['order_line_status'] ?? null) === OrderLineStatus::PENDING_PREORDER->value) {
-                continue;
-            }
-
-            if (empty($item['product_id'])) {
-                continue;
-            }
-
-            // Re-use the already-locked product from validateAndResolveAvailability.
-            // lockForUpdate was called there; within the same transaction the lock is held.
-            $product = $this->productRepository->lockForUpdate($item['product_id']);
-            $quantity = $item['quantity'] ?? 1;
-
-            // PurchaseProductAction::execute() throws StockException on failure,
-            // propagating up and rolling back this transaction.
-            $this->purchaseProductAction->execute($product, $quantity);
+        if ($requiresShipping && empty($data['saved_address'])) {
+            $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);
         }
+
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                return [
+                    'valid' => false,
+                    'message' => ucfirst(str_replace('_', ' ', $field)) . ' is required'
+                ];
+            }
+        }
+
+        return ['valid' => true];
     }
 
     // =========================================================================
     // Remainder of the service (unchanged from original)
     // =========================================================================
+
+    private function validateAndResolveAvailability(array $cartItems): array
+    {
+        foreach ($cartItems as &$item) {
+            if (empty($item['product_id'])) {
+                continue;
+            }
+
+            if (!empty($item['variant_id'])) {
+                $variant = $this->productVariantRepository->lockForUpdate($item['variant_id']);
+
+                if (!$variant) {
+                    throw new \Exception("Variant not found: {$item['product_name']}");
+                }
+
+                $purchasable = $variant;
+            } else {
+                $product = $this->productRepository->lockForUpdate($item['product_id']);
+
+                if (!$product) {
+                    throw new \Exception("Product not found: {$item['product_name']}");
+                }
+
+                $purchasable = $product;
+            }
+
+            $policy = $product->availabilityPolicy();
+
+            if (!$policy->canPurchase()) {
+                throw new \Exception("{$product->name} is not available for purchase");
+            }
+
+            $sellableStock = $this->calculateSellableStockAction->execute($purchasable);
+
+            if ($item['quantity'] > $sellableStock) {
+                if (!$policy->isPreOrder()) {
+                    throw new \Exception(
+                        "{$product->name} has insufficient stock. " .
+                        "Available: {$sellableStock}, Requested: {$item['quantity']}"
+                    );
+                }
+
+                if (!$policy->getExpectedShipDate()) {
+                    throw new \Exception("{$product->name} preorder is not configured correctly");
+                }
+            }
+
+            $availability = $this->resolveAvailabilityAction->execute($purchasable, $item['quantity']);
+
+            $item['order_line_status'] = $availability['status'];
+            $item['expected_ship_date'] = $availability['expected_ship_date']?->format('Y-m-d H:i:s') ?? null;
+            $item['is_preorder'] = $availability['is_preorder'];
+        }
+
+        return $cartItems;
+    }
+
+    private function attachDeliveryEstimates(array $cartItems): array
+    {
+        $itemsWithEstimates = [];
+        $deliveryMethod = DeliveryMethodConfig::default();
+        $orderDate = new DateTimeImmutable();
+
+        foreach ($cartItems as $item) {
+            $purchasable = $this->resolvePurchasable($item);
+
+            if (!$purchasable) {
+                $itemsWithEstimates[] = $item;
+                continue;
+            }
+
+            $fulfilment = $this->fulfilmentResolver->resolve($purchasable);
+            $estimate = $this->deliveryEstimator->estimate($fulfilment, $deliveryMethod, $orderDate);
+
+            $itemsWithEstimates[] = array_merge($item, [
+                'estimated_dispatch' => $estimate->dispatchDate?->format('Y-m-d'),
+                'estimated_delivery_from' => $estimate->from?->format('Y-m-d'),
+                'estimated_delivery_to' => $estimate->to?->format('Y-m-d'),
+                'estimated_delivery_formatted' => $estimate->formattedRange(),
+                'requires_shipping' => $estimate->requiresShipping
+            ]);
+        }
+
+        return $itemsWithEstimates;
+    }
+
+    private function resolvePurchasable(array $item): mixed
+    {
+        if (!empty($item['subscription_plan_id'])) {
+            return SubscriptionPlan::find($item['subscription_plan_id']);
+        }
+
+        if (!empty($item['variant_id'])) {
+            return app(\App\Repositories\Product\ProductVariantRepository::class)
+                ->find($item['variant_id']);
+        }
+
+        if (!empty($item['product_id'])) {
+            return $this->productRepository->find($item['product_id']);
+        }
+
+        return null;
+    }
 
     private function resolveDiscounts(
         array   $cartItems,
@@ -344,8 +434,8 @@ class CheckoutService
         int               $shippingCents,
         int               $taxCents,
         int               $totalCents,
-        int    $siteId,
-        string $currency
+        int               $siteId,
+        string            $currency
     ): array
     {
         $orderData = [
@@ -396,6 +486,46 @@ class CheckoutService
         return $orderData;
     }
 
+    /**
+     * Allocate stock for every product-based cart item.
+     *
+     * Subscription items carry no stock on the products table — their stock is
+     * managed by FulfilSubscriptionAction via OneTimeSubscriptionCheckoutService.
+     * Free-gift items with zero price are skipped; their stock is handled by
+     * ApplyGiftPromotionAction at the caller level.
+     *
+     * Called inside the order-creation transaction — any StockException rolls
+     * the whole transaction back automatically.
+     */
+    private function allocateStockForCartItems(array $cartItems): void
+    {
+        foreach ($cartItems as $item) {
+            // Skip subscription lines — no product-table stock to decrement.
+            if (!empty($item['subscription_plan_id'])) {
+                continue;
+            }
+
+            // Skip items that were already validated as pre-orders; their stock
+            // accounting is handled separately when the issue ships.
+            if (($item['order_line_status'] ?? null) === OrderLineStatus::PENDING_PREORDER->value) {
+                continue;
+            }
+
+            if (empty($item['product_id'])) {
+                continue;
+            }
+
+            // Re-use the already-locked product from validateAndResolveAvailability.
+            // lockForUpdate was called there; within the same transaction the lock is held.
+            $product = $this->productRepository->lockForUpdate($item['product_id']);
+            $quantity = $item['quantity'] ?? 1;
+
+            // PurchaseProductAction::execute() throws StockException on failure,
+            // propagating up and rolling back this transaction.
+            $this->purchaseProductAction->execute($product, $quantity);
+        }
+    }
+
     private function prepareOrderItemsFromDiscounts(array $cartItems, ResolvedDiscounts $discounts): array
     {
         $orderItems = [];
@@ -436,36 +566,6 @@ class CheckoutService
         }
 
         return $orderItems;
-    }
-
-    private function prepareOrderItems(array $cartItems): array
-    {
-        $items = [];
-        foreach ($cartItems as $cartItem) {
-            $items[] = [
-                'product_id' => $cartItem['product_id'],
-                'product_name' => $cartItem['product_name'],
-                'product_sku' => $cartItem['product_sku'] ?? '',
-                'quantity' => $cartItem['quantity'],
-                'unit_price' => $cartItem['price'],
-                'subtotal' => $cartItem['subtotal'],
-                'tax' => 0,
-                'total' => $cartItem['subtotal'],
-                'expected_ship_date' => $cartItem['expected_ship_date'],
-                'preorder_enabled' => $cartItem['is_preorder'],
-            ];
-        }
-        return $items;
-    }
-
-    private function claimReward(int $rewardId, int $orderId): void
-    {
-        $reward = $this->rewardsRepository->find($rewardId);
-
-        if ($reward && $reward->isPending()) {
-            $reward->claim();
-            $reward->update(['notes' => "Applied to order #{$orderId}"]);
-        }
     }
 
     private function handleMerchantFunding(int $merchantId, float $amount, int $orderId, int $voucherId): void
@@ -535,134 +635,20 @@ class CheckoutService
         ]);
     }
 
-    private function validateCheckoutData(array $data): array
+    private function claimReward(int $rewardId, int $orderId): void
     {
-        $requiresShipping = $this->cartService->requiresShipping();
-        $required = $requiresShipping ? ['first_name', 'last_name', 'email'] : [];
+        $reward = $this->rewardsRepository->find($rewardId);
 
-        if ($requiresShipping && empty($data['saved_address'])) {
-            $required = array_merge($required, ['address', 'city', 'postal_code', 'country']);
+        if ($reward && $reward->isPending()) {
+            $reward->claim();
+            $reward->update(['notes' => "Applied to order #{$orderId}"]);
         }
-
-        foreach ($required as $field) {
-            if (empty($data[$field])) {
-                return [
-                    'valid' => false,
-                    'message' => ucfirst(str_replace('_', ' ', $field)) . ' is required'
-                ];
-            }
-        }
-
-        return ['valid' => true];
-    }
-
-    private function attachDeliveryEstimates(array $cartItems): array
-    {
-        $itemsWithEstimates = [];
-        $deliveryMethod = DeliveryMethodConfig::default();
-        $orderDate = new DateTimeImmutable();
-
-        foreach ($cartItems as $item) {
-            $purchasable = $this->resolvePurchasable($item);
-
-            if (!$purchasable) {
-                $itemsWithEstimates[] = $item;
-                continue;
-            }
-
-            $fulfilment = $this->fulfilmentResolver->resolve($purchasable);
-            $estimate = $this->deliveryEstimator->estimate($fulfilment, $deliveryMethod, $orderDate);
-
-            $itemsWithEstimates[] = array_merge($item, [
-                'estimated_dispatch' => $estimate->dispatchDate?->format('Y-m-d'),
-                'estimated_delivery_from' => $estimate->from?->format('Y-m-d'),
-                'estimated_delivery_to' => $estimate->to?->format('Y-m-d'),
-                'estimated_delivery_formatted' => $estimate->formattedRange(),
-                'requires_shipping' => $estimate->requiresShipping
-            ]);
-        }
-
-        return $itemsWithEstimates;
-    }
-
-    private function resolvePurchasable(array $item): mixed
-    {
-        if (!empty($item['subscription_plan_id'])) {
-            return SubscriptionPlan::find($item['subscription_plan_id']);
-        }
-
-        if (!empty($item['variant_id'])) {
-            return app(\App\Repositories\Product\ProductVariantRepository::class)
-                ->find($item['variant_id']);
-        }
-
-        if (!empty($item['product_id'])) {
-            return $this->productRepository->find($item['product_id']);
-        }
-
-        return null;
-    }
-
-    private function validateAndResolveAvailability(array $cartItems): array
-    {
-        foreach ($cartItems as &$item) {
-            if (empty($item['product_id'])) {
-                continue;
-            }
-
-            if (!empty($item['variant_id'])) {
-                $variant = $this->productVariantRepository->lockForUpdate($item['variant_id']);
-
-                if (!$variant) {
-                    throw new \Exception("Variant not found: {$item['product_name']}");
-                }
-
-                $purchasable = $variant;
-            } else {
-                $product = $this->productRepository->lockForUpdate($item['product_id']);
-
-                if (!$product) {
-                    throw new \Exception("Product not found: {$item['product_name']}");
-                }
-
-                $purchasable = $product;
-            }
-
-            $policy = $product->availabilityPolicy();
-
-            if (!$policy->canPurchase()) {
-                throw new \Exception("{$product->name} is not available for purchase");
-            }
-
-            $sellableStock = $this->calculateSellableStockAction->execute($purchasable);
-
-            if ($item['quantity'] > $sellableStock) {
-                if (!$policy->isPreOrder()) {
-                    throw new \Exception(
-                        "{$product->name} has insufficient stock. " .
-                        "Available: {$sellableStock}, Requested: {$item['quantity']}"
-                    );
-                }
-
-                if (!$policy->getExpectedShipDate()) {
-                    throw new \Exception("{$product->name} preorder is not configured correctly");
-                }
-            }
-
-            $availability = $this->resolveAvailabilityAction->execute($purchasable, $item['quantity']);
-
-            $item['order_line_status'] = $availability['status'];
-            $item['expected_ship_date'] = $availability['expected_ship_date']?->format('Y-m-d H:i:s') ?? null;
-            $item['is_preorder'] = $availability['is_preorder'];
-        }
-
-        return $cartItems;
     }
 
     public function confirmRegularCheckoutPayment(string $paymentIntentId, int $orderId): array
     {
         try {
-            $confirmResult = $this->stripeProcessor->confirmPaymentIntent($paymentIntentId);
+            $confirmResult = $this->paymentIntentGateway->confirmPaymentIntent($paymentIntentId);
 
             if (!$confirmResult['success'] || $confirmResult['status'] !== 'succeeded') {
                 return ['success' => false, 'message' => 'Payment confirmation failed'];
@@ -773,18 +759,21 @@ class CheckoutService
                     continue;
                 }
 
-                $piResult = $this->stripeProcessor->createPaymentIntentWithCustomer([
-                    'amount' => $allocations[$key]['total'],
-                    'member' => $member,
-                    'currency' => strtolower($currency),
-                    'site_id' => $siteId,
-                    'metadata' => [
-                        'checkout_type' => 'multi_merchant',
-                        'merchant_id' => $group['merchant_id'] ?? $key,
+                $customerId = $member ? $this->customerGateway->getOrCreate($member) : null;
+
+                $dto = new CreatePaymentIntentDto(
+                    amountCents:      (int) round($allocations[$key]['total'] * 100),
+                    currency:         strtolower($currency),
+                    metadata:         [
+                        'checkout_type'    => 'multi_merchant',
+                        'merchant_id'      => $group['merchant_id'] ?? $key,
                         'stripe_group_key' => $group['stripe_group_key'] ?? 'default',
-                        'member_id' => $member->id ?? null,
+                        'member_id'        => $member->id ?? null,
                     ],
-                ]);
+                    stripeCustomerId: $customerId,
+                );
+
+                $piResult = $this->paymentIntentGateway->createWithCustomer($dto)->toLegacyArray();
 
                 if (!$piResult['success']) {
                     return ['success' => false, 'message' => 'Payment processing failed'];
@@ -926,5 +915,25 @@ class CheckoutService
         } catch (\Exception $e) {
             return ['success' => false, 'message' => 'Checkout failed'];
         }
+    }
+
+    private function prepareOrderItems(array $cartItems): array
+    {
+        $items = [];
+        foreach ($cartItems as $cartItem) {
+            $items[] = [
+                'product_id' => $cartItem['product_id'],
+                'product_name' => $cartItem['product_name'],
+                'product_sku' => $cartItem['product_sku'] ?? '',
+                'quantity' => $cartItem['quantity'],
+                'unit_price' => $cartItem['price'],
+                'subtotal' => $cartItem['subtotal'],
+                'tax' => 0,
+                'total' => $cartItem['subtotal'],
+                'expected_ship_date' => $cartItem['expected_ship_date'],
+                'preorder_enabled' => $cartItem['is_preorder'],
+            ];
+        }
+        return $items;
     }
 }

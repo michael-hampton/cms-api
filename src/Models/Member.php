@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Address\AddressType;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 
@@ -465,5 +466,57 @@ class Member extends Model
             'segment_id',
             $relation
         );
+    }
+
+    public function resolveBillingAddress(): ?Address
+    {
+        $defaultBilling  = null;
+        $firstBilling    = null;
+
+        $defaultShipping = null;
+        $firstShipping   = null;
+
+        $defaultAny      = null;
+        $firstAny        = null;
+
+        foreach ($this->addresses as $address) {
+
+            if ($firstAny === null) {
+                $firstAny = $address;
+            }
+
+            if ($address->is_default && $defaultAny === null) {
+                $defaultAny = $address;
+            }
+
+            if ($address->type === AddressType::Billing->value) {
+
+                if ($firstBilling === null) {
+                    $firstBilling = $address;
+                }
+
+                if ($address->is_default) {
+                    $defaultBilling = $address;
+                }
+            }
+
+            if ($address->type === AddressType::Shipping->value) {
+
+                if ($firstShipping === null) {
+                    $firstShipping = $address;
+                }
+
+                if ($address->is_default) {
+                    $defaultShipping = $address;
+                }
+            }
+        }
+
+        return $defaultBilling
+            ?? $firstBilling
+            ?? $defaultShipping
+            ?? $firstShipping
+            ?? $defaultAny
+            ?? $firstAny;
     }
 }

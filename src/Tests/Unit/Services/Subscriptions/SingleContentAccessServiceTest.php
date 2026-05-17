@@ -2,6 +2,8 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Stripe\CreatePaymentIntentDto;
+use App\DTO\Stripe\PaymentIntentResultDto;
 use App\Framework\Database\Database;
 use App\Models\Member;
 use App\Models\Model;
@@ -10,6 +12,10 @@ use App\Models\SingleContentAccess;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SingleContentAccessRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
+use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Subscriptions\SingleContentAccessService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery as m;
@@ -22,23 +28,37 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
     private Model $testMember;
     private $paymentRepositoryMock;
     private $databaseMock;
+    private StripePaymentIntentGateway $stripePaymentIntentGateway;
+    private StripeCustomerGateway $stripeCustomerGateway;
 
     public function testPurchaseAccessCreatesPaymentIntent(): void
     {
-        $this->stripeProcessorMock
-            ->shouldReceive('createPaymentIntentWithCustomer')
+        $paymentIntentResult = new PaymentIntentResultDto(
+            true,
+            'pi_test123',
+            'pi_test123_secret'
+        );
+
+        $this->stripeCustomerGateway
+            ->shouldReceive('getOrCreate')
             ->once()
-            ->with(m::on(function ($data) {
-                return $data['amount'] === 9.99
-                    && $data['currency'] === 'USD'
-                    && $data['metadata']['content_type'] === 'page'
-                    && $data['metadata']['content_id'] === 1;
-            }))
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_test123',
-                'client_secret' => 'pi_test123_secret'
-            ]);
+            ->with(m::type(Member::class))
+            ->andReturn('cus_test123');
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('createWithCustomer')
+            ->once()
+            ->withArgs(function (CreatePaymentIntentDto $dto) {
+                return $dto->amountCents === 999
+                    && $dto->currency === 'USD'
+                    && $dto->stripeCustomerId === 'cus_test123'
+                    && $dto->metadata['member_id'] === 1
+                    && $dto->metadata['site_id'] === 1
+                    && $dto->metadata['content_type'] === 'page'
+                    && $dto->metadata['content_id'] === 1
+                    && $dto->metadata['single_content_access'] === true;
+            })
+            ->andReturn($paymentIntentResult);
 
         $this->databaseMock
             ->shouldReceive('transaction')
@@ -47,8 +67,15 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->repositoryMock->shouldReceive('hasActiveAccess')
+        $this->repositoryMock
+            ->shouldReceive('hasActiveAccess')
             ->once()
+            ->with(
+                $this->testMember->id,
+                'page',
+                1,
+                $this->siteId
+            )
             ->andReturn(false);
 
         $mockAccess = m::mock(SingleContentAccess::class)->makePartial();
@@ -58,6 +85,17 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
         $this->repositoryMock
             ->shouldReceive('createAccess')
             ->once()
+            ->with(m::on(function (array $data) {
+                return $data['member_id'] === 1
+                    && $data['site_id'] === 1
+                    && $data['content_type'] === 'page'
+                    && $data['content_id'] === 1
+                    && $data['price'] === 9.99
+                    && $data['currency'] === 'USD'
+                    && $data['duration_days'] === 7
+                    && $data['is_active'] === false
+                    && $data['metadata']['payment_intent_id'] === 'pi_test123';
+            }))
             ->andReturn($mockAccess);
 
         $result = $this->service->purchaseAccess(
@@ -71,13 +109,22 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
         );
 
         $this->assertTrue($result['success']);
+        $this->assertEquals(1, $result['access_id']);
         $this->assertEquals('pi_test123', $result['payment_intent_id']);
         $this->assertEquals('pi_test123_secret', $result['client_secret']);
         $this->assertEquals('test_token', $result['access_token']);
+        $this->assertArrayHasKey('expires_at', $result);
     }
 
     public function testPurchaseAccessFailsWhenPaymentIntentFails(): void
     {
+        $failedPaymentResult = new PaymentIntentResultDto(
+            false,
+            null,
+            null,
+            'Payment failed'
+        );
+
         $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
@@ -85,17 +132,40 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->repositoryMock->shouldReceive('hasActiveAccess')
+        $this->repositoryMock
+            ->shouldReceive('hasActiveAccess')
             ->once()
+            ->with(
+                $this->testMember->id,
+                'page',
+                1,
+                $this->siteId
+            )
             ->andReturn(false);
 
-        $this->stripeProcessorMock
-            ->shouldReceive('createPaymentIntentWithCustomer')
+        $this->stripeCustomerGateway
+            ->shouldReceive('getOrCreate')
             ->once()
-            ->andReturn([
-                'success' => false,
-                'message' => 'Payment failed'
-            ]);
+            ->with(m::type(Member::class))
+            ->andReturn('cus_test123');
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('createWithCustomer')
+            ->once()
+            ->withArgs(function (CreatePaymentIntentDto $dto) {
+                return $dto->amountCents === 999
+                    && $dto->currency === 'USD'
+                    && $dto->stripeCustomerId === 'cus_test123'
+                    && $dto->metadata['member_id'] === 1
+                    && $dto->metadata['site_id'] === 1
+                    && $dto->metadata['content_type'] === 'page'
+                    && $dto->metadata['content_id'] === 1
+                    && $dto->metadata['single_content_access'] === true;
+            })
+            ->andReturn($failedPaymentResult);
+
+        $this->repositoryMock
+            ->shouldNotReceive('createAccess');
 
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Payment failed');
@@ -113,6 +183,13 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
 
     public function testCompleteAccessPurchaseSucceeds(): void
     {
+        $paymentIntentResult = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_test123',
+            clientSecret: null,
+            status: 'succeeded',
+        );
+
         $mockAccess = m::mock(SingleContentAccess::class)->makePartial();
         $mockAccess->id = 1;
         $mockAccess->member_id = $this->testMember->id;
@@ -129,14 +206,11 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->stripeProcessorMock
-            ->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
             ->once()
             ->with('pi_test123')
-            ->andReturn([
-                'success' => true,
-                'status' => 'succeeded'
-            ]);
+            ->andReturn($paymentIntentResult);
 
         $this->repositoryMock
             ->shouldReceive('findByPaymentIntent')
@@ -152,21 +226,33 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($mockPayment);
 
-        $mockAccess->shouldReceive('update')
+        $mockAccess
+            ->shouldReceive('update')
             ->once()
             ->with(m::on(function ($data) {
                 return $data['is_active'] === true
-                    && isset($data['payment_id']);
+                    && $data['payment_id'] === 1;
             }))
             ->andReturn(true);
 
-        $result = $this->service->completeAccessPurchase('pi_test123');
+        $result = $this->service->completeAccessPurchase(
+            'pi_test123'
+        );
 
         $this->assertTrue($result['success']);
+        $this->assertSame($mockAccess, $result['access']);
+        $this->assertSame($mockPayment, $result['payment']);
     }
 
     public function testCompleteAccessPurchaseFailsForInvalidToken(): void
     {
+        $paymentIntentResult = new PaymentIntentResultDto(
+            success: true,
+            paymentIntentId: 'pi_test123',
+            clientSecret: null,
+            status: 'succeeded',
+        );
+
         $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
@@ -174,14 +260,11 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->stripeProcessorMock
-            ->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('retrieve')
             ->once()
             ->with('pi_test123')
-            ->andReturn([
-                'success' => true,
-                'status' => 'succeeded'
-            ]);
+            ->andReturn($paymentIntentResult);
 
         $this->repositoryMock
             ->shouldReceive('findByPaymentIntent')
@@ -189,10 +272,17 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
             ->with('pi_test123')
             ->andReturn(null);
 
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Access record not found');
+        $this->paymentRepositoryMock
+            ->shouldNotReceive('create');
 
-        $this->service->completeAccessPurchase('pi_test123');
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage(
+            'Access record not found'
+        );
+
+        $this->service->completeAccessPurchase(
+            'pi_test123'
+        );
     }
 
     public function testCheckAccessReturnsTrueForValidAccess(): void
@@ -283,6 +373,12 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
 
     public function testPurchaseAccessCalculatesCorrectExpiryDate(): void
     {
+        $paymentIntentResult = new PaymentIntentResultDto(
+            true,
+            'pi_test123',
+            'pi_test123_secret'
+        );
+
         $this->databaseMock
             ->shouldReceive('transaction')
             ->once()
@@ -290,21 +386,43 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->repositoryMock->shouldReceive('hasActiveAccess')
+        $this->repositoryMock
+            ->shouldReceive('hasActiveAccess')
             ->once()
+            ->with(
+                $this->testMember->id,
+                'newsletter',
+                2,
+                $this->siteId
+            )
             ->andReturn(false);
 
-        $this->stripeProcessorMock
-            ->shouldReceive('createPaymentIntentWithCustomer')
+        $this->stripeCustomerGateway
+            ->shouldReceive('getOrCreate')
             ->once()
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_test123',
-                'client_secret' => 'pi_test123_secret'
-            ]);
+            ->with(m::type(Member::class))
+            ->andReturn('cus_test123');
+
+        $this->stripePaymentIntentGateway
+            ->shouldReceive('createWithCustomer')
+            ->once()
+            ->withArgs(function (CreatePaymentIntentDto $dto) {
+                return $dto->amountCents === 499
+                    && $dto->currency === 'USD'
+                    && $dto->stripeCustomerId === 'cus_test123'
+                    && $dto->metadata['member_id'] === 1
+                    && $dto->metadata['site_id'] === 1
+                    && $dto->metadata['content_type'] === 'newsletter'
+                    && $dto->metadata['content_id'] === 2
+                    && $dto->metadata['single_content_access'] === true;
+            })
+            ->andReturn($paymentIntentResult);
 
         $capturedAccessData = null;
-        $mockAccess = m::mock(SingleContentAccess::class)->makePartial();
+
+        $mockAccess = m::mock(SingleContentAccess::class)
+            ->makePartial();
+
         $mockAccess->id = 1;
         $mockAccess->access_token = 'test_token';
 
@@ -321,18 +439,34 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
             2,
             4.99,
             'USD',
-            30 // 30 days
+            30
         );
 
-        $this->assertNotNull($capturedAccessData);
-        $this->assertEquals(30, $capturedAccessData['duration_days']);
+        $this->assertNotNull(
+            $capturedAccessData
+        );
 
-        // Check that expires_at is approximately 30 days from now
-        $expiresAt = new \DateTime($capturedAccessData['expires_at']);
-        $expectedExpiry = now_datetime()->modify('+30 days');
-        $diff = $expiresAt->diff($expectedExpiry);
+        $this->assertEquals(
+            30,
+            $capturedAccessData['duration_days']
+        );
 
-        $this->assertLessThan(60, $diff->s); // Within 60 seconds
+        $expiresAt = new \DateTime(
+            $capturedAccessData['expires_at']
+        );
+
+        $expectedExpiry = now_datetime()
+            ->modify('+30 days');
+
+        $differenceInSeconds = abs(
+            $expiresAt->getTimestamp()
+            - $expectedExpiry->getTimestamp()
+        );
+
+        $this->assertLessThan(
+            60,
+            $differenceInSeconds
+        );
     }
 
     protected function setUp(): void
@@ -343,11 +477,14 @@ class SingleContentAccessServiceTest extends FunctionalTestCase
         $this->stripeProcessorMock = m::mock(StripePaymentProcessor::class);
         $this->paymentRepositoryMock = m::mock(PaymentRepository::class);
         $this->databaseMock = m::mock(Database::class);
+        $this->stripePaymentIntentGateway = m::mock(StripePaymentIntentGateway::class);
+        $this->stripeCustomerGateway = m::mock(StripeCustomerGateway::class);
 
         $this->service = new SingleContentAccessService(
             $this->repositoryMock,
             $this->paymentRepositoryMock,
-            $this->stripeProcessorMock,
+            $this->stripePaymentIntentGateway,
+            $this->stripeCustomerGateway,
             $this->databaseMock
         );
 

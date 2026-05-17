@@ -27,6 +27,10 @@ class SubscriptionPlanPricingResource extends JsonResource
             'stripe_price_id' => $this->getAttribute('stripe_price_id'),
             'created_at' => $this->getAttribute('created_at')?->format('Y-m-d H:i:s'),
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d H:i:s'),
+            'trial_days'            => $this->getAttribute('trial_days'),
+            'intro_price'           => $this->getAttribute('intro_price'),
+            'intro_cycles'          => $this->getAttribute('intro_cycles'),
+            'stripe_intro_price_id' => $this->getAttribute('stripe_intro_price_id'),
         ];
     }
 }

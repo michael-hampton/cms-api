@@ -15,6 +15,8 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
 use App\Services\Subscriptions\SubscriptionBillingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -325,16 +327,16 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
         $this->databaseMock = m::mock(Database::class);
         $this->strategyResolver    = m::mock(SubscriptionPricingStrategyResolver::class);
-        $this->subscriptionGateway = m::mock(StripeSubscriptionGatewayInterface::class);
-        $this->scheduleGateway     = m::mock(StripeSubscriptionScheduleGatewayInterface::class);
+        $this->subscriptionGateway = m::mock(StripeSubscriptionGateway::class);
+        $this->scheduleGateway     = m::mock(StripeSubscriptionScheduleGateway::class);
 
         $this->service = new SubscriptionBillingService(
             $this->subscriptionRepository,
             $this->stripeProcessor,
             $this->databaseMock,
             $this->strategyResolver,
-            $this->subscriptionGateway,
             $this->scheduleGateway,
+            $this->subscriptionGateway,
         );
     }
 

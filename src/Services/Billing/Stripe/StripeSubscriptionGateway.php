@@ -26,9 +26,19 @@ use Stripe\StripeClient;
  */
 class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
 {
+    private StripeClient $stripe;
+
     public function __construct(
-        private readonly StripeClient $stripe,
-    ) {}
+        ?StripeClient                      $stripeClient = null
+    )
+    {
+        if ($stripeClient) {
+            $this->stripe = $stripeClient;
+        } else {
+            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
+            $this->stripe = new StripeClient($secretKey);
+        }
+    }
 
     public function create(CreateStripeSubscriptionDto $dto): StripeSubscriptionResultDto
     {

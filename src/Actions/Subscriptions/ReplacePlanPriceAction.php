@@ -122,32 +122,37 @@ class ReplacePlanPriceAction
         array                   $overrides,
         string                  $stripePriceId,
         string                  $normalisedCurrency,
-    ): array
-    {
+    ): array {
         return array_merge(
         // Copy all logical properties from the current row.
             [
-                'plan_id' => $current->plan_id,
-                'duration_months' => $current->duration_months,
-                'issue_count' => $current->issue_count,
-                'price' => $current->price,
-                'sale_price' => $current->sale_price,
-                'digital_price' => $current->digital_price,
+                'plan_id'            => $current->plan_id,
+                'duration_months'    => $current->duration_months,
+                'issue_count'        => $current->issue_count,
+                'price'              => $current->price,
+                'sale_price'         => $current->sale_price,
+                'digital_price'      => $current->digital_price,
                 'digital_sale_price' => $current->digital_sale_price,
-                'currency' => $current->currency,
-                'label' => $current->label,
+                'currency'           => $current->currency,
+                'label'              => $current->label,
                 'period_description' => $current->period_description,
-                'is_default' => $current->is_default,
-                'sort_order' => $current->sort_order,
-                'discount_percentage' => $current->discount_percentage,
+                'is_default'         => $current->is_default,
+                'sort_order'         => $current->sort_order,
+                'discount_percentage'=> $current->discount_percentage,
+
+                // Copy intro/trial fields from the current row — overrides may change them
+                'trial_days'         => $current->trial_days,
+                'intro_price'        => $current->intro_price,
+                'intro_cycles'       => $current->intro_cycles,
             ],
             // Apply caller-supplied overrides.
             $overrides,
             // Always enforce these — callers cannot override them.
             [
-                'currency' => $normalisedCurrency,
-                'stripe_price_id' => $stripePriceId,
-                'is_active' => true,
+                'currency'              => $normalisedCurrency,
+                'stripe_price_id'       => $stripePriceId,
+                'stripe_intro_price_id' => null, // must re-sync after replacement
+                'is_active'             => true,
             ]
         );
     }

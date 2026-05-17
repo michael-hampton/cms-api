@@ -78,7 +78,12 @@ class AddPlanPriceAction
         // 4. Persist PlanPricing without stripe_price_id.
         $pricing = $this->pricingRepository->create(array_merge(
             $pricingData,
-            ['plan_id' => $planId, 'currency' => $currency, 'stripe_price_id' => null]
+            [
+                'plan_id'               => $planId,
+                'currency'              => $currency,
+                'stripe_price_id'       => null,
+                'stripe_intro_price_id' => null, // populated later by sync:stripe-prices
+            ]
         ));
 
         // 5. Create Stripe Price — throws on failure; pricing row exists but stripe_price_id stays null.

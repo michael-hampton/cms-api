@@ -42,6 +42,10 @@ class StripePaymentProcessor
         }
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function processSubscriptionPayment(
         Subscription     $subscription,
         SubscriptionPlan $plan,
@@ -254,6 +258,10 @@ class StripePaymentProcessor
         ];
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function createStripeSubscription(
         string           $customerId,
         SubscriptionPlan $plan,
@@ -386,6 +394,10 @@ class StripePaymentProcessor
         };
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function processOneTimePayment(array $orderData, array $paymentData): array
     {
         try {
@@ -512,6 +524,10 @@ class StripePaymentProcessor
         }
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function createRefund(string $paymentIntentId, array $options = []): array
     {
         try {
@@ -717,12 +733,8 @@ class StripePaymentProcessor
     }
 
     /**
-     * Process a refund for a payment
-     *
-     * @param string $transactionId The Stripe charge or payment intent ID
-     * @param float $amount The amount to refund (in dollars)
-     * @param array $options Additional options (reason, metadata, etc.)
-     * @return array Result with success status, refund_id, and message
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
      */
     public function refund(string $transactionId, float $amount, array $options = []): array
     {
@@ -802,6 +814,10 @@ class StripePaymentProcessor
         return false;
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function createPaymentIntent(array $orderData): array
     {
         try {
@@ -832,8 +848,8 @@ class StripePaymentProcessor
     }
 
     /**
-     * Create payment intent with customer for one-time subscriptions
-     * This ensures payment methods are saved for future use
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
      */
     public function createPaymentIntentWithCustomer(array $orderData): array
     {
@@ -992,6 +1008,10 @@ class StripePaymentProcessor
         }
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function processSubscriptionPaymentWithVoucher(
         Subscription     $subscription,
         SubscriptionPlan $plan,
@@ -1249,6 +1269,10 @@ class StripePaymentProcessor
         };
     }
 
+    /**
+     * @deprecated Use SubscriptionBillingService::createSubscription() instead.
+     *             Voucher handling belongs in the discount resolution layer, not here.
+     */
     public function confirmPaymentIntent(string $paymentIntentId): array
     {
         try {

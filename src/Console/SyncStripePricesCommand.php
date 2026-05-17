@@ -42,10 +42,7 @@ class SyncStripePricesCommand extends Command
             return self::SUCCESS;
         }
 
-        $plansById = SubscriptionPlan::query()
-            ->whereIn('id', $planIds)
-            ->get()
-            ->keyBy('id');
+        $plansById = $this->resolvePlansById($planIds); // ← extracted
 
         if (!$introOnly) {
             $this->syncStandardPrices($result, $dryRun, $planId, $planIds, $plansById);
@@ -58,6 +55,14 @@ class SyncStripePricesCommand extends Command
         return $result->hasFailures() ? self::FAILURE : self::SUCCESS;
     }
 
+    protected function resolvePlansById(array $planIds): object
+    {
+        return SubscriptionPlan::query()
+            ->whereIn('id', $planIds)
+            ->get()
+            ->keyBy('id');
+    }
+
     // ── Standard price sync ──────────────────────────────────────────────────
 
     private function syncStandardPrices(
@@ -67,16 +72,7 @@ class SyncStripePricesCommand extends Command
         array  $planIds,
         object $plansById,
     ): void {
-        $query = SubscriptionPlanPricing::query()
-            ->whereNull('stripe_price_id')
-            ->where('is_active', true)
-            ->whereIn('plan_id', $planIds);
-
-        if ($planIdFilter !== null) {
-            $query->where('plan_id', $planIdFilter);
-        }
-
-        $rows = $query->get();
+        $rows = $this->queryStandardRows($planIds, $planIdFilter); // ← delegate
 
         if ($rows->isEmpty()) {
             $this->info('No unsynced standard pricing rows found.');
@@ -144,19 +140,7 @@ class SyncStripePricesCommand extends Command
         array  $planIds,
         object $plansById,
     ): void {
-        // Rows that have intro pricing configured but no Stripe intro price yet
-        $query = SubscriptionPlanPricing::query()
-            ->whereNotNull('intro_price')
-            ->whereNotNull('intro_cycles')
-            ->whereNull('stripe_intro_price_id')
-            ->where('is_active', true)
-            ->whereIn('plan_id', $planIds);
-
-        if ($planIdFilter !== null) {
-            $query->where('plan_id', $planIdFilter);
-        }
-
-        $rows = $query->get();
+        $rows = $this->queryIntroRows($planIds, $planIdFilter); // ← delegate
 
         if ($rows->isEmpty()) {
             $this->info('No unsynced intro pricing rows found.');

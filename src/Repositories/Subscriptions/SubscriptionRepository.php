@@ -291,10 +291,12 @@ class SubscriptionRepository extends Repository
             ]) !== null;
     }
 
-    public function updateLastPaymentDate(int $subscriptionId, \DateTime $lastPaymentDate): bool
+    public function updateLastPaymentDate(int $subscriptionId, ?\DateTime $lastPaymentDate = null): bool
     {
+        $lastPaymentDate ??= new \DateTime();
+
         return $this->update($subscriptionId, [
-                'last_payment_date' => $lastPaymentDate->format('Y-m-d H:i:s')
+                'last_payment_date' => $lastPaymentDate->format('Y-m-d H:i:s'),
             ]) !== null;
     }
 
@@ -367,21 +369,25 @@ class SubscriptionRepository extends Repository
     /**
      * Check if a pending payment already exists for the current billing cycle
      */
-    public function hasPendingPaymentForCycle(int $subscriptionId, \DateTime $billingDate): bool
+    public function hasPendingPaymentForCycle(int $subscriptionId, ?\DateTime $billingDate = null): bool
     {
-        $startOfDay = (clone $billingDate)->setTime(0, 0, 0);
-        $endOfDay = (clone $billingDate)->setTime(23, 59, 59);
+        $billingDate ??= new \DateTime();
 
-        $query = "SELECT COUNT(*) as count 
-                  FROM payments 
-                  WHERE subscription_id = ? 
-                  AND status = 'pending' 
-                  AND created_at BETWEEN ? AND ?";
+        $startOfDay = (clone $billingDate)->setTime(0, 0, 0);
+        $endOfDay   = (clone $billingDate)->setTime(23, 59, 59);
+
+        $query = "
+        SELECT COUNT(*) as count 
+        FROM payments 
+        WHERE subscription_id = ? 
+        AND status = 'pending' 
+        AND created_at BETWEEN ? AND ?
+    ";
 
         $result = $this->database->query($query, [
             $subscriptionId,
             $startOfDay->format('Y-m-d H:i:s'),
-            $endOfDay->format('Y-m-d H:i:s')
+            $endOfDay->format('Y-m-d H:i:s'),
         ]);
 
         return ($result[0]['count'] ?? 0) > 0;

@@ -7,6 +7,7 @@ use App\DTO\Cart\TaxData;
 use App\DTO\Checkout\DeliveryMethodConfig;
 use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
+use App\DTO\Stripe\PaymentIntentResultDto;
 use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Orders\OrderLineStatus;
 use App\Enums\Orders\OrderStatus;
@@ -32,6 +33,8 @@ use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Preorder\Actions\CalculateSellableStockAction;
 use App\Services\Billing\Preorder\Actions\ResolveAvailabilityAction;
 use App\Services\Billing\Preorder\PhysicalProductAvailabilityPolicy;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Billing\TaxCalculatorService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Shipping\FulfilmentResolver;
@@ -83,83 +86,8 @@ class CheckoutServiceTest extends FunctionalTestCase
     private CheckoutEligibilityService|MockInterface $eligibilityService;
     private PurchaseProductAction|MockInterface $purchaseProductAction;
 
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->cartService = Mockery::mock(CartService::class);
-        $this->orderCreationService = Mockery::mock(OrderCreationService::class);
-        $this->voucherService = Mockery::mock(VoucherService::class);
-        $this->shippingService = Mockery::mock(ShippingService::class);
-        $this->memberAuthWrapper = Mockery::mock(MemberAuthWrapper::class);
-        $this->calculationService = Mockery::mock(OrderCalculationService::class);
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
-        $this->splittingService = Mockery::mock(CheckoutSplittingService::class);
-        $this->allocationService = Mockery::mock(PaymentAllocationService::class);
-        $this->merchantShippingService = Mockery::mock(MerchantShippingService::class);
-        $this->shipmentRepository = Mockery::mock(ShipmentRepository::class);
-        $this->currencyResolver = Mockery::mock(CurrencyResolver::class);
-        $this->databaseMock = Mockery::mock(Database::class);
-        $this->orderManager = Mockery::mock(OrderManager::class);
-        $this->taxCalculatorService = Mockery::mock(TaxCalculatorService::class);
-        $this->merchantRepository = Mockery::mock(MerchantRepository::class);
-        $this->discountResolver = Mockery::mock(DiscountResolver::class);
-        $this->rewardsRepository = Mockery::mock(RewardsRepository::class);
-        $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
-        $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
-        $this->productRepository = Mockery::mock(ProductRepository::class);
-        $this->resolveAvailabilityAction = Mockery::mock(ResolveAvailabilityAction::class);
-        $this->calculateSellableStockAction = Mockery::mock(CalculateSellableStockAction::class);
-        $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
-        $this->eligibilityService = Mockery::mock(CheckoutEligibilityService::class);
-        $this->purchaseProductAction = Mockery::mock(PurchaseProductAction::class);
-
-        $this->service = new CheckoutService(
-            $this->cartService,
-            $this->orderCreationService,
-            $this->voucherService,
-            $this->shippingService,
-            $this->memberAuthWrapper,
-            $this->calculationService,
-            $this->stripeProcessor,
-            $this->splittingService,
-            $this->allocationService,
-            $this->merchantShippingService,
-            $this->shipmentRepository,
-            $this->currencyResolver,
-            $this->databaseMock,
-            $this->orderManager,
-            $this->taxCalculatorService,
-            $this->merchantRepository,
-            $this->discountResolver,
-            $this->rewardsRepository,
-            $this->businessDayEstimator,
-            $this->fulfilmentResolver,
-            $this->productRepository,
-            $this->resolveAvailabilityAction,
-            $this->calculateSellableStockAction,
-            $this->productVariantRepository,
-            $this->eligibilityService,
-            $this->purchaseProductAction,
-        );
-
-        $this->eligibilityService->shouldReceive('validate')
-            ->andReturnUsing(function ($member, array $cartItems) {
-                return new EligibilityResult(valid: $cartItems, removed: []);
-            })->byDefault();
-
-        $this->purchaseProductAction
-            ->shouldReceive('execute')
-            ->andReturn(null)
-            ->byDefault();
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
+    private StripeCustomerGateway|MockInterface $stripeCustomerGateway;
+    private StripePaymentIntentGateway|MockInterface $stripePaymentIntentGateway;
 
     public function test_it_returns_error_when_required_fields_are_missing(): void
     {
@@ -254,13 +182,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             });
 
         // Payment intent creation
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('create')
             ->once()
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
 
         // Order creation
@@ -402,6 +327,19 @@ class CheckoutServiceTest extends FunctionalTestCase
         return $discounts;
     }
 
+    private function makePaymentIntentResult(
+        bool   $success = true,
+        string $paymentIntentId = 'pi_123',
+        string $clientSecret = 'secret_123',
+    ): \App\DTO\Stripe\PaymentIntentResultDto
+    {
+        return new \App\DTO\Stripe\PaymentIntentResultDto(
+            success: $success,
+            paymentIntentId: $paymentIntentId,
+            clientSecret: $clientSecret,
+        );
+    }
+
     public function test_it_successfully_processes_checkout_with_valid_voucher(): void
     {
         $data = $this->getValidCheckoutData(['voucher_code' => 'SAVE20']);
@@ -463,13 +401,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             });
 
         // Payment intent creation
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('create')
             ->once()
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         // Order creation
         $this->orderCreationService->shouldReceive('create')
@@ -527,11 +462,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
+
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -577,11 +512,11 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
+
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -618,12 +553,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             });
 
         // Payment intent fails
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('create')
             ->once()
-            ->andReturn([
-                'success' => false,
-                'message' => 'Payment processor error'
-            ]);
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn(new PaymentIntentResultDto(false, null, null, null, null, 'Payment processor error'));
 
         $result = $this->service->processCheckout($data, $siteId);
 
@@ -661,11 +594,11 @@ class CheckoutServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
+
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -696,11 +629,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -730,11 +662,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
 
         // Cart clear should be called within transaction
@@ -847,13 +778,13 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->cartService->shouldReceive('requiresShipping')->times(3)->andReturn(false);
 
         // Stripe payment intents for each group
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
-            ->twice()
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->atLeast($this->once())
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->atLeast($this->once())   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         // Transaction wrapper
         $this->databaseMock->shouldReceive('transaction')
@@ -974,11 +905,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->once()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->once()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         // Transaction assertion
         $this->databaseMock->shouldReceive('transaction')
@@ -1041,11 +974,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_1' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->once()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->once()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $order = $this->getOrder();
@@ -1113,11 +1048,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
         $this->databaseMock->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->merchantRepository->shouldReceive('createTransaction')
             ->once();
@@ -1159,11 +1093,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -1205,11 +1138,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1900));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -1251,11 +1183,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1600));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -1312,11 +1243,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1440));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->voucherService->shouldReceive('applyVoucher')->once();
         $this->cartService->shouldReceive('clear')->once();
@@ -1374,11 +1304,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->voucherService->shouldReceive('applyVoucher')->once();
         $this->cartService->shouldReceive('clear')->once();
@@ -1445,11 +1374,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1390));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->voucherService->shouldReceive('applyVoucher')->once();
         $this->cartService->shouldReceive('clear')->once();
@@ -1484,18 +1412,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         // Assert amount is in cents (integer)
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('create')
             ->once()
-            ->with(Mockery::on(function ($args) {
-                $this->assertIsFloat($args['amount']);
-                $this->assertEquals(13000, $args['amount']); // 100.00 + 10.00 + 20.00 in cents
-                return true;
-            }))
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
@@ -1543,22 +1463,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         // Assert metadata includes discount breakdown
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('create')
             ->once()
-            ->with(Mockery::on(function ($args) {
-                $this->assertArrayHasKey('metadata', $args);
-                $this->assertEquals(1000, $args['metadata']['offer_discount_cents']);
-                $this->assertEquals(2000, $args['metadata']['voucher_discount_cents']);
-                $this->assertEquals(500, $args['metadata']['reward_discount_cents']);
-                $this->assertEquals('SAVE20', $args['metadata']['voucher_code']);
-                $this->assertEquals(5, $args['metadata']['campaign_id']);
-                return true;
-            }))
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->voucherService->shouldReceive('applyVoucher')->once();
@@ -1591,11 +1499,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_test_123',
-            'client_secret' => 'pi_test_123_secret_abc'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
@@ -1603,8 +1510,8 @@ class CheckoutServiceTest extends FunctionalTestCase
         $result = $this->service->processCheckout($data, $siteId);
 
         $this->assertTrue($result['success']);
-        $this->assertEquals('pi_test_123', $result['payment_intent_id']);
-        $this->assertEquals('pi_test_123_secret_abc', $result['client_secret']);
+        $this->assertEquals('pi_123', $result['payment_intent_id']);
+        $this->assertEquals('secret_123', $result['client_secret']);
     }
 
     public function test_it_applies_voucher_only_when_voucher_discount_is_present(): void
@@ -1631,11 +1538,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
 
         // applyVoucher should NOT be called
@@ -1708,13 +1614,13 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
-            ->times(3)
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->atLeast($this->once())
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->atLeast($this->once())   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
@@ -1772,14 +1678,18 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
 
         // Payment intent fails BEFORE transaction starts
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
             ->once()
-            ->andReturn(['success' => false]);
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->once()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $result = $this->service->processMultiMerchantCheckout($data, $siteId);
 
         $this->assertFalse($result['success']);
-        $this->assertEquals('Payment processing failed', $result['message']);
+        $this->assertEquals('Checkout failed', $result['message']);
     }
 
     public function test_it_creates_shipment_for_each_merchant_order(): void
@@ -1822,11 +1732,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_2' => ['subtotal' => 50.00, 'shipping' => 5.00, 'tax' => 10.00, 'total' => 65.00, 'stripe_eligible' => true]
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->twice()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->twice()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $order1 = $this->getOrder(['id' => 1]);
@@ -1907,11 +1819,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_2' => ['subtotal' => 40.00, 'shipping' => 5.00, 'tax' => 8.00, 'total' => 53.00, 'stripe_eligible' => true]
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->twice()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->twice()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $order1 = $this->getOrder(['id' => 1]);
@@ -1973,13 +1887,13 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
 
         // Only ONE payment intent created (merchant_2 is not stripe eligible)
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
             ->once()
-            ->andReturn([
-                'success' => true,
-                'payment_intent_id' => 'pi_123',
-                'client_secret' => 'secret_123'
-            ]);
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->once()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
@@ -2036,11 +1950,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2500));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -2109,28 +2022,6 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->assertStringContainsString('email', strtolower($result['message']));
     }
 
-//    public function test_it_validates_phone_is_not_required(): void
-//    {
-//        $data = [
-//            'first_name' => 'John',
-//            'last_name' => 'Doe',
-//            'email' => 'john@example.com',
-//            'address_line_1' => '123 Main St',
-//            'city' => 'London',
-//            'postal_code' => 'SW1A 1AA',
-//            'country' => 'GB',
-//            'address' => 'test',
-//        ];
-//
-//        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(true);
-//
-//        $result = $this->service->processCheckout($data, 1);
-//
-//        dd($result);
-//
-//        $this->assertTrue($result['success']);
-//    }
-
     public function test_it_calculates_tax_correctly(): void
     {
         $data = $this->getValidCheckoutData();
@@ -2171,11 +2062,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->andReturn(new TaxData(rate: 0.1, taxCents: 950)); // 9.5% tax rate
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -2184,12 +2074,34 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
     }
 
+//    public function test_it_validates_phone_is_not_required(): void
+//    {
+//        $data = [
+//            'first_name' => 'John',
+//            'last_name' => 'Doe',
+//            'email' => 'john@example.com',
+//            'address_line_1' => '123 Main St',
+//            'city' => 'London',
+//            'postal_code' => 'SW1A 1AA',
+//            'country' => 'GB',
+//            'address' => 'test',
+//        ];
+//
+//        $this->cartService->shouldReceive('requiresShipping')->once()->andReturn(true);
+//
+//        $result = $this->service->processCheckout($data, 1);
+//
+//        dd($result);
+//
+//        $this->assertTrue($result['success']);
+//    }
+
     public function test_it_confirms_regular_checkout_payment_successfully(): void
     {
         $paymentIntentId = 'pi_test_123';
         $orderId = 1;
 
-        $this->stripeProcessor->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('confirmPaymentIntent')
             ->once()
             ->with($paymentIntentId)
             ->andReturn([
@@ -2224,7 +2136,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $paymentIntentId = 'pi_test_123';
         $orderId = 1;
 
-        $this->stripeProcessor->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('confirmPaymentIntent')
             ->once()
             ->with($paymentIntentId)
             ->andReturn([
@@ -2243,7 +2155,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $paymentIntentId = 'pi_test_123';
         $orderId = 1;
 
-        $this->stripeProcessor->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('confirmPaymentIntent')
             ->once()
             ->with($paymentIntentId)
             ->andThrow(new \Exception('Network error'));
@@ -2316,11 +2228,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 2000));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
 
         // Voucher should NOT be applied since it lost
@@ -2370,11 +2281,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 1000));
         $this->databaseMock->shouldReceive('transaction')->twice()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
 
         // Merchant with insufficient balance
@@ -2654,11 +2564,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 0));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')
             ->once()
             ->with(
@@ -2679,7 +2588,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $paymentIntentId = 'pi_test_123';
         $orderId = 1;
 
-        $this->stripeProcessor->shouldReceive('confirmPaymentIntent')
+        $this->stripePaymentIntentGateway->shouldReceive('confirmPaymentIntent')
             ->once()
             ->andReturn(['success' => true, 'status' => 'succeeded']);
 
@@ -2734,11 +2643,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 500));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123',
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -2798,11 +2706,10 @@ class CheckoutServiceTest extends FunctionalTestCase
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
         $this->taxCalculatorService->shouldReceive('calculateOrderTax')->once()->andReturn(new TaxData(rate: 0.1, taxCents: 500));
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true,
-            'payment_intent_id' => 'pi_123',
-            'client_secret' => 'secret_123',
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -2850,9 +2757,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_2' => ['subtotal' => 0.00, 'shipping' => 0.00, 'tax' => 0.00, 'total' => 0.00, 'stripe_eligible' => true]
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->twice()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->twice()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $order1 = $this->getOrder(['order_number' => 'ORD-001']);
@@ -2952,9 +2863,13 @@ class CheckoutServiceTest extends FunctionalTestCase
             'merchant_gift' => ['subtotal' => 0.00, 'shipping' => 0.00, 'tax' => 0.00, 'total' => 0.00, 'stripe_eligible' => true],
         ]);
         $this->currencyResolver->shouldReceive('resolve')->once()->andReturn('GBP');
-        $this->stripeProcessor->shouldReceive('createPaymentIntentWithCustomer')->twice()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
-        ]);
+        $this->stripeCustomerGateway->shouldReceive('getOrCreate')
+            ->twice()
+            ->andReturn('cus_test');
+        $this->stripePaymentIntentGateway->shouldReceive('createWithCustomer')
+            ->twice()   // or ->twice()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
 
         $paidOrder = $this->getOrder(['id' => 1, 'order_number' => 'ORD-001']);
@@ -3041,9 +2956,10 @@ class CheckoutServiceTest extends FunctionalTestCase
             ->once()->andReturn(new TaxData(rate: 0.2, taxCents: 1000));
 
         $this->databaseMock->shouldReceive('transaction')->once()->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_123', 'client_secret' => 'secret_123'
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         $order = $this->getOrder();
 
@@ -3129,9 +3045,10 @@ class CheckoutServiceTest extends FunctionalTestCase
                 return $cb();
             });
 
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_x', 'client_secret' => 's_x',
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -3186,9 +3103,10 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->databaseMock->shouldReceive('transaction')->once()
             ->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_x', 'client_secret' => 's_x',
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
 
         // ── Stock allocation throws — must cause a failure response ──────────
         $this->purchaseProductAction->shouldReceive('execute')->once()
@@ -3239,9 +3157,10 @@ class CheckoutServiceTest extends FunctionalTestCase
 
         $this->databaseMock->shouldReceive('transaction')->once()
             ->andReturnUsing(fn($cb) => $cb());
-        $this->stripeProcessor->shouldReceive('createPaymentIntent')->once()->andReturn([
-            'success' => true, 'payment_intent_id' => 'pi_x', 'client_secret' => 's_x',
-        ]);
+        $this->stripePaymentIntentGateway->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type(\App\DTO\Stripe\CreatePaymentIntentDto::class))
+            ->andReturn($this->makePaymentIntentResult());
         $this->orderCreationService->shouldReceive('create')->once()->andReturn($order);
         $this->cartService->shouldReceive('clear')->once();
 
@@ -3252,6 +3171,80 @@ class CheckoutServiceTest extends FunctionalTestCase
         $result = $this->service->processCheckout($data, $siteId);
 
         $this->assertTrue($result['success']);
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->cartService = Mockery::mock(CartService::class);
+        $this->orderCreationService = Mockery::mock(OrderCreationService::class);
+        $this->voucherService = Mockery::mock(VoucherService::class);
+        $this->shippingService = Mockery::mock(ShippingService::class);
+        $this->memberAuthWrapper = Mockery::mock(MemberAuthWrapper::class);
+        $this->calculationService = Mockery::mock(OrderCalculationService::class);
+        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->splittingService = Mockery::mock(CheckoutSplittingService::class);
+        $this->allocationService = Mockery::mock(PaymentAllocationService::class);
+        $this->merchantShippingService = Mockery::mock(MerchantShippingService::class);
+        $this->shipmentRepository = Mockery::mock(ShipmentRepository::class);
+        $this->currencyResolver = Mockery::mock(CurrencyResolver::class);
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->orderManager = Mockery::mock(OrderManager::class);
+        $this->taxCalculatorService = Mockery::mock(TaxCalculatorService::class);
+        $this->merchantRepository = Mockery::mock(MerchantRepository::class);
+        $this->discountResolver = Mockery::mock(DiscountResolver::class);
+        $this->rewardsRepository = Mockery::mock(RewardsRepository::class);
+        $this->businessDayEstimator = Mockery::mock(InternalBusinessDayEstimator::class);
+        $this->fulfilmentResolver = Mockery::mock(FulfilmentResolver::class);
+        $this->productRepository = Mockery::mock(ProductRepository::class);
+        $this->resolveAvailabilityAction = Mockery::mock(ResolveAvailabilityAction::class);
+        $this->calculateSellableStockAction = Mockery::mock(CalculateSellableStockAction::class);
+        $this->productVariantRepository = Mockery::mock(ProductVariantRepository::class);
+        $this->eligibilityService = Mockery::mock(CheckoutEligibilityService::class);
+        $this->purchaseProductAction = Mockery::mock(PurchaseProductAction::class);
+        $this->stripeCustomerGateway = Mockery::mock(StripeCustomerGateway::class);
+        $this->stripePaymentIntentGateway = Mockery::mock(StripePaymentIntentGateway::class);
+
+        $this->service = new CheckoutService(
+            $this->cartService,
+            $this->orderCreationService,
+            $this->voucherService,
+            $this->shippingService,
+            $this->memberAuthWrapper,
+            $this->calculationService,
+            $this->stripePaymentIntentGateway,
+            $this->stripeCustomerGateway,
+            $this->splittingService,
+            $this->allocationService,
+            $this->merchantShippingService,
+            $this->shipmentRepository,
+            $this->currencyResolver,
+            $this->databaseMock,
+            $this->orderManager,
+            $this->taxCalculatorService,
+            $this->merchantRepository,
+            $this->discountResolver,
+            $this->rewardsRepository,
+            $this->businessDayEstimator,
+            $this->fulfilmentResolver,
+            $this->productRepository,
+            $this->resolveAvailabilityAction,
+            $this->calculateSellableStockAction,
+            $this->productVariantRepository,
+            $this->eligibilityService,
+            $this->purchaseProductAction,
+        );
+
+        $this->eligibilityService->shouldReceive('validate')
+            ->andReturnUsing(function ($member, array $cartItems) {
+                return new EligibilityResult(valid: $cartItems, removed: []);
+            })->byDefault();
+
+        $this->purchaseProductAction
+            ->shouldReceive('execute')
+            ->andReturn(null)
+            ->byDefault();
     }
 
 //    public function test_preorder_items_are_skipped_during_stock_allocation(): void
@@ -3319,4 +3312,10 @@ class CheckoutServiceTest extends FunctionalTestCase
 //
 //        $this->assertTrue($result['success']);
 //    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
 }

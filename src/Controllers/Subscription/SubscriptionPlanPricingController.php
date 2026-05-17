@@ -10,7 +10,7 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
-use App\Requests\Offers\CreatePricingTierRequest;
+use App\Requests\Subscription\CreatePricingTierRequest;
 use App\Requests\Subscription\UpdatePricingTierRequest;
 use App\Resources\SubscriptionPlanPricingResource;
 use App\Search\SearchCriteriaParser;

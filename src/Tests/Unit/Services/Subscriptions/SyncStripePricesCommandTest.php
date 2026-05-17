@@ -43,7 +43,10 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
         $this->stripePriceGateway
             ->shouldReceive('createRecurringPrice')
             ->once()
-            ->with('prod_abc', 999, m::any(), m::any())
+            ->withArgs(function (...$args) {
+                return $args[0] === 'prod_abc'
+                    && $args[1] === 999;
+            })
             ->andReturn('price_std_new');
 
         $this->pricingRepository
@@ -51,7 +54,11 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
             ->once()
             ->with(10, ['stripe_price_id' => 'price_std_new']);
 
-        $command = $this->makeCommand(plans: [$plan], standardRows: [$pricing], introRows: []);
+        $command = $this->makeCommand(
+            plans: [$plan],
+            standardRows: [$pricing],
+            introRows: [],
+        );
 
         $exitCode = $command->handle();
 
@@ -387,23 +394,27 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
                 $this->planRepository,
                 $this->stripePriceGateway,
             ])
-            ->onlyMethods(['resolvePlanIds', 'queryStandardRows', 'queryIntroRows', 'option', 'info'])
+            ->onlyMethods([
+                'resolvePlanIds',
+                'resolvePlansById',   // ← added
+                'queryStandardRows',
+                'queryIntroRows',
+                'option',
+                'info',
+            ])
             ->getMock();
 
-        $planIds = array_map(fn ($p) => $p->id, $plans);
+        $planIds    = array_map(fn ($p) => $p->id, $plans);
+        $keyedPlans = collect($plans)->keyBy('id');
 
         $command->method('resolvePlanIds')->willReturn($planIds);
+        $command->method('resolvePlansById')->willReturn($keyedPlans);  // ← added
         $command->method('queryStandardRows')->willReturn(collect($standardRows));
         $command->method('queryIntroRows')->willReturn(collect($introRows));
         $command->method('info');
-
         $command->method('option')->willReturnCallback(
             fn (string $key) => $options[$key] ?? false
         );
-
-        // Wire plansById — commands need the keyed collection
-        // We inject plans as a pre-keyed collection via protected method override.
-        // If your framework supports it, alternatively bind via service container.
 
         return $command;
     }
