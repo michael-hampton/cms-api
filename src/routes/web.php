@@ -622,6 +622,7 @@ $router->group(['middleware' => [RequireContributorAuth::class, CheckContributor
     $router->get('/{site}/open-collab/onboarding/dashboard', [OnboardingDashboardController::class, 'index']);
     $router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index']);
     $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index']);
+    $router->get('/{site}/open-collab/contributor/dashboard', [\App\Controllers\OpenCollab\DashboardPageNewController::class, 'index']);
     $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings']);
     $router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
     $router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);

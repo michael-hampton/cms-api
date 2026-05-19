@@ -1010,4 +1010,41 @@ class PageRepository extends Repository
             ->where('contributor_id', $contributorId)
             ->exists();
     }
+
+    public function countPendingReview(?int $siteId = null): int
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        return Page::where('site_id', $siteId)
+            ->where('status', 'waiting_approval')
+            ->count();
+    }
+
+    public function getPendingReview(?int $siteId = null, int $limit = 10): \App\Framework\Support\Collection
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        return Page::with(['pageAuthors', 'pageAuthors.author'])
+            ->where('site_id', $siteId)
+            ->where('status', 'waiting_approval')
+            ->orderBy('updated_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function getPendingApproval(?int $assignedTo = null, ?int $siteId = null): \App\Framework\Support\Collection
+    {
+        $siteId = $siteId ?? $this->siteId;
+
+        $query = Page::with(['pageAuthors', 'pageAuthors.author'])
+            ->where('site_id', $siteId)
+            ->where('status', 'waiting_approval')
+            ->orderBy('updated_at', 'desc');
+
+        if ($assignedTo !== null) {
+            $query->where('owner_id', $assignedTo);
+        }
+
+        return $query->get();
+    }
 }
