@@ -9,8 +9,8 @@ class TaxData
         public float   $ratePercentage = 0,
         public ?string $jurisdiction = null,
         public bool    $includesShipping = false,
-        public float   $taxCents = 0,
-        public float   $taxableAmountCents = 0,
+        public int   $taxCents = 0,
+        public int   $taxableAmountCents = 0,
         public bool    $exempt = false
     )
     {

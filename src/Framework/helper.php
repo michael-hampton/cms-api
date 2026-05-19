@@ -242,43 +242,43 @@ if (!function_exists('config')) {
      * @param mixed $default
      * @return mixed
      */
-    function config(string $key, $default = null)
+    function config(string $key, mixed $default = null): mixed
     {
         static $config = null;
 
         if ($config === null) {
-            // Load all config files
             $config = [];
 
-            $configFiles = [
-                'app' => 'config/app.php',
-                'print' => 'config/print.php',
-                'legal' => 'config/legal.php',
-                'boost' => 'config/boost.php',
-                'database' => 'config/database.php',
-                'routing' => 'config/routing.php',
-                'recommendations' => 'config/recommendations.php',
-                'commission' => 'config/commission.php',
-                'bundles' => 'config/bundles.php',
-                'shipping' => 'config/shipping.php',
-            ];
+            foreach (glob(base_path('config/*.php')) as $file) {
 
-            foreach ($configFiles as $name => $file) {
-                $file = base_path($file);
-                if (file_exists($file)) {
-                    $config[$name] = require $file;
+                // Skip class-style files
+                if (preg_match('/[A-Z]/', basename($file))) {
+                    continue;
+                }
+
+                $name = pathinfo($file, PATHINFO_FILENAME);
+
+                $loaded = require $file;
+
+                // Only accept config arrays
+                if (is_array($loaded)) {
+                    $config[$name] = $loaded;
                 }
             }
         }
 
-        // Support dot notation: 'app.debug' or 'database.host'
-        $keys = explode('.', $key);
+        if ($key === '') {
+            return $config;
+        }
+
+        $segments = explode('.', $key);
         $value = $config;
 
-        foreach ($keys as $segment) {
-            if (!isset($value[$segment])) {
+        foreach ($segments as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
                 return $default;
             }
+
             $value = $value[$segment];
         }
 
