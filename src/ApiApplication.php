@@ -162,6 +162,7 @@ use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
 use App\Services\Billing\Stripe\StripeRefundGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Gdpr\Exporters\ActivityExporter;
 use App\Services\Gdpr\Exporters\AddressesExporter;
 use App\Services\Gdpr\Exporters\CommunicationsExporter;
@@ -256,6 +257,7 @@ use App\Services\Vouchers\Providers\VoucherDiscountProvider;
 use DateTimeInterface;
 use Error;
 use Exception;
+use Stripe\StripeClient;
 use Throwable;
 
 require_once __DIR__ . '/bootstrap.php';
@@ -360,6 +362,75 @@ class ApiApplication
             return $registry;
         });
 
+        $this->container->singleton(
+            StripeCustomerGateway::class,
+            fn () => new StripeCustomerGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripePaymentIntentGateway::class,
+            fn () => new StripePaymentIntentGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            Services\Billing\Stripe\StripePaymentIntentGateway::class,
+            fn () => new Services\Billing\Stripe\StripePaymentIntentGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripePriceGateway::class,
+            fn () => new StripePriceGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeProductGateway::class,
+            fn () => new StripeProductGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeRefundGateway::class,
+            fn () => new StripeRefundGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeSubscriptionGateway::class,
+            fn () => new StripeSubscriptionGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
 
         // Bind the channel map for DeliverIssueDeliveryJob.
         // Keys are SubscriptionType enum values.

@@ -14,18 +14,10 @@ use Stripe\StripeClient;
  */
 class StripeRefundGateway implements StripeRefundGatewayInterface
 {
-    private StripeClient $stripe;
-
     public function __construct(
-        ?StripeClient                      $stripeClient = null
+        private readonly StripeClient                      $stripe
     )
     {
-        if ($stripeClient) {
-            $this->stripe = $stripeClient;
-        } else {
-            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
-            $this->stripe = new StripeClient($secretKey);
-        }
     }
 
     /**

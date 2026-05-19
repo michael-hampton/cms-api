@@ -7,16 +7,8 @@ use Stripe\StripeClient;
 
 class StripePriceGateway implements StripePriceGatewayInterface
 {
-    private StripeClient $stripe;
-
-    public function __construct(?StripeClient $stripeClient = null)
+    public function __construct(private readonly StripeClient $stripe)
     {
-        if ($stripeClient) {
-            $this->stripe = $stripeClient;
-        } else {
-            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? config('payment.stripe.secret_key');
-            $this->stripe = new StripeClient($secretKey);
-        }
     }
 
     public function createRecurringPrice(
