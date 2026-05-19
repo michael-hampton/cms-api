@@ -362,6 +362,8 @@ class ApiApplication
             return $registry;
         });
 
+        //stripe
+
         $this->container->singleton(
             StripeCustomerGateway::class,
             fn () => new StripeCustomerGateway(
