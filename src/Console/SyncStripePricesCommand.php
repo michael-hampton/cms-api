@@ -108,7 +108,7 @@ class SyncStripePricesCommand extends Command
             $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
                 $plan->stripe_product_id,
                 (int) round($pricing->price * 100),
-                $pricing->currency,
+                $pricing->currency ?? 'GBP',
                 $pricing->interval ?? 'month',
             );
 
