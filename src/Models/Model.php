@@ -23,6 +23,7 @@ use App\Framework\Database\Relations\RelationshipHandler;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Event;
 use App\Framework\Support\Serializable;
+use App\Framework\Support\Str;
 use BackedEnum;
 use BadMethodCallException;
 use DateTime;
@@ -1671,7 +1672,8 @@ abstract class Model
             return $this->relations[$key] !== null;
         }
 
-        return false;
+        // 👇 important: allow computed properties
+        return method_exists($this, 'get' . Str::studly($key) . 'Attribute');
     }
 
 }

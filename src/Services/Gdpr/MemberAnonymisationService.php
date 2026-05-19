@@ -9,6 +9,7 @@ use App\Models\MemberConsent;
 use App\Models\MemberNote;
 use App\Models\MemberSubscriptionPreference;
 use App\Models\Notification;
+use App\Repositories\Members\MemberRepository;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -36,6 +37,8 @@ final class MemberAnonymisationService
     public function __construct(
         private readonly Database         $database,
         private readonly GdprAuditLogger  $auditLogger,
+        private readonly MemberRepository $memberRepository,
+        private readonly MemberDataCleaner $dataCleaner,
     ) {}
 
     /**
@@ -46,7 +49,7 @@ final class MemberAnonymisationService
      */
     public function anonymise(int $memberId, int $performedByAdminId): void
     {
-        $member = Member::find($memberId);
+        $member = $this->memberRepository->find($memberId);
 
         if (!$member) {
             throw new InvalidArgumentException("Member [{$memberId}] not found.");
@@ -64,11 +67,11 @@ final class MemberAnonymisationService
 
         $this->database->transaction(function () use ($member, $memberId, $performedByAdminId) {
             $this->anonymiseCoreProfile($member);
-            $this->deleteAddresses($memberId);
-            $this->anonymiseConsents($memberId);
-            $this->deleteNotes($memberId);
-            $this->deleteNotifications($memberId);
-            $this->unsubscribeFromNewsletters($member);
+            $this->dataCleaner->deleteAddresses($memberId);
+            $this->dataCleaner->deleteNotes($memberId);
+            $this->dataCleaner->deleteNotifications($memberId);
+            $this->dataCleaner->revokeConsents($memberId);
+            $this->dataCleaner->disableSubscriptions($memberId);
         });
 
         $this->auditLogger->logAdminAction(
@@ -85,7 +88,7 @@ final class MemberAnonymisationService
     {
         $anonEmail = 'deleted-' . $member->id . '@anonymised.invalid';
 
-        $member->update([
+        $this->memberRepository->update($member->id, [
             // Identity — replaced with placeholders
             'first_name'              => 'Deleted',
             'last_name'               => 'User',
@@ -117,43 +120,6 @@ final class MemberAnonymisationService
             'show_activity'           => false,
             'show_badges'             => false,
         ]);
-    }
-
-    private function deleteAddresses(int $memberId): void
-    {
-        Address::where('member_id', $memberId)->delete();
-    }
-
-    private function anonymiseConsents(int $memberId): void
-    {
-        // Revoke all active consents — preserve the rows for legal audit trail
-        MemberConsent::where('member_id', $memberId)
-            ->where('is_granted', true)
-            ->update([
-                'is_granted' => false,
-                'revoked_at' => date('Y-m-d H:i:s'),
-            ]);
-    }
-
-    private function deleteNotes(int $memberId): void
-    {
-        // CRM notes contain PII written by agents — hard delete
-        MemberNote::where('member_id', $memberId)->delete();
-    }
-
-    private function deleteNotifications(int $memberId): void
-    {
-        Notification::where('member_id', $memberId)->delete();
-    }
-
-    private function unsubscribeFromNewsletters(Member $member): void
-    {
-        MemberSubscriptionPreference::where('member_id', $member->id)
-            ->update([
-                'is_active'            => false,
-                'email_notifications'  => false,
-                'newsletter_opt_out'   => true,
-            ]);
     }
 
     private function isAlreadyAnonymised(Member $member): bool

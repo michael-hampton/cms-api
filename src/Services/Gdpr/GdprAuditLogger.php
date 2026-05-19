@@ -12,7 +12,7 @@ use App\Models\GdprAuditLog;
  * Failures are caught and logged to the system logger rather than
  * propagating — a failed audit write must never abort a member-facing flow.
  */
-final class GdprAuditLogger
+class GdprAuditLogger
 {
     // ── Action constants ───────────────────────────────────────────────────
 

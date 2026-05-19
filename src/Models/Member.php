@@ -41,7 +41,9 @@ class Member extends Model
         'assigned_agent_id',
         'crm_notes',
         'show_activity',
-        'show_badges'
+        'show_badges',
+        'is_forgotten',
+        'forgotten_at'
     ];
     protected $hidden = [
         'password',
@@ -56,7 +58,9 @@ class Member extends Model
         'communication_preferences' => 'array',
         'anonymous' => 'boolean',
         'show_activity' => 'boolean',
-        'show_badges' => 'boolean'
+        'show_badges' => 'boolean',
+        'is_forgotten' => 'boolean',
+        'forgotten_at' => 'datetime',
     ];
 
     public static function findByEmail(string $email, ?int $siteId): ?self
