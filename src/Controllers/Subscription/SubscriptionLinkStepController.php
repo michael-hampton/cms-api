@@ -22,12 +22,12 @@ use App\Services\Subscriptions\SubscriptionLinkingService;
 class SubscriptionLinkStepController extends Controller
 {
     /** URL of the next onboarding step (Step 4 – Preferences) */
-    private const NEXT_STEP = '/member/onboarding/preferences';
+    private const NEXT_STEP      = '/member/onboarding/preferences';
+    private const PREFS_SAVE_URL = '/member/onboarding/preferences/save';
 
     public function __construct(
         private readonly SubscriptionLinkingService $linkingService,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
@@ -42,17 +42,18 @@ class SubscriptionLinkStepController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        // Skip Step 3 entirely when the member already has a linked subscription
+        // Skip Step 3 entirely when the member already has a linked subscription.
         if ($this->linkingService->memberHasLinkedSubscription($member->id, $siteId)) {
             return $this->redirect(self::NEXT_STEP);
         }
 
         return $this->view('subscriptions/link-subscription', [
-            'member' => $member,
-            'site' => SiteContext::get(),
+            'member'     => $member,
+            'site'       => SiteContext::get(),
             'nextStepUrl' => self::NEXT_STEP,
-            'linkUrl' => '/member/onboarding/link-subscription',
-            'csrfToken' => csrf_token(),
+            'prefsSaveUrl' => self::PREFS_SAVE_URL,
+            'linkUrl'    => '/member/onboarding/link-subscription',
+            'csrfToken'  => csrf_token(),
         ]);
     }
 
@@ -67,14 +68,14 @@ class SubscriptionLinkStepController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        $accountNumber = trim((string)$request->input('account_number', ''));
-        $postcode = trim((string)$request->input('postcode', ''));
+        $accountNumber = trim((string) $request->input('account_number', ''));
+        $postcode      = trim((string) $request->input('postcode', ''));
 
         if ($accountNumber === '' || $postcode === '') {
             return $this->jsonResponse([
-                'success' => false,
+                'success'    => false,
                 'error_code' => 'validation_error',
-                'message' => 'Account number and postcode are required.',
+                'message'    => 'Account number and postcode are required.',
             ], 422);
         }
 
@@ -94,29 +95,29 @@ class SubscriptionLinkStepController extends Controller
 
         } catch (SubscriptionNotFoundException) {
             return $this->jsonResponse([
-                'success' => false,
+                'success'    => false,
                 'error_code' => 'mismatch',
-                'message' => 'We couldn\'t find a subscription matching those details. '
+                'message'    => 'We couldn\'t find a subscription matching those details. '
                     . 'Please check your mailing label and try again.',
             ], 422);
 
         } catch (SubscriptionAlreadyLinkedException $e) {
             return $this->jsonResponse([
-                'success' => false,
+                'success'    => false,
                 'error_code' => 'already_linked',
-                'message' => $this->maskedAlreadyLinkedMessage($e->getLinkedEmail()),
+                'message'    => $this->maskedAlreadyLinkedMessage($e->getLinkedEmail()),
             ], 409);
 
         } catch (\Throwable $e) {
             Logger::error('Subscription linking failed', [
                 'member_id' => $member->id,
-                'error' => $e->getMessage(),
+                'error'     => $e->getMessage(),
             ]);
 
             return $this->jsonResponse([
-                'success' => false,
+                'success'    => false,
                 'error_code' => 'server_error',
-                'message' => 'Something went wrong. Please try again.',
+                'message'    => 'Something went wrong. Please try again.',
             ], 500);
         }
     }
@@ -145,9 +146,9 @@ class SubscriptionLinkStepController extends Controller
 
         $maskedLocal = substr($local, 0, 2) . str_repeat('*', max(5, strlen($local) - 2));
 
-        $dotPos = strrpos($domain, '.');
+        $dotPos     = strrpos($domain, '.');
         $domainName = $dotPos !== false ? substr($domain, 0, $dotPos) : $domain;
-        $tld = $dotPos !== false ? substr($domain, $dotPos) : '';
+        $tld        = $dotPos !== false ? substr($domain, $dotPos)    : '';
         $maskedDomain = substr($domainName, 0, 1) . str_repeat('*', max(4, strlen($domainName) - 1));
 
         return "{$maskedLocal}@{$maskedDomain}{$tld}";
