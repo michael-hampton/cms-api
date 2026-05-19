@@ -45,7 +45,7 @@ class SubscriptionPricingStrategyResolverTest extends TestCase
     {
         $pricing = $this->makePricing(trialDays: 14, introPrice: null, introCycles: null);
 
-        $result = $this->resolver->resolve($pricing);
+        $result = $this->resolver->resolve($pricing, 14);
 
         $this->assertTrue($result->hasTrial);
         $this->assertSame(14, $result->trialDays);
@@ -74,7 +74,7 @@ class SubscriptionPricingStrategyResolverTest extends TestCase
     {
         $pricing = $this->makePricing(trialDays: 7, introPrice: 0.99, introCycles: 3);
 
-        $result = $this->resolver->resolve($pricing);
+        $result = $this->resolver->resolve($pricing, 7);
 
         $this->assertTrue($result->hasTrial);
         $this->assertSame(7, $result->trialDays);

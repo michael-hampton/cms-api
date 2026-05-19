@@ -348,7 +348,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
 
         $this->strategyResolver
             ->shouldReceive('resolve')
-            ->with($pricing)
+            ->with($pricing, 0)
             ->andReturn($this->makeStrategy(SubscriptionStrategyType::STANDARD));
 
         $this->subscriptionGateway
@@ -376,6 +376,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
 
         $this->strategyResolver
             ->shouldReceive('resolve')
+            ->with($pricing, 14)
             ->andReturn($this->makeStrategy(SubscriptionStrategyType::TRIAL, trialDays: 14));
 
         $this->subscriptionGateway
@@ -390,7 +391,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         $this->subscriptionGateway->shouldNotReceive('create');
         $this->scheduleGateway->shouldNotReceive('create');
 
-        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test', 14);
 
         $this->assertSame('trialing', $result->status);
     }
@@ -416,7 +417,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
                 $dto->recurringPriceId === 'price_std'
                 && $dto->introPriceId  === 'price_intro'
                 && $dto->introCycles   === 1
-                && $dto->trialDays     === null
+                && $dto->trialDays     === 0
             ))
             ->andReturn($this->makeResult(scheduleId: 'sched_test'));
 
@@ -451,7 +452,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             ))
             ->andReturn($this->makeResult(scheduleId: 'sched_test'));
 
-        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test');
+        $result = $this->service->createSubscription($subscription, $plan, $pricing, 'cus_test', 7);
 
         $this->assertSame('sched_test', $result->stripeScheduleId);
     }

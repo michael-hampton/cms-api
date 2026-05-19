@@ -498,4 +498,12 @@ class SubscriptionRepository extends Repository
     {
         return Subscription::where('payment_subscription_id', $stripeSubscriptionId)->first();
     }
+
+    public function memberHadTrialOnPlan(int $memberId, int $planId): bool
+    {
+        return Subscription::where('member_id', $memberId)
+            ->where('plan_id', $planId)
+            ->whereNotNull('trial_ends_at')  // adjust to your actual trial tracking column
+            ->exists();
+    }
 }

@@ -134,14 +134,15 @@ class SubscriptionBillingService
         SubscriptionPlan        $plan,
         SubscriptionPlanPricing $pricingTier,
         string                  $stripeCustomerId,
+        int $trialDaysOverride = 0
     ): StripeSubscriptionResultDto {
-        $strategy = $this->strategyResolver->resolve($pricingTier);
+        $strategy = $this->strategyResolver->resolve($pricingTier, $trialDaysOverride);
 
         return match ($strategy->type) {
             SubscriptionStrategyType::STANDARD    => $this->createStandard($subscription, $pricingTier, $stripeCustomerId),
-            SubscriptionStrategyType::TRIAL       => $this->createTrial($subscription, $pricingTier, $stripeCustomerId, $strategy->trialDays),
+            SubscriptionStrategyType::TRIAL       => $this->createTrial($subscription, $pricingTier, $stripeCustomerId, $trialDaysOverride),
             SubscriptionStrategyType::INTRO,
-            SubscriptionStrategyType::TRIAL_INTRO => $this->createScheduled($subscription, $pricingTier, $stripeCustomerId, $strategy->trialDays),
+            SubscriptionStrategyType::TRIAL_INTRO => $this->createScheduled($subscription, $pricingTier, $stripeCustomerId, $trialDaysOverride),
         };
     }
 

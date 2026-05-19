@@ -20,9 +20,9 @@ use App\Services\Billing\Stripe\Contracts\SubscriptionPricingStrategyInterface;
  */
 class SubscriptionPricingStrategyResolver implements SubscriptionPricingStrategyInterface
 {
-    public function resolve(SubscriptionPlanPricing $pricing): SubscriptionPricingStrategyData
+    public function resolve(SubscriptionPlanPricing $pricing, int $trialDaysOverride = 0): SubscriptionPricingStrategyData
     {
-        $hasTrial = $pricing->hasTrial();
+        $hasTrial = $trialDaysOverride > 0 && $pricing->hasTrial();
         $hasIntro = $pricing->hasIntroPricing();
 
         $type = match (true) {

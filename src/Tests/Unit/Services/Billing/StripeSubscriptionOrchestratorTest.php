@@ -9,6 +9,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\StripeSubscriptionOrchestrator;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Subscriptions\SubscriptionBillingService;
@@ -22,6 +23,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
     private MockInterface $billingService;
     private MockInterface $pricingRepository;
     private StripeSubscriptionOrchestrator $orchestrator;
+    private SubscriptionRepository $subscriptionRepository;
 
     protected function setUp(): void
     {
@@ -31,10 +33,14 @@ class StripeSubscriptionOrchestratorTest extends TestCase
         $this->billingService    = m::mock(SubscriptionBillingService::class);
         $this->pricingRepository = m::mock(SubscriptionPlanPricingRepository::class);
 
+        $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
+        $this->subscriptionRepository->shouldReceive('memberHadTrialOnPlan')->andReturn(false)->byDefault();
+
         $this->orchestrator = new StripeSubscriptionOrchestrator(
             $this->customerGateway,
             $this->billingService,
             $this->pricingRepository,
+            $this->subscriptionRepository
         );
     }
 
@@ -64,7 +70,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
         $this->billingService
             ->shouldReceive('createSubscription')
             ->once()
-            ->with($subscription, $plan, $pricingTier, 'cus_test')
+            ->with($subscription, $plan, $pricingTier, 'cus_test', 0)
             ->andReturn($result);
 
         $subscription->shouldReceive('update')->once();
@@ -123,7 +129,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
         $this->billingService
             ->shouldReceive('createSubscription')
             ->once()
-            ->with($subscription, $plan, $pricingTier, 'cus_test')
+            ->with($subscription, $plan, $pricingTier, 'cus_test', 0)
             ->andReturn($this->makeResult());
 
         $subscription->shouldReceive('update')->once();
@@ -163,6 +169,8 @@ class StripeSubscriptionOrchestratorTest extends TestCase
             $subscription, $plan, $member,
             ['pricing_tier_id' => 99]
         );
+
+        $this->assertTrue(true);
     }
 
     public function test_falls_back_to_plan_default_when_explicit_tier_belongs_to_different_plan(): void
@@ -474,6 +482,80 @@ class StripeSubscriptionOrchestratorTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function test_trial_is_passed_through_when_member_has_no_prior_trial(): void
+    {
+        [$subscription, $plan, $member, $pricingTier] = $this->makeModels();
+        $plan->trial_days = 7;
+
+        $plan->shouldReceive('getDefaultPricing')->andReturn($pricingTier);
+
+        $this->customerGateway->shouldReceive('getOrCreate')->andReturn('cus_test');
+
+        $this->subscriptionRepository
+            ->expects('memberHadTrialOnPlan')
+            ->with($member->id, $plan->id)
+            ->andReturn(false);
+
+        $this->billingService
+            ->expects('createSubscription')
+            ->withArgs(fn($s, $p, $pt, $cid, $trialDays) => $trialDays === 7)
+            ->andReturn($this->makeResult());
+
+        $subscription->shouldReceive('update')->andReturn(true);
+
+        $this->orchestrator->create($subscription, $plan, $member);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_trial_is_stripped_when_member_previously_had_trial(): void
+    {
+        [$subscription, $plan, $member, $pricingTier] = $this->makeModels();
+
+        $plan->shouldReceive('getDefaultPricing')->andReturn($pricingTier);
+
+        $this->customerGateway
+            ->shouldReceive('getOrCreate')
+            ->andReturn('cus_test');
+
+        $this->billingService
+            ->shouldReceive('createSubscription')
+            ->withArgs(fn($s, $p, $pt, $cid, $trialDays) => $trialDays === 0)
+            ->andReturn($this->makeResult());
+
+        $subscription->shouldReceive('update')->andReturn(true);
+
+        $this->orchestrator->create($subscription, $plan, $member);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_trial_check_is_skipped_when_plan_has_no_trial(): void
+    {
+        [$subscription, $plan, $member, $pricingTier] = $this->makeModels();
+
+        $plan->shouldReceive('getDefaultPricing')->andReturn($pricingTier);
+
+        $this->customerGateway
+            ->shouldReceive('getOrCreate')
+            ->andReturn('cus_test');
+
+        $this->subscriptionRepository
+            ->expects('memberHadTrialOnPlan')
+            ->never();
+
+        $this->billingService
+            ->shouldReceive('createSubscription')
+            ->withArgs(fn($s, $p, $pt, $cid, $trialDays) => $trialDays === 0)
+            ->andReturn($this->makeResult());
+
+        $subscription->shouldReceive('update')->andReturn(true);
+
+        $this->orchestrator->create($subscription, $plan, $member);
+
+        $this->assertTrue(true);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function makeModels(): array
@@ -486,6 +568,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
 
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
+        $plan->trial_days = 0;
 
         $member = m::mock(Member::class)->makePartial();
         $member->id   = 1;

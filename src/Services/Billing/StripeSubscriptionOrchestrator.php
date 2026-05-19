@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Subscriptions\SubscriptionBillingService;
 
@@ -34,6 +35,7 @@ class StripeSubscriptionOrchestrator
         private readonly StripeCustomerGateway              $customerGateway,
         private readonly SubscriptionBillingService         $billingService,
         private readonly SubscriptionPlanPricingRepository  $pricingRepository,
+        private readonly SubscriptionRepository $subscriptionRepository,
     ) {}
 
     /**
@@ -67,12 +69,21 @@ class StripeSubscriptionOrchestrator
             );
         }
 
+        $trialDays = $plan->trial_days ?? 0;
+
+        if ($trialDays > 0) {
+            if ($this->subscriptionRepository->memberHadTrialOnPlan($member->id, $plan->id)) {
+                $trialDays = 0;
+            }
+        }
+
         // 4. Create the Stripe subscription via billing service
         $result = $this->billingService->createSubscription(
             $subscription,
             $plan,
             $pricingTier,
             $customerId,
+            $trialDays
         );
 
         // 5. Persist Stripe IDs back to the local subscription record
