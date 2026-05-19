@@ -33,6 +33,10 @@ class ArticlePayment extends Model
         'failure_reason',
     ];
 
+    protected $appends = [
+        'title'
+    ];
+
     protected $casts = [
         'created_at' => 'date',
         'updated_at' => 'date',

@@ -39,4 +39,9 @@ class User extends Model
     {
         return $this->is_active;
     }
+
+    public function sites()
+    {
+      return $this->belongsToMany(Site::class, 'oc_user_sites', 'user_id', 'site_id');
+    }
 }

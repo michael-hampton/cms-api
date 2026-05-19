@@ -92,7 +92,7 @@ class Auth
 
     public static function getUser()
     {
-        return User::where('id', Session::get('user_id'))->first();
+        return User::with(['sites'])->where('id', Session::get('user_id'))->first();
     }
 
     public static function user(): ?AuthenticatedUser

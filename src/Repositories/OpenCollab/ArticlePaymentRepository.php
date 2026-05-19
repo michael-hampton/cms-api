@@ -3,6 +3,7 @@
 namespace App\Repositories\OpenCollab;
 
 use App\Enums\OpenCollab\PaymentStatus;
+use App\Framework\Database\Database;
 use App\Models\ArticlePayment;
 use App\Models\Model;
 use App\Repositories\Repository;
@@ -76,6 +77,34 @@ class ArticlePaymentRepository extends Repository
             )
             ->orderByDesc('oc_article_payments.created_at')
             ->paginate($perPage);
+    }
+
+    /**
+     * Full transaction history for the earnings transaction table.
+     *
+     * Returns both succeeded and refunded payments, sorted descending by date.
+     * The renderer uses `status` to colour refunds red and prefix a minus sign.
+     *
+     * @return array<int, array{page_title: string, amount: int, status: string, created_at: string}>
+     */
+    public function transactionsForContributor(int $contributorId): array
+    {
+        return Database::table('oc_article_payments as ap')
+            ->leftJoin('pages as p', 'p.id', '=', 'ap.page_id')
+            ->where('ap.user_id', $contributorId)
+            ->whereIn('ap.status', ['succeeded', 'refunded'])
+            ->orderByDesc('ap.created_at')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'page_title' => $row['page_title'] ?? '–',
+                    'amount'     => (int) $row['amount'],
+                    'status'     => $row['status'],
+                    'created_at' => $row['created_at'],
+                ];
+            })
+            ->values()
+            ->toArray();
     }
 
     protected function getModelClass(): string

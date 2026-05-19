@@ -35,6 +35,8 @@ use App\Controllers\Crm\CrmMemberNoteController;
 use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
 use App\Controllers\Crm\CrmSubscriptionController;
+use App\Controllers\Crm\RtbfController;
+use App\Controllers\Crm\SarExportController;
 use App\Controllers\Crm\StripeConfigController;
 use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
@@ -347,6 +349,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ContributorSettingsController::class, 'saveExpertise']
         );
 
+        $router->get('/open-collab/dashboard/widgets/{slug}', [\App\Controllers\OpenCollab\DashboardPageNewController::class, 'getWidget']);
+
         $router->post(
             '/open-collab/contributor/avatar',
             [ContributorSettingsController::class, 'uploadAvatar']
@@ -588,9 +592,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/crm/members/{memberId}/orders', [CrmSubscriptionController::class, 'ordersForMember']);
         $router->get('/crm/members/{memberId}/communications', [CrmCommunicationsController::class, 'index']);
         $router->get('/crm/members/{memberId}/activity', [CrmSubscriptionController::class, 'activityForMember']);
-
-
-        //    "path": "/api/test-ste/crm/members/1/activity"
+        $router->get('/crm/members/{memberId}/sar-export', [SarExportController::class, 'export']);
+        $router->post('/crm/members/{memberId}/forget', [RtbfController::class, 'forget']);
 
         $router->get(
             '/crm/subscriptions/{subscriptionId}/history',

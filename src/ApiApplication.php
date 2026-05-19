@@ -162,6 +162,15 @@ use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
 use App\Services\Billing\Stripe\StripeRefundGateway;
+use App\Services\Gdpr\Exporters\ActivityExporter;
+use App\Services\Gdpr\Exporters\AddressesExporter;
+use App\Services\Gdpr\Exporters\CommunicationsExporter;
+use App\Services\Gdpr\Exporters\ConsentsExporter;
+use App\Services\Gdpr\Exporters\OrdersExporter;
+use App\Services\Gdpr\Exporters\PaymentsExporter;
+use App\Services\Gdpr\Exporters\ProfileExporter;
+use App\Services\Gdpr\Exporters\SubscriptionsExporter;
+use App\Services\Gdpr\MemberExportService;
 use App\Services\Members\AddressLookupService;
 use App\Services\Members\AddressLookupServiceInterface;
 use App\Services\Members\Comments\Contracts\SpamDetectionInterface;
@@ -211,6 +220,14 @@ use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
 use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
 use App\Services\Newsletter\Renderers\TextBlockRenderer;
 use App\Services\Newsletter\Renderers\TrendingContentBlockRenderer;
+use App\Services\OpenCollab\Dashboard\WidgetRegistry;
+use App\Services\OpenCollab\Dashboard\Widgets\ActivityWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\ApprovalWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\DraftsWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\EarningsWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\OnboardingWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\QuickLinksWidget;
+use App\Services\OpenCollab\Dashboard\Widgets\ReviewQueueWidget;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\Shared\NativeSessionStore;
@@ -310,6 +327,35 @@ class ApiApplication
                 LabelExportFormat::Csv,
                 $this->container->make(CsvLabelExportFormatStrategy::class)
             );
+
+            return $registry;
+        });
+
+        $exporters = [
+            new ProfileExporter(),
+            new AddressesExporter(),
+            new OrdersExporter(),
+            new PaymentsExporter(),
+            new SubscriptionsExporter(),
+            new ConsentsExporter(),
+            new CommunicationsExporter(),
+            new ActivityExporter(),
+        ];
+
+        $this->container->bind(MemberExportService::class, fn() => new MemberExportService($exporters));
+
+        $this->container->singleton(WidgetRegistry::class, function () {
+            // Fix: Instantiate the registry directly to avoid the infinite loop
+            $registry = new WidgetRegistry();
+
+            $registry->register($this->container->make(EarningsWidget::class));
+            $registry->register($this->container->make(DraftsWidget::class));
+            $registry->register($this->container->make(ActivityWidget::class));
+            $registry->register($this->container->make(OnboardingWidget::class));
+            $registry->register($this->container->make(QuickLinksWidget::class));
+            $registry->register($this->container->make(ReviewQueueWidget::class));
+            $registry->register($this->container->make(ApprovalWidget::class));
+
 
             return $registry;
         });
