@@ -77,6 +77,7 @@ class PrintSubscriptionRepository extends Repository
         ]);
 
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
         if (!$row) return null;
 
         return new SubscriptionWithAddress(

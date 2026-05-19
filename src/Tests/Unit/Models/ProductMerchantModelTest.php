@@ -288,6 +288,6 @@ class ProductMerchantModelTest extends FunctionalTestCase
             'url' => 'https://example.com/product.jpg',
         ]);
 
-        $this->assertEquals(80, $productMerchant->final_price); //todo
+        $this->assertEquals(80, $productMerchant->final_price);
     }
 }

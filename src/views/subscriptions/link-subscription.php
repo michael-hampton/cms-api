@@ -609,9 +609,6 @@
            FormValidator — client-side rules for the linking form
         ───────────────────────────────────────────────────────────────── */
         class FormValidator {
-            /**
-             * @returns {{ valid: boolean, errors: Array<{field: HTMLElement, message: string}> }}
-             */
             validate(accountNumber, postcode, accountInput, postcodeInput) {
                 const errors = [];
 

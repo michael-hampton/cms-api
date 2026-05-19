@@ -95,10 +95,10 @@ class ProductOfferBundleItemModelTest extends FunctionalTestCase
         $this->assertEquals($product->id, $item->product->id);
     }
 
-    public function testCannotHaveBothProductAndOffer(): void  //todo
+    public function testCannotHaveBothProductAndOffer(): void
     {
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage('Bundle item must have either product or product offer');
+        $this->expectExceptionMessage('Bundle item cannot have both product and product offer');
 
         $bundle = ProductOfferBundle::create([
             'name' => 'Test Bundle',
