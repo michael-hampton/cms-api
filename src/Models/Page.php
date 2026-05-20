@@ -107,6 +107,23 @@ class Page extends Model
         'is_public_contribution' => 'boolean'
     ];
 
+    /**
+     * Get all valid statuses
+     */
+    public static function getValidStatuses(): array
+    {
+        return [
+            PageStatus::DRAFT->value,
+            PageStatus::PUBLISHED->value,
+            PageStatus::ARCHIVED->value,
+            PageStatus::SCHEDULED->value,
+            PageStatus::WAITING_APPROVAL->value,
+            PageStatus::PRIVATE->value,
+            PageStatus::ON_HOLD->value,
+            PageStatus::INTERNAL->value,
+        ];
+    }
+
     public function blocks(bool $relation = false)
     {
         return $this->hasMany(Block::class, 'page_id', 'id', $relation)->orderBy('order');
@@ -304,38 +321,22 @@ class Page extends Model
             ->orderBy('sort_order');
     }
 
-    public function authors($relation = true)
+    public function authors($relation = false)
     {
-        $query = $this->belongsToMany(
+        return $this->belongsToMany(
             Author::class,
             'page_authors',
             'page_id',
             'author_id',
             true
         )->withPivot('role', 'sort_order')
-            ->orderBy('page_authors.sort_order');
-
-        return $relation ? $query : $query->get();
-    }
-
-    public function primaryAuthors($relation = false)
-    {
-        $query = $this->belongsToMany(
-            Author::class,
-            'page_authors',
-            'page_id',
-            'author_id',
-            true
-        )->wherePivot('role', 'primary')
-            ->withPivot('sort_order')
-            ->orderBy('page_authors.sort_order');
-
-        return $relation ? $query : $query->get();
+            ->orderBy('page_authors.sort_order')
+            ->get();
     }
 
     public function contributors($relation = false)
     {
-        $query = $this->belongsToMany(
+        return $this->belongsToMany(
             Author::class,
             'page_authors',
             'page_id',
@@ -343,15 +344,28 @@ class Page extends Model
             true
         )->wherePivot('role', 'contributor')
             ->withPivot('sort_order')
-            ->orderBy('page_authors.sort_order');
-
-        return $relation ? $query : $query->get();
+            ->orderBy('page_authors.sort_order')
+            ->get();
     }
 
 // Helper method to get primary author (for backward compatibility)
     public function getPrimaryAuthor()
     {
         return $this->primaryAuthors()->first();
+    }
+
+    public function primaryAuthors($relation = false)
+    {
+        return $this->belongsToMany(
+            Author::class,
+            'page_authors',
+            'page_id',
+            'author_id',
+            true
+        )->wherePivot('role', 'primary')
+            ->withPivot('sort_order')
+            ->orderBy('page_authors.sort_order')
+            ->get();
     }
 
     public function regionSets(bool $relation = false)
@@ -376,21 +390,6 @@ class Page extends Model
         );
     }
 
-    public function requiresMemberLogin(): bool
-    {
-        return (bool) ($this->requires_member_login ?? false);
-    }
-
-    public function getAllowedMemberRoles(): ?array
-    {
-        if (!$this->allowed_member_roles) {
-            return null;
-        }
-
-        $roles = json_decode($this->allowed_member_roles, true);
-        return is_array($roles) ? $roles : null;
-    }
-
     public function canBeAccessedBy(?AuthenticatedMember $member): bool
     {
         if (!$this->requiresMemberLogin()) {
@@ -410,7 +409,22 @@ class Page extends Model
         return $member->hasAnyRole($allowedRoles);
     }
 
+    public function requiresMemberLogin(): bool
+    {
+        return (bool)($this->requires_member_login ?? false);
+    }
+
     // Add these methods to App\Models\Page.php
+
+    public function getAllowedMemberRoles(): ?array
+    {
+        if (!$this->allowed_member_roles) {
+            return null;
+        }
+
+        $roles = json_decode($this->allowed_member_roles, true);
+        return is_array($roles) ? $roles : null;
+    }
 
     public function views($relation = false)
     {
@@ -424,15 +438,14 @@ class Page extends Model
 
     public function likedByMembers($relation = false)
     {
-        $query = $this->belongsToMany(
+        return $this->belongsToMany(
             Member::class,
             'page_likes',
             'page_id',
             'member_id',
             true
-        )->withPivot('liked_at');
-
-        return $relation ? $query : $query->get();
+        )->withPivot('liked_at')
+            ->get();
     }
 
     public function getLikeCount(): int
@@ -606,23 +619,6 @@ class Page extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by', 'id');
-    }
-
-    /**
-     * Get all valid statuses
-     */
-    public static function getValidStatuses(): array
-    {
-        return [
-            PageStatus::DRAFT->value,
-            PageStatus::PUBLISHED->value,
-            PageStatus::ARCHIVED->value,
-            PageStatus::SCHEDULED->value,
-            PageStatus::WAITING_APPROVAL->value,
-            PageStatus::PRIVATE->value,
-            PageStatus::ON_HOLD->value,
-            PageStatus::INTERNAL->value,
-        ];
     }
 
     public function owner($relation = false)

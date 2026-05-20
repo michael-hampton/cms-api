@@ -19,15 +19,14 @@ class Badge extends Model
 
     public function members($relation = false)
     {
-        $query = $this->belongsToMany(
+        return $this->belongsToMany(
             Member::class,
             'member_badges',
             'badge_id',
             'member_id',
             true
-        )->withPivot(['earned_at', 'criteria_met', 'is_visible']);
-
-        return $relation ? $query : $query->get();
+        )->withPivot(['earned_at', 'criteria_met', 'is_visible'])
+        ->get();
     }
 
     public function checkCriteria(Member $member): bool

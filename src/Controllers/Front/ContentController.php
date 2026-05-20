@@ -99,7 +99,7 @@ class ContentController extends Controller
         }
 
         $this->activityTracking->trackPageView($page);
-        
+
         // Check and auto-claim gift if member is logged in
         $claimedGift = null;
         if (MemberAuth::check()) {
