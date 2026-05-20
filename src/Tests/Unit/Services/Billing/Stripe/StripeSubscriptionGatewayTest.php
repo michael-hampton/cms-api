@@ -4,10 +4,10 @@ namespace App\Tests\Unit\Services\Billing\Stripe;
 
 use App\DTO\Stripe\CreateStripeSubscriptionDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
+use App\Services\Billing\Stripe\StripeCouponGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
-use Stripe\Collection;
 use Stripe\Invoice;
 use Stripe\PaymentIntent;
 use Stripe\Service\SubscriptionService;
@@ -18,6 +18,7 @@ class StripeSubscriptionGatewayTest extends TestCase
 {
     private StripeClient            $stripeClient;
     private SubscriptionService     $subscriptions;
+    private StripeCouponGateway     $couponGateway;
     private StripeSubscriptionGateway $gateway;
 
     protected function setUp(): void
@@ -25,11 +26,12 @@ class StripeSubscriptionGatewayTest extends TestCase
         parent::setUp();
 
         $this->subscriptions = m::mock(SubscriptionService::class);
+        $this->couponGateway = m::mock(StripeCouponGateway::class);
 
         $this->stripeClient = m::mock(StripeClient::class)->makePartial();
         $this->stripeClient->subscriptions = $this->subscriptions;
 
-        $this->gateway = new StripeSubscriptionGateway($this->stripeClient);
+        $this->gateway = new StripeSubscriptionGateway($this->stripeClient, $this->couponGateway);
     }
 
     protected function tearDown(): void
@@ -41,6 +43,8 @@ class StripeSubscriptionGatewayTest extends TestCase
     public function test_create_calls_stripe_with_correct_payload(): void
     {
         $dto = $this->makeDto();
+
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->subscriptions
             ->shouldReceive('create')
@@ -64,6 +68,8 @@ class StripeSubscriptionGatewayTest extends TestCase
     public function test_create_with_trial_includes_trial_period_days(): void
     {
         $dto = $this->makeDto(trialDays: 14);
+
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->subscriptions
             ->shouldReceive('create')
@@ -99,6 +105,8 @@ class StripeSubscriptionGatewayTest extends TestCase
     {
         $dto = $this->makeDto();
 
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
+
         $this->subscriptions
             ->shouldReceive('create')
             ->once()
@@ -113,6 +121,8 @@ class StripeSubscriptionGatewayTest extends TestCase
     public function test_create_wraps_stripe_api_exception(): void
     {
         $dto = $this->makeDto();
+
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->subscriptions
             ->shouldReceive('create')
@@ -129,9 +139,38 @@ class StripeSubscriptionGatewayTest extends TestCase
         $this->gateway->create($dto);
     }
 
+    public function test_create_applies_stripe_coupon_when_voucher_present(): void
+    {
+        $dto = $this->makeDto(voucherId: 55);
+
+        $this->couponGateway
+            ->shouldReceive('getOrCreateForVoucher')
+            ->once()
+            ->with(55, 'gbp')
+            ->andReturn([
+                'coupon_id' => 'coupon_test',
+                'voucher_id' => 55,
+                'voucher_code' => 'SAVE10',
+            ]);
+
+        $this->subscriptions
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(function (array $params) {
+                return $params['discounts'] === [['coupon' => 'coupon_test']]
+                    && $params['metadata']['voucher_id'] === 55
+                    && $params['metadata']['voucher_code'] === 'SAVE10';
+            }))
+            ->andReturn($this->makeStripeSubscription('active'));
+
+        $result = $this->gateway->create($dto);
+
+        $this->assertSame('sub_test', $result->stripeSubscriptionId);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private function makeDto(?int $trialDays = null): CreateStripeSubscriptionDto
+    private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionDto
     {
         return new CreateStripeSubscriptionDto(
             stripeCustomerId: 'cus_test',
@@ -141,6 +180,8 @@ class StripeSubscriptionGatewayTest extends TestCase
             memberId:         1,
             siteId:           1,
             trialDays:        $trialDays,
+            currency:         'gbp',
+            voucherId:        $voucherId,
         );
     }
 

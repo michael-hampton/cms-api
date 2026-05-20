@@ -87,7 +87,7 @@ class StripeSubscriptionOrchestrator
         );
 
         // 5. Persist Stripe IDs back to the local subscription record
-        $this->persistResult($subscription, $result);
+        $this->persistResult($subscription, $result, $trialDays > 0);
 
         return $result;
     }
@@ -122,6 +122,7 @@ class StripeSubscriptionOrchestrator
     private function persistResult(
         Subscription              $subscription,
         StripeSubscriptionResultDto $result,
+        bool $hasTrial = false
     ): void {
         $subscription->update([
             'payment_subscription_id' => $result->stripeSubscriptionId,
@@ -134,6 +135,8 @@ class StripeSubscriptionOrchestrator
             'current_period_end'      => $result->currentPeriodEnd
                 ? date('Y-m-d H:i:s', $result->currentPeriodEnd)
                 : null,
+            'trial_used_at' => $hasTrial ? now() : null,
+            'type' => 'paid'
         ]);
     }
 }

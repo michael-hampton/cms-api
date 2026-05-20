@@ -36,6 +36,7 @@ use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use DateTimeImmutable;
 use Exception;
 use RuntimeException;
+use Throwable;
 
 class CartController extends Controller
 {
@@ -428,8 +429,6 @@ class CartController extends Controller
 
         if (!empty($subscriptionItems)) {
             $result = $this->processSubscription($request);
-
-            $this->clearCheckoutSession();
             $statusCode = $result['success'] ? 200 : 400;
             return $this->resourceResponse($result, $statusCode);
         }
@@ -453,7 +452,9 @@ class CartController extends Controller
             event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId(), $result['order_id']));
         }
 
-        $this->clearCheckoutSession();
+        if ($result['success']) {
+            $this->clearCheckoutSession();
+        }
 
         return $this->resourceResponse($result, $statusCode);
     }
@@ -467,13 +468,20 @@ class CartController extends Controller
         $data = $request->all();
         $siteId = SiteContext::getId();
 
-        $result = $this->subscriptionCheckoutService->processCheckout($data, $siteId);
+        try {
+            $result = $this->subscriptionCheckoutService->processCheckout($data, $siteId);
 
-        event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId()));
+            event(new OrderCreatedByMember(MemberAuth::id(), SiteContext::getId()));
 
-        Session::forget('applied_voucher_code');
+            return $result;
+        } catch (Throwable $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
 
-        return $result;
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 
     private function clearCheckoutSession(): void

@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Billing\Stripe;
 use App\DTO\Stripe\CreateStripeSubscriptionScheduleDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Factories\Stripe\StripeSchedulePhaseFactory;
+use App\Services\Billing\Stripe\StripeCouponGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +23,7 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
     private SubscriptionScheduleService        $schedules;
     private SubscriptionService                $subscriptions;
     private StripeSchedulePhaseFactory         $phaseFactory;
+    private StripeCouponGateway                $couponGateway;
     private StripeSubscriptionScheduleGateway  $gateway;
 
     protected function setUp(): void
@@ -31,6 +33,7 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
         $this->schedules     = m::mock(SubscriptionScheduleService::class);
         $this->subscriptions = m::mock(SubscriptionService::class);
         $this->phaseFactory  = m::mock(StripeSchedulePhaseFactory::class);
+        $this->couponGateway = m::mock(StripeCouponGateway::class);
 
         $this->stripeClient = m::mock(StripeClient::class)->makePartial();
         $this->stripeClient->subscriptionSchedules = $this->schedules;
@@ -39,6 +42,7 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
         $this->gateway = new StripeSubscriptionScheduleGateway(
             $this->stripeClient,
             $this->phaseFactory,
+            $this->couponGateway,
         );
     }
 
@@ -56,8 +60,10 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
         $this->phaseFactory
             ->shouldReceive('buildPhases')
             ->once()
-            ->with($dto)
+            ->with($dto, null)
             ->andReturn($phases);
+
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->schedules
             ->shouldReceive('create')
@@ -87,7 +93,8 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
     {
         $dto = $this->makeDto(trialDays: 14);
 
-        $this->phaseFactory->shouldReceive('buildPhases')->andReturn([]);
+        $this->phaseFactory->shouldReceive('buildPhases')->with($dto, null)->andReturn([]);
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->schedules
             ->shouldReceive('create')
@@ -113,7 +120,8 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
     {
         $dto = $this->makeDto();
 
-        $this->phaseFactory->shouldReceive('buildPhases')->andReturn([]);
+        $this->phaseFactory->shouldReceive('buildPhases')->with($dto, null)->andReturn([]);
+        $this->couponGateway->shouldNotReceive('getOrCreateForVoucher');
 
         $this->schedules
             ->shouldReceive('create')
@@ -125,9 +133,50 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
         $this->gateway->create($dto);
     }
 
+    public function test_create_passes_coupon_to_first_phase_when_voucher_present(): void
+    {
+        $dto = $this->makeDto(voucherId: 22);
+        $phases = [['items' => [['price' => 'price_intro']], 'discounts' => [['coupon' => 'coupon_test']]]];
+
+        $this->couponGateway
+            ->shouldReceive('getOrCreateForVoucher')
+            ->once()
+            ->with(22, 'gbp')
+            ->andReturn([
+                'coupon_id' => 'coupon_test',
+                'voucher_id' => 22,
+                'voucher_code' => 'SAVE22',
+            ]);
+
+        $this->phaseFactory
+            ->shouldReceive('buildPhases')
+            ->once()
+            ->with($dto, 'coupon_test')
+            ->andReturn($phases);
+
+        $this->schedules
+            ->shouldReceive('create')
+            ->once()
+            ->with(m::on(function (array $params) {
+                return $params['phases'][0]['discounts'] === [['coupon' => 'coupon_test']]
+                    && $params['metadata']['voucher_id'] === 22
+                    && $params['metadata']['voucher_code'] === 'SAVE22';
+            }))
+            ->andReturn($this->makeSchedule('sub_test', 'sched_test'));
+
+        $this->subscriptions
+            ->shouldReceive('retrieve')
+            ->once()
+            ->andReturn($this->makeStripeSubscription('active'));
+
+        $result = $this->gateway->create($dto);
+
+        $this->assertSame('sched_test', $result->stripeScheduleId);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private function makeDto(?int $trialDays = null): CreateStripeSubscriptionScheduleDto
+    private function makeDto(?int $trialDays = null, ?int $voucherId = null): CreateStripeSubscriptionScheduleDto
     {
         return new CreateStripeSubscriptionScheduleDto(
             stripeCustomerId:  'cus_test',
@@ -139,6 +188,8 @@ class StripeSubscriptionScheduleGatewayTest extends TestCase
             memberId:          1,
             siteId:            1,
             trialDays:         $trialDays,
+            currency:          'gbp',
+            voucherId:         $voucherId,
         );
     }
 

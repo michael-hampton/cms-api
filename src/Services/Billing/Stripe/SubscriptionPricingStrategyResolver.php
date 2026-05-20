@@ -23,6 +23,7 @@ class SubscriptionPricingStrategyResolver implements SubscriptionPricingStrategy
     public function resolve(SubscriptionPlanPricing $pricing, int $trialDaysOverride = 0): SubscriptionPricingStrategyData
     {
         $hasTrial = $trialDaysOverride > 0 && $pricing->hasTrial();
+
         $hasIntro = $pricing->hasIntroPricing();
 
         $type = match (true) {

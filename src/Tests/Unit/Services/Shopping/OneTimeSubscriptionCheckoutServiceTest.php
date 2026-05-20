@@ -101,8 +101,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->fulfilSubscriptionAction->shouldReceive('confirm')->andReturn(null)->byDefault();
         $this->fulfilSubscriptionAction->shouldReceive('release')->andReturn(null)->byDefault();
 
-        $this->cartService->shouldReceive('clear')->byDefault();
-
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->andReturn(['success' => true])
             ->byDefault();
@@ -214,7 +212,40 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         // setupSuccessfulPayment now covers the activation transaction (Phase 4)
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
+
+        $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_does_not_clear_cart_before_payment_confirmation(): void
+    {
+        $member = $this->createMockMember();
+        $subscription = $this->createMockSubscription();
+        $order = $this->createMockOrder();
+
+        $this->setupAuthenticatedMember($member);
+        $this->setupCartWithSingleSubscription();
+        $this->setResolvedDiscountExpectations();
+        $this->setDeliveryEstimateExpectations();
+
+        $this->database->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->once()
+            ->andReturn([[
+                'subscription' => $subscription,
+                'pricing' => $this->createMockPricing(),
+            ]]);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->once()
+            ->andReturn($order);
+
+        $this->setupSuccessfulPayment();
+        $this->cartService->shouldNotReceive('clear');
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
@@ -279,7 +310,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 return $callback();
             });
 
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
@@ -394,7 +424,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
 
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         $result = $this->service->processCheckout(['one_time_subscription' => true, 'voucher_code' => 'SAVE10'], 1);
 
@@ -427,7 +456,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn(['success' => true, 'client_secret' => 'secret', 'payment_intent_id' => 'pi_123']);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
@@ -460,7 +488,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn(['success' => true, 'client_secret' => 'pi_123', 'payment_intent_id' => 'pi_123']);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
@@ -500,7 +527,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn(['success' => true, 'client_secret' => 'pi_123', 'payment_intent_id' => 'pi_123']);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
@@ -568,7 +594,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $paymentResult = ['success' => true, 'client_secret' => 'pi_test', 'payment_intent_id' => 'pi_123'];
         $this->paymentIntentService->shouldReceive('createForOrder')->once()->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
@@ -753,11 +778,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
 
-    private function setupCartClear(): void
-    {
-        $this->cartService->shouldReceive('clear')->once();
-    }
-
     private function setResolvedDiscountExpectations()
     {
         $subscriptionItems = [
@@ -861,7 +881,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
@@ -907,7 +926,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $paymentResult = ['success' => true];
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
@@ -1041,7 +1059,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->once()
             ->with($order, $paymentResult);
 
-        $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
@@ -1080,7 +1097,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
 
-        $this->cartService->shouldReceive('clear')->once();
 
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')->andReturn(['success' => true]);
 
@@ -1119,7 +1135,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $paymentResult = ['success' => true];
         $this->paymentIntentService->shouldReceive('createForOrder')->andReturn($paymentResult);
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
 
         $expectedResponse = ['success' => true, 'order_id' => 1, 'redirect_url' => '/success'];
 
@@ -1402,7 +1417,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->andReturn(['success' => true, 'payment_intent_id' => 'pi_123']);
 
         $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
-        $this->cartService->shouldReceive('clear')->once();
         $this->responseBuilder->shouldReceive('buildCheckoutResponse')
             ->once()
             ->with(
@@ -1446,7 +1460,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
@@ -1485,7 +1498,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             ->andReturn($order);
 
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
@@ -1546,7 +1558,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
@@ -1580,7 +1591,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         // ────────────────────────────────────────────────────────────────────
 
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         $result = $this->service->processCheckout(['one_time_subscription' => true], 1);
 
@@ -1687,7 +1697,6 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')->once()->andReturn($subs);
         $this->orderDraftService->shouldReceive('createPendingOrder')->once()->andReturn($order);
         $this->setupSuccessfulPayment();
-        $this->setupCartClear();
 
         // ── Digital subscriptions carry no issue stock — reserve must not fire
         $this->fulfilSubscriptionAction->shouldNotReceive('reserve');

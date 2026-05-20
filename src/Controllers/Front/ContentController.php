@@ -49,7 +49,7 @@ class ContentController extends Controller
         parent::__construct();
     }
 
-    public function show(Page $page, UrlResolutionResult $urlResolutionResult)
+    public function show(Page $page)
     {
         $member = MemberAuth::getMember();
         $memberId = $member ? $member->id : null;
@@ -76,6 +76,7 @@ class ContentController extends Controller
             ->with(['items'])
             ->first();
 
+
         // Load page relationships
         $page->load([
             'blocks', 'categories', 'tags', 'metadata',
@@ -98,7 +99,7 @@ class ContentController extends Controller
         }
 
         $this->activityTracking->trackPageView($page);
-
+        
         // Check and auto-claim gift if member is logged in
         $claimedGift = null;
         if (MemberAuth::check()) {

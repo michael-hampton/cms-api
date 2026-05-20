@@ -539,8 +539,8 @@ $router->get('/{site}/deals/{id}/modal', [DealsController::class, 'getProductMod
 
 
 // Apply page member access check to content routes
-$router->get('{slug}', [ContentController::class, 'show'])
-    ->middleware([CheckPageMemberAccess::class]);
+//$router->get('{slug}', [ContentController::class, 'show'])
+//    ->middleware([CheckPageMemberAccess::class]);
 
 $router->get('/{siteName}/{regionSlug}/{pageSlug}', [RegionContentController::class, 'show'])
     //->middleware([CheckPageMemberAccess::class])

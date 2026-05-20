@@ -27,7 +27,8 @@ use Stripe\StripeClient;
 class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
 {
     public function __construct(
-        private readonly StripeClient                      $stripe
+        private readonly StripeClient $stripe,
+        private readonly StripeCouponGateway $couponGateway,
     )
     {
     }
@@ -55,14 +56,22 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         ?int                        $trialDays,
     ): StripeSubscriptionResultDto {
         try {
+            $coupon = $dto->voucherId !== null
+                ? $this->couponGateway->getOrCreateForVoucher($dto->voucherId, $dto->currency ?? 'gbp')
+                : null;
+
             $params = [
                 'customer'           => $dto->stripeCustomerId,
                 'items'              => [['price' => $dto->stripePriceId]],
-                'metadata'           => $this->buildMetadata($dto),
+                'metadata'           => $this->buildMetadata($dto, $coupon),
                 'expand'             => ['latest_invoice.payment_intent'],
                 'collection_method'  => 'charge_automatically',
                 'automatic_tax'      => ['enabled' => true],
             ];
+
+            if ($coupon !== null) {
+                $params['discounts'] = [['coupon' => $coupon['coupon_id']]];
+            }
 
             if ($trialDays !== null) {
                 $params['trial_period_days'] = $trialDays;
@@ -80,14 +89,21 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         }
     }
 
-    private function buildMetadata(CreateStripeSubscriptionDto $dto): array
+    private function buildMetadata(CreateStripeSubscriptionDto $dto, ?array $coupon = null): array
     {
-        return [
+        $metadata = [
             'subscription_id' => $dto->subscriptionId,
             'plan_id'         => $dto->planId,
             'member_id'       => $dto->memberId,
             'site_id'         => $dto->siteId,
         ];
+
+        if ($coupon !== null) {
+            $metadata['voucher_id'] = $coupon['voucher_id'];
+            $metadata['voucher_code'] = $coupon['voucher_code'];
+        }
+
+        return $metadata;
     }
 
     private function mapToDto(
@@ -95,6 +111,7 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         ?string              $stripeScheduleId,
     ): StripeSubscriptionResultDto {
         $invoice         = $subscription->latest_invoice;
+
         $paymentIntent   = is_object($invoice) ? ($invoice->payment_intent ?? null) : null;
         $paymentIntentId = null;
         $clientSecret    = null;

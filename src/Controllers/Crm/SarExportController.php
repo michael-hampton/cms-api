@@ -77,10 +77,7 @@ class SarExportController extends Controller
             return $this->csvResponse($bundle, $memberId);
         }
 
-        return $this->jsonResponse([
-            'success' => true,
-            'data'    => $bundle,
-        ]);
+        return $this->resourceResponse(['data' => $bundle]);
     }
 
     private function csvResponse(array $bundle, int $memberId): JsonResponse
@@ -88,10 +85,6 @@ class SarExportController extends Controller
         // For CSV we flatten each module into its own section.
         // Clients that need a true CSV file should handle download client-side.
         // We return JSON with a csv_url hint for async download in future.
-        return $this->jsonResponse([
-            'success' => true,
-            'message' => 'CSV format: use the JSON bundle and render per-module CSVs client-side.',
-            'data'    => $bundle,
-        ]);
+        return $this->resourceResponse(['data' => $bundle]);
     }
 }

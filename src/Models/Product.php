@@ -210,7 +210,7 @@ class Product extends Model implements BoostableInterface, Stockable
             'product_merchants',
             'product_id',
             'merchant_id'
-        )->withPivot(['url', 'price', 'is_available', 'variant_id', 'last_price_check']);
+        )->withPivot(['url', 'price', 'is_available', 'variant_id', 'last_price_check'])->get();
     }
 
     public function badges($relation = false)

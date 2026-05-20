@@ -5,6 +5,7 @@ namespace App\Framework\Database\Relations;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Model;
+use ArrayObject;
 
 class BelongsToManyHandler extends RelationshipHandler implements PivotOperationsInterface
 {
@@ -142,6 +143,7 @@ class BelongsToManyHandler extends RelationshipHandler implements PivotOperation
     private function loadPivotRecords(array $parentIds, array $relationData): Collection
     {
         $pivotQuery = new QueryBuilder($relationData['pivot_table'], $this->eagerLoader, $this->database);
+
         return $pivotQuery->whereIn($relationData['foreign_key'], $parentIds)->get();
     }
 
@@ -299,10 +301,12 @@ class BelongsToManyHandler extends RelationshipHandler implements PivotOperation
                 }
 
                 // Set pivot data on the model
+                $pivot = new ArrayObject($pivotData, ArrayObject::ARRAY_AS_PROPS);
+
                 if ($record instanceof Model) {
-                    $record->setAttribute('pivot', $pivotData);
+                    $record->setAttribute('pivot', $pivot);
                 } elseif (is_array($record)) {
-                    $record['pivot'] = $pivotData;
+                    $record['pivot'] = $pivot;
                 }
             }
 

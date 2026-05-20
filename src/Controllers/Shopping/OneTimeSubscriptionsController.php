@@ -26,6 +26,7 @@ use App\Services\Shopping\OneTimeSubscriptionService;
 use App\Services\Shopping\SubscriptionCatalogService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use RuntimeException;
+use Throwable;
 
 class OneTimeSubscriptionsController extends Controller
 {
@@ -220,56 +221,63 @@ class OneTimeSubscriptionsController extends Controller
 
     public function checkout(Request $request)
     {
-        $data = $request->all();
-        $siteId = SiteContext::getId();
-        $member = MemberAuth::getMember();
+        try {
+            $data = $request->all();
+            $siteId = SiteContext::getId();
+            $member = MemberAuth::getMember();
 
-        if (!$member && !empty($data['email'])) {
-            $email = $data['email'];
-            $sessionId = $this->cartService->getSessionId();
+            if (!$member && !empty($data['email'])) {
+                $email = $data['email'];
+                $sessionId = $this->cartService->getSessionId();
 
-            try {
-                $result = $this->identityService->createAnonymous($email, $siteId, $data);
-                $member = Member::find($result->userId);
-                MemberAuth::login($member);
+                try {
+                    $result = $this->identityService->createAnonymous($email, $siteId, $data);
+                    $member = Member::find($result->userId);
+                    MemberAuth::login($member);
 
-                // Migrate any session-keyed cart items to the newly created member
-                // so that downstream services can find them by member id.
-                $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
-
-            } catch (RuntimeException $e) {
-                return $this->errorResponse($e->getMessage(), 400);
+                    // Migrate any session-keyed cart items to the newly created member
+                    // so that downstream services can find them by member id.
+                    $this->cartMigration->migrateSessionCartToMember($member->id, $sessionId);
+                } catch (RuntimeException $e) {
+                    return $this->errorResponse($e->getMessage(), 400);
+                }
             }
+
+            if (!$member) {
+                return $this->errorResponse('Authentication required', 401);
+            }
+
+            // Persist contact fields that createAnonymous may not have written.
+            // Only fill blanks — never overwrite data already on the member record.
+            $contactUpdates = array_filter([
+                'first_name' => empty($member->first_name) ? ($data['first_name'] ?? null) : null,
+                'last_name' => empty($member->last_name) ? ($data['last_name'] ?? null) : null,
+                'phone' => empty($member->phone) ? ($data['phone'] ?? null) : null,
+            ]);
+
+            if (!empty($contactUpdates)) {
+                $member->fill($contactUpdates);
+                $member->save();
+            }
+
+            $items = $this->cartService->getItems();
+
+            if (!$items) {
+                return $this->errorResponse('No items in cart', 400);
+            }
+
+            $result = $this->checkoutService->processCheckout($data, $siteId);
+
+            if (!($result['success'] ?? false)) {
+                return $this->errorResponse($result['message'] ?? 'Checkout failed', 400);
+            }
+
+            return $this->jsonResponse($result, 200);
+        } catch (Throwable $e) {
+            $_SESSION['flash_error'] = $e->getMessage();
+
+            return $this->errorResponse($e->getMessage(), 500);
         }
-
-        if (!$member) {
-            return $this->errorResponse('Authentication required', 401);
-        }
-
-        // Persist contact fields that createAnonymous may not have written.
-        // Only fill blanks — never overwrite data already on the member record.
-        $contactUpdates = array_filter([
-            'first_name' => empty($member->first_name) ? ($data['first_name'] ?? null) : null,
-            'last_name' => empty($member->last_name) ? ($data['last_name'] ?? null) : null,
-            'phone' => empty($member->phone) ? ($data['phone'] ?? null) : null,
-        ]);
-
-        if (!empty($contactUpdates)) {
-            $member->fill($contactUpdates);
-            $member->save();
-        }
-
-        $items = $this->cartService->getItems();
-
-        if (!$items) {
-            return $this->errorResponse('No items in cart', 400);
-        }
-
-        $result = $this->checkoutService->processCheckout($data, $siteId);
-
-        $this->clearCheckoutSession();
-        $statusCode = $result['success'] ? 200 : 400;
-        return $this->jsonResponse($result, $statusCode);
 
     }
 
@@ -325,6 +333,9 @@ class OneTimeSubscriptionsController extends Controller
             foreach ($subscriptionIds as $subId) {
                 $this->subscriptionService->activateSubscription((int)$subId, $orderId);
             }
+
+            $this->cartService->clear();
+            $this->clearCheckoutSession();
 
             return $this->jsonResponse($result);
         }
@@ -408,6 +419,9 @@ class OneTimeSubscriptionsController extends Controller
             'status' => 'completed',
             'payment_status' => 'paid'
         ]);
+
+        $this->cartService->clear();
+        $this->clearCheckoutSession();
 
         return $this->jsonResponse(['success' => true]);
     }

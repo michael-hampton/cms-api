@@ -82,7 +82,8 @@ class Subscription extends Model
         'renewed_from_subscription_id',
         'cancel_at_period_end',
         'stripe_customer_id',
-        'stripe_schedule_id'
+        'stripe_schedule_id',
+        'trial_used_at'
     ];
 
     protected $casts = [

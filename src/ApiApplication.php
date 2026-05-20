@@ -151,6 +151,7 @@ use App\Observers\PageObserver;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
+use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
 use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway;
 use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
@@ -158,6 +159,7 @@ use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
+use App\Services\Billing\Stripe\StripeCouponGateway;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
@@ -425,12 +427,24 @@ class ApiApplication
         );
 
         $this->container->singleton(
+            StripeCouponGateway::class,
+            fn () => new StripeCouponGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                ),
+                app(VoucherRepository::class)
+            )
+        );
+
+        $this->container->singleton(
             StripeSubscriptionGateway::class,
             fn () => new StripeSubscriptionGateway(
                 new StripeClient(
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
-                )
+                ),
+                app(StripeCouponGateway::class)
             )
         );
 

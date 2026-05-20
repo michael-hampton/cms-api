@@ -155,6 +155,106 @@ class PageModelTest extends FunctionalTestCase
         $this->assertEquals('Test Tag', $tags->first()->name);
     }
 
+    public function testPageAuthorsIncludePivotDataAndSortOrder()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+        ]);
+
+        $this->database->insert('authors', [
+            'name' => 'Primary Author',
+            'slug' => 'primary-author',
+            'email' => 'primary@example.com',
+            'status' => 'active',
+            'site_id' => $this->siteId,
+        ]);
+        $primaryAuthor = Author::where('email', 'primary@example.com')->first();
+
+        $this->database->insert('authors', [
+            'name' => 'Contributor Author',
+            'slug' => 'contributor-author',
+            'email' => 'contributor@example.com',
+            'status' => 'active',
+            'site_id' => $this->siteId,
+        ]);
+        $contributor = Author::where('email', 'contributor@example.com')->first();
+
+        $this->database->insert('page_authors', [
+            'page_id' => $page->id,
+            'author_id' => $contributor->id,
+            'role' => 'contributor',
+            'sort_order' => 2,
+        ]);
+
+        $this->database->insert('page_authors', [
+            'page_id' => $page->id,
+            'author_id' => $primaryAuthor->id,
+            'role' => 'primary',
+            'sort_order' => 1,
+        ]);
+
+        $authors = $page->authors(false);
+
+        $this->assertCount(2, $authors);
+        $this->assertEquals('Primary Author', $authors->first()->name);
+        $this->assertEquals('primary', $authors->first()->pivot->role);
+        $this->assertEquals(1, $authors->first()->pivot->sort_order);
+    }
+
+    public function testPagePrimaryAuthorsAndContributorsCanBeFiltered()
+    {
+        $page = Page::create([
+            'title' => 'Test Page',
+            'slug' => 'test-page',
+            'status' => 'draft',
+        ]);
+
+        $this->database->insert('authors', [
+            'name' => 'Primary Author',
+            'slug' => 'primary-author-2',
+            'email' => 'primary2@example.com',
+            'status' => 'active',
+            'site_id' => $this->siteId,
+        ]);
+        $primaryAuthor = Author::where('email', 'primary2@example.com')->first();
+
+        $this->database->insert('authors', [
+            'name' => 'Contributor Author',
+            'slug' => 'contributor-author-2',
+            'email' => 'contributor2@example.com',
+            'status' => 'active',
+            'site_id' => $this->siteId,
+        ]);
+        $contributor = Author::where('email', 'contributor2@example.com')->first();
+
+        $this->database->insert('page_authors', [
+            'page_id' => $page->id,
+            'author_id' => $primaryAuthor->id,
+            'role' => 'primary',
+            'sort_order' => 1,
+        ]);
+
+        $this->database->insert('page_authors', [
+            'page_id' => $page->id,
+            'author_id' => $contributor->id,
+            'role' => 'contributor',
+            'sort_order' => 2,
+        ]);
+
+        $primaryAuthors = $page->primaryAuthors();
+        $contributors = $page->contributors();
+
+        $this->assertCount(1, $primaryAuthors);
+        $this->assertEquals('Primary Author', $primaryAuthors->first()->name);
+        $this->assertEquals(1, $primaryAuthors->first()->pivot->sort_order);
+
+        $this->assertCount(1, $contributors);
+        $this->assertEquals('Contributor Author', $contributors->first()->name);
+        $this->assertEquals(2, $contributors->first()->pivot->sort_order);
+    }
+
     public function testGetUrlAttribute()
     {
         $page = Page::create([

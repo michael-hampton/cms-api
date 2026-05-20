@@ -35,6 +35,7 @@ class PaymentRecorder
             'payment_provider' => 'stripe',
             'transaction_id' => $paymentData['transaction_id'],
             'payment_intent_id' => $paymentData['payment_intent_id'],
+            'stripe_invoice_id' => $paymentData['stripe_invoice_id'],
             'status' => $paymentData['status'],
             'amount' => $amountCents / 100,
             'currency' => $currency,

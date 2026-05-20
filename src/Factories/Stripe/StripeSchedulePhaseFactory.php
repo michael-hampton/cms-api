@@ -27,10 +27,10 @@ class StripeSchedulePhaseFactory
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function buildPhases(CreateStripeSubscriptionScheduleDto $dto): array
+    public function buildPhases(CreateStripeSubscriptionScheduleDto $dto, ?string $stripeCouponId = null): array
     {
         return [
-            $this->introPhase($dto->introPriceId, $dto->introCycles),
+            $this->introPhase($dto->introPriceId, $dto->introCycles, $stripeCouponId),
             $this->recurringPhase($dto->recurringPriceId),
         ];
     }
@@ -40,12 +40,19 @@ class StripeSchedulePhaseFactory
     /**
      * @param array<string, mixed>
      */
-    private function introPhase(string $introPriceId, int $introCycles): array
+    private function introPhase(string $introPriceId, int $introCycles, ?string $stripeCouponId = null): array
     {
-        return [
+        $phase = [
             'items'      => [['price' => $introPriceId]],
             'iterations' => $introCycles,
         ];
+
+        if ($stripeCouponId !== null) {
+            // First-cycle vouchers belong on the first billed phase only.
+            $phase['discounts'] = [['coupon' => $stripeCouponId]];
+        }
+
+        return $phase;
     }
 
     /**

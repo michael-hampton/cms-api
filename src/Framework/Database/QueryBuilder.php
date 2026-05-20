@@ -228,7 +228,7 @@ class QueryBuilder
                 return "`{$table}`.`{$col}`";
             }
 
-            return "{$table}.{$col}";
+            return "`{$table}`.{$col}";
         }
 
         // Quote if it's a reserved word

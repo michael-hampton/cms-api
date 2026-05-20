@@ -218,8 +218,6 @@ class OneTimeSubscriptionCheckoutService
             $this->orderDraftService->attachPaymentIntent($order, $paymentResult);
         }
 
-        $this->cartService->clear();
-
         return $this->responseBuilder->buildCheckoutResponse(
             $order,
             $subscriptions,

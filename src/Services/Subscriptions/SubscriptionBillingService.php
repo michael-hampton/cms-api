@@ -163,6 +163,8 @@ class SubscriptionBillingService
                 planId:           $subscription->plan_id,
                 memberId:         $subscription->member_id,
                 siteId:           $subscription->site_id,
+                currency:         $subscription->currency,
+                voucherId:        $subscription->voucher_id,
             )
         );
     }
@@ -184,6 +186,8 @@ class SubscriptionBillingService
                 memberId:         $subscription->member_id,
                 siteId:           $subscription->site_id,
                 trialDays:        $trialDays,
+                currency:         $subscription->currency,
+                voucherId:        $subscription->voucher_id,
             )
         );
     }
@@ -208,6 +212,8 @@ class SubscriptionBillingService
                 memberId:          $subscription->member_id,
                 siteId:            $subscription->site_id,
                 trialDays:         $trialDays,
+                currency:          $subscription->currency,
+                voucherId:         $subscription->voucher_id,
             )
         );
     }

@@ -154,9 +154,11 @@ class CrmSubscriptionCreationService
             ]);
 
         } catch (Exception $exception) {
-            echo $exception->getMessage();
-            die;
-
+            Logger::info('Failed to create subscription for member', [
+                'member_id' => $memberId,
+                'plan_id' => $planId,
+            ]);
+            throw $exception;
         } finally {
             // Always restore auth state and clear the injected cart,
             // even if checkout throws.

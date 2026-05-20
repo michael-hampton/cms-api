@@ -27,22 +27,26 @@ use Stripe\StripeClient;
 class StripeSubscriptionScheduleGateway implements StripeSubscriptionScheduleGatewayInterface
 {
     public function __construct(
-        private readonly StripeClient              $stripe,
+        private readonly StripeClient $stripe,
         private readonly StripeSchedulePhaseFactory $phaseFactory,
+        private readonly StripeCouponGateway $couponGateway,
     ) {}
 
     public function create(CreateStripeSubscriptionScheduleDto $dto): StripeSubscriptionResultDto
     {
         try {
             $startDate = $this->resolveStartDate($dto->trialDays);
-            $phases    = $this->phaseFactory->buildPhases($dto);
+            $coupon = $dto->voucherId !== null
+                ? $this->couponGateway->getOrCreateForVoucher($dto->voucherId, $dto->currency ?? 'gbp')
+                : null;
+            $phases    = $this->phaseFactory->buildPhases($dto, $coupon['coupon_id'] ?? null);
 
             $schedule = $this->stripe->subscriptionSchedules->create([
                 'customer'      => $dto->stripeCustomerId,
                 'start_date'    => $startDate,
                 'end_behavior'  => 'release',
                 'phases'        => $phases,
-                'metadata'      => $this->buildMetadata($dto),
+                'metadata'      => $this->buildMetadata($dto, $coupon),
             ]);
 
             // Retrieve the attached subscription so we can return its ID and
@@ -80,14 +84,21 @@ class StripeSubscriptionScheduleGateway implements StripeSubscriptionScheduleGat
         return 'now';
     }
 
-    private function buildMetadata(CreateStripeSubscriptionScheduleDto $dto): array
+    private function buildMetadata(CreateStripeSubscriptionScheduleDto $dto, ?array $coupon = null): array
     {
-        return [
+        $metadata = [
             'subscription_id' => $dto->subscriptionId,
             'plan_id'         => $dto->planId,
             'member_id'       => $dto->memberId,
             'site_id'         => $dto->siteId,
         ];
+
+        if ($coupon !== null) {
+            $metadata['voucher_id'] = $coupon['voucher_id'];
+            $metadata['voucher_code'] = $coupon['voucher_code'];
+        }
+
+        return $metadata;
     }
 
     private function mapToDto(

@@ -377,6 +377,13 @@ $apiBase = '/api/' . $site;
 
 <div id="alert-container"></div>
 
+<?php if (isset($_SESSION['flash_error'])): ?>
+    <div class="alert alert-error" style="margin-bottom: 1.5rem;">
+        <?= htmlspecialchars($_SESSION['flash_error']) ?>
+    </div>
+    <?php unset($_SESSION['flash_error']); ?>
+<?php endif; ?>
+
 <!-- ── Mixed-cart warning ───────────────────────────────────────── -->
 <?php if ($isMixedCart): ?>
     <div class="alert alert-error" style="margin-bottom: 1.5rem;">
@@ -640,7 +647,30 @@ $apiBase = '/api/' . $site;
 
         async request(url, options = {}) {
             const response = await fetch(url, options);
-            return response.json();
+            const contentType = response.headers.get('content-type') || '';
+
+            if (contentType.includes('application/json')) {
+                const payload = await response.json();
+
+                if (!response.ok) {
+                    const message = payload.message
+                        || payload.error
+                        || payload.data?.message
+                        || payload.data?.error
+                        || `Request failed with status ${response.status}`;
+                    throw new Error(message);
+                }
+
+                return payload;
+            }
+
+            const text = (await response.text()).trim();
+
+            if (!response.ok) {
+                throw new Error(text || `Request failed with status ${response.status}`);
+            }
+
+            throw new Error(text || 'Unexpected response from checkout service.');
         }
 
         async createOneTimeSubscriptionCheckout(payload) {

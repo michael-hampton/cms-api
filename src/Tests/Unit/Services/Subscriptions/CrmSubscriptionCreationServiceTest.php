@@ -145,12 +145,16 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $plan = $this->makePlan(siteId: 1, isActive: true);
         $subscription = $this->makeSubscription();
 
+        $plan->shouldReceive('getDeliveryOptions')
+            ->once()
+            ->andReturn(['print']);
+
         $this->memberRepository->expects('find')->with(1)->andReturn($member);
         $this->planRepository->expects('find')->with(5)->andReturn($plan);
         $this->subscriptionRepository->expects('hasActiveSubscriptionToPlan')->with(1, 5)->andReturnFalse();
 
         $this->memberAuth->expects('login')->with($member)->once();
-        $this->cartService->expects('addSubscriptionToCart')->with(5)->once();
+        $this->cartService->expects('addSubscriptionToCart')->with(5, 'print')->once();
         $this->cartService->expects('clear')->once();
 
         $checkoutResult = ['subscription_id' => 42, 'order_id' => 7];
@@ -195,6 +199,10 @@ class CrmSubscriptionCreationServiceTest extends TestCase
         $member = $this->makeMember(siteId: 1);
         $plan = $this->makePlan(siteId: 1, isActive: true);
 
+        $plan->shouldReceive('getDeliveryOptions')
+            ->once()
+            ->andReturn(['print']);
+
         $this->memberRepository->expects('find')->andReturn($member);
         $this->planRepository->expects('find')->andReturn($plan);
         $this->subscriptionRepository->expects('hasActiveSubscriptionToPlan')->andReturnFalse();
@@ -215,6 +223,9 @@ class CrmSubscriptionCreationServiceTest extends TestCase
     {
         $member = $this->makeMember(siteId: 1);
         $plan = $this->makePlan(siteId: 1, isActive: true);
+        $plan->shouldReceive('getDeliveryOptions')
+            ->once()
+            ->andReturn(['print']);
         $subscription = $this->makeSubscription();
         $addressData = ['line1' => '1 Test St', 'city' => 'London'];
 
@@ -255,6 +266,9 @@ class CrmSubscriptionCreationServiceTest extends TestCase
     {
         $member = $this->makeMember(siteId: 1);
         $plan = $this->makePlan(siteId: 1, isActive: true);
+        $plan->shouldReceive('getDeliveryOptions')
+            ->once()
+            ->andReturn(['print']);
         $subscription = $this->makeSubscription();
 
         $this->memberRepository->expects('find')->andReturn($member);

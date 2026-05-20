@@ -5,6 +5,7 @@ namespace App\Framework\Database\Relations;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Model;
+use ArrayObject;
 use BadMethodCallException;
 
 class RelationBuilder implements RelationBuilderInterface
@@ -86,6 +87,7 @@ class RelationBuilder implements RelationBuilderInterface
         $relatedInstance = new $relatedModel();
         $relatedTable = $relatedInstance->getTable();
 
+        $this->query->select("{$relatedTable}.*");
         $this->query->join($pivotTable, "{$relatedTable}.id", '=', "{$pivotTable}.{$relatedKey}")
             ->where("{$pivotTable}.{$foreignKey}", $parentId);
     }
@@ -219,34 +221,109 @@ class RelationBuilder implements RelationBuilderInterface
      */
     protected function handleBelongsToManyResults(Collection $results): Collection
     {
-        // If results are already model instances, return them as-is
-        if ($results->isEmpty() && is_object($results->first())) {
+        if ($results->isEmpty()) {
             return $results;
         }
 
-        // If results are arrays, filter out pivot columns
+        $resultsArray = $results->all();
+        $firstResult = $results->first();
+
+        if (!empty($this->pivotColumns)) {
+            $this->attachPivotDataToResults($resultsArray);
+        }
+
+        if ($firstResult instanceof Model) {
+            return new Collection($resultsArray);
+        }
+
         $pivotTable = $this->relationData['pivot_table'];
         $cleanResults = [];
 
-        foreach ($results as $result) {
-            if (is_array($result)) {
-                // Filter out pivot columns
-                $modelData = [];
-                foreach ($result as $key => $value) {
-                    // Skip pivot table columns (they might be prefixed)
-                    if (!str_starts_with($key, $pivotTable . '_') &&
-                        !str_starts_with($key, $pivotTable . '.')) {
-                        $modelData[$key] = $value;
-                    }
-                }
-                $cleanResults[] = $modelData;
-            } else {
-                // If it's already an object, keep it
+        foreach ($resultsArray as $result) {
+            if (!is_array($result)) {
                 $cleanResults[] = $result;
+                continue;
             }
+
+            $modelData = [];
+            foreach ($result as $key => $value) {
+                if (!str_starts_with($key, $pivotTable . '_') &&
+                    !str_starts_with($key, $pivotTable . '.')) {
+                    $modelData[$key] = $value;
+                }
+            }
+
+            $cleanResults[] = $modelData;
         }
 
         return new Collection($cleanResults);
+    }
+
+    protected function attachPivotDataToResults(array $results): void
+    {
+        $relatedIds = [];
+
+        foreach ($results as $result) {
+            $relatedId = $result instanceof Model ? $result->getAttribute('id') : ($result['id'] ?? null);
+            if ($relatedId !== null) {
+                $relatedIds[] = $relatedId;
+            }
+        }
+
+        if (empty($relatedIds)) {
+            return;
+        }
+
+        $pivotQuery = new QueryBuilder(
+            $this->relationData['pivot_table'],
+            $this->handler->eagerLoader,
+            $this->handler->database
+        );
+
+        $pivotRecords = $pivotQuery
+            ->where($this->relationData['foreign_key'], $this->parent->getAttribute('id'))
+            ->whereIn($this->relationData['related_key'], array_values(array_unique($relatedIds)))
+            ->get();
+
+        $pivotMap = [];
+        foreach ($pivotRecords as $pivotRecord) {
+            $relatedId = $pivotRecord instanceof Model
+                ? $pivotRecord->getAttribute($this->relationData['related_key'])
+                : ($pivotRecord[$this->relationData['related_key']] ?? null);
+
+            if ($relatedId !== null) {
+                $pivotMap[$relatedId] = $pivotRecord;
+            }
+        }
+
+        foreach ($results as $result) {
+            $relatedId = $result instanceof Model ? $result->getAttribute('id') : ($result['id'] ?? null);
+            if ($relatedId === null || !isset($pivotMap[$relatedId])) {
+                continue;
+            }
+
+            $pivotData = [];
+            foreach ($this->pivotColumns as $column) {
+                $pivotValue = $pivotMap[$relatedId] instanceof Model
+                    ? $pivotMap[$relatedId]->getAttribute($column)
+                    : ($pivotMap[$relatedId][$column] ?? null);
+
+                if ($pivotValue !== null) {
+                    $pivotData[$column] = $pivotValue;
+                }
+            }
+
+            $pivot = new ArrayObject($pivotData, ArrayObject::ARRAY_AS_PROPS);
+
+            if ($result instanceof Model) {
+                $result->setAttribute('pivot', $pivot);
+                continue;
+            }
+
+            if (is_array($result)) {
+                $result['pivot'] = $pivot;
+            }
+        }
     }
 
     /**

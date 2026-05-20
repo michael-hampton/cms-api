@@ -136,7 +136,7 @@ class MemberAuth
                 return null;
             }
 
-            $roles = $member->roles()->get();
+            $roles = $member->roles()?->get();
 
             $rolesSlugs = $roles->pluck('slug')->toArray();
 

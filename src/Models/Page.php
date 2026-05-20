@@ -306,19 +306,21 @@ class Page extends Model
 
     public function authors($relation = true)
     {
-        return $this->belongsToMany(
+        $query = $this->belongsToMany(
             Author::class,
             'page_authors',
             'page_id',
             'author_id',
             true
         )->withPivot('role', 'sort_order')
-            ->orderBy('page_authors.sort_order')->get();
+            ->orderBy('page_authors.sort_order');
+
+        return $relation ? $query : $query->get();
     }
 
     public function primaryAuthors($relation = false)
     {
-        return $this->belongsToMany(
+        $query = $this->belongsToMany(
             Author::class,
             'page_authors',
             'page_id',
@@ -327,11 +329,13 @@ class Page extends Model
         )->wherePivot('role', 'primary')
             ->withPivot('sort_order')
             ->orderBy('page_authors.sort_order');
+
+        return $relation ? $query : $query->get();
     }
 
     public function contributors($relation = false)
     {
-        return $this->belongsToMany(
+        $query = $this->belongsToMany(
             Author::class,
             'page_authors',
             'page_id',
@@ -340,6 +344,8 @@ class Page extends Model
         )->wherePivot('role', 'contributor')
             ->withPivot('sort_order')
             ->orderBy('page_authors.sort_order');
+
+        return $relation ? $query : $query->get();
     }
 
 // Helper method to get primary author (for backward compatibility)
@@ -418,13 +424,15 @@ class Page extends Model
 
     public function likedByMembers($relation = false)
     {
-        return $this->belongsToMany(
+        $query = $this->belongsToMany(
             Member::class,
             'page_likes',
             'page_id',
             'member_id',
-            $relation
+            true
         )->withPivot('liked_at');
+
+        return $relation ? $query : $query->get();
     }
 
     public function getLikeCount(): int

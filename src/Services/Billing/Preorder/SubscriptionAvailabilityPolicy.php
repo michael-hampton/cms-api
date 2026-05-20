@@ -113,7 +113,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
 
         // Print subscription - check next issue
         $nextIssue = $this->plan->getNextIssue();
-
+        
         if (!$nextIssue) {
             return 'No issues available';
         }

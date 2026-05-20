@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Order;
@@ -63,22 +64,9 @@ class SubscriptionPaymentService
             $data,
         );
 
-        // Map StripeSubscriptionResultDto to the shape the rest of this method expects
-        $stripeResponse = [
-            'success'                     => true,
-            'subscription_id'             => $stripeResult->stripeSubscriptionId,
-            'status'                      => $stripeResult->status,
-            'customer_id'                 => $stripeResult->stripeCustomerId,
-            'payment_intent_id'           => $stripeResult->paymentIntentId,
-            'requires_action'             => $stripeResult->requiresAction,
-            'payment_intent_client_secret'=> $stripeResult->paymentIntentClientSecret,
-            'current_period_start'        => $stripeResult->currentPeriodStart,
-            'current_period_end'          => $stripeResult->currentPeriodEnd,
-        ];
-
         // ── 2. Resolve invoice amount ────────────────────────────────────────
         $invoiceAmountCents = $this->resolveInvoiceAmountCents(
-            $stripeResponse,
+            $stripeResult,
             $subscription,
             $data,
         );
@@ -90,28 +78,30 @@ class SubscriptionPaymentService
             $subscription,
             $plan,
             [
-                'amount_cents'        => $invoiceAmountCents,
-                'payment_intent_id' => $stripeResult->paymentIntentId ?? null,
-                'status' => $this->mapStripeStatusToPaymentStatus($stripeResult->status ?? 'pending'),
-                'order_id'            => $orderId,
-                'transaction_id'      => $stripeResponse['payment_intent_id'] ?? $stripeResponse['subscription_id'],
-                'stripe_subscription_id' => $stripeResponse['subscription_id'],
-                'stripe_customer_id'  => $stripeResponse['customer_id'],
-                'invoice_tax_cents'   => $stripeResponse['invoice_tax_cents'] ?? null,
+                'amount_cents'           => $invoiceAmountCents,
+                'payment_intent_id'      => $stripeResult->paymentIntentId,
+                'status'                 => $this->mapStripeStatusToPaymentStatus($stripeResult->status ?? 'pending'),
+                'order_id'               => $orderId,
+                'transaction_id'         => $stripeResult->paymentIntentId ?? $stripeResult->stripeSubscriptionId,
+                'stripe_subscription_id' => $stripeResult->stripeSubscriptionId,
+                'stripe_customer_id'     => $stripeResult->stripeCustomerId,
+                'stripe_invoice_id'      => $stripeResult->latestInvoiceId,
+                // invoice_tax_cents is not returned by the gateway — populated later via webhook
+                'invoice_tax_cents'      => null,
             ],
         );
 
         // ── 4. Transition state only for immediately active subscriptions ────
-        $isActive   = $stripeResponse['status'] === 'active';
-        $noAction   = !$stripeResponse['requires_action'];
+        $isActive = $stripeResult->status === 'active';
+        $noAction = !$stripeResult->requiresAction;
 
         if ($isActive && $noAction) {
             $this->paymentRecorder->markCompleted($payment);
 
             $this->subscriptionStateManager->markActiveFromStripe(
                 $subscription,
-                $stripeResponse['current_period_start'],
-                $stripeResponse['current_period_end'],
+                $stripeResult->currentPeriodStart,
+                $stripeResult->currentPeriodEnd,
             );
 
             if ($orderId) {
@@ -122,10 +112,10 @@ class SubscriptionPaymentService
         return [
             'success'                      => true,
             'payment_id'                   => $payment->id,
-            'requires_action'              => $stripeResponse['requires_action'],
-            'payment_intent_client_secret' => $stripeResponse['payment_intent_client_secret'] ?? null,
-            'subscription_id'              => $stripeResponse['subscription_id'],
-            'status'                       => $stripeResponse['status'],
+            'requires_action'              => $stripeResult->requiresAction,
+            'payment_intent_client_secret' => $stripeResult->paymentIntentClientSecret,
+            'subscription_id'              => $stripeResult->stripeSubscriptionId,
+            'status'                       => $stripeResult->status,
         ];
     }
 
@@ -290,15 +280,17 @@ class SubscriptionPaymentService
      * so the payment record reflects the eventual charge amount.
      */
     private function resolveInvoiceAmountCents(
-        array        $stripeResponse,
-        Subscription $subscription,
-        array        $data,
+        StripeSubscriptionResultDto $stripeResult,
+        Subscription                $subscription,
+        array                       $data,
     ): ?int {
-        if ($stripeResponse['requires_action']) {
+        if ($stripeResult->requiresAction) {
             return null;
         }
 
-        $invoiceCents = $stripeResponse['invoice_amount_cents'] ?? null;
+        // invoice_amount_cents is not currently returned by the gateway;
+        // retained as a hook for when the DTO exposes it.
+        $invoiceCents = null;
 
         if ($invoiceCents !== null && $invoiceCents > 0) {
             return $invoiceCents;

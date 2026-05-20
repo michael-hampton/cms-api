@@ -17,5 +17,6 @@ final class CreateStripeSubscriptionDto
         public readonly int     $siteId,
         public readonly ?int    $trialDays      = null,
         public readonly ?string $currency       = 'gbp',
+        public readonly ?int    $voucherId      = null,
     ) {}
 }
