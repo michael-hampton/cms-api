@@ -100,8 +100,6 @@ final class WidgetResolver
 
         $userConfigs = $this->settingsRepository->getForUser($user->id);
 
-        $userConfigs = [];
-
         $overrideMap = [];
         foreach ($userConfigs as $config) {
             $overrideMap[$config['widget_key']] = $config;
@@ -177,5 +175,68 @@ final class WidgetResolver
         }
 
         return config('dashboard.default', []);
+    }
+
+    /**
+     * Returns all widgets available to this user regardless of enabled state,
+     * each decorated with their current override config.
+     *
+     * Used by the widget management UI to show the full list so users can
+     * re-enable disabled widgets or see what's available to add.
+     *
+     * Shape per item:
+     * {
+     *   key:      string,
+     *   title:    string,
+     *   enabled:  bool,    — current user override; defaults true
+     *   position: int,     — current user override; defaults to config order
+     * }
+     *
+     * Returns an empty array while the onboarding gate is active — there is
+     * nothing to customise until the dashboard itself is accessible.
+     *
+     * @return array<int, array{key: string, title: string, enabled: bool, position: int}>
+     */
+    public function availableForUser(User $user): array
+    {
+        if ($this->isOnboardingGated($user)) {
+            return [];
+        }
+
+        $baseKeys    = $this->baseKeysForUser($user);
+        $userConfigs = $this->settingsRepository->getForUser($user->id);
+
+        $overrideMap = [];
+        foreach ($userConfigs as $config) {
+            $overrideMap[$config['widget_key']] = $config;
+        }
+
+        $available = [];
+
+        foreach ($baseKeys as $position => $key) {
+            if (!$this->registry->has($key)) {
+                continue;
+            }
+
+            $widget = $this->registry->get($key);
+
+            if (!$widget->visibleFor($user)) {
+                continue;
+            }
+
+            $override = $overrideMap[$key] ?? [];
+
+            $available[] = [
+                'key'      => $key,
+                'title'    => $widget->title(),
+                'enabled'  => (bool)($override['enabled'] ?? true),
+                'position' => (int)($override['position'] ?? $position),
+            ];
+        }
+
+        // Sort by current position so the management UI opens in display order
+        usort($available, fn($a, $b) => $a['position'] <=> $b['position']);
+
+        return $available;
     }
 }

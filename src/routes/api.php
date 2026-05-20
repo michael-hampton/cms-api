@@ -98,6 +98,7 @@ use App\Controllers\OpenCollab\ContributorNotificationPreferenceController;
 use App\Controllers\OpenCollab\ContributorPageController;
 use App\Controllers\OpenCollab\ContributorRequestController;
 use App\Controllers\OpenCollab\ContributorSettingsController;
+use App\Controllers\OpenCollab\DashboardPageNewController;
 use App\Controllers\OpenCollab\EarningsDisputeController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
@@ -110,6 +111,7 @@ use App\Controllers\OpenCollab\ResendInvitationController;
 use App\Controllers\OpenCollab\StripeConnectController;
 use App\Controllers\OpenCollab\StripeWebhookController;
 use App\Controllers\OpenCollab\ViolationController;
+use App\Controllers\OpenCollab\WidgetSettingsController;
 use App\Controllers\Product\MerchantContactController;
 use App\Controllers\Product\MerchantController;
 use App\Controllers\Product\MerchantImportController;
@@ -349,7 +351,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ContributorSettingsController::class, 'saveExpertise']
         );
 
-        $router->get('/open-collab/dashboard/widgets/{slug}', [\App\Controllers\OpenCollab\DashboardPageNewController::class, 'getWidget']);
+        $router->get('/open-collab/dashboard/widgets/{slug}', [DashboardPageNewController::class, 'getWidget']);
+        $router->get('/open-collab/dashboard/widgets', [DashboardPageNewController::class, 'index']);
+        $router->put('/open-collab/dashboard/widgets/positions', [WidgetSettingsController::class, 'updatePositions']);
+        $router->put('/open-collab/dashboard/widgets/{key}/settings', [WidgetSettingsController::class, 'saveWidgetConfig']);
 
         $router->post(
             '/open-collab/contributor/avatar',

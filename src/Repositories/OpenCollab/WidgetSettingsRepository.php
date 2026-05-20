@@ -35,7 +35,7 @@ class WidgetSettingsRepository
      */
     public function getForUser(int $userId): Collection
     {
-       return $this->db
+        return $this->db
             ->table(self::TABLE)
             ->select([
                 'widget_key',
@@ -72,31 +72,37 @@ class WidgetSettingsRepository
         array  $settings = []
     ): void
     {
+        $existing = $this->db
+            ->table(self::TABLE)
+            ->where('user_id', $userId)
+            ->where('widget_key', $widgetKey)
+            ->exists();
+
+        $payload = [
+            'enabled' => $enabled,
+            'position' => $position,
+            'settings' => json_encode($settings),
+            'updated_at' => now(),
+        ];
+
+        if ($existing) {
+            $this->db
+                ->table(self::TABLE)
+                ->where('user_id', $userId)
+                ->where('widget_key', $widgetKey)
+                ->update($payload);
+
+            return;
+        }
+
         $this->db
             ->table(self::TABLE)
-            ->upsert(
-                [
-                    [
-                        'user_id' => $userId,
-                        'widget_key' => $widgetKey,
-                        'enabled' => $enabled,
-                        'position' => $position,
-                        'settings' => json_encode($settings),
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                ],
-                [
-                    'user_id',
-                    'widget_key',
-                ],
-                [
-                    'enabled',
-                    'position',
-                    'settings',
-                    'updated_at',
-                ]
-            );
+            ->insert([
+                'user_id' => $userId,
+                'widget_key' => $widgetKey,
+                'created_at' => now(),
+                ...$payload,
+            ]);
     }
 
     /**

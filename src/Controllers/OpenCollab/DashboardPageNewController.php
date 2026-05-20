@@ -4,6 +4,7 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
 use App\Services\OpenCollab\Dashboard\WidgetRegistry;
@@ -20,10 +21,19 @@ class DashboardPageNewController extends Controller
         parent::__construct();
     }
 
+    public function index(): JsonResponse
+    {
+        $user = Auth::getUser();
+
+        return $this->resourceResponse([
+            'widgets' => $this->widgetResolver->availableForUser(User::hydrateStatic($user)),
+        ]);
+    }
+
     /**
      * GET /contributor/dashboard
      */
-    public function index()
+    public function show()
     {
         $user = User::hydrateStatic(Auth::getUser());
         $widgets = $this->widgetResolver->resolveForUser($user);
