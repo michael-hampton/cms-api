@@ -10,4 +10,9 @@ class UserSite extends Model
         'user_id',
         'site_id',
     ];
+
+    public function site()
+    {
+        return $this->belongsTo(Site::class, 'site_id');
+    }
 }
