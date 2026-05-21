@@ -2,8 +2,11 @@
 
 namespace App\Tests\Unit\Services\Billing\Stripe;
 
+use App\DTO\Stripe\BillingAddressData;
 use App\Models\Address;
 use App\Models\Member;
+use App\Services\Billing\Stripe\Contracts\BillingAddressResolverInterface;
+use App\Services\Billing\Stripe\Contracts\StripeCustomerAddressSynchroniserInterface;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use Mockery as m;
 use Mockery\MockInterface;
@@ -16,23 +19,31 @@ use Stripe\StripeClient;
 
 class StripeCustomerGatewayTest extends TestCase
 {
-    private MockInterface       $stripeClient;
-    private MockInterface       $customers;
-    private MockInterface       $paymentMethods;
-    private StripeCustomerGateway $gateway;
+    private MockInterface                            $stripeClient;
+    private MockInterface                            $customers;
+    private MockInterface                            $paymentMethods;
+    private MockInterface                            $addressResolver;
+    private MockInterface                            $addressSynchroniser;
+    private StripeCustomerGateway                    $gateway;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->customers      = m::mock(CustomerService::class);
-        $this->paymentMethods = m::mock(PaymentMethodService::class);
+        $this->customers           = m::mock(CustomerService::class);
+        $this->paymentMethods      = m::mock(PaymentMethodService::class);
+        $this->addressResolver     = m::mock(BillingAddressResolverInterface::class);
+        $this->addressSynchroniser = m::mock(StripeCustomerAddressSynchroniserInterface::class);
 
-        $this->stripeClient = m::mock(StripeClient::class)->makePartial();
-        $this->stripeClient->customers      = $this->customers;
+        $this->stripeClient              = m::mock(StripeClient::class)->makePartial();
+        $this->stripeClient->customers   = $this->customers;
         $this->stripeClient->paymentMethods = $this->paymentMethods;
 
-        $this->gateway = new StripeCustomerGateway($this->stripeClient);
+        $this->gateway = new StripeCustomerGateway(
+            $this->stripeClient,
+            $this->addressResolver,
+            $this->addressSynchroniser,
+        );
     }
 
     protected function tearDown(): void
@@ -45,7 +56,13 @@ class StripeCustomerGatewayTest extends TestCase
 
     public function test_returns_existing_customer_id_when_member_has_stripe_customer_id(): void
     {
-        $member = $this->makeMember(stripeCustomerId: 'cus_existing');
+        $member  = $this->makeMember(stripeCustomerId: 'cus_existing');
+        $address = $this->makeFullBillingAddress();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn($address);
 
         $stripeCustomer = $this->makeStripeCustomer('cus_existing');
 
@@ -54,6 +71,11 @@ class StripeCustomerGatewayTest extends TestCase
             ->once()
             ->with('cus_existing')
             ->andReturn($stripeCustomer);
+
+        $this->addressSynchroniser
+            ->shouldReceive('sync')
+            ->once()
+            ->with('cus_existing', $address);
 
         $this->customers->shouldNotReceive('create');
 
@@ -64,11 +86,16 @@ class StripeCustomerGatewayTest extends TestCase
 
     public function test_does_not_update_member_when_reusing_existing_customer(): void
     {
-        $member = $this->makeMember(stripeCustomerId: 'cus_existing');
+        $member  = $this->makeMember(stripeCustomerId: 'cus_existing');
+        $address = $this->makeFullBillingAddress();
+
+        $this->addressResolver->shouldReceive('resolve')->andReturn($address);
 
         $this->customers
             ->shouldReceive('retrieve')
             ->andReturn($this->makeStripeCustomer('cus_existing'));
+
+        $this->addressSynchroniser->shouldReceive('sync');
 
         $member->shouldNotReceive('update');
 
@@ -81,11 +108,19 @@ class StripeCustomerGatewayTest extends TestCase
 
     public function test_creates_new_customer_when_stripe_returns_not_found(): void
     {
-        $member = $this->makeMember(stripeCustomerId: 'cus_stale');
+        $member  = $this->makeMember(stripeCustomerId: 'cus_stale');
+        $address = $this->makeFullBillingAddress();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn($address);
 
         $this->customers
             ->shouldReceive('retrieve')
             ->andThrow($this->makeStripeNotFoundException());
+
+        $this->addressSynchroniser->shouldNotReceive('sync');
 
         $newCustomer = $this->makeStripeCustomer('cus_new');
 
@@ -107,72 +142,71 @@ class StripeCustomerGatewayTest extends TestCase
 
     public function test_creates_new_customer_when_member_has_no_stripe_customer_id(): void
     {
-        $member = $this->makeMember(
-            stripeCustomerId: null
+        $member = $this->makeMember(stripeCustomerId: null);
+
+        $billingAddress = new BillingAddressData(
+            line1:   null,
+            line2:   null,
+            city:    null,
+            state:   null,
+            postcode: null,
+            country: 'GB',
         );
 
-        $customer = $this->makeStripeCustomer(
-            'cus_created'
-        );
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->with($member, null)
+            ->andReturn($billingAddress);
+
+        $customer = $this->makeStripeCustomer('cus_created');
 
         $this->customers
             ->shouldReceive('create')
             ->once()
             ->with(m::on(function (array $params) {
-
-                $this->assertSame(
-                    'test@example.com',
-                    $params['email']
-                );
-
-                $this->assertArrayHasKey(
-                    'name',
-                    $params
-                );
-
-                $this->assertArrayHasKey(
-                    'address',
-                    $params
-                );
-
-                $this->assertSame(
-                    1,
-                    $params['metadata']['member_id']
-                );
-
-                $this->assertSame(
-                    1,
-                    $params['metadata']['site_id']
-                );
-
+                $this->assertSame('test@example.com', $params['email']);
+                $this->assertArrayHasKey('name', $params);
+                $this->assertArrayHasKey('address', $params);
+                $this->assertSame(1, $params['metadata']['member_id']);
+                $this->assertSame(1, $params['metadata']['site_id']);
                 return true;
             }))
             ->andReturn($customer);
 
-        $this->customers
-            ->shouldNotReceive('retrieve');
+        $this->customers->shouldNotReceive('retrieve');
+
+        $this->addressSynchroniser->shouldNotReceive('sync');
 
         $member
             ->shouldReceive('update')
             ->once()
-            ->with([
-                'stripe_customer_id' => 'cus_created'
-            ]);
+            ->with(['stripe_customer_id' => 'cus_created']);
 
-        $result = $this->gateway->getOrCreate(
-            $member
-        );
+        $result = $this->gateway->getOrCreate($member);
 
-        $this->assertSame(
-            'cus_created',
-            $result
-        );
+        $this->assertSame('cus_created', $result);
     }
 
     public function test_creates_customer_with_full_address_when_address_provided(): void
     {
-        $member  = $this->makeMember(stripeCustomerId: null);
-        $address = $this->makeAddress();
+        $member       = $this->makeMember(stripeCustomerId: null);
+        $addressModel = $this->makeAddress();
+
+        $billingAddress = new BillingAddressData(
+            line1:    '123 Test Street',
+            line2:    null,
+            city:     'London',
+            state:    null,
+            postcode: 'SW1A 1AA',
+            country:  'GB',
+        );
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->with($member, $addressModel)
+            ->andReturn($billingAddress);
 
         $this->customers
             ->shouldReceive('create')
@@ -187,7 +221,7 @@ class StripeCustomerGatewayTest extends TestCase
 
         $member->shouldReceive('update')->once();
 
-        $this->gateway->getOrCreate($member, $address);
+        $this->gateway->getOrCreate($member, $addressModel);
 
         $this->assertTrue(true);
     }
@@ -196,13 +230,28 @@ class StripeCustomerGatewayTest extends TestCase
     {
         $member = $this->makeMember(stripeCustomerId: null);
 
+        $billingAddress = new BillingAddressData(
+            line1:    null,
+            line2:    null,
+            city:     null,
+            state:    null,
+            postcode: null,
+            country:  'GB',
+        );
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->with($member, null)
+            ->andReturn($billingAddress);
+
         $this->customers
             ->shouldReceive('create')
             ->once()
             ->with(m::on(function (array $params) {
-                return $params['address'] === ['country' => 'GB']
-                    || (isset($params['address']['country'])
-                        && count($params['address']) === 1);
+                return isset($params['address']['country'])
+                    && $params['address']['country'] === 'GB'
+                    && count($params['address']) === 1;
             }))
             ->andReturn($this->makeStripeCustomer('cus_new'));
 
@@ -216,6 +265,23 @@ class StripeCustomerGatewayTest extends TestCase
     public function test_falls_back_to_gb_when_member_has_no_country(): void
     {
         $member = $this->makeMember(stripeCustomerId: null, country: null);
+
+        // Resolver returns GB-country-only address (sourced from member->country ?? null,
+        // but in this case the BillingAddressResolver itself falls back when country is null.
+        // The gateway test verifies that when the resolver returns a GB address, it is used.
+        $billingAddress = new BillingAddressData(
+            line1:    null,
+            line2:    null,
+            city:     null,
+            state:    null,
+            postcode: null,
+            country:  'GB',
+        );
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn($billingAddress);
 
         $this->customers
             ->shouldReceive('create')
@@ -285,6 +351,78 @@ class StripeCustomerGatewayTest extends TestCase
         $this->assertSame(['attach', 'update'], $callOrder);
     }
 
+    public function test_sync_is_called_with_resolved_address_for_existing_customer(): void
+    {
+        $member         = $this->makeMember(stripeCustomerId: 'cus_existing');
+        $billingAddress = $this->makeFullBillingAddress();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->once()
+            ->andReturn($billingAddress);
+
+        $this->customers
+            ->shouldReceive('retrieve')
+            ->andReturn($this->makeStripeCustomer('cus_existing'));
+
+        $this->addressSynchroniser
+            ->shouldReceive('sync')
+            ->once()
+            ->with('cus_existing', $billingAddress);
+
+        $this->gateway->getOrCreate($member);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_sync_is_not_called_when_creating_new_customer(): void
+    {
+        $member         = $this->makeMember(stripeCustomerId: null);
+        $billingAddress = $this->makeFullBillingAddress();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->andReturn($billingAddress);
+
+        $this->customers
+            ->shouldReceive('create')
+            ->andReturn($this->makeStripeCustomer('cus_new'));
+
+        $this->addressSynchroniser->shouldNotReceive('sync');
+
+        $member->shouldReceive('update')->once();
+
+        $this->gateway->getOrCreate($member);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_sync_is_not_called_when_existing_customer_not_found_in_stripe(): void
+    {
+        $member         = $this->makeMember(stripeCustomerId: 'cus_stale');
+        $billingAddress = $this->makeFullBillingAddress();
+
+        $this->addressResolver
+            ->shouldReceive('resolve')
+            ->andReturn($billingAddress);
+
+        $this->customers
+            ->shouldReceive('retrieve')
+            ->andThrow($this->makeStripeNotFoundException());
+
+        $this->addressSynchroniser->shouldNotReceive('sync');
+
+        $this->customers
+            ->shouldReceive('create')
+            ->andReturn($this->makeStripeCustomer('cus_new'));
+
+        $member->shouldReceive('update')->once();
+
+        $this->gateway->getOrCreate($member);
+
+        $this->assertTrue(true);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function makeMember(
@@ -335,5 +473,17 @@ class StripeCustomerGatewayTest extends TestCase
             ->andReturn(404);
 
         return $exception;
+    }
+
+    private function makeFullBillingAddress(): BillingAddressData
+    {
+        return new BillingAddressData(
+            line1:    '123 Test Street',
+            line2:    null,
+            city:     'London',
+            state:    null,
+            postcode: 'SW1A 1AA',
+            country:  'GB',
+        );
     }
 }

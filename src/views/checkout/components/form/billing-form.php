@@ -119,6 +119,7 @@ $emailHintText = $isDigitalOnly
     'name'  => 'phone',
     'label' => 'Phone',
     'type'  => 'tel',
+    'value'    => $member?->phone ?? '',
     ])
     @include('checkout/components/form/form-row', ['close' => true])
 
@@ -144,7 +145,7 @@ $emailHintText = $isDigitalOnly
 
     @include('checkout/components/form/form-section', ['close' => true])
 
-<?php if (!$isDigitalOnly): ?>
+<?php if (!$isDigitalOnly || $requiresShipping): ?>
 
     <!-- ── Saved addresses (logged-in users) ────────────────────────────── -->
     @include('checkout/components/form/form-section', [

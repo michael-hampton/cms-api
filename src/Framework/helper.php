@@ -13,6 +13,7 @@ use App\Framework\Queue\Job;
 use App\Framework\Queue\PendingDispatch;
 use App\Framework\Security\Csrf;
 use App\Framework\Session\Session;
+use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
@@ -752,6 +753,11 @@ if (!function_exists('optional')) {
             }
         };
     }
+}
+
+function cache()
+{
+    return new Cache();
 }
 
 

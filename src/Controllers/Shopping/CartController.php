@@ -4,6 +4,7 @@ namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
 use App\DTO\Checkout\DeliveryMethodConfig;
+use App\Enums\Address\AddressType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Members\OrderCreatedByMember;
 use App\Framework\Authorization\MemberAuth;
@@ -15,6 +16,7 @@ use App\Models\Member;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Auth\OTPRepository;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Members\AddressRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -61,6 +63,7 @@ class CartController extends Controller
         private GiftResolutionService           $giftResolutionService,
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly CurrencyResolver       $currencyResolver,
+        private readonly AddressRepository                  $addressRepository,
     )
     {
         parent::__construct();
@@ -271,18 +274,20 @@ class CartController extends Controller
         $currencyCode = $this->currencyResolver->resolveUpperCase();
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
 
+        $member = MemberAuth::check() ? MemberAuth::getMember() : null;
+
         $cartData = [
             'items' => $items,
             'total' => $this->cartService->getTotal(),
             'count' => $this->cartService->getCount(),
-            'requiresShipping' => $this->cartService->requiresShipping(),
+            'requiresShipping' => ($member === null || $member->addresses->count() === 0) || $this->cartService->requiresShipping(),
             'shipping' => $shipping,
             'subtotal' => $subtotal,
             'savedCards' => $savedCards,
             'tax' => $tax->taxCents / 100,
             'tax_rate' => $tax->rate,
             'hasPreOrders' => $this->detectPreOrders($items),
-            'member' => MemberAuth::check() ? MemberAuth::getMember() : null,
+            'member' => $member,
             'checkoutMode' => 'steps',
             'currency' => $currencyCode,
             'currencySymbol' => $currencySymbol,
@@ -416,6 +421,22 @@ class CartController extends Controller
         if (!empty($contactUpdates)) {
             $member->fill($contactUpdates);
             $member->save();
+        }
+
+        if (!empty($data['address']) && $member->addresses->count() === 0) {
+            $this->addressRepository->create(
+                [
+                    'member_id' => $member->id,
+                    'address_line_1' => $data['address'],
+                    'address_line_2' => $data['address2'],
+                    'city' => $data['city'],
+                    'state' => $data['state'],
+                    'postcode' => $data['postal_code'],
+                    'country' => $data['country'],
+                    'is_default' => true,
+                    'type' => AddressType::Billing->value,
+                ]
+            );
         }
 
         $items = $this->cartService->getItems();

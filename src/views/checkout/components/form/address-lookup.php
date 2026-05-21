@@ -18,46 +18,44 @@
  * Country follows the same <select> + handleCountryChange() pattern already
  * used in billing-form so US-specific UI toggling keeps working unchanged.
  *
- * @var object|null $member Pre-fills fields from member address data.
- * @var bool $requiresShipping Controls `required` on address fields.
+ * @var object|null $member            Pre-fills fields from member address data.
+ * @var bool        $requiresShipping  Controls `required` on address fields.
+ *
+ * Countries are loaded from the `countries` table (is_active = true),
+ * ordered by sort_order then name, so the list always matches what Stripe
+ * accepts. The hardcoded $countries array has been removed; add or deactivate
+ * countries via the countries table / CountriesSeeder instead.
  *
  * DEFENSIVE DEFAULTS
  */
-$member = $member ?? null;
+
+use App\Models\Country;
+
+$member           = $member ?? null;
 $requiresShipping = $requiresShipping ?? false;
-$required = $requiresShipping;
+$required         = $requiresShipping;
 
 $prefill = [
-        'address' => $member->address ?? '',
-        'city' => $member->city ?? '',
-        'county' => $member->county ?? '',
+        'address'     => $member->address     ?? '',
+        'city'        => $member->city        ?? '',
+        'county'      => $member->county      ?? '',
         'postal_code' => $member->postal_code ?? '',
-        'country' => $member->country ?? 'GB',
+        'country'     => $member->country     ?? 'GB',
 ];
 
-// Full country list — matches billing-form so handleCountryChange() keeps working
-$countries = [
-        'GB' => 'United Kingdom',
-        'US' => 'United States',
-        'AU' => 'Australia',
-        'CA' => 'Canada',
-        'IE' => 'Ireland',
-        'NZ' => 'New Zealand',
-        'ZA' => 'South Africa',
-        'DE' => 'Germany',
-        'FR' => 'France',
-        'ES' => 'Spain',
-        'IT' => 'Italy',
-        'NL' => 'Netherlands',
-        'BE' => 'Belgium',
-        'SE' => 'Sweden',
-        'NO' => 'Norway',
-        'DK' => 'Denmark',
-        'FI' => 'Finland',
-        'PT' => 'Portugal',
-        'AT' => 'Austria',
-        'CH' => 'Switzerland',
-];
+// Load active countries from the database, ordered for the dropdown.
+// Result is an associative array: ['GB' => 'United Kingdom', ...]
+// Cached for the request lifetime via remember() so repeated @include calls
+// on the same page (e.g. billing + shipping) don't hit the DB twice.
+$countries = cache()->remember('checkout.countries', now_datetime()->addMinutes(10), function () {
+    return Country::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->pluck('name', 'code')
+            ->all();
+});
 
 $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_code']);
 
@@ -217,16 +215,16 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
 
     <div class="address-lookup__search-row">
         @include('checkout/components/form/input', [
-        'name' => 'postcode_search',
-        'id' => 'postcode-search',
-        'label' => 'Find your address',
-        'type' => 'text',
+        'name'        => 'postcode_search',
+        'id'          => 'postcode-search',
+        'label'       => 'Find your address',
+        'type'        => 'text',
         'placeholder' => 'Enter postcode, e.g. SW1A 1AA',
-        'value' => $prefill['postal_code'],
-        'errorId' => 'error-postcode-search',
-        'attrs' => [
+        'value'       => $prefill['postal_code'],
+        'errorId'     => 'error-postcode-search',
+        'attrs'       => [
         'autocomplete' => 'postal-code',
-        'aria-label' => 'Postcode for address lookup',
+        'aria-label'   => 'Postcode for address lookup',
         ],
         ])
 
@@ -254,48 +252,46 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
          class="address-lookup__manual"
          style="<?= $hasExistingAddress ? '' : 'display:none;' ?>">
 
-
         @include('checkout/components/form/form-group', [
-        'name' => 'address',
-        'label' => 'Address',
+        'name'     => 'address',
+        'label'    => 'Address',
         'required' => true,
-        'class' => 'full-width',
+        'class'    => 'full-width',
         ])
         @include('checkout/components/form/form-group', [
-        'name' => 'address2',
+        'name'  => 'address2',
         'label' => 'Apartment, suite, etc. (optional)',
         'class' => 'full-width',
         ])
 
         @include('checkout/components/form/form-row')
         @include('checkout/components/form/form-group', [
-        'name' => 'city',
-        'label' => 'City',
+        'name'     => 'city',
+        'label'    => 'City',
         'required' => true,
         ])
         @include('checkout/components/form/form-group', [
-        'name' => 'state',
+        'name'  => 'state',
         'label' => 'State / Province',
         ])
         @include('checkout/components/form/form-row', ['close' => true])
 
-
         @include('checkout/components/form/form-row')
         @include('checkout/components/form/form-group', [
-        'name' => 'postal_code',
-        'label' => 'Postal Code',
+        'name'     => 'postal_code',
+        'label'    => 'Postal Code',
         'required' => true,
         ])
         @include('checkout/components/form/select', [
-        'name' => 'country',
-        'id' => 'country-select',
-        'label' => 'Country',
-        'required' => true,
-        'blank' => true,
+        'name'       => 'country',
+        'id'         => 'country-select',
+        'label'      => 'Country',
+        'required'   => true,
+        'blank'      => true,
         'blankLabel' => 'Select Country',
-        'options' => $countries,
-        'selected' => $member?->country ?? '',
-        'onChange' => 'handleCountryChange(this.value)',
+        'options'    => $countries,
+        'selected'   => $member?->country ?? '',
+        'onChange'   => 'handleCountryChange(this.value)',
         ])
         @include('checkout/components/form/form-row', ['close' => true])
 
@@ -321,51 +317,53 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
      * Reads the global `API_BASE` already declared on every checkout/subscription page.
      */
     const addressLookup = (() => {
-        const resultsEl = document.getElementById('address-results');
-        const manualEl = document.getElementById('address-manual-entry');
-        const toggleBtn = document.getElementById('address-lookup-toggle');
+        const resultsEl    = document.getElementById('address-results');
+        const manualEl     = document.getElementById('address-manual-entry');
+        const toggleBtn    = document.getElementById('address-lookup-toggle');
         const postcodeInput = document.getElementById('postcode-search');
-        const findBtn = document.getElementById('address-find-btn');
-        const errorEl = document.getElementById('error-postcode-search');
+        const findBtn      = document.getElementById('address-find-btn');
+        const errorEl      = document.getElementById('error-postcode-search');
 
         // Maps API response keys to form input ids
         const fieldMap = {
-            address: 'address',
-            city: 'city',
-            county: 'county',
+            address:     'address',
+            city:        'city',
+            county:      'county',
             postal_code: 'postal_code',
-            country: 'country',
+            country:     'country',
         };
 
         let manualVisible = <?= $hasExistingAddress ? 'true' : 'false' ?>;
-        let _addresses = [];
+        let _addresses    = [];
 
         /* ── Helpers ──────────────────────────────────────────────── */
         const showResults = html => {
-            resultsEl.innerHTML = html;
+            resultsEl.innerHTML    = html;
             resultsEl.style.display = 'block';
         };
         const hideResults = () => {
             resultsEl.style.display = 'none';
-            resultsEl.innerHTML = '';
+            resultsEl.innerHTML     = '';
         };
 
         function showManual() {
-            manualEl.style.display = 'block';
-            toggleBtn.textContent = 'Search for a different address';
-            manualVisible = true;
+            manualEl.style.display  = 'block';
+            toggleBtn.textContent   = 'Search for a different address';
+            manualVisible           = true;
         }
 
         function hideManual() {
             manualEl.style.display = 'none';
-            toggleBtn.textContent = 'Enter address manually';
-            manualVisible = false;
+            toggleBtn.textContent  = 'Enter address manually';
+            manualVisible          = false;
         }
 
         /* ── Populate form fields from a selected address ─────────── */
         function populate(addr) {
             Object.entries(fieldMap).forEach(([key, inputId]) => {
-                const el = inputId === 'country' ? document.getElementById('country-select') : document.getElementById('field-' + inputId);
+                const el = inputId === 'country'
+                    ? document.getElementById('country-select')
+                    : document.getElementById('field-' + inputId);
                 if (el && addr[key] !== undefined) el.value = addr[key];
             });
 
@@ -394,7 +392,7 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
 
             try {
                 const base = (typeof API_BASE !== 'undefined') ? API_BASE : '';
-                const res = await fetch(`${base}/address-lookup?postcode=${encodeURIComponent(postcode)}`, {
+                const res  = await fetch(`${base}/address-lookup?postcode=${encodeURIComponent(postcode)}`, {
                     headers: {'Accept': 'application/json'}
                 });
                 const data = await res.json();
@@ -413,11 +411,11 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
                 const items = _addresses.map((addr, i) => {
                     const label = [addr.address, addr.city, addr.postal_code].filter(Boolean).join(', ');
                     return `<div class="address-lookup__result-item"
-                             role="option" tabindex="0"
-                             onclick="addressLookup.select(${i})"
-                             onkeydown="if(event.key==='Enter')addressLookup.select(${i})">
-                            ${label}
-                        </div>`;
+                                 role="option" tabindex="0"
+                                 onclick="addressLookup.select(${i})"
+                                 onkeydown="if(event.key==='Enter')addressLookup.select(${i})">
+                                ${label}
+                            </div>`;
                 }).join('');
 
                 showResults(items);
@@ -443,12 +441,10 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         }
 
         /* ── Wiring ───────────────────────────────────────────────── */
-        // Close dropdown when clicking outside the component
         document.addEventListener('click', e => {
             if (!document.getElementById('address-lookup')?.contains(e.target)) hideResults();
         });
 
-        // Enter key on postcode input triggers search
         postcodeInput?.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();

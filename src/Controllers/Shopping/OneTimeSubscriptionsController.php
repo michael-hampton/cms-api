@@ -3,6 +3,7 @@
 namespace App\Controllers\Shopping;
 
 use App\Controllers\Controller;
+use App\Enums\Address\AddressType;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Events\Subscriptions\PaymentSucceeded;
@@ -13,6 +14,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
+use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Auth\CheckoutIdentityService;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
@@ -44,6 +46,7 @@ class OneTimeSubscriptionsController extends Controller
         private readonly CartPersistenceService             $cartPersistence,
         private readonly CartService                        $cartService,
         private readonly CartMigrationService               $cartMigration,
+        private readonly AddressRepository                  $addressRepository,
 
     )
     {
@@ -260,6 +263,23 @@ class OneTimeSubscriptionsController extends Controller
                 $member->save();
             }
 
+            if (!empty($data['address']) && $member->addresses->count() === 0) {
+                $this->addressRepository->create(
+                    [
+                        'member_id' => $member->id,
+                        'address_line_1' => $data['address'],
+                        'address_line_2' => $data['address2'],
+                        'city' => $data['city'],
+                        'state' => $data['state'],
+                        'postcode' => $data['postal_code'],
+                        'country' => $data['country'],
+                        'is_default' => true,
+                        'type' => AddressType::Billing->value,
+
+                    ]
+                );
+            }
+
             $items = $this->cartService->getItems();
 
             if (!$items) {
@@ -279,13 +299,6 @@ class OneTimeSubscriptionsController extends Controller
             return $this->errorResponse($e->getMessage(), 500);
         }
 
-    }
-
-    private function clearCheckoutSession(): void
-    {
-        Session::forget('applied_voucher_code');
-        Session::forget('checkout_token');
-        Session::forget('pending_otp_email');
     }
 
     public function confirmPayment(Request $request)
@@ -424,6 +437,13 @@ class OneTimeSubscriptionsController extends Controller
         $this->clearCheckoutSession();
 
         return $this->jsonResponse(['success' => true]);
+    }
+
+    private function clearCheckoutSession(): void
+    {
+        Session::forget('applied_voucher_code');
+        Session::forget('checkout_token');
+        Session::forget('pending_otp_email');
     }
 
     public function showMultiple(Request $request)

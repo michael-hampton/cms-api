@@ -51,6 +51,89 @@ class QueryBuilder
         $this->paramPrefix = spl_object_id($this);
     }
 
+    public function upsert(
+        array $values,
+        array|string $uniqueBy,
+        ?array $updateColumns = null
+    ): int {
+        if (empty($values)) {
+            return 0;
+        }
+
+        // Support single row and bulk rows
+        $isBulk = isset($values[0]) && is_array($values[0]);
+
+        if (!$isBulk) {
+            $values = [$values];
+        }
+
+        $columns = array_keys($values[0]);
+
+        // Default: update everything except unique columns
+        if ($updateColumns === null) {
+            $uniqueBy = (array)$uniqueBy;
+
+            $updateColumns = array_filter(
+                $columns,
+                fn ($col) => !in_array($col, $uniqueBy, true)
+            );
+        }
+
+        $quotedColumns = array_map(
+            [$this, 'quoteColumn'],
+            $columns
+        );
+
+        $rows = [];
+        $bindings = [];
+
+        foreach ($values as $row) {
+            $placeholders = [];
+
+            foreach ($columns as $column) {
+                $paramKey = $this->paramPrefix .
+                    '_param_' .
+                    $this->paramCounter++;
+
+                $placeholders[] = ":{$paramKey}";
+
+                $value = $row[$column] ?? null;
+
+                if (is_bool($value)) {
+                    $value = $value ? 1 : 0;
+                }
+
+                $bindings[$paramKey] = $value;
+            }
+
+            $rows[] = '(' . implode(', ', $placeholders) . ')';
+        }
+
+        $updates = [];
+
+        foreach ($updateColumns as $column) {
+            $quoted = $this->quoteColumn($column);
+
+            $updates[] =
+                "{$quoted} = VALUES({$quoted})";
+        }
+
+        $sql = sprintf(
+            'INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s',
+            $this->quoteTable($this->table),
+            implode(', ', $quotedColumns),
+            implode(', ', $rows),
+            implode(', ', $updates)
+        );
+
+        $stmt = $this->database->query(
+            $sql,
+            $bindings
+        );
+
+        return $stmt->rowCount();
+    }
+
     // SELECT methods
     public function select($columns): self
     {

@@ -154,12 +154,14 @@ use App\Repositories\Product\ProductRepositoryInterface;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
 use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway;
+use App\Services\Billing\Stripe\BillingAddressResolver;
 use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
 use App\Services\Billing\Stripe\StripeCouponGateway;
+use App\Services\Billing\Stripe\StripeCustomerAddressSynchroniser;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
@@ -372,7 +374,9 @@ class ApiApplication
                 new StripeClient(
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
-                )
+                ),
+                app(BillingAddressResolver::class),
+                app(StripeCustomerAddressSynchroniser::class)
             )
         );
 
@@ -419,6 +423,16 @@ class ApiApplication
         $this->container->singleton(
             StripeRefundGateway::class,
             fn () => new StripeRefundGateway(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeCustomerAddressSynchroniser::class,
+            fn () => new StripeCustomerAddressSynchroniser(
                 new StripeClient(
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')

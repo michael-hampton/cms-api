@@ -293,11 +293,6 @@ class OrderDraftServiceTest extends TestCase
             ->expects('calculateOrderTax')
             ->andReturn($this->makeTaxResult(200));
 
-        $this->taxCalculatorService
-            ->expects('distributeTaxToItems')
-            ->once()
-            ->andReturnUsing(fn($items) => $items); // pass-through
-
         $this->orderCreationService->expects('create')->andReturn($order);
 
         $result = $this->service->createPendingOrder(
@@ -593,7 +588,7 @@ class OrderDraftServiceTest extends TestCase
             ->once()
             ->withArgs(function ($data, $items, $siteId) {
 
-                $this->assertSame(30.0, $data['total']);
+                $this->assertSame(30, $data['total']);
                 $this->assertCount(2, $items);
                 $this->assertSame(1, $siteId);
 

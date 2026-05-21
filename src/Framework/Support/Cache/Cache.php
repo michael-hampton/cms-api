@@ -6,12 +6,30 @@ class Cache
 {
     private static $cache = [];
 
-    public static function put(string $key, $value, int $seconds = 3600): void
-    {
+    public static function put(
+        string $key,
+               $value,
+        int|\DateTimeInterface $ttl = 3600
+    ): void {
+        $seconds = self::resolveTtl($ttl);
+
         self::$cache[$key] = [
             'value' => $value,
-            'expires' => time() + $seconds
+            'expires' => time() + $seconds,
         ];
+    }
+
+    private static function resolveTtl(
+        int|\DateTimeInterface $ttl
+    ): int {
+        if (is_int($ttl)) {
+            return $ttl;
+        }
+
+        return max(
+            0,
+            $ttl->getTimestamp() - time()
+        );
     }
 
     public static function get(string $key, $default = null)
@@ -40,8 +58,11 @@ class Cache
         self::$cache = [];
     }
 
-    public static function remember(string $key, int $seconds, callable $callback)
-    {
+    public static function remember(
+        string $key,
+        int|\DateTimeInterface $ttl,
+        callable $callback
+    ) {
         $value = self::get($key);
 
         if ($value !== null) {
@@ -49,7 +70,12 @@ class Cache
         }
 
         $value = $callback();
-        self::put($key, $value, $seconds);
+
+        self::put(
+            $key,
+            $value,
+            $ttl
+        );
 
         return $value;
     }

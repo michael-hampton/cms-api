@@ -73,12 +73,15 @@ if ($hasPrint && $hasDigital) {
     $basketType = 'print_only';
 }
 
+$forceAddress = $member?->addresses->count() === 0 ?: true;
+
 // For digital-only baskets the shipping address is never needed.
 // Override the controller-supplied $requiresShipping so every downstream
 // component (address-lookup, validation) picks up the correct value.
-if ($basketType === 'digital_only') {
+if ($basketType === 'digital_only' && ($member?->addresses->count() > 0 ?? true)) {
     $requiresShipping = false;
 }
+
 // ─────────────────────────────────────────────────────────────────────────
 
 $subscriptionCartSnapshot = array_values(array_map(function ($item) {
@@ -562,6 +565,7 @@ $apiBase = '/api/' . $site;
             'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
             'isSubscriptionCart' => $isSubscription,
             'isOneTimeCart' => $isOneTimeCart,
+            'forceAddress' => $forceAddress,
     ]) ?>;
 
     let isLoggedIn = false;
@@ -840,7 +844,7 @@ $apiBase = '/api/' . $site;
             if (includesDigital) base.push('email');
 
             // Address fields — only for non-digital-only baskets without a saved address
-            if (!isDigitalOnly && !selectedAddressId) {
+            if ((!isDigitalOnly || this.config.forceAddress) && !selectedAddressId) {
                 base.push('address', 'city', 'postal_code', 'country');
             }
 
@@ -860,7 +864,7 @@ $apiBase = '/api/' . $site;
         validateShippingFields() {
             document.querySelectorAll('.form-error').forEach(el => (el.textContent = ''));
 
-            if (!this.config.requiresShipping && this.config.basketType === 'digital_only') {
+            if (!this.config.requiresShipping && (this.config.basketType === 'digital_only' || this.config.forceAddress === true)) {
                 // For digital-only, only validate non-address fields
                 return this._validateFields(['first_name', 'last_name', 'email']);
             }
@@ -1010,7 +1014,7 @@ $apiBase = '/api/' . $site;
 
             // For digital-only baskets, strip any address keys that might have
             // leaked in from autofill so the server doesn't attempt to validate them.
-            if (this.config.basketType === 'digital_only') {
+            if (this.config.basketType === 'digital_only' && this.config.forceAddress !== true) {
                 ['address', 'address2', 'city', 'state', 'postal_code', 'country'].forEach(k => delete data[k]);
             } else if (selectedAddressId) {
                 data.saved_address = selectedAddressId;
