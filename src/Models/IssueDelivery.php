@@ -196,4 +196,9 @@ class IssueDelivery extends Model
     {
         return $this->hasMany(PrintRun::class, 'issue_delivery_id');
     }
+
+    public function isInStock()
+    {
+        return $this->stock_quantity > 0;
+    }
 }

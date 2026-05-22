@@ -69,7 +69,7 @@ class OneTimeSubscriptionsController extends Controller
             'price_min' => $request->input('price_min'),
             'price_max' => $request->input('price_max'),
             'sort' => $request->input('sort', SubscriptionSortOption::PRICE_LOW_TO_HIGH->value),
-            'per_page' => $request->input('per_page', 12),
+            'per_page' => $request->input('per_page', 15),
             'page' => $request->input('page', 1),
             'tags' => $request->input('tags', []),
             'categories' => $request->input('categories'),

@@ -21,10 +21,12 @@ class SubscriptionListingService
      * Get grouped subscriptions for member
      * Groups by type (print, digital) and status (active, expired)
      */
-    public function getGroupedSubscriptions(int $memberId, int $siteId): array
+    public function getGroupedSubscriptions(int $memberId, ?int $siteId = null): array
     {
         $subscriptions = Subscription::where('member_id', $memberId)
-            ->where('site_id', $siteId)
+            ->when(!empty($siteId), function ($query) use ($siteId) {
+                $query->where('site_id', $siteId);
+            })
             ->with(['plan', 'premiumAccess'])
             ->orderBy('status', 'asc')
             ->orderBy('created_at', 'desc')

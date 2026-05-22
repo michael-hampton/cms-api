@@ -259,11 +259,18 @@ class SubscriptionPlan extends Model
 
     public function getBestSale(): ?array
     {
+        $printInStock = $this->hasPrintOption() && $this->isPrintInStock();
+
         $best = null;
 
         foreach ($this->pricingTiers as $tier) {
 
             foreach (['print', 'digital'] as $type) {
+
+                // Skip print entirely when the plan has no in-stock issue.
+                if ($type === 'print' && !$printInStock) {
+                    continue;
+                }
 
                 $price = $type === 'print'
                     ? $tier->price
@@ -275,19 +282,19 @@ class SubscriptionPlan extends Model
 
                 if (!is_numeric($price)) continue;
 
-                $price = (float)$price;
-                $sale = is_numeric($sale) ? (float)$sale : null;
+                $price = (float) $price;
+                $sale  = is_numeric($sale) ? (float) $sale : null;
 
                 if ($sale !== null && $sale > 0 && $sale < $price) {
 
-                    $pct = (int)round((($price - $sale) / $price) * 100);
+                    $pct = (int) round((($price - $sale) / $price) * 100);
 
                     if ($best === null || $pct > $best['savingPct']) {
                         $best = [
-                            'original' => $price,
-                            'sale' => $sale,
-                            'savingPct' => $pct,
-                            'tierId' => $tier->getId(),
+                            'original'   => $price,
+                            'sale'       => $sale,
+                            'savingPct'  => $pct,
+                            'tierId'     => $tier->id,
                         ];
                     }
                 }
@@ -458,5 +465,12 @@ class SubscriptionPlan extends Model
             ->where('on_sale_date', '>', now())
             ->orderBy('on_sale_date', 'asc')
             ->get();
+    }
+
+    public function isPrintInStock(): bool
+    {
+        $issue = $this->getNextIssue();
+
+        return $issue !== null && $issue->isInStock();
     }
 }

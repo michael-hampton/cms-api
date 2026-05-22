@@ -49,6 +49,8 @@
                 </div>
             </div>
 
+            @include('products/components/category-carousel')
+
             <div class="shop-layout">
                 <!-- Sidebar -->
                 <aside class="shop-sidebar">
@@ -332,6 +334,10 @@
 
 <script id="all-specification-groups" type="application/json"><?= json_encode($specificationGroups ?? []) ?></script>
 
+@js('productModal.js')
+@js('products.js')
+@js('recommendations.js')
+
 <script>
     SITE = '<?= htmlspecialchars(\App\Framework\Support\SiteContext::slug(), ENT_QUOTES) ?>';
     CURRENCY_SYMBOL = '<?= htmlspecialchars($currencySymbol, ENT_QUOTES) ?>';
@@ -341,12 +347,80 @@
         wishlistCount: <?= $wishlistCount ?>,
         wishlistProductIds: <?=json_encode($wishlistProductIds)?>
     }
-    ;
+
+    window.CATEGORY_CAROUSEL_DATA = <?= json_encode($categories ?? []) ?>;
+
+    // products.js - Add or integrate this code
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const carouselContainer = document.getElementById('category-carousel');
+
+        // 1. On page load, read the active category from the URL query string
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialCategoryId = urlParams.get('category_ids') ? Number(urlParams.get('category_ids')) : null;
+
+        // If a category exists in the URL on initial load, ensure the carousel renders it as active
+        if (initialCategoryId && carouselContainer) {
+            carouselContainer.dataset.activeCategory = initialCategoryId;
+        }
+
+        // 2. Listen for selection changes dispatched by the CategoryCarousel
+        if (carouselContainer) {
+            carouselContainer.addEventListener('category:select', (event) => {
+                const selectedCategoryId = event.detail.categoryId; // yields number or null if deselected
+
+                // Update the URL and refresh product results
+                updateUrlAndLoadProducts(selectedCategoryId);
+            });
+        }
+
+        /**
+         * Updates the URL search parameters and triggers the product reload
+         * @param {number|null} categoryId
+         */
+        function updateUrlAndLoadProducts(categoryId) {
+            const currentParams = new URLSearchParams(window.location.search);
+
+            // Update or remove the category parameter while preserving search queries (e.g., ?q=...)
+            if (categoryId) {
+                currentParams.set('category_ids', categoryId);
+            } else {
+                currentParams.delete('category_ids');
+            }
+
+            // Reset pagination to page 1 whenever filters change
+            if (currentParams.has('page')) {
+                currentParams.set('page', '1');
+            }
+
+            // Generate the new relative path with updated query parameters
+            const newUrl = window.location.pathname + '?' + currentParams.toString();
+
+            // Push the new state to the browser history bar without re-loading the page
+            window.history.pushState({ categoryId }, '', newUrl);
+
+            // Trigger your existing product loading function
+                loadProducts();
+        }
+
+        // 3. Optional: Sync carousel if user clicks browser Back/Forward buttons
+        window.addEventListener('popstate', () => {
+            const updatedParams = new URLSearchParams(window.location.search);
+            const currentCatId = updatedParams.get('category_ids') ? Number(updatedParams.get('category_ids')) : null;
+
+            // Safely update the carousel UI component instance to match the new URL state
+            if (window.categoryCarousel) {
+                // Note: Since setActiveCategory toggles if the ID matches, only update if it differs
+                if (window.categoryCarousel.activeId !== currentCatId) {
+                    window.categoryCarousel.setActiveCategory(currentCatId);
+                }
+            }
+
+            loadProducts();
+        });
+    });
 </script>
 
-@js('productModal.js')
-@js('products.js')
-@js('recommendations.js')
 
 </body>
 </html>

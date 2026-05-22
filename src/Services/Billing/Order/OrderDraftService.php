@@ -92,7 +92,7 @@ class OrderDraftService
             $orderItems = $this->distributeTaxProportionally($orderItems, $totalTaxCents);
 
             foreach ($orderItems as &$item) {
-                $shippingCents = $item['shipping_cents'];
+                $shippingCents = $item['shipping_cents'] ?? 0;
                 $isPrinted     = $item['metadata']['delivery_type'] === SubscriptionType::PRINTED->value;
 
                 $item['total'] = $item['subtotal']

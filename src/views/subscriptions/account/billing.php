@@ -3,10 +3,13 @@
  * View: account/billing.php
  *
  * Variables from ShopAccountController::billing():
- *   $member     – authenticated member
- *   $active_tab – 'billing'
+ * $member            – authenticated member
+ * $active_tab        – 'billing'
+ * $stripe_public_key – Stripe publishable key (e.g., pk_test_...)
  */
 ?>
+<script src="https://js.stripe.com/v3/"></script>
+
 <style>
     /* ── Billing layout ──────────────────────────────────────────── */
     .billing-grid {
@@ -108,20 +111,60 @@
         transition: var(--transition);
         width: 100%;
     }
+
     .add-card-btn:hover {
         border-color: var(--ink);
         color: var(--ink);
         background: var(--paper);
     }
 
+    /* ── Address grid layout ─────────────────────────────────────── */
+    .address-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .address-card {
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--paper-light);
+        position: relative;
+    }
+
+    .address-card__badge {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        background: var(--border);
+        color: var(--ink-soft);
+    }
+
+    .address-card__badge.is-billing {
+        background: rgba(0, 102, 204, 0.1);
+        color: #0066cc;
+    }
+
+    .address-card__badge.is-shipping {
+        background: rgba(0, 153, 76, 0.1);
+        color: #00994c;
+    }
+
     /* ── Add card modal ──────────────────────────────────────────── */
     .stripe-field-wrapper {
         border: 1.5px solid var(--border);
         border-radius: var(--radius-sm);
-        padding: 12px 14px;
+        padding: 14px;
         background: var(--white);
         transition: var(--transition);
         margin-bottom: 14px;
+        min-height: 45px;
     }
 
     .stripe-field-wrapper:focus-within {
@@ -152,45 +195,6 @@
         flex-shrink: 0;
     }
 
-    /* Form fields (billing address block) */
-    .form-field {
-        margin-bottom: 14px;
-    }
-    .form-field label {
-        display: block;
-        font-size: 10.5px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: .09em;
-        color: var(--ink-muted);
-        margin-bottom: 6px;
-    }
-
-    .form-field input,
-    .form-field select {
-        width: 100%;
-        padding: 10px 12px;
-        border: 1.5px solid var(--border);
-        border-radius: var(--radius-sm);
-        font-family: var(--font-body);
-        font-size: 14px;
-        color: var(--ink);
-        background: var(--white);
-        outline: none;
-        transition: var(--transition);
-    }
-
-    .form-field input:focus,
-    .form-field select:focus {
-        border-color: var(--ink);
-    }
-
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
     /* Empty payment state */
     .no-payment-state {
         text-align: center;
@@ -214,6 +218,26 @@
         color: var(--ink-muted);
         margin-bottom: 20px;
     }
+
+    /* Skeleton loader */
+    .pm-skeleton {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pm-skeleton__row {
+        height: 64px;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(90deg, var(--paper-dark) 25%, var(--paper) 50%, var(--paper-dark) 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.4s infinite;
+    }
+
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
 </style>
 
 <?php $page_title = 'Billing'; ?>
@@ -230,32 +254,28 @@
 
     <div class="billing-grid">
 
-        <!-- Payment methods -->
         <div class="card">
             <div class="card__header">
                 <span class="card__title">Payment Methods</span>
-                <button class="btn btn--ghost btn--sm" onclick="openAddCardModal()">+ Add card</button>
+                <button class="btn btn--ghost btn--sm" id="open-add-card-btn">+ Add card</button>
             </div>
             <div class="card__body" id="payment-methods-body">
-                <div class="no-payment-state" id="pm-loading-state">
-                    <div class="no-payment-state__icon">💳</div>
-                    <div class="no-payment-state__title">Loading payment methods…</div>
-                    <div class="no-payment-state__sub">Fetching your saved cards.</div>
+                <div class="pm-skeleton">
+                    <div class="pm-skeleton__row"></div>
+                    <div class="pm-skeleton__row"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Billing address -->
         <div class="card">
             <div class="card__header">
-                <span class="card__title">Billing Address</span>
+                <span class="card__title">Saved Addresses</span>
             </div>
             <div class="card__body" id="billing-address-body">
-                <div style="font-size:14px; color:var(--ink-muted);">Loading billing address…</div>
+                <div class="pm-skeleton"><div class="pm-skeleton__row" style="height:90px"></div></div>
             </div>
         </div>
 
-        <!-- Security note -->
         <div style="display:flex; align-items:flex-start; gap:12px; padding:15px 18px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; color:var(--ink-muted); line-height:1.65; box-shadow:var(--shadow-xs);">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  style="width:18px;height:18px;flex-shrink:0;margin-top:1px;color:var(--green);">
@@ -268,22 +288,16 @@
         </div>
     </div>
 
-
-    <!-- ── Add card modal ────────────────────────────────────────────── -->
-    <div class="modal-overlay" id="add-card-modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="add-card-modal" role="dialog" aria-modal="true" aria-labelledby="add-card-title">
         <div class="modal">
             <div class="modal__header">
-                <h2 class="modal__title">Add Payment Method</h2>
-                <button class="modal__close" onclick="closeAddCardModal()">×</button>
+                <h2 class="modal__title" id="add-card-title">Add Payment Method</h2>
+                <button class="modal__close" id="close-add-card-btn" aria-label="Close">×</button>
             </div>
             <div class="modal__body">
                 <div class="stripe-field-label">Card details</div>
-                <div class="stripe-field-wrapper" id="stripe-card-element">
-                    <div style="height:20px; display:flex; align-items:center;">
-                        <span style="font-size:13px; color:var(--ink-muted);">Card number, expiry, CVC</span>
-                    </div>
-                </div>
-                <div id="card-errors" style="color:var(--red); font-size:13px; margin-bottom:12px; display:none;"></div>
+                <div class="stripe-field-wrapper" id="stripe-card-element"></div>
+                <div id="card-errors" style="color:var(--red); font-size:13px; margin-bottom:12px; display:none;" role="alert"></div>
 
                 <label style="display:flex; align-items:center; gap:10px; font-size:14px; cursor:pointer; margin-bottom:16px;">
                     <input type="checkbox" id="set-as-default" checked
@@ -299,20 +313,17 @@
                 </div>
             </div>
             <div class="modal__footer">
-                <button class="btn btn--ghost" onclick="closeAddCardModal()">Cancel</button>
-                <button class="btn btn--primary" onclick="submitAddCard()" id="add-card-submit">Add Card</button>
+                <button class="btn btn--ghost" id="cancel-add-card-btn">Cancel</button>
+                <button class="btn btn--primary" id="submit-add-card-btn">Add Card</button>
             </div>
         </div>
     </div>
 
-    <!-- ── Remove card confirmation ──────────────────────────────────── -->
-    <div class="modal-overlay" id="remove-card-modal" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="remove-card-modal" role="dialog" aria-modal="true" aria-labelledby="remove-card-title">
         <div class="modal">
             <div class="modal__header">
-                <h2 class="modal__title">Remove Card</h2>
-                <button class="modal__close"
-                        onclick="document.getElementById('remove-card-modal').classList.remove('open')">×
-                </button>
+                <h2 class="modal__title" id="remove-card-title">Remove Card</h2>
+                <button class="modal__close" id="close-remove-card-btn" aria-label="Close">×</button>
             </div>
             <div class="modal__body">
                 <p style="font-size:14px; color:var(--ink-soft); line-height:1.65;">
@@ -321,163 +332,511 @@
                 </p>
             </div>
             <div class="modal__footer">
-                <button class="btn btn--ghost"
-                        onclick="document.getElementById('remove-card-modal').classList.remove('open')">Cancel
-                </button>
-                <button class="btn btn--danger" onclick="confirmRemoveCard()" id="remove-confirm-btn">Remove Card
-                </button>
+                <button class="btn btn--ghost" id="cancel-remove-card-btn">Cancel</button>
+                <button class="btn btn--danger" id="confirm-remove-card-btn">Remove Card</button>
             </div>
         </div>
     </div>
 
 </main>
-</div><!-- /.shell -->
-</body>
+</div></body>
 </html>
 
-
 <script>
-    let removeCardId = null;
+    class BillingPage {
+        // ── Constants ────────────────────────────────────────────────────
+        static NETWORK_ICONS = {
+            visa: '💳',
+            mastercard: '💳',
+            amex: '💳',
+            discover: '💳',
+        };
 
-    async function loadPaymentMethods() {
-        try {
-            const res = await fetch('/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/payment-methods', {
-                headers: {'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json'}
-            });
-            const data = await res.json();
-            renderPaymentMethods(data.data.payment_methods ?? [], data.data.billing_address ?? null);
-        } catch (e) {
-            document.getElementById('payment-methods-body').innerHTML = `
-                <div class="no-payment-state">
-                    <div class="no-payment-state__icon">💳</div>
-                    <div class="no-payment-state__title">No payment methods</div>
-                    <div class="no-payment-state__sub">Add a payment method to speed up checkout and renewals.</div>
-                    <button class="btn btn--primary" onclick="openAddCardModal()">Add card</button>
-                </div>`;
-        }
-    }
+        static STRIPE_PUBLIC_KEY = '<?= $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key') ?>';
 
-    const NETWORK_ICONS = {visa: '💳', mastercard: '💳', amex: '💳', discover: '💳'};
+        static ENDPOINTS = {
+            paymentMethods: '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/member/payment-methods',
+            addresses:      '/api/<?= \App\Framework\Support\SiteContext::slug() ?>/<?= (int) $member->id ?>/addresses',
+            setupIntent:    '/account/billing/setup-intent', // backend endpoint to generate setup intent client secret
+            addCard:        '/account/billing/add-card',     // backend endpoint to confirm and finalize payment method attachment
+            removeCard:     '/account/billing/remove-card',
+            setDefault:     '/account/billing/set-default',
+        };
 
-    function renderPaymentMethods(methods, billingAddress) {
-        const body = document.getElementById('payment-methods-body');
+        // ── Stripe State Instances ───────────────────────────────────────
+        #stripe = null;
+        #elements = null;
+        #cardElement = null;
 
-        if (!methods || methods.length === 0) {
-            body.innerHTML = `
-                <div class="no-payment-state">
-                    <div class="no-payment-state__icon">💳</div>
-                    <div class="no-payment-state__title">No payment methods saved</div>
-                    <div class="no-payment-state__sub">Add a payment method to speed up checkout and renewals.</div>
-                    <button class="btn btn--primary" onclick="openAddCardModal()">Add card</button>
-                </div>`;
-        } else {
-            let html = '<div class="pm-list">';
-            methods.forEach(pm => {
-                const icon = NETWORK_ICONS[pm.brand?.toLowerCase()] ?? '💳';
-                const isDefault = pm.is_default ? 'is-default' : '';
-                html += `
-                    <div class="pm-card ${isDefault}">
-                        <div class="pm-card__network">${icon}</div>
-                        <div class="pm-card__info">
-                            <div class="pm-card__number">${pm.brand ?? 'Card'} ···· ${pm.last4 ?? '????'}</div>
-                            <div class="pm-card__expiry">Expires ${pm.exp_month ?? '--'}/${pm.exp_year ?? '--'}</div>
-                        </div>
-                        ${pm.is_default ? '<span class="pm-card__default-badge">Default</span>' : ''}
-                        <div class="pm-card__actions">
-                            ${!pm.is_default ? `<button class="btn btn--ghost btn--sm" onclick="setDefault('${pm.id}')">Set default</button>` : ''}
-                            <button class="btn btn--danger btn--sm" onclick="openRemoveCard('${pm.id}')">Remove</button>
-                        </div>
-                    </div>`;
-            });
-            html += `<button class="add-card-btn" onclick="openAddCardModal()">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"/>
-                            <line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                        Add new card
-                     </button>`;
-            html += '</div>';
-            body.innerHTML = html;
+        // ── Core State ───────────────────────────────────────────────────
+        #state = {
+            paymentMethods:   [],
+            addresses:        [],
+            loadingPMs:       true,
+            loadingAddress:   true,
+            pendingRemoveId:  null,
+            submittingAdd:    false,
+            submittingRemove: false,
+            submittingDefault: null,
+        };
+
+        // ── DOM refs ─────────────────────────────────────────────────────
+        #els = {};
+
+        constructor() {
+            this.#bindElements();
+            this.#attachListeners();
+            this.#load();
         }
 
-        if (billingAddress) {
-            document.getElementById('billing-address-body').innerHTML = `
-                <div style="font-size:14px; color:var(--ink-soft); line-height:1.9;">
-                    <strong style="color:var(--ink);">${billingAddress.name ?? ''}</strong><br>
-                    ${billingAddress.line1 ?? ''}<br>
-                    ${billingAddress.line2 ? billingAddress.line2 + '<br>' : ''}
-                    ${billingAddress.city ?? ''}, ${billingAddress.postcode ?? ''}<br>
-                    ${billingAddress.country ?? ''}
-                </div>`;
-        }
-    }
+        // ── Bootstrap ────────────────────────────────────────────────────
 
-    function openAddCardModal() {
-        document.getElementById('add-card-modal').classList.add('open');
-    }
-
-    function closeAddCardModal() {
-        document.getElementById('add-card-modal').classList.remove('open');
-    }
-
-    async function submitAddCard() {
-        alert('Card addition will be wired up to Stripe Elements. Implement stripe.confirmCardSetup() here.');
-    }
-
-    function openRemoveCard(id) {
-        removeCardId = id;
-        document.getElementById('remove-card-modal').classList.add('open');
-    }
-
-    async function confirmRemoveCard() {
-        const btn = document.getElementById('remove-confirm-btn');
-        btn.disabled = true;
-        btn.textContent = 'Removing…';
-        try {
-            const res = await fetch('/account/billing/remove-card', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({payment_method_id: removeCardId}),
+        #bindElements() {
+            const ids = [
+                'payment-methods-body',
+                'billing-address-body',
+                'add-card-modal',
+                'remove-card-modal',
+                'open-add-card-btn',
+                'close-add-card-btn',
+                'cancel-add-card-btn',
+                'submit-add-card-btn',
+                'close-remove-card-btn',
+                'cancel-remove-card-btn',
+                'confirm-remove-card-btn',
+                'card-errors',
+                'set-as-default',
+            ];
+            ids.forEach(id => {
+                this.#els[id] = document.getElementById(id);
             });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('remove-card-modal').classList.remove('open');
-                loadPaymentMethods();
-            } else {
-                alert(data.message ?? 'Failed to remove card.');
-                btn.disabled = false;
-                btn.textContent = 'Remove Card';
+        }
+
+        #attachListeners() {
+            // Add card modal triggers
+            this.#els['open-add-card-btn'].addEventListener('click', () => this.#openAddCard());
+            this.#els['close-add-card-btn'].addEventListener('click', () => this.#closeAddCard());
+            this.#els['cancel-add-card-btn'].addEventListener('click', () => this.#closeAddCard());
+            this.#els['submit-add-card-btn'].addEventListener('click', () => this.#submitAddCard());
+
+            // Remove card modal triggers
+            this.#els['close-remove-card-btn'].addEventListener('click', () => this.#closeRemoveCard());
+            this.#els['cancel-remove-card-btn'].addEventListener('click', () => this.#closeRemoveCard());
+            this.#els['confirm-remove-card-btn'].addEventListener('click', () => this.#confirmRemoveCard());
+
+            // Backdrop dismissal
+            this.#els['add-card-modal'].addEventListener('click', e => {
+                if (e.target === this.#els['add-card-modal']) this.#closeAddCard();
+            });
+            this.#els['remove-card-modal'].addEventListener('click', e => {
+                if (e.target === this.#els['remove-card-modal']) this.#closeRemoveCard();
+            });
+
+            // Escape key handling
+            document.addEventListener('keydown', e => {
+                if (e.key !== 'Escape') return;
+                this.#closeAddCard();
+                this.#closeRemoveCard();
+            });
+        }
+
+        // ── Stripe.js Management ─────────────────────────────────────────
+
+        #initStripe() {
+            if (this.#stripe) return;
+
+            if (typeof Stripe === 'undefined') {
+                console.error('Stripe.js failed to load.');
+                return;
             }
-        } catch (e) {
-            alert('Network error.');
-            btn.disabled = false;
-            btn.textContent = 'Remove Card';
-        }
-    }
 
-    async function setDefault(id) {
-        try {
-            const res = await fetch('/account/billing/set-default', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                body: JSON.stringify({payment_method_id: id}),
+            this.#stripe = Stripe(BillingPage.STRIPE_PUBLIC_KEY);
+            this.#elements = this.#stripe.elements();
+
+            // Match current UI theme rules safely inside the Stripe iframe container
+            const style = {
+                base: {
+                    color: '#111111',
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSmoothing: 'antialiased',
+                    fontSize: '14px',
+                    '::placeholder': {
+                        color: '#999999',
+                    },
+                },
+                invalid: {
+                    color: '#e53e3e',
+                    iconColor: '#e53e3e',
+                },
+            };
+
+            this.#cardElement = this.#elements.create('card', { style, hidePostalCode: true });
+
+            // Inline live validation updates
+            this.#cardElement.on('change', event => {
+                const errorEl = this.#els['card-errors'];
+                if (event.error) {
+                    errorEl.textContent = event.error.message;
+                    errorEl.style.display = 'block';
+                } else {
+                    this.#clearCardErrors();
+                }
             });
-            const data = await res.json();
-            if (data.success) loadPaymentMethods();
-            else alert(data.message ?? 'Failed.');
-        } catch (e) {
-            alert('Network error.');
+        }
+
+        // ── Data Actions ─────────────────────────────────────────────────
+
+        async #load() {
+            await Promise.all([
+                this.#loadPaymentMethods(),
+                this.#loadAddresses()
+            ]);
+        }
+
+        async #loadPaymentMethods() {
+            this.#setState({ loadingPMs: true });
+            try {
+                const res  = await this.#apiFetch(BillingPage.ENDPOINTS.paymentMethods);
+                const data = await res.json();
+
+                this.#setState({
+                    loadingPMs:     false,
+                    paymentMethods: data.data?.payment_methods ?? data.payment_methods ?? [],
+                });
+            } catch {
+                this.#setState({ loadingPMs: false, paymentMethods: [] });
+            }
+        }
+
+        async #loadAddresses() {
+            this.#setState({ loadingAddress: true });
+            try {
+                const res  = await this.#apiFetch(BillingPage.ENDPOINTS.addresses);
+                const data = await res.json();
+
+                this.#setState({
+                    loadingAddress: false,
+                    addresses:      data.items ?? [],
+                });
+            } catch {
+                this.#setState({ loadingAddress: false, addresses: [] });
+            }
+        }
+
+        async #submitAddCard() {
+            if (this.#state.submittingAdd) return;
+
+            this.#setState({ submittingAdd: true });
+            this.#renderAddCardBtn();
+            this.#clearCardErrors();
+
+            try {
+                // Step 1: Request SetupIntent token from local app container backend
+                const intentRes = await this.#apiFetch(BillingPage.ENDPOINTS.setupIntent, { method: 'POST' });
+                const intentData = await intentRes.json();
+
+                if (!intentData.success || !intentData.client_secret) {
+                    throw new Error(intentData.message || 'Unable to initialize card transaction setup.');
+                }
+
+                // Step 2: Confirm Intent directly via Stripe API Core engine
+                const result = await this.#stripe.confirmCardSetup(intentData.client_secret, {
+                    payment_method: {
+                        card: this.#cardElement,
+                        billing_details: {
+                            name: '<?= addslashes($member->name ?? "") ?>',
+                            email: '<?= addslashes($member->email ?? "") ?>'
+                        }
+                    }
+                });
+
+                if (result.error) {
+                    throw new Error(result.error.message);
+                }
+
+                // Step 3: Pass resulting confirmed payment method string token to app database router
+                const attachRes = await this.#apiFetch(BillingPage.ENDPOINTS.addCard, {
+                    method: 'POST',
+                    body:   JSON.stringify({
+                        payment_method_id: result.setupIntent.payment_method,
+                        set_default:       this.#els['set-as-default'].checked
+                    }),
+                });
+                const attachData = await attachRes.json();
+
+                if (attachData.success) {
+                    this.#closeAddCard();
+                    await this.#loadPaymentMethods();
+                } else {
+                    throw new Error(attachData.message || 'Failed to link new card to profile account.');
+                }
+            } catch (err) {
+                const errorEl = this.#els['card-errors'];
+                errorEl.textContent = err.message || 'An unexpected connection error occurred.';
+                errorEl.style.display = 'block';
+            } finally {
+                this.#setState({ submittingAdd: false });
+                this.#renderAddCardBtn();
+            }
+        }
+
+        async #confirmRemoveCard() {
+            if (this.#state.submittingRemove) return;
+
+            this.#setState({ submittingRemove: true });
+            this.#renderRemoveCardBtn();
+
+            try {
+                const res  = await this.#apiFetch(BillingPage.ENDPOINTS.removeCard, {
+                    method: 'POST',
+                    body:   JSON.stringify({ payment_method_id: this.#state.pendingRemoveId }),
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    this.#closeRemoveCard();
+                    await this.#loadPaymentMethods();
+                } else {
+                    alert(data.message ?? 'Failed to remove card.');
+                }
+            } catch {
+                alert('Network error. Please try again.');
+            } finally {
+                this.#setState({ submittingRemove: false, pendingRemoveId: null });
+                this.#renderRemoveCardBtn();
+            }
+        }
+
+        async #setDefault(paymentMethodId) {
+            if (this.#state.submittingDefault) return;
+
+            this.#setState({ submittingDefault: paymentMethodId });
+            this.#renderPaymentMethods();
+
+            try {
+                const res  = await this.#apiFetch(BillingPage.ENDPOINTS.setDefault, {
+                    method: 'POST',
+                    body:   JSON.stringify({ payment_method_id: paymentMethodId }),
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    await this.#loadPaymentMethods();
+                } else {
+                    alert(data.message ?? 'Failed to set default.');
+                }
+            } catch {
+                alert('Network error. Please try again.');
+            } finally {
+                this.#setState({ submittingDefault: null });
+            }
+        }
+
+        // ── State management ─────────────────────────────────────────────
+
+        #setState(patch) {
+            Object.assign(this.#state, patch);
+            this.#render();
+        }
+
+        #render() {
+            this.#renderPaymentMethods();
+            this.#renderAddresses();
+        }
+
+        // ── Renderers ────────────────────────────────────────────────────
+
+        #renderPaymentMethods() {
+            const body = this.#els['payment-methods-body'];
+
+            if (this.#state.loadingPMs) {
+                body.innerHTML = `
+                <div class="pm-skeleton">
+                    <div class="pm-skeleton__row"></div>
+                    <div class="pm-skeleton__row"></div>
+                </div>`;
+                return;
+            }
+
+            const methods = this.#state.paymentMethods;
+
+            if (!methods.length) {
+                body.innerHTML = this.#emptyPaymentHtml();
+                body.querySelector('.js-open-add-card')?.addEventListener('click', () => this.#openAddCard());
+                return;
+            }
+
+            const listHtml = methods.map(pm => this.#paymentCardHtml(pm)).join('');
+            body.innerHTML = `<div class="pm-list">${listHtml}<button class="add-card-btn js-open-add-card">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add new card
+        </button></div>`;
+
+            body.querySelectorAll('[data-action="set-default"]').forEach(btn => {
+                btn.addEventListener('click', () => this.#setDefault(btn.dataset.id));
+            });
+            body.querySelectorAll('[data-action="remove"]').forEach(btn => {
+                btn.addEventListener('click', () => this.#openRemoveCard(btn.dataset.id));
+            });
+            body.querySelector('.js-open-add-card')?.addEventListener('click', () => this.#openAddCard());
+        }
+
+        #renderAddresses() {
+            const body = this.#els['billing-address-body'];
+
+            if (this.#state.loadingAddress) {
+                body.innerHTML = `<div class="pm-skeleton"><div class="pm-skeleton__row" style="height:90px"></div></div>`;
+                return;
+            }
+
+            const addresses = this.#state.addresses;
+            if (!addresses.length) {
+                body.innerHTML = `<p style="font-size:14px; color:var(--ink-muted);">No addresses on file.</p>`;
+                return;
+            }
+
+            // Clean looping rendering tracking exact item array parameters: address_line_1, address_line_2, city, state, postcode, country
+            const cardsHtml = addresses.map(addr => {
+                const typeClass = addr.type === 'billing' ? 'is-billing' : (addr.type === 'shipping' ? 'is-shipping' : '');
+                const typeLabel = addr.type ? addr.type.charAt(0).toUpperCase() + addr.type.slice(1) : 'Address';
+
+                return `
+                <div class="address-card">
+                    <span class="address-card__badge ${typeClass}">${typeLabel}</span>
+                    <div style="font-size:14px; color:var(--ink-soft); line-height:1.7;">
+                        <strong style="color:var(--ink); display:block; margin-bottom: 4px;">${this.#escape(addr.label ?? '')}</strong>
+                        ${this.#escape(addr.address_line_1 ?? '')}<br>
+                        ${addr.address_line_2 ? this.#escape(addr.address_line_2) + '<br>' : ''}
+                        ${this.#escape(addr.city ?? '')}${addr.state ? ', ' + this.#escape(addr.state) : ''} ${this.#escape(addr.postcode ?? '')}<br>
+                        ${this.#escape(addr.country ?? '')}
+                    </div>
+                </div>`;
+            }).join('');
+
+            body.innerHTML = `<div class="address-grid">${cardsHtml}</div>`;
+        }
+
+        #renderRemoveCardBtn() {
+            const btn = this.#els['confirm-remove-card-btn'];
+            btn.disabled    = this.#state.submittingRemove;
+            btn.textContent = this.#state.submittingRemove ? 'Removing…' : 'Remove Card';
+        }
+
+        #renderAddCardBtn() {
+            const btn = this.#els['submit-add-card-btn'];
+            btn.disabled    = this.#state.submittingAdd;
+            btn.textContent = this.#state.submittingAdd ? 'Processing…' : 'Add Card';
+        }
+
+        // ── HTML builders ────────────────────────────────────────────────
+
+        #paymentCardHtml(pm) {
+            const icon      = BillingPage.NETWORK_ICONS[pm.brand?.toLowerCase()] ?? '💳';
+            const isDefault = pm.is_default;
+            const isBusy    = this.#state.submittingDefault === pm.id;
+            const brand     = this.#escape(pm.brand ?? 'Card');
+            const last4     = this.#escape(pm.last4 ?? '????');
+            const expMonth  = this.#escape(String(pm.exp_month ?? '--'));
+            const expYear   = this.#escape(String(pm.exp_year ?? '--'));
+
+            const defaultBtn = !isDefault
+                ? `<button class="btn btn--ghost btn--sm" data-action="set-default" data-id="${this.#escape(pm.id)}" ${isBusy ? 'disabled' : ''}>
+                   ${isBusy ? 'Saving…' : 'Set default'}
+               </button>`
+                : '';
+
+            const badge = isDefault
+                ? `<span class="pm-card__default-badge">Default</span>`
+                : '';
+
+            return `
+            <div class="pm-card ${isDefault ? 'is-default' : ''}">
+                <div class="pm-card__network">${icon}</div>
+                <div class="pm-card__info">
+                    <div class="pm-card__number">${brand} ···· ${last4}</div>
+                    <div class="pm-card__expiry">Expires ${expMonth}/${expYear}</div>
+                </div>
+                ${badge}
+                <div class="pm-card__actions">
+                    ${defaultBtn}
+                    <button class="btn btn--danger btn--sm" data-action="remove" data-id="${this.#escape(pm.id)}">Remove</button>
+                </div>
+            </div>`;
+        }
+
+        #emptyPaymentHtml() {
+            return `
+            <div class="no-payment-state">
+                <div class="no-payment-state__icon">💳</div>
+                <div class="no-payment-state__title">No payment methods saved</div>
+                <div class="no-payment-state__sub">Add a payment method to speed up checkout and renewals.</div>
+                <button class="btn btn--primary js-open-add-card">Add card</button>
+            </div>`;
+        }
+
+        // ── Modal helpers ────────────────────────────────────────────────
+
+        #openAddCard() {
+            this.#els['add-card-modal'].classList.add('open');
+            this.#initStripe();
+            if (this.#cardElement) {
+                this.#cardElement.mount('#stripe-card-element');
+            }
+            this.#els['close-add-card-btn'].focus();
+        }
+
+        #closeAddCard() {
+            this.#els['add-card-modal'].classList.remove('open');
+            if (this.#cardElement) {
+                this.#cardElement.unmount();
+            }
+            this.#clearCardErrors();
+        }
+
+        #openRemoveCard(paymentMethodId) {
+            this.#setState({ pendingRemoveId: paymentMethodId });
+            this.#els['remove-card-modal'].classList.add('open');
+            this.#els['close-remove-card-btn'].focus();
+        }
+
+        #closeRemoveCard() {
+            this.#els['remove-card-modal'].classList.remove('open');
+            this.#setState({ pendingRemoveId: null, submittingRemove: false });
+            this.#renderRemoveCardBtn();
+        }
+
+        #clearCardErrors() {
+            const el = this.#els['card-errors'];
+            el.style.display = 'none';
+            el.textContent   = '';
+        }
+
+        // ── Utilities ────────────────────────────────────────────────────
+
+        async #apiFetch(url, options = {}) {
+            return fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type':      'application/json',
+                    'X-Requested-With':  'XMLHttpRequest',
+                    'Accept':            'application/json',
+                    ...(options.headers ?? {}),
+                },
+            });
+        }
+
+        #escape(str) {
+            return String(str)
+                .replace(/&/g,  '&amp;')
+                .replace(/</g,  '&lt;')
+                .replace(/>/g,  '&gt;')
+                .replace(/"/g,  '&quot;')
+                .replace(/'/g,  '&#039;');
         }
     }
 
-    ['add-card-modal', 'remove-card-modal'].forEach(id => {
-        document.getElementById(id).addEventListener('click', function (e) {
-            if (e.target === this) this.classList.remove('open');
-        });
-    });
-    document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-    });
-
-    loadPaymentMethods();
+    document.addEventListener('DOMContentLoaded', () => new BillingPage());
 </script>

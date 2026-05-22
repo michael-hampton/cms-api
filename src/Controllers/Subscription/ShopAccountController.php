@@ -43,7 +43,8 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, null);
+
         $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
         $recentOrders = $this->orderManager->getByUser($member->id, 5);
 
@@ -71,7 +72,7 @@ class ShopAccountController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id, $siteId);
+        $grouped = $this->subscriptionListingService->getGroupedSubscriptions($member->id);
         $summary = $this->subscriptionListingService->getSubscriptionSummary($member->id, $siteId);
 
         // Annotate each subscription with server-computed eligibility flags.

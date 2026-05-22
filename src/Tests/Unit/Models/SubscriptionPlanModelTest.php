@@ -1146,4 +1146,361 @@ class SubscriptionPlanModelTest extends FunctionalTestCase
         $this->assertNull($result['tier']);
     }
 
+    // ---------------------------------------------------------------------------
+// getBestSale — stock-awareness
+// ---------------------------------------------------------------------------
+    public function testGetBestSaleReturnsPrintSaleWhenIssueIsInStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan',
+            'slug'                   => 'print-in-stock',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => null,
+        ]);
+
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,   // 33% saving
+            'digital_price'      => 0,
+            'digital_sale_price' => 0,
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-2 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 50,    // in stock
+        ]);
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNotNull($result, 'Expected a sale when print issue is in stock');
+        $this->assertEquals(30.00, $result['original']);
+        $this->assertEquals(20.00, $result['sale']);
+        $this->assertEquals(33,    $result['savingPct']);
+    }
+
+    public function testGetBestSaleIgnoresPrintSaleWhenIssueHasZeroStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan OOS',
+            'slug'                   => 'print-oos',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => null,
+        ]);
+
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,
+            'digital_price'      => 0,
+            'digital_sale_price' => 0,
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-2 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 0,    // out of stock
+        ]);
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNull($result, 'Expected no sale when print issue is out of stock');
+    }
+
+    public function testGetBestSaleIgnoresPrintSaleWhenIssueHasNullStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan Null Stock',
+            'slug'                   => 'print-null-stock',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => null,
+        ]);
+
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,
+            'digital_price'      => 0,
+            'digital_sale_price' => 0,
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-2 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 0,  // null stock treated as out of stock
+        ]);
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNull($result, 'Expected no sale when issue stock is null');
+    }
+
+    public function testGetBestSaleIgnoresPrintSaleWhenNoIssueExists(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan No Issue',
+            'slug'                   => 'print-no-issue',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => null,
+        ]);
+
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,
+            'digital_price'      => 0,
+            'digital_sale_price' => 0,
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        // No IssueDelivery created
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNull($result, 'Expected no sale when no issue delivery exists for the plan');
+    }
+
+    public function testGetBestSaleReturnsDigitalSaleRegardlessOfPrintStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Hybrid Plan OOS Print',
+            'slug'                   => 'hybrid-oos-print',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => 'https://example.com/dl',
+        ]);
+
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,    // print 33% — should be ignored (OOS)
+            'digital_price'      => 25.00,
+            'digital_sale_price' => 18.00,   // digital 28% — should be returned
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-2 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 0,    // print out of stock
+        ]);
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNotNull($result, 'Expected digital sale even when print is out of stock');
+        $this->assertEquals(25.00, $result['original']);
+        $this->assertEquals(18.00, $result['sale']);
+        $this->assertEquals(28,    $result['savingPct']);
+    }
+
+    public function testGetBestSaleReturnsBestSaleAcrossMultipleTiersWithMixedStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Multi-Tier Plan',
+            'slug'                   => 'multi-tier',
+            'price'                  => 0,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+            'digital_download_url'   => 'https://example.com/dl',
+        ]);
+
+        // Tier 1: small digital saving
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 30.00,
+            'sale_price'         => 20.00,   // print 33% — OOS, must be ignored
+            'digital_price'      => 20.00,
+            'digital_sale_price' => 18.00,  // digital 10%
+            'is_default'         => false,
+            'is_active'          => true,
+            'sort_order'         => 1,
+            'duration_months'    => 1,
+            'issue_count'        => 1,
+            'label'              => 'Monthly',
+            'period_description' => '1 month',
+        ]);
+
+        // Tier 2: larger digital saving
+        SubscriptionPlanPricing::create([
+            'plan_id'            => $plan->id,
+            'site_id'            => $this->siteId,
+            'price'              => 100.00,
+            'sale_price'         => 60.00,  // print 40% — OOS, must be ignored
+            'digital_price'      => 90.00,
+            'digital_sale_price' => 45.00, // digital 50% — should win
+            'is_default'         => true,
+            'is_active'          => true,
+            'sort_order'         => 2,
+            'duration_months'    => 12,
+            'issue_count'        => 12,
+            'label'              => 'Annual',
+            'period_description' => '12 months',
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-2 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 0,  // print out of stock
+        ]);
+
+        $plan->load('pricingTiers');
+        $result = $plan->getBestSale();
+
+        $this->assertNotNull($result);
+        $this->assertEquals(90.00, $result['original'], 'Should use digital price as original');
+        $this->assertEquals(45.00, $result['sale'],     'Should use digital sale price');
+        $this->assertEquals(50,    $result['savingPct'], 'Should return 50% — the best digital saving');
+    }
+
+    public function testIsPrintInStockReturnsTrueWhenNextIssueHasStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan',
+            'slug'                   => 'print-stocked',
+            'price'                  => 10.00,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-1 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 10,
+        ]);
+
+        $this->assertTrue($plan->isPrintInStock());
+    }
+
+    public function testIsPrintInStockReturnsFalseWhenNextIssueIsOutOfStock(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan OOS',
+            'slug'                   => 'print-empty',
+            'price'                  => 10.00,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+        ]);
+
+        IssueDelivery::create([
+            'site_id'              => $this->siteId,
+            'subscription_plan_id' => $plan->id,
+            'issue_number'         => 1,
+            'issue_title'          => 'Issue 1',
+            'on_sale_date'         => now_datetime()->modify('-1 days'),
+            'status'               => IssueDeliveryStatus::ACTIVE->value,
+            'stock_quantity'       => 0,
+        ]);
+
+        $this->assertFalse($plan->isPrintInStock());
+    }
+
+    public function testIsPrintInStockReturnsFalseWhenNoIssueExists(): void
+    {
+        $plan = SubscriptionPlan::create([
+            'site_id'                => $this->siteId,
+            'name'                   => 'Print Plan No Issues',
+            'slug'                   => 'print-no-issues',
+            'price'                  => 10.00,
+            'currency'               => 'USD',
+            'billing_period'         => 'monthly',
+            'print_shipping_required'=> true,
+        ]);
+
+        $this->assertFalse($plan->isPrintInStock());
+    }
+
 }

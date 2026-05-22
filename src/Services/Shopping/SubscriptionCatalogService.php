@@ -95,7 +95,7 @@ class SubscriptionCatalogService
         $query = $query->orderBy($column, $direction);
 
         // Pagination
-        $perPage = $filters['per_page'] ?? 12;
+        $perPage = $filters['per_page'] ?? 15;
         $page = $filters['page'] ?? 1;
 
         return $query->paginate($perPage, $page);
