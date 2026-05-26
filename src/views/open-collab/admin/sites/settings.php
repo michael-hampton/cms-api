@@ -231,6 +231,114 @@
     </div>
 </div>
 
+<div class="oc-card" style="margin-top:28px;" id="rbac-card">
+    <div class="oc-card__header">
+        <span class="oc-card__title">Roles &amp; Permissions</span>
+        <span class="oc-card__subtitle">Site-scoped access, member role assignments, direct overrides, and audit history.</span>
+    </div>
+    <div class="oc-card__body">
+        <div id="rbac-banner" style="display:none;margin-bottom:16px;"></div>
+
+        <div class="oc-rbac-grid">
+            <section class="oc-rbac-section">
+                <h3 class="oc-rbac-section__title">Permissions Matrix</h3>
+                <div style="overflow:auto;">
+                    <table class="oc-rbac-table">
+                        <thead>
+                        <tr>
+                            <th>Permission</th>
+                            <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
+                                <th><?= htmlspecialchars($role['name']) ?></th>
+                            <?php endforeach; ?>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach (($rbacSummary['permissions'] ?? []) as $permission): ?>
+                            <tr>
+                                <td>
+                                    <strong><?= htmlspecialchars($permission['slug']) ?></strong><br>
+                                    <span class="oc-rbac-meta"><?= htmlspecialchars($permission['group']) ?></span>
+                                </td>
+                                <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
+                                    <td>
+                                        <input type="checkbox"
+                                               data-role-id="<?= (int) $role['id'] ?>"
+                                               data-permission-slug="<?= htmlspecialchars($permission['slug']) ?>"
+                                               <?= in_array($permission['id'], $role['permission_ids'] ?? [], true) ? 'checked' : '' ?>
+                                               onchange="rbacManager.toggleRolePermission(this)">
+                                    </td>
+                                <?php endforeach; ?>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="oc-rbac-section">
+                <h3 class="oc-rbac-section__title">Members</h3>
+                <div class="oc-rbac-member-list">
+                    <?php foreach (($rbacSummary['members'] ?? []) as $member): ?>
+                        <div class="oc-rbac-member">
+                            <div>
+                                <div class="oc-rbac-member__name"><?= htmlspecialchars($member['name']) ?></div>
+                                <div class="oc-rbac-meta"><?= htmlspecialchars($member['email']) ?> · legacy: <?= htmlspecialchars($member['legacy_role'] ?? 'user') ?></div>
+                            </div>
+                            <select multiple size="4" data-user-id="<?= (int) $member['id'] ?>" onchange="rbacManager.updateMemberRoles(this)">
+                                <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
+                                    <option value="<?= (int) $role['id'] ?>" <?= in_array($role['id'], $member['role_ids'] ?? [], true) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($role['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="oc-rbac-section">
+                <h3 class="oc-rbac-section__title">Overrides</h3>
+                <div class="oc-rbac-member-list">
+                    <?php foreach (($rbacSummary['members'] ?? []) as $member): ?>
+                        <form class="oc-rbac-override-row" onsubmit="rbacManager.saveOverride(event, <?= (int) $member['id'] ?>)">
+                            <div>
+                                <div class="oc-rbac-member__name"><?= htmlspecialchars($member['name']) ?></div>
+                                <div class="oc-rbac-meta">Grant or deny one permission for this site.</div>
+                            </div>
+                            <select name="permission_slug">
+                                <?php foreach (($rbacSummary['permissions'] ?? []) as $permission): ?>
+                                    <option value="<?= htmlspecialchars($permission['slug']) ?>"><?= htmlspecialchars($permission['slug']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <select name="granted">
+                                <option value="true">Grant</option>
+                                <option value="false">Deny</option>
+                            </select>
+                            <button type="submit" class="oc-btn oc-btn--ghost oc-btn--sm">Save</button>
+                        </form>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+
+            <section class="oc-rbac-section">
+                <h3 class="oc-rbac-section__title">Audit Log</h3>
+                <div class="oc-rbac-audit-list">
+                    <?php foreach (($rbacSummary['audit'] ?? []) as $entry): ?>
+                        <div class="oc-rbac-audit-item">
+                            <div class="oc-rbac-member__name"><?= htmlspecialchars($entry['action']) ?></div>
+                            <div class="oc-rbac-meta">
+                                actor <?= htmlspecialchars((string) ($entry['actor_user_id'] ?? 'system')) ?> ·
+                                target <?= htmlspecialchars((string) ($entry['target_user_id'] ?? 'n/a')) ?> ·
+                                <?= htmlspecialchars((string) $entry['created_at']) ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -276,6 +384,73 @@
         display: block;
         font-size: .78rem;
         color: var(--slate);
+    }
+
+    .oc-rbac-grid {
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+        gap:20px;
+    }
+
+    .oc-rbac-section__title {
+        font-size:1rem;
+        font-weight:700;
+        color:var(--navy);
+        margin:0 0 12px;
+    }
+
+    .oc-rbac-table {
+        width:100%;
+        border-collapse:collapse;
+        font-size:.82rem;
+    }
+
+    .oc-rbac-table th,
+    .oc-rbac-table td {
+        padding:8px 10px;
+        border-bottom:1px solid var(--border);
+        text-align:left;
+        vertical-align:top;
+    }
+
+    .oc-rbac-meta {
+        color:var(--slate);
+        font-size:.74rem;
+    }
+
+    .oc-rbac-member-list,
+    .oc-rbac-audit-list {
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+    }
+
+    .oc-rbac-member,
+    .oc-rbac-override-row,
+    .oc-rbac-audit-item {
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:12px;
+        background:#fff;
+    }
+
+    .oc-rbac-member {
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        align-items:flex-start;
+    }
+
+    .oc-rbac-member__name {
+        font-weight:600;
+        color:var(--navy);
+    }
+
+    .oc-rbac-override-row {
+        display:grid;
+        grid-template-columns:1.4fr 1fr 110px auto;
+        gap:10px;
+        align-items:center;
     }
 </style>
 <script>
@@ -649,5 +824,63 @@
             <?= json_encode($site) ?>,
         localStorage.getItem('oc_token') || '',
     );
+
+    const rbacManager = {
+        async toggleRolePermission(checkbox) {
+            const roleId = checkbox.dataset.roleId;
+            const inputs = Array.from(document.querySelectorAll(`input[data-role-id="${roleId}"]`));
+            const permissionSlugs = inputs.filter(input => input.checked).map(input => input.dataset.permissionSlug);
+
+            await this.request(`/<?= htmlspecialchars($site) ?>/api/open-collab/admin/rbac-role-permissions/${roleId}`, {
+                method: 'POST',
+                body: JSON.stringify({permission_slugs: permissionSlugs}),
+            });
+        },
+
+        async updateMemberRoles(select) {
+            const userId = select.dataset.userId;
+            const roleIds = Array.from(select.selectedOptions).map(option => Number(option.value));
+
+            await this.request(`/<?= htmlspecialchars($site) ?>/api/open-collab/admin/contributors/${userId}/roles`, {
+                method: 'POST',
+                body: JSON.stringify({role_ids: roleIds}),
+            });
+        },
+
+        async saveOverride(event, userId) {
+            event.preventDefault();
+            const form = event.target;
+            const permissionSlug = form.permission_slug.value;
+            const granted = form.granted.value === 'true';
+
+            await this.request(`/<?= htmlspecialchars($site) ?>/api/open-collab/admin/rbac/overrides/${userId}`, {
+                method: 'POST',
+                body: JSON.stringify({permission_slug: permissionSlug, granted}),
+            });
+        },
+
+        async request(url, options) {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('oc_token') || ''}`,
+                    'Accept': 'application/json',
+                },
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            const banner = document.getElementById('rbac-banner');
+            if (!banner) return;
+
+            banner.style.display = 'block';
+            banner.className = response.ok ? 'oc-alert oc-alert--success' : 'oc-alert oc-alert--danger';
+            banner.textContent = payload.message || payload.error || (response.ok ? 'Saved.' : 'Failed to save.');
+
+            if (response.ok) {
+                setTimeout(() => window.location.reload(), 400);
+            }
+        }
+    };
 </script>
 @endsection

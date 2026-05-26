@@ -21,7 +21,9 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_list_and_show_site_contributors(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
+        UserSite::where('user_id', $this->otherContributor->id)
+            ->where('site_id', $this->siteId)
+            ->delete();
         $otherSite = Site::create(['name' => 'Other Site', 'slug' => 'other-site-admin', 'is_default' => false]);
         UserSite::create(['user_id' => $this->otherContributor->id, 'site_id' => $otherSite->id]);
 
@@ -43,6 +45,10 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_show_returns_404_for_contributor_without_site_access(): void
     {
+        UserSite::where('user_id', $this->otherContributor->id)
+            ->where('site_id', $this->siteId)
+            ->delete();
+
         $response = $this->getForSite("/api/open-collab/admin/contributors/{$this->otherContributor->id}");
 
         $this->assertEquals(404, $response->getStatusCode());
@@ -50,8 +56,6 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_deactivate_and_reactivate_contributor(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
-
         $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/deactivate", ['reason' => 'test']);
 
         $this->assertEquals(200, $deactivateResponse->getStatusCode());
@@ -64,8 +68,6 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_deactivate_account_without_reason(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
-
         $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/deactivate");
         $data = json_decode($deactivateResponse->getContent(), true);
 
@@ -79,8 +81,6 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_reactivate_account_without_reason(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId, 'is_active' => 0]);
-
         $deactivateResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/reactivate");
         $data = json_decode($deactivateResponse->getContent(), true);
 
@@ -94,8 +94,6 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_close_contributor_account(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
-
         $pendingPayout = Payout::create([
             'user_id' => $this->contributor->id,
             'site_id' => $this->siteId,
@@ -129,8 +127,6 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_close_returns_422_when_reason_is_invalid(): void
     {
-        UserSite::create(['user_id' => $this->contributor->id, 'site_id' => $this->siteId]);
-
         $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/close", [
             'reason' => 'bad',
         ]);
@@ -140,6 +136,10 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
     public function test_admin_can_grant_and_revoke_site_access(): void
     {
+        UserSite::where('user_id', $this->otherContributor->id)
+            ->where('site_id', $this->siteId)
+            ->delete();
+
         $grantResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->otherContributor->id}/grant-access");
         $this->assertEquals(200, $grantResponse->getStatusCode());
         $this->assertDatabaseHas('oc_user_sites', ['user_id' => $this->otherContributor->id, 'site_id' => $this->siteId]);
@@ -147,6 +147,27 @@ class AdminContributorControllerTest extends FunctionalTestCase
         $revokeResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->otherContributor->id}/revoke-access");
         $this->assertEquals(200, $revokeResponse->getStatusCode());
         $this->assertDatabaseMissing('oc_user_sites', ['user_id' => $this->otherContributor->id, 'site_id' => $this->siteId]);
+    }
+
+    public function test_admin_can_update_contributor_role_and_backfill_site_role_assignment(): void
+    {
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/role", [
+            'role' => 'admin',
+            'reason' => 'Needs site admin access',
+        ]);
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseHas('users', ['id' => $this->contributor->id, 'role' => 'admin']);
+        $this->assertDatabaseHas('oc_site_user_roles', [
+            'site_id' => $this->siteId,
+            'user_id' => $this->contributor->id,
+            'role_id' => \App\Models\OpenCollabRole::where('slug', 'site_admin')->first()->id,
+        ]);
+        $this->assertDatabaseHas('oc_rbac_audit_logs', [
+            'site_id' => $this->siteId,
+            'target_user_id' => $this->contributor->id,
+            'action' => 'contributor_role_changed',
+        ]);
     }
 
     public function test_admin_can_list_resend_and_revoke_invitations(): void

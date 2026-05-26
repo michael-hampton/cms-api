@@ -78,7 +78,9 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\Tag;
 use App\Models\Territory;
+use App\Models\Site;
 use App\Models\User;
+use App\Models\UserSite;
 use App\Models\UserNotification;
 use App\Models\Voucher;
 
@@ -372,9 +374,18 @@ trait CreatesTestData
 
     protected function createUser(array $overrides = []): User
     {
-        return $this->factory(User::class)
+        $user = $this->factory(User::class)
             ->forSite($this->siteId)
             ->create($overrides);
+
+        if (!empty($this->siteId) && \App\Models\Site::find($this->siteId)) {
+            UserSite::firstOrCreate([
+                'user_id' => $user->id,
+                'site_id' => $this->siteId,
+            ]);
+        }
+
+        return $user;
     }
 
     protected function createProductPriceHistory(array $overrides = []): Model
@@ -508,6 +519,10 @@ trait CreatesTestData
      */
     protected function createPage(array $overrides = []): Page
     {
+        if (!empty($this->siteId) && !Site::find($this->siteId) && method_exists($this, 'ensureSiteExists')) {
+            $this->ensureSiteExists();
+        }
+
         return $this->factory(Page::class)
             ->forSite($this->siteId)
             ->create($overrides);

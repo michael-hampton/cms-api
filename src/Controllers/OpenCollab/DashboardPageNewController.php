@@ -7,6 +7,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
+use App\Services\OpenCollab\SitePermissionResolver;
 use App\Services\OpenCollab\Dashboard\WidgetRegistry;
 use App\Services\OpenCollab\Dashboard\WidgetResolver;
 use App\Services\OpenCollab\Dashboard\WidgetResponse;
@@ -16,6 +17,7 @@ class DashboardPageNewController extends Controller
     public function __construct(
         private readonly WidgetResolver $widgetResolver,
         private readonly WidgetRegistry $widgetRegistry,
+        private readonly SitePermissionResolver $permissionResolver,
     )
     {
         parent::__construct();
@@ -56,6 +58,13 @@ class DashboardPageNewController extends Controller
     {
         $user   = User::hydrateStatic(Auth::getUser());
         $widget = $this->widgetRegistry->get($slug);
+        $siteId = (int) SiteContext::getId();
+
+        foreach ($this->widgetRegistry->permissionsFor($slug) as $permission) {
+            if (!$this->permissionResolver->allows($user->id, $siteId, $permission)) {
+                return $this->errorResponse('Forbidden.', 403);
+            }
+        }
 
         $response = WidgetResponse::make(
             $widget->key(),

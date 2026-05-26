@@ -11,6 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Requests\OpenCollab\MarkPayoutPaidRequest;
 use App\Requests\OpenCollab\RequestPayoutRequest;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\PayoutService;
 
 /**
@@ -28,6 +29,7 @@ class PayoutController extends Controller
     public function __construct(
         private readonly PayoutService    $payoutService,
         private readonly PayoutRepository $payoutRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -120,6 +122,15 @@ class PayoutController extends Controller
      */
     public function adminIndex(): JsonResponse
     {
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), [
+                'payout.view',
+                'payout.approve',
+            ]);
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
+        }
+
         $perPage = (int)($_GET['per_page'] ?? 25);
         $payouts = $this->payoutRepository->forSite(SiteContext::getId(), $perPage);
 
@@ -141,6 +152,12 @@ class PayoutController extends Controller
         }
 
         try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.approve']);
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
+        }
+
+        try {
             $payout = $this->payoutService->approve($id, Auth::id());
 
             return $this->jsonResponse([
@@ -159,6 +176,12 @@ class PayoutController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Not logged in', 422);
+        }
+
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.mark_paid']);
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         }
 
         try {
@@ -192,6 +215,12 @@ class PayoutController extends Controller
             return $this->errorResponse('Not logged in', 422);
         }
 
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.reject']);
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
+        }
+
         $reason = $request->input('reason');
 
         if (empty($reason)) {
@@ -217,6 +246,12 @@ class PayoutController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Not logged in', 422);
+        }
+
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.approve']);
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         }
 
         try {

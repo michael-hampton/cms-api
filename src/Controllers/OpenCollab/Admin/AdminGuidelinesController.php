@@ -17,6 +17,7 @@ use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Repositories\OpenCollab\GuidelineTemplateRepository;
 use App\Services\OpenCollab\GuidelineService;
 use App\Services\OpenCollab\GuidelineTemplateService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 /**
  * Admin CRUD and lifecycle management for brand guidelines.
@@ -40,6 +41,7 @@ class AdminGuidelinesController extends Controller
         private readonly GuidelineTemplateRepository $templateRepository,
         private readonly GuidelineService            $guidelineService,
         private readonly GuidelineTemplateService    $guidelineTemplateService,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -47,6 +49,10 @@ class AdminGuidelinesController extends Controller
 
     public function index(): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
+            return $response;
+        }
+
         $guidelines = $this->guidelinesContentRepository->allForSite(SiteContext::getId());
 
         return $this->jsonResponse(
@@ -56,6 +62,10 @@ class AdminGuidelinesController extends Controller
 
     public function latest(): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.acknowledge', 'guideline.publish'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->latestPublishedForSite(SiteContext::getId());
         if (!$guideline) {
             return $this->errorResponse('No published guidelines found for this site.', 404);
@@ -66,6 +76,10 @@ class AdminGuidelinesController extends Controller
 
     public function show(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -76,6 +90,10 @@ class AdminGuidelinesController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.create'])) {
+            return $response;
+        }
+
         $content = $request->input('content', '');
 
         if (empty($content)) {
@@ -99,6 +117,10 @@ class AdminGuidelinesController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.edit'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -135,6 +157,10 @@ class AdminGuidelinesController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.archive'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -166,6 +192,10 @@ class AdminGuidelinesController extends Controller
 
     public function publish(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.publish'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -186,6 +216,10 @@ class AdminGuidelinesController extends Controller
 
     public function archive(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.archive'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -205,6 +239,10 @@ class AdminGuidelinesController extends Controller
 
     public function clone(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.create'])) {
+            return $response;
+        }
+
         $guideline = $this->guidelinesContentRepository->find($id);
         if (!$guideline || (int)$guideline->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Guidelines not found.', 404);
@@ -220,6 +258,10 @@ class AdminGuidelinesController extends Controller
 
     public function storeFromTemplate(Request $request): JsonResponse
     {
+        if ($response = $this->authorize(['guideline.create'])) {
+            return $response;
+        }
+
         $templateId = (int)$request->input('template_id', 0);
         $template = $this->templateRepository->find($templateId);
 
@@ -258,5 +300,15 @@ class AdminGuidelinesController extends Controller
             'cloned_from_version_id' => $guideline->cloned_from_version_id,
             'created_at' => $guideline->created_at,
         ];
+    }
+
+    private function authorize(array $permissions): ?JsonResponse
+    {
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
+            return null;
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
+        }
     }
 }

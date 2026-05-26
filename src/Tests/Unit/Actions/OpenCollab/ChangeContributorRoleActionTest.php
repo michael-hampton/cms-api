@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Services\Cms\UserService;
+use App\Services\OpenCollab\RbacAuditLogger;
+use App\Services\OpenCollab\SiteRoleAssignmentService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -17,6 +19,8 @@ class ChangeContributorRoleActionTest extends TestCase
     private AdminContributorRepository $repository;
     private UserService $userService;
     private AdminActivityLogRepository $logger;
+    private SiteRoleAssignmentService $siteRoleAssignmentService;
+    private RbacAuditLogger $rbacAuditLogger;
     private ChangeContributorRoleAction $action;
 
     public function test_it_changes_role_and_logs_with_before_after_payload(): void
@@ -38,6 +42,12 @@ class ChangeContributorRoleActionTest extends TestCase
             ->once()
             ->with(5, ['role' => 'author']);
 
+        $this->siteRoleAssignmentService
+            ->shouldReceive('syncLegacyRole')
+            ->once()
+            ->with(5, 1, 'author')
+            ->andReturn(null);
+
         $this->logger
             ->shouldReceive('log')
             ->once()
@@ -54,6 +64,17 @@ class ChangeContributorRoleActionTest extends TestCase
                     && $payload === ['from' => 'editor', 'to' => 'author']
                     && $reason === 'Promotion to author';
             });
+
+        $this->rbacAuditLogger
+            ->shouldReceive('log')
+            ->once()
+            ->with(
+                'contributor_role_changed',
+                1,
+                99,
+                5,
+                ['from_legacy_role' => 'editor', 'to_legacy_role' => 'author', 'mapped_site_role' => null]
+            );
 
         $this->action->execute(
             userId: 5,
@@ -104,6 +125,10 @@ class ChangeContributorRoleActionTest extends TestCase
             ->andReturn($contributor);
 
         $this->userService->shouldReceive('updateUser');
+        $this->siteRoleAssignmentService->shouldReceive('syncLegacyRole')
+            ->once()
+            ->with(5, 1, 'editor')
+            ->andReturn('reviewer');
 
         $this->logger
             ->shouldReceive('log')
@@ -112,6 +137,17 @@ class ChangeContributorRoleActionTest extends TestCase
                 return $payload === ['from' => 'viewer', 'to' => 'editor'];
             })
             ->andReturn(Mockery::mock(AdminActivityLog::class));
+
+        $this->rbacAuditLogger
+            ->shouldReceive('log')
+            ->once()
+            ->with(
+                'contributor_role_changed',
+                1,
+                99,
+                5,
+                ['from_legacy_role' => 'viewer', 'to_legacy_role' => 'editor', 'mapped_site_role' => 'reviewer']
+            );
 
         $this->action->execute(
             userId: 5,
@@ -131,11 +167,15 @@ class ChangeContributorRoleActionTest extends TestCase
         $this->repository = mock(AdminContributorRepository::class)->makePartial();
         $this->userService = mock(UserService::class)->makePartial();
         $this->logger = mock(AdminActivityLogRepository::class)->makePartial();
+        $this->siteRoleAssignmentService = mock(SiteRoleAssignmentService::class)->makePartial();
+        $this->rbacAuditLogger = mock(RbacAuditLogger::class)->makePartial();
 
         $this->action = new ChangeContributorRoleAction(
             contributorRepository: $this->repository,
             userService: $this->userService,
             logger: $this->logger,
+            siteRoleAssignmentService: $this->siteRoleAssignmentService,
+            rbacAuditLogger: $this->rbacAuditLogger,
         );
     }
 }

@@ -14,9 +14,11 @@ use App\Framework\HttpClient\HttpClientResponse;
 use App\Framework\Mail\ArrayMailer;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
+use App\Framework\Support\Config;
 use App\Models\Member;
 use App\Models\Site;
 use App\Models\User;
+use App\Models\UserSite;
 use Exception;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -85,6 +87,8 @@ abstract class FunctionalTestCase extends TestCase
 
         // Create application with test database
         $this->app = new ApiApplication($testConfig, $this->database);
+
+        Config::set('rbac.site_enabled', false);
 
         $this->ensureSiteExists();
 
@@ -176,6 +180,12 @@ abstract class FunctionalTestCase extends TestCase
         }
 
         $this->authenticatedUser = $user;
+        if (!empty($this->siteId) && Site::find($this->siteId)) {
+            UserSite::firstOrCreate([
+                'user_id' => $user->id,
+                'site_id' => $this->siteId,
+            ]);
+        }
         Auth::login($user->toArray());
 
         // Generate a test token (you may need to adjust based on your token generation logic)

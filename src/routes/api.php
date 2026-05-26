@@ -28,7 +28,10 @@ use App\Controllers\Cms\TerritoryController;
 use App\Controllers\Cms\UserController;
 use App\Controllers\Cms\VideoController;
 use App\Controllers\Crm\CrmAddressController;
+use App\Controllers\Crm\CrmAttachmentController;
+use App\Controllers\Crm\CrmChargingController;
 use App\Controllers\Crm\CrmCommunicationsController;
+use App\Controllers\Crm\CrmManualPaymentController;
 use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
 use App\Controllers\Crm\CrmMemberNoteController;
@@ -87,6 +90,7 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\RbacAdminController;
 use App\Controllers\OpenCollab\Admin\SiteSettingsController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
 use App\Controllers\OpenCollab\ArticleCommentController;
@@ -397,6 +401,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [AdminContractController::class, '']
         );
 
+        $router->get('/open-collab/admin/contracts', [AdminContractController::class, 'index']);
+        $router->get('/open-collab/admin/contracts/latest', [AdminContractController::class, 'latest']);
+        $router->post('/open-collab/admin/contracts', [AdminContractController::class, 'store']);
+        $router->get('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'show']);
+        $router->put('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'update']);
+        $router->delete('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'destroy']);
         $router->post('/open-collab/admin/contracts/{id}/publish', [AdminContractController::class, 'publish']);
         $router->post('/open-collab/admin/contracts/{id}/clone', [AdminContractController::class, 'clone']);
         $router->post('/open-collab/admin/contracts/from-template', [AdminContractController::class, 'storeFromTemplate']);
@@ -407,6 +417,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/open-collab/admin/contract-templates/{id}', [AdminContractTemplateController::class, 'destroy']);
 
         // Specialized Guideline Actions
+        $router->get('/open-collab/admin/guidelines', [AdminGuidelinesController::class, 'index']);
+        $router->get('/open-collab/admin/guidelines/latest', [AdminGuidelinesController::class, 'latest']);
+        $router->post('/open-collab/admin/guidelines', [AdminGuidelinesController::class, 'store']);
+        $router->get('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'show']);
+        $router->put('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'update']);
+        $router->delete('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'destroy']);
         $router->post('/open-collab/admin/guidelines/{id}/publish', [AdminGuidelinesController::class, 'publish']);
         $router->post('/open-collab/admin/guidelines/{id}/clone', [AdminGuidelinesController::class, 'clone']);
         $router->post('/open-collab/admin/guidelines/from-template', [AdminGuidelinesController::class, 'storeFromTemplate']);
@@ -461,6 +477,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/open-collab/admin/invitations/{id}',
             [AdminContributorController::class, 'revokeInvitation']
         );
+
+        $router->get('/open-collab/admin/rbac', [RbacAdminController::class, 'summary']);
+        $router->post('/open-collab/admin/rbac-role-permissions/{roleId}', [RbacAdminController::class, 'syncRolePermissions']);
+        $router->post('/open-collab/admin/contributors/{userId}/roles', [RbacAdminController::class, 'assignMemberRoles']);
+        $router->post('/open-collab/admin/rbac/overrides/{userId}', [RbacAdminController::class, 'setOverride']);
 
         $router->get(
             '/open-collab/admin/articles/pending',
@@ -581,6 +602,47 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post(
             '/open-collab/admin/contributor-requests/{id}/reject',
             [ContributorRequestController::class, 'reject']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/manual-payments',
+            [CrmManualPaymentController::class, 'index']
+        );
+        $router->post(
+            '/crm/members/{memberId}/manual-payments',
+            [CrmManualPaymentController::class, 'store']
+        );
+        $router->delete(
+            '/crm/members/{memberId}/manual-payments/{id}',
+            [CrmManualPaymentController::class, 'destroy']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/attachments',
+            [CrmAttachmentController::class, 'index']
+        );
+        $router->post(
+            '/crm/members/{memberId}/attachments',
+            [CrmAttachmentController::class, 'store']
+        );
+        $router->delete(
+            '/crm/members/{memberId}/attachments/{id}',
+            [CrmAttachmentController::class, 'destroy']
+        );
+
+        $router->post(
+            '/crm/members/{memberId}/charging/disable',
+            [CrmChargingController::class, 'disable']
+        );
+        $router->post(
+            '/crm/members/{memberId}/charging/enable',
+            [CrmChargingController::class, 'enable']
+        );
+
+// Retry a specific failed payment (charging-policy-aware)
+        $router->post(
+            '/crm/members/{memberId}/payments/{paymentId}/retry',
+            [CrmChargingController::class, 'retryPayment']
         );
 
         // crm
@@ -1418,7 +1480,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/issue-deliveries', [IssueDeliveryController::class, 'store']);
         $router->get('/issue-deliveries/search', [IssueDeliveryController::class, 'index']);
         $router->get('/issue-deliveries/{id}', [IssueDeliveryController::class, 'show']);
-        $router->put('/issue-deliveries/{id}', [IssueDeliveryController::class, 'update']);
+        $router->post('/issue-deliveries/{id}', [IssueDeliveryController::class, 'update']);
         $router->delete('/issue-deliveries/{id}', [IssueDeliveryController::class, 'destroy']);
         $router->put('/issue-deliveries/{id}/status', [IssueDeliveryController::class, 'updateStatus']);
 

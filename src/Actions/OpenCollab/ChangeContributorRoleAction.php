@@ -6,6 +6,8 @@ use App\Enums\OpenCollab\AdminAction;
 use App\Repositories\OpenCollab\AdminActivityLogRepository;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Services\Cms\UserService;
+use App\Services\OpenCollab\RbacAuditLogger;
+use App\Services\OpenCollab\SiteRoleAssignmentService;
 
 /**
  * Changes a contributor's role and writes an audit log with the before/after values.
@@ -18,6 +20,8 @@ class ChangeContributorRoleAction
         private readonly AdminContributorRepository $contributorRepository,
         private readonly UserService                $userService,
         private readonly AdminActivityLogRepository $logger,
+        private readonly SiteRoleAssignmentService  $siteRoleAssignmentService,
+        private readonly RbacAuditLogger            $rbacAuditLogger,
     )
     {
     }
@@ -48,6 +52,7 @@ class ChangeContributorRoleAction
         $oldRole = is_array($contributor) ? ($contributor['role'] ?? null) : $contributor->role;
 
         $this->userService->updateUser($userId, ['role' => $newRole]);
+        $mappedRole = $this->siteRoleAssignmentService->syncLegacyRole($userId, $siteId, $newRole);
 
         $this->logger->log(
             adminId: $adminId,
@@ -58,6 +63,18 @@ class ChangeContributorRoleAction
                 'to' => $newRole,
             ],
             reason: $reason,
+        );
+
+        $this->rbacAuditLogger->log(
+            action: 'contributor_role_changed',
+            siteId: $siteId,
+            actorUserId: $adminId,
+            targetUserId: $userId,
+            payload: [
+                'from_legacy_role' => $oldRole,
+                'to_legacy_role' => $newRole,
+                'mapped_site_role' => $mappedRole,
+            ],
         );
     }
 

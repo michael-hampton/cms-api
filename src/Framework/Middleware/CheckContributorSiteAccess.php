@@ -27,50 +27,21 @@ use App\Repositories\OpenCollab\UserSiteRepository;
  *       ...
  *   });
  */
-class CheckContributorSiteAccess
+class CheckContributorSiteAccess extends RequireSiteMembership
 {
-    public function __construct(
-        private readonly UserSiteRepository $userSiteRepository,
-    )
-    {
-    }
-
     public function handle(Request $request, callable $next): Response
     {
-        // 1. Must be authenticated.
-        if (!Auth::check()) {
-            $loginPath = $this->buildLoginPath($request);
+        $response = parent::handle($request, $next);
 
-            if ($request->wantsJson()) {
-                return Response::json([
-                    'success' => false,
-                    'message' => 'Unauthenticated.',
-                ], 401);
-            }
-
-            return Response::redirect($loginPath);
+        if ($response->getStatusCode() !== 403 || $request->wantsJson()) {
+            return $response;
         }
 
-        $user = Auth::user();
-        $siteId = (int)SiteContext::getId();
-
-        // 2. Must have explicit access to the current site.
-        if (!$this->userSiteRepository->hasAccess($user->id, $siteId)) {
-            if ($request->wantsJson()) {
-                return Response::json([
-                    'success' => false,
-                    'message' => 'You do not have access to this site.',
-                ], 403);
-            }
-
-            // Redirect back to login with a descriptive error so the
-            // contributor knows why they were rejected rather than seeing
-            // a blank page.
-            $loginPath = $this->buildLoginPath($request);
-            return Response::redirect($loginPath . '?error=no_site_access');
+        if (str_contains((string) $response->getContent(), '/login')) {
+            return Response::redirect($this->buildLoginPath($request) . '?error=no_site_access');
         }
 
-        return $next($request);
+        return $response;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────

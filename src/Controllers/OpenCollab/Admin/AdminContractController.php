@@ -15,6 +15,7 @@ use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContractTemplateRepository;
 use App\Services\OpenCollab\ContractService;
 use App\Services\OpenCollab\ContractTemplateService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 /**
  * Admin CRUD and lifecycle management for contributor contracts.
@@ -38,6 +39,7 @@ class AdminContractController extends Controller
         private readonly ContractTemplateRepository $templateRepository,
         private readonly ContractService            $contractService,
         private readonly ContractTemplateService    $contractTemplateService,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -45,6 +47,10 @@ class AdminContractController extends Controller
 
     public function index(): JsonResponse
     {
+        if ($response = $this->authorize(['contract.view', 'contract.create', 'contract.publish'])) {
+            return $response;
+        }
+
         $contracts = $this->contractRepository->getContractsForSite(SiteContext::getId());
 
         return $this->jsonResponse(
@@ -54,6 +60,10 @@ class AdminContractController extends Controller
 
     public function latest(): JsonResponse
     {
+        if ($response = $this->authorize(['contract.view'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->latestPublishedForSite(SiteContext::getId());
         if (!$contract) {
             return $this->errorResponse('No published contract found for this site.', 404);
@@ -64,6 +74,10 @@ class AdminContractController extends Controller
 
     public function show(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.view'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -74,6 +88,10 @@ class AdminContractController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if ($response = $this->authorize(['contract.create'])) {
+            return $response;
+        }
+
         $content = trim($request->input('content', ''));
 
         if (empty($content)) {
@@ -97,6 +115,10 @@ class AdminContractController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.edit'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -133,6 +155,10 @@ class AdminContractController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.archive'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -164,6 +190,10 @@ class AdminContractController extends Controller
 
     public function publish(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.publish'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -183,6 +213,10 @@ class AdminContractController extends Controller
 
     public function archive(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.archive'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -202,6 +236,10 @@ class AdminContractController extends Controller
 
     public function clone(int $id): JsonResponse
     {
+        if ($response = $this->authorize(['contract.create'])) {
+            return $response;
+        }
+
         $contract = $this->contractRepository->find($id);
         if (!$contract || (int)$contract->site_id !== SiteContext::getId()) {
             return $this->errorResponse('Contract not found.', 404);
@@ -217,6 +255,10 @@ class AdminContractController extends Controller
 
     public function storeFromTemplate(Request $request): JsonResponse
     {
+        if ($response = $this->authorize(['contract.create'])) {
+            return $response;
+        }
+
         $templateId = (int)$request->input('template_id', 0);
         $template = $this->templateRepository->find($templateId);
 
@@ -238,6 +280,10 @@ class AdminContractController extends Controller
 
     public function fromTemplate(Request $request): JsonResponse
     {
+        if ($response = $this->authorize(['contract.create'])) {
+            return $response;
+        }
+
         $template = $this->templateRepository->find($request->input('template_id'));
         if (!$template) return $this->errorResponse('Template not found', 404);
 
@@ -268,5 +314,15 @@ class AdminContractController extends Controller
             'cloned_from_version_id' => $contract->cloned_from_version_id,
             'created_at' => $contract->created_at,
         ];
+    }
+
+    private function authorize(array $permissions): ?JsonResponse
+    {
+        try {
+            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
+            return null;
+        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
+        }
     }
 }

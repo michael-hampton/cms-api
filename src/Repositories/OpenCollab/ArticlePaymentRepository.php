@@ -27,10 +27,14 @@ class ArticlePaymentRepository extends Repository
      */
     public function sumSucceededAmountForContributor(int $contributorId): int
     {
-        return (int)ArticlePayment::join('pages', 'pages.id', '=', 'oc_article_payments.page_id')
-            ->where('pages.contributor_id', $contributorId)
-            ->where('oc_article_payments.status', PaymentStatus::Succeeded->value)
-            ->sum('oc_article_payments.amount');
+        $row = Database::table('oc_article_payments as ap')
+            ->join('pages as p', 'p.id', '=', 'ap.page_id')
+            ->where('p.contributor_id', $contributorId)
+            ->where('ap.status', PaymentStatus::Succeeded->value)
+            ->selectRaw('SUM(ap.amount) as total')
+            ->first();
+
+        return (int)($row['total'] ?? $row->total ?? 0);
     }
 
     /**
@@ -39,17 +43,18 @@ class ArticlePaymentRepository extends Repository
      */
     public function earningsBreakdownForContributor(int $contributorId): array
     {
-        return ArticlePayment::join('pages', 'pages.id', '=', 'oc_article_payments.page_id')
-            ->where('pages.contributor_id', $contributorId)
-            ->where('oc_article_payments.status', PaymentStatus::Succeeded->value)
-            ->selectRaw('oc_article_payments.page_id, pages.title, SUM(oc_article_payments.amount) as total')
-            ->groupBy('oc_article_payments.page_id', 'pages.title')
+        return Database::table('oc_article_payments as ap')
+            ->join('pages as p', 'p.id', '=', 'ap.page_id')
+            ->where('p.contributor_id', $contributorId)
+            ->where('ap.status', PaymentStatus::Succeeded->value)
+            ->selectRaw('ap.page_id, p.title, SUM(ap.amount) as total')
+            ->groupBy('ap.page_id', 'p.title')
             ->orderByDesc('total')
             ->get()
             ->map(fn($row) => [
-                'page_id' => (int)$row->page_id,
-                'title' => $row->title,
-                'total' => (int)$row->total,
+                'page_id' => (int)($row['page_id'] ?? $row->page_id),
+                'title' => $row['title'] ?? $row->title,
+                'total' => (int)($row['total'] ?? $row->total),
             ])
             ->toArray();
     }

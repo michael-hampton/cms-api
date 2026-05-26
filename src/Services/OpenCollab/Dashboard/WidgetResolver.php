@@ -5,6 +5,9 @@ namespace App\Services\OpenCollab\Dashboard;
 use App\Models\User;
 use App\Repositories\OpenCollab\WidgetSettingsRepository;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
+use App\Framework\Support\SiteContext;
+use App\Services\OpenCollab\LegacyRoleToSiteRoleMapper;
+use App\Services\OpenCollab\SitePermissionResolver;
 
 /**
  * Produces the final, ordered, deduplicated widget list for a user by merging:
@@ -35,6 +38,8 @@ final class WidgetResolver
     public function __construct(
         private readonly WidgetRegistry            $registry,
         private readonly WidgetSettingsRepository  $settingsRepository,
+        private readonly SitePermissionResolver    $permissionResolver,
+        private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,
     ) {}
 
     /**
@@ -61,10 +66,10 @@ final class WidgetResolver
      */
     private function isOnboardingGated(User $user): bool
     {
-        $gatedRoles = config('dashboard.onboarding_gated_roles', []);
-        $userRole   = $user->role ?? null;
+        $siteId = (int) SiteContext::getId();
+        $permission = config('dashboard.onboarding_permission');
 
-        if (!$userRole || !in_array($userRole, $gatedRoles, true)) {
+        if (!$siteId || !$permission || !$this->permissionResolver->allows($user->id, $siteId, $permission)) {
             return false;
         }
 
@@ -167,14 +172,28 @@ final class WidgetResolver
      */
     private function baseKeysForUser(User $user): array
     {
-        $roleConfig = config('dashboard.roles', []);
-        $userRole   = $user->role ?? null;
+        $siteId = (int) SiteContext::getId();
+        $permissions = $siteId > 0 ? $this->permissionResolver->forUser($user->id, $siteId) : [];
 
-        if ($userRole && isset($roleConfig[$userRole])) {
-            return $roleConfig[$userRole];
+        if (in_array('*', $permissions, true)) {
+            return array_values(array_unique(array_merge(...array_values(config('dashboard.permission_sets', [])))));
         }
 
-        return config('dashboard.default', []);
+        $sets = [];
+        foreach (config('dashboard.permission_sets', []) as $set => $widgets) {
+            $requiredPermission = match ($set) {
+                'creator' => 'content.create',
+                'reviewer' => 'content.review',
+                'finance' => 'payout.view',
+                default => null,
+            };
+
+            if ($requiredPermission !== null && in_array($requiredPermission, $permissions, true)) {
+                $sets = array_merge($sets, $widgets);
+            }
+        }
+
+        return !empty($sets) ? array_values(array_unique($sets)) : config('dashboard.default', []);
     }
 
     /**

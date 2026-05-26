@@ -21,10 +21,12 @@ final class WidgetRegistry
 {
     /** @var array<string, DashboardWidgetInterface> Keyed by widget->key() */
     private array $widgets = [];
+    private array $permissions = [];
 
-    public function register(DashboardWidgetInterface $widget): void
+    public function register(DashboardWidgetInterface $widget, array $permissions = []): void
     {
         $this->widgets[$widget->key()] = $widget;
+        $this->permissions[$widget->key()] = $permissions;
     }
 
     /**
@@ -66,5 +68,10 @@ final class WidgetRegistry
     public function has(string $key): bool
     {
         return isset($this->widgets[$key]);
+    }
+
+    public function permissionsFor(string $key): array
+    {
+        return $this->permissions[$key] ?? [];
     }
 }

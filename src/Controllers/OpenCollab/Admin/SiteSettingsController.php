@@ -11,6 +11,7 @@ use App\Repositories\Cms\UserRepository;
 use App\Requests\OpenCollab\Admin\AssignSiteUserRequest;
 use App\Requests\OpenCollab\Admin\SearchSiteUsersRequest;
 use App\Requests\UpdateSiteSettingsRequest;
+use App\Services\OpenCollab\RbacManagementService;
 use App\Services\OpenCollab\SiteAccessService;
 use App\Services\OpenCollab\SiteService;
 use Exception;
@@ -21,6 +22,7 @@ class SiteSettingsController extends Controller
         private readonly SiteService       $siteService,
         private readonly SiteAccessService $siteAccessService,
         private readonly UserRepository    $userRepository,
+        private readonly RbacManagementService $rbacManagementService,
     )
     {
         parent::__construct();
@@ -49,6 +51,7 @@ class SiteSettingsController extends Controller
             'site' => $site->slug,
             'currentSite' => $site,
             'assignedUsers' => $assignedUsers,
+            'rbacSummary' => $this->rbacManagementService->summaryForSite($site->id),
         ]);
     }
 

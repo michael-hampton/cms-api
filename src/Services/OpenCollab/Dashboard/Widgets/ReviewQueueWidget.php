@@ -16,7 +16,7 @@ final class ReviewQueueWidget implements DashboardWidgetInterface
 
     public function visibleFor(User $user): bool
     {
-        return in_array($user->role, ['editor', 'admin'], true);
+        return true;
     }
 
     public function data(User $user): array

@@ -19,21 +19,20 @@ class AdminContributorRepositoryTest extends RepositoryTestCase
             'name' => 'Alice Contributor',
             'email' => 'alice@example.com',
             'role' => 'contributor',
+            'is_contributor' => true,
         ]);
         $nonMatching = $this->createUser([
             'name' => 'Bob Writer',
             'email' => 'bob@example.com',
             'role' => 'contributor',
+            'is_contributor' => true,
         ]);
         $nonContributor = $this->createUser([
             'name' => 'Alice Admin',
             'email' => 'alice-admin@example.com',
             'role' => 'user',
+            'is_contributor' => false,
         ]);
-
-        UserSite::create(['user_id' => $matching->id, 'site_id' => $this->siteId]);
-        UserSite::create(['user_id' => $nonMatching->id, 'site_id' => $this->siteId]);
-        UserSite::create(['user_id' => $nonContributor->id, 'site_id' => $this->siteId]);
 
         $results = $this->repository->searchForSite($this->siteId, 'Alice', 10);
         $item = $results['data']->all()[0];
@@ -45,10 +44,26 @@ class AdminContributorRepositoryTest extends RepositoryTestCase
     public function test_find_contributor_for_site_returns_null_when_user_is_not_on_site(): void
     {
         $user = $this->createUser(['is_contributor' => true]);
+        UserSite::where('user_id', $user->id)
+            ->where('site_id', $this->siteId)
+            ->delete();
 
         $found = $this->repository->findContributorForSite($user->id, $this->siteId);
 
         $this->assertNull($found);
+    }
+
+    public function test_find_contributor_for_site_returns_contributor_even_when_legacy_role_changes(): void
+    {
+        $user = $this->createUser([
+            'role' => 'admin',
+            'is_contributor' => true,
+        ]);
+
+        $found = $this->repository->findContributorForSite($user->id, $this->siteId);
+
+        $this->assertNotNull($found);
+        $this->assertEquals($user->id, is_array($found) ? $found['id'] : $found->id);
     }
 
     public function test_pending_closure_for_site_returns_inactive_contributors_newest_first(): void
@@ -67,10 +82,6 @@ class AdminContributorRepositoryTest extends RepositoryTestCase
             'is_contributor' => true,
             'is_active' => true,
         ]);
-
-        UserSite::create(['user_id' => $older->id, 'site_id' => $this->siteId]);
-        UserSite::create(['user_id' => $newer->id, 'site_id' => $this->siteId]);
-        UserSite::create(['user_id' => $active->id, 'site_id' => $this->siteId]);
 
         $results = $this->repository->pendingClosureForSite($this->siteId);
         $first = $results->first();

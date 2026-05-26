@@ -161,6 +161,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
 
     private function setupSiteOnboarding(bool $requiresSiteOnboarding = false): void
     {
+        $this->ensureSiteExists();
         $site = Site::find($this->siteId);
 
         $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
@@ -176,10 +177,10 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
             'is_contributor' => true,
         ]);
 
-        ContributorProfile::create([
-            'user_id' => $this->contributor->id,
-            'bio' => 'test bio',
-        ]);
+        ContributorProfile::firstOrCreate(
+            ['user_id' => $this->contributor->id],
+            ['bio' => 'test bio'],
+        );
 
         $this->setupSiteOnboarding();
 

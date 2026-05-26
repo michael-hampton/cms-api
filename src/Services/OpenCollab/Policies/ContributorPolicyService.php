@@ -3,6 +3,7 @@
 namespace App\Services\OpenCollab\Policies;
 
 use App\Models\Site;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ContributorOnboardingService;
 
 /**
@@ -30,18 +31,25 @@ class ContributorPolicyService implements ContributorPolicy
 
     public function __construct(
         private readonly ContributorOnboardingService $onboarding,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
     }
 
     public function canCreateArticle(int $userId, Site $site): bool
     {
-        return true;
+        return $this->authorization->allowsAny($userId, $site->id, [
+            'content.create',
+            'content.edit_own',
+        ]);
     }
 
     public function canPublishArticle(int $userId, Site $site): bool
     {
-        return $this->hasNoPendingBlockingSteps($userId, $site, self::PUBLISH_BLOCKING_STEPS);
+        return $this->authorization->allowsAny($userId, $site->id, [
+            'content.publish',
+            'content.submit',
+        ]) && $this->hasNoPendingBlockingSteps($userId, $site, self::PUBLISH_BLOCKING_STEPS);
     }
 
     private function hasNoPendingBlockingSteps(int $userId, Site $site, array $blockingSteps): bool
@@ -58,12 +66,14 @@ class ContributorPolicyService implements ContributorPolicy
 
     public function canSubmitForReview(int $userId, Site $site): bool
     {
-        return $this->hasNoPendingBlockingSteps($userId, $site, self::PUBLISH_BLOCKING_STEPS);
+        return $this->authorization->allows($userId, $site->id, 'content.submit')
+            && $this->hasNoPendingBlockingSteps($userId, $site, self::PUBLISH_BLOCKING_STEPS);
     }
 
     public function canWithdraw(int $userId, Site $site): bool
     {
-        return $this->hasNoPendingBlockingSteps($userId, $site, self::WITHDRAW_BLOCKING_STEPS);
+        return $this->authorization->allows($userId, $site->id, 'payout.request')
+            && $this->hasNoPendingBlockingSteps($userId, $site, self::WITHDRAW_BLOCKING_STEPS);
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

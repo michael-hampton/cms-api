@@ -32,7 +32,7 @@ class ContributorDashboardController extends Controller
             (new EarningsResource(
                 [
                     'breakdown' => $breakdown,
-                    'total' => $total
+                    'total_pence' => $total
                 ]
             ))->toArray()
         );

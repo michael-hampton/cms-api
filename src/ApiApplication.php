@@ -354,13 +354,15 @@ class ApiApplication
             // Fix: Instantiate the registry directly to avoid the infinite loop
             $registry = new WidgetRegistry();
 
-            $registry->register($this->container->make(EarningsWidget::class));
-            $registry->register($this->container->make(DraftsWidget::class));
-            $registry->register($this->container->make(ActivityWidget::class));
-            $registry->register($this->container->make(OnboardingWidget::class));
-            $registry->register($this->container->make(QuickLinksWidget::class));
-            $registry->register($this->container->make(ReviewQueueWidget::class));
-            $registry->register($this->container->make(ApprovalWidget::class));
+            $widgetPermissions = config('dashboard.widget_permissions', []);
+
+            $registry->register($this->container->make(EarningsWidget::class), $widgetPermissions['earnings'] ?? []);
+            $registry->register($this->container->make(DraftsWidget::class), $widgetPermissions['drafts'] ?? []);
+            $registry->register($this->container->make(ActivityWidget::class), $widgetPermissions['activity'] ?? []);
+            $registry->register($this->container->make(OnboardingWidget::class), $widgetPermissions['onboarding'] ?? []);
+            $registry->register($this->container->make(QuickLinksWidget::class), $widgetPermissions['quick_links'] ?? []);
+            $registry->register($this->container->make(ReviewQueueWidget::class), $widgetPermissions['review_queue'] ?? []);
+            $registry->register($this->container->make(ApprovalWidget::class), $widgetPermissions['approvals'] ?? []);
 
 
             return $registry;

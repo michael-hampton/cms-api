@@ -43,7 +43,11 @@ class Member extends Model
         'show_activity',
         'show_badges',
         'is_forgotten',
-        'forgotten_at'
+        'forgotten_at',
+        'charging_disabled',
+        'charging_disabled_reason',
+        'charging_disabled_at',
+        'charging_disabled_by'
     ];
     protected $hidden = [
         'password',
@@ -61,6 +65,10 @@ class Member extends Model
         'show_badges' => 'boolean',
         'is_forgotten' => 'boolean',
         'forgotten_at' => 'datetime',
+        'charging_disabled' => 'boolean',
+        'charging_disabled_reason' => 'string',
+        'charging_disabled_at' => 'datetime',
+        'charging_disabled_by' => 'integer',
     ];
 
     public static function findByEmail(string $email, ?int $siteId): ?self
