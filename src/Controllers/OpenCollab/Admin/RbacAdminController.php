@@ -3,27 +3,30 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Framework\Authorization\Auth;
-use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Models\User;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\RbacManagementService;
 
 class RbacAdminController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly RbacManagementService $rbacManagementService,
         private readonly OpenCollabAuthorizationService $authorization,
+        private readonly RbacRepository $rbacRepository,
     ) {
         parent::__construct();
     }
 
     public function summary(): JsonResponse
     {
-        if ($response = $this->authorize(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
             return $response;
         }
 
@@ -32,7 +35,7 @@ class RbacAdminController extends Controller
 
     public function syncRolePermissions(Request $request, int $roleId): JsonResponse
     {
-        if ($response = $this->authorize(['site.roles.manage', 'site.permissions.manage'])) {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage'])) {
             return $response;
         }
 
@@ -48,11 +51,11 @@ class RbacAdminController extends Controller
 
     public function assignMemberRoles(Request $request, int $userId): JsonResponse
     {
-        if ($response = $this->authorize(['creator.manage_roles', 'site.members', 'site.roles.manage'])) {
+        if ($response = $this->authorizeSitePermissions(['creator.manage_roles', 'site.members', 'site.roles.manage'])) {
             return $response;
         }
 
-        if (!User::find($userId)) {
+        if (!$this->rbacRepository->userExists($userId)) {
             return $this->errorResponse('User not found.', 404);
         }
 
@@ -68,11 +71,11 @@ class RbacAdminController extends Controller
 
     public function setOverride(Request $request, int $userId): JsonResponse
     {
-        if ($response = $this->authorize(['site.permissions.manage', 'creator.manage_roles'])) {
+        if ($response = $this->authorizeSitePermissions(['site.permissions.manage', 'creator.manage_roles'])) {
             return $response;
         }
 
-        if (!User::find($userId)) {
+        if (!$this->rbacRepository->userExists($userId)) {
             return $this->errorResponse('User not found.', 404);
         }
 
@@ -90,15 +93,5 @@ class RbacAdminController extends Controller
         }
 
         return $this->resourceResponse(['message' => 'Permission override updated.']);
-    }
-
-    private function authorize(array $permissions): ?JsonResponse
-    {
-        try {
-            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
-            return null;
-        } catch (UnauthorizedException $exception) {
-            return $this->errorResponse($exception->getMessage(), 403);
-        }
     }
 }

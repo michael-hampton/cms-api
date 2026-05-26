@@ -14,6 +14,7 @@ use App\Framework\HttpClient\HttpClientResponse;
 use App\Framework\Mail\ArrayMailer;
 use App\Framework\Migration\MigrationRunner;
 use App\Framework\Session\Session;
+use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Config;
 use App\Models\Member;
 use App\Models\Site;
@@ -64,6 +65,7 @@ abstract class FunctionalTestCase extends TestCase
         // Ensure each test starts with a clean container so mocks/bindings from
         // previous tests cannot leak across the suite.
         Container::getInstance()->flush();
+        Cache::flush();
 
         $this->cleanupServerGlobals();
 

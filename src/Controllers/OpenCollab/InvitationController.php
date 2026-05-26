@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Exceptions\OpenCollab\InvalidInvitationException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\AuthenticationService;
@@ -13,12 +14,16 @@ use App\Framework\Support\SiteContext;
 use App\Requests\OpenCollab\AcceptInvitationRequest;
 use App\Requests\OpenCollab\CreateInvitationRequest;
 use App\Services\OpenCollab\InvitationService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 class InvitationController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly InvitationService     $invitationService,
         private readonly AuthenticationService $authenticationService,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -32,6 +37,10 @@ class InvitationController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Not logged in', 401);
+        }
+
+        if ($response = $this->authorizeSitePermissions(['creator.invite', 'site.members'])) {
+            return $response;
         }
 
         try {

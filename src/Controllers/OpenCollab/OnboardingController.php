@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\AgeVerificationMethod;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -19,6 +20,7 @@ use App\Requests\OpenCollab\StoreOnboardingProfileRequest;
 use App\Requests\OpenCollab\StorePaymentDetailsRequest;
 use App\Resources\OpenCollab\OnboardingStatusResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use RuntimeException;
 
 /**
@@ -37,12 +39,15 @@ use RuntimeException;
  */
 class OnboardingController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly ContributorOnboardingService $onboardingService,
         private readonly ContributorProfileRepository $profileRepository,
         private readonly ContractRepository           $contractRepository,
         private readonly GuidelinesRepository         $guidelinesRepository,
-        private readonly ContributorProfileRepository $contributorProfileRepository
+        private readonly ContributorProfileRepository $contributorProfileRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -53,6 +58,10 @@ class OnboardingController extends Controller
      */
     public function status(): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
         $site = $this->currentSite();
         $userId = Auth::id();
         $pending = $this->onboardingService->pendingSteps($userId, $site);
@@ -67,6 +76,10 @@ class OnboardingController extends Controller
      */
     public function storeProfile(StoreOnboardingProfileRequest $request): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $userId = Auth::id();
@@ -88,6 +101,10 @@ class OnboardingController extends Controller
      */
     public function storePaymentDetails(StorePaymentDetailsRequest $request): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $userId = Auth::id();
@@ -108,6 +125,10 @@ class OnboardingController extends Controller
      */
     public function getContract(): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view', 'contract.sign'])) {
+            return $response;
+        }
+
         $site = $this->currentSite();
         $contract = $this->contractRepository->latestForSite($site->id);
 
@@ -127,6 +148,10 @@ class OnboardingController extends Controller
      */
     public function signContract(SignContractRequest $request): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view', 'contract.sign'])) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $userId = Auth::id();
@@ -160,6 +185,10 @@ class OnboardingController extends Controller
 
     public function updateAgeVerification(Request $request): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
         try {
             $data = $request->all();
             $userId = Auth::id();
@@ -179,6 +208,10 @@ class OnboardingController extends Controller
      */
     public function acknowledgeGuidelines(AcknowledgeGuidelinesRequest $request): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view', 'guideline.acknowledge'])) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $userId = Auth::id();

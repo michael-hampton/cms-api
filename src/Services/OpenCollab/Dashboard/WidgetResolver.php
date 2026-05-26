@@ -6,7 +6,6 @@ use App\Models\User;
 use App\Repositories\OpenCollab\WidgetSettingsRepository;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
 use App\Framework\Support\SiteContext;
-use App\Services\OpenCollab\LegacyRoleToSiteRoleMapper;
 use App\Services\OpenCollab\SitePermissionResolver;
 
 /**
@@ -39,7 +38,6 @@ final class WidgetResolver
         private readonly WidgetRegistry            $registry,
         private readonly WidgetSettingsRepository  $settingsRepository,
         private readonly SitePermissionResolver    $permissionResolver,
-        private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,
     ) {}
 
     /**

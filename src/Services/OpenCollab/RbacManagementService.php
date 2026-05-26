@@ -2,14 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
-use App\Models\OpenCollabPermission;
-use App\Models\OpenCollabRole;
-use App\Models\OpenCollabRolePermission;
-use App\Models\OpenCollabRbacAuditLog;
-use App\Models\OpenCollabSiteUserPermission;
-use App\Models\OpenCollabSiteUserRole;
-use App\Models\User;
-use App\Models\UserSite;
+use App\Repositories\OpenCollab\RbacRepository;
 
 class RbacManagementService
 {
@@ -17,6 +10,7 @@ class RbacManagementService
         private readonly RbacBootstrapper $bootstrapper,
         private readonly SitePermissionResolver $permissionResolver,
         private readonly RbacAuditLogger $auditLogger,
+        private readonly RbacRepository $rbacRepository,
     ) {
     }
 
@@ -24,74 +18,47 @@ class RbacManagementService
     {
         $this->bootstrapper->ensureSeeded($siteId);
 
-        $permissions = OpenCollabPermission::orderBy('group')
-            ->orderBy('slug')
-            ->get();
-
-        $roles = OpenCollabRole::orderBy('name')->get();
-        $rolePermissionMap = [];
-        foreach (OpenCollabRolePermission::all() as $mapping) {
-            $rolePermissionMap[(int) $mapping->role_id][] = (int) $mapping->permission_id;
-        }
-
-        $users = User::whereIn('id', UserSite::where('site_id', $siteId)->get()->pluck('user_id')->toArray())
-            ->orderBy('name')
-            ->get();
-
-        $userRoleMap = [];
-        foreach (OpenCollabSiteUserRole::where('site_id', $siteId)->get() as $assignment) {
-            $userRoleMap[(int) $assignment->user_id][] = (int) $assignment->role_id;
-        }
-
-        $overrides = OpenCollabSiteUserPermission::where('site_id', $siteId)->get()->map(function ($override) {
-            $permission = OpenCollabPermission::find($override->permission_id);
-
-            return [
-                'id' => (int) $override->id,
-                'user_id' => (int) $override->user_id,
-                'permission_id' => (int) $override->permission_id,
-                'permission_slug' => $permission?->slug,
-                'granted' => (bool) $override->granted,
-            ];
-        })->toArray();
-
-        $audit = OpenCollabRbacAuditLog::where('site_id', $siteId)
-            ->orderBy('id', 'desc')
-            ->limit(50)
-            ->get()
-            ->map(function ($entry) {
+        $permissions = $this->rbacRepository->permissions();
+        $roles = $this->rbacRepository->roles();
+        $rolePermissionMap = $this->rbacRepository->rolePermissionMap();
+        $users = $this->rbacRepository->usersForSite($siteId);
+        $userRoleMap = $this->rbacRepository->userRoleMapForSite($siteId);
+        $overrides = array_map(function ($override) {
+            $permissionSlug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
+            return array_merge($override, ['permission_slug' => $permissionSlug]);
+        }, $this->rbacRepository->overridesForSite($siteId));
+        $audit = array_map(function ($entry) {
                 return [
-                    'id' => (int) $entry->id,
-                    'action' => $entry->action,
-                    'actor_user_id' => $entry->actor_user_id ? (int) $entry->actor_user_id : null,
-                    'target_user_id' => $entry->target_user_id ? (int) $entry->target_user_id : null,
-                    'payload' => is_array($entry->payload) ? $entry->payload : (json_decode((string) $entry->payload, true) ?: []),
-                    'created_at' => $entry->created_at,
+                    'id' => (int) $entry['id'],
+                    'action' => $entry['action'],
+                    'actor_user_id' => !empty($entry['actor_user_id']) ? (int) $entry['actor_user_id'] : null,
+                    'target_user_id' => !empty($entry['target_user_id']) ? (int) $entry['target_user_id'] : null,
+                    'payload' => is_array($entry['payload'] ?? null) ? $entry['payload'] : (json_decode((string) ($entry['payload'] ?? ''), true) ?: []),
+                    'created_at' => $entry['created_at'] ?? null,
                 ];
-            })
-            ->toArray();
+            }, $this->rbacRepository->auditForSite($siteId, 50));
 
         return [
-            'permissions' => $permissions->map(fn($permission) => [
-                'id' => (int) $permission->id,
-                'name' => $permission->name,
-                'slug' => $permission->slug,
-                'group' => $permission->group,
-            ])->toArray(),
-            'roles' => $roles->map(fn($role) => [
-                'id' => (int) $role->id,
-                'name' => $role->name,
-                'slug' => $role->slug,
-                'is_system' => (bool) $role->is_system,
-                'permission_ids' => array_values(array_unique($rolePermissionMap[(int) $role->id] ?? [])),
-            ])->toArray(),
-            'members' => $users->map(fn($user) => [
-                'id' => (int) $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'legacy_role' => $user->role,
-                'role_ids' => array_values(array_unique($userRoleMap[(int) $user->id] ?? [])),
-            ])->toArray(),
+            'permissions' => array_map(fn($permission) => [
+                'id' => (int) $permission['id'],
+                'name' => $permission['name'],
+                'slug' => $permission['slug'],
+                'group' => $permission['group'],
+            ], $permissions),
+            'roles' => array_map(fn($role) => [
+                'id' => (int) $role['id'],
+                'name' => $role['name'],
+                'slug' => $role['slug'],
+                'is_system' => (bool) $role['is_system'],
+                'permission_ids' => array_values(array_unique($rolePermissionMap[(int) $role['id']] ?? [])),
+            ], $roles),
+            'members' => array_map(fn($user) => [
+                'id' => (int) $user['id'],
+                'name' => $user['name'],
+                'email' => $user['email'],
+                'legacy_role' => $user['role'],
+                'role_ids' => array_values(array_unique($userRoleMap[(int) $user['id']] ?? [])),
+            ], $users),
             'overrides' => $overrides,
             'audit' => $audit,
         ];
@@ -101,23 +68,15 @@ class RbacManagementService
     {
         $this->bootstrapper->ensureSeeded($siteId);
 
-        $permissionIds = OpenCollabPermission::whereIn('slug', $permissionSlugs)
-            ->get()
-            ->pluck('id')
-            ->map(fn($id) => (int) $id)
-            ->toArray();
+        $permissionIds = array_map(
+            'intval',
+            array_column(array_filter($this->rbacRepository->permissions(), fn($permission) => in_array($permission['slug'], $permissionSlugs, true)), 'id')
+        );
 
-        OpenCollabRolePermission::where('role_id', $roleId)->delete();
+        $this->rbacRepository->replaceRolePermissions($roleId, $permissionIds);
 
-        foreach ($permissionIds as $permissionId) {
-            OpenCollabRolePermission::create([
-                'role_id' => $roleId,
-                'permission_id' => $permissionId,
-            ]);
-        }
-
-        foreach (UserSite::where('site_id', $siteId)->get() as $membership) {
-            $this->permissionResolver->invalidate((int) $membership->user_id, $siteId);
+        foreach ($this->rbacRepository->siteMembershipUserIds($siteId) as $userId) {
+            $this->permissionResolver->invalidate($userId, $siteId);
         }
 
         $this->auditLogger->log(
@@ -130,17 +89,8 @@ class RbacManagementService
 
     public function assignUserRoles(int $siteId, int $userId, array $roleIds, ?int $actorUserId = null): void
     {
-        OpenCollabSiteUserRole::where('site_id', $siteId)
-            ->where('user_id', $userId)
-            ->delete();
-
-        foreach (array_values(array_unique(array_map('intval', $roleIds))) as $roleId) {
-            OpenCollabSiteUserRole::create([
-                'site_id' => $siteId,
-                'user_id' => $userId,
-                'role_id' => $roleId,
-            ]);
-        }
+        $roleIds = array_values(array_unique(array_map('intval', $roleIds)));
+        $this->rbacRepository->replaceUserRoles($siteId, $userId, $roleIds);
 
         $this->permissionResolver->invalidate($userId, $siteId);
 
@@ -155,26 +105,12 @@ class RbacManagementService
 
     public function setUserOverride(int $siteId, int $userId, string $permissionSlug, bool $granted, ?int $actorUserId = null): void
     {
-        $permission = OpenCollabPermission::where('slug', $permissionSlug)->first();
+        $permission = $this->rbacRepository->findPermissionBySlug($permissionSlug);
         if (!$permission) {
             throw new \InvalidArgumentException('Permission not found.');
         }
 
-        $override = OpenCollabSiteUserPermission::where('site_id', $siteId)
-            ->where('user_id', $userId)
-            ->where('permission_id', $permission->id)
-            ->first();
-
-        if ($override) {
-            $override->update(['granted' => $granted]);
-        } else {
-            OpenCollabSiteUserPermission::create([
-                'site_id' => $siteId,
-                'user_id' => $userId,
-                'permission_id' => $permission->id,
-                'granted' => $granted,
-            ]);
-        }
+        $this->rbacRepository->upsertUserOverride($siteId, $userId, (int) $permission->id, $granted);
 
         $this->permissionResolver->invalidate($userId, $siteId);
 

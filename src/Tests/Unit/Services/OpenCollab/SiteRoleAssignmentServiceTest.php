@@ -7,6 +7,7 @@ use App\Models\OpenCollabRole;
 use App\Models\OpenCollabSiteUserRole;
 use App\Models\Site;
 use App\Models\User;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Repositories\OpenCollab\UserSiteRepository;
 use App\Services\OpenCollab\LegacyRoleToSiteRoleMapper;
 use App\Services\OpenCollab\RbacBootstrapper;
@@ -18,19 +19,21 @@ use Mockery;
 class SiteRoleAssignmentServiceTest extends RepositoryTestCase
 {
     private SiteRoleAssignmentService $service;
+    private RbacBootstrapper $bootstrapper;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         Config::set('rbac', require __DIR__ . '/../../../../config/rbac.php');
+        $this->bootstrapper = new RbacBootstrapper(new RbacRepository());
 
         $resolver = Mockery::mock(SitePermissionResolver::class);
         $resolver->shouldReceive('invalidate')->byDefault();
 
         $this->service = new SiteRoleAssignmentService(
             new LegacyRoleToSiteRoleMapper(),
-            new RbacBootstrapper(),
+            $this->bootstrapper,
             $resolver,
         );
     }
@@ -45,7 +48,7 @@ class SiteRoleAssignmentServiceTest extends RepositoryTestCase
             'role' => 'contributor',
         ]);
 
-        (new RbacBootstrapper())->ensureSeeded($site->id);
+        $this->bootstrapper->ensureSeeded($site->id);
 
         $reviewerRole = OpenCollabRole::where('slug', 'reviewer')->first();
         OpenCollabSiteUserRole::create([

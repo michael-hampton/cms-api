@@ -108,7 +108,7 @@ class AttachmentServiceTest extends TestCase
     {
         $file = Mockery::mock(UploadedFile::class);
         $file->shouldReceive('isValid')->andReturn(true);
-        $file->shouldReceive('getMimeType')->andReturn('text/plain');
+        $file->shouldReceive('getMimeType')->andReturn('text/test');
         $file->shouldReceive('getSize')->andReturn(100);
 
         $this->expectException(Exception::class);

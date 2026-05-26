@@ -579,13 +579,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->post(
-            '/api/{site}/open-collab/contributor-requests',
+            '/open-collab/contributor-requests',
             [ContributorRequestController::class, 'store']
         );
 
-// ── Invitation self-service resend (public — no auth) ────────────────
         $router->post(
-            '/api/{site}/open-collab/invitations/resend',
+            '/open-collab/invitations/resend',
             [ResendInvitationController::class, 'resend']
         );
 
@@ -1641,6 +1640,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->get('/status', [OnboardingController::class, 'status']);
         $router->post('/profile', [OnboardingController::class, 'storeProfile']);
         $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
+        $router->get('/contract', [OnboardingController::class, 'getContract']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);
         $router->post('/age-verification', [OnboardingController::class, 'updateAgeVerification']);
@@ -1700,10 +1700,12 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     // Invitations (Targets InvitationController)
     $router->post('/invitations', [InvitationController::class, 'store']);
+    $router->post('/invitations/resend', [ResendInvitationController::class, 'resend']);
 
     // POST /api/{site}/open-collab/pages 
     // Triggers: ContributorPageController@store
     $router->post('/pages', [ContributorPageController::class, 'store']);
+    $router->post('/pages/{id}/submit', [ArticleApprovalController::class, 'submit']);
 
     // PUT /api/{site}/open-collab/pages/{id}
     // Triggers: ContributorPageController@update
@@ -1725,6 +1727,10 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->post('/admin/disputes/{id}/resolve', [EarningsDisputeController::class, 'resolve']);
 
     $router->get('/admin/violations', [ViolationController::class, 'siteIndex']);
+    $router->get('/admin/contributors/{userId}/violations', [ViolationController::class, 'index']);
+    $router->post('/admin/contributors/{userId}/violations', [ViolationController::class, 'store']);
+    $router->post('/admin/violations/{id}/resolve', [ViolationController::class, 'resolve']);
+    $router->post('/admin/contracts/{id}/publish', [AdminContractController::class, 'publish']);
 
     $router->post('/admin/payment-terms', [AdminPaymentTermsController::class, 'save']);
 
@@ -1735,10 +1741,6 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         [ContributorRequestController::class, 'store']
     );
 
-    $router->post(
-        '/invitations/resend',
-        [ResendInvitationController::class, 'resend']
-    );
 });
 
 $router->get('/api/{site}/open-collab/payouts/{id}/statement', [PayoutStatementController::class, 'download']);

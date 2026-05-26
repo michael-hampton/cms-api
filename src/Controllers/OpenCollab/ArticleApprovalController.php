@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Authorization\Auth;
@@ -28,6 +29,8 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
  */
 class ArticleApprovalController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly ArticleApprovalService $approvalService,
         private readonly OpenCollabAuthorizationService $authorization,
@@ -42,7 +45,7 @@ class ArticleApprovalController extends Controller
      */
     public function pending(): JsonResponse
     {
-        if ($response = $this->authorize(['content.review', 'content.approve', 'content.reject'])) {
+        if ($response = $this->authorizeSitePermissions(['content.review', 'content.approve', 'content.reject'])) {
             return $response;
         }
 
@@ -58,7 +61,7 @@ class ArticleApprovalController extends Controller
      */
     public function approve(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['content.approve'])) {
+        if ($response = $this->authorizeSitePermissions(['content.approve'])) {
             return $response;
         }
 
@@ -79,7 +82,7 @@ class ArticleApprovalController extends Controller
      */
     public function reject(RejectArticleRequest $request, int $id): JsonResponse
     {
-        if ($response = $this->authorize(['content.reject'])) {
+        if ($response = $this->authorizeSitePermissions(['content.reject'])) {
             return $response;
         }
 
@@ -111,7 +114,7 @@ class ArticleApprovalController extends Controller
      */
     public function submit(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['content.submit'])) {
+        if ($response = $this->authorizeSitePermissions(['content.submit'])) {
             return $response;
         }
 
@@ -135,7 +138,7 @@ class ArticleApprovalController extends Controller
      */
     public function resubmit(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['content.submit'])) {
+        if ($response = $this->authorizeSitePermissions(['content.submit'])) {
             return $response;
         }
 
@@ -150,16 +153,6 @@ class ArticleApprovalController extends Controller
             return $this->errorResponse($e->getMessage(), 403);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    private function authorize(array $permissions): ?JsonResponse
-    {
-        try {
-            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
-            return null;
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
-            return $this->errorResponse($e->getMessage(), 403);
         }
     }
 }

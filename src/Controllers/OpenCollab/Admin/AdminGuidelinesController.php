@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
@@ -36,6 +37,8 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
  */
 class AdminGuidelinesController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly GuidelinesContentRepository $guidelinesContentRepository,
         private readonly GuidelineTemplateRepository $templateRepository,
@@ -49,7 +52,7 @@ class AdminGuidelinesController extends Controller
 
     public function index(): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
             return $response;
         }
 
@@ -62,7 +65,7 @@ class AdminGuidelinesController extends Controller
 
     public function latest(): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.acknowledge', 'guideline.publish'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.acknowledge', 'guideline.publish'])) {
             return $response;
         }
 
@@ -76,7 +79,7 @@ class AdminGuidelinesController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.edit', 'guideline.publish', 'guideline.archive'])) {
             return $response;
         }
 
@@ -90,7 +93,7 @@ class AdminGuidelinesController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.create'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.create'])) {
             return $response;
         }
 
@@ -117,7 +120,7 @@ class AdminGuidelinesController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.edit'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.edit'])) {
             return $response;
         }
 
@@ -157,7 +160,7 @@ class AdminGuidelinesController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.archive'])) {
             return $response;
         }
 
@@ -192,7 +195,7 @@ class AdminGuidelinesController extends Controller
 
     public function publish(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.publish'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.publish'])) {
             return $response;
         }
 
@@ -216,7 +219,7 @@ class AdminGuidelinesController extends Controller
 
     public function archive(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.archive'])) {
             return $response;
         }
 
@@ -239,7 +242,7 @@ class AdminGuidelinesController extends Controller
 
     public function clone(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.create'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.create'])) {
             return $response;
         }
 
@@ -258,7 +261,7 @@ class AdminGuidelinesController extends Controller
 
     public function storeFromTemplate(Request $request): JsonResponse
     {
-        if ($response = $this->authorize(['guideline.create'])) {
+        if ($response = $this->authorizeSitePermissions(['guideline.create'])) {
             return $response;
         }
 
@@ -300,15 +303,5 @@ class AdminGuidelinesController extends Controller
             'cloned_from_version_id' => $guideline->cloned_from_version_id,
             'created_at' => $guideline->created_at,
         ];
-    }
-
-    private function authorize(array $permissions): ?JsonResponse
-    {
-        try {
-            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
-            return null;
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
-            return $this->errorResponse($e->getMessage(), 403);
-        }
     }
 }

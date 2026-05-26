@@ -4,18 +4,14 @@ namespace App\Services\OpenCollab;
 
 use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Config;
-use App\Models\OpenCollabPermission;
-use App\Models\OpenCollabRolePermission;
-use App\Models\OpenCollabSiteUserPermission;
-use App\Models\OpenCollabSiteUserRole;
-use App\Models\Site;
-use App\Models\User;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Repositories\OpenCollab\UserSiteRepository;
 
 class SitePermissionResolver
 {
     public function __construct(
         private readonly UserSiteRepository $userSiteRepository,
+        private readonly RbacRepository $rbacRepository,
         private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,
         private readonly RbacBootstrapper $bootstrapper,
     ) {
@@ -23,7 +19,7 @@ class SitePermissionResolver
 
     public function forUser(int $userId, int $siteId): array
     {
-        if (!Site::find($siteId)) {
+        if (!$this->rbacRepository->siteExists($siteId)) {
             return [];
         }
 
@@ -61,31 +57,17 @@ class SitePermissionResolver
 
     private function sitePermissions(int $userId, int $siteId): array
     {
-        $roleIds = OpenCollabSiteUserRole::where('site_id', $siteId)
-            ->where('user_id', $userId)
-            ->get()
-            ->pluck('role_id')
-            ->toArray();
+        $roleIds = $this->rbacRepository->roleIdsForUser($siteId, $userId);
+        $permissionIds = $this->rbacRepository->permissionIdsForRoles($roleIds);
+        $permissions = $this->rbacRepository->permissionSlugsForIds($permissionIds);
 
-        $permissionIds = empty($roleIds)
-            ? []
-            : OpenCollabRolePermission::whereIn('role_id', $roleIds)->get()->pluck('permission_id')->toArray();
-
-        $permissions = empty($permissionIds)
-            ? []
-            : OpenCollabPermission::whereIn('id', $permissionIds)->get()->pluck('slug')->toArray();
-
-        $overrides = OpenCollabSiteUserPermission::where('site_id', $siteId)
-            ->where('user_id', $userId)
-            ->get();
-
-        foreach ($overrides as $override) {
-            $slug = OpenCollabPermission::find($override->permission_id)?->slug;
+        foreach ($this->rbacRepository->overridesForUser($siteId, $userId) as $override) {
+            $slug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
             if (!$slug) {
                 continue;
             }
 
-            if ((bool) $override->granted) {
+            if ((bool) $override['granted']) {
                 $permissions[] = $slug;
                 continue;
             }
@@ -98,9 +80,7 @@ class SitePermissionResolver
 
     private function legacyPermissions(int $userId): array
     {
-        $user = User::find($userId);
-
-        return $this->legacyRoleMapper->permissionsForRole($user?->role);
+        return $this->legacyRoleMapper->permissionsForRole($this->rbacRepository->legacyRoleForUser($userId));
     }
 
     private function normalizePermissions(array $permissions): array

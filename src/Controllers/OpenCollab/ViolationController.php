@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\ViolationAction;
 use App\Enums\OpenCollab\ViolationSeverity;
 use App\Enums\OpenCollab\ViolationType;
@@ -11,6 +12,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Requests\OpenCollab\RecordViolationRequest;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ViolationService;
 
 /**
@@ -22,9 +24,12 @@ use App\Services\OpenCollab\ViolationService;
  */
 class ViolationController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly ViolationService $violationService,
         private readonly \App\Repositories\OpenCollab\ViolationRepository $violationRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -36,6 +41,10 @@ class ViolationController extends Controller
      */
     public function siteIndex(): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['violation.view'])) {
+            return $response;
+        }
+
         $limit = min((int)($_GET['limit'] ?? 100), 200);
         $violations = $this->violationRepository->forSite(SiteContext::getId(), $limit);
 
@@ -49,6 +58,10 @@ class ViolationController extends Controller
      */
     public function index(int $userId): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['violation.view'])) {
+            return $response;
+        }
+
         $violations = $this->violationRepository->forContributor($userId, SiteContext::getId());
 
         return $this->resourceResponse([
@@ -80,6 +93,10 @@ class ViolationController extends Controller
      */
     public function store(RecordViolationRequest $request, int $userId): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['violation.record'])) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
 
@@ -114,6 +131,10 @@ class ViolationController extends Controller
      */
     public function resolve(int $id): JsonResponse
     {
+        if ($response = $this->authorizeSitePermissions(['violation.resolve'])) {
+            return $response;
+        }
+
         $notes = $_POST['notes'] ?? (json_decode(file_get_contents('php://input'), true)['notes'] ?? null);
 
         try {

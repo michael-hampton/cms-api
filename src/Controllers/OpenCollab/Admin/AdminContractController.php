@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Exceptions\OpenCollab\ContractNotArchivableException;
 use App\Exceptions\OpenCollab\ContractNotEditableException;
 use App\Exceptions\OpenCollab\ContractNotPublishableException;
@@ -34,6 +35,8 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
  */
 class AdminContractController extends Controller
 {
+    use AuthorizesSitePermissions;
+
     public function __construct(
         private readonly ContractRepository         $contractRepository,
         private readonly ContractTemplateRepository $templateRepository,
@@ -47,7 +50,7 @@ class AdminContractController extends Controller
 
     public function index(): JsonResponse
     {
-        if ($response = $this->authorize(['contract.view', 'contract.create', 'contract.publish'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.view', 'contract.create', 'contract.publish'])) {
             return $response;
         }
 
@@ -60,7 +63,7 @@ class AdminContractController extends Controller
 
     public function latest(): JsonResponse
     {
-        if ($response = $this->authorize(['contract.view'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.view'])) {
             return $response;
         }
 
@@ -74,7 +77,7 @@ class AdminContractController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.view'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.view'])) {
             return $response;
         }
 
@@ -88,7 +91,7 @@ class AdminContractController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        if ($response = $this->authorize(['contract.create'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.create'])) {
             return $response;
         }
 
@@ -115,7 +118,7 @@ class AdminContractController extends Controller
 
     public function update(Request $request, int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.edit'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.edit'])) {
             return $response;
         }
 
@@ -155,7 +158,7 @@ class AdminContractController extends Controller
 
     public function destroy(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.archive'])) {
             return $response;
         }
 
@@ -190,7 +193,7 @@ class AdminContractController extends Controller
 
     public function publish(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.publish'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.publish'])) {
             return $response;
         }
 
@@ -213,7 +216,7 @@ class AdminContractController extends Controller
 
     public function archive(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.archive'])) {
             return $response;
         }
 
@@ -236,7 +239,7 @@ class AdminContractController extends Controller
 
     public function clone(int $id): JsonResponse
     {
-        if ($response = $this->authorize(['contract.create'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.create'])) {
             return $response;
         }
 
@@ -255,7 +258,7 @@ class AdminContractController extends Controller
 
     public function storeFromTemplate(Request $request): JsonResponse
     {
-        if ($response = $this->authorize(['contract.create'])) {
+        if ($response = $this->authorizeSitePermissions(['contract.create'])) {
             return $response;
         }
 
@@ -314,15 +317,5 @@ class AdminContractController extends Controller
             'cloned_from_version_id' => $contract->cloned_from_version_id,
             'created_at' => $contract->created_at,
         ];
-    }
-
-    private function authorize(array $permissions): ?JsonResponse
-    {
-        try {
-            $this->authorization->assertAny(Auth::id(), SiteContext::getId(), $permissions);
-            return null;
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
-            return $this->errorResponse($e->getMessage(), 403);
-        }
     }
 }

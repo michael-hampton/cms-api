@@ -39,6 +39,9 @@ return [
         ['name' => 'Manage Site Members', 'slug' => 'site.members', 'group' => 'site_administration'],
         ['name' => 'Manage Site Roles', 'slug' => 'site.roles.manage', 'group' => 'site_administration'],
         ['name' => 'Manage Site Permissions', 'slug' => 'site.permissions.manage', 'group' => 'site_administration'],
+        ['name' => 'View Violations', 'slug' => 'violation.view', 'group' => 'moderation'],
+        ['name' => 'Record Violations', 'slug' => 'violation.record', 'group' => 'moderation'],
+        ['name' => 'Resolve Violations', 'slug' => 'violation.resolve', 'group' => 'moderation'],
     ],
 
     'roles' => [
@@ -63,7 +66,7 @@ return [
         'reviewer' => [
             'name' => 'Reviewer',
             'is_system' => true,
-            'permissions' => ['content.review', 'content.reject', 'content.approve'],
+            'permissions' => ['content.review', 'content.reject', 'content.approve', 'violation.view', 'violation.record'],
         ],
         'finance' => [
             'name' => 'Finance',
@@ -78,7 +81,7 @@ return [
         'brand_manager' => [
             'name' => 'Brand Manager',
             'is_system' => true,
-            'permissions' => ['creator.invite', 'creator.manage_roles', 'onboarding.override', 'site.members'],
+            'permissions' => ['creator.invite', 'creator.manage_roles', 'onboarding.override', 'site.members', 'violation.view', 'violation.record', 'violation.resolve'],
         ],
     ],
 
@@ -90,6 +93,6 @@ return [
         'creator' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'onboarding.view']],
         'contributor' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'payout.request', 'contract.sign', 'guideline.acknowledge', 'onboarding.view']],
         'reviewer' => ['site_role' => 'reviewer', 'permissions' => ['content.review', 'content.reject', 'content.approve']],
-        'editor' => ['site_role' => 'reviewer', 'permissions' => ['content.review', 'content.reject', 'content.approve']],
+        'editor' => ['site_role' => 'reviewer', 'permissions' => ['content.review', 'content.reject', 'content.approve', 'violation.view', 'violation.record']],
     ],
 ];

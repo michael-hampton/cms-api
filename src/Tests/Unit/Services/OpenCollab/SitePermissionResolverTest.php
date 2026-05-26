@@ -10,6 +10,7 @@ use App\Models\OpenCollabRolePermission;
 use App\Models\OpenCollabSiteUserPermission;
 use App\Models\OpenCollabSiteUserRole;
 use App\Models\User;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Repositories\OpenCollab\UserSiteRepository;
 use App\Services\OpenCollab\LegacyRoleToSiteRoleMapper;
 use App\Services\OpenCollab\RbacBootstrapper;
@@ -24,6 +25,8 @@ class SitePermissionResolverTest extends FunctionalTestCase
     private SitePermissionResolver $resolver;
     private User $user;
     private UserSiteRepository $userSiteRepository;
+    private RbacRepository $rbacRepository;
+    private RbacBootstrapper $bootstrapper;
 
     protected function setUp(): void
     {
@@ -34,12 +37,14 @@ class SitePermissionResolverTest extends FunctionalTestCase
 
         $this->user = $this->createUser(['role' => 'contributor', 'site_id' => $this->siteId]);
         $this->userSiteRepository = new UserSiteRepository();
-        $this->userSiteRepository->grant($this->user->id, $this->siteId);
+        $this->rbacRepository = new RbacRepository();
+        $this->bootstrapper = new RbacBootstrapper($this->rbacRepository);
 
         $this->resolver = new SitePermissionResolver(
             $this->userSiteRepository,
+            $this->rbacRepository,
             new LegacyRoleToSiteRoleMapper(),
-            new RbacBootstrapper(),
+            $this->bootstrapper,
         );
     }
 
@@ -56,7 +61,7 @@ class SitePermissionResolverTest extends FunctionalTestCase
     public function test_merges_site_role_permissions_and_overrides_when_feature_flag_enabled(): void
     {
         Config::set('rbac.site_enabled', true);
-        (new RbacBootstrapper())->ensureSeeded($this->siteId);
+        $this->bootstrapper->ensureSeeded($this->siteId);
 
         $reviewerRole = OpenCollabRole::where('slug', 'reviewer')->first();
         OpenCollabSiteUserRole::create([
@@ -87,5 +92,50 @@ class SitePermissionResolverTest extends FunctionalTestCase
         Config::set('rbac.site_enabled', true);
 
         $this->assertSame([], $this->resolver->forUser($this->user->id, $this->siteId + 999));
+    }
+
+    public function test_supports_direct_grants_without_any_role_assignment(): void
+    {
+        Config::set('rbac.site_enabled', true);
+        $this->bootstrapper->ensureSeeded($this->siteId);
+        $user = $this->createUser(['role' => 'user', 'site_id' => $this->siteId]);
+
+        $permission = OpenCollabPermission::where('slug', 'creator.invite')->first();
+        OpenCollabSiteUserPermission::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'permission_id' => $permission->id,
+            'granted' => true,
+        ]);
+
+        $permissions = $this->resolver->forUser($user->id, $this->siteId);
+
+        $this->assertContains('creator.invite', $permissions);
+    }
+
+    public function test_denied_override_removes_permission_from_site_role_assignment(): void
+    {
+        Config::set('rbac.site_enabled', true);
+        $this->bootstrapper->ensureSeeded($this->siteId);
+        $user = $this->createUser(['role' => 'user', 'site_id' => $this->siteId]);
+
+        $brandManagerRole = OpenCollabRole::where('slug', 'brand_manager')->first();
+        OpenCollabSiteUserRole::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'role_id' => $brandManagerRole->id,
+        ]);
+
+        $permission = OpenCollabPermission::where('slug', 'creator.invite')->first();
+        OpenCollabSiteUserPermission::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'permission_id' => $permission->id,
+            'granted' => false,
+        ]);
+
+        $this->resolver->invalidate($user->id, $this->siteId);
+
+        $this->assertFalse($this->resolver->allows($user->id, $this->siteId, 'creator.invite'));
     }
 }
