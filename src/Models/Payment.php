@@ -27,7 +27,11 @@ class Payment extends Model
         'subscription_id',
         'stripe_invoice_id',
         'hosted_invoice_url',
-        'raw_payload'
+        'raw_payload',
+        'member_id',
+        'notes',
+        'received_at',
+        'reference',
     ];
 
     protected $casts = [
@@ -37,6 +41,7 @@ class Payment extends Model
         'failed_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'received_at' => 'datetime',
     ];
 
     public function order($relation = false)

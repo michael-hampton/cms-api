@@ -223,6 +223,30 @@ class PaymentRepository extends Repository
             ->get();
     }
 
+    public function findByMemberPaginated(int $memberId, int $siteId, int $page, int $perPage): array
+    {
+        $offset = ($page - 1) * $perPage;
+
+        $total = Payment::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->count();
+
+        $items = Payment::where('member_id', $memberId)
+            ->where('site_id', $siteId)
+            ->orderByDesc('received_at')
+            ->limit($perPage)
+            ->offset($offset)
+            ->get();
+
+        return [
+            'items'      => $items,
+            'total'      => $total,
+            'per_page'   => $perPage,
+            'page'       => $page,
+            'last_page'  => (int) ceil($total / $perPage),
+        ];
+    }
+
     protected function getModelClass(): string
     {
         return Payment::class;
