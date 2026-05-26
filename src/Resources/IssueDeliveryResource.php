@@ -53,6 +53,7 @@ class IssueDeliveryResource extends JsonResource
                     'status' => $this->subscription['status'],
                 ];
             }),
+            'cover_image' => $this->getAttribute('cover_image'),
         ];
     }
 }

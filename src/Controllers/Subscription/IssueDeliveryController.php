@@ -22,21 +22,19 @@ use Exception;
 class IssueDeliveryController extends Controller
 {
     public function __construct(
-        private readonly IssueDeliveryService    $issueDeliveryService,
+        private readonly IssueDeliveryService       $issueDeliveryService,
         private readonly IssueDeliveryRepository    $issueDeliveryRepository,
         private readonly ImportIssueSchedulesAction $importIssueSchedulesAction,
-        private readonly ExportIssueSchedulesAction $exportIssueSchedulesAction
-    )
-    {
+        private readonly ExportIssueSchedulesAction $exportIssueSchedulesAction,
+    ) {
         parent::__construct();
     }
 
     public function index(Request $request, string $site): JsonResponse
     {
         try {
-            $criteria = SearchCriteriaParser::fromRequest($request, $site);
-            $result = $this->issueDeliveryRepository->search($criteria);
-
+            $criteria   = SearchCriteriaParser::fromRequest($request, $site);
+            $result     = $this->issueDeliveryRepository->search($criteria);
             $collection = new PaginatedResourceCollection($result, IssueDeliveryResource::class);
 
             return $this->resourceResponse($collection->toArray());
@@ -55,7 +53,7 @@ class IssueDeliveryController extends Controller
 
         return $this->resourceResponse([
             'success' => true,
-            'data' => $schedule
+            'data'    => $schedule,
         ]);
     }
 
@@ -63,8 +61,8 @@ class IssueDeliveryController extends Controller
     {
         try {
             $siteId = SiteContext::getId();
-
-            $data = $request->validated();
+            $data   = $request->validated();
+            $data['promotion_id'] = $data['promotion_id'] ?: null;
 
             $data['site_id'] = $siteId;
 
@@ -72,29 +70,28 @@ class IssueDeliveryController extends Controller
                 $data['issue_title'] = $data['title'];
             }
 
-//            if (empty($data['issue_title']) || empty($data['issue_number']) || empty($data['on_sale_date'])) {
-//                die('here');
-//                return $this->resourceResponse([
-//                    'success' => false,
-//                    'message' => 'Missing required fields'
-//                ], 422);
-//            }
+            // Handle optional cover image upload
+            if ($request->hasFile('cover_image')) {
+                $uploadPath = $this->issueDeliveryService->storeCoverImage(
+                    $request->file('cover_image')
+                );
+
+                $data['cover_image'] = url($uploadPath);
+            }
 
             $schedule = $this->issueDeliveryRepository->create($data);
 
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Schedule created successfully',
-                'data' => $schedule->toArray()
+                'data'    => $schedule->toArray(),
             ]);
-
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
-
-        } catch (\Exception $e) {
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -103,9 +100,29 @@ class IssueDeliveryController extends Controller
     {
         try {
             $data = $request->validated();
+            $data['promotion_id'] = $data['promotion_id'] ?: null;
 
             if (isset($data['title'])) {
                 $data['issue_title'] = $data['title'];
+            }
+
+            // Handle cover image replacement / removal
+            if ($request->hasFile('cover_image')) {
+                $existing = $this->issueDeliveryRepository->find($id);
+
+                $coverImage = $this->issueDeliveryService->replaceCoverImage(
+                    $existing,
+                    $request->file('cover_image')
+                );
+
+                $data['cover_image'] = url($coverImage);
+            } elseif (array_key_exists('cover_image', $data) && $data['cover_image'] === null) {
+                // Explicit null means the client wants to remove the cover image
+                $existing = $this->issueDeliveryRepository->find($id);
+                if ($existing) {
+                    $this->issueDeliveryService->removeCoverImage($existing);
+                }
+                $data['cover_image'] = null;
             }
 
             $schedule = $this->issueDeliveryRepository->update($id, $data);
@@ -119,17 +136,14 @@ class IssueDeliveryController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Schedule updated successfully',
-                'data' => $schedule->toArray()
+                'data'    => $schedule->toArray(),
             ]);
-
-        } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
-
-        } catch (\Exception $e) {
-
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -137,25 +151,28 @@ class IssueDeliveryController extends Controller
     public function destroy(int $id)
     {
         try {
+            // Remove the cover image from disk before deleting the record
+            $schedule = $this->issueDeliveryRepository->find($id);
+            if ($schedule) {
+                $this->issueDeliveryService->removeCoverImage($schedule);
+            }
+
             $this->issueDeliveryRepository->delete($id);
 
             return $this->resourceResponse([
                 'success' => true,
-                'message' => 'Schedule deleted successfully'
+                'message' => 'Schedule deleted successfully',
             ]);
-
-        } catch (\Exception $e) {
-
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
 
     public function updateStatus(Request $request, int $id)
     {
-        // 'status' => 'required|string|in:draft,active,cancelled'
         $data = $request->all();
 
         try {
@@ -170,14 +187,12 @@ class IssueDeliveryController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Status updated successfully',
-                'data' => $schedule
+                'data'    => $schedule,
             ]);
-
-        } catch (\Exception $e) {
-
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -189,7 +204,7 @@ class IssueDeliveryController extends Controller
         if (!$request->hasFile('csv_file')) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => 'No CSV file uploaded'
+                'message' => 'No CSV file uploaded',
             ], 400);
         }
 
@@ -201,13 +216,12 @@ class IssueDeliveryController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => "Imported {$result['success_count']} schedules successfully",
-                'data' => $result
+                'data'    => $result,
             ]);
-
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
@@ -220,14 +234,11 @@ class IssueDeliveryController extends Controller
             $filepath = $this->exportIssueSchedulesAction->execute($siteId);
 
             return $this->downloadFile($filepath, basename($filepath));
-
-        } catch (\Exception $e) {
-
+        } catch (Exception $e) {
             return $this->resourceResponse([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
-
 }

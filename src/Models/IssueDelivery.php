@@ -29,23 +29,24 @@ class IssueDelivery extends Model
         'fulfilment_date',
         'site_id',
         'issue_code',
+        'cover_image',
         'stock_quantity',
         'preorder_enabled',
         'restock_date',
         'dispatched_at',
-        'dispatched_failed_at'
+        'dispatched_failed_at',
     ];
 
     protected $casts = [
-        'on_sale_date' => 'datetime',
-        'estimated_delivery_date' => 'datetime',
-        'metadata' => 'array',
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-        'cut_off_date' => 'date',
-        'fulfilment_date' => 'date',
-        'tracking_info' => 'array',
-        'restock_date' => 'datetime',
+        'on_sale_date'              => 'datetime',
+        'estimated_delivery_date'   => 'datetime',
+        'metadata'                  => 'array',
+        'created_at'                => 'datetime',
+        'updated_at'                => 'datetime',
+        'cut_off_date'              => 'date',
+        'fulfilment_date'           => 'date',
+        'tracking_info'             => 'array',
+        'restock_date'              => 'datetime',
     ];
 
     public function subscription($relation = false)
@@ -58,16 +59,49 @@ class IssueDelivery extends Model
         return $this->hasMany(SubscriptionPlan::class, 'id', 'subscription_plan_id');
     }
 
+    // =========================================================================
+    // Cover image helpers
+    // =========================================================================
+
+    /**
+     * Return this issue's cover image URL, falling back to the plan's image
+     * if no issue-specific image has been uploaded.
+     */
+    public function getCoverImageUrl(?SubscriptionPlan $plan = null): ?string
+    {
+        if ($this->cover_image) {
+            return $this->cover_image;
+        }
+
+        if ($plan) {
+            return $plan->print_image_url ?? $plan->digital_image_url ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * True when this issue has its own cover image (not inherited from the plan).
+     */
+    public function hasOwnCoverImage(): bool
+    {
+        return !empty($this->cover_image);
+    }
+
+    // =========================================================================
+    // Status helpers
+    // =========================================================================
+
     /**
      * Get human-readable status
      */
     public function getStatusLabel(): string
     {
         return match ($this->calculateStatus()) {
-            'Scheduled' => '📅 Scheduled',
+            'Scheduled'  => '📅 Scheduled',
             'In Transit' => '🚚 In Transit',
-            'Delivered' => '✓ Delivered',
-            default => $this->calculateStatus()
+            'Delivered'  => '✓ Delivered',
+            default      => $this->calculateStatus(),
         };
     }
 
@@ -88,7 +122,7 @@ class IssueDelivery extends Model
             return 'Scheduled';
         }
 
-        $onSaleDate = $this->on_sale_date;
+        $onSaleDate      = $this->on_sale_date;
         $estimatedDelivery = $this->estimated_delivery_date;
 
         if ($now < $onSaleDate) {
@@ -120,10 +154,10 @@ class IssueDelivery extends Model
     public function isOverdue(): bool
     {
         $status = $this->calculateStatus();
-        $now = new \DateTime();
+        $now    = new \DateTime();
 
-        return $status !== 'Delivered' &&
-            $this->estimated_delivery_date < $now->modify('-7 days');
+        return $status !== 'Delivered'
+            && $this->estimated_delivery_date < $now->modify('-7 days');
     }
 
     public function isActive(): bool
@@ -176,19 +210,19 @@ class IssueDelivery extends Model
     public function markDispatched(): void
     {
         $this->update([
-            'status' => IssueDeliveryStatus::DISPATCHED->value,
-            'dispatched_at' => now(),
+            'status'             => IssueDeliveryStatus::DISPATCHED->value,
+            'dispatched_at'      => now(),
             'dispatch_failed_at' => null,
-            'dispatch_error' => null,
+            'dispatch_error'     => null,
         ]);
     }
 
     public function markDispatchFailed(string $error): void
     {
         $this->update([
-            'status' => IssueDeliveryStatus::FAILED->value,
+            'status'             => IssueDeliveryStatus::FAILED->value,
             'dispatch_failed_at' => now(),
-            'dispatch_error' => $error,
+            'dispatch_error'     => $error,
         ]);
     }
 
