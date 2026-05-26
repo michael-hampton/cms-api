@@ -295,6 +295,7 @@ class ComparisonManager {
             return;
         }
         const ids = Array.from(this.products).join(',');
+
         window.location.href = `/${SITE}/compare?ids=${ids}`;
     }
 }

@@ -334,6 +334,7 @@
 
 <script id="all-specification-groups" type="application/json"><?= json_encode($specificationGroups ?? []) ?></script>
 
+@include('components/share-modal')
 @js('productModal.js')
 @js('products.js')
 @js('recommendations.js')
