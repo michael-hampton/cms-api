@@ -479,7 +479,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->get('/open-collab/admin/rbac', [RbacAdminController::class, 'summary']);
+        $router->post('/open-collab/admin/rbac/roles', [RbacAdminController::class, 'createRole']);
+        $router->delete('/open-collab/admin/rbac/roles/{roleId}', [RbacAdminController::class, 'deleteRole']);
         $router->post('/open-collab/admin/rbac-role-permissions/{roleId}', [RbacAdminController::class, 'syncRolePermissions']);
+        $router->post('/open-collab/admin/rbac/role-permissions/{roleId}', [RbacAdminController::class, 'syncRolePermissions']);
         $router->post('/open-collab/admin/contributors/{userId}/roles', [RbacAdminController::class, 'assignMemberRoles']);
         $router->post('/open-collab/admin/rbac/overrides/{userId}', [RbacAdminController::class, 'setOverride']);
 

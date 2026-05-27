@@ -3,9 +3,11 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\PayoutService;
 
 /**
@@ -24,9 +26,12 @@ use App\Services\OpenCollab\PayoutService;
  */
 class PayoutPageController extends Controller
 {
+    use AuthorizesSitePagePermissions;
+
     public function __construct(
         private readonly PayoutService    $payoutService,
         private readonly PayoutRepository $payoutRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -37,6 +42,10 @@ class PayoutPageController extends Controller
      */
     public function index()
     {
+        if ($response = $this->authorizeSitePagePermissions(['payout.request', 'payout.view'])) {
+            return $response;
+        }
+
         return $this->view('open-collab.payouts.index', [
             'currentUser' => Auth::user(),
             'site' => SiteContext::slug(),

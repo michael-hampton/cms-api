@@ -94,4 +94,43 @@ class RbacAdminController extends Controller
 
         return $this->resourceResponse(['message' => 'Permission override updated.']);
     }
+
+    public function createRole(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage'])) {
+            return $response;
+        }
+
+        try {
+            $role = $this->rbacManagementService->createRole(
+                SiteContext::getId(),
+                (string) $request->get('name', ''),
+                ($request->get('slug') !== null ? (string) $request->get('slug') : null),
+                is_array($request->get('permission_slugs', [])) ? array_values(array_map('strval', $request->get('permission_slugs', []))) : [],
+                Auth::id(),
+            );
+        } catch (\InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
+        }
+
+        return $this->resourceResponse([
+            'message' => 'Role created.',
+            'role' => $role,
+        ], 201);
+    }
+
+    public function deleteRole(int $roleId): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage'])) {
+            return $response;
+        }
+
+        try {
+            $this->rbacManagementService->deleteRole(SiteContext::getId(), $roleId, Auth::id());
+        } catch (\InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
+        }
+
+        return $this->resourceResponse(['message' => 'Role deleted.']);
+    }
 }

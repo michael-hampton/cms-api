@@ -247,6 +247,11 @@
     </div>
     <div class="oc-card__body">
         <div id="rbac-banner" style="display:none;margin-bottom:16px;"></div>
+        <form class="oc-rbac-role-create" onsubmit="rbacManager.createRole(event)">
+            <input type="text" name="name" class="oc-input" placeholder="Role name" required>
+            <input type="text" name="slug" class="oc-input" placeholder="role_slug (optional)">
+            <button type="submit" class="oc-btn oc-btn--primary oc-btn--sm">Add role</button>
+        </form>
         <div class="oc-rbac-member-list">
             <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
                 <div class="oc-rbac-member">
@@ -254,7 +259,12 @@
                         <div class="oc-rbac-member__name"><?= htmlspecialchars($role['name']) ?></div>
                         <div class="oc-rbac-meta"><?= htmlspecialchars($role['slug']) ?><?= !empty($role['is_system']) ? ' · system role' : '' ?></div>
                     </div>
-                    <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="rbacManager.focusRole(<?= (int) $role['id'] ?>)">Edit permissions</button>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="rbacManager.focusRole(<?= (int) $role['id'] ?>)">Edit permissions</button>
+                        <?php if (empty($role['is_system'])): ?>
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger" onclick="rbacManager.deleteRole(<?= (int) $role['id'] ?>, '<?= htmlspecialchars($role['name'], ENT_QUOTES, 'UTF-8') ?>')">Delete</button>
+                        <?php endif; ?>
+                    </div>
                 </div>
             <?php endforeach; ?>
         </div>
@@ -324,6 +334,22 @@
                         }
                         ?>
                         <div class="oc-rbac-meta">Current site roles: <?= htmlspecialchars($memberRoleNames ? implode(', ', $memberRoleNames) : 'none') ?></div>
+                        <?php
+                        $memberOverrides = array_values(array_filter(($rbacSummary['overrides'] ?? []), fn($override) => (int) $override['user_id'] === (int) $member['id']));
+                        ?>
+                        <div class="oc-rbac-current-overrides" id="member-overrides-<?= (int) $member['id'] ?>">
+                            <?php if ($memberOverrides === []): ?>
+                                <span class="oc-rbac-meta" data-empty-state="true">No direct overrides.</span>
+                            <?php else: ?>
+                                <?php foreach ($memberOverrides as $override): ?>
+                                    <span class="oc-rbac-override-pill"
+                                          data-permission-slug="<?= htmlspecialchars($override['permission_slug']) ?>"
+                                          data-granted="<?= !empty($override['granted']) ? 'true' : 'false' ?>">
+                                        <?= htmlspecialchars($override['permission_slug']) ?> · <?= !empty($override['granted']) ? 'grant' : 'deny' ?>
+                                    </span>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <select name="permission_slug">
                         <?php foreach (($rbacSummary['permissions'] ?? []) as $permission): ?>
@@ -496,6 +522,13 @@
         align-items:flex-start;
     }
 
+    .oc-rbac-role-create {
+        display:grid;
+        grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr) auto;
+        gap:10px;
+        margin-bottom:16px;
+    }
+
     .oc-rbac-member__name {
         font-weight:600;
         color:var(--navy);
@@ -506,6 +539,29 @@
         grid-template-columns:1.4fr 1fr 110px auto;
         gap:10px;
         align-items:center;
+    }
+
+    .oc-rbac-current-overrides {
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px;
+        margin-top:8px;
+    }
+
+    .oc-rbac-override-pill {
+        display:inline-flex;
+        align-items:center;
+        padding:4px 8px;
+        border-radius:999px;
+        font-size:.72rem;
+        font-weight:600;
+        background:var(--slate-pale);
+        color:var(--navy);
+    }
+
+    .oc-rbac-override-pill[data-granted="false"] {
+        background:var(--red-pale);
+        color:var(--red);
     }
 </style>
 <script>
@@ -890,10 +946,10 @@
             const inputs = Array.from(document.querySelectorAll(`input[data-role-id="${roleId}"]`));
             const permissionSlugs = inputs.filter(input => input.checked).map(input => input.dataset.permissionSlug);
 
-            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac-role-permissions/${roleId}`, {
+            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/role-permissions/${roleId}`, {
                 method: 'POST',
                 body: JSON.stringify({permission_slugs: permissionSlugs}),
-            });
+            }, {reload: false});
         },
 
         async updateMemberRoles(select) {
@@ -903,7 +959,7 @@
             await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/${userId}/roles`, {
                 method: 'POST',
                 body: JSON.stringify({role_ids: roleIds}),
-            });
+            }, {reload: false});
         },
 
         async saveOverride(event, userId) {
@@ -912,13 +968,43 @@
             const permissionSlug = form.permission_slug.value;
             const granted = form.granted.value === 'true';
 
-            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/overrides/${userId}`, {
+            const result = await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/overrides/${userId}`, {
                 method: 'POST',
                 body: JSON.stringify({permission_slug: permissionSlug, granted}),
-            });
+            }, {reload: false});
+
+            if (result?.response?.ok) {
+                this.upsertOverridePill(userId, permissionSlug, granted);
+            }
         },
 
-        async request(url, options) {
+        async createRole(event) {
+            event.preventDefault();
+            const form = event.target;
+            const name = form.name.value.trim();
+            const slug = form.slug.value.trim();
+
+            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    slug: slug || null,
+                    permission_slugs: [],
+                }),
+            }, {reload: true});
+        },
+
+        async deleteRole(roleId, roleName) {
+            if (!confirm(`Delete the role "${roleName}"?`)) {
+                return;
+            }
+
+            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles/${roleId}`, {
+                method: 'DELETE',
+            }, {reload: true});
+        },
+
+        async request(url, options, config = {}) {
             const response = await fetch(url, {
                 ...options,
                 headers: {
@@ -936,9 +1022,29 @@
             banner.className = response.ok ? 'oc-alert oc-alert--success' : 'oc-alert oc-alert--danger';
             banner.textContent = payload.message || payload.error || (response.ok ? 'Saved.' : 'Failed to save.');
 
-            if (response.ok) {
+            if (response.ok && config.reload === true) {
                 setTimeout(() => window.location.reload(), 400);
             }
+
+            return {response, payload};
+        },
+
+        upsertOverridePill(userId, permissionSlug, granted) {
+            const container = document.getElementById(`member-overrides-${userId}`);
+            if (!container) return;
+
+            container.querySelector('[data-empty-state="true"]')?.remove();
+
+            let pill = container.querySelector(`[data-permission-slug="${CSS.escape(permissionSlug)}"]`);
+            if (!pill) {
+                pill = document.createElement('span');
+                pill.className = 'oc-rbac-override-pill';
+                pill.dataset.permissionSlug = permissionSlug;
+                container.appendChild(pill);
+            }
+
+            pill.dataset.granted = granted ? 'true' : 'false';
+            pill.textContent = `${permissionSlug} · ${granted ? 'grant' : 'deny'}`;
         }
     };
 

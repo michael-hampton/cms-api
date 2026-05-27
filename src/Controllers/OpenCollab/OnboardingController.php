@@ -109,10 +109,14 @@ class OnboardingController extends Controller
             $data = $request->validated();
             $userId = Auth::id();
 
+
+
             $this->profileRepository->markPaymentSetup(
                 userId: $userId,
                 stripeToken: $data['stripe_token'] ?? $data['payment_method_type'],
             );
+
+            die('here');
 
             return $this->successResponse('Payment details saved.');
         } catch (ValidationException $e) {

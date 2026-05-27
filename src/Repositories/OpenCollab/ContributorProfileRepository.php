@@ -59,8 +59,19 @@ class ContributorProfileRepository extends Repository
 
     public function isPaymentSetup(int $userId): bool
     {
+        $profile = $this->findByUserId($userId);
+
+        if ($profile && !empty($profile->payment_method_type) && !empty($profile->payment_details)) {
+            return true;
+        }
+
         $account = $this->payoutAccountRepository->findByUserId($userId, 'stripe');
-        return (bool)($account?->payouts_enabled);
+
+        if (!$account) {
+            return false;
+        }
+
+        return (bool)($account->payouts_enabled || $account->details_submitted);
     }
 
     // ── Age verification ──────────────────────────────────────────────────────

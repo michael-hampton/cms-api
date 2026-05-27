@@ -45,6 +45,21 @@ class AdminGuidelinesControllerTest extends FunctionalTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
+    public function test_index_returns_403_for_user_without_guideline_permissions(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'guidelines-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->getForSite('/api/open-collab/admin/guidelines');
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     public function test_show_returns_guideline_by_id(): void
     {
         $guideline = Guideline::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Full guidelines content for individual viewing.', 'created_at' => date('Y-m-d H:i:s')]);
@@ -112,6 +127,25 @@ class AdminGuidelinesControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
+    public function test_store_returns_403_for_user_with_only_acknowledge_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'guidelines-ack-only@example.com',
+            'role' => 'user',
+            'is_contributor' => true,
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'guideline.acknowledge');
+
+        $response = $this->postForSite('/api/open-collab/admin/guidelines', [
+            'content' => 'This guideline content is valid but should still be rejected for this user.',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     // ── Update ────────────────────────────────────────────────────────────────
 
     public function test_update_modifies_content_of_unacknowledged_guideline(): void
@@ -121,6 +155,7 @@ class AdminGuidelinesControllerTest extends FunctionalTestCase
         $response = $this->putForSite("/api/open-collab/admin/guidelines/{$guideline->id}", [
             'content' => 'Updated guidelines content that is long enough to pass the validation requirements.',
         ]);
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());

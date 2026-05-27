@@ -485,6 +485,22 @@ body {
     gap: 24px;
 }
 
+.oc-widget-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 24px;
+    align-items: start;
+}
+
+.oc-widget {
+    grid-column: span 6;
+    min-width: 0;
+}
+
+.oc-widget .oc-card {
+    height: 100%;
+}
+
 /* ── Table ────────────────────────────────────────────────── */
 .oc-table {
     width: 100%;
@@ -1391,6 +1407,14 @@ body {
         grid-template-columns: 1fr;
     }
 
+    .oc-widget-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .oc-widget {
+        grid-column: span 1;
+    }
+
     .oc-auth {
         grid-template-columns: 1fr;
     }
@@ -1409,6 +1433,14 @@ body {
 }
 
 @media (max-width: 600px) {
+    .oc-widget-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .oc-widget {
+        grid-column: span 1;
+    }
+
     .oc-stats {
         grid-template-columns: 1fr 1fr;
     }

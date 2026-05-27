@@ -190,6 +190,21 @@ class PayoutControllerTest extends FunctionalTestCase
         $this->assertNotEmpty($items);
     }
 
+    public function test_admin_list_returns_403_for_user_without_payout_view_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'payout-admin-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->getForSite('/api/open-collab/admin/payouts');
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     public function test_request_returns_validation_errors_for_invalid_method(): void
     {
         $this->actingAs($this->contributor);
@@ -231,6 +246,47 @@ class PayoutControllerTest extends FunctionalTestCase
             'status' => PayoutStatus::Paid->value,
             'reference' => 'BANK-123',
         ]);
+    }
+
+    public function test_approve_returns_403_for_user_without_payout_approve_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'payout-approve-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'payout.view');
+
+        $payout = Payout::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/admin/payouts/{$payout->id}/approve");
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->contributor = $this->createUser([
+            'email' => 'payout-contributor@example.com',
+            'role' => 'contributor',
+            'is_contributor' => true,
+        ]);
+
+        ContributorProfile::firstOrCreate(
+            ['user_id' => $this->contributor->id],
+            ['bio' => 'test bio'],
+        );
     }
 
     public function test_admin_can_reject_pending_payout(): void
@@ -302,19 +358,4 @@ class PayoutControllerTest extends FunctionalTestCase
         $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->contributor = $this->createUser([
-            'email' => 'payout-contributor@example.com',
-            'role' => 'contributor',
-            'is_contributor' => true,
-        ]);
-
-        ContributorProfile::firstOrCreate(
-            ['user_id' => $this->contributor->id],
-            ['bio' => 'test bio'],
-        );
-    }
 }

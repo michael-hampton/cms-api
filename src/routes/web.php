@@ -103,6 +103,7 @@ use App\Framework\Middleware\AuthenticateMerchantPortal;
 use App\Framework\Middleware\CheckContributorSiteAccess;
 use App\Framework\Middleware\CheckPageMemberAccess;
 use App\Framework\Middleware\RequireAdminRole;
+use App\Framework\Middleware\RequireOpenCollabPagePermission;
 use App\Framework\Middleware\RequireContributorAuth;
 use App\Framework\Middleware\RequireMemberAuth;
 use App\Framework\Middleware\VerifyCsrfToken;
@@ -580,7 +581,7 @@ $router->get('/go/{type}/{id}', [AdvertTrackingController::class, 'handle'])
         // 'throttle:60,1',  // Uncomment and tune — prevents click flooding
     ]);
 
-$router->group(['middleware' => [RequireAdminRole::class]], function ($router) {
+$router->group(['middleware' => [RequireAdminRole::class, RequireOpenCollabPagePermission::class]], function ($router) {
     $router->get('/{site}/open-collab/admin/articles/pending',
         [AdminArticlePageController::class, 'pending']);
     $router->get('/{site}/open-collab/admin/contracts',
@@ -617,7 +618,7 @@ $router->group(['middleware' => [RequireAdminRole::class]], function ($router) {
 
 });
 
-$router->group(['middleware' => [RequireContributorAuth::class, CheckContributorSiteAccess::class]], function ($router) {
+$router->group(['middleware' => [RequireContributorAuth::class, CheckContributorSiteAccess::class, RequireOpenCollabPagePermission::class]], function ($router) {
     $router->get('/{site}/open-collab/onboarding', [OnboardingPageController::class, 'show']);
     $router->get('/{site}/open-collab/onboarding/dashboard', [OnboardingDashboardController::class, 'index']);
     $router->get('/{site}/open-collab/settings', [ContributorAccountPageController::class, 'index']);
@@ -644,4 +645,3 @@ $router->get('/{site}/open-collab/request-access',
 $router->get('/{site}/open-collab/resend-invitation',
     [ResendInvitationPageController::class, 'show'])
     ->name('contributor.resend-invitation');
-

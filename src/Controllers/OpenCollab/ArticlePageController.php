@@ -3,10 +3,12 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\OpenCollab\ArticleAccessService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ReadabilityService;
 
 /**
@@ -21,10 +23,13 @@ use App\Services\OpenCollab\ReadabilityService;
  */
 class ArticlePageController extends Controller
 {
+    use AuthorizesSitePagePermissions;
+
     public function __construct(
         private readonly PageRepository       $pageRepository,
         private readonly ArticleAccessService $accessService,
         private readonly ReadabilityService   $readabilityService,
+        private readonly OpenCollabAuthorizationService $authorization,
     )
     {
         parent::__construct();
@@ -90,6 +95,10 @@ class ArticlePageController extends Controller
      */
     public function create()
     {
+        if ($response = $this->authorizeSitePagePermissions(['content.create'])) {
+            return $response;
+        }
+
         return $this->view('open-collab.articles.editor', [
             'page' => null,
             'site' => SiteContext::slug(),
@@ -106,6 +115,10 @@ class ArticlePageController extends Controller
      */
     public function edit(int $id)
     {
+        if ($response = $this->authorizeSitePagePermissions(['content.edit_own'])) {
+            return $response;
+        }
+
         $userId = Auth::id();
         $page = $this->pageRepository->find($id);
 

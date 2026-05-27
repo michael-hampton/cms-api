@@ -15,6 +15,21 @@ class ViolationControllerTest extends FunctionalTestCase
 
     private User $contributor;
 
+    public function test_index_returns_403_for_user_without_violation_view_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'violations-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->getForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations");
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     public function test_index_lists_violations_for_contributor_on_current_site(): void
     {
         $siteViolation = ContributorViolation::create([
@@ -102,6 +117,26 @@ class ViolationControllerTest extends FunctionalTestCase
         $this->assertArrayHasKey('type', $data['errors']);
         $this->assertArrayHasKey('severity', $data['errors']);
         $this->assertArrayHasKey('action_taken', $data['errors']);
+    }
+
+    public function test_store_returns_403_for_user_without_violation_record_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'violations-record-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'violation.view');
+
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/violations", [
+            'type' => 'plagiarism',
+            'severity' => 'high',
+            'reason' => 'This payload is valid but the actor should still be forbidden.',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
     }
 
     public function test_resolve_marks_violation_resolved_and_reactivates_user(): void
@@ -195,6 +230,47 @@ class ViolationControllerTest extends FunctionalTestCase
         $this->assertEquals(422, $response->getStatusCode());
     }
 
+    public function test_resolve_returns_403_for_user_without_violation_resolve_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'violations-resolve-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'violation.view');
+        $this->grantSitePermission($restrictedUser, 'violation.record');
+
+        $violation = ContributorViolation::create([
+            'user_id' => $this->contributor->id,
+            'site_id' => $this->siteId,
+            'type' => 'policy',
+            'severity' => 'medium',
+            'reason' => 'Resolvable violation that should still be protected.',
+            'action_taken' => ViolationAction::Suspension->value,
+            'created_by' => $restrictedUser->id,
+        ]);
+
+        $response = $this->postForSite("/api/open-collab/admin/violations/{$violation->id}/resolve", [
+            'notes' => 'Attempted without resolve permission.',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->contributor = $this->createUser([
+            'email' => 'violations@example.com',
+            'role' => 'contributor',
+            'is_contributor' => true,
+            'is_active' => true,
+        ]);
+    }
+
     public function test_site_wide_list_does_not_include_violations_from_other_sites(): void
     {
         $otherSite = Site::create(['name' => 'Other', 'slug' => 'other-viol-site', 'is_default' => false]);
@@ -217,15 +293,4 @@ class ViolationControllerTest extends FunctionalTestCase
         $this->assertCount(0, $items);
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->contributor = $this->createUser([
-            'email' => 'violations@example.com',
-            'role' => 'contributor',
-            'is_contributor' => true,
-            'is_active' => true,
-        ]);
-    }
 }

@@ -156,4 +156,41 @@ class RbacManagementServiceTest extends RepositoryTestCase
         $this->assertSame('ledger.view', $override['permission_slug']);
         $this->assertTrue($override['granted']);
     }
+
+    public function test_create_role_creates_custom_role_site_assignment_and_audit(): void
+    {
+        $role = $this->service->createRole($this->siteId, 'Custom Reviewer', null, ['content.review'], 55);
+
+        $createdRole = OpenCollabRole::find($role['id']);
+
+        $this->assertSame('Custom Reviewer', $createdRole->name);
+        $this->assertSame('custom_reviewer', $createdRole->slug);
+        $this->assertDatabaseHas('oc_site_roles', [
+            'site_id' => $this->siteId,
+            'role_id' => $createdRole->id,
+        ]);
+        $this->assertDatabaseHas('oc_rbac_audit_logs', [
+            'site_id' => $this->siteId,
+            'actor_user_id' => 55,
+            'action' => 'role_created',
+        ]);
+    }
+
+    public function test_delete_role_removes_custom_role_and_audit(): void
+    {
+        $role = $this->service->createRole($this->siteId, 'Disposable Role', 'disposable_role', [], 55);
+
+        $this->service->deleteRole($this->siteId, $role['id'], 66);
+
+        $this->assertDatabaseMissing('oc_roles', ['id' => $role['id']]);
+        $this->assertDatabaseMissing('oc_site_roles', [
+            'site_id' => $this->siteId,
+            'role_id' => $role['id'],
+        ]);
+        $this->assertDatabaseHas('oc_rbac_audit_logs', [
+            'site_id' => $this->siteId,
+            'actor_user_id' => 66,
+            'action' => 'role_deleted',
+        ]);
+    }
 }

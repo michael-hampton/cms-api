@@ -46,6 +46,21 @@ class AdminContractControllerTest extends FunctionalTestCase
         $this->assertEquals(404, $response->getStatusCode());
     }
 
+    public function test_index_returns_403_for_user_without_contract_permissions(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'contracts-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->getForSite('/api/open-collab/admin/contracts');
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     public function test_show_returns_contract_by_id(): void
     {
         $contract = Contract::create(['site_id' => $this->siteId, 'version' => 1, 'content' => 'Full contract content for viewing.', 'created_at' => date('Y-m-d H:i:s')]);
@@ -102,6 +117,24 @@ class AdminContractControllerTest extends FunctionalTestCase
     {
         $response = $this->postForSite('/api/open-collab/admin/contracts', ['content' => 'Too short.']);
         $this->assertEquals(422, $response->getStatusCode());
+    }
+
+    public function test_store_returns_403_for_user_with_only_contract_view_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'contracts-view-only@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'contract.view');
+
+        $response = $this->postForSite('/api/open-collab/admin/contracts', [
+            'content' => 'This contract content is long enough but should still be forbidden.',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
     }
 
     // ── Update ────────────────────────────────────────────────────────────────

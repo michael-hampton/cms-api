@@ -17,9 +17,15 @@ use App\Framework\Session\Session;
 use App\Framework\Support\Cache\Cache;
 use App\Framework\Support\Config;
 use App\Models\Member;
+use App\Models\OpenCollabPermission;
+use App\Models\OpenCollabRole;
+use App\Models\OpenCollabSiteUserPermission;
+use App\Models\OpenCollabSiteUserRole;
 use App\Models\Site;
 use App\Models\User;
 use App\Models\UserSite;
+use App\Repositories\OpenCollab\RbacRepository;
+use App\Services\OpenCollab\RbacBootstrapper;
 use Exception;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -565,6 +571,42 @@ abstract class FunctionalTestCase extends TestCase
             $response->getStatusCode(),
             $response->getHeaders()
         );
+    }
+
+    protected function enableSiteRbac(): void
+    {
+        $this->ensureSiteExists();
+        Config::set('rbac', require __DIR__ . '/../../../config/rbac.php');
+        Config::set('rbac.site_enabled', true);
+
+        (new RbacBootstrapper(new RbacRepository()))->ensureSeeded($this->siteId);
+    }
+
+    protected function assignSiteRole(User $user, string $roleSlug): void
+    {
+        $this->enableSiteRbac();
+
+        $role = OpenCollabRole::where('slug', $roleSlug)->first();
+
+        OpenCollabSiteUserRole::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+        ]);
+    }
+
+    protected function grantSitePermission(User $user, string $permissionSlug, bool $granted = true): void
+    {
+        $this->enableSiteRbac();
+
+        $permission = OpenCollabPermission::where('slug', $permissionSlug)->first();
+
+        OpenCollabSiteUserPermission::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'permission_id' => $permission->id,
+            'granted' => $granted,
+        ]);
     }
 
     protected function deleteForSite(string $uri, array $headers = [], bool $forMember = false): Response

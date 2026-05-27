@@ -6,6 +6,7 @@ use App\Models\ContributorPayoutAccount;
 use App\Models\ContributorProfile;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
+use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
@@ -95,7 +96,31 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->repository = new ContributorProfileRepository();
+        $this->repository = new ContributorProfileRepository(new ContributorPayoutAccountRepository());
         $this->user = $this->createUser();
+    }
+
+    public function test_is_payment_setup_returns_true_when_profile_payment_details_exist(): void
+    {
+        ContributorProfile::create([
+            'user_id' => $this->user->id,
+            'payment_method_type' => 'stripe',
+            'payment_details' => 'tok_test_profile',
+        ]);
+
+        $this->assertTrue($this->repository->isPaymentSetup($this->user->id));
+    }
+
+    public function test_is_payment_setup_returns_true_when_account_details_are_submitted(): void
+    {
+        ContributorPayoutAccount::create([
+            'user_id' => $this->user->id,
+            'provider' => 'stripe',
+            'stripe_account_id' => 'acct_test_3',
+            'payouts_enabled' => false,
+            'details_submitted' => true,
+        ]);
+
+        $this->assertTrue($this->repository->isPaymentSetup($this->user->id));
     }
 }

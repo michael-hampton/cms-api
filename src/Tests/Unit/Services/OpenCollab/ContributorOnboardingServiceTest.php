@@ -131,6 +131,25 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
         $this->assertNotEmpty($pending[0]['reason']);
     }
 
+    public function test_pending_steps_does_not_return_payment_step_when_profile_payment_setup_exists(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => false, 'require_guidelines_ack' => false]);
+        $profile = $this->makeProfile([
+            'bio' => 'ok',
+            'payment_method_type' => 'stripe',
+            'payment_details' => 'tok_test_profile',
+        ]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(true);
+        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEmpty($pending);
+    }
+
     public function test_pending_steps_returns_contract_step_when_not_signed(): void
     {
         $site = $this->makeSite(['id' => 10, 'require_payment_setup' => false, 'require_contracts' => true, 'require_guidelines_ack' => false]);

@@ -60,7 +60,7 @@ class RequireAdminRole implements MiddlewareInterface
             if ($request->wantsJson()) {
                 return Response::json(['success' => false, 'message' => 'Forbidden.'], 403);
             }
-            return Response::redirect('/login');
+            return Response::html('Forbidden.', 403);
         }
 
         return $next($request);

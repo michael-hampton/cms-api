@@ -129,6 +129,28 @@ class InvitationControllerTest extends FunctionalTestCase
         $this->assertEquals(401, $response->getStatusCode());
     }
 
+    public function test_user_without_invitation_permissions_cannot_create_invitation(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'invitation-restricted@example.com',
+            'role' => 'user',
+            'is_contributor' => true,
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->postForSite('/api/open-collab/invitations', [
+            'email' => 'blocked@example.com',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertDatabaseMissing('oc_invitations', [
+            'email' => 'blocked@example.com',
+            'site_id' => $this->siteId,
+        ]);
+    }
+
     // -------------------------------------------------------------------------
     // POST /api/{site}/open-collab/invitations/{token}/accept (guest accepts)
     // -------------------------------------------------------------------------

@@ -21,7 +21,7 @@ class RbacAdminControllerTest extends FunctionalTestCase
     {
         parent::setUp();
 
-        Config::set('rbac.site_enabled', true);
+        $this->enableSiteRbac();
 
         $this->member = $this->createUser([
             'name' => 'RBAC Member',
@@ -92,7 +92,7 @@ class RbacAdminControllerTest extends FunctionalTestCase
         $role = OpenCollabRole::where('slug', 'finance')->first();
         $permission = OpenCollabPermission::where('slug', 'ledger.view')->first();
 
-        $response = $this->postForSite("/api/open-collab/admin/rbac-role-permissions/{$role->id}", [
+        $response = $this->postForSite("/api/open-collab/admin/rbac/role-permissions/{$role->id}", [
             'permission_slugs' => ['ledger.view'],
         ]);
 
@@ -106,5 +106,71 @@ class RbacAdminControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'action' => 'role_permissions_synced',
         ]);
+    }
+
+    public function test_summary_returns_403_for_user_without_rbac_permissions(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'rbac-summary-restricted@example.com',
+            'role' => 'user',
+            'is_contributor' => true,
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->getForSite('/api/open-collab/admin/rbac');
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
+    public function test_assign_member_roles_returns_403_for_user_without_role_management_permission(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'rbac-assign-restricted@example.com',
+            'role' => 'user',
+        ]);
+        $this->actingAs($restrictedUser);
+        $this->grantSitePermission($restrictedUser, 'content.review');
+
+        $role = OpenCollabRole::where('slug', 'finance')->first();
+        $response = $this->postForSite("/api/open-collab/admin/contributors/{$this->member->id}/roles", [
+            'role_ids' => [$role->id],
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
+    public function test_create_role_persists_custom_role(): void
+    {
+        $response = $this->postForSite('/api/open-collab/admin/rbac/roles', [
+            'name' => 'Custom Finance Ops',
+            'slug' => 'custom_finance_ops',
+            'permission_slugs' => ['payout.view'],
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+        $this->assertDatabaseHas('oc_roles', [
+            'slug' => 'custom_finance_ops',
+            'name' => 'Custom Finance Ops',
+        ]);
+    }
+
+    public function test_delete_role_removes_custom_role(): void
+    {
+        $this->postForSite('/api/open-collab/admin/rbac/roles', [
+            'name' => 'Disposable',
+            'slug' => 'disposable',
+            'permission_slugs' => [],
+        ]);
+
+        $role = OpenCollabRole::where('slug', 'disposable')->first();
+
+        $response = $this->deleteForSite("/api/open-collab/admin/rbac/roles/{$role->id}");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseMissing('oc_roles', ['id' => $role->id]);
     }
 }

@@ -130,4 +130,22 @@ class ResendInvitationControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId,
         ]);
     }
+
+    public function test_user_without_invitation_permissions_cannot_resend_invitation(): void
+    {
+        $this->enableSiteRbac();
+
+        $restrictedUser = $this->createUser([
+            'email' => 'resend-restricted@example.com',
+            'role' => 'user',
+            'is_contributor' => true,
+        ]);
+        $this->actingAs($restrictedUser);
+
+        $response = $this->postForSite('/api/open-collab/invitations/resend', [
+            'email' => 'pending@example.com',
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
 }

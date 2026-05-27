@@ -122,4 +122,91 @@ class RbacManagementService
             payload: ['permission_slug' => $permissionSlug, 'granted' => $granted]
         );
     }
+
+    public function createRole(int $siteId, string $name, ?string $slug = null, array $permissionSlugs = [], ?int $actorUserId = null): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
+        $name = trim($name);
+        if ($name === '') {
+            throw new \InvalidArgumentException('Role name is required.');
+        }
+
+        $slug = $slug !== null && trim($slug) !== ''
+            ? trim($slug)
+            : strtolower(trim(preg_replace('/[^a-z0-9]+/i', '_', $name), '_'));
+
+        if ($slug === '') {
+            throw new \InvalidArgumentException('Role slug is required.');
+        }
+
+        if ($this->rbacRepository->findRoleBySlug($slug)) {
+            throw new \InvalidArgumentException('A role with that slug already exists.');
+        }
+
+        $role = $this->rbacRepository->createRole([
+            'name' => $name,
+            'slug' => $slug,
+            'is_system' => false,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $this->rbacRepository->ensureSiteRole($siteId, (int) $role->id, $role->name, true);
+
+        if ($permissionSlugs !== []) {
+            $this->syncRolePermissions($siteId, (int) $role->id, $permissionSlugs, $actorUserId);
+        }
+
+        $this->auditLogger->log(
+            action: 'role_created',
+            siteId: $siteId,
+            actorUserId: $actorUserId,
+            payload: ['role_id' => (int) $role->id, 'slug' => $slug, 'name' => $name]
+        );
+
+        return [
+            'id' => (int) $role->id,
+            'name' => $role->name,
+            'slug' => $role->slug,
+            'is_system' => (bool) $role->is_system,
+        ];
+    }
+
+    public function deleteRole(int $siteId, int $roleId, ?int $actorUserId = null): void
+    {
+        $role = $this->rbacRepository->findRoleById($roleId);
+        if (!$role) {
+            throw new \InvalidArgumentException('Role not found.');
+        }
+
+        if ((bool) $role->is_system) {
+            throw new \InvalidArgumentException('System roles cannot be deleted.');
+        }
+
+        $affectedUserIds = [];
+        foreach ($this->rbacRepository->userRoleMapForSite($siteId) as $userId => $roleIds) {
+            if (in_array($roleId, $roleIds, true)) {
+                $affectedUserIds[] = (int) $userId;
+            }
+        }
+
+        $this->rbacRepository->deleteUserRolesForRole($siteId, $roleId);
+        $this->rbacRepository->deleteSiteRole($siteId, $roleId);
+
+        if ($this->rbacRepository->siteRoleCountForRole($roleId) === 0) {
+            $this->rbacRepository->deleteRolePermissions($roleId);
+            $this->rbacRepository->deleteRole($roleId);
+        }
+
+        foreach ($affectedUserIds as $userId) {
+            $this->permissionResolver->invalidate($userId, $siteId);
+        }
+
+        $this->auditLogger->log(
+            action: 'role_deleted',
+            siteId: $siteId,
+            actorUserId: $actorUserId,
+            payload: ['role_id' => $roleId, 'slug' => $role->slug, 'name' => $role->name]
+        );
+    }
 }
