@@ -8,7 +8,7 @@ use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Subscriptions\Refunds\FullRefundStrategy;
 use App\Services\Subscriptions\Refunds\ManualRefundStrategy;
 use App\Services\Subscriptions\Refunds\ProRatedRefundStrategy;
@@ -22,7 +22,7 @@ class SubscriptionCancellationService
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly PaymentRepository      $paymentRepository,
-        private readonly StripePaymentProcessor $stripeProcessor,
+        private readonly StripeSubscriptionLifecycleService $stripeLifecycleService,
         private readonly SubscriptionRefundService $refundService,
         ?Database                               $database = null
     )
@@ -58,7 +58,7 @@ class SubscriptionCancellationService
             // Stripe cancellation
             $stripeResult = null;
             if ($subscription->hasStripeSubscription()) {
-                $stripeResult = $this->stripeProcessor->cancelSubscription(
+                $stripeResult = $this->stripeLifecycleService->cancel(
                     $subscription->getStripeSubscriptionId(),
                     $cancelAtPeriodEnd
                 );
@@ -155,7 +155,7 @@ class SubscriptionCancellationService
             }
 
             if ($subscription->hasStripeSubscription() && $_ENV['APP_ENV'] !== 'testing') {
-                $stripeResult = $this->stripeProcessor->reactivateSubscription(
+                $stripeResult = $this->stripeLifecycleService->reactivate(
                     $subscription->getStripeSubscriptionId()
                 );
 

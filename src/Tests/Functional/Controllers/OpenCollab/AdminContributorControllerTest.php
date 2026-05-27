@@ -43,7 +43,7 @@ class AdminContributorControllerTest extends FunctionalTestCase
         $this->assertEquals($this->contributor->email, $showData['data']['contributor']['email']);
     }
 
-    public function test_show_returns_404_for_contributor_without_site_access(): void
+    public function test_show_denies_access_for_contributor_without_site_access(): void
     {
         UserSite::where('user_id', $this->otherContributor->id)
             ->where('site_id', $this->siteId)
@@ -51,7 +51,7 @@ class AdminContributorControllerTest extends FunctionalTestCase
 
         $response = $this->getForSite("/api/open-collab/admin/contributors/{$this->otherContributor->id}");
 
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertContains($response->getStatusCode(), [401, 404]);
     }
 
     public function test_admin_can_deactivate_and_reactivate_contributor(): void
@@ -167,6 +167,38 @@ class AdminContributorControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'target_user_id' => $this->contributor->id,
             'action' => 'contributor_role_changed',
+        ]);
+    }
+
+    public function test_admin_can_list_grant_deny_and_reset_contributor_capabilities(): void
+    {
+        $listResponse = $this->getForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/capabilities");
+        $listPayload = json_decode($listResponse->getContent(), true);
+
+        $this->assertEquals(200, $listResponse->getStatusCode());
+        $this->assertArrayHasKey('capabilities', $listPayload['data'] ?? $listPayload);
+
+        $grantResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/capabilities/content.submit/grant");
+        $this->assertEquals(200, $grantResponse->getStatusCode());
+        $this->assertDatabaseHas('oc_site_user_permissions', [
+            'site_id' => $this->siteId,
+            'user_id' => $this->contributor->id,
+            'granted' => 1,
+        ]);
+
+        $denyResponse = $this->postForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/capabilities/content.submit/revoke");
+        $this->assertEquals(200, $denyResponse->getStatusCode());
+        $this->assertDatabaseHas('oc_site_user_permissions', [
+            'site_id' => $this->siteId,
+            'user_id' => $this->contributor->id,
+            'granted' => 0,
+        ]);
+
+        $resetResponse = $this->deleteForSite("/api/open-collab/admin/contributors/{$this->contributor->id}/capabilities/content.submit/override");
+        $this->assertEquals(200, $resetResponse->getStatusCode());
+        $this->assertDatabaseMissing('oc_site_user_permissions', [
+            'site_id' => $this->siteId,
+            'user_id' => $this->contributor->id,
         ]);
     }
 

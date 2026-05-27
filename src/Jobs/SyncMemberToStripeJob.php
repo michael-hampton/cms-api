@@ -8,7 +8,7 @@ use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeCustomerDetailsUpdater;
 use RuntimeException;
 
 /**
@@ -32,7 +32,7 @@ final class SyncMemberToStripeJob extends BaseJob implements ShouldQueue
     public int $backoff = 30;
 
     private MemberRepository $memberRepository;
-    private StripePaymentProcessor $stripe;
+    private StripeCustomerDetailsUpdater $stripeCustomerDetailsUpdater;
 
     public function __construct(
         public readonly int  $memberId,
@@ -43,6 +43,9 @@ final class SyncMemberToStripeJob extends BaseJob implements ShouldQueue
 
     public function handle(): void
     {
+        $this->memberRepository = $this->resolveProperty('memberRepository', MemberRepository::class);
+        $this->stripeCustomerDetailsUpdater = $this->resolveProperty('stripeCustomerDetailsUpdater', StripeCustomerDetailsUpdater::class);
+
         $member = $this->memberRepository->find($this->memberId);
 
         if ($member === null) {
@@ -62,7 +65,7 @@ final class SyncMemberToStripeJob extends BaseJob implements ShouldQueue
 
         $payload = $this->buildPayload($member);
 
-        $result = $this->stripe->updateCustomerDetails(
+        $result = $this->stripeCustomerDetailsUpdater->update(
             $member->stripe_customer_id,
             $payload,
         );

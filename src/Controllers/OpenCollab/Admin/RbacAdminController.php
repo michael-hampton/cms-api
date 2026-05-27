@@ -33,6 +33,51 @@ class RbacAdminController extends Controller
         return $this->resourceResponse($this->rbacManagementService->summaryForSite(SiteContext::getId()));
     }
 
+    public function permissions(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+            return $response;
+        }
+
+        return $this->resourceResponse(['permissions' => $this->rbacManagementService->permissionsForSite(SiteContext::getId())]);
+    }
+
+    public function roles(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+            return $response;
+        }
+
+        return $this->resourceResponse(['roles' => $this->rbacManagementService->rolesForSite(SiteContext::getId())]);
+    }
+
+    public function members(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+            return $response;
+        }
+
+        return $this->resourceResponse(['members' => $this->rbacManagementService->membersForSite(SiteContext::getId())]);
+    }
+
+    public function overrides(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+            return $response;
+        }
+
+        return $this->resourceResponse(['overrides' => $this->rbacManagementService->overridesForSite(SiteContext::getId())]);
+    }
+
+    public function audit(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage', 'site.members', 'site.manage'])) {
+            return $response;
+        }
+
+        return $this->resourceResponse(['audit' => $this->rbacManagementService->auditForSite(SiteContext::getId())]);
+    }
+
     public function syncRolePermissions(Request $request, int $roleId): JsonResponse
     {
         if ($response = $this->authorizeSitePermissions(['site.roles.manage', 'site.permissions.manage'])) {
@@ -93,6 +138,25 @@ class RbacAdminController extends Controller
         }
 
         return $this->resourceResponse(['message' => 'Permission override updated.']);
+    }
+
+    public function deleteOverride(int $userId, string $permissionSlug): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['site.permissions.manage', 'creator.manage_roles'])) {
+            return $response;
+        }
+
+        if (!$this->rbacRepository->userExists($userId)) {
+            return $this->errorResponse('User not found.', 404);
+        }
+
+        try {
+            $this->rbacManagementService->deleteUserOverride(SiteContext::getId(), $userId, $permissionSlug, Auth::id());
+        } catch (\InvalidArgumentException $exception) {
+            return $this->errorResponse($exception->getMessage(), 422);
+        }
+
+        return $this->resourceResponse(['message' => 'Permission override removed.']);
     }
 
     public function createRole(Request $request): JsonResponse

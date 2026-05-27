@@ -1005,7 +1005,6 @@ $selectedTags = !empty($filters['tags'])
             <?php else: ?>
                 <div class="plans-grid">
                     <?php foreach ($plans as $plan):
-
                         $bestSale   = $plan->getBestSale();
                         $hasSale    = !empty($bestSale);
 

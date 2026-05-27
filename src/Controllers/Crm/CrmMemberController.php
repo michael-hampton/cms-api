@@ -11,6 +11,7 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\CrmMemberRepository;
 use App\Requests\Crm\UpdateMemberRequest;
+use App\Services\Billing\Stripe\StripeCustomerProfileSyncService;
 use App\Services\Members\CrmMemberProfileService;
 use App\Services\Members\CrmMemberService;
 use Exception;
@@ -23,6 +24,7 @@ class CrmMemberController extends Controller
         private readonly CrmMemberService        $crmMemberService,
         private readonly AddressRepository       $addressRepository,
         private readonly CrmMemberProfileService $crmMemberProfileService,
+        private readonly StripeCustomerProfileSyncService $stripeCustomerProfileSyncService,
     ) {
         parent::__construct();
     }
@@ -133,6 +135,7 @@ class CrmMemberController extends Controller
         try {
             $data    = $request->validated();
             $created = $this->crmMemberService->createMember(SiteContext::getId(), $data);
+            $this->stripeCustomerProfileSyncService->sync($created);
 
             return $this->resourceResponse([
                 'success' => true,
@@ -150,6 +153,8 @@ class CrmMemberController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
+            echo $e->getMessage();
+            die;
             return $this->resourceResponse(['success' => false, 'message' => 'Failed to create member.'], 500);
         }
     }
@@ -166,6 +171,7 @@ class CrmMemberController extends Controller
         try {
             $data    = $request->validated();
             $updated = $this->crmMemberService->updateMember($id, SiteContext::getId(), $data);
+            $this->stripeCustomerProfileSyncService->sync($updated);
 
             return $this->jsonResponse([
                 'success' => true,
@@ -197,7 +203,8 @@ class CrmMemberController extends Controller
         }
 
         try {
-            $this->crmMemberService->updateMember($id, SiteContext::getId(), ['is_active' => false]);
+            $updated = $this->crmMemberService->updateMember($id, SiteContext::getId(), ['is_active' => false]);
+            $this->stripeCustomerProfileSyncService->markInactive($updated);
 
             return $this->jsonResponse(['success' => true, 'message' => 'Member deactivated.']);
         } catch (InvalidArgumentException $e) {

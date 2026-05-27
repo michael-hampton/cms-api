@@ -8,7 +8,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\PaymentRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -22,7 +22,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
     private $subscriptionRepository;
     private $paymentRepository;
-    private $stripeProcessor;
+    private $stripeLifecycleService;
     private $databaseMock;
     private SubscriptionCancellationService $service;
 
@@ -32,14 +32,14 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->paymentRepository = m::mock(PaymentRepository::class);
-        $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
+        $this->stripeLifecycleService = m::mock(StripeSubscriptionLifecycleService::class);
         $this->refundService = m::mock(SubscriptionRefundService::class);
         $this->databaseMock = m::mock(Database::class);
 
         $this->service = new SubscriptionCancellationService(
             $this->subscriptionRepository,
             $this->paymentRepository,
-            $this->stripeProcessor,
+            $this->stripeLifecycleService,
             $this->refundService,
             $this->databaseMock
         );
@@ -80,7 +80,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
-        $this->stripeProcessor->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService->shouldReceive('cancel')
             ->once()
             ->with('sub_stripe123', true)
             ->andReturn([
@@ -135,8 +135,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -175,8 +175,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -216,8 +216,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -254,8 +254,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -291,8 +291,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -339,7 +339,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
-        $this->stripeProcessor->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService->shouldReceive('cancel')
             ->once()
             ->with('sub_stripe123', false)
             ->andReturn([
@@ -394,7 +394,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
-        $this->stripeProcessor->shouldReceive('reactivateSubscription')
+        $this->stripeLifecycleService->shouldReceive('reactivate')
             ->once()
             ->with('sub_stripe123')
             ->andReturn([
@@ -546,7 +546,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->with($subscriptionId);
 
-        $this->stripeProcessor->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService->shouldReceive('cancel')
             ->once()
             ->with('sub_stripe123', false)
             ->andReturn([
@@ -591,7 +591,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService->shouldReceive('cancel')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -617,8 +617,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->shouldReceive('find')
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -660,8 +660,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->twice()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -704,8 +704,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->shouldReceive('find')
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -752,8 +752,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -794,8 +794,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->with(1);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -823,8 +823,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->shouldReceive('find')
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -866,8 +866,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->with(1);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -911,8 +911,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -945,8 +945,8 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor
-            ->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService
+            ->shouldReceive('cancel')
             ->once()
             ->andReturn(['success' => true]);
 
@@ -1036,7 +1036,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
-        $this->stripeProcessor->shouldReceive('reactivateSubscription')
+        $this->stripeLifecycleService->shouldReceive('reactivate')
             ->once()
             ->with('sub_stripe123')
             ->andReturn([
@@ -1121,7 +1121,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('reactivateSubscription')
+        $this->stripeLifecycleService->shouldReceive('reactivate')
             ->once()
             ->andReturn([
                 'success' => false,
@@ -1334,7 +1334,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->with($subscriptionId)
             ->andReturn($mockSubscription);
 
-        $this->stripeProcessor->shouldReceive('cancelSubscription')
+        $this->stripeLifecycleService->shouldReceive('cancel')
             ->once()
             ->with('sub_stripe123', true)
             ->andReturn([
@@ -1381,7 +1381,7 @@ class SubscriptionCancellationServiceTest extends FunctionalTestCase
             ->andReturn($subscription);
 
         // should NOT throw
-        $this->stripeProcessor->shouldReceive('reactivateSubscription')
+        $this->stripeLifecycleService->shouldReceive('reactivate')
             ->never();
 
         $this->subscriptionRepository->shouldReceive('update')

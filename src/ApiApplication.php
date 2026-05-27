@@ -153,7 +153,7 @@ use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
-use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway;
+use App\Services\Billing\PaymentProviders\StripePaymentIntentGateway as LegacyStripePaymentIntentGateway;
 use App\Services\Billing\Stripe\BillingAddressResolver;
 use App\Services\Billing\Stripe\Contracts\StripeCustomerGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripePaymentIntentGatewayInterface;
@@ -161,12 +161,21 @@ use App\Services\Billing\Stripe\Contracts\StripePriceGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeProductGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
 use App\Services\Billing\Stripe\StripeCouponGateway;
+use App\Services\Billing\Stripe\StripeCustomerEmailUpdater;
+use App\Services\Billing\Stripe\StripeCustomerDetailsUpdater;
 use App\Services\Billing\Stripe\StripeCustomerAddressSynchroniser;
+use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
+use App\Services\Billing\Stripe\StripeCustomerProfileSyncService;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripeOffSessionCharger;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Billing\Stripe\StripePriceGateway;
 use App\Services\Billing\Stripe\StripeProductGateway;
 use App\Services\Billing\Stripe\StripeRefundGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionBillingCycleService;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionLifecycleService;
+use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
 use App\Services\Gdpr\Exporters\ActivityExporter;
 use App\Services\Gdpr\Exporters\AddressesExporter;
 use App\Services\Gdpr\Exporters\CommunicationsExporter;
@@ -383,8 +392,8 @@ class ApiApplication
         );
 
         $this->container->singleton(
-            StripePaymentIntentGateway::class,
-            fn () => new StripePaymentIntentGateway(
+            LegacyStripePaymentIntentGateway::class,
+            fn () => new LegacyStripePaymentIntentGateway(
                 new StripeClient(
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
@@ -393,8 +402,8 @@ class ApiApplication
         );
 
         $this->container->singleton(
-            Services\Billing\Stripe\StripePaymentIntentGateway::class,
-            fn () => new Services\Billing\Stripe\StripePaymentIntentGateway(
+            StripePaymentIntentGateway::class,
+            fn () => new StripePaymentIntentGateway(
                 new StripeClient(
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
@@ -461,6 +470,87 @@ class ApiApplication
                     ?? config('payment.stripe.secret_key')
                 ),
                 app(StripeCouponGateway::class)
+            )
+        );
+
+        $this->container->singleton(
+            StripeCustomerProfileSyncService::class,
+            fn () => new StripeCustomerProfileSyncService(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                ),
+                app(StripeCustomerGateway::class)
+            )
+        );
+
+        $this->container->singleton(
+            StripeCustomerPaymentMethodService::class,
+            fn () => new StripeCustomerPaymentMethodService(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeCustomerEmailUpdater::class,
+            fn () => new StripeCustomerEmailUpdater(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeCustomerDetailsUpdater::class,
+            fn () => new StripeCustomerDetailsUpdater(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeSubscriptionLifecycleService::class,
+            fn () => new StripeSubscriptionLifecycleService(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeSubscriptionBillingCycleService::class,
+            fn () => new StripeSubscriptionBillingCycleService(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeSubscriptionPlanUpdater::class,
+            fn () => new StripeSubscriptionPlanUpdater(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
+            )
+        );
+
+        $this->container->singleton(
+            StripeOffSessionCharger::class,
+            fn () => new StripeOffSessionCharger(
+                new StripeClient(
+                    $_ENV['STRIPE_SECRET_KEY']
+                    ?? config('payment.stripe.secret_key')
+                )
             )
         );
 

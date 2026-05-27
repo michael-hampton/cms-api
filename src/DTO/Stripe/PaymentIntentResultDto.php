@@ -14,6 +14,9 @@ class PaymentIntentResultDto
         public readonly ?string $clientSecret    = null,
         public readonly ?string $status          = null,
         public readonly ?string $customerId      = null,
+        public readonly ?string $paymentMethodId = null,
+        public readonly ?int    $amountCents     = null,
+        public readonly ?string $currency        = null,
         public readonly ?string $errorMessage    = null,
         public readonly ?string $errorCode       = null,
     ) {}

@@ -6,7 +6,7 @@ use App\Exceptions\Subscriptions\MissingStripePriceException;
 use App\Exceptions\Subscriptions\StripeUpdateFailedException;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
 use App\Services\Subscriptions\StripeSubscriptionUpgradeService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -14,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 class StripeSubscriptionUpgradeServiceTest extends TestCase
 {
     private StripeSubscriptionUpgradeService $service;
-    private $stripeProcessor;
+    private $planUpdater;
 
     public function testUpdateSubscriptionPlanSuccess(): void
     {
@@ -28,7 +28,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->name = 'Premium Plan';
         $upgradePlan->stripe_price_id = 'price_abc123';
 
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')
+        $this->planUpdater->shouldReceive('update')
             ->with('sub_123', 'price_abc123', Mockery::type('array'))
             ->once()
             ->andReturn(['success' => true]);
@@ -61,7 +61,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->stripe_price_id = 'price_abc123';
 
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')
+        $this->planUpdater->shouldReceive('update')
             ->once()
             ->andReturn(['success' => false, 'error' => 'Card declined']);
 
@@ -79,7 +79,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $upgradePlan->stripe_price_id = 'price_abc123';
 
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')
+        $this->planUpdater->shouldReceive('update')
             ->once()
             ->andReturn(['success' => false]); // No error message
 
@@ -98,7 +98,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->stripe_price_id = 'price_abc123';
 
         // Should not call stripe processor
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')->never();
+        $this->planUpdater->shouldReceive('update')->never();
 
         $this->service->updateSubscriptionPlan($subscription, $upgradePlan);
 
@@ -116,7 +116,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->stripe_price_id = 'price_abc123';
 
         // Should not call stripe processor in testing
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')->never();
+        $this->planUpdater->shouldReceive('update')->never();
 
         $this->service->updateSubscriptionPlan($subscription, $upgradePlan);
 
@@ -134,7 +134,7 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->id = 2;
         $upgradePlan->stripe_price_id = 'price_abc123';
 
-        $this->stripeProcessor->shouldReceive('updateSubscriptionPlan')
+        $this->planUpdater->shouldReceive('update')
             ->with('sub_123', 'price_abc123', Mockery::on(function ($metadata) {
                 return isset($metadata['upgraded_at'])
                     && isset($metadata['original_plan_id'])
@@ -152,8 +152,8 @@ class StripeSubscriptionUpgradeServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
-        $this->service = new StripeSubscriptionUpgradeService($this->stripeProcessor);
+        $this->planUpdater = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+        $this->service = new StripeSubscriptionUpgradeService($this->planUpdater);
 
         $_ENV['APP_ENV'] = 'production';
     }

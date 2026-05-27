@@ -8,14 +8,14 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Members\MemberRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeCustomerEmailUpdater;
 use App\Services\Subscriptions\MemberSubscriptionService;
 
 class MemberApiController extends Controller
 {
     public function __construct(
         private readonly MemberRepository          $memberRepository,
-        private readonly StripePaymentProcessor    $stripeProcessor,
+        private readonly StripeCustomerEmailUpdater $stripeCustomerEmailUpdater,
         private readonly MemberSubscriptionService $subscriptionService
     )
     {
@@ -75,10 +75,14 @@ class MemberApiController extends Controller
             // Update Stripe customer email if changed and customer exists
             if ($emailChanged && $updatedMember->stripe_customer_id) {
                 try {
-                    $this->stripeProcessor->updateCustomerEmail(
+                    $stripeResult = $this->stripeCustomerEmailUpdater->update(
                         $updatedMember->stripe_customer_id,
                         $data['email']
                     );
+
+                    if (!($stripeResult['success'] ?? false)) {
+                        throw new \RuntimeException($stripeResult['message'] ?? 'Failed to update customer email in Stripe');
+                    }
                 } catch (\Exception $e) {
                     // Log error but don't fail the update
                     \App\Framework\Support\Logger::error('Failed to update Stripe customer email', [

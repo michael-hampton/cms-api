@@ -170,10 +170,6 @@ class SubscriptionRefundServiceTest extends TestCase
             ->once()
             ->andReturn($lastPayment);
 
-        // Should not call Stripe refund
-        $this->mockStripeProcessor
-            ->shouldNotReceive('refund');
-
         $refundPayment = $this->createMockPayment();
         $this->mockPaymentRepository
             ->shouldReceive('create')

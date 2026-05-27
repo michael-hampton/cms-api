@@ -11,7 +11,7 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Order\OrderUpdateService;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionPauseService;
 
@@ -39,8 +39,8 @@ class ShopAccountApiController extends Controller
         private readonly OrderUpdateService              $orderUpdateService,
         private readonly SubscriptionRepository          $subscriptionRepository,
         private readonly OrderRepository                 $orderRepository,
-        private readonly StripePaymentProcessor $stripePaymentService,
-        private readonly AddressRepository      $addressRepository
+        private readonly StripeCustomerPaymentMethodService $paymentMethodService,
+        private readonly AddressRepository                 $addressRepository
     )
     {
         parent::__construct();
@@ -186,14 +186,13 @@ class ShopAccountApiController extends Controller
     {
         $member = MemberAuth::getMember();
 
-        $methods = $this->stripePaymentService->getCustomerPaymentMethods($member->stripe_customer_id);
-        //$defaultMethod  = $this->stripePaymentService->getCustomerPaymentMethods($member->stripe_customer_id);
+        $methods = $this->paymentMethodService->getCustomerPaymentMethods($member);
         $billingAddress = !empty($member) ? $this->addressRepository->getBillingAddressesForMember($member->id) : null;
 
         return $this->jsonResponse([
             'success' => true,
-            'payment_methods' => $methods,
-            'default_method' => null, //todo
+            'payment_methods' => $methods['payment_methods'] ?? [],
+            'default_method' => $methods['default_payment_method_id'] ?? null,
             'billing_address' => $billingAddress,
         ]);
     }
@@ -209,11 +208,14 @@ class ShopAccountApiController extends Controller
 
         // Guard: ensure the payment method belongs to this customer before
         // promoting it — prevents a member from setting another member's card.
-        if (!$this->stripePaymentService->paymentMethodBelongsToCustomer($member->stripe_customer_id, $paymentMethodId)) {
+        $result = $this->paymentMethodService->setDefaultPaymentMethod(
+            (string) $member->stripe_customer_id,
+            $paymentMethodId
+        );
+
+        if (!($result['success'] ?? false)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
         }
-
-        $this->stripePaymentService->setDefaultPaymentMethod($member->stripe_customer_id, $paymentMethodId);
 
         return $this->jsonResponse(['success' => true]);
     }
@@ -229,11 +231,11 @@ class ShopAccountApiController extends Controller
 
         // Guard: verify the payment method belongs to this customer before
         // detaching — prevents a member from removing another member's card.
-        if (!$this->stripePaymentService->paymentMethodBelongsToCustomer($member->stripe_customer_id, $paymentMethodId)) {
+        $result = $this->paymentMethodService->removePaymentMethod($member, $paymentMethodId);
+
+        if (!($result['success'] ?? false)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Payment method not found.'], 404);
         }
-
-        $this->stripePaymentService->detachPaymentMethod($paymentMethodId);
 
         return $this->jsonResponse(['success' => true]);
     }

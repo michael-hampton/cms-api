@@ -7,12 +7,12 @@ use App\Exceptions\Subscriptions\StripeUpdateFailedException;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
 
 class StripeSubscriptionUpgradeService
 {
     public function __construct(
-        private readonly StripePaymentProcessor $stripeProcessor
+        private readonly StripeSubscriptionPlanUpdater $planUpdater
     )
     {
     }
@@ -36,7 +36,7 @@ class StripeSubscriptionUpgradeService
             );
         }
 
-        $result = $this->stripeProcessor->updateSubscriptionPlan(
+        $result = $this->planUpdater->update(
             $stripeSubscriptionId,
             $priceId,
             [

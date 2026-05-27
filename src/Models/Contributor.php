@@ -25,7 +25,7 @@ class Contributor extends Model
 
     public function verifyPassword(string $plain): bool
     {
-        return password_verify($plain, $this->password);
+        return password_verify($plain, $this->attributes['password'] ?? '');
     }
 
     public function isActive(): bool

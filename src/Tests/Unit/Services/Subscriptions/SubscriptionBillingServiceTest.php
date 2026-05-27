@@ -12,9 +12,9 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
+use App\Services\Billing\Stripe\StripeSubscriptionBillingCycleService;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
@@ -25,7 +25,7 @@ use Mockery as m;
 class SubscriptionBillingServiceTest extends FunctionalTestCase
 {
     private $subscriptionRepository;
-    private $stripeProcessor;
+    private $billingCycleService;
     private $databaseMock;
     private SubscriptionBillingService $service;
 
@@ -148,7 +148,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('updateBillingCycleAnchor')
+        $this->billingCycleService->shouldReceive('updateBillingCycleAnchor')
             ->with('sub_123', 15, true)
             ->once()
             ->andReturn([
@@ -186,7 +186,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('updateBillingCycleAnchor')
+        $this->billingCycleService->shouldReceive('updateBillingCycleAnchor')
             ->with('sub_123', 15, true)
             ->once()
             ->andReturn([
@@ -236,7 +236,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($subscription);
 
-        $this->stripeProcessor->shouldReceive('updateBillingCycleAnchor')
+        $this->billingCycleService->shouldReceive('updateBillingCycleAnchor')
             ->with('sub_123', 15, false)
             ->once()
             ->andReturn([
@@ -307,7 +307,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
             'days_difference' => 14
         ];
 
-        $this->stripeProcessor->shouldReceive('calculateBillingDateProration')
+        $this->billingCycleService->shouldReceive('calculateBillingDateProration')
             ->with('sub_123', 15)
             ->once()
             ->andReturn($expectedPreview);
@@ -324,7 +324,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         parent::setUp();
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
-        $this->stripeProcessor = m::mock(StripePaymentProcessor::class);
+        $this->billingCycleService = m::mock(StripeSubscriptionBillingCycleService::class);
         $this->databaseMock = m::mock(Database::class);
         $this->strategyResolver    = m::mock(SubscriptionPricingStrategyResolver::class);
         $this->subscriptionGateway = m::mock(StripeSubscriptionGateway::class);
@@ -332,7 +332,7 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
 
         $this->service = new SubscriptionBillingService(
             $this->subscriptionRepository,
-            $this->stripeProcessor,
+            $this->billingCycleService,
             $this->databaseMock,
             $this->strategyResolver,
             $this->scheduleGateway,

@@ -66,6 +66,30 @@ class RbacAdminControllerTest extends FunctionalTestCase
         ]);
     }
 
+    public function test_delete_override_removes_user_override_and_writes_audit_log(): void
+    {
+        $permission = OpenCollabPermission::where('slug', 'content.submit')->first();
+
+        $this->postForSite("/api/open-collab/admin/rbac/overrides/{$this->member->id}", [
+            'permission_slug' => 'content.submit',
+            'granted' => false,
+        ]);
+
+        $response = $this->deleteForSite("/api/open-collab/admin/rbac/overrides/{$this->member->id}/content.submit");
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertDatabaseMissing('oc_site_user_permissions', [
+            'site_id' => $this->siteId,
+            'user_id' => $this->member->id,
+            'permission_id' => $permission->id,
+        ]);
+        $this->assertDatabaseHas('oc_rbac_audit_logs', [
+            'site_id' => $this->siteId,
+            'target_user_id' => $this->member->id,
+            'action' => 'user_permission_override_deleted',
+        ]);
+    }
+
     public function test_assign_member_roles_persists_role_assignments_and_audit_log(): void
     {
         $role = OpenCollabRole::where('slug', 'finance')->first();
@@ -106,6 +130,42 @@ class RbacAdminControllerTest extends FunctionalTestCase
             'site_id' => $this->siteId,
             'action' => 'role_permissions_synced',
         ]);
+    }
+
+    public function test_split_summary_endpoints_return_segmented_payloads(): void
+    {
+        $this->grantSitePermission($this->authenticatedUser, 'site.roles.manage');
+        $this->grantSitePermission($this->authenticatedUser, 'site.permissions.manage');
+        $this->grantSitePermission($this->authenticatedUser, 'site.members');
+
+        $this->actingAs($this->authenticatedUser);
+        $permissionsResponse = $this->getForSite('/api/open-collab/admin/rbac/permissions');
+        $this->actingAs($this->authenticatedUser);
+        $rolesResponse = $this->getForSite('/api/open-collab/admin/rbac/roles');
+        $this->actingAs($this->authenticatedUser);
+        $membersResponse = $this->getForSite('/api/open-collab/admin/rbac/members');
+        $this->actingAs($this->authenticatedUser);
+        $overridesResponse = $this->getForSite('/api/open-collab/admin/rbac/overrides');
+        $this->actingAs($this->authenticatedUser);
+        $auditResponse = $this->getForSite('/api/open-collab/admin/rbac/audit');
+
+        $this->assertEquals(200, $permissionsResponse->getStatusCode());
+        $this->assertEquals(200, $rolesResponse->getStatusCode());
+        $this->assertEquals(200, $membersResponse->getStatusCode());
+        $this->assertEquals(200, $overridesResponse->getStatusCode());
+        $this->assertEquals(200, $auditResponse->getStatusCode());
+
+        $permissionsPayload = json_decode($permissionsResponse->getContent(), true);
+        $rolesPayload = json_decode($rolesResponse->getContent(), true);
+        $membersPayload = json_decode($membersResponse->getContent(), true);
+        $overridesPayload = json_decode($overridesResponse->getContent(), true);
+        $auditPayload = json_decode($auditResponse->getContent(), true);
+
+        $this->assertArrayHasKey('permissions', $permissionsPayload['data'] ?? $permissionsPayload);
+        $this->assertArrayHasKey('roles', $rolesPayload['data'] ?? $rolesPayload);
+        $this->assertArrayHasKey('members', $membersPayload['data'] ?? $membersPayload);
+        $this->assertArrayHasKey('overrides', $overridesPayload['data'] ?? $overridesPayload);
+        $this->assertArrayHasKey('audit', $auditPayload['data'] ?? $auditPayload);
     }
 
     public function test_summary_returns_403_for_user_without_rbac_permissions(): void

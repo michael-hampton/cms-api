@@ -11,10 +11,9 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionRepository;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionGatewayInterface;
 use App\Services\Billing\Stripe\Contracts\StripeSubscriptionScheduleGatewayInterface;
-use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionBillingCycleService;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionScheduleGateway;
 use App\Services\Billing\Stripe\SubscriptionPricingStrategyResolver;
@@ -23,10 +22,9 @@ class SubscriptionBillingService
 {
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
-        private readonly StripePaymentProcessor $stripeProcessor,
+        private readonly StripeSubscriptionBillingCycleService $billingCycleService,
         private readonly Database               $database,
         private readonly SubscriptionPricingStrategyResolver       $strategyResolver,
-        //private readonly StripeCustomerGateway        $subscriptionGateway,
         private readonly StripeSubscriptionScheduleGateway $scheduleGateway,
         private readonly StripeSubscriptionGateway $subscriptionGateway,
     )
@@ -63,7 +61,7 @@ class SubscriptionBillingService
             }
 
             // Update in Stripe
-            $result = $this->stripeProcessor->updateBillingCycleAnchor(
+            $result = $this->billingCycleService->updateBillingCycleAnchor(
                 $subscription->getStripeSubscriptionId(),
                 $dayOfMonth,
                 $prorate
@@ -113,7 +111,7 @@ class SubscriptionBillingService
             ];
         }
 
-        return $this->stripeProcessor->calculateBillingDateProration(
+        return $this->billingCycleService->calculateBillingDateProration(
             $subscription->getStripeSubscriptionId(),
             $dayOfMonth
         );

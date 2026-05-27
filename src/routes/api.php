@@ -462,6 +462,26 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/open-collab/admin/contributors/{id}/revoke-access',
             [AdminContributorController::class, 'revokeAccess']
         );
+        $router->post(
+            '/open-collab/admin/contributors/{id}/role',
+            [AdminContributorController::class, 'updateRole']
+        );
+        $router->get(
+            '/open-collab/admin/contributors/{id}/capabilities',
+            [AdminContributorController::class, 'capabilities']
+        );
+        $router->post(
+            '/open-collab/admin/contributors/{id}/capabilities/{capabilityKey}/grant',
+            [AdminContributorController::class, 'grantCapability']
+        );
+        $router->post(
+            '/open-collab/admin/contributors/{id}/capabilities/{capabilityKey}/revoke',
+            [AdminContributorController::class, 'revokeCapability']
+        );
+        $router->delete(
+            '/open-collab/admin/contributors/{id}/capabilities/{capabilityKey}/override',
+            [AdminContributorController::class, 'resetCapability']
+        );
 
         $router->get(
             '/open-collab/admin/invitations',
@@ -479,12 +499,18 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->get('/open-collab/admin/rbac', [RbacAdminController::class, 'summary']);
+        $router->get('/open-collab/admin/rbac/permissions', [RbacAdminController::class, 'permissions']);
+        $router->get('/open-collab/admin/rbac/roles', [RbacAdminController::class, 'roles']);
+        $router->get('/open-collab/admin/rbac/members', [RbacAdminController::class, 'members']);
+        $router->get('/open-collab/admin/rbac/overrides', [RbacAdminController::class, 'overrides']);
+        $router->get('/open-collab/admin/rbac/audit', [RbacAdminController::class, 'audit']);
         $router->post('/open-collab/admin/rbac/roles', [RbacAdminController::class, 'createRole']);
         $router->delete('/open-collab/admin/rbac/roles/{roleId}', [RbacAdminController::class, 'deleteRole']);
         $router->post('/open-collab/admin/rbac-role-permissions/{roleId}', [RbacAdminController::class, 'syncRolePermissions']);
         $router->post('/open-collab/admin/rbac/role-permissions/{roleId}', [RbacAdminController::class, 'syncRolePermissions']);
         $router->post('/open-collab/admin/contributors/{userId}/roles', [RbacAdminController::class, 'assignMemberRoles']);
         $router->post('/open-collab/admin/rbac/overrides/{userId}', [RbacAdminController::class, 'setOverride']);
+        $router->delete('/open-collab/admin/rbac/overrides/{userId}/{permissionSlug}', [RbacAdminController::class, 'deleteOverride']);
 
         $router->get(
             '/open-collab/admin/articles/pending',

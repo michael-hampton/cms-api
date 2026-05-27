@@ -13,7 +13,7 @@ use App\Repositories\Billing\PaymentRepository;
 use App\Requests\FailPaymentRequest;
 use App\Requests\RefundPaymentRequest;
 use App\Requests\Subscription\CreateSubscriptionPaymentRequest;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Payments\OneTimeSubscriptionPaymentService;
 use App\Services\Billing\PaymentService;
 use Exception;
 
@@ -22,7 +22,7 @@ class PaymentController extends Controller
     public function __construct(
         private readonly PaymentService  $paymentService,
         private readonly PaymentRepository      $paymentRepository,
-        private readonly StripePaymentProcessor $stripePaymentProcessor,
+        private readonly OneTimeSubscriptionPaymentService $oneTimeSubscriptionPaymentService,
         private readonly OrderRepository $orderRepository
     )
     {
@@ -270,7 +270,7 @@ class PaymentController extends Controller
             $result = [];
 
             foreach ($orders as $order) {
-                $result = $this->stripePaymentProcessor->handleOneTimeSubscriptionPayment(
+                $result = $this->oneTimeSubscriptionPaymentService->confirmPayment(
                     $paymentIntentId,
                     $order->id,
                     $siteId
@@ -284,7 +284,7 @@ class PaymentController extends Controller
             return $this->resourceResponse($result, 200);
         }
 
-        $result = $this->stripePaymentProcessor->handleOneTimeSubscriptionPayment(
+        $result = $this->oneTimeSubscriptionPaymentService->confirmPayment(
             $paymentIntentId,
             $orderId,
             $siteId

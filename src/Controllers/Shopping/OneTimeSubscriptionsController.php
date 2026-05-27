@@ -17,7 +17,7 @@ use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Services\Auth\CheckoutIdentityService;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Payments\OneTimeSubscriptionPaymentService;
 use App\Services\Currency\CurrencyResolver;
 use App\Services\Reviews\ReviewService;
 use App\Services\Shopping\CartMigrationService;
@@ -41,7 +41,7 @@ class OneTimeSubscriptionsController extends Controller
         private readonly ReviewService                      $reviewService,
         private readonly CurrencyResolver                   $currencyResolver,
         private readonly OrderRepository                    $orderRepository,
-        private readonly StripePaymentProcessor             $stripeProcessor,
+        private readonly OneTimeSubscriptionPaymentService  $oneTimeSubscriptionPaymentService,
         private readonly CheckoutIdentityService            $identityService,
         private readonly CartPersistenceService             $cartPersistence,
         private readonly CartService                        $cartService,
@@ -332,7 +332,7 @@ class OneTimeSubscriptionsController extends Controller
         // ── One-time payment flow (paymentIntentId present) ───────────────────
         // Stripe already charged the card; verify the intent and record payment.
         if (!empty($paymentIntentId)) {
-            $result = $this->stripeProcessor->handleOneTimeSubscriptionPayment(
+            $result = $this->oneTimeSubscriptionPaymentService->confirmPayment(
                 $paymentIntentId,
                 $orderId,
                 $siteId,

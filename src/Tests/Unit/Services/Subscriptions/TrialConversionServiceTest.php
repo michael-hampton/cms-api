@@ -12,7 +12,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeOffSessionCharger;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\TrialConversionService;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
@@ -27,7 +27,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
     use MockeryPHPUnitIntegration;
 
     private TrialConversionService $service;
-    private StripePaymentProcessor|MockInterface $stripeProcessor;
+    private StripeOffSessionCharger|MockInterface $offSessionCharger;
     private Database|MockInterface $databaseMock;
     private OrderManager|MockInterface $orderManager;
     private SubscriptionDateCalculator|MockInterface $dateCalculator;
@@ -48,7 +48,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn($newEndDate);
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->andReturn(['success' => true, 'payment_intent_id' => 'pi_test_123']);
 
@@ -147,7 +147,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::MONTHLY);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable('+1 month'));
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->with(
                 $order->stripe_customer_id,
@@ -183,7 +183,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable('+1 year'));
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->with('cus_from_order_123', Mockery::any(), Mockery::any(), Mockery::any())
             ->andReturn(['success' => true, 'payment_intent_id' => 'pi_x']);
@@ -215,7 +215,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable('+1 year'));
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->andReturn(['success' => true, 'payment_intent_id' => 'pi_x']);
 
@@ -244,7 +244,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
             ->once()
             ->andReturn($order);
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->andReturn(['success' => false, 'message' => 'Card declined']);
 
@@ -270,7 +270,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     public function test_returns_false_when_trial_has_not_yet_ended(): void
@@ -282,7 +282,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     public function test_returns_false_when_plan_not_found(): void
@@ -297,7 +297,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     public function test_returns_false_when_no_order_found(): void
@@ -315,7 +315,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     /**
@@ -360,7 +360,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     // =========================================================================
@@ -376,7 +376,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $result = $this->service->convertSingle($subscription);
 
         $this->assertFalse($result);
-        $this->stripeProcessor->shouldNotHaveReceived('chargeOffSession');
+        $this->offSessionCharger->shouldNotHaveReceived('charge');
     }
 
     public function test_rethrows_when_payment_succeeded_but_activation_fails(): void
@@ -390,7 +390,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->planValidator->shouldReceive('validateBillingPeriod')->andReturn(BillingPeriod::YEARLY);
         $this->dateCalculator->shouldReceive('calculateEndDate')->andReturn(new \DateTimeImmutable('+1 year'));
 
-        $this->stripeProcessor->shouldReceive('chargeOffSession')
+        $this->offSessionCharger->shouldReceive('charge')
             ->once()
             ->andReturn(['success' => true, 'payment_intent_id' => 'pi_x']);
 
@@ -409,7 +409,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
     {
         parent::setUp();
 
-        $this->stripeProcessor = Mockery::mock(StripePaymentProcessor::class);
+        $this->offSessionCharger = Mockery::mock(StripeOffSessionCharger::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->orderManager = Mockery::mock(OrderManager::class);
         $this->dateCalculator = Mockery::mock(SubscriptionDateCalculator::class);
@@ -418,7 +418,7 @@ class TrialConversionServiceTest extends FunctionalTestCase
         $this->orderRepository = Mockery::mock(OrderRepository::class);
 
         $this->service = new TrialConversionService(
-            $this->stripeProcessor,
+            $this->offSessionCharger,
             $this->databaseMock,
             $this->orderManager,
             $this->dateCalculator,

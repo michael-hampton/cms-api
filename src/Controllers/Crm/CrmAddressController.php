@@ -14,6 +14,7 @@ use App\Repositories\Members\AddressRepository;
 use App\Repositories\Members\CrmMemberRepository;
 use App\Requests\Crm\CrmCreateAddressRequest;
 use App\Requests\Crm\CrmUpdateAddressRequest;
+use App\Services\Billing\Stripe\StripeCustomerAddressSyncService;
 use Exception;
 
 class CrmAddressController extends Controller
@@ -23,6 +24,7 @@ class CrmAddressController extends Controller
     public function __construct(
         private readonly AddressRepository   $addressRepository,
         private readonly CrmMemberRepository $crmMemberRepository,
+        private readonly StripeCustomerAddressSyncService $stripeCustomerAddressSyncService,
     )
     {
         parent::__construct();
@@ -107,6 +109,7 @@ class CrmAddressController extends Controller
                 $data,
                 SiteContext::getId()
             );
+            $this->stripeCustomerAddressSyncService->sync($member, $address);
 
             if (!empty($data['postcode'])) {
                 event(new MemberPostcodeUpdated($member, $data['postcode'], null));
@@ -180,6 +183,7 @@ class CrmAddressController extends Controller
             $originalPostcode = $address->postcode;
 
             $updated = $this->addressRepository->update($id, $data);
+            $this->stripeCustomerAddressSyncService->sync($member, $updated);
 
             if ($address->is_default) {
                 event(new MemberDetailsChanged($memberId, '', $id));
@@ -224,6 +228,10 @@ class CrmAddressController extends Controller
 
         try {
             $address->delete();
+            $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
+            if ($member) {
+                $this->stripeCustomerAddressSyncService->sync($member);
+            }
 
             return $this->jsonResponse(['success' => true, 'message' => 'Address deleted successfully.']);
         } catch (Exception $e) {

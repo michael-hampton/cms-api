@@ -18,50 +18,82 @@ class RbacManagementService
     {
         $this->bootstrapper->ensureSeeded($siteId);
 
-        $permissions = $this->rbacRepository->permissions();
-        $roles = $this->rbacRepository->roles();
+        return [
+            'permissions' => $this->permissionsForSite($siteId),
+            'roles' => $this->rolesForSite($siteId),
+            'members' => $this->membersForSite($siteId),
+            'overrides' => $this->overridesForSite($siteId),
+            'audit' => $this->auditForSite($siteId),
+        ];
+    }
+
+    public function permissionsForSite(int $siteId): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
+        return array_map(fn($permission) => [
+            'id' => (int) $permission['id'],
+            'name' => $permission['name'],
+            'slug' => $permission['slug'],
+            'group' => $permission['group'],
+        ], $this->rbacRepository->permissions());
+    }
+
+    public function rolesForSite(int $siteId): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
         $rolePermissionMap = $this->rbacRepository->rolePermissionMap();
-        $users = $this->rbacRepository->usersForSite($siteId);
+
+        return array_map(fn($role) => [
+            'id' => (int) $role['id'],
+            'name' => $role['name'],
+            'slug' => $role['slug'],
+            'is_system' => (bool) $role['is_system'],
+            'permission_ids' => array_values(array_unique($rolePermissionMap[(int) $role['id']] ?? [])),
+        ], $this->rbacRepository->roles());
+    }
+
+    public function membersForSite(int $siteId): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
         $userRoleMap = $this->rbacRepository->userRoleMapForSite($siteId);
-        $overrides = array_map(function ($override) {
+
+        return array_map(fn($user) => [
+            'id' => (int) $user['id'],
+            'name' => $user['name'],
+            'email' => $user['email'],
+            'legacy_role' => $user['role'],
+            'role_ids' => array_values(array_unique($userRoleMap[(int) $user['id']] ?? [])),
+        ], $this->rbacRepository->usersForSite($siteId));
+    }
+
+    public function overridesForSite(int $siteId): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
+        return array_map(function ($override) {
             $permissionSlug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
+
             return array_merge($override, ['permission_slug' => $permissionSlug]);
         }, $this->rbacRepository->overridesForSite($siteId));
-        $audit = array_map(function ($entry) {
-                return [
-                    'id' => (int) $entry['id'],
-                    'action' => $entry['action'],
-                    'actor_user_id' => !empty($entry['actor_user_id']) ? (int) $entry['actor_user_id'] : null,
-                    'target_user_id' => !empty($entry['target_user_id']) ? (int) $entry['target_user_id'] : null,
-                    'payload' => is_array($entry['payload'] ?? null) ? $entry['payload'] : (json_decode((string) ($entry['payload'] ?? ''), true) ?: []),
-                    'created_at' => $entry['created_at'] ?? null,
-                ];
-            }, $this->rbacRepository->auditForSite($siteId, 50));
+    }
 
-        return [
-            'permissions' => array_map(fn($permission) => [
-                'id' => (int) $permission['id'],
-                'name' => $permission['name'],
-                'slug' => $permission['slug'],
-                'group' => $permission['group'],
-            ], $permissions),
-            'roles' => array_map(fn($role) => [
-                'id' => (int) $role['id'],
-                'name' => $role['name'],
-                'slug' => $role['slug'],
-                'is_system' => (bool) $role['is_system'],
-                'permission_ids' => array_values(array_unique($rolePermissionMap[(int) $role['id']] ?? [])),
-            ], $roles),
-            'members' => array_map(fn($user) => [
-                'id' => (int) $user['id'],
-                'name' => $user['name'],
-                'email' => $user['email'],
-                'legacy_role' => $user['role'],
-                'role_ids' => array_values(array_unique($userRoleMap[(int) $user['id']] ?? [])),
-            ], $users),
-            'overrides' => $overrides,
-            'audit' => $audit,
-        ];
+    public function auditForSite(int $siteId, int $limit = 50): array
+    {
+        $this->bootstrapper->ensureSeeded($siteId);
+
+        return array_map(function ($entry) {
+            return [
+                'id' => (int) $entry['id'],
+                'action' => $entry['action'],
+                'actor_user_id' => !empty($entry['actor_user_id']) ? (int) $entry['actor_user_id'] : null,
+                'target_user_id' => !empty($entry['target_user_id']) ? (int) $entry['target_user_id'] : null,
+                'payload' => is_array($entry['payload'] ?? null) ? $entry['payload'] : (json_decode((string) ($entry['payload'] ?? ''), true) ?: []),
+                'created_at' => $entry['created_at'] ?? null,
+            ];
+        }, $this->rbacRepository->auditForSite($siteId, $limit));
     }
 
     public function syncRolePermissions(int $siteId, int $roleId, array $permissionSlugs, ?int $actorUserId = null): void
@@ -120,6 +152,28 @@ class RbacManagementService
             actorUserId: $actorUserId,
             targetUserId: $userId,
             payload: ['permission_slug' => $permissionSlug, 'granted' => $granted]
+        );
+    }
+
+    public function deleteUserOverride(int $siteId, int $userId, string $permissionSlug, ?int $actorUserId = null): void
+    {
+        $permission = $this->rbacRepository->findPermissionBySlug($permissionSlug);
+        if (!$permission) {
+            throw new \InvalidArgumentException('Permission not found.');
+        }
+
+        if (!$this->rbacRepository->deleteUserOverride($siteId, $userId, (int) $permission->id)) {
+            throw new \InvalidArgumentException('Permission override not found.');
+        }
+
+        $this->permissionResolver->invalidate($userId, $siteId);
+
+        $this->auditLogger->log(
+            action: 'user_permission_override_deleted',
+            siteId: $siteId,
+            actorUserId: $actorUserId,
+            targetUserId: $userId,
+            payload: ['permission_slug' => $permissionSlug]
         );
     }
 

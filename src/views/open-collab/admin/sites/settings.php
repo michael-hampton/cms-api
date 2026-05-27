@@ -252,21 +252,8 @@
             <input type="text" name="slug" class="oc-input" placeholder="role_slug (optional)">
             <button type="submit" class="oc-btn oc-btn--primary oc-btn--sm">Add role</button>
         </form>
-        <div class="oc-rbac-member-list">
-            <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
-                <div class="oc-rbac-member">
-                    <div>
-                        <div class="oc-rbac-member__name"><?= htmlspecialchars($role['name']) ?></div>
-                        <div class="oc-rbac-meta"><?= htmlspecialchars($role['slug']) ?><?= !empty($role['is_system']) ? ' · system role' : '' ?></div>
-                    </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="rbacManager.focusRole(<?= (int) $role['id'] ?>)">Edit permissions</button>
-                        <?php if (empty($role['is_system'])): ?>
-                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger" onclick="rbacManager.deleteRole(<?= (int) $role['id'] ?>, '<?= htmlspecialchars($role['name'], ENT_QUOTES, 'UTF-8') ?>')">Delete</button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+        <div class="oc-rbac-member-list" id="rbac-role-list">
+            <div class="oc-rbac-loading">Loading roles…</div>
         </div>
     </div>
 </div>
@@ -278,33 +265,16 @@
     </div>
     <div class="oc-card__body">
         <div style="overflow:auto;">
-            <table class="oc-rbac-table">
+            <table class="oc-rbac-table" id="rbac-matrix-table">
                 <thead>
                 <tr>
                     <th>Permission</th>
-                    <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
-                        <th id="role-column-<?= (int) $role['id'] ?>"><?= htmlspecialchars($role['name']) ?></th>
-                    <?php endforeach; ?>
                 </tr>
                 </thead>
-                <tbody>
-                <?php foreach (($rbacSummary['permissions'] ?? []) as $permission): ?>
-                    <tr>
-                        <td>
-                            <strong><?= htmlspecialchars($permission['slug']) ?></strong><br>
-                            <span class="oc-rbac-meta"><?= htmlspecialchars($permission['group']) ?></span>
-                        </td>
-                        <?php foreach (($rbacSummary['roles'] ?? []) as $role): ?>
-                            <td>
-                                <input type="checkbox"
-                                       data-role-id="<?= (int) $role['id'] ?>"
-                                       data-permission-slug="<?= htmlspecialchars($permission['slug']) ?>"
-                                       <?= in_array($permission['id'], $role['permission_ids'] ?? [], true) ? 'checked' : '' ?>
-                                       onchange="rbacManager.toggleRolePermission(this)">
-                            </td>
-                        <?php endforeach; ?>
-                    </tr>
-                <?php endforeach; ?>
+                <tbody id="rbac-matrix-body">
+                <tr>
+                    <td class="oc-rbac-loading">Loading permissions matrix…</td>
+                </tr>
                 </tbody>
             </table>
         </div>
@@ -314,56 +284,72 @@
 <div class="oc-card oc-tab-panel" style="margin-top:28px;" id="rbac-overrides-panel">
     <div class="oc-card__header">
         <span class="oc-card__title">Overrides</span>
-        <span class="oc-card__subtitle">Grant or revoke specific permissions for a site member.</span>
+        <span class="oc-card__subtitle">Grant or revoke specific permissions for individual site members.</span>
     </div>
     <div class="oc-card__body">
-        <div class="oc-rbac-member-list">
-            <?php foreach (($rbacSummary['members'] ?? []) as $member): ?>
-                <form class="oc-rbac-override-row" onsubmit="rbacManager.saveOverride(event, <?= (int) $member['id'] ?>)">
-                    <div>
-                        <div class="oc-rbac-member__name"><?= htmlspecialchars($member['name']) ?></div>
-                        <?php
-                        $memberRoleNames = [];
-                        foreach (($member['role_ids'] ?? []) as $memberRoleId) {
-                            foreach (($rbacSummary['roles'] ?? []) as $roleOption) {
-                                if ((int) $roleOption['id'] === (int) $memberRoleId) {
-                                    $memberRoleNames[] = $roleOption['name'];
-                                    break;
-                                }
-                            }
-                        }
-                        ?>
-                        <div class="oc-rbac-meta">Current site roles: <?= htmlspecialchars($memberRoleNames ? implode(', ', $memberRoleNames) : 'none') ?></div>
-                        <?php
-                        $memberOverrides = array_values(array_filter(($rbacSummary['overrides'] ?? []), fn($override) => (int) $override['user_id'] === (int) $member['id']));
-                        ?>
-                        <div class="oc-rbac-current-overrides" id="member-overrides-<?= (int) $member['id'] ?>">
-                            <?php if ($memberOverrides === []): ?>
-                                <span class="oc-rbac-meta" data-empty-state="true">No direct overrides.</span>
-                            <?php else: ?>
-                                <?php foreach ($memberOverrides as $override): ?>
-                                    <span class="oc-rbac-override-pill"
-                                          data-permission-slug="<?= htmlspecialchars($override['permission_slug']) ?>"
-                                          data-granted="<?= !empty($override['granted']) ? 'true' : 'false' ?>">
-                                        <?= htmlspecialchars($override['permission_slug']) ?> · <?= !empty($override['granted']) ? 'grant' : 'deny' ?>
-                                    </span>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <select name="permission_slug">
-                        <?php foreach (($rbacSummary['permissions'] ?? []) as $permission): ?>
-                            <option value="<?= htmlspecialchars($permission['slug']) ?>"><?= htmlspecialchars($permission['slug']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <select name="granted">
-                        <option value="true">Grant</option>
-                        <option value="false">Deny</option>
-                    </select>
-                    <button type="submit" class="oc-btn oc-btn--ghost oc-btn--sm">Save</button>
-                </form>
-            <?php endforeach; ?>
+        <div class="oc-rbac-member-list" id="rbac-overrides-list">
+            <div class="oc-rbac-loading">Loading overrides…</div>
         </div>
+    </div>
+</div>
+
+<!-- ── Override drawer ──────────────────────────────────────────────────── -->
+<div id="override-drawer-backdrop"
+     style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.45);z-index:400;"
+     onclick="rbacManager.closeOverrideDrawer()"></div>
+<div id="override-drawer"
+     style="display:none;position:fixed;top:0;right:0;bottom:0;width:360px;max-width:95vw;
+            background:#fff;z-index:401;box-shadow:-8px 0 40px rgba(0,0,0,.12);
+            display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px 18px;border-bottom:1px solid var(--border);">
+        <div>
+            <div style="font-weight:700;font-size:1rem;color:var(--navy);">Add Override</div>
+            <div id="override-drawer-subtitle" style="font-size:.78rem;color:var(--slate);margin-top:2px;"></div>
+        </div>
+        <button type="button"
+                onclick="rbacManager.closeOverrideDrawer()"
+                style="background:none;border:none;cursor:pointer;padding:4px;color:var(--slate);line-height:1;"
+                aria-label="Close">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+        </button>
+    </div>
+    <div style="padding:20px 24px;flex:1;overflow-y:auto;">
+        <div id="override-drawer-banner" style="display:none;margin-bottom:16px;"></div>
+        <div class="oc-form-group">
+            <label class="oc-label" for="override-drawer-permission">Permission</label>
+            <select class="oc-select" id="override-drawer-permission">
+                <option value="">Loading permissions…</option>
+            </select>
+        </div>
+        <div class="oc-form-group" style="margin-top:16px;">
+            <label class="oc-label">Type</label>
+            <div style="display:flex;gap:10px;margin-top:6px;">
+                <label class="oc-override-type-option" id="override-type-grant">
+                    <input type="radio" name="override_type" value="true" checked style="position:absolute;opacity:0;pointer-events:none;">
+                    <span class="oc-override-type-option__icon oc-override-type-option__icon--grant">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                            <polyline points="2,8 6,12 14,4"/>
+                        </svg>
+                    </span>
+                    <span>Grant</span>
+                </label>
+                <label class="oc-override-type-option" id="override-type-deny">
+                    <input type="radio" name="override_type" value="false" style="position:absolute;opacity:0;pointer-events:none;">
+                    <span class="oc-override-type-option__icon oc-override-type-option__icon--deny">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13">
+                            <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+                        </svg>
+                    </span>
+                    <span>Deny</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;">
+        <button type="button" class="oc-btn oc-btn--ghost" style="flex:1;" onclick="rbacManager.closeOverrideDrawer()">Cancel</button>
+        <button type="button" class="oc-btn oc-btn--primary" style="flex:1;" id="override-drawer-save" onclick="rbacManager.saveDrawerOverride()">Save override</button>
     </div>
 </div>
 
@@ -373,17 +359,8 @@
         <span class="oc-card__subtitle">Recent RBAC changes for this site.</span>
     </div>
     <div class="oc-card__body">
-        <div class="oc-rbac-audit-list">
-            <?php foreach (($rbacSummary['audit'] ?? []) as $entry): ?>
-                <div class="oc-rbac-audit-item">
-                    <div class="oc-rbac-member__name"><?= htmlspecialchars($entry['action']) ?></div>
-                    <div class="oc-rbac-meta">
-                        actor <?= htmlspecialchars((string) ($entry['actor_user_id'] ?? 'system')) ?> ·
-                        target <?= htmlspecialchars((string) ($entry['target_user_id'] ?? 'n/a')) ?> ·
-                        <?= htmlspecialchars((string) $entry['created_at']) ?>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+        <div class="oc-rbac-audit-list" id="rbac-audit-list">
+            <div class="oc-rbac-loading">Loading audit log…</div>
         </div>
     </div>
 </div>
@@ -506,6 +483,15 @@
         gap:10px;
     }
 
+    .oc-rbac-loading {
+        border:1px dashed var(--border);
+        border-radius:12px;
+        padding:14px;
+        color:var(--slate);
+        font-size:.82rem;
+        background:#fff;
+    }
+
     .oc-rbac-member,
     .oc-rbac-override-row,
     .oc-rbac-audit-item {
@@ -534,32 +520,123 @@
         color:var(--navy);
     }
 
-    .oc-rbac-override-row {
-        display:grid;
-        grid-template-columns:1.4fr 1fr 110px auto;
-        gap:10px;
-        align-items:center;
+    .oc-rbac-override-card {
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:14px 16px;
+        background:#fff;
+    }
+
+    .oc-rbac-override-card__header {
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-start;
+        gap:12px;
+        margin-bottom:12px;
     }
 
     .oc-rbac-current-overrides {
         display:flex;
         flex-wrap:wrap;
         gap:6px;
-        margin-top:8px;
+        min-height:24px;
+    }
+
+    .oc-rbac-empty-overrides {
+        line-height:24px;
     }
 
     .oc-rbac-override-pill {
         display:inline-flex;
         align-items:center;
-        padding:4px 8px;
+        gap:5px;
+        padding:4px 6px 4px 8px;
         border-radius:999px;
         font-size:.72rem;
         font-weight:600;
         background:var(--slate-pale);
         color:var(--navy);
+        border:1px solid transparent;
     }
 
     .oc-rbac-override-pill[data-granted="false"] {
+        background:var(--red-pale);
+        color:var(--red);
+    }
+
+    .oc-rbac-override-pill__type {
+        text-transform:uppercase;
+        font-size:.65rem;
+        letter-spacing:.04em;
+        opacity:.7;
+    }
+
+    .oc-rbac-override-pill__slug {
+        font-weight:700;
+    }
+
+    .oc-rbac-override-pill__remove {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        background:none;
+        border:none;
+        cursor:pointer;
+        padding:2px;
+        border-radius:50%;
+        color:inherit;
+        opacity:.6;
+        line-height:1;
+        transition:opacity .15s, background .15s;
+    }
+
+    .oc-rbac-override-pill__remove:hover {
+        opacity:1;
+        background:rgba(0,0,0,.1);
+    }
+
+    .oc-override-type-option {
+        display:flex;
+        align-items:center;
+        gap:8px;
+        padding:9px 14px;
+        border-radius:8px;
+        border:1.5px solid var(--border);
+        cursor:pointer;
+        font-size:.82rem;
+        font-weight:600;
+        color:var(--navy);
+        transition:border-color .15s, background .15s;
+        position:relative;
+        flex:1;
+    }
+
+    .oc-override-type-option:has(input:checked) {
+        border-color:var(--navy);
+        background:var(--slate-pale);
+    }
+
+    #override-type-deny:has(input:checked) {
+        border-color:var(--red);
+        background:var(--red-pale);
+        color:var(--red);
+    }
+
+    .oc-override-type-option__icon {
+        width:24px;
+        height:24px;
+        border-radius:50%;
+        display:grid;
+        place-items:center;
+        flex-shrink:0;
+    }
+
+    .oc-override-type-option__icon--grant {
+        background:#dcfce7;
+        color:var(--green);
+    }
+
+    .oc-override-type-option__icon--deny {
         background:var(--red-pale);
         color:var(--red);
     }
@@ -937,6 +1014,62 @@
     );
 
     const rbacManager = {
+        state: {
+            permissions: [],
+            roles: [],
+            members: [],
+            overrides: [],
+            audit: [],
+        },
+        endpoints: {
+            permissions: '/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/permissions',
+            roles: '/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles',
+            members: '/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/members',
+            overrides: '/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/overrides',
+            audit: '/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/audit',
+        },
+        async init() {
+            await this.loadAll();
+        },
+        async loadAll() {
+            const [permissions, roles, members, overrides, audit] = await Promise.all([
+                this.fetchSegment('permissions'),
+                this.fetchSegment('roles'),
+                this.fetchSegment('members'),
+                this.fetchSegment('overrides'),
+                this.fetchSegment('audit'),
+            ]);
+
+            this.state.permissions = permissions;
+            this.state.roles = roles;
+            this.state.members = members;
+            this.state.overrides = overrides;
+            this.state.audit = audit;
+            this.renderAll();
+        },
+        async fetchSegment(segment) {
+            const response = await fetch(this.endpoints[segment], {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('oc_token') || ''}`,
+                    'Accept': 'application/json',
+                },
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload.message || payload.error || `Failed to load ${segment}.`);
+            }
+
+            const body = payload.data ?? payload;
+            return Array.isArray(body?.[segment]) ? body[segment] : [];
+        },
+        renderAll() {
+            this.renderPermissionOptions();
+            this.renderRoles();
+            this.renderMatrix();
+            this.renderOverrides();
+            this.renderAudit();
+        },
         focusRole(roleId) {
             document.querySelector('[data-tab-target="rbac-matrix-panel"]')?.click();
             document.getElementById(`role-column-${roleId}`)?.scrollIntoView({behavior: 'smooth', inline: 'center', block: 'nearest'});
@@ -949,7 +1082,7 @@
             await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/role-permissions/${roleId}`, {
                 method: 'POST',
                 body: JSON.stringify({permission_slugs: permissionSlugs}),
-            }, {reload: false});
+            });
         },
 
         async updateMemberRoles(select) {
@@ -959,22 +1092,91 @@
             await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/${userId}/roles`, {
                 method: 'POST',
                 body: JSON.stringify({role_ids: roleIds}),
-            }, {reload: false});
+            });
         },
 
-        async saveOverride(event, userId) {
-            event.preventDefault();
-            const form = event.target;
-            const permissionSlug = form.permission_slug.value;
-            const granted = form.granted.value === 'true';
+        // ── Override drawer ────────────────────────────────────────────────────
+
+        _overrideDrawerUserId: null,
+
+        openOverrideDrawer(userId, userName) {
+            this._overrideDrawerUserId = userId;
+            document.getElementById('override-drawer-subtitle').textContent = userName;
+            document.getElementById('override-drawer-banner').style.display = 'none';
+
+            document.getElementById('override-drawer-permission').selectedIndex = 0;
+            const grantRadio = document.querySelector('#override-drawer input[value="true"]');
+            if (grantRadio) grantRadio.checked = true;
+
+            const backdrop = document.getElementById('override-drawer-backdrop');
+            const drawer   = document.getElementById('override-drawer');
+            backdrop.style.display = 'block';
+            drawer.style.display   = 'flex';
+            requestAnimationFrame(() => drawer.style.transform = 'translateX(0)');
+        },
+
+        closeOverrideDrawer() {
+            const drawer = document.getElementById('override-drawer');
+            drawer.style.transform = 'translateX(100%)';
+            drawer.addEventListener('transitionend', () => {
+                drawer.style.display = 'none';
+                document.getElementById('override-drawer-backdrop').style.display = 'none';
+            }, {once: true});
+        },
+
+        async saveDrawerOverride() {
+            const userId = this._overrideDrawerUserId;
+            if (!userId) return;
+
+            const permissionSlug = document.getElementById('override-drawer-permission').value;
+            const grantedRadio   = document.querySelector('#override-drawer input[name="override_type"]:checked');
+            const granted        = grantedRadio ? grantedRadio.value === 'true' : true;
+            const btn            = document.getElementById('override-drawer-save');
+            const banner         = document.getElementById('override-drawer-banner');
+
+            btn.disabled    = true;
+            btn.textContent = 'Saving…';
+            banner.style.display = 'none';
 
             const result = await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/overrides/${userId}`, {
                 method: 'POST',
                 body: JSON.stringify({permission_slug: permissionSlug, granted}),
-            }, {reload: false});
+            });
+
+            btn.disabled    = false;
+            btn.textContent = 'Save override';
 
             if (result?.response?.ok) {
                 this.upsertOverridePill(userId, permissionSlug, granted);
+                this.closeOverrideDrawer();
+            } else {
+                banner.className     = 'oc-alert oc-alert--danger';
+                banner.textContent   = result?.payload?.message || 'Failed to save override.';
+                banner.style.display = 'block';
+            }
+        },
+
+        async removeOverride(userId, permissionSlug, triggerBtn) {
+            triggerBtn.disabled = true;
+
+            const result = await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/overrides/${userId}/${encodeURIComponent(permissionSlug)}`, {
+                method: 'DELETE',
+            });
+
+            if (result?.response?.ok) {
+                this.state.overrides = this.state.overrides.filter((override) => !(Number(override.user_id) === Number(userId) && override.permission_slug === permissionSlug));
+                const pill = triggerBtn.closest('[data-permission-slug]');
+                pill?.remove();
+                const container = document.getElementById(`member-overrides-${userId}`);
+                if (container && container.querySelectorAll('.oc-rbac-override-pill').length === 0) {
+                    const empty = document.createElement('span');
+                    empty.className = 'oc-rbac-meta oc-rbac-empty-overrides';
+                    empty.dataset.emptyState = 'true';
+                    empty.textContent = 'No direct overrides set.';
+                    container.appendChild(empty);
+                }
+            } else {
+                triggerBtn.disabled = false;
             }
         },
 
@@ -984,14 +1186,22 @@
             const name = form.name.value.trim();
             const slug = form.slug.value.trim();
 
-            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles`, {
+            const result = await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles`, {
                 method: 'POST',
                 body: JSON.stringify({
                     name,
                     slug: slug || null,
                     permission_slugs: [],
                 }),
-            }, {reload: true});
+            });
+
+            if (result?.response?.ok) {
+                form.reset();
+                if (result.payload?.role) {
+                    this.state.roles.push({...result.payload.role, permission_ids: result.payload.role.permission_ids || []});
+                    this.renderAll();
+                }
+            }
         },
 
         async deleteRole(roleId, roleName) {
@@ -999,12 +1209,21 @@
                 return;
             }
 
-            await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles/${roleId}`, {
+            const result = await this.request(`/api/<?= htmlspecialchars($site) ?>/open-collab/admin/rbac/roles/${roleId}`, {
                 method: 'DELETE',
-            }, {reload: true});
+            });
+
+            if (result?.response?.ok) {
+                this.state.roles = this.state.roles.filter((role) => Number(role.id) !== Number(roleId));
+                this.state.members = this.state.members.map((member) => ({
+                    ...member,
+                    role_ids: (member.role_ids || []).filter((id) => Number(id) !== Number(roleId)),
+                }));
+                this.renderAll();
+            }
         },
 
-        async request(url, options, config = {}) {
+        async request(url, options) {
             const response = await fetch(url, {
                 ...options,
                 headers: {
@@ -1022,29 +1241,203 @@
             banner.className = response.ok ? 'oc-alert oc-alert--success' : 'oc-alert oc-alert--danger';
             banner.textContent = payload.message || payload.error || (response.ok ? 'Saved.' : 'Failed to save.');
 
-            if (response.ok && config.reload === true) {
-                setTimeout(() => window.location.reload(), 400);
-            }
-
             return {response, payload};
         },
 
+        renderPermissionOptions() {
+            const select = document.getElementById('override-drawer-permission');
+            if (!select) return;
+
+            if (!this.state.permissions.length) {
+                select.innerHTML = '<option value="">No permissions available</option>';
+                return;
+            }
+
+            select.innerHTML = this.state.permissions.map((permission) => `
+                <option value="${this.escapeHtml(permission.slug)}">${this.escapeHtml(permission.slug)}</option>
+            `).join('');
+        },
+
+        renderRoles() {
+            const list = document.getElementById('rbac-role-list');
+            if (list) {
+                if (!this.state.roles.length) {
+                    list.innerHTML = '<div class="oc-rbac-loading">No roles found.</div>';
+                    return;
+                }
+
+                list.innerHTML = this.state.roles.map((role) => `
+                    <div class="oc-rbac-member" data-role-id="${Number(role.id)}">
+                        <div>
+                            <div class="oc-rbac-member__name">${this.escapeHtml(role.name)}</div>
+                            <div class="oc-rbac-meta">${this.escapeHtml(role.slug)}${role.is_system ? ' · system role' : ''}</div>
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="rbacManager.focusRole(${Number(role.id)})">Edit permissions</button>
+                            ${role.is_system ? '' : `<button type="button" class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger" onclick="rbacManager.deleteRole(${Number(role.id)}, '${this.escapeJsString(role.name)}')">Delete</button>`}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        },
+
+        renderMatrix() {
+            const table = document.getElementById('rbac-matrix-table');
+            const body = document.getElementById('rbac-matrix-body');
+            if (!table || !body) return;
+
+            const headRow = table.querySelector('thead tr');
+            headRow.innerHTML = `<th>Permission</th>${this.state.roles.map((role) => `<th id="role-column-${Number(role.id)}">${this.escapeHtml(role.name)}</th>`).join('')}`;
+
+            if (!this.state.permissions.length) {
+                body.innerHTML = '<tr><td class="oc-rbac-loading">No permissions found.</td></tr>';
+                return;
+            }
+
+            body.innerHTML = this.state.permissions.map((permission) => `
+                <tr>
+                    <td>
+                        <strong>${this.escapeHtml(permission.slug)}</strong><br>
+                        <span class="oc-rbac-meta">${this.escapeHtml(permission.group)}</span>
+                    </td>
+                    ${this.state.roles.map((role) => `
+                        <td>
+                            <input type="checkbox"
+                                   data-role-id="${Number(role.id)}"
+                                   data-permission-slug="${this.escapeHtml(permission.slug)}"
+                                   ${Array.isArray(role.permission_ids) && role.permission_ids.includes(permission.id) ? 'checked' : ''}
+                                   onchange="rbacManager.toggleRolePermission(this)">
+                        </td>
+                    `).join('')}
+                </tr>
+            `).join('');
+        },
+
+        renderOverrides() {
+            const list = document.getElementById('rbac-overrides-list');
+            if (!list) return;
+
+            if (!this.state.members.length) {
+                list.innerHTML = '<div class="oc-rbac-loading">No members found.</div>';
+                return;
+            }
+
+            list.innerHTML = this.state.members.map((member) => {
+                const memberRoleNames = (member.role_ids || [])
+                    .map((roleId) => this.state.roles.find((role) => Number(role.id) === Number(roleId))?.name)
+                    .filter(Boolean);
+                const memberOverrides = this.state.overrides.filter((override) => Number(override.user_id) === Number(member.id));
+
+                return `
+                    <div class="oc-rbac-override-card">
+                        <div class="oc-rbac-override-card__header">
+                            <div>
+                                <div class="oc-rbac-member__name">${this.escapeHtml(member.name)}</div>
+                                <div class="oc-rbac-meta">Roles: ${this.escapeHtml(memberRoleNames.length ? memberRoleNames.join(', ') : 'none')}</div>
+                            </div>
+                            <button type="button"
+                                    class="oc-btn oc-btn--ghost oc-btn--sm"
+                                    onclick="rbacManager.openOverrideDrawer(${Number(member.id)}, '${this.escapeJsString(member.name)}')"
+                                    aria-label="Add override for ${this.escapeHtml(member.name)}">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" width="13" height="13" style="vertical-align:-1px;">
+                                    <line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/>
+                                </svg>
+                                Add override
+                            </button>
+                        </div>
+                        <div class="oc-rbac-current-overrides" id="member-overrides-${Number(member.id)}">
+                            ${memberOverrides.length ? memberOverrides.map((override) => `
+                                <span class="oc-rbac-override-pill"
+                                      data-permission-slug="${this.escapeHtml(override.permission_slug)}"
+                                      data-user-id="${Number(member.id)}"
+                                      data-granted="${override.granted ? 'true' : 'false'}">
+                                    <span class="oc-rbac-override-pill__type">${override.granted ? 'grant' : 'deny'}</span>
+                                    <span class="oc-rbac-override-pill__slug">${this.escapeHtml(override.permission_slug)}</span>
+                                    <button type="button"
+                                            class="oc-rbac-override-pill__remove"
+                                            aria-label="Remove override for ${this.escapeHtml(override.permission_slug)}"
+                                            onclick="rbacManager.removeOverride(${Number(member.id)}, '${this.escapeJsString(override.permission_slug)}', this)">
+                                        <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" width="9" height="9">
+                                            <line x1="1.5" y1="1.5" x2="8.5" y2="8.5"/><line x1="8.5" y1="1.5" x2="1.5" y2="8.5"/>
+                                        </svg>
+                                    </button>
+                                </span>
+                            `).join('') : '<span class="oc-rbac-meta oc-rbac-empty-overrides" data-empty-state="true">No direct overrides set.</span>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        },
+
+        renderAudit() {
+            const list = document.getElementById('rbac-audit-list');
+            if (!list) return;
+
+            if (!this.state.audit.length) {
+                list.innerHTML = '<div class="oc-rbac-loading">No audit entries yet.</div>';
+                return;
+            }
+
+            list.innerHTML = this.state.audit.map((entry) => `
+                <div class="oc-rbac-audit-item">
+                    <div class="oc-rbac-member__name">${this.escapeHtml(entry.action)}</div>
+                    <div class="oc-rbac-meta">
+                        actor ${this.escapeHtml(entry.actor_user_id ?? 'system')} ·
+                        target ${this.escapeHtml(entry.target_user_id ?? 'n/a')} ·
+                        ${this.escapeHtml(entry.created_at ?? '')}
+                    </div>
+                </div>
+            `).join('');
+        },
+
+        escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        },
+
+        escapeJsString(value) {
+            return String(value)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'");
+        },
+
         upsertOverridePill(userId, permissionSlug, granted) {
+            const existing = this.state.overrides.find((override) => Number(override.user_id) === Number(userId) && override.permission_slug === permissionSlug);
+            if (existing) {
+                existing.granted = granted;
+            } else {
+                this.state.overrides.push({user_id: Number(userId), permission_slug: permissionSlug, granted});
+            }
+
             const container = document.getElementById(`member-overrides-${userId}`);
             if (!container) return;
 
             container.querySelector('[data-empty-state="true"]')?.remove();
 
-            let pill = container.querySelector(`[data-permission-slug="${CSS.escape(permissionSlug)}"]`);
+            let pill = container.querySelector(`.oc-rbac-override-pill[data-permission-slug="${CSS.escape(permissionSlug)}"]`);
             if (!pill) {
                 pill = document.createElement('span');
                 pill.className = 'oc-rbac-override-pill';
                 pill.dataset.permissionSlug = permissionSlug;
+                pill.dataset.userId = String(userId);
                 container.appendChild(pill);
             }
 
             pill.dataset.granted = granted ? 'true' : 'false';
-            pill.textContent = `${permissionSlug} · ${granted ? 'grant' : 'deny'}`;
+            pill.innerHTML = `
+                <span class="oc-rbac-override-pill__type">${granted ? 'grant' : 'deny'}</span>
+                <span class="oc-rbac-override-pill__slug">${this.escapeHtml(permissionSlug)}</span>
+                <button type="button"
+                        class="oc-rbac-override-pill__remove"
+                        aria-label="Remove override for ${this.escapeHtml(permissionSlug)}"
+                        onclick="rbacManager.removeOverride(${Number(userId)}, '${this.escapeJsString(permissionSlug)}', this)">
+                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" width="9" height="9">
+                        <line x1="1.5" y1="1.5" x2="8.5" y2="8.5"/><line x1="8.5" y1="1.5" x2="1.5" y2="8.5"/>
+                    </svg>
+                </button>`;
         }
     };
 
@@ -1055,6 +1448,15 @@
             tab.classList.add('active');
             document.getElementById(tab.dataset.tabTarget)?.classList.add('active');
         });
+    });
+
+    rbacManager.init().catch((error) => {
+        const banner = document.getElementById('rbac-banner');
+        if (banner) {
+            banner.style.display = 'block';
+            banner.className = 'oc-alert oc-alert--danger';
+            banner.textContent = error.message || 'Failed to load RBAC data.';
+        }
     });
 </script>
 @endsection

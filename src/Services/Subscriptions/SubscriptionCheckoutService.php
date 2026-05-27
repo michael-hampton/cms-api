@@ -2,17 +2,14 @@
 
 namespace App\Services\Subscriptions;
 
-use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
-use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Vouchers\VoucherService;
 use DateTime;
 use Exception;
@@ -22,102 +19,49 @@ class SubscriptionCheckoutService
     public function __construct(
         private readonly SubscriptionPlanRepository $planRepository,
         private readonly SubscriptionRepository     $subscriptionRepository,
-        private readonly PaymentMethodRepository    $paymentMethodRepository,
+        private readonly SubscriptionCheckoutPreparationService $preparationService,
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly PayPalPaymentProcessor     $paypalProcessor,
         private readonly VoucherService $voucherService,
-        private readonly SubscriptionEligibilityService $eligibilityService,
-        private readonly SubscriptionPricingResolver $pricingResolver,
         private readonly Database                       $database,
 
     )
     {
     }
 
+    /**
+     * Intentionally separate from OneTimeSubscriptionCheckoutService.
+     *
+     * The one-time checkout stack is cart/session driven and ultimately creates
+     * one-time subscriptions (auto_renew=false) via OneTimeSubscriptionService.
+     * This recurring checkout flow must preserve recurring subscription
+     * semantics, so we only reuse lower-level pricing/eligibility/payment
+     * collaborators that are safe for recurring billing.
+     */
     public function processSubscriptionCheckout(int $memberId, array $data, int $siteId): array
     {
         try {
-            $paymentProvider = $this->paymentMethodRepository->findByCode($data['payment_method']);
+            $prepared = $this->preparationService->prepare($memberId, $data, $siteId);
 
             // Step 1: Create subscription record (PENDING)
-            $subscription = $this->database->transaction(function () use ($memberId, $data, $siteId, $paymentProvider) {
-
-                // Validate plan
-                $plan = $this->planRepository->find($data['subscription_plan_id']);
-
-                if (!$plan || !$plan->is_active) {
-                    throw new Exception('Invalid subscription plan');
-                }
-
-                // Validate payment method
-                $paymentMethod = $paymentProvider;
-                if (!$paymentMethod || !$paymentMethod->is_active) {
-                    throw new Exception('Invalid payment method');
-                }
-
-                // Check eligibility using injected service
-                $eligibility = $this->eligibilityService->canMemberSubscribe($memberId, $plan->id, $siteId, true);
-
-                if (!$eligibility['can_subscribe']) {
-                    throw new Exception($eligibility['reason']);
-                }
-
-                $pricingData = [
-                    'variant' => $data['variant'] ?? SubscriptionType::DIGITAL->value,
-                    'pricing_tier_id' => $data['pricing_tier_id'] ?? null,
-                    'voucher_code' => $data['voucher_code'] ?? null
-                ];
-
-                $resolvedPrice = $this->pricingResolver->resolve($plan, $pricingData, $memberId);
-
-                // Defaults
-                $voucherId = null;
-                $discountAmount = 0;
-                $finalPrice = $resolvedPrice->finalPrice;
-
-                // Handle voucher
-                if (!empty($data['voucher_code'])) {
-                    $voucherValidation = $this->voucherService->validateVoucherForSubscription(
-                        $data['voucher_code'],
-                        $plan->id,
-                        $memberId
-                    );
-
-                    if (!$voucherValidation->valid) {
-                        throw new Exception($voucherValidation->message);
-                    }
-
-                    $voucherId = $voucherValidation->voucherId;
-                    $discountAmount = $voucherValidation->discount;
-                    $finalPrice = $voucherValidation->finalPrice;
-                }
-
+            $subscription = $this->database->transaction(function () use ($memberId, $siteId, $prepared) {
                 // Create subscription (status: pending)
                 return $this->createSubscription(
                     $memberId,
-                    $plan,
+                    $prepared->plan,
                     $siteId,
-                    $voucherId,
-                    $discountAmount,
-                    $finalPrice
+                    $prepared->resolvedPrice->voucherId,
+                    $prepared->resolvedPrice->discountAmount,
+                    $prepared->resolvedPrice->finalPrice
                 );
             });
 
             // Step 2: Process payment OUTSIDE transaction
-            $plan = $subscription->plan;
-            $paymentMethod = $paymentProvider;
-
-            $voucher = null;
-            if ($subscription->voucher_id !== null) {
-                $voucher = $this->voucherService->getVoucherById($subscription->voucher_id);
-            }
-
             $paymentResult = $this->processPayment(
                 $subscription,
-                $plan,
+                $prepared->plan,
                 $data,
-                $paymentMethod,
-                $voucher
+                $prepared->paymentMethod
             );
 
             if (!$paymentResult['success']) {
@@ -132,7 +76,7 @@ class SubscriptionCheckoutService
             }
 
             // Step 3: Activate subscription & apply voucher
-            $this->database->transaction(function () use ($subscription, $plan, $paymentResult, $memberId) {
+            $this->database->transaction(function () use ($subscription, $prepared, $paymentResult, $memberId) {
 
                 $this->subscriptionRepository->update($subscription->id, [
                     'payment_intent_id' => $paymentResult['payment_intent_id'] ?? null,
@@ -141,7 +85,7 @@ class SubscriptionCheckoutService
                 ]);
 
                 // Grant premium access
-                $this->grantPlanPremiumAccess($subscription, $plan);
+                $this->grantPlanPremiumAccess($subscription, $prepared->plan);
 
                 // Apply voucher usage AFTER successful payment
                 if ($subscription->voucher_id !== null) {
@@ -251,8 +195,7 @@ class SubscriptionCheckoutService
         Subscription     $subscription,
         SubscriptionPlan $plan,
         array            $data,
-        $paymentMethod,
-        $voucher = null
+        $paymentMethod
     ): array
     {
         $processor = match ($data['payment_method']) {
@@ -265,15 +208,6 @@ class SubscriptionCheckoutService
             return $processor->processStripeSubscriptionPayment(
                 $subscription,
                 $plan,
-                $data
-            );
-        }
-
-        if ($voucher) {
-            return $processor->processSubscriptionPaymentWithVoucher(
-                $subscription,
-                $plan,
-                $voucher,
                 $data
             );
         }

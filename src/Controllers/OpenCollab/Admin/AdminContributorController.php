@@ -13,9 +13,12 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Requests\OpenCollab\CloseContributorAccountRequest;
 use App\Services\OpenCollab\ContributorTerminationService;
 use App\Services\OpenCollab\InvitationService;
+use App\Services\OpenCollab\RbacManagementService;
+use App\Services\OpenCollab\SitePermissionResolver;
 use App\Services\OpenCollab\SiteAccessService;
 
 /**
@@ -43,6 +46,9 @@ class AdminContributorController extends Controller
         private readonly SiteAccessService             $siteAccessService,
         private readonly InvitationService             $invitationService,
         private readonly InvitationRepository          $invitationRepository,
+        private readonly RbacRepository                $rbacRepository,
+        private readonly SitePermissionResolver        $permissionResolver,
+        private readonly RbacManagementService         $rbacManagementService,
         private readonly DeactivateContributorAction $deactivateAction,
         private readonly ReactivateContributorAction $reactivateAction,
         private readonly ChangeContributorRoleAction $changeRoleAction,
@@ -191,6 +197,71 @@ class AdminContributorController extends Controller
         }
     }
 
+    public function capabilities(int $id): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        $siteId = SiteContext::getId();
+        $effectivePermissions = $this->permissionResolver->forUser($id, $siteId);
+        $rolePermissionIds = $this->rbacRepository->permissionIdsForRoles($this->rbacRepository->roleIdsForUser($siteId, $id));
+        $rolePermissionSlugs = array_values(array_unique($this->rbacRepository->permissionSlugsForIds($rolePermissionIds)));
+
+        $overrides = [];
+        foreach ($this->rbacRepository->overridesForUser($siteId, $id) as $override) {
+            $slug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
+            if ($slug) {
+                $overrides[$slug] = (bool) $override['granted'];
+            }
+        }
+
+        $capabilities = array_map(function (array $permission) use ($effectivePermissions, $rolePermissionSlugs, $overrides) {
+            $slug = $permission['slug'];
+            $directGrant = array_key_exists($slug, $overrides) && $overrides[$slug] === true;
+            $directDeny = array_key_exists($slug, $overrides) && $overrides[$slug] === false;
+
+            return [
+                'key' => $slug,
+                'label' => $permission['name'],
+                'description' => null,
+                'effective' => in_array($slug, $effectivePermissions, true),
+                'source' => $directGrant || $directDeny ? 'override' : (in_array($slug, $rolePermissionSlugs, true) ? 'role' : 'none'),
+                'directGrant' => $directGrant,
+                'directDeny' => $directDeny,
+            ];
+        }, $this->rbacManagementService->permissionsForSite($siteId));
+
+        return $this->resourceResponse(['capabilities' => $capabilities]);
+    }
+
+    public function grantCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        return $this->setCapabilityOverride($id, $capabilityKey, true);
+    }
+
+    public function revokeCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        return $this->setCapabilityOverride($id, $capabilityKey, false);
+    }
+
+    public function resetCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        try {
+            $this->rbacManagementService->deleteUserOverride(SiteContext::getId(), $id, $capabilityKey, Auth::id());
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+
+        return $this->successResponse('Capability override removed.');
+    }
+
     // ── Invitations ───────────────────────────────────────────────────────────
 
     /**
@@ -283,5 +354,21 @@ class AdminContributorController extends Controller
             'revoked_at' => $inv->revoked_at,
             'created_at' => $inv->created_at,
         ];
+    }
+
+    private function setCapabilityOverride(int $id, string $capabilityKey, bool $granted): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        try {
+            $this->rbacManagementService->setUserOverride(SiteContext::getId(), $id, $capabilityKey, $granted, Auth::id());
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+
+        return $this->successResponse($granted ? 'Capability granted.' : 'Capability denied.');
     }
 }

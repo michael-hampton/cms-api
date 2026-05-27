@@ -11,7 +11,7 @@ use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Services\Billing\Order\OrderManager;
-use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeOffSessionCharger;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\Validators\OneTimePlanValidator;
 use Psr\Log\LoggerInterface;
@@ -41,7 +41,7 @@ use Psr\Log\LoggerInterface;
 class TrialConversionService
 {
     public function __construct(
-        private readonly StripePaymentProcessor     $stripeProcessor,
+        private readonly StripeOffSessionCharger    $offSessionCharger,
         private readonly Database                   $database,
         private readonly OrderManager               $orderManager,
         private readonly SubscriptionDateCalculator $dateCalculator,
@@ -164,7 +164,7 @@ class TrialConversionService
         $amountCents = (int)round($subscription->price * 100);
         $currency = $subscription->currency ?? 'gbp';
 
-        $paymentResult = $this->stripeProcessor->chargeOffSession(
+        $paymentResult = $this->offSessionCharger->charge(
             stripeCustomerId: $stripeCustomerId,
             amountCents: $amountCents,
             currency: $currency,

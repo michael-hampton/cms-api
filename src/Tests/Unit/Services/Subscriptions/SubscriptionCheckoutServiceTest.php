@@ -3,20 +3,17 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Subscriptions\ResolvedSubscriptionPrice;
-use App\DTO\Vouchers\VoucherValidationResult;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\PaymentMethod;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
-use App\Models\Voucher;
-use App\Repositories\Billing\PaymentMethodRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\PaymentProviders\PayPalPaymentProcessor;
-use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
 use App\Services\Subscriptions\SubscriptionCheckoutService;
-use App\Services\Subscriptions\SubscriptionEligibilityService;
+use App\Services\Subscriptions\SubscriptionCheckoutPreparationResult;
+use App\Services\Subscriptions\SubscriptionCheckoutPreparationService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Vouchers\VoucherService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -26,13 +23,11 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 {
     private $planRepository;
     private $subscriptionRepository;
-    private $paymentMethodRepository;
+    private $preparationService;
     private $subscriptionPaymentService;
     private $paypalProcessor;
     private $voucherService;
     private $service;
-    private $eligibilityService;
-    private SubscriptionPricingResolver $pricingResolver;
 
     protected function setUp(): void
     {
@@ -40,22 +35,18 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->planRepository = m::mock(SubscriptionPlanRepository::class);
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
-        $this->paymentMethodRepository = m::mock(PaymentMethodRepository::class);
+        $this->preparationService = m::mock(SubscriptionCheckoutPreparationService::class);
         $this->subscriptionPaymentService = m::mock(SubscriptionPaymentService::class);
         $this->paypalProcessor = m::mock(PayPalPaymentProcessor::class);
         $this->voucherService = m::mock(VoucherService::class);
-        $this->eligibilityService = m::mock(SubscriptionEligibilityService::class);
-        $this->pricingResolver = m::mock(SubscriptionPricingResolver::class);
 
         $this->service = new SubscriptionCheckoutService(
             $this->planRepository,
             $this->subscriptionRepository,
-            $this->paymentMethodRepository,
+            $this->preparationService,
             $this->subscriptionPaymentService,
             $this->paypalProcessor,
             $this->voucherService,
-            $this->eligibilityService,
-            $this->pricingResolver,
             Database::getInstance()
         );
     }
@@ -75,22 +66,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
 
-        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
-        $paymentMethod->is_active = true;
-
-        $this->setPricingResolverExpectations($plan);
-
-        $this->setEligibilityServiceMock(true);
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($plan);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('stripe')
-            ->once()
-            ->andReturn($paymentMethod);
+        $paymentMethod = $this->createPaymentMethod();
+        $this->expectPreparation(1, ['subscription_plan_id' => 1, 'payment_method' => 'stripe'], 1, $plan, $paymentMethod);
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
@@ -145,45 +122,15 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->shouldReceive('getPremiumAccessGrants')->andReturn([]);
         $plan->shouldReceive('grantsPremiumAccess')->andReturn(false);
 
-        $this->setPricingResolverExpectations($plan, 'SAVE10');
-
-        $this->setEligibilityServiceMock(true);
-
-        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
-        $paymentMethod->is_active = true;
-
-        $voucher = m::mock(Voucher::class)->makePartial();
-        $voucher->id = 1;
-        $voucher->code = 'SAVE10';
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($plan);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('stripe')
-            ->once()
-            ->andReturn($paymentMethod);
-
-        // Update to expect VoucherValidationResult object
-        $voucherResult = new VoucherValidationResult(
-            valid: true,
-            message: 'Voucher applied successfully',
-            discount: 5.00,
-            voucher: $voucher,
-            finalPrice: 24.99
+        $paymentMethod = $this->createPaymentMethod();
+        $this->expectPreparation(
+            1,
+            ['subscription_plan_id' => 1, 'payment_method' => 'stripe', 'voucher_code' => 'SAVE10'],
+            1,
+            $plan,
+            $paymentMethod,
+            new ResolvedSubscriptionPrice(1, SubscriptionType::DIGITAL->value, 29.99, 0, 24.99, 'GBP', 5.00, 1)
         );
-
-        $this->voucherService->shouldReceive('getVoucherById')
-            ->with(1)
-            ->once()
-            ->andReturn($voucher);
-
-        $this->voucherService->shouldReceive('validateVoucherForSubscription')
-            ->with('SAVE10', 1, 1)
-            ->once()
-            ->andReturn($voucherResult);
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
@@ -239,33 +186,10 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
     public function testProcessSubscriptionCheckoutFailsWithInvalidVoucher(): void
     {
-        $plan = m::mock(SubscriptionPlan::class)->makePartial();
-        $plan->id = 1;
-        $plan->is_active = true;
-        $plan->price = 22.99;
-
-        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
-        $paymentMethod->is_active = true;
-
-        $this->setPricingResolverExpectations($plan, 'INVALID');
-        $this->setEligibilityServiceMock(true);
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
+        $this->preparationService->shouldReceive('prepare')
             ->once()
-            ->andReturn($plan);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('stripe')
-            ->once()
-            ->andReturn($paymentMethod);
-
-        $voucherValidationResult = new VoucherValidationResult(valid: false, message: 'Invalid or expired voucher code');
-
-        $this->voucherService->shouldReceive('validateVoucherForSubscription')
-            ->with('INVALID', 1, 1)
-            ->once()
-            ->andReturn($voucherValidationResult);
+            ->with(1, ['subscription_plan_id' => 1, 'payment_method' => 'stripe', 'voucher_code' => 'INVALID'], 1)
+            ->andThrow(new \InvalidArgumentException('Invalid or expired voucher code'));
 
         $data = [
             'subscription_plan_id' => 1,
@@ -281,15 +205,10 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
     public function testProcessSubscriptionCheckoutFailsWithInvalidPlan(): void
     {
-        $this->planRepository->shouldReceive('find')
-            ->with(999)
+        $this->preparationService->shouldReceive('prepare')
             ->once()
-            ->andReturn(null);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('stripe')
-            ->once()
-            ->andReturn(null);
+            ->with(1, ['subscription_plan_id' => 999, 'payment_method' => 'stripe'], 1)
+            ->andThrow(new \Exception('Invalid subscription plan'));
 
         $data = [
             'subscription_plan_id' => 999,
@@ -304,18 +223,10 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
     public function testProcessSubscriptionCheckoutFailsWithInactivePlan(): void
     {
-        $plan = m::mock(SubscriptionPlan::class)->makePartial();
-        $plan->is_active = false;
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
+        $this->preparationService->shouldReceive('prepare')
             ->once()
-            ->andReturn($plan);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('stripe')
-            ->once()
-            ->andReturn(null);
+            ->with(1, ['subscription_plan_id' => 1, 'payment_method' => 'stripe'], 1)
+            ->andThrow(new \Exception('Invalid subscription plan'));
 
         $data = [
             'subscription_plan_id' => 1,
@@ -330,18 +241,10 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
     public function testProcessSubscriptionCheckoutFailsWithInvalidPaymentMethod(): void
     {
-        $plan = m::mock(SubscriptionPlan::class)->makePartial();
-        $plan->is_active = true;
-
-        $this->planRepository->shouldReceive('find')
-            ->with(1)
+        $this->preparationService->shouldReceive('prepare')
             ->once()
-            ->andReturn($plan);
-
-        $this->paymentMethodRepository->shouldReceive('findByCode')
-            ->with('invalid')
-            ->once()
-            ->andReturn(null);
+            ->with(1, ['subscription_plan_id' => 1, 'payment_method' => 'invalid'], 1)
+            ->andThrow(new \Exception('Invalid payment method'));
 
         $data = [
             'subscription_plan_id' => 1,
@@ -352,23 +255,6 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Invalid payment method', $result['message']);
-    }
-
-    private function setEligibilityServiceMock(bool $canSubscribe): void
-    {
-        $this->eligibilityService->shouldReceive('canMemberSubscribe')
-            ->with(1, 1, 1, true)
-            ->andReturn(['can_subscribe' => $canSubscribe]);
-    }
-
-    private function setPricingResolverExpectations(SubscriptionPlan $plan, ?string $voucherCode = null)
-    {
-        $result = new ResolvedSubscriptionPrice(1, SubscriptionType::DIGITAL->value, $plan->price, 0, $plan->price, 'GBP', 0, null);
-
-        $this->pricingResolver->shouldReceive('resolve')
-            ->once()
-            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => NULL, 'voucher_code' => $voucherCode], 1)
-            ->andReturn($result);
     }
 
     public function testGetSubscriptionPlanBySlugReturnsPlan(): void
@@ -406,14 +292,8 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
         $plan->currency = 'USD';
         $plan->billing_period = 'monthly';
 
-        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
-        $paymentMethod->is_active = true;
-
-        $this->setPricingResolverExpectations($plan);
-        $this->setEligibilityServiceMock(true);
-
-        $this->planRepository->shouldReceive('find')->with(1)->once()->andReturn($plan);
-        $this->paymentMethodRepository->shouldReceive('findByCode')->with('stripe')->once()->andReturn($paymentMethod);
+        $paymentMethod = $this->createPaymentMethod();
+        $this->expectPreparation(1, ['subscription_plan_id' => 1, 'payment_method' => 'stripe'], 1, $plan, $paymentMethod);
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
@@ -422,12 +302,10 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('create')->once()->andReturn($subscription);
 
-        // Payment fails
         $this->subscriptionPaymentService->shouldReceive('processStripeSubscriptionPayment')
             ->once()
             ->andReturn(['success' => false, 'message' => 'Card declined']);
 
-        // Subscription must be marked failed
         $this->subscriptionRepository->shouldReceive('update')
             ->once()
             ->with(1, ['status' => 'failed']);
@@ -437,5 +315,92 @@ class SubscriptionCheckoutServiceTest extends FunctionalTestCase
 
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('Card declined', $result['message']);
+    }
+
+    public function testProcessSubscriptionCheckoutUsesPaypalProcessorWithoutVoucherSpecificMethod(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+        $plan->is_active = true;
+        $plan->price = 29.99;
+        $plan->currency = 'USD';
+        $plan->billing_period = 'monthly';
+        $plan->shouldReceive('getPremiumAccessGrants')->andReturn([]);
+        $plan->shouldReceive('grantsPremiumAccess')->andReturn(false);
+
+        $paymentMethod = $this->createPaymentMethod();
+        $this->expectPreparation(
+            1,
+            ['subscription_plan_id' => 1, 'payment_method' => 'paypal', 'voucher_code' => 'SAVE10'],
+            1,
+            $plan,
+            $paymentMethod,
+            new ResolvedSubscriptionPrice(1, SubscriptionType::DIGITAL->value, 29.99, 0, 24.99, 'GBP', 5.00, 1)
+        );
+
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->id = 1;
+        $subscription->plan = $plan;
+        $subscription->voucher_id = 1;
+        $subscription->discount_amount = 5.00;
+
+        $this->subscriptionRepository->shouldReceive('create')->once()->andReturn($subscription);
+
+        $this->paypalProcessor->shouldReceive('processSubscriptionPayment')
+            ->once()
+            ->with($subscription, $plan, ['subscription_plan_id' => 1, 'payment_method' => 'paypal', 'voucher_code' => 'SAVE10'])
+            ->andReturn(['success' => true, 'redirect_url' => 'https://paypal.test']);
+
+        $this->subscriptionRepository->shouldReceive('update')
+            ->once()
+            ->with(1, ['payment_intent_id' => null, 'payment_subscription_id' => null, 'status' => 'active'])
+            ->andReturn($subscription);
+
+        $this->voucherService->shouldReceive('applyVoucher')
+            ->once()
+            ->with(1, 1, 5.00)
+            ->andReturn(true);
+
+        $result = $this->service->processSubscriptionCheckout(
+            1,
+            ['subscription_plan_id' => 1, 'payment_method' => 'paypal', 'voucher_code' => 'SAVE10'],
+            1
+        );
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('https://paypal.test', $result['redirect_url']);
+    }
+
+    private function expectPreparation(
+        int $memberId,
+        array $data,
+        int $siteId,
+        SubscriptionPlan $plan,
+        object $paymentMethod,
+        ?ResolvedSubscriptionPrice $resolvedPrice = null
+    ): void {
+        $resolvedPrice ??= new ResolvedSubscriptionPrice(
+            1,
+            SubscriptionType::DIGITAL->value,
+            $plan->price,
+            0,
+            $plan->price,
+            'GBP',
+            0,
+            null
+        );
+
+        $this->preparationService->shouldReceive('prepare')
+            ->with($memberId, $data, $siteId)
+            ->once()
+            ->andReturn(new SubscriptionCheckoutPreparationResult($plan, $paymentMethod, $resolvedPrice));
+    }
+
+    private function createPaymentMethod(): PaymentMethod
+    {
+        $paymentMethod = m::mock(PaymentMethod::class)->makePartial();
+        $paymentMethod->is_active = true;
+
+        return $paymentMethod;
     }
 }

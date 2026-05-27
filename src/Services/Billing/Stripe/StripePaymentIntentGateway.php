@@ -111,6 +111,9 @@ class StripePaymentIntentGateway implements StripePaymentIntentGatewayInterface
                 clientSecret:    $intent->client_secret,
                 status:          $intent->status,
                 customerId:      is_string($intent->customer) ? $intent->customer : $intent->customer?->id,
+                paymentMethodId: is_string($intent->payment_method) ? $intent->payment_method : $intent->payment_method?->id,
+                amountCents:     $intent->amount ?? null,
+                currency:        $intent->currency ?? null,
             );
 
         } catch (ApiErrorException $e) {

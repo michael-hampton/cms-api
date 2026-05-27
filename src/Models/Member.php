@@ -145,7 +145,7 @@ class Member extends Model
 
     public function verifyPassword(string $password): bool
     {
-        return password_verify($password, $this->password);
+        return password_verify($password, $this->attributes['password'] ?? '');
     }
 
     public function getDisplayNameAttribute(): string

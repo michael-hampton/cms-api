@@ -38,6 +38,7 @@ class MemberSubscriptionsApiController extends Controller
         }
 
         $member = MemberAuth::getMember();
+
         $siteId = SiteContext::getId();
 
         $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId, true);
