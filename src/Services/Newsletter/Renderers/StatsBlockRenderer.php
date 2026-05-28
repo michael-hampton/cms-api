@@ -38,7 +38,10 @@ class StatsBlockRenderer implements EmailBlockRenderer
             $html[] = "<h3 style=\"{$titleStyle}\">" . Str::sanitize($blockData->title) . '</h3>';
         }
 
-        $html[] = '<table style="width: 100%;"><tr>';
+        $tableStyle = $blockData->layout === 'horizontal'
+            ? 'width: 100%; table-layout: fixed;'
+            : 'width: 100%;';
+        $html[] = '<table style="' . $tableStyle . '"><tr>';
 
         $statCount = count($blockData->stats);
         $cellWidth = $statCount > 0 ? floor(100 / $statCount) : 100;

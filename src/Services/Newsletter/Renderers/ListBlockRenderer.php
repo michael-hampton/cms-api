@@ -30,8 +30,12 @@ class ListBlockRenderer implements EmailBlockRenderer
         $baseListStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 15px 0; padding-left: 30px;';
         $listStyle = $blockData->style->mergeIntoCss($baseListStyle);
 
+        $startAttr = $tag === 'ol' && $blockData->startIndex > 1
+            ? ' start="' . $blockData->startIndex . '"'
+            : '';
+
         $html = [];
-        $html[] = "<{$tag} style=\"{$listStyle}\">";
+        $html[] = "<{$tag}{$startAttr} style=\"{$listStyle}\">";
 
         foreach ($blockData->items as $item) {
             $html[] = '<li style="margin-bottom: 8px;">' . Str::sanitize($item) . '</li>';

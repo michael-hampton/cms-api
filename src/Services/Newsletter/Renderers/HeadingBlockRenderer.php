@@ -38,13 +38,18 @@ class HeadingBlockRenderer implements EmailBlockRenderer
         $level = $blockData->level;
 
         // Start from renderer defaults, then merge block-level style overrides.
-        $baseHeadingStyle = "color: #333; font-size: {$defaultSize}; margin: 20px 0 10px 0; font-weight: bold;";
+        $headingColor = $blockData->textColor ? Str::sanitize($blockData->textColor) : '#333';
+        $fontStyle = $blockData->fontStyle ? 'font-style: ' . Str::sanitize($blockData->fontStyle) . ';' : '';
+        $fontFamily = $blockData->fontFamily ? 'font-family: ' . Str::sanitize($blockData->fontFamily) . ';' : '';
+        $fontWeight = $blockData->fontWeight ? Str::sanitize($blockData->fontWeight) : 'bold';
+        $textTransform = $blockData->textTransform ? 'text-transform: ' . Str::sanitize($blockData->textTransform) . ';' : '';
+        $baseHeadingStyle = "color: {$headingColor}; font-size: {$defaultSize}; margin: 20px 0 10px 0; font-weight: {$fontWeight}; {$fontStyle}{$fontFamily}{$textTransform}";
         $headingStyle = $blockData->style->mergeIntoCss($baseHeadingStyle);
 
         $html = "<h{$level} style=\"{$headingStyle}\">" . Str::sanitize($blockData->text) . "</h{$level}>\n";
 
         if ($blockData->subtitle) {
-            $baseSubStyle = 'color: #666; font-size: 16px; margin: 0 0 20px 0;';
+            $baseSubStyle = "color: {$headingColor}; font-size: 16px; margin: 0 0 20px 0; {$fontStyle}{$fontFamily}{$textTransform}";
             $subStyle = $blockData->style->mergeIntoCss($baseSubStyle);
             $html .= "<p style=\"{$subStyle}\">" . Str::sanitize($blockData->subtitle) . "</p>\n";
         }

@@ -9,6 +9,7 @@ class StatsBlockData extends BaseBlockData
     public function __construct(
         public readonly ?string $title,
         public readonly array $stats,
+        public readonly ?string $layout,
     )
     {
     }
@@ -18,6 +19,7 @@ class StatsBlockData extends BaseBlockData
         $instance = new static(
             title: $data['title'] ?? null,
             stats: $data['stats'] ?? [],
+            layout: $data['layout'] ?? null,
         );
 
         $instance->resolveStyle($data);

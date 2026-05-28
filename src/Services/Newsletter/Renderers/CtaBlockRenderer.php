@@ -53,10 +53,17 @@ class CtaBlockRenderer implements EmailBlockRenderer
         if ($blockData->sponsored) $linkAttrs .= ' rel="sponsored"';
         if ($blockData->openInNewTab) $linkAttrs .= ' target="_blank"';
 
-        $baseBtnStyle = "{$padding} background-color: {$bgColor}; color: {$textColor}; display: inline-block; text-decoration: none; border-radius: 4px; font-weight: bold;";
+        $widthCss = $blockData->buttonWidth ? 'width: ' . Str::sanitize($blockData->buttonWidth) . ';' : '';
+        $borderRadius = $blockData->roundedButton
+            ? '9999px'
+            : ($blockData->borderRadius ? Str::sanitize($blockData->borderRadius) : '4px');
+        $borderCss = $blockData->buttonBorder ? 'border: ' . Str::sanitize($blockData->buttonBorder) . ';' : '';
+        $baseBtnStyle = "{$padding} {$widthCss} {$borderCss} background-color: {$bgColor}; color: {$textColor}; display: inline-block; text-decoration: none; border-radius: {$borderRadius}; font-weight: bold;";
         $btnStyle = $blockData->style->mergeIntoCss($baseBtnStyle);
 
-        $baseWrapperStyle = "margin: 25px 0; {$alignStyle}";
+        $paddingTop = $blockData->paddingTop ? 'padding-top: ' . Str::sanitize($blockData->paddingTop) . ';' : '';
+        $paddingBottom = $blockData->paddingBottom ? 'padding-bottom: ' . Str::sanitize($blockData->paddingBottom) . ';' : '';
+        $baseWrapperStyle = "margin: 25px 0; {$alignStyle} {$paddingTop} {$paddingBottom}";
         $wrapperStyle = $blockData->style->mergeIntoCss($baseWrapperStyle);
 
         $html = "<div style=\"{$wrapperStyle}\">"

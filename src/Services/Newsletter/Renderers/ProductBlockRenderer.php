@@ -45,8 +45,22 @@ class ProductBlockRenderer implements EmailBlockRenderer
 
         $html[] = "<h3 style=\"{$nameStyle}\">" . Str::sanitize($blockData->name) . '</h3>';
 
+        if ($blockData->brand) {
+            $html[] = '<p style="color: #888; margin: 0 0 10px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">' . Str::sanitize($blockData->brand) . '</p>';
+        }
+
         if ($blockData->description) {
             $html[] = '<p style="color: #666; margin: 0 0 15px 0; font-size: 14px;">' . Str::sanitize($blockData->description) . '</p>';
+        }
+
+        if (!empty($blockData->specs)) {
+            $html[] = '<ul style="margin: 0 0 15px 20px; padding: 0; color: #555; font-size: 13px;">';
+            foreach ($blockData->specs as $spec) {
+                $label = Str::sanitize($spec['text'] ?? '');
+                $value = Str::sanitize($spec['value'] ?? '');
+                $html[] = '<li style="margin-bottom: 4px;">' . $label . ($value !== '' ? ': ' . $value : '') . '</li>';
+            }
+            $html[] = '</ul>';
         }
 
         $html[] = '<div style="margin: 15px 0;">';

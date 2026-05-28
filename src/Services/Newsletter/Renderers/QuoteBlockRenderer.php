@@ -29,7 +29,8 @@ class QuoteBlockRenderer implements EmailBlockRenderer
         $baseStyle = 'border-left: 4px solid #007bff; padding-left: 20px; margin: 20px 0; font-style: italic;';
         $wrapperStyle = $blockData->style->mergeIntoCss($baseStyle);
 
-        $baseTextStyle = 'color: #333; font-size: 18px; line-height: 1.6; margin: 0;';
+        $quoteColor = $blockData->textColor ? Str::sanitize($blockData->textColor) : '#333';
+        $baseTextStyle = "color: {$quoteColor}; font-size: 18px; line-height: 1.6; margin: 0;";
         $textStyle = $blockData->style->mergeIntoCss($baseTextStyle);
 
         $html = [];

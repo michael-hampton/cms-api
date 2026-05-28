@@ -8,6 +8,7 @@ class TextBlockData extends BaseBlockData
 {
     public function __construct(
         public readonly array $paragraphs,
+        public readonly ?string $textColor,
     )
     {
     }
@@ -16,6 +17,7 @@ class TextBlockData extends BaseBlockData
     {
         $instance = new static(
             paragraphs: $data['paragraphs'] ?? [],
+            textColor: $data['textColor'] ?? null,
         );
 
         $instance->resolveStyle($data);

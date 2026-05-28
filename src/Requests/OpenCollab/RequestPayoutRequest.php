@@ -9,7 +9,7 @@ class RequestPayoutRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'method' => ['required', 'string', 'in:bank_transfer,paypal,other'],
+            'method' => ['required', 'string', 'in:bank_transfer,paypal,other,stripe'],
         ];
     }
 
@@ -17,7 +17,7 @@ class RequestPayoutRequest extends FormRequest
     {
         return [
             'method.required' => 'A payout method is required.',
-            'method.in' => 'Supported methods: bank_transfer, paypal, other.',
+            'method.in' => 'Supported methods: bank_transfer, paypal, other, stripe.',
         ];
     }
 }

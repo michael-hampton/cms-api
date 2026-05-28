@@ -26,7 +26,14 @@ class NoteBlockRenderer implements EmailBlockRenderer
             return RenderedBlock::skipped();
         }
 
-        $baseStyle = 'background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; padding: 20px; margin: 20px 0;';
+        $alignmentStyle = match ($blockData->alignment) {
+            'left' => 'margin-right: auto; width: 75%;',
+            'center' => 'margin-left: auto; margin-right: auto; width: 75%;',
+            'right' => 'margin-left: auto; width: 75%;',
+            default => 'width: 100%;',
+        };
+
+        $baseStyle = 'background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px; padding: 20px; margin: 20px 0; ' . $alignmentStyle;
         $wrapperStyle = $blockData->style->mergeIntoCss($baseStyle);
 
         $baseTitleStyle = 'color: #333; margin: 0 0 15px 0; font-size: 20px;';

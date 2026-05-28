@@ -97,7 +97,7 @@ class BannerBlockRenderer implements EmailBlockRenderer
 
             $navHtml = sprintf(
                 '<div style="text-align:center;padding:10px 20px;background-color:%s;">%s</div>',
-                $bg,
+                htmlspecialchars($blockData->navBackgroundColor ?: $bg),
                 $navItems
             );
         } elseif (!empty($blockData->ctaText)) {
@@ -201,11 +201,11 @@ HTML;
 
         // ── Optional address / extra line from ctaText ────────────────────────
         $addressHtml = '';
-        if (!empty($blockData->ctaText)) {
+        if (!empty($blockData->address) || !empty($blockData->ctaText)) {
             $addressHtml = sprintf(
                 '<p style="margin:0 0 8px 0;font-size:11px;color:%s;">%s</p>',
                 $color,
-                Str::sanitize($blockData->ctaText)
+                Str::sanitize($blockData->address ?: $blockData->ctaText)
             );
         }
 

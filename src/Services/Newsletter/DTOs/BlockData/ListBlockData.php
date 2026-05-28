@@ -9,6 +9,7 @@ class ListBlockData extends BaseBlockData
     public function __construct(
         public readonly string $listType,
         public readonly array $items,
+        public readonly int $startIndex,
     )
     {
     }
@@ -18,6 +19,7 @@ class ListBlockData extends BaseBlockData
         $instance = new static(
             listType: $data['listType'] ?? 'ul',
             items: $data['items'] ?? [],
+            startIndex: (int)($data['startIndex'] ?? 1),
         );
 
         $instance->resolveStyle($data);

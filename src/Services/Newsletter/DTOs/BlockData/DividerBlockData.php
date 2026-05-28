@@ -14,6 +14,10 @@ class DividerBlockData extends BaseBlockData
 {
     public function __construct(
         public readonly string $lineStyle = 'solid',
+        public readonly ?string $marginTop = null,
+        public readonly ?string $marginBottom = null,
+        public readonly ?string $dividerColor = null,
+        public readonly ?string $thickness = null,
     )
     {
     }
@@ -25,7 +29,13 @@ class DividerBlockData extends BaseBlockData
         $data['lineStyle'] = $data['style'] ?? 'solid';
         unset($data['style']);
 
-        $instance = new static(lineStyle: $lineStyle);
+        $instance = new static(
+            lineStyle: $lineStyle,
+            marginTop: $data['marginTop'] ?? null,
+            marginBottom: $data['marginBottom'] ?? null,
+            dividerColor: $data['dividerColor'] ?? null,
+            thickness: $data['thickness'] ?? null,
+        );
 
         $instance->resolveStyle($data);
 

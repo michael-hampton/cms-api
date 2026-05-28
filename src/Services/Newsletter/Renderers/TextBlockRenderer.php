@@ -27,7 +27,8 @@ class TextBlockRenderer implements EmailBlockRenderer
         }
 
         // Build the base paragraph style, then merge any block-level overrides.
-        $baseParaStyle = 'color: #333; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;';
+        $textColor = $blockData->textColor ? Str::sanitize($blockData->textColor) : '#333';
+        $baseParaStyle = "color: {$textColor}; font-size: 16px; line-height: 1.6; margin: 0 0 15px 0;";
         $paraStyle = $blockData->style->mergeIntoCss($baseParaStyle);
 
         // If the block has a background colour or padding, wrap paragraphs in a container div.

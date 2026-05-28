@@ -17,6 +17,12 @@ class ImageBlockData extends BaseBlockData
         public readonly bool    $openInNewTab,
         public readonly string  $layout,
         public readonly string  $alignment,
+        public readonly ?string $context,
+        public readonly ?string $imageWidth,
+        public readonly ?string $maxHeight,
+        public readonly ?string $objectFit,
+        public readonly ?string $objectPosition,
+        public readonly ?string $imagePadding,
         public readonly array $endorsements,
     )
     {
@@ -35,6 +41,12 @@ class ImageBlockData extends BaseBlockData
             openInNewTab: (bool)($data['openInNewTab'] ?? false),
             layout: $data['layout'] ?? 'full',
             alignment: $data['alignment'] ?? 'fullscreen',
+            context: $data['context'] ?? null,
+            imageWidth: $data['imageWidth'] ?? null,
+            maxHeight: $data['maxHeight'] ?? null,
+            objectFit: $data['objectFit'] ?? null,
+            objectPosition: $data['objectPosition'] ?? null,
+            imagePadding: $data['imagePadding'] ?? null,
             endorsements: $data['endorsements'] ?? [],
         );
 

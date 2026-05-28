@@ -9,6 +9,8 @@ class SectionBlockData extends BaseBlockData
     public function __construct(
         public readonly string $title,
         public readonly string $headingType,
+        public readonly ?string $navigationText,
+        public readonly bool $excludeFromNav,
     )
     {
     }
@@ -18,6 +20,8 @@ class SectionBlockData extends BaseBlockData
         $instance = new static(
             title: $data['title'] ?? '',
             headingType: $data['headingType'] ?? 'h2',
+            navigationText: $data['navigationText'] ?? null,
+            excludeFromNav: (bool)($data['excludeFromNav'] ?? false),
         );
 
         $instance->resolveStyle($data);

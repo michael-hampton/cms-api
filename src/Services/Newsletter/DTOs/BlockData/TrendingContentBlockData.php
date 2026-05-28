@@ -6,8 +6,6 @@ namespace App\Services\Newsletter\DTOs\BlockData;
 
 class TrendingContentBlockData extends BaseBlockData
 {
-    public $timeframe;
-
     public function __construct(
         /** How many products to surface at render time */
         public readonly int     $limit,
@@ -17,6 +15,7 @@ class TrendingContentBlockData extends BaseBlockData
 
         /** Optional section heading */
         public readonly ?string $title,
+        public readonly ?string $timeframe,
 
         /**
          * Mock items stored at insert time for builder preview.
@@ -35,6 +34,7 @@ class TrendingContentBlockData extends BaseBlockData
             limit: (int)($data['limit'] ?? 4),
             fallback: $data['fallback'] ?? 'top_sellers',
             title: $data['title'] ?? null,
+            timeframe: $data['timeframe'] ?? null,
             mockItems: $data['mock_items'] ?? [],
             showImage: $data['showImage'] ?? true,
             showExcerpt: $data['showExcerpt'] ?? true

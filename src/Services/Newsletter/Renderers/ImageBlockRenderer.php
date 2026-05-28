@@ -43,7 +43,12 @@ class ImageBlockRenderer implements EmailBlockRenderer
         $baseWrapperStyle = "margin: 20px 0; {$alignmentStyle}";
         $wrapperStyle = $blockData->style->mergeIntoCss($baseWrapperStyle);
 
-        $imgStyle = "{$widthStyle} height: auto; display: block; border-radius: 4px;";
+        $customWidth = $blockData->imageWidth ? 'width: ' . Str::sanitize($blockData->imageWidth) . ';' : '';
+        $maxHeight = $blockData->maxHeight ? 'max-height: ' . Str::sanitize($blockData->maxHeight) . ';' : '';
+        $objectFit = $blockData->objectFit ? 'object-fit: ' . Str::sanitize($blockData->objectFit) . ';' : '';
+        $objectPosition = $blockData->objectPosition ? 'object-position: ' . Str::sanitize($blockData->objectPosition) . ';' : '';
+        $padding = $blockData->imagePadding ? 'padding: ' . Str::sanitize($blockData->imagePadding) . ';' : '';
+        $imgStyle = "{$widthStyle}{$customWidth}{$maxHeight}{$objectFit}{$objectPosition}{$padding} height: auto; display: block; border-radius: 4px;";
         $imgTag = '<img src="' . Str::sanitize($blockData->src) . '" alt="' . Str::sanitize($blockData->alt) . "\" style=\"{$imgStyle}\">";
 
         $linkAttrs = '';

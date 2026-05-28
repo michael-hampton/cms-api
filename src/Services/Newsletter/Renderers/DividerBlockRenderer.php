@@ -32,7 +32,11 @@ class DividerBlockRenderer implements EmailBlockRenderer
             default => 'solid',
         };
 
-        $baseStyle = "border: none; border-top: 2px {$borderCss} #ddd; margin: 25px 0;";
+        $thickness = $blockData->thickness ? Str::sanitize($blockData->thickness) : '2px';
+        $color = $blockData->dividerColor ? Str::sanitize($blockData->dividerColor) : '#ddd';
+        $marginTop = $blockData->marginTop ? Str::sanitize($blockData->marginTop) : '25px';
+        $marginBottom = $blockData->marginBottom ? Str::sanitize($blockData->marginBottom) : '25px';
+        $baseStyle = "border: none; border-top: {$thickness} {$borderCss} {$color}; margin-top: {$marginTop}; margin-bottom: {$marginBottom};";
         $resolvedStyle = $blockData->style->mergeIntoCss($baseStyle);
 
         return RenderedBlock::rendered("<hr style=\"{$resolvedStyle}\">");

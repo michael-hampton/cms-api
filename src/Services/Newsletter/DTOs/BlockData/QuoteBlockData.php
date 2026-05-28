@@ -9,6 +9,7 @@ class QuoteBlockData extends BaseBlockData
     public function __construct(
         public readonly string  $text,
         public readonly ?string $attribution = null,
+        public readonly ?string $textColor = null,
     )
     {
     }
@@ -18,6 +19,7 @@ class QuoteBlockData extends BaseBlockData
         $instance = new static(
             text: $data['text'] ?? '',
             attribution: $data['attribution'] ?? null,
+            textColor: $data['textColor'] ?? null,
         );
 
         $instance->resolveStyle($data);

@@ -36,7 +36,7 @@ class TrendingContentBlockRenderer implements EmailBlockRenderer
         $articles = $this->resolver->resolveArticles(
             $context->siteId,
             $blockData->limit,
-            'trending',
+            $blockData->fallback ?: 'trending',
             $context->member
         );
 

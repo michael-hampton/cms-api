@@ -35,8 +35,10 @@ class SectionBlockRenderer implements EmailBlockRenderer
         $baseStyle = "color: #333; font-size: {$size}; margin: 30px 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid #007bff;";
         $style = $blockData->style->mergeIntoCss($baseStyle);
 
-        return RenderedBlock::rendered(
-            "<{$tag} style=\"{$style}\">" . Str::sanitize($blockData->title) . "</{$tag}>"
-        );
+        $content = "<{$tag} style=\"{$style}\">" . Str::sanitize($blockData->title) . "</{$tag}>";
+        if ($blockData->navigationText && !$blockData->excludeFromNav) {
+            $content .= '<p style="color: #666; font-size: 12px; margin: 6px 0 0 0; text-transform: uppercase; letter-spacing: 0.5px;">' . Str::sanitize($blockData->navigationText) . '</p>';
+        }
+        return RenderedBlock::rendered($content);
     }
 }
