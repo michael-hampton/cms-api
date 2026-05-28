@@ -2,6 +2,8 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Database\Database;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
@@ -67,6 +69,15 @@ class SubscriptionDeliveryService
 
             // Update issue delivery schedule ONLY for this subscription
             $this->updateIssueDeliverySchedule($subscriptionId, $pauseStart, $pauseEnd);
+
+            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
+                event(new SubscriptionPaused(
+                    subscription: $this->subscriptionRepository->find($subscriptionId),
+                    pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
+                    pauseStart: $pauseStart->format('Y-m-d H:i:s'),
+                    reason: $reason,
+                ));
+            }
 
             return [
                 'success' => true,
@@ -156,6 +167,13 @@ class SubscriptionDeliveryService
 
             // Recalculate issue delivery schedule
             $this->recalculateIssueDeliverySchedule($subscriptionId);
+
+            if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
+                event(new SubscriptionResumed(
+                    subscription: $this->subscriptionRepository->find($subscriptionId),
+                    memberId: (int)$subscription->member_id,
+                ));
+            }
 
             return [
                 'success' => true,

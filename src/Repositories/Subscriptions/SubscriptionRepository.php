@@ -4,6 +4,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
+use App\Events\Subscriptions\SubscriptionCreated;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Model;
@@ -194,6 +195,16 @@ class SubscriptionRepository extends Repository
 
         // **GRANT PREMIUM ACCESS FROM PLAN**
         $this->grantPlanPremiumAccess($subscription, $plan);
+
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
+            event(new SubscriptionCreated(
+                subscriptionId: (int)$subscription->id,
+                planId: (int)$plan->id,
+                billingPeriod: (string)$plan->billing_period,
+                priceCents: (int)round(((float)($subscription->price ?? $plan->price)) * 100),
+                currency: (string)($subscription->currency ?? $plan->currency ?? 'GBP'),
+            ));
+        }
 
         return $subscription;
     }

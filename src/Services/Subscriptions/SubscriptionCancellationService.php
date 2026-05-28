@@ -3,6 +3,8 @@
 namespace App\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Events\Subscriptions\SubscriptionCancelled;
+use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
@@ -115,9 +117,19 @@ class SubscriptionCancellationService
                 'cancel_at_period_end' => $cancelAtPeriodEnd,
             ]);
 
+            $refreshedSubscription = $this->subscriptionRepository->find($subscriptionId);
+
+            if ($this->shouldDispatchLifecycleEvent((int)$subscriptionId)) {
+                event(new SubscriptionCancelled(
+                    subscriptionId: (int)$subscriptionId,
+                    cancelAtPeriodEnd: (bool)$cancelAtPeriodEnd,
+                    endDate: $this->formatEventDate($refreshedSubscription?->end_date),
+                ));
+            }
+
             return [
                 'success' => true,
-                'subscription' => $this->subscriptionRepository->find($subscriptionId),
+                'subscription' => $refreshedSubscription,
                 'stripe_result' => $stripeResult,
             ];
         });
@@ -190,9 +202,18 @@ class SubscriptionCancellationService
                 'stripe_subscription_id' => $subscription->getStripeSubscriptionId(),
             ]);
 
+            $refreshedSubscription = $this->subscriptionRepository->find($subscriptionId);
+
+            if ($this->shouldDispatchLifecycleEvent((int)$subscriptionId)) {
+                event(new SubscriptionReactivated(
+                    subscriptionId: (int)$subscriptionId,
+                    daysRemaining: $daysRemaining,
+                ));
+            }
+
             return [
                 'success' => true,
-                'subscription' => $this->subscriptionRepository->find($subscriptionId),
+                'subscription' => $refreshedSubscription,
                 'days_remaining' => $daysRemaining,
                 'message' => $daysRemaining
                     ? "Reactivated with {$daysRemaining} days remaining"
@@ -258,5 +279,23 @@ class SubscriptionCancellationService
                 $grant['expires_at'] ?? null
             );
         }
+    }
+
+    private function shouldDispatchLifecycleEvent(int $subscriptionId): bool
+    {
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
+            return false;
+        }
+
+        return Subscription::where('id', $subscriptionId)->exists();
+    }
+
+    private function formatEventDate(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i:s');
+        }
+
+        return is_string($value) ? $value : null;
     }
 }

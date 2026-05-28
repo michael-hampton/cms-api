@@ -2,6 +2,7 @@
 
 namespace App\Services\Subscriptions;
 
+use App\Events\Subscriptions\SubscriptionCreated;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Model;
@@ -144,6 +145,16 @@ class SubscriptionCheckoutService
             'currency' => $plan->currency,
             'auto_renew' => $plan->billing_period !== 'lifetime'
         ]);
+
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) !== 'testing') {
+            event(new SubscriptionCreated(
+                subscriptionId: (int)$subscription->id,
+                planId: (int)$plan->id,
+                billingPeriod: (string)$plan->billing_period,
+                priceCents: (int)round(((float)($finalPrice ?? $plan->price)) * 100),
+                currency: (string)($plan->currency ?? 'GBP'),
+            ));
+        }
 
         return $subscription;
     }
