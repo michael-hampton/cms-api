@@ -895,7 +895,10 @@
         }
 
         render() {
-            const isGranted = this.raw.is_granted === true || this.raw.is_granted === 1;
+            const pendingValue = this.manager.store.state.pendingChanges[this.data.code];
+            const isGranted = pendingValue !== undefined
+                ? Boolean(Number(pendingValue))
+                : (this.raw.is_granted === true || this.raw.is_granted === 1 || this.raw.is_granted === '1');
             const isLocked = this.raw.is_locked === true || this.raw.is_locked === 1;
 
             const statusBadge = UI.el('span', {
@@ -991,12 +994,45 @@
     /**
      * Orchestrator: Privacy Manager
      */
+    class PrivacyStore {
+        constructor() {
+            this.state = {
+                groupedConsents: {},
+                audits: [],
+                pendingChanges: {},
+                loadingConsents: false,
+                loadingAudit: false,
+                saving: false,
+                error: null,
+                auditFilters: {
+                    action: '',
+                    consent: '',
+                },
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     class PrivacyManager {
         constructor() {
             this.prefsContainer = document.getElementById('consentsContainer');
             this.auditContainer = document.getElementById('audit-panel-body');
-            this.allAudits = [];
-            this.pendingChanges = {}; // <--- Track changes here
+            this.store = new PrivacyStore();
+            this.store.subscribe(state => this.render(state));
             this.init();
         }
 
@@ -1010,12 +1046,31 @@
 
         async loadConsents() {
             try {
+                this.store.setState({loadingConsents: true});
                 const res = await api(`${API_BASE}/member/consent?member_id=${MEMBER_ID}`);
-                // Your API returns { items: { category: [] } }
-                this.renderConsents(res.items || {});
+                this.store.setState({
+                    groupedConsents: res.items || {},
+                    loadingConsents: false,
+                });
                 this.populateConsentFilter(res.items || {});
-            } catch (e) {
+            } catch (_) {
+                this.store.setState({loadingConsents: false});
                 UI.toast('Failed to load preferences', 'error');
+            }
+        }
+
+        render(state) {
+            if (!state.loadingConsents) {
+                this.renderConsents(state.groupedConsents);
+            }
+
+            if (!state.loadingAudit) {
+                this.renderAudit(state.audits);
+            }
+
+            const savePrompt = document.getElementById('savePrompt');
+            if (savePrompt) {
+                savePrompt.classList.toggle('active', Object.keys(state.pendingChanges).length > 0);
             }
         }
 
@@ -1058,31 +1113,28 @@
         }
 
         toggleConsent(code, isGranted) {
-            this.pendingChanges[code] = isGranted ? 1 : 0;
-
-            // Show the save button container if it was hidden
-            const savePrompt = document.getElementById('savePrompt');
-            if (savePrompt) savePrompt.classList.add('active');
-
-            // Optional: Visual feedback that the item is "dirty"
-            console.log(`Pending change: ${code} = ${isGranted}`);
+            this.store.setState({
+                pendingChanges: {
+                    ...this.store.state.pendingChanges,
+                    [code]: isGranted ? 1 : 0,
+                }
+            });
         }
 
         async saveAllConsents() {
-            const codes = Object.keys(this.pendingChanges);
+            const codes = Object.keys(this.store.state.pendingChanges);
             if (codes.length === 0) {
                 UI.toast('No changes to save', 'error');
                 return;
             }
 
             try {
-                // If your API supports bulk, send the whole object.
-                // If it ONLY supports single updates, we use Promise.all:
+                this.store.setState({saving: true});
                 await api(`${API_BASE}/member/consent/update`, {
                     method: 'POST',
                     body: JSON.stringify({
                         member_id: MEMBER_ID,
-                        consents: this.pendingChanges, // This is now { code: true/false, ... }
+                        consents: this.store.state.pendingChanges,
                         source: 'web_portal'
                     })
                 });
@@ -1090,45 +1142,55 @@
                 UI.toast('All preferences have been synchronized', 'success');
                 window.scrollTo({top: 0, behavior: 'smooth'});
 
-                // Cleanup
-                this.pendingChanges = {};
-                const savePrompt = document.getElementById('savePrompt');
-                if (savePrompt) savePrompt.classList.remove('active');
+                this.store.setState({pendingChanges: {}});
 
-                // Refresh UI and History
-                this.loadConsents();
-                this.loadAudit();
+                await Promise.all([this.loadConsents(), this.loadAudit()]);
 
             } catch (e) {
-                console.error('Error saving preferences:', e);
-                toast.error('✕ Failed to save: ' + e.message);
+                UI.toast('Failed to save: ' + e.message, 'error');
+            } finally {
+                this.store.setState({saving: false});
             }
         }
 
-        // ... Keep existing loadAudit, renderAudit, wireFilters, wireAccountActions from previous response ...
         async loadAudit() {
             try {
+                this.store.setState({loadingAudit: true});
                 const data = await api(`${API_BASE}/member/consent/audit-history?member_id=${MEMBER_ID}`);
-                this.allAudits = data.items || [];
-                this.renderAudit(this.allAudits);
-            } catch (e) {
-                console.error(e);
+                this.store.setState({
+                    audits: data.items || [],
+                    loadingAudit: false,
+                });
+            } catch (_) {
+                this.store.setState({loadingAudit: false});
             }
         }
 
         renderAudit(items) {
-            const actionFilter = document.getElementById('auditActionFilter').value;
-            const typeFilter = document.getElementById('auditConsentFilter').value;
+            const actionFilter = this.store.state.auditFilters.action;
+            const typeFilter = this.store.state.auditFilters.consent;
             const filtered = items.filter(e => {
-                return (!actionFilter || e.action === actionFilter) && (!typeFilter || e.consent_type === typeFilter);
+                return (!actionFilter || e.action === actionFilter)
+                    && (!typeFilter || e.consent_type?.code === typeFilter);
             });
-            UI.render(this.auditContainer, filtered.map(e => new AuditSidebarEntry(e).render()));
+            UI.render(this.auditContainer, filtered.length
+                ? filtered.map(e => new AuditSidebarEntry(e).render())
+                : [UI.el('div', {className: 'empty-state'}, [
+                    UI.el('p', {}, ['No audit entries match the selected filters.'])
+                ])]);
         }
 
         wireFilters() {
             ['auditActionFilter', 'auditConsentFilter'].forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.onchange = () => this.renderAudit(this.allAudits);
+                if (el) {
+                    el.onchange = () => this.store.setState({
+                        auditFilters: {
+                            action: document.getElementById('auditActionFilter').value,
+                            consent: document.getElementById('auditConsentFilter').value,
+                        }
+                    });
+                }
             });
         }
 
@@ -1138,7 +1200,7 @@
                     const res = await api(`${API_BASE}/member/export-data?member_id=${MEMBER_ID}`, {method: 'POST'});
                     if (res.download_url) window.location.href = res.download_url;
                 } catch (e) {
-                    toast.error('Export failed');
+                    UI.toast('Export failed', 'error');
                 }
             };
             window.confirmDeleteAccount = () => {

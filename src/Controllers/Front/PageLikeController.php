@@ -48,7 +48,7 @@ class PageLikeController extends Controller
             $this->activityTracking->trackLike($result['like']);
             event(new PageLikedByMember($member->id, $pageId, $siteId));
         } else {
-            event(new PageUnlikedByMember($member->id, $pageId, $siteId));
+            event(new PageUnlikedByMember($member->id, $siteId, $pageId));
         }
 
         return $this->resourceResponse([

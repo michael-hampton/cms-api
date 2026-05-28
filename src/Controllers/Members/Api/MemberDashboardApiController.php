@@ -130,6 +130,7 @@ class MemberDashboardApiController extends Controller
     public function discovery(): JsonResponse
     {
         $member = $this->getAuthenticatedMember();
+
         if ($member instanceof JsonResponse) {
             return $member;
         }

@@ -5,27 +5,19 @@ namespace App\Controllers\Members\Subscriptions;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
-use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\CategoryRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\MemberSubscriptionService;
-use App\Services\Subscriptions\SubscriptionBillingService;
-use App\Services\Subscriptions\SubscriptionCancellationService;
-use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberSubscriptionsController extends Controller
 {
     public function __construct(
-        private readonly SubscriptionRepository    $subscriptionRepository,
-        private readonly MemberSubscriptionService $subscriptionService,
-        private readonly CategoryRepository        $categoryRepository,
-        private readonly SubscriptionPlanService         $subscriptionPlanService,
-        private readonly SubscriptionCancellationService $cancellationService,
-        private readonly SubscriptionBillingService  $subscriptionBillingService,
-        private readonly SubscriptionDeliveryService $deliveryService
-
+        private readonly SubscriptionRepository     $subscriptionRepository,
+        private readonly MemberSubscriptionService  $subscriptionService,
+        private readonly CategoryRepository         $categoryRepository,
+        private readonly SubscriptionPlanService    $subscriptionPlanService,
     )
     {
         parent::__construct();
@@ -38,23 +30,11 @@ class MemberSubscriptionsController extends Controller
         }
 
         $member = MemberAuth::getMember();
-        $siteId = SiteContext::getId();
-
-        $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId, true);
-
-        $subscriptionHistory = $this->subscriptionRepository->getSubscriptionHistory($member->id, $siteId);
-
-        // Get email subscription preferences
-        $subscriptionSummary = $this->subscriptionService->getSubscriptionSummary($member->id, $siteId);
-
-        $plans = $this->subscriptionPlanService->getActivePlansForSite($siteId);
+        $plans = $this->subscriptionPlanService->getActivePlansForSite(SiteContext::getId());
 
         return $this->view('member/subscriptions/index', [
             'member' => $member,
             'site' => SiteContext::get(),
-            'activeSubscription' => $activeSubscription,
-            'subscriptionHistory' => $subscriptionHistory,
-            'subscriptionSummary' => $subscriptionSummary,
             'plans' => $plans,
             'subscriptionModalData' => [
                 'plans' => $plans,

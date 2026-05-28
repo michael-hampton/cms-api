@@ -444,14 +444,40 @@
 <script>
     class StatsSection {
         render(progress) {
-            const s = progress.stats;
+            const s = progress.stats && !Array.isArray(progress.stats)
+                ? progress.stats
+                : {};
             const cards = [
-                {icon: '🏆', value: progress.total_points.toLocaleString(), label: 'Total Points'},
-                {icon: '🎖️', value: `${progress.badges_earned} / ${progress.badges_available}`, label: 'Badges Earned'},
-                {icon: '💬', value: s.comments.toLocaleString(), label: 'Comments Posted'},
-                {icon: '📚', value: s.pages_read.toLocaleString(), label: 'Pages Read'},
-                {icon: '❤️', value: s.likes.toLocaleString(), label: 'Likes Given'},
-                {icon: '📅', value: s.member_days.toLocaleString(), label: 'Days as Member'},
+                {
+                    icon: '🏆',
+                    value: Number(progress.total_points ?? 0).toLocaleString(),
+                    label: 'Total Points'
+                },
+                {
+                    icon: '🎖️',
+                    value: `${Number(progress.badges_earned ?? 0)} / ${Number(progress.badges_available ?? 0)}`,
+                    label: 'Badges Earned'
+                },
+                {
+                    icon: '💬',
+                    value: Number(s.comments ?? s.comments_count ?? 0).toLocaleString(),
+                    label: 'Comments Posted'
+                },
+                {
+                    icon: '📚',
+                    value: Number(s.pages_read ?? s.reads ?? 0).toLocaleString(),
+                    label: 'Pages Read'
+                },
+                {
+                    icon: '❤️',
+                    value: Number(s.likes ?? s.likes_count ?? 0).toLocaleString(),
+                    label: 'Likes Given'
+                },
+                {
+                    icon: '📅',
+                    value: Number(s.member_days ?? 0).toLocaleString(),
+                    label: 'Days as Member'
+                },
             ];
             UI.render(document.getElementById('stats-container'), cards.map(c =>
                 UI.el('div', {className: 'stat-card'}, [
@@ -507,12 +533,13 @@
 
             const items = nextBadges.map(item => {
                 const pct = Math.min(100, Math.round(item.progress.percentage));
+                const badge = item.badge ?? {};
                 const bar = UI.el('div', {className: 'progress-bar', style: {width: `${pct}%`}});
                 return UI.el('div', {className: 'progress-item'}, [
                     UI.el('div', {className: 'progress-header'}, [
                         UI.el('div', {className: 'progress-header-left'}, [
-                            UI.el('strong', {}, [`${item.badge.icon ?? '✨'} ${item.badge.name}`]),
-                            UI.el('span', {}, [` ${item.badge.description ?? ''}`]),
+                            UI.el('strong', {}, [`${badge.icon ?? '✨'} ${badge.name ?? 'Upcoming badge'}`]),
+                            UI.el('span', {}, [` ${badge.description ?? ''}`]),
                         ]),
                         UI.el('span', {className: 'progress-pct'}, [`${pct}%`]),
                     ]),
@@ -687,17 +714,22 @@
         async init() {
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/activity`);
-                const {progress, recent_activities, activity_trends, member_badges, next_badges} = json.data;
+                const data = json.data ?? {};
+                const progress = data.progress ?? {};
+                const recentActivities = data.recent_activities ?? [];
+                const activityTrends = data.activity_trends ?? [];
+                const memberBadges = data.member_badges ?? [];
+                const nextBadges = data.next_badges ?? progress.next_badges ?? [];
 
                 this.stats.render(progress);
-                this.badges.render(member_badges);
-                this.next.render(next_badges);
-                this.feed.render(recent_activities);
+                this.badges.render(memberBadges);
+                this.next.render(nextBadges);
+                this.feed.render(recentActivities);
 
                 requestAnimationFrame(() => {
                     this.chart.draw(
-                        (activity_trends ?? []).map(d => d.date),
-                        (activity_trends ?? []).map(d => d.count),
+                        activityTrends.map(d => d.date),
+                        activityTrends.map(d => d.count),
                     );
                 });
             } catch {

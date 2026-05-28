@@ -833,15 +833,45 @@
 
     /* ─── SETTINGS ORCHESTRATOR ─────────────────────────────── */
 
+    class SettingsStore {
+        constructor() {
+            this.state = {
+                member: null,
+                preferences: null,
+                siteSlug: SITE_SLUG,
+                loading: false,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     class SettingsManager {
         constructor() {
             this.msgContainer = document.getElementById('messageContainer');
+            this.store = new SettingsStore();
 
             this.forms = {
                 details: document.getElementById('accountForm'),
                 privacy: document.getElementById('privacyForm'),
                 prefs: document.getElementById('preferencesForm')
             };
+
+            this.store.subscribe(state => this.render(state));
 
             this.init();
         }
@@ -852,18 +882,44 @@
         }
 
         async loadInitialData() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const {success, data, message} = await api(`/api/${SITE_SLUG}/member/account-details`);
                 if (!success) {
+                    this.store.setState({
+                        loading: false,
+                        error: message || 'Failed to load account data',
+                    });
                     UI.toast(message || 'Failed to load account data', 'error');
                     return;
                 }
 
-                this.hydrate(data)
-
-            } catch (e) {
-                console.error("Hydration Error:", e);
+                this.store.setState({
+                    member: data.member,
+                    preferences: data.preferences,
+                    siteSlug: data.site_slug,
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load account data',
+                });
+                UI.toast('Failed to load account data', 'error');
             }
+        }
+
+        render(state) {
+            if (state.loading || !state.member) {
+                return;
+            }
+
+            this.hydrate({
+                member: state.member,
+                preferences: state.preferences,
+                site_slug: state.siteSlug,
+            });
         }
 
         hydrate({member, preferences, site_slug}) {
@@ -1001,6 +1057,8 @@
         async handleDetailsSubmit(e) {
             e.preventDefault();
             const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const original = btn.innerHTML;
 
             const payload = {
                 first_name: form.first_name.value,
@@ -1010,14 +1068,24 @@
             };
 
             try {
-                // Using the global SITE_SLUG as per original file
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
                 const res = await api(`/api/${SITE_SLUG}/member/account-details`, {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
+                this.store.setState({
+                    member: {
+                        ...this.store.state.member,
+                        ...payload,
+                    }
+                });
                 UI.toast('Account details updated successfully', 'success');
-            } catch (err) {
-                UI.error('Failed to connect to server', 'error');
+            } catch (_) {
+                UI.toast('Failed to connect to server', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
             }
         }
 
@@ -1027,6 +1095,8 @@
         async handlePreferencesSubmit(e) {
             e.preventDefault();
             const form = e.target;
+            const btn = form.querySelector('button[type="submit"]');
+            const original = btn.innerHTML;
 
             const payload = {
                 marketing_emails: form.marketing_emails.checked ? 1 : 0,
@@ -1037,13 +1107,24 @@
             };
 
             try {
+                btn.disabled = true;
+                btn.textContent = 'Saving...';
                 const res = await api(`/api/${SITE_SLUG}/member/settings/communication-preferences`, {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
+                this.store.setState({
+                    preferences: {
+                        ...this.store.state.preferences,
+                        ...payload,
+                    }
+                });
                 UI.toast('Communication preferences saved', 'success');
-            } catch (err) {
-                UI.error('Failed to connect to server', 'error');
+            } catch (_) {
+                UI.toast('Failed to connect to server', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = original;
             }
         }
     }

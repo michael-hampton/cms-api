@@ -347,19 +347,64 @@
 <script>
     const API_BASE = '/api/' + SITE_SLUG;
 
+    class CommentStore {
+        constructor() {
+            this.state = {
+                comments: [],
+                loading: false,
+                error: null,
+                deletingIds: new Set(),
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setDeleting(id, deleting) {
+            const deletingIds = new Set(this.state.deletingIds);
+
+            if (deleting) {
+                deletingIds.add(id);
+            } else {
+                deletingIds.delete(id);
+            }
+
+            this.setState({deletingIds});
+        }
+    }
+
     /**
      * Component: Individual Comment Card
      */
     class CommentCard {
-        constructor(data, manager) {
+        constructor(data, manager, options = {}) {
             this.data = data;
             this.manager = manager;
+            this.options = options;
             this.el = null; // Reference to the DOM element
         }
 
         render() {
             const c = this.data;
             const status = (c.status || 'pending').toLowerCase();
+            const isDeleting = !!this.options.deleting;
+            const deleteButton = UI.el('button', {
+                className: 'btn btn-danger btn-sm',
+                disabled: isDeleting,
+                onclick: () => this.handleDelete()
+            }, [isDeleting ? 'Deleting…' : 'Delete Comment']);
 
             this.el = UI.el('div', {
                 className: 'comment-card',
@@ -386,11 +431,7 @@
                         href: `/${c.page_slug}#comment-${c.id}`,
                         className: 'btn btn-secondary btn-sm'
                     }, ['View on Page']) : null,
-
-                    UI.el('button', {
-                        className: 'btn btn-danger btn-sm',
-                        onclick: () => this.handleDelete()
-                    }, ['Delete Comment'])
+                    deleteButton
                 ])
             ]);
 
@@ -401,19 +442,8 @@
             if (!confirm('Are you sure you want to delete this comment?')) return;
 
             try {
-                const success = await this.manager.deleteCommentApi(this.data.id);
-                if (success) {
-                    // Animate out
-                    this.el.style.transition = 'opacity .3s, transform .3s';
-                    this.el.style.opacity = '0';
-                    this.el.style.transform = 'translateX(-20px)';
-
-                    setTimeout(() => {
-                        this.el.remove();
-                        this.manager.checkEmptyState();
-                    }, 300);
-                }
-            } catch (e) {
+                await this.manager.deleteComment(this.data.id);
+            } catch (_) {
                 UI.toast('Failed to delete comment', 'error');
             }
         }
@@ -425,30 +455,51 @@
     class CommentManager {
         constructor() {
             this.root = document.getElementById('comments-root');
-            this.init();
-        }
+            this.store = new CommentStore();
 
-        async init() {
-            await this.loadComments();
+            this.store.subscribe(state => this.render(state));
+            this.loadComments();
         }
 
         async loadComments() {
-            alert(API_BASE)
+            this.store.setState({loading: true, error: null});
+
             try {
                 const res = await api(`${API_BASE}/member/comments`);
-                this.render(res.data?.comments || []);
-            } catch (e) {
-                this.root.innerHTML = `<p class="error-text">Failed to load comments. Please refresh.</p>`;
+                this.store.setState({
+                    comments: res.data?.comments || [],
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    error: 'Failed to load comments. Please refresh.',
+                    loading: false,
+                });
             }
         }
 
-        render(comments) {
-            if (!comments.length) {
+        render(state) {
+            if (state.loading) {
+                UI.render(this.root, UI.el('p', {
+                    style: {textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'}
+                }, ['Loading comments…']));
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.root, UI.el('p', {className: 'error-text'}, [state.error]));
+                return;
+            }
+
+            if (!state.comments.length) {
                 this.renderEmptyState();
                 return;
             }
 
-            const cards = comments.map(c => new CommentCard(c, this).render());
+            const cards = state.comments.map(c => new CommentCard(c, this, {
+                deleting: state.deletingIds.has(c.id),
+            }).render());
+
             UI.render(this.root, UI.el('div', {className: 'comments-list'}, cards));
         }
 
@@ -461,25 +512,26 @@
             ]));
         }
 
-        async deleteCommentApi(id) {
+        async deleteComment(id) {
+            this.store.setDeleting(id, true);
+
             try {
                 const res = await api(`${API_BASE}/member/comments/${id}`, {method: 'DELETE'});
-                if (res.success) {
-                    UI.toast('Comment deleted successfully', 'success');
-                    return true;
-                }
-                UI.toast(res.message || 'Error deleting comment', 'error');
-                return false;
-            } catch (e) {
-                UI.toast('System error during deletion', 'error');
-                return false;
-            }
-        }
 
-        checkEmptyState() {
-            const remaining = this.root.querySelectorAll('.comment-card').length;
-            if (remaining === 0) {
-                this.renderEmptyState();
+                if (!res.success) {
+                    UI.toast(res.message || 'Error deleting comment', 'error');
+                    return;
+                }
+
+                this.store.setState({
+                    comments: this.store.state.comments.filter(comment => comment.id !== id),
+                });
+
+                UI.toast('Comment deleted successfully', 'success');
+            } catch (_) {
+                UI.toast('System error during deletion', 'error');
+            } finally {
+                this.store.setDeleting(id, false);
             }
         }
     }

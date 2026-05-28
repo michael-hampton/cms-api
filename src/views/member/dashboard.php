@@ -1703,6 +1703,13 @@
 </div>
 
 <script>
+    function fmt(amount, currency = 'GBP') {
+        return new Intl.NumberFormat('en-GB', {
+            style: 'currency',
+            currency: currency || 'GBP',
+        }).format(Number(amount || 0));
+    }
+
     /* ─────────────────────────────────────────────────────────────
        Component: RecommendedCard
     ───────────────────────────────────────────────────────────── */
@@ -1872,8 +1879,6 @@
                     UI.el('span', {}, ['📧 To: ', g.recipient_email ?? '']),
                     UI.el('span', {}, ['📅 ', UI.formatDate(g.gifted_at)]),
                 ]);
-
-            console.log('g', g)
 
             const actionBtn = this.direction === 'received'
                 ? (status === 'pending'
@@ -2188,7 +2193,7 @@
         /* ── Top-level layout ── */
 
         buildVerifiedDashboard(data) {
-            const {member, stats, recent_orders, all_subscriptions} = data;
+            const {member, stats, recent_orders, all_subscriptions, recent_activities, subscription_history_events} = data;
 
             const navItems = [
                 {
@@ -2310,7 +2315,7 @@
                 UI.el('h2', {className: 'section-title'}, ['Quick Access']),
                 UI.el('div', {className: 'dashboard-grid'}, navCards),
                 UI.el('h2', {className: 'section-title'}, ['Recent Activity']),
-                UI.el('div', {className: 'dashboard-grid'}, [this.buildActivityTables(recent_orders, all_subscriptions)]),
+                UI.el('div', {className: 'dashboard-grid'}, [this.buildActivityTables(recent_orders, all_subscriptions, recent_activities, subscription_history_events)]),
                 UI.el('h2', {className: 'section-title'}, ['Your Activity']),
                 UI.el('div', {className: 'stats-grid'}, statCards),
             ];
@@ -2394,8 +2399,8 @@
 
         /* ── Activity tables ── */
 
-        buildActivityTables(recentOrders, allSubscriptions) {
-            if (!recentOrders?.length && !allSubscriptions?.length) return UI.el('div', {}, []);
+        buildActivityTables(recentOrders, allSubscriptions, recentActivities, subscriptionHistoryEvents) {
+            if (!recentOrders?.length && !allSubscriptions?.length && !recentActivities?.length && !subscriptionHistoryEvents?.length) return UI.el('div', {}, []);
 
             const ordersTab = UI.el('button', {
                     id: 'ordersTab',
@@ -2422,10 +2427,23 @@
                         color: 'var(--text-secondary)'
                     }
                 },
-                [`Subscriptions (${allSubscriptions?.length ?? 0})`]);
+                [`Subscriptions (${subscriptionHistoryEvents?.length ?? allSubscriptions?.length ?? 0})`]);
+            const activityTab = UI.el('button', {
+                    id: 'recentActivityTab',
+                    style: {
+                        padding: '1rem',
+                        background: 'none',
+                        border: 'none',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        color: 'var(--text-secondary)'
+                    }
+                },
+                [`Activity (${recentActivities?.length ?? 0})`]);
 
             ordersTab.addEventListener('click', () => window.dashboardApp.switchActivityTab('orders'));
             subsTab.addEventListener('click', () => window.dashboardApp.switchActivityTab('subscriptions'));
+            activityTab.addEventListener('click', () => window.dashboardApp.switchActivityTab('activity'));
 
             const orderRows = (recentOrders ?? []).map(o =>
                 UI.el('tr', {style: {borderBottom: '1px solid var(--border-color)'}}, [
@@ -2448,11 +2466,11 @@
                 ])
             );
 
-            const subsRows = (allSubscriptions ?? []).map(s =>
+            const subsRows = (subscriptionHistoryEvents ?? []).map(event =>
                 UI.el('tr', {style: {borderBottom: '1px solid var(--border-color)'}}, [
-                    UI.el('td', {style: {padding: '.75rem'}}, [UI.formatDate(s.created_at)]),
-                    UI.el('td', {style: {padding: '.75rem', fontWeight: '600'}}, [s.plan_name ?? '']),
-                    UI.el('td', {style: {padding: '.75rem'}}, [UI.statusBadge(s.status)]),
+                    UI.el('td', {style: {padding: '.75rem'}}, [UI.formatDate(event.occurred_at)]),
+                    UI.el('td', {style: {padding: '.75rem', fontWeight: '600'}}, [this.subscriptionHistoryLabel(event.event_type)]),
+                    UI.el('td', {style: {padding: '.75rem'}}, [this.subscriptionHistoryDetails(event)]),
                     UI.el('td', {style: {padding: '.75rem'}}, [
                         UI.el('a', {
                             href: `/${this.siteSlug}/member/subscriptions`,
@@ -2496,7 +2514,7 @@
                 ? UI.el('div', {style: {overflowX: 'auto'}}, [
                     UI.el('table', {style: {width: '100%', borderCollapse: 'collapse'}}, [
                         UI.el('thead', {}, [UI.el('tr', {style: {background: 'var(--bg-light)'}},
-                            ['Date', 'Plan', 'Status', 'Action'].map(h =>
+                            ['Date', 'Event', 'Details', 'Action'].map(h =>
                                 UI.el('th', {
                                     style: {
                                         padding: '.75rem',
@@ -2520,12 +2538,80 @@
                         padding: '2rem',
                         color: 'var(--text-secondary)'
                     }
-                }, ['No subscriptions yet']);
+                }, ['No subscription history yet']);
+
+            const activityIcons = {comment: '💬', like: '❤️', read: '📖', share: '↗️', purchase: '🛍️'};
+            const activityLabels = {
+                comment: 'Posted a comment',
+                like: 'Liked a page',
+                read: 'Read a page',
+                share: 'Shared content',
+                purchase: 'Made a purchase',
+            };
+
+            const activityFeed = (recentActivities ?? []).length
+                ? UI.el('div', {}, (recentActivities ?? []).map(activity =>
+                    UI.el('div', {
+                        style: {
+                            display: 'flex',
+                            gap: '1rem',
+                            padding: '1rem 0',
+                            borderBottom: '1px solid var(--border-color)'
+                        }
+                    }, [
+                        UI.el('div', {
+                            style: {
+                                width: '2.5rem',
+                                height: '2.5rem',
+                                borderRadius: '50%',
+                                background: 'var(--bg-light)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: '0'
+                            }
+                        }, [activityIcons[activity.activity_type] ?? '✨']),
+                        UI.el('div', {style: {flex: '1'}}, [
+                            UI.el('div', {
+                                style: {
+                                    fontSize: '.9375rem',
+                                    marginBottom: '.25rem'
+                                }
+                            }, [activityLabels[activity.activity_type] ?? 'Activity']),
+                            UI.el('div', {
+                                style: {
+                                    fontSize: '.8125rem',
+                                    color: 'var(--text-secondary)'
+                                }
+                            }, [
+                                UI.timeAgo(activity.activity_date),
+                                Number(activity.points ?? 0) > 0
+                                    ? UI.el('span', {
+                                        style: {
+                                            color: 'var(--success-color)',
+                                            fontWeight: '600',
+                                            marginLeft: '.5rem'
+                                        }
+                                    }, [`+${activity.points} points`])
+                                    : null,
+                            ]),
+                        ]),
+                    ])
+                ))
+                : UI.el('div', {
+                    style: {
+                        textAlign: 'center',
+                        padding: '2rem',
+                        color: 'var(--text-secondary)'
+                    }
+                }, ['No recent activity yet']);
 
             const ordersContent = UI.el('div', {id: 'ordersContent'});
             const subsContent = UI.el('div', {id: 'subscriptionsContent', style: {display: 'none'}});
+            const activityContent = UI.el('div', {id: 'recentActivityContent', style: {display: 'none'}});
             UI.render(ordersContent, [ordersTable]);
             UI.render(subsContent, [subsTable]);
+            UI.render(activityContent, [activityFeed]);
 
             return UI.el('div', {
                 style: {
@@ -2545,10 +2631,71 @@
                         marginBottom: '1.5rem',
                         borderBottom: '2px solid var(--border-color)'
                     }
-                }, [ordersTab, subsTab]),
+                }, [ordersTab, subsTab, activityTab]),
                 ordersContent,
                 subsContent,
+                activityContent,
             ]);
+        }
+
+        subscriptionHistoryLabel(eventType) {
+            const labels = {
+                'subscription.created': 'Subscription created',
+                'subscription.cancelled': 'Subscription cancelled',
+                'subscription.reactivated': 'Subscription reactivated',
+                'subscription.paused': 'Delivery paused',
+                'subscription.resumed': 'Delivery resumed',
+                'payment.succeeded': 'Payment succeeded',
+                'payment.failed': 'Payment failed',
+                'payment.refunded': 'Payment refunded',
+            };
+
+            return labels[eventType] ?? eventType;
+        }
+
+        subscriptionHistoryDetails(event) {
+            const metadata = event.metadata || {};
+
+            switch (event.event_type) {
+                case 'subscription.created':
+                    return [
+                        event.subscription_plan_name ? `Plan: ${event.subscription_plan_name}` : null,
+                        metadata.billing_period ? `Billing: ${metadata.billing_period}` : null,
+                        metadata.amount ? `Amount: ${fmt(Number(metadata.amount) / 100, metadata.currency)}` : null,
+                    ].filter(Boolean).join(' · ') || 'Subscription created.';
+                case 'subscription.cancelled':
+                    return metadata.cancel_at_period_end
+                        ? 'Scheduled to cancel at the end of the billing period.'
+                        : 'Cancelled immediately.';
+                case 'subscription.reactivated':
+                    return metadata.days_remaining
+                        ? `${metadata.days_remaining} day(s) remaining in the entitlement period.`
+                        : 'Subscription reactivated.';
+                case 'subscription.paused':
+                    return [
+                        metadata.pause_start ? `From ${UI.formatDate(metadata.pause_start)}` : null,
+                        metadata.pause_end ? `until ${UI.formatDate(metadata.pause_end)}` : null,
+                        metadata.reason ? `Reason: ${metadata.reason}` : null,
+                    ].filter(Boolean).join(' ') || 'Delivery paused.';
+                case 'subscription.resumed':
+                    return 'Delivery resumed.';
+                case 'payment.succeeded':
+                    return metadata.amount
+                        ? `Paid ${fmt(Number(metadata.amount) / 100, metadata.currency)}.`
+                        : 'Payment processed successfully.';
+                case 'payment.failed':
+                    return metadata.failure_reason
+                        ? `Payment failed: ${metadata.failure_reason}.`
+                        : 'Payment failed.';
+                case 'payment.refunded':
+                    return metadata.amount
+                        ? `Refunded ${fmt(Number(metadata.amount) / 100, metadata.currency)}.`
+                        : 'Payment refunded.';
+                default:
+                    return event.subscription_plan_name
+                        ? `Plan: ${event.subscription_plan_name}`
+                        : 'Subscription event recorded.';
+            }
         }
 
         /* ── Section renderers ── */
@@ -2638,6 +2785,7 @@
         }
 
         renderGiftedArticles(gifted) {
+
             const el = document.getElementById('section-gifted');
             if (!gifted.received_count && !gifted.given_count) return;
 
@@ -3017,9 +3165,14 @@
                     throw new Error('Failed to load core dashboard data');
                 }
 
+                const subscriptionHistoryEvents = await this._loadSubscriptionHistoryEvents(
+                    overview.data.all_subscriptions ?? []
+                );
+
                 this._render({
                     ...overview.data, ...activity.data, ...discovery.data,
-                    stats: statsData.data?.stats ?? {}
+                    stats: statsData.data?.stats ?? {},
+                    subscription_history_events: subscriptionHistoryEvents,
                 });
 
                 const isVerified = overview.data.member?.email_verified_at !== null;
@@ -3055,15 +3208,48 @@
             root.style.display = 'block';
         }
 
+        async _loadSubscriptionHistoryEvents(subscriptions) {
+            const items = Array.isArray(subscriptions) ? subscriptions : [];
+
+            if (!items.length) {
+                return [];
+            }
+
+            const histories = await Promise.all(items.map(async subscription => {
+                try {
+                    const response = await api(`/api/${this.siteSlug}/member/subscriptions/${subscription.id}/history?per_page=10`);
+                    return (response.events ?? []).map(event => ({
+                        ...event,
+                        subscription_id: subscription.id,
+                        subscription_plan_name: subscription.plan_name ?? '',
+                    }));
+                } catch (_) {
+                    return [];
+                }
+            }));
+
+            return histories
+                .flat()
+                .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+                .slice(0, 10);
+        }
+
         /* ── Tab handlers ── */
 
         switchActivityTab(tab) {
             const ordersEl = document.getElementById('ordersContent');
             const subsEl = document.getElementById('subscriptionsContent');
+            const activityEl = document.getElementById('recentActivityContent');
             if (ordersEl) ordersEl.style.display = tab === 'orders' ? 'block' : 'none';
             if (subsEl) subsEl.style.display = tab === 'subscriptions' ? 'block' : 'none';
-            ['orders', 'subscriptions'].forEach(t => {
-                const btn = document.getElementById(t + 'Tab');
+            if (activityEl) activityEl.style.display = tab === 'activity' ? 'block' : 'none';
+            const tabIds = {
+                orders: 'ordersTab',
+                subscriptions: 'subscriptionsTab',
+                activity: 'recentActivityTab',
+            };
+            ['orders', 'subscriptions', 'activity'].forEach(t => {
+                const btn = document.getElementById(tabIds[t]);
                 if (!btn) return;
                 btn.style.borderBottom = t === tab ? '3px solid var(--primary-color)' : 'none';
                 btn.style.color = t === tab ? 'var(--text-primary)' : 'var(--text-secondary)';

@@ -1162,10 +1162,37 @@
     /* ─────────────────────────────────────────────────────────────
        App orchestration
     ───────────────────────────────────────────────────────────── */
+    class GiftedArticlesStore {
+        constructor() {
+            this.state = {
+                mode: 'loading',
+                data: null,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     class GiftedArticlesApp {
         constructor() {
             this.root = document.getElementById('app-content');
             this.loader = document.getElementById('page-loader');
+            this.store = new GiftedArticlesStore();
+            this.store.subscribe(state => this.render(state));
         }
 
         async init() {
@@ -1190,18 +1217,32 @@
         async runIndexFlow() {
             try {
                 const data = await api(`${API_BASE}/member/gifted-articles`);
-                this.showIndex(data.data);
+                this.store.setState({
+                    mode: 'index',
+                    data: data.data,
+                    error: null,
+                });
             } catch (err) {
-                this.showError('Failed to load gifted articles. Please refresh.');
+                this.store.setState({
+                    mode: 'error',
+                    error: 'Failed to load gifted articles. Please refresh.',
+                });
             }
         }
 
         async runGiftFormFlow(slug) {
             try {
                 const data = await api(`${API_BASE}/member/gift-modal/${slug}`);
-                this.show([new GiftForm(data.data.page, data.data.allowance).render()]);
+                this.store.setState({
+                    mode: 'gift-form',
+                    data: data.data,
+                    error: null,
+                });
             } catch (err) {
-                this.showError(err.message ?? 'Article not found.');
+                this.store.setState({
+                    mode: 'error',
+                    error: err.message ?? 'Article not found.',
+                });
             }
         }
 
@@ -1213,9 +1254,42 @@
                     window.location.href = `/${SITE_SLUG}/${data.gift.page.slug}`;
                     return;
                 }
-                this.show([new ClaimResult(data).render()]);
+                this.store.setState({
+                    mode: 'claim-result',
+                    data,
+                    error: null,
+                });
             } catch (err) {
-                this.show([new ClaimResult({success: false, message: err.message}).render()]);
+                this.store.setState({
+                    mode: 'claim-result',
+                    data: {success: false, message: err.message},
+                    error: null,
+                });
+            }
+        }
+
+        render(state) {
+            if (state.mode === 'loading') {
+                return;
+            }
+
+            if (state.mode === 'index' && state.data) {
+                this.showIndex(state.data);
+                return;
+            }
+
+            if (state.mode === 'gift-form' && state.data) {
+                this.show([new GiftForm(state.data.page, state.data.allowance).render()]);
+                return;
+            }
+
+            if (state.mode === 'claim-result' && state.data) {
+                this.show([new ClaimResult(state.data).render()]);
+                return;
+            }
+
+            if (state.mode === 'error') {
+                this.showError(state.error);
             }
         }
 

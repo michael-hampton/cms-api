@@ -561,9 +561,47 @@
 </div>
 
 <script>
+    class OrdersStore {
+        constructor() {
+            this.state = {
+                orders: [],
+                loading: false,
+                error: null,
+                cancellingIds: new Set(),
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setCancelling(orderId, cancelling) {
+            const cancellingIds = new Set(this.state.cancellingIds);
+
+            if (cancelling) {
+                cancellingIds.add(orderId);
+            } else {
+                cancellingIds.delete(orderId);
+            }
+
+            this.setState({cancellingIds});
+        }
+    }
 
     class CancelModal {
-        constructor() {
+        constructor(manager) {
+            this.manager = manager;
             this.orderId = null;
             this._bind();
         }
@@ -598,44 +636,69 @@
             btn.disabled = true;
             btn.textContent = 'Cancelling…';
             try {
+                this.manager.store.setCancelling(this.orderId, true);
                 await api(`/api/${SITE_SLUG}/member/orders/${this.orderId}/cancel`, {
                     method: 'POST',
                     body: JSON.stringify({reason, notify_customer: notify}),
                 });
                 this.close();
                 UI.toast('Order cancelled successfully.', 'success');
-                setTimeout(() => ordersList.load(), 800);
+                setTimeout(() => this.manager.load(), 800);
             } catch (e) {
                 UI.toast(e.message || 'Failed to cancel order.', 'error');
                 btn.disabled = false;
                 btn.textContent = 'Cancel Order';
+            } finally {
+                if (this.orderId !== null) {
+                    this.manager.store.setCancelling(this.orderId, false);
+                }
             }
         }
     }
 
     class OrdersList {
-        constructor(modal) {
-            this.modal = modal;
+        constructor() {
+            this.container = document.getElementById('orders-container');
+            this.store = new OrdersStore();
+            this.modal = new CancelModal(this);
+
+            this.store.subscribe(state => this.render(state));
         }
 
         async load() {
-            const container = document.getElementById('orders-container');
+            this.store.setState({loading: true, error: null});
+
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/orders`);
-                this.render(container, json.data);
+                this.store.setState({
+                    orders: json.data || [],
+                    loading: false,
+                });
             } catch (e) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Please try refreshing the page.',
+                });
                 UI.toast('Failed to load orders. Please refresh.', 'error');
-                UI.render(container, [UI.emptyState({
-                    icon: '⚠️', title: 'Failed to Load Orders',
-                    body: 'Please try refreshing the page.',
-                    action: UI.el('button', {className: 'btn btn-primary', onclick: () => this.load()}, ['Retry']),
-                })]);
             }
         }
 
-        render(container, orders) {
-            if (!orders?.length) {
-                UI.render(container, [UI.emptyState({
+        render(state) {
+            if (state.loading) {
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.container, [UI.emptyState({
+                    icon: '⚠️', title: 'Failed to Load Orders',
+                    body: state.error,
+                    action: UI.el('button', {className: 'btn btn-primary', onclick: () => this.load()}, ['Retry']),
+                })]);
+                return;
+            }
+
+            if (!state.orders?.length) {
+                UI.render(this.container, [UI.emptyState({
                     icon: '🛍️', title: 'No Orders Yet',
                     body: "You haven't placed any orders yet.",
                     action: UI.el('a', {href: '/', className: 'btn btn-primary'}, ['Start Shopping']),
@@ -643,7 +706,7 @@
                 return;
             }
 
-            UI.render(container, orders.map(order => {
+            UI.render(this.container, state.orders.map(order => {
                 const date = new Date(order.created_at).toLocaleDateString('en-US',
                     {month: 'long', day: 'numeric', year: 'numeric'});
 
@@ -653,11 +716,14 @@
                         className: 'btn btn-primary btn-sm',
                     }, ['View Details']),
                 ];
-                //if (order.can_cancel) {
-                const cancelBtn = UI.el('button', {className: 'btn btn-secondary btn-sm'}, ['Cancel Order']);
+                const isCancelling = state.cancellingIds.has(order.id);
+                const canCancel = order.can_be_cancelled ?? order.can_cancel ?? true;
+                const cancelBtn = UI.el('button', {
+                    className: 'btn btn-secondary btn-sm',
+                    disabled: isCancelling || !canCancel,
+                }, [isCancelling ? 'Cancelling…' : (canCancel ? 'Cancel Order' : 'Cannot Cancel')]);
                 cancelBtn.addEventListener('click', () => this.modal.open(order.id));
                 actions.push(cancelBtn);
-                //}
 
                 return UI.el('div', {className: 'order-card'}, [
                     UI.el('div', {className: 'order-header'}, [
@@ -689,11 +755,9 @@
 
     let ordersList;
     document.addEventListener('DOMContentLoaded', () => {
-        const modal = new CancelModal();
-        // Expose confirm so the inline button in the PHP template can call it
-        window.confirmCancelOrder = () => modal.confirm();
-        window.closeCancelModal = () => modal.close();
-        ordersList = new OrdersList(modal);
+        ordersList = new OrdersList();
+        window.confirmCancelOrder = () => ordersList.modal.confirm();
+        window.closeCancelModal = () => ordersList.modal.close();
         ordersList.load();
     });
 </script>

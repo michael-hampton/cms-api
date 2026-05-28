@@ -944,6 +944,38 @@
         return UI.el('span', {className: `badge badge-${type}`}, [text]);
     }
 
+    class SubscriptionsStore {
+        constructor() {
+            this.state = {
+                activeSubscription: null,
+                subscriptionSummary: null,
+                plans: [],
+                paymentWarning: null,
+                historyEvents: [],
+                historyPagination: null,
+                loading: false,
+                error: null,
+                historyLoading: false,
+                historyError: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     /* ─────────────────────────────────────────────────────────────────────────
      * ConfirmDialog
      * Wraps the confirm/cancel UX in a Promise. Resolves with the selected
@@ -1172,7 +1204,6 @@
             }
 
             if (hasStripeSubscription && sub.auto_renew) {
-                alert('yes')
                 nodes.push(this._changeBillingDateBtn(s));
             }
 
@@ -1640,56 +1671,114 @@
      * ───────────────────────────────────────────────────────────────────────── */
 
     class HistoryCard {
-        render(history) {
+        render(state) {
             const root = document.getElementById('history-body');
 
-            if (!history?.length) {
+            if (state.historyLoading) {
+                UI.render(root, [
+                    UI.el('div', {className: 'skeleton', style: {height: '40px', marginBottom: '8px'}}),
+                    UI.el('div', {className: 'skeleton', style: {height: '40px', marginBottom: '8px'}}),
+                    UI.el('div', {className: 'skeleton', style: {height: '40px'}}),
+                ]);
+                return;
+            }
+
+            if (state.historyError) {
+                UI.render(root, UI.emptyState({
+                    icon: '⚠️',
+                    title: 'Unable to load history',
+                    body: state.historyError,
+                }));
+                return;
+            }
+
+            if (!state.activeSubscription) {
+                UI.render(root, UI.emptyState({
+                    icon: '📋',
+                    title: 'No active subscription history',
+                    body: 'History will appear here once you have an active subscription.',
+                }));
+                return;
+            }
+
+            if (!state.historyEvents?.length) {
                 UI.render(root, UI.emptyState({icon: '📋', title: 'No subscription history'}));
                 return;
             }
 
-            const headers = ['Plan', 'Type', 'Status', 'Start Date', 'End Date', 'Price'];
+            const headers = ['Event', 'Date', 'Details'];
             const thead = UI.el('thead', {}, [
                 UI.el('tr', {}, headers.map(h => UI.el('th', {}, [h]))),
             ]);
 
-            const tbody = UI.el('tbody', {}, history.map(sub =>
+            const tbody = UI.el('tbody', {}, state.historyEvents.map(event =>
                 UI.el('tr', {}, [
                     UI.el('td', {style: {fontWeight: '600'}}, [
-                        sub.plan_name,
-                        sub.delivery_type
-                            ? UI.el('span', {
-                                    style: {
-                                        fontSize: '12px',
-                                        color: '#64748b',
-                                        display: 'block',
-                                        marginTop: '4px'
-                                    }
-                                },
-                                [sub.download_url ? '💻 Digital' : '📦 Print'])
-                            : null,
+                        this._eventLabel(event.event_type),
                     ]),
-                    UI.el('td', {}, [
-                        UI.el('span', {
-                                className: 'badge',
-                                style: {
-                                    background: sub.type === 'paid' ? '#e0e7ff' : '#f3f4f6',
-                                    color: sub.type === 'paid' ? '#3730a3' : '#374151'
-                                }
-                            },
-                            [(sub.type || 'standard').charAt(0).toUpperCase() + (sub.type || 'standard').slice(1)]),
-                    ]),
-                    UI.el('td', {}, [badge(
-                        sub.status.charAt(0).toUpperCase() + sub.status.slice(1),
-                        sub.status === 'active' ? 'success' : 'warning',
-                    )]),
-                    UI.el('td', {}, [UI.formatDate(sub.start_date)]),
-                    UI.el('td', {}, [sub.end_date ? UI.formatDate(sub.end_date) : '—']),
-                    UI.el('td', {style: {fontWeight: '600'}}, [fmt(sub.lowest_efective_price?.min ?? sub.price, sub.currency)]),
+                    UI.el('td', {}, [UI.formatDate(event.occurred_at)]),
+                    UI.el('td', {style: {color: '#64748b'}}, [this._eventDetails(event)]),
                 ])
             ));
 
             UI.render(root, UI.el('table', {className: 'history-table'}, [thead, tbody]));
+        }
+
+        _eventLabel(eventType) {
+            const labels = {
+                'subscription.created': 'Subscription created',
+                'subscription.cancelled': 'Subscription cancelled',
+                'subscription.reactivated': 'Subscription reactivated',
+                'subscription.paused': 'Delivery paused',
+                'subscription.resumed': 'Delivery resumed',
+                'payment.succeeded': 'Payment succeeded',
+                'payment.failed': 'Payment failed',
+                'payment.refunded': 'Payment refunded',
+            };
+
+            return labels[eventType] ?? eventType;
+        }
+
+        _eventDetails(event) {
+            const metadata = event.metadata || {};
+
+            switch (event.event_type) {
+                case 'subscription.created':
+                    return [
+                        metadata.billing_period ? `Billing: ${metadata.billing_period}` : null,
+                        metadata.amount ? `Amount: ${fmt(Number(metadata.amount) / 100, metadata.currency)}` : null,
+                    ].filter(Boolean).join(' · ') || 'Subscription created.';
+                case 'subscription.cancelled':
+                    return metadata.cancel_at_period_end
+                        ? 'Scheduled to cancel at the end of the billing period.'
+                        : 'Cancelled immediately.';
+                case 'subscription.reactivated':
+                    return metadata.days_remaining
+                        ? `${metadata.days_remaining} day(s) remaining in the entitlement period.`
+                        : 'Subscription reactivated.';
+                case 'subscription.paused':
+                    return [
+                        metadata.pause_start ? `From ${UI.formatDate(metadata.pause_start)}` : null,
+                        metadata.pause_end ? `until ${UI.formatDate(metadata.pause_end)}` : null,
+                        metadata.reason ? `Reason: ${metadata.reason}` : null,
+                    ].filter(Boolean).join(' ') || 'Delivery paused.';
+                case 'subscription.resumed':
+                    return 'Delivery resumed.';
+                case 'payment.succeeded':
+                    return metadata.amount
+                        ? `Paid ${fmt(Number(metadata.amount) / 100, metadata.currency)}.`
+                        : 'Payment processed successfully.';
+                case 'payment.failed':
+                    return metadata.failure_reason
+                        ? `Payment failed: ${metadata.failure_reason}.`
+                        : 'Payment failed.';
+                case 'payment.refunded':
+                    return metadata.amount
+                        ? `Refunded ${fmt(Number(metadata.amount) / 100, metadata.currency)}.`
+                        : 'Payment refunded.';
+                default:
+                    return 'Subscription event recorded.';
+            }
         }
     }
 
@@ -1848,9 +1937,8 @@
      * ───────────────────────────────────────────────────────────────────────── */
 
     class RenewalModal {
-        #sub;
-
-        constructor() {
+        constructor(app) {
+            this.app = app;
             this.modal = document.getElementById('renewalModal');
 
             document.getElementById('closeRenewalModal').addEventListener('click', () => this.close());
@@ -1861,15 +1949,9 @@
             });
         }
 
-        /** Must be called after API data loads so we have subscription context. */
-        setSub(sub) {
-            this.#sub = sub;
-        }
-
         open() {
-            if (!this.#sub) return;
-
-            const sub = this.#sub;
+            const sub = this.app.store.state.activeSubscription;
+            if (!sub) return;
 
             UI.setTxt('currentPlanName', `${sub.plan_name} — ${sub.delivery_type === 'print' ? 'Print' : 'Digital'}`);
 
@@ -1921,7 +2003,8 @@
         }
 
         async _processRenewal() {
-            const sub = this.#sub;
+            const sub = this.app.store.state.activeSubscription;
+            if (!sub) return;
             const renewalType = document.querySelector('input[name="renewal_type"]:checked')?.value ?? 'fixed';
             const submitBtn = document.getElementById('renewalSubmitBtn');
 
@@ -1944,30 +2027,84 @@
 
     class SubscriptionsApp {
         constructor() {
+            this.store = new SubscriptionsStore();
             this.subscriptionCard = new ActiveSubscriptionCard(this);
             this.emailPrefsCard = new EmailPreferencesCard();
             this.historyCard = new HistoryCard();
             this.pauseModal = new PauseDeliveryModal(this);
             this.billingModal = new BillingDateModal(this);
-            this.renewalModal = new RenewalModal();
+            this.renewalModal = new RenewalModal(this);
+
+            this.store.subscribe(state => this.render(state));
         }
 
         async init() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const json = await api(`${API_BASE}/member/subscriptions/overview`);
-                const {activeSubscription, subscriptionHistory, subscriptionSummary, plans, payment_warning} = json;
+                const {activeSubscription, subscriptionSummary, plans, payment_warning} = json;
 
-                // Give the renewal modal access to the active subscription data
-                if (activeSubscription) {
-                    this.renewalModal.setSub(activeSubscription);
+                this.store.setState({
+                    activeSubscription,
+                    subscriptionSummary,
+                    plans: plans || [],
+                    paymentWarning: payment_warning ?? null,
+                    loading: false,
+                });
+
+                if (activeSubscription?.id) {
+                    await this.loadHistory(activeSubscription.id);
+                } else {
+                    this.store.setState({
+                        historyEvents: [],
+                        historyPagination: null,
+                        historyLoading: false,
+                        historyError: null,
+                    });
                 }
-
-                this.subscriptionCard.render(activeSubscription, plans, payment_warning ?? null);
-                this.emailPrefsCard.render(subscriptionSummary);
-                this.historyCard.render(subscriptionHistory);
-            } catch (e) {
-                console.log('e', e)
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load subscription data. Please refresh the page.',
+                });
                 UI.toast('Failed to load subscription data. Please refresh the page.', 'error');
+            }
+        }
+
+        render(state) {
+            if (state.error) {
+                return;
+            }
+
+            this.subscriptionCard.render(state.activeSubscription || {}, state.plans, state.paymentWarning);
+
+            if (state.subscriptionSummary) {
+                this.emailPrefsCard.render(state.subscriptionSummary);
+            }
+
+            this.historyCard.render(state);
+        }
+
+        async loadHistory(subscriptionId) {
+            this.store.setState({
+                historyLoading: true,
+                historyError: null,
+            });
+
+            try {
+                const response = await api(`${API_BASE}/member/subscriptions/${subscriptionId}/history`);
+
+                this.store.setState({
+                    historyEvents: response.events || [],
+                    historyPagination: response.pagination || null,
+                    historyLoading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    historyLoading: false,
+                    historyError: 'Please try refreshing the page.',
+                });
             }
         }
 

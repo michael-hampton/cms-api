@@ -3,9 +3,6 @@
 namespace App\Controllers\Members\Api\Subscriptions;
 
 use App\Controllers\Controller;
-use App\Events\Subscriptions\SubscriptionCancelled;
-use App\Events\Subscriptions\SubscriptionPaused;
-use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -15,6 +12,7 @@ use App\Services\Subscriptions\MemberSubscriptionService;
 use App\Services\Subscriptions\SubscriptionBillingService;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
+use App\Services\Subscriptions\SubscriptionHistoryService;
 use App\Services\Subscriptions\SubscriptionPlanService;
 
 class MemberSubscriptionsApiController extends Controller
@@ -25,6 +23,7 @@ class MemberSubscriptionsApiController extends Controller
         private readonly SubscriptionCancellationService $cancellationService,
         private readonly SubscriptionBillingService      $billingService,
         private readonly SubscriptionDeliveryService     $deliveryService,
+        private readonly SubscriptionHistoryService      $historyService,
         private readonly SubscriptionPlanService         $planService,
     )
     {
@@ -43,7 +42,6 @@ class MemberSubscriptionsApiController extends Controller
 
         $activeSubscription = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId, true);
 
-        $subscriptionHistory = $this->subscriptionRepository->getSubscriptionHistory($member->id, $siteId);
         $subscriptionSummary = $this->subscriptionService->getSubscriptionSummary($member->id, $siteId);
         $plans = $this->planService->getActivePlansForSite($siteId);
         
@@ -57,9 +55,37 @@ class MemberSubscriptionsApiController extends Controller
                 'delivery_pause_start' => $activeSubscription->delivery_pause_start?->format('Y-m-d H:i:s'),
                 'delivery_pause_end' => $activeSubscription->delivery_pause_end?->format('Y-m-d H:i:s'),
             ]) : [],
-            'subscriptionHistory' => $subscriptionHistory,
             'subscriptionSummary' => $subscriptionSummary,
             'plans' => $plans,
+        ]);
+    }
+
+    public function history(Request $request, int $subscriptionId): mixed
+    {
+        if (!MemberAuth::check()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $member = MemberAuth::getMember();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->member_id !== (int) $member->id) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
+        }
+
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = max(1, min(100, (int) $request->input('per_page', 25)));
+        $history = $this->historyService->getPaginatedHistory($subscriptionId, $page, $perPage);
+
+        return $this->resourceResponse([
+            'success' => true,
+            'events' => $history['events'],
+            'pagination' => [
+                'total' => $history['total'],
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => (int) ceil($history['total'] / $perPage),
+            ],
         ]);
     }
 
@@ -90,12 +116,6 @@ class MemberSubscriptionsApiController extends Controller
             $message = $cancelAtPeriodEnd
                 ? 'Subscription will be cancelled at the end of the billing period.'
                 : 'Subscription cancelled successfully.';
-
-            event(new SubscriptionCancelled(
-                subscriptionId: $subscription->id,
-                cancelAtPeriodEnd: $cancelAtPeriodEnd,
-                endDate: now()
-            ));
 
             return $this->resourceResponse([
                 'success' => true,
@@ -283,13 +303,6 @@ class MemberSubscriptionsApiController extends Controller
 
             $result = $this->deliveryService->pauseDelivery($subscriptionId, $pauseStart, $pauseEnd, $reason);
 
-            event(new SubscriptionPaused(
-                subscription: $subscription,
-                pauseStart: $pauseStart->format('Y-m-d H:i:s'),
-                pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
-                reason: $reason,
-            ));
-
             return $this->resourceResponse($result);
         } catch (\Exception $e) {
             return $this->resourceResponse(['success' => false, 'message' => $e->getMessage()], 400);
@@ -311,11 +324,6 @@ class MemberSubscriptionsApiController extends Controller
 
         try {
             $result = $this->deliveryService->resumeDelivery($subscriptionId);
-
-            event(new SubscriptionResumed(
-                subscription: $subscription,
-                memberId: $member->id
-            ));
 
             return $this->resourceResponse($result);
         } catch (\Exception $e) {

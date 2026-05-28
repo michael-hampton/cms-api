@@ -411,6 +411,36 @@
     const API_BASE = '/api/<?= $site->slug ?>';
     const MEMBER_ID = <?= (int)$member->id ?>;
 
+    class AuditHistoryStore {
+        constructor() {
+            this.state = {
+                entries: [],
+                filters: {
+                    action: '',
+                    consent: '',
+                    date: '',
+                },
+                loading: false,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     /* ─── UI COMPONENTS ─────────────────────────────────────── */
 
     /**
@@ -504,7 +534,8 @@
         constructor() {
             this.container = document.getElementById('timeline-root');
             this.skeleton = document.getElementById('timeline-skeleton');
-            this.allEntries = [];
+            this.store = new AuditHistoryStore();
+            this.store.subscribe(state => this.render(state));
             this.init();
         }
 
@@ -514,19 +545,24 @@
         }
 
         async loadData() {
-            try {
-                // Using the existing API structure
-                const res = await api(`${API_BASE}/member/consent/audit-history?member_id=${MEMBER_ID}`);
-                this.allEntries = res.items || [];
+            this.store.setState({loading: true, error: null});
 
-                // UI Transition
+            try {
+                const res = await api(`${API_BASE}/member/consent/audit-history?member_id=${MEMBER_ID}`);
+                this.store.setState({
+                    entries: res.items || [],
+                    loading: false,
+                });
+
                 if (this.skeleton) this.skeleton.style.display = 'none';
                 this.container.style.display = 'block';
 
                 this.populateConsentFilter();
-                this.render();
             } catch (e) {
-                console.error('History Load Error:', e);
+                this.store.setState({
+                    loading: false,
+                    error: e.message || 'Failed to load history.',
+                });
                 if (this.skeleton) {
                     this.skeleton.innerHTML = `<div class="error-state">Failed to load history: ${e.message}</div>`;
                 }
@@ -538,7 +574,7 @@
             if (!select) return;
 
             const seen = new Set();
-            this.allEntries.forEach(e => {
+            this.store.state.entries.forEach(e => {
                 const c = e.consent_type;
                 if (c && !seen.has(c.code)) {
                     seen.add(c.code);
@@ -547,12 +583,23 @@
             });
         }
 
-        render() {
-            const actionVal = document.getElementById('actionFilter').value;
-            const consentVal = document.getElementById('consentFilter').value;
-            const dateVal = document.getElementById('dateFilter').value;
+        render(state) {
+            if (state.loading) {
+                return;
+            }
 
-            const filtered = this.allEntries.filter(e => {
+            if (state.error) {
+                UI.render(this.container, UI.el('div', {className: 'empty-state'}, [
+                    UI.el('p', {}, [state.error])
+                ]));
+                return;
+            }
+
+            const actionVal = state.filters.action;
+            const consentVal = state.filters.consent;
+            const dateVal = state.filters.date;
+
+            const filtered = state.entries.filter(e => {
                 const matchesAction = !actionVal || e.action === actionVal;
                 const matchesConsent = !consentVal || (e.consent_type && e.consent_type.code === consentVal);
                 const matchesDate = !dateVal || e.created_at.startsWith(dateVal);
@@ -566,17 +613,24 @@
                 return;
             }
 
-            // Build the timeline nodes
             const timelineNodes = filtered.map(entry => new AuditRow(entry).render());
-
-            // Wrap in a timeline container and render
             UI.render(this.container, UI.el('div', {className: 'timeline'}, timelineNodes));
         }
 
         wireFilters() {
             ['actionFilter', 'consentFilter', 'dateFilter'].forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.onchange = () => this.render();
+                if (el) {
+                    el.onchange = () => {
+                        this.store.setState({
+                            filters: {
+                                action: document.getElementById('actionFilter').value,
+                                consent: document.getElementById('consentFilter').value,
+                                date: document.getElementById('dateFilter').value,
+                            }
+                        });
+                    };
+                }
             });
         }
     }

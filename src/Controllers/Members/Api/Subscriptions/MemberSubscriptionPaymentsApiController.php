@@ -27,9 +27,9 @@ class MemberSubscriptionPaymentsApiController extends Controller
         $member = MemberAuth::getMember();
         $siteId = SiteContext::getId();
 
-        $subscriptions = $this->subscriptionRepository->getActiveSubscriptionForMember($member->id, $siteId);
+        $subscriptions = $this->subscriptionRepository->getSubscriptionHistory($member->id, $siteId);
 
-        if (empty($subscriptions)) {
+        if ($subscriptions->isEmpty()) {
             return $this->jsonResponse([
                 'success' => true,
                 'payments' => [],

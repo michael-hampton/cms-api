@@ -460,6 +460,33 @@
 </main>
 
 <script>
+    class PlansStore {
+        constructor() {
+            this.state = {
+                plans: [],
+                currentSubscription: null,
+                loading: false,
+                error: null,
+                vouchers: {},
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     /**
      * PlansPage — drives the Subscription Plans listing view.
      * All DOM construction goes through app-core UI helpers.
@@ -473,22 +500,41 @@
 
             this.plansGrid = document.getElementById('plansGrid');
             this.currentBanner = document.getElementById('currentBanner');
-
-            /** Voucher state keyed by plan slug */
-            this.vouchers = {};
+            this.store = new PlansStore();
+            this.store.subscribe(state => this.render(state));
         }
 
         async init() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const res = await api(this.apiUrl);
-                this.renderBanner(res.data.currentSubscription);
-                this.renderPlans(res.data.plans, res.data.currentSubscription);
+                this.store.setState({
+                    plans: res.data.plans || [],
+                    currentSubscription: res.data.currentSubscription || null,
+                    loading: false,
+                });
             } catch (err) {
+                this.store.setState({
+                    loading: false,
+                    error: err.message || 'Failed to load plans',
+                });
                 UI.toast(err.message || 'Failed to load plans', 'error');
+            }
+        }
+
+        render(state) {
+            if (state.loading) return;
+
+            if (state.error) {
                 UI.render(this.plansGrid, [
                     UI.emptyState({icon: '⚠️', title: 'Unable to load plans', body: 'Please refresh the page.'}),
                 ]);
+                return;
             }
+
+            this.renderBanner(state.currentSubscription);
+            this.renderPlans(state.plans, state.currentSubscription);
         }
 
         // ── Banner ─────────────────────────────────────────────────────────────
@@ -519,7 +565,6 @@
         planCard(plan, currentSub) {
             const isCurrent = currentSub && currentSub.plan_id === plan.id;
             const hasActiveSub = isCurrent;
-            console.log(currentSub.plan_id, plan.id, hasActiveSub, isCurrent)
 
             const card = UI.el('div', {
                 className: `plan-card ${plan.is_featured ? 'featured' : ''}`,
@@ -626,14 +671,21 @@
                     body: JSON.stringify({voucher_code: code}),
                 });
 
-                this.vouchers[plan.slug] = {code, discount: data.discount};
+                this.store.setState({
+                    vouchers: {
+                        ...this.store.state.vouchers,
+                        [plan.slug]: {code, discount: data.discount},
+                    },
+                });
                 UI.text(msgEl, `✓ ${data.message}`);
                 msgEl.classList.add('ok');
 
                 UI.text(priceEl, `Final price: ${plan.currency} ${Number(data.final_price).toFixed(2)} (save ${Number(data.discount).toFixed(2)})`);
                 priceEl.style.display = 'block';
             } catch (err) {
-                delete this.vouchers[plan.slug];
+                const vouchers = {...this.store.state.vouchers};
+                delete vouchers[plan.slug];
+                this.store.setState({vouchers});
                 UI.text(msgEl, err.message || 'Invalid voucher code.');
                 msgEl.classList.add('fail');
             }
@@ -645,7 +697,7 @@
             btn.disabled = true;
             btn.classList.add('loading');
 
-            const voucher = this.vouchers[plan.slug];
+            const voucher = this.store.state.vouchers[plan.slug];
             const payload = {voucher_code: voucher?.code ?? null};
 
             try {

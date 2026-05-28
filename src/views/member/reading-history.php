@@ -377,35 +377,85 @@
 </div>
 
 <script>
+    class ReadingHistoryStore {
+        constructor() {
+            this.state = {
+                views: [],
+                totalPagesRead: 0,
+                loading: false,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     class ReadingHistory {
+        constructor() {
+            this.root = document.getElementById('reading-history-root');
+            this.store = new ReadingHistoryStore();
+
+            this.store.subscribe(state => this.render(state));
+        }
+
         async load() {
-            const root = document.getElementById('reading-history-root');
+            this.store.setState({loading: true, error: null});
+
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/reading-history`);
-                this.render(root, json.data.recently_viewed, json.data.total_pages_read);
-            } catch {
+                this.store.setState({
+                    views: json.data.recently_viewed || [],
+                    totalPagesRead: json.data.total_pages_read || 0,
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    error: 'Please try refreshing the page.',
+                    loading: false,
+                });
                 UI.toast('Failed to load reading history. Please refresh.', 'error');
-                UI.render(root, [UI.emptyState({
-                    icon: '⚠️',
-                    title: 'Failed to Load',
-                    body: 'Please try refreshing the page.',
-                })]);
             }
         }
 
-        render(root, views, totalPagesRead) {
+        render(state) {
+            if (state.loading) {
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.root, [UI.emptyState({
+                    icon: '⚠️',
+                    title: 'Failed to Load',
+                    body: state.error,
+                })]);
+                return;
+            }
+
             const statsBar = UI.el('div', {className: 'stats-bar'}, [
                 UI.el('div', {className: 'stat-item'}, [
                     UI.el('span', {className: 'stat-icon'}, ['📖']),
                     UI.el('div', {className: 'stat-info'}, [
-                        UI.el('h3', {}, [String(totalPagesRead)]),
+                        UI.el('h3', {}, [String(state.totalPagesRead)]),
                         UI.el('p', {}, ['Unique Pages Read']),
                     ]),
                 ]),
             ]);
 
-            if (!views?.length) {
-                UI.render(root, [statsBar, UI.emptyState({
+            if (!state.views?.length) {
+                UI.render(this.root, [statsBar, UI.emptyState({
                     icon: '📚',
                     title: 'No Reading History Yet',
                     body: 'Start exploring content to build your reading history.',
@@ -415,7 +465,7 @@
             }
 
             const timeline = UI.el('div', {className: 'timeline'});
-            views.forEach(view => {
+            state.views.forEach(view => {
                 const page = view.page;
                 if (!page) return;
 
@@ -440,7 +490,7 @@
                 ]));
             });
 
-            UI.render(root, [statsBar, timeline]);
+            UI.render(this.root, [statsBar, timeline]);
         }
     }
 

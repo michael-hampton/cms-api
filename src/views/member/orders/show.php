@@ -1079,11 +1079,40 @@
     /* ─────────────────────────────────────────────────────────────
        OrderManager — orchestrates loading, rendering, and actions
     ───────────────────────────────────────────────────────────── */
+    class OrderStore {
+        constructor() {
+            this.state = {
+                orderData: null,
+                loading: false,
+                error: null,
+                currentRefundType: 'full',
+                refundSubmitting: false,
+                cancelSubmitting: false,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     class OrderManager {
         constructor({siteSlug}) {
             this.siteSlug = siteSlug;
-            this.orderData = null;
-            this.currentRefundType = 'full';
+            this.store = new OrderStore();
+
+            this.store.subscribe(state => this._render(state));
 
             document.addEventListener('DOMContentLoaded', () => this._load());
         }
@@ -1092,12 +1121,19 @@
 
         async _load() {
             const orderId = window.location.pathname.split('/').pop();
+            this.store.setState({loading: true, error: null});
 
             try {
                 const json = await api(`/api/${this.siteSlug}/member/orders/${orderId}`);
-                this.orderData = json.data;
-                this._render();
-            } catch {
+                this.store.setState({
+                    orderData: json.data,
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load order details. Please refresh the page.',
+                });
                 UI.render(document.getElementById('main-content'), [
                     UI.el('div', {className: 'page-loader'}, ['']),
                 ]);
@@ -1105,8 +1141,12 @@
             }
         }
 
-        _render() {
-            const o = this.orderData;
+        _render(state) {
+            if (state.loading || !state.orderData) {
+                return;
+            }
+
+            const o = state.orderData;
             const main = document.getElementById('main-content');
 
             UI.render(main, [
@@ -1122,18 +1162,18 @@
         /* ── Modal openers ── */
 
         openRefundModal() {
-            this.currentRefundType = 'full';
-            RefundModal.open(this.orderData, this.currentRefundType, type => this._updateRefundType(type));
+            this.store.setState({currentRefundType: 'full'});
+            RefundModal.open(this.store.state.orderData, this.store.state.currentRefundType, type => this._updateRefundType(type));
         }
 
         openCancelModal() {
-            CancelModal.open(this.orderData);
+            CancelModal.open(this.store.state.orderData);
         }
 
         /* ── Refund type switching ── */
 
         _updateRefundType(type) {
-            this.currentRefundType = type;
+            this.store.setState({currentRefundType: type});
 
             document.getElementById('opt-full')?.classList.toggle('active', type === 'full');
             document.getElementById('opt-partial')?.classList.toggle('active', type === 'partial');
@@ -1141,7 +1181,7 @@
             const partialEl = document.getElementById('partialRefundItems');
             if (partialEl) partialEl.style.display = type === 'partial' ? 'block' : 'none';
 
-            this._updateRefundDisplay(type === 'full' ? this.orderData.total : this._calculatePartialAmount());
+            this._updateRefundDisplay(type === 'full' ? this.store.state.orderData.total : this._calculatePartialAmount());
         }
 
         _calculatePartialAmount() {
@@ -1165,13 +1205,14 @@
         }
 
         _updateRefundDisplay(amount) {
-            const pct = this.orderData.total > 0 ? (amount / this.orderData.total) * 100 : 0;
+            const orderData = this.store.state.orderData;
+            const pctSafe = orderData.total > 0 ? (amount / orderData.total) * 100 : 0;
             const amountEl = document.getElementById('refundAmount');
             const barEl = document.getElementById('refundProgressBar');
             const pctEl = document.getElementById('refundPercentage');
-            if (amountEl) UI.text(amountEl, `${this.orderData.currency} ${amount.toFixed(2)}`);
-            if (barEl) barEl.style.width = `${Math.min(pct, 100)}%`;
-            if (pctEl) UI.text(pctEl, `${Math.round(pct)}% of order total`);
+            if (amountEl) UI.text(amountEl, `${orderData.currency} ${amount.toFixed(2)}`);
+            if (barEl) barEl.style.width = `${Math.min(pctSafe, 100)}%`;
+            if (pctEl) UI.text(pctEl, `${Math.round(pctSafe)}% of order total`);
         }
 
         /* Called by qty input change listeners */
@@ -1189,17 +1230,18 @@
             }
 
             try {
-                await api(`/api/${this.siteSlug}/member/orders/${this.orderData.id}/refund`, {
+                this.store.setState({refundSubmitting: true});
+                await api(`/api/${this.siteSlug}/member/orders/${this.store.state.orderData.id}/refund`, {
                     method: 'POST',
                     body: JSON.stringify({
-                        order_id: this.orderData.id,
-                        refund_type: this.currentRefundType,
-                        refund_amount: this.currentRefundType === 'full' ? this.orderData.total : this._calculatePartialAmount(),
+                        order_id: this.store.state.orderData.id,
+                        refund_type: this.store.state.currentRefundType,
+                        refund_amount: this.store.state.currentRefundType === 'full' ? this.store.state.orderData.total : this._calculatePartialAmount(),
                         reason,
                         internal_notes: document.getElementById('refundNotes')?.value,
                         notify_customer: document.getElementById('notifyCustomer')?.checked ?? true,
                         restock_items: document.getElementById('restockItems')?.checked ?? true,
-                        items: this.currentRefundType === 'partial' ? this._getPartialItems() : [],
+                        items: this.store.state.currentRefundType === 'partial' ? this._getPartialItems() : [],
                     }),
                 });
                 UI.toast('Refund processed successfully', 'success');
@@ -1207,6 +1249,8 @@
                 location.reload();
             } catch (err) {
                 UI.toast(err.message ?? 'Failed to process refund', 'error');
+            } finally {
+                this.store.setState({refundSubmitting: false});
             }
         }
 
@@ -1218,7 +1262,8 @@
             }
 
             try {
-                await api(`/api/${this.siteSlug}/member/orders/${this.orderData.id}/cancel`, {
+                this.store.setState({cancelSubmitting: true});
+                await api(`/api/${this.siteSlug}/member/orders/${this.store.state.orderData.id}/cancel`, {
                     method: 'POST',
                     body: JSON.stringify({
                         reason,
@@ -1230,6 +1275,8 @@
                 location.reload();
             } catch (err) {
                 UI.toast(err.message ?? 'Failed to cancel order', 'error');
+            } finally {
+                this.store.setState({cancelSubmitting: false});
             }
         }
     }

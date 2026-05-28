@@ -611,26 +611,91 @@
 
 
 <script>
+    class RewardsStore {
+        constructor() {
+            this.state = {
+                rewards: null,
+                loading: false,
+                error: null,
+                claimingIds: new Set(),
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setClaiming(id, claiming) {
+            const claimingIds = new Set(this.state.claimingIds);
+
+            if (claiming) {
+                claimingIds.add(id);
+            } else {
+                claimingIds.delete(id);
+            }
+
+            this.setState({claimingIds});
+        }
+    }
 
     class RewardsPage {
         static toggleFaq(element) {
             element.classList.toggle('active');
         }
 
+        constructor() {
+            this.store = new RewardsStore();
+            this.content = document.getElementById('rewards-content');
+            this.loadingNode = document.getElementById('rewards-loading');
+            this.store.subscribe(state => this.render(state));
+        }
+
         async load() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/rewards`);
-                this.render(json.data);
-            } catch {
-                UI.render(document.getElementById('rewards-loading'), [
+                this.store.setState({
+                    rewards: json.data,
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load rewards. Please refresh.',
+                });
+                UI.render(this.loadingNode, [
                     UI.el('p', {style: {color: '#dc3545'}}, ['Failed to load rewards. Please refresh.']),
                 ]);
             }
         }
 
-        render({stats, unclaimed_rewards, claimed_rewards, top_rewards}) {
-            const content = document.getElementById('rewards-content');
-            UI.render(content, [
+        render(state) {
+            if (state.loading || !state.rewards) {
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.loadingNode, [
+                    UI.el('p', {style: {color: '#dc3545'}}, [state.error]),
+                ]);
+                return;
+            }
+
+            const {stats, unclaimed_rewards, claimed_rewards, top_rewards} = state.rewards;
+
+            UI.render(this.content, [
                 this._summary(stats),
                 unclaimed_rewards.length ? this._notification(unclaimed_rewards.length) : null,
                 unclaimed_rewards.length ? this._section('⭐ Available to Claim', unclaimed_rewards,
@@ -644,8 +709,8 @@
                     body: 'Keep engaging with our content to earn rewards!',
                 }) : null,
             ]);
-            document.getElementById('rewards-loading').style.display = 'none';
-            content.style.display = 'block';
+            this.loadingNode.style.display = 'none';
+            this.content.style.display = 'block';
         }
 
         _summary(stats) {
@@ -733,8 +798,8 @@
         _unclaimedCard(r) {
             const claimBtn = UI.el('button', {
                 className: 'btn btn-primary',
-                ...(r.is_expired ? {disabled: true} : {}),
-            }, [r.is_expired ? 'Expired' : 'Claim Reward']);
+                ...(r.is_expired || this.store.state.claimingIds.has(r.id) ? {disabled: true} : {}),
+            }, [r.is_expired ? 'Expired' : (this.store.state.claimingIds.has(r.id) ? 'Claiming…' : 'Claim Reward')]);
             claimBtn.addEventListener('click', () => this._claim(r.id, claimBtn));
 
             return UI.el('div', {className: 'reward-card', id: `reward-card-${r.id}`}, [
@@ -807,19 +872,17 @@
 
         async _claim(rewardId, btn) {
             if (!confirm('Claim this reward?')) return;
-            const original = btn.textContent;
-            btn.textContent = 'Claiming…';
-            btn.disabled = true;
+            this.store.setClaiming(rewardId, true);
             try {
                 const res = await api(`/api/${SITE_SLUG}/member/rewards/${rewardId}/claim`, {method: 'POST'});
                 if (res.data?.success) {
                     UI.toast(res.data.message || 'Reward claimed!', 'success');
-                    setTimeout(() => this.load(), 800);
+                    await this.load();
                 } else throw new Error(res.data?.message);
             } catch (e) {
                 UI.toast(e.message || 'Failed to claim reward.', 'error');
-                btn.textContent = original;
-                btn.disabled = false;
+            } finally {
+                this.store.setClaiming(rewardId, false);
             }
         }
     }

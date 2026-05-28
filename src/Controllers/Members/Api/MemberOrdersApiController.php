@@ -17,9 +17,17 @@ class MemberOrdersApiController extends Controller
     public function index()
     {
         $member = MemberAuth::getMember();
+        $orders = $this->orderRepository->getByUser($member->id)->map(function ($order) {
+            $data = $order->toArray();
+            $data['created_at'] = $order->created_at?->format('Y-m-d H:i:s');
+            $data['can_be_cancelled'] = $order->canBeCancelled();
+
+            return $data;
+        });
+
         return $this->resourceResponse([
             'success' => true,
-            'data' => $this->orderRepository->getByUser($member->id)
+            'data' => $orders
         ]);
     }
 

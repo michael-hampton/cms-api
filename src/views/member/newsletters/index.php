@@ -991,6 +991,35 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
+    class NewsletterStore {
+        constructor() {
+            this.state = {
+                newslettersWithAccess: [],
+                availableNewsletters: [],
+                subscriptions: [],
+                recommendations: [],
+                selected: new Set(),
+                loadingNewsletters: false,
+                loadingRecommendations: false,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
 
     // ── Recommendation section ────────────────────────────────────────────
 
@@ -1001,22 +1030,15 @@
             this.grid = document.getElementById('recommendations-grid');
         }
 
-        async load() {
-            try {
-                const json = await api(`/api/${SITE_SLUG}/member/newsletters/recommendations`);
-                const items = json.data ?? [];
-
-                if (!items.length) {
-                    // Section stays hidden — no empty state shown here.
-                    return;
-                }
-
-                UI.render(this.grid, items.map(item => this._card(item)));
-                this.section.classList.add('visible');
-            } catch {
-                // Silent failure — recommendations are non-critical.
-                // The All Newsletters section still loads independently.
+        render(items) {
+            if (!items.length) {
+                this.section.classList.remove('visible');
+                UI.render(this.grid, []);
+                return;
             }
+
+            UI.render(this.grid, items.map(item => this._card(item)));
+            this.section.classList.add('visible');
         }
 
         _card(item) {
@@ -1060,6 +1082,7 @@
         _card(item) {
             const isLocked = !item.has_access;
             const isSubscribed = item.is_subscribed;
+            const isSelected = this.mgr.store.state.selected.has(item.id);
 
             const statusBadge = UI.el('span', {
                 className: `status-badge ${isLocked ? 'locked' : isSubscribed ? 'subscribed' : 'unsubscribed'}`,
@@ -1073,8 +1096,9 @@
                     type: 'checkbox',
                     className: 'newsletter-checkbox',
                     'data-newsletter-id': item.id,
+                    ...(isSelected ? {checked: true} : {}),
                 });
-                cb.addEventListener('change', () => this.mgr.updateSelection());
+                cb.addEventListener('change', () => this.mgr.toggleSelected(item.id, cb.checked));
                 topRight = cb;
             }
 
@@ -1124,54 +1148,95 @@
 
     class NewsletterManager {
         constructor() {
-            this.newslettersWithAccess = [];
-            this.availableNewsletters = [];
-            this.subscriptions = [];
-            this.selected = new Set();
+            this.store = new NewsletterStore();
             this.grid = new NewsletterGrid(this);
             this.recommendations = new RecommendationsSection(this);
             this.upgradeModal = new UpgradeModal(this);
+
+            this.store.subscribe(state => this.render(state));
         }
 
         async load() {
-            // Fire both requests concurrently — they are independent.
+            this.store.setState({
+                loadingNewsletters: true,
+                loadingRecommendations: true,
+                error: null,
+            });
+
             await Promise.all([
                 this._loadNewsletters(),
-                this.recommendations.load(),
+                this._loadRecommendations(),
             ]);
         }
 
         async _loadNewsletters() {
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/newsletters`);
-                this.newslettersWithAccess = json.data.newsletters_with_access;
-                this.availableNewsletters = json.data.available_newsletters;
-                this.subscriptions = json.data.subscriptions;
-                this.grid.render(this.newslettersWithAccess);
+                this.store.setState({
+                    newslettersWithAccess: json.data.newsletters_with_access || [],
+                    availableNewsletters: json.data.available_newsletters || [],
+                    subscriptions: json.data.subscriptions || [],
+                    selected: new Set(),
+                    loadingNewsletters: false,
+                });
+            } catch {
+                this.store.setState({
+                    loadingNewsletters: false,
+                    error: 'Failed to load newsletters. Please refresh.',
+                });
+                UI.toast('Failed to load newsletters. Please refresh.', 'error');
+            }
+        }
+
+        async _loadRecommendations() {
+            try {
+                const json = await api(`/api/${SITE_SLUG}/member/newsletters/recommendations`);
+                this.store.setState({
+                    recommendations: json.data ?? [],
+                    loadingRecommendations: false,
+                });
+            } catch {
+                this.store.setState({
+                    recommendations: [],
+                    loadingRecommendations: false,
+                });
+            }
+        }
+
+        render(state) {
+            if (!state.loadingNewsletters) {
+                this.grid.render(state.newslettersWithAccess);
                 this._populateModal();
                 document.getElementById('subscribeBtn').disabled = false;
-            } catch {
-                UI.toast('Failed to load newsletters. Please refresh.', 'error');
+                document.getElementById('selectedCount').textContent = state.selected.size;
+                document.getElementById('floatingActionBar').classList.toggle('show', state.selected.size > 0);
+            }
+
+            if (!state.loadingRecommendations) {
+                this.recommendations.render(state.recommendations);
             }
         }
 
         _populateModal() {
             const list = document.getElementById('modalNewsletterList');
-            if (!this.availableNewsletters.length) {
+            const availableNewsletters = this.store.state.availableNewsletters;
+
+            if (!availableNewsletters.length) {
                 UI.render(list, [UI.el('p', {style: {textAlign: 'center', color: 'var(--text-secondary)'}},
                     ['No newsletters available.'])]);
                 return;
             }
-            UI.render(list, this.availableNewsletters.map(n => {
+            UI.render(list, availableNewsletters.map(n => {
                 const subbed = n.is_subscribed;
+                const selected = this.store.state.selected.has(n.id);
                 const cb = UI.el('input', {
                     type: 'checkbox',
                     className: 'modal-item-checkbox',
                     'data-newsletter-id': n.id,
-                    ...(subbed ? {disabled: true, checked: true} : {}),
+                    ...(subbed ? {disabled: true, checked: true} : selected ? {checked: true} : {}),
                 });
                 const item = UI.el('div', {
-                    className: `modal-newsletter-item${subbed ? ' already-subscribed' : ''}`,
+                    className: `modal-newsletter-item${subbed ? ' already-subscribed' : ''}${selected ? ' selected' : ''}`,
                     'data-newsletter-id': n.id,
                 }, [
                     cb,
@@ -1189,20 +1254,23 @@
                     ]),
                 ]);
                 if (!subbed) item.addEventListener('click', () => {
-                    cb.checked = !cb.checked;
-                    item.classList.toggle('selected', cb.checked);
+                    const nextChecked = !cb.checked;
+                    cb.checked = nextChecked;
+                    this.toggleSelected(n.id, nextChecked);
                 });
                 return item;
             }));
         }
 
-        updateSelection() {
-            this.selected.clear();
-            document.querySelectorAll('.newsletter-checkbox:checked').forEach(cb =>
-                this.selected.add(parseInt(cb.dataset.newsletterId)));
-            const bar = document.getElementById('floatingActionBar');
-            document.getElementById('selectedCount').textContent = this.selected.size;
-            bar.classList.toggle('show', this.selected.size > 0);
+        toggleSelected(id, checked) {
+            const selected = new Set(this.store.state.selected);
+            if (checked) {
+                selected.add(id);
+            } else {
+                selected.delete(id);
+            }
+
+            this.store.setState({selected});
         }
 
         async quickSubscribe(id) {
@@ -1212,9 +1280,7 @@
                     body: JSON.stringify({newsletter_id: id}),
                 });
                 UI.toast('Successfully subscribed!', 'success');
-                // Reload both sections — a new subscription changes
-                // both the list state and the recommendation set.
-                setTimeout(() => this.load(), 900);
+                await this.load();
             } catch (e) {
                 UI.toast(e.message || 'Failed to subscribe.', 'error');
             }
@@ -1222,7 +1288,7 @@
 
         async quickUnsubscribe(id) {
             if (!confirm('Unsubscribe from this newsletter?')) return;
-            const sub = this.subscriptions.find(s => s.newsletter_id === id);
+            const sub = this.store.state.subscriptions.find(s => s.newsletter_id === id);
             if (!sub) {
                 UI.toast('Subscription not found.', 'error');
                 return;
@@ -1233,7 +1299,7 @@
                     body: JSON.stringify({subscriber_id: sub.id}),
                 });
                 UI.toast('Successfully unsubscribed.', 'success');
-                setTimeout(() => this.load(), 900);
+                await this.load();
             } catch (e) {
                 UI.toast(e.message || 'Failed to unsubscribe.', 'error');
             }
@@ -1246,26 +1312,22 @@
                     body: JSON.stringify({newsletter_ids: ids}),
                 });
                 UI.toast(`Subscribed to ${ids.length} newsletter(s).`, 'success');
-                setTimeout(() => this.load(), 900);
+                await this.load();
             } catch (e) {
                 UI.toast(e.message || 'Failed to subscribe.', 'error');
             }
         }
 
         subscribeSelected() {
-            if (!this.selected.size) {
+            if (!this.store.state.selected.size) {
                 UI.toast('Select at least one newsletter.', 'error');
                 return;
             }
-            this.bulkSubscribe(Array.from(this.selected));
-            this.selected.clear();
-            document.querySelectorAll('.newsletter-checkbox').forEach(cb => cb.checked = false);
-            this.updateSelection();
+            this.bulkSubscribe(Array.from(this.store.state.selected));
         }
 
         subscribeModalSelected() {
-            const ids = Array.from(document.querySelectorAll('.modal-item-checkbox:checked:not([disabled])'))
-                .map(cb => parseInt(cb.dataset.newsletterId));
+            const ids = Array.from(this.store.state.selected);
             if (!ids.length) {
                 UI.toast('Select at least one newsletter.', 'error');
                 return;
@@ -1282,18 +1344,21 @@
         _closeModal() {
             document.getElementById('newsletterModal').classList.remove('show');
             document.body.style.overflow = '';
-            document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
-                cb.checked = false;
-                cb.closest('.modal-newsletter-item')?.classList.remove('selected');
-            });
             document.getElementById('selectAllCheckbox').checked = false;
         }
 
         selectAll(checked) {
-            document.querySelectorAll('.modal-item-checkbox:not([disabled])').forEach(cb => {
-                cb.checked = checked;
-                cb.closest('.modal-newsletter-item')?.classList.toggle('selected', checked);
+            const selected = new Set(this.store.state.selected);
+            this.store.state.availableNewsletters.forEach(item => {
+                if (!item.is_subscribed) {
+                    if (checked) {
+                        selected.add(item.id);
+                    } else {
+                        selected.delete(item.id);
+                    }
+                }
             });
+            this.store.setState({selected});
         }
     }
 
@@ -1577,10 +1642,7 @@
         window.selectAllNewsletters = checked => mgr.selectAll(checked);
         window.subscribeSelected = () => mgr.subscribeSelected();
         window.subscribeModalSelected = () => mgr.subscribeModalSelected();
-        window.clearSelection = () => {
-            mgr.selected.clear();
-            mgr.updateSelection();
-        };
+        window.clearSelection = () => mgr.store.setState({selected: new Set()});
         window.closeUpgradeModal = () => mgr.upgradeModal.close();
 
         mgr.load();

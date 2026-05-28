@@ -248,32 +248,97 @@
 </div>
 
 <script>
+    class LikedPagesStore {
+        constructor() {
+            this.state = {
+                pages: [],
+                totalLikes: 0,
+                loading: false,
+                error: null,
+                removingIds: new Set(),
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setRemoving(pageId, removing) {
+            const removingIds = new Set(this.state.removingIds);
+
+            if (removing) {
+                removingIds.add(pageId);
+            } else {
+                removingIds.delete(pageId);
+            }
+
+            this.setState({removingIds});
+        }
+    }
+
     class LikedPages {
+        constructor() {
+            this.root = document.getElementById('liked-pages-root');
+            this.store = new LikedPagesStore();
+
+            this.store.subscribe(state => this.render(state));
+        }
+
         async load() {
-            const root = document.getElementById('liked-pages-root');
+            this.store.setState({loading: true, error: null});
+
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/liked-pages`);
-                this.render(root, json.data.liked_pages, json.data.total_likes);
-            } catch {
-                UI.render(root, [UI.el('p', {
-                    style: {color: 'var(--danger-color)', textAlign: 'center'},
-                }, ['Failed to load liked pages. Please refresh.'])]);
+                this.store.setState({
+                    pages: json.data.liked_pages || [],
+                    totalLikes: json.data.total_likes || 0,
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    error: 'Failed to load liked pages. Please refresh.',
+                    loading: false,
+                });
             }
         }
 
-        render(root, pages, totalLikes) {
+        render(state) {
+            if (state.loading) {
+                UI.render(this.root, [UI.el('p', {
+                    style: {textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem'},
+                }, ['Loading liked pages…'])]);
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.root, [UI.el('p', {
+                    style: {color: 'var(--danger-color)', textAlign: 'center'},
+                }, [state.error])]);
+                return;
+            }
+
             const statsBar = UI.el('div', {className: 'stats-bar'}, [
                 UI.el('div', {className: 'stat-item'}, [
                     UI.el('span', {className: 'stat-icon'}, ['❤️']),
                     UI.el('div', {className: 'stat-info'}, [
-                        UI.el('h3', {}, [String(totalLikes)]),
+                        UI.el('h3', {}, [String(state.totalLikes)]),
                         UI.el('p', {}, ['Total Likes']),
                     ]),
                 ]),
             ]);
 
-            if (!pages.length) {
-                UI.render(root, [statsBar, UI.emptyState({
+            if (!state.pages.length) {
+                UI.render(this.root, [statsBar, UI.emptyState({
                     icon: '💔',
                     title: 'No Liked Pages Yet',
                     body: 'Start exploring and like pages to build your collection.',
@@ -283,21 +348,24 @@
             }
 
             const grid = UI.el('div', {className: 'pages-grid'});
-            pages.forEach(like => {
+            state.pages.forEach(like => {
                 const page = like.page;
                 if (!page) return;
-                grid.appendChild(this._card(page, like.liked_at));
+                grid.appendChild(this._card(page, like.liked_at, state.removingIds.has(page.id)));
             });
 
-            UI.render(root, [statsBar, grid]);
+            UI.render(this.root, [statsBar, grid]);
         }
 
-        _card(page, likedAt) {
+        _card(page, likedAt, isRemoving = false) {
             const img = page.listing_image_id
                 ? UI.el('img', {src: `/images/${page.listing_image_id}`, alt: page.title, className: 'page-image'})
                 : UI.el('div', {className: 'page-image'});
 
-            const unlikeBtn = UI.el('button', {className: 'unlike-btn'}, ['Unlike']);
+            const unlikeBtn = UI.el('button', {
+                className: 'unlike-btn',
+                disabled: isRemoving,
+            }, [isRemoving ? 'Removing…' : 'Unlike']);
             unlikeBtn.addEventListener('click', e => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -328,22 +396,22 @@
 
         async _unlike(pageId) {
             if (!confirm('Remove this page from your liked pages?')) return;
+
+            this.store.setRemoving(pageId, true);
+
             try {
                 await api(`/api/${SITE_SLUG}/member/pages/like/${pageId}`, {
                     method: 'POST',
                     headers: {'X-Requested-With': 'XMLHttpRequest'},
                 });
-                const card = document.querySelector(`[data-page-id="${pageId}"]`);
-                if (card) {
-                    card.style.transition = 'opacity .3s, transform .3s';
-                    card.style.opacity = '0';
-                    card.style.transform = 'scale(.95)';
-                    setTimeout(() => this.load(), 300);
-                } else {
-                    this.load();
-                }
-            } catch {
-                alert('Failed to unlike page. Please try again.');
+                this.store.setState({
+                    pages: this.store.state.pages.filter(like => like.page?.id !== pageId),
+                    totalLikes: Math.max(0, this.store.state.totalLikes - 1),
+                });
+            } catch (_) {
+                UI.toast('Failed to unlike page. Please try again.', 'error');
+            } finally {
+                this.store.setRemoving(pageId, false);
             }
         }
     }

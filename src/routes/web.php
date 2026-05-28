@@ -108,6 +108,7 @@ use App\Framework\Middleware\RequireOpenCollabPagePermission;
 use App\Framework\Middleware\RequireContributorAuth;
 use App\Framework\Middleware\RequireMemberAuth;
 use App\Framework\Middleware\VerifyCsrfToken;
+use App\Middleware\OpenCollab\OnboardingRouteGuard;
 
 /*
 |--------------------------------------------------------------------------
@@ -626,12 +627,15 @@ $router->group(['middleware' => [RequireContributorAuth::class, CheckContributor
     $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index']);
     $router->get('/{site}/open-collab/contributor/dashboard', [\App\Controllers\OpenCollab\DashboardPageNewController::class, 'show']);
     $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings']);
-    $router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
-    $router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);
     $router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
     $router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
     $router->get('/{site}/open-collab/earnings', [ContributorEarningsPageController::class, 'index']);
     $router->get('/{site}/open-collab/disputes', [ContributorDisputePageController::class, 'index']);
+
+    $router->group(['middleware' => [OnboardingRouteGuard::class]], function ($router) {
+        $router->get('/{site}/open-collab/articles/create', [ArticlePageController::class, 'create']);
+        $router->get('/{site}/open-collab/articles/edit/{id}', [ArticlePageController::class, 'edit']);
+    });
 });
 
 // Guest-accessible Web route

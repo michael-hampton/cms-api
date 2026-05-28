@@ -769,48 +769,80 @@
     }
 
     class BadgesPage {
+        constructor() {
+            this.state = {
+                earnedBadges: [],
+                unearnedBadges: [],
+                categories: [],
+                loading: false,
+                error: null,
+            };
+        }
+
         async init() {
+            this.setState({loading: true, error: null});
             try {
                 const json = await api(`/api/${SITE_SLUG}/member/badges`);
-                const {earned_badges, unearned_badges, categories} = json.data;
-
-                document.getElementById('badge-stats-summary').textContent =
-                    `${earned_badges.length} earned • ${earned_badges.length + unearned_badges.length} total available`;
-
-                // Carousel
-                this.carousel = new Carousel('badgesCarousel');
-                this.carousel.build(earned_badges, unearned_badges);
-                document.getElementById('prevBtn').onclick = () => this.carousel.move(-1);
-                document.getElementById('nextBtn').onclick = () => this.carousel.move(1);
-                let resizeTimer;
-                window.addEventListener('resize', () => {
-                    clearTimeout(resizeTimer);
-                    resizeTimer = setTimeout(() => this.carousel.onResize(), 150);
+                this.setState({
+                    earnedBadges: json.data.earned_badges || [],
+                    unearnedBadges: json.data.unearned_badges || [],
+                    categories: json.data.categories || [],
+                    loading: false,
                 });
-
-                // Earned section
-                if (earned_badges.length) {
-                    document.getElementById('earnedSection').style.display = 'block';
-                    this.earnedGrid = new BadgeGrid('earnedBadgesGrid', 'earnedFilterTabs', earned_badges, true);
-                    this.earnedGrid.buildTabs(categories ?? []);
-                    this.earnedGrid.render();
-                }
-
-                // Unearned section
-                if (unearned_badges.length) {
-                    document.getElementById('unearnedSection').style.display = 'block';
-                    this.unearnedGrid = new BadgeGrid('unearnedBadgesGrid', 'unearnedFilterTabs', unearned_badges, false);
-                    this.unearnedGrid.buildTabs(categories ?? []);
-                    this.unearnedGrid.render();
-                    document.getElementById('showMoreBtn').onclick = () => this.unearnedGrid.showMore();
-                }
-
-                if (!earned_badges.length && !unearned_badges.length) {
-                    document.getElementById('empty-state').style.display = 'block';
-                }
-            } catch (e) {
+                this.render();
+            } catch (_) {
+                this.setState({
+                    loading: false,
+                    error: 'Failed to load badges. Please refresh.',
+                });
                 UI.toast('Failed to load badges. Please refresh.', 'error');
                 document.getElementById('badgesCarousel').innerHTML = '';
+            }
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+        }
+
+        render() {
+            const {earnedBadges, unearnedBadges, categories, loading, error} = this.state;
+            if (loading || error) {
+                return;
+            }
+
+            document.getElementById('badge-stats-summary').textContent =
+                `${earnedBadges.length} earned • ${earnedBadges.length + unearnedBadges.length} total available`;
+
+            this.carousel = new Carousel('badgesCarousel');
+            this.carousel.build(earnedBadges, unearnedBadges);
+            document.getElementById('prevBtn').onclick = () => this.carousel.move(-1);
+            document.getElementById('nextBtn').onclick = () => this.carousel.move(1);
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => this.carousel.onResize(), 150);
+            });
+
+            if (earnedBadges.length) {
+                document.getElementById('earnedSection').style.display = 'block';
+                this.earnedGrid = new BadgeGrid('earnedBadgesGrid', 'earnedFilterTabs', earnedBadges, true);
+                this.earnedGrid.buildTabs(categories ?? []);
+                this.earnedGrid.render();
+            }
+
+            if (unearnedBadges.length) {
+                document.getElementById('unearnedSection').style.display = 'block';
+                this.unearnedGrid = new BadgeGrid('unearnedBadgesGrid', 'unearnedFilterTabs', unearnedBadges, false);
+                this.unearnedGrid.buildTabs(categories ?? []);
+                this.unearnedGrid.render();
+                document.getElementById('showMoreBtn').onclick = () => this.unearnedGrid.showMore();
+            }
+
+            if (!earnedBadges.length && !unearnedBadges.length) {
+                document.getElementById('empty-state').style.display = 'block';
             }
         }
     }

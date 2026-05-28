@@ -388,6 +388,46 @@
 </div>
 
 <script>
+    class AddressStore {
+        constructor() {
+            this.state = {
+                addresses: [],
+                loading: false,
+                error: null,
+                deletingIds: new Set(),
+                defaultingIds: new Set(),
+                saving: false,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setFlag(key, id, enabled) {
+            const ids = new Set(this.state[key]);
+
+            if (enabled) {
+                ids.add(id);
+            } else {
+                ids.delete(id);
+            }
+
+            this.setState({[key]: ids});
+        }
+    }
+
     /**
      * Address Card Component
      * Represents a single address item in the list
@@ -401,6 +441,8 @@
         render() {
             const addr = this.address;
             const isDefault = !!parseInt(addr.is_default);
+            const deleting = this.manager.store.state.deletingIds.has(addr.id);
+            const defaulting = this.manager.store.state.defaultingIds.has(addr.id);
 
             return UI.el('div', {
                 className: `address-card ${isDefault ? 'default' : ''}`,
@@ -427,8 +469,9 @@
                 UI.el('div', {className: 'address-actions'}, [
                     !isDefault ? UI.el('button', {
                         className: 'btn btn-secondary btn-sm',
+                        disabled: defaulting,
                         onclick: () => this.manager.setDefault(addr.id)
-                    }, ['Set as Default']) : null,
+                    }, [defaulting ? 'Updating…' : 'Set as Default']) : null,
 
                     UI.el('button', {
                         className: 'btn btn-secondary btn-sm',
@@ -437,8 +480,9 @@
 
                     UI.el('button', {
                         className: 'btn btn-danger btn-sm',
+                        disabled: deleting,
                         onclick: () => this.manager.deleteAddress(addr.id)
-                    }, ['Delete'])
+                    }, [deleting ? 'Deleting…' : 'Delete'])
                 ])
             ]);
         }
@@ -503,6 +547,7 @@
             data.member_id = MEMBER_ID;
 
             this.clearErrors();
+            this.manager.store.setState({saving: true});
 
             try {
                 const endpoint = this.editingId
@@ -519,7 +564,7 @@
                 if (result.success) {
                     UI.toast(this.editingId ? 'Address updated' : 'Address added', 'success');
                     this.close();
-                    this.manager.loadAddresses();
+                    await this.manager.loadAddresses();
                 }
             } catch (error) {
                 // Note: api() wrapper in app-core handles the .errors object if present
@@ -528,6 +573,8 @@
                 } else {
                     UI.toast(error.message || 'An unexpected error occurred', 'error');
                 }
+            } finally {
+                this.manager.store.setState({saving: false});
             }
         }
 
@@ -550,7 +597,9 @@
     class AddressManager {
         constructor() {
             this.container = document.getElementById('addresses-container');
+            this.store = new AddressStore();
             this.modal = new AddressModal(this);
+            this.store.subscribe(state => this.render(state));
             this.init();
         }
 
@@ -568,16 +617,42 @@
         }
 
         async loadAddresses() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const response = await api(`${API_BASE}/member/addresses/search?member_id=${MEMBER_ID}`);
-                this.render(response.items || []);
-            } catch (error) {
+                this.store.setState({
+                    addresses: response.items || [],
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load addresses',
+                });
                 UI.toast('Failed to load addresses', 'error');
             }
         }
 
-        render(addresses) {
-            if (!addresses || addresses.length === 0) {
+        render(state) {
+            if (state.loading) {
+                return;
+            }
+
+            if (state.error) {
+                UI.render(this.container, UI.emptyState({
+                    icon: '⚠️',
+                    title: 'Unable to load addresses',
+                    body: state.error,
+                    action: UI.el('button', {
+                        className: 'btn btn-primary',
+                        onclick: () => this.loadAddresses()
+                    }, ['Retry'])
+                }));
+                return;
+            }
+
+            if (!state.addresses || state.addresses.length === 0) {
                 UI.render(this.container, UI.emptyState({
                     icon: '📍',
                     title: 'No Addresses Found',
@@ -591,7 +666,7 @@
             }
 
             const grid = UI.el('div', {className: 'addresses-grid'});
-            addresses.forEach(addr => {
+            state.addresses.forEach(addr => {
                 const card = new AddressCard(addr, this);
                 grid.appendChild(card.render());
             });
@@ -603,24 +678,30 @@
             if (!confirm('Are you sure you want to delete this address?')) return;
 
             try {
+                this.store.setFlag('deletingIds', id, true);
                 await api(`${API_BASE}/member/addresses/${id}`, {method: 'DELETE'});
                 UI.toast('Address deleted successfully', 'success');
-                this.loadAddresses();
+                await this.loadAddresses();
             } catch (error) {
                 UI.toast(error.message || 'Delete failed', 'error');
+            } finally {
+                this.store.setFlag('deletingIds', id, false);
             }
         }
 
         async setDefault(id) {
             try {
+                this.store.setFlag('defaultingIds', id, true);
                 await api(`${API_BASE}/member/addresses/${id}/set-default`, {
                     method: 'POST',
                     body: JSON.stringify({member_id: MEMBER_ID})
                 });
                 UI.toast('Default address updated', 'success');
-                this.loadAddresses();
+                await this.loadAddresses();
             } catch (error) {
                 UI.toast('Could not update default address', 'error');
+            } finally {
+                this.store.setFlag('defaultingIds', id, false);
             }
         }
     }
