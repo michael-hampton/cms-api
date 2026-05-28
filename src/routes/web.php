@@ -69,6 +69,7 @@ use App\Controllers\OpenCollab\Admin\AdminContributorPageController;
 use App\Controllers\OpenCollab\Admin\AdminContributorRequestPageController;
 use App\Controllers\OpenCollab\Admin\AdminDisputePageController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesPageController;
+use App\Controllers\OpenCollab\Admin\AdminInvitationPageController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsPageController;
 use App\Controllers\OpenCollab\Admin\AdminPayoutPageController;
 use App\Controllers\OpenCollab\Admin\AdminScheduledPayoutsPageController;
@@ -607,7 +608,7 @@ $router->group(['middleware' => [RequireAdminRole::class, RequireOpenCollabPageP
     $router->get('/{site}/open-collab/admin/payouts/scheduled',
         [AdminScheduledPayoutsPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/invitations',
-        [InvitationPageController::class, 'index']);
+        [AdminInvitationPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/activity',
         [AdminActivityPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/sites/settings', [SiteSettingsController::class, 'show']);

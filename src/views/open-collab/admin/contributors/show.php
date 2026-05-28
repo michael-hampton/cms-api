@@ -10,6 +10,17 @@
  */
 
 $isActive = (bool)($contributor['is_active'] ?? true);
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$overviewPanels = $overviewPanels ?? [];
+$capabilitiesPanels = $capabilitiesPanels ?? [];
+$hasOverviewPanels = !empty($overviewPanels);
+$hasCapabilitiesPanels = !empty($capabilitiesPanels);
+$canSendInvitation = in_array('contributor.invitation_action', $allowedComponentKeys, true);
+$canViewViolations = in_array('contributor.violation_action', $allowedComponentKeys, true);
+$canManageStatus = in_array('contributor.manage_status_action', $allowedComponentKeys, true);
+$canManageSiteAccess = in_array('contributor.site_access_action', $allowedComponentKeys, true);
+$canManageRole = in_array('contributor.role_action', $allowedComponentKeys, true);
+$canManageCapabilities = in_array('contributor.capabilities_manage_action', $allowedComponentKeys, true);
 ?>
 @endsection
 
@@ -66,154 +77,53 @@ $isActive = (bool)($contributor['is_active'] ?? true);
 
     <div style="display:flex;flex-direction:column;gap:20px;">
 
+        <?php if ($hasOverviewPanels || $hasCapabilitiesPanels): ?>
         <div class="oc-tabbar" style="display:flex;gap:20px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;">
-            <button type="button" class="oc-tabbar__tab active" data-tab-target="contributor-overview-panel">Overview</button>
-            <button type="button" class="oc-tabbar__tab" data-tab-target="contributor-capabilities-panel">Capabilities Overrides</button>
-        </div>
-
-        <div id="contributor-overview-panel" class="oc-tab-panel active">
-            <div class="oc-card">
-                <div class="oc-card__header">
-                    <div style="display:flex;align-items:center;gap:14px;">
-                        <div style="width:48px;height:48px;border-radius:50%;background:var(--navy);
-                                    display:grid;place-items:center;font-weight:700;font-size:1.2rem;
-                                    color:var(--amber);flex-shrink:0;">
-                            <?= strtoupper(substr($contributor['name'] ?? 'C', 0, 1)) ?>
-                        </div>
-                        <div>
-                            <div style="font-size:1.1rem;font-weight:700;color:var(--navy);">
-                                <?= htmlspecialchars($contributor['name'] ?? 'Unknown') ?>
-                            </div>
-                            <div style="font-size:.82rem;color:var(--slate);">
-                                <?= htmlspecialchars($contributor['email'] ?? '') ?>
-                            </div>
-                        </div>
-                        <span data-role="status-badge" class="oc-badge <?= $isActive ? 'oc-badge--published' : 'oc-badge--revoked' ?>" style="margin-left:auto;">
-                            <?= $isActive ? 'Active' : 'Inactive' ?>
-                        </span>
-                    </div>
-                </div>
-                <div class="oc-card__body">
-                    <dl style="display:grid;grid-template-columns:140px 1fr;gap:10px 16px;font-size:.875rem;">
-                        <dt style="color:var(--slate);font-weight:500;">ID</dt>
-                        <dd style="color:var(--navy);font-family:monospace;">#<?= (int)$contributor['id'] ?></dd>
-                        <dt style="color:var(--slate);font-weight:500;">Role</dt>
-                        <dd>
-                            <select id="role-select" class="oc-select" style="font-size:.8rem;padding:4px 8px;">
-                                <?php foreach (['contributor', 'editor', 'admin'] as $r): ?>
-                                    <option value="<?= $r ?>" <?= ($contributor['role'] ?? 'contributor') === $r ? 'selected' : '' ?>>
-                                        <?= ucfirst($r) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </dd>
-                        <dt style="color:var(--slate);font-weight:500;">Joined</dt>
-                        <dd style="color:var(--navy);">
-                            <?= !empty($contributor['created_at']) ? $contributor['created_at'] : '–' ?>
-                        </dd>
-                        <dt style="color:var(--slate);font-weight:500;">Is contributor</dt>
-                        <dd><?= ($contributor['is_contributor'] ?? false) ? '<span class="oc-badge oc-badge--published">Yes</span>' : '<span class="oc-badge oc-badge--draft">No</span>' ?></dd>
-                    </dl>
-                </div>
-            </div>
-
-            <div class="oc-card">
-                <div class="oc-card__header">
-                    <span class="oc-card__title">Site Access</span>
-                </div>
-                <div class="oc-card__body">
-                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;">
-                        <div>
-                            <div style="font-weight:500;font-size:.875rem;color:var(--navy);">
-                                <?= htmlspecialchars($site) ?>
-                            </div>
-                            <div style="font-size:.75rem;color:var(--slate);">Current site</div>
-                        </div>
-                        <div style="display:flex;gap:8px;">
-                            <button data-action="grant-access"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    style="border-color:#bbf7d0;color:var(--green);">Grant
-                            </button>
-                            <button data-action="revoke-access"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    style="border-color:#fecaca;color:var(--red);">Revoke
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <?php if ($invitations && count($invitations) > 0): ?>
-                <div class="oc-card">
-                    <div class="oc-card__header">
-                        <span class="oc-card__title">Invitation History</span>
-                        <span style="font-size:.72rem;background:var(--slate-pale);color:var(--slate);
-                                 padding:2px 8px;border-radius:10px;font-weight:600;">
-                        <?= count($invitations) ?>
-                    </span>
-                    </div>
-                    <table class="oc-table">
-                        <thead>
-                        <tr>
-                            <th>Sent</th>
-                            <th>Status</th>
-                            <th>Expires</th>
-                            <th></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <?php foreach ($invitations as $inv): ?>
-                            <?php
-                            $status = $inv->resolveStatus()->value;
-                            $statusBadge = match ($status) {
-                                'pending' => 'oc-badge--waiting-approval',
-                                'used' => 'oc-badge--published',
-                                'expired' => 'oc-badge--draft',
-                                'revoked' => 'oc-badge--revoked',
-                                default => 'oc-badge--draft',
-                            };
-                            ?>
-                            <tr data-invitation-id="<?= (int)$inv->id ?>">
-                                <td style="font-size:.78rem;color:var(--slate);">
-                                    <?= $inv->created_at ? $inv->created_at->format('d M Y') : '–' ?>
-                                </td>
-                                <td data-role="invitation-status">
-                                    <span class="oc-badge <?= $statusBadge ?>"><?= ucfirst($status) ?></span>
-                                </td>
-                                <td style="font-size:.78rem;color:var(--slate);">
-                                    <?= $inv->expires_at ? $inv->expires_at->format('d M Y') : '–' ?>
-                                </td>
-                                <td style="text-align:right;" data-role="invitation-action">
-                                    <?php if ($status === 'pending'): ?>
-                                        <button data-action="revoke-invitation" data-invitation-id="<?= (int)$inv->id ?>"
-                                                class="oc-btn oc-btn--ghost oc-btn--sm"
-                                                style="font-size:.7rem;border-color:#fecaca;color:var(--red);">
-                                            Revoke
-                                        </button>
-                                    <?php elseif (in_array($status, ['expired', 'revoked'])): ?>
-                                        <button data-action="resend-invitation" data-invitation-id="<?= (int)$inv->id ?>"
-                                                class="oc-btn oc-btn--ghost oc-btn--sm" style="font-size:.7rem;">
-                                            Resend
-                                        </button>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
+            <?php if ($hasOverviewPanels): ?>
+                <button type="button" class="oc-tabbar__tab active" data-tab-target="contributor-overview-panel">Overview</button>
+            <?php endif; ?>
+            <?php if ($hasCapabilitiesPanels): ?>
+                <button type="button" class="oc-tabbar__tab <?= !$hasOverviewPanels ? 'active' : '' ?>" data-tab-target="contributor-capabilities-panel">Capabilities Overrides</button>
             <?php endif; ?>
         </div>
+        <?php endif; ?>
 
-        <div id="contributor-capabilities-panel" class="oc-tab-panel">
+        <?php if ($hasOverviewPanels): ?>
+        <div id="contributor-overview-panel" class="oc-tab-panel active">
+            <?php foreach ($overviewPanels as $panel): ?>
+                <?= $panel->render([
+                    'contributor' => $contributor,
+                    'invitations' => $invitations,
+                    'site' => $site,
+                    'isActive' => $isActive,
+                    'canManageRole' => $canManageRole,
+                    'canManageSiteAccess' => $canManageSiteAccess,
+                    'canSendInvitation' => $canSendInvitation,
+                    'canManageCapabilities' => $canManageCapabilities,
+                ]) ?>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($hasCapabilitiesPanels): ?>
+        <div id="contributor-capabilities-panel" class="oc-tab-panel <?= !$hasOverviewPanels ? 'active' : '' ?>">
+            <?php foreach ($capabilitiesPanels as $panel): ?>
+                <?= $panel->render([
+                    'contributor' => $contributor,
+                    'site' => $site,
+                    'canManageCapabilities' => $canManageCapabilities,
+                ]) ?>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!$hasOverviewPanels && !$hasCapabilitiesPanels): ?>
             <div class="oc-card">
-                <div class="oc-card__header">
-                    <span class="oc-card__title">Site Capabilities Grid</span>
-                </div>
-                <div class="oc-card__body" id="capabilities-list">
+                <div class="oc-card__body" style="padding:32px 24px;text-align:center;color:var(--slate);">
+                    No panels are available for this contributor.
                 </div>
             </div>
-        </div>
+        <?php endif; ?>
 
     </div>
 
@@ -225,54 +135,62 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                              color:var(--slate);margin-bottom:4px;">Quick actions
                 </div>
 
-                <button data-role="status-toggle-btn" data-action="<?= $isActive ? 'deactivate' : 'reactivate' ?>"
-                        class="oc-btn oc-btn--ghost oc-btn--block"
-                        style="<?= $isActive ? 'border-color:#fecaca;color:var(--red);' : 'border-color:#bbf7d0;color:var(--green);' ?>">
-                    <?php if ($isActive): ?>
+                <?php if ($canManageStatus): ?>
+                    <button data-role="status-toggle-btn" data-action="<?= $isActive ? 'deactivate' : 'reactivate' ?>"
+                            class="oc-btn oc-btn--ghost oc-btn--block"
+                            style="<?= $isActive ? 'border-color:#fecaca;color:var(--red);' : 'border-color:#bbf7d0;color:var(--green);' ?>">
+                        <?php if ($isActive): ?>
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="14">
+                                <path fill-rule="evenodd"
+                                      d="M13.477 14.89A6 6 0 015.11 6.524L13.476 14.89zm1.414-1.414L6.524 5.11A6 6 0 0114.89 13.476zM18 10a8 8 0 11-16 0 8 8 0 0116 0z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Deactivate account
+                        <?php else: ?>
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="14">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Reactivate account
+                        <?php endif; ?>
+                    </button>
+                <?php endif; ?>
+
+                <?php if ($canSendInvitation): ?>
+                    <button data-action="send-invitation"
+                            class="oc-btn oc-btn--ghost oc-btn--block">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="14">
+                            <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                            <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                        </svg>
+                        Send new invitation
+                    </button>
+                <?php endif; ?>
+
+                <?php if ($canViewViolations): ?>
+                    <a href="/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/<?= (int)$contributor['id'] ?>/violations"
+                       class="oc-btn oc-btn--ghost oc-btn--block">
                         <svg viewBox="0 0 20 20" fill="currentColor" width="14">
                             <path fill-rule="evenodd"
-                                  d="M13.477 14.89A6 6 0 015.11 6.524L13.476 14.89zm1.414-1.414L6.524 5.11A6 6 0 0114.89 13.476zM18 10a8 8 0 11-16 0 8 8 0 0116 0z"
+                                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
                                   clip-rule="evenodd"/>
                         </svg>
-                        Deactivate account
-                    <?php else: ?>
-                        <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                            <path fill-rule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                  clip-rule="evenodd"/>
-                        </svg>
-                        Reactivate account
-                    <?php endif; ?>
-                </button>
-
-                <button data-action="send-invitation"
-                        class="oc-btn oc-btn--ghost oc-btn--block">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                        <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
-                        <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
-                    </svg>
-                    Send new invitation
-                </button>
-
-                <a href="/<?= htmlspecialchars($site) ?>/open-collab/admin/contributors/<?= (int)$contributor['id'] ?>/violations"
-                   class="oc-btn oc-btn--ghost oc-btn--block">
-                    <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                        <path fill-rule="evenodd"
-                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    View violations
-                </a>
+                        View violations
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
 
-        <div class="oc-danger-zone">
-            <div class="oc-danger-zone__title">Danger Zone</div>
-            <button data-action="open-close-modal"
-                    class="oc-btn oc-btn--danger oc-btn--block oc-btn--sm">
-                Close account permanently
-            </button>
-        </div>
+        <?php if ($canManageStatus): ?>
+            <div class="oc-danger-zone">
+                <div class="oc-danger-zone__title">Danger Zone</div>
+                <button data-action="open-close-modal"
+                        class="oc-btn oc-btn--danger oc-btn--block oc-btn--sm">
+                    Close account permanently
+                </button>
+            </div>
+        <?php endif; ?>
 
     </div>
 
@@ -300,55 +218,13 @@ $isActive = (bool)($contributor['is_active'] ?? true);
     </div>
 </div>
 
-<div id="capability-drawer-backdrop" style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:400;"></div>
-
-<div id="capability-drawer" style="display:none;position:fixed;top:0;right:0;bottom:0;width:440px;max-width:100%;background:#fff;z-index:500;box-shadow:-10px 0 40px rgba(0,0,0,.12);transform:translateX(100%);transition:transform .3s ease-in-out;flex-direction:column;">
-    <div style="padding:24px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-            <h3 id="capability-drawer-title" style="font-family:var(--font-display);font-size:1.2rem;color:var(--navy);margin:0;">Capability</h3>
-            <p id="capability-drawer-subtitle" style="font-size:.82rem;color:var(--slate);margin:4px 0 0 0;"></p>
-        </div>
-        <button data-action="close-capability-drawer" style="border:none;background:none;font-size:1.4rem;color:var(--slate);cursor:pointer;line-height:1;">&times;</button>
-    </div>
-
-    <div style="padding:24px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:18px;">
-        <div id="capability-drawer-banner" style="display:none;"></div>
-
-        <div class="oc-form-group" style="display:none;">
-            <select id="capability-drawer-select" class="oc-select"></select>
-        </div>
-
-        <div>
-            <span style="font-size:.75rem;text-transform:uppercase;font-weight:700;letter-spacing:.05em;color:var(--slate);display:block;margin-bottom:6px;">Rule Description</span>
-            <p id="capability-drawer-desc" style="font-size:.875rem;color:var(--navy);line-height:1.5;margin:0;"></p>
-        </div>
-
-        <div class="oc-form-group">
-            <span style="font-size:.75rem;text-transform:uppercase;font-weight:700;letter-spacing:.05em;color:var(--slate);display:block;margin-bottom:8px;">Explicit Override Action</span>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-                <label style="display:flex;align-items:center;gap:8px;font-size:.875rem;color:var(--navy);cursor:pointer;">
-                    <input type="radio" name="cap_action" value="grant" checked>
-                    <span>Explicitly Allow (Grant permission)</span>
-                </label>
-                <label style="display:flex;align-items:center;gap:8px;font-size:.875rem;color:var(--navy);cursor:pointer;">
-                    <input type="radio" name="cap_action" value="revoke">
-                    <span>Explicitly Block (Deny permission)</span>
-                </label>
-            </div>
-        </div>
-    </div>
-
-    <div style="padding:16px 24px;border-top:1px solid #e2e8f0;background:#f8fafc;display:flex;gap:12px;">
-        <button data-action="close-capability-drawer" class="oc-btn oc-btn--ghost" style="flex:1;">Cancel</button>
-        <button id="capability-drawer-save" class="oc-btn oc-btn--primary" style="flex:1;">Save Override</button>
-    </div>
-</div>
-
 @endsection
 
 @section('scripts')
 
 <script>
+    const CAN_MANAGE_CAPABILITIES = <?= $canManageCapabilities ? 'true' : 'false' ?>;
+
     class ContributorApi {
         /** @param {string} site  @param {()=>string} tokenFn */
         constructor(site, tokenFn) {
@@ -768,21 +644,21 @@ $isActive = (bool)($contributor['is_active'] ?? true);
                 const canDeny = !cap.directDeny;
                 const canReset = cap.directGrant || cap.directDeny;
 
-                const grantBtn = canGrant
+                const grantBtn = CAN_MANAGE_CAPABILITIES && canGrant
                     ? `<button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
                            style="border-color:#bbf7d0;color:#16a34a;font-size:.72rem;"
                            data-action="grant-capability"
                            data-cap-key="${_esc(cap.key)}">Grant</button>`
                     : '';
 
-                const denyBtn = canDeny
+                const denyBtn = CAN_MANAGE_CAPABILITIES && canDeny
                     ? `<button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
                            style="border-color:#fecaca;color:var(--red);font-size:.72rem;"
                            data-action="deny-capability"
                            data-cap-key="${_esc(cap.key)}">Deny</button>`
                     : '';
 
-                const resetBtn = canReset
+                const resetBtn = CAN_MANAGE_CAPABILITIES && canReset
                     ? `<button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
                            style="font-size:.72rem;"
                            data-action="reset-capability"

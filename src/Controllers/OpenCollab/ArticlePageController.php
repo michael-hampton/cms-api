@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
@@ -23,6 +24,8 @@ use App\Services\OpenCollab\ReadabilityService;
  */
 class ArticlePageController extends Controller
 {
+    use ResolvesUiComponents;
+
     use AuthorizesSitePagePermissions;
 
     public function __construct(
@@ -153,6 +156,7 @@ class ArticlePageController extends Controller
 
         return $this->view('open-collab.articles.index', [
             'articles' => $articles,
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('articles.index'),
             'site' => SiteContext::slug(),
             'currentUser' => Auth::user(),
         ]);

@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\InvitationRepository;
@@ -15,6 +16,8 @@ use App\Repositories\OpenCollab\InvitationRepository;
  */
 class AdminInvitationPageController extends Controller
 {
+    use ResolvesUiComponents;
+
     public function __construct(
         private readonly InvitationRepository $invitationRepository,
     )
@@ -31,6 +34,7 @@ class AdminInvitationPageController extends Controller
 
         return $this->view('open-collab.admin.invitations.index', [
             'invitations' => $invitations,
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('invitations.index'),
             'pageTitle' => 'Invitations',
             'activeNav' => 'invitations',
             'breadcrumbs' => [['label' => 'Invitations']],

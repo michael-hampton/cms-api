@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Services\OpenCollab\ArticleApprovalService;
@@ -15,6 +16,8 @@ use App\Services\OpenCollab\ArticleApprovalService;
  */
 class AdminArticlePageController extends Controller
 {
+    use ResolvesUiComponents;
+
     public function __construct(
         private readonly ArticleApprovalService $approvalService,
     )
@@ -31,6 +34,7 @@ class AdminArticlePageController extends Controller
 
         return $this->view('open-collab.admin.articles.pending', [
             'articles' => $articles,
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('articles.pending'),
             'pageTitle' => 'Approval Queue',
             'activeNav' => 'articles',
             'pendingCount' => $articles->count(),

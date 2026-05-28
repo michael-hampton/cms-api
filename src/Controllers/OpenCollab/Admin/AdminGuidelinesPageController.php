@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 
@@ -11,6 +12,8 @@ use App\Framework\Support\SiteContext;
  */
 class AdminGuidelinesPageController extends Controller
 {
+    use ResolvesUiComponents;
+
     public function __construct()
     {
         parent::__construct();
@@ -19,6 +22,7 @@ class AdminGuidelinesPageController extends Controller
     public function index()
     {
         return $this->view('open-collab.admin.guidelines.index', [
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('guideline.index'),
             'pageTitle' => 'Brand Guidelines',
             'activeNav' => 'guidelines',
             'breadcrumbs' => [['label' => 'Guidelines']],

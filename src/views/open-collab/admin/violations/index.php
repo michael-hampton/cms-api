@@ -10,6 +10,8 @@
  * The contributor endpoint GET /admin/contributors/{id}/violations is used
  * once a contributor is selected from the search results.
  */
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$canResolveViolation = in_array('violations.resolve_action', $allowedComponentKeys, true);
 ?>
 @endsection
 
@@ -23,6 +25,7 @@
             font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;
             z-index:300;pointer-events:none;"></div>
 
+<?php if ($canResolveViolation): ?>
 <!-- Resolve modal -->
 <div id="resolve-modal"
      style="display:none;position:fixed;inset:0;background:rgba(15,25,41,.55);z-index:500;place-items:center;"
@@ -50,6 +53,7 @@
         </div>
     </div>
 </div>
+<?php endif; ?>
 
 <!-- Filter / search bar -->
 <div class="oc-card" style="margin-bottom:20px;padding:16px 20px;">
@@ -168,6 +172,7 @@
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
+    const CAN_RESOLVE_VIOLATION = <?= $canResolveViolation ? 'true' : 'false' ?>;
 
     class ViolationsManager {
         #site;
@@ -277,7 +282,7 @@
                         year: 'numeric'
                     })
                     : '—';
-                const actionCell = isResolved
+                const actionCell = isResolved || !CAN_RESOLVE_VIOLATION
                     ? `<div style="display:flex;gap:6px;justify-content:flex-end;"><a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${v.user_id}/violations" class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a></div>`
                     : `<div style="display:flex;gap:6px;justify-content:flex-end;"><a href="/${this.#esc(this.#site)}/open-collab/admin/contributors/${v.user_id}/violations" class="oc-btn oc-btn--ghost oc-btn--sm">Profile</a><button onclick="manager.openResolveModal(${v.id})" class="oc-btn oc-btn--primary oc-btn--sm">Resolve</button></div>`;
 

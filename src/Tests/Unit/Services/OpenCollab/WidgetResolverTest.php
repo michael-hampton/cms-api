@@ -28,7 +28,11 @@ class WidgetResolverTest extends TestCase
         parent::setUp();
 
         Config::set('dashboard', require __DIR__ . '/../../../../config/dashboard.php');
-        SiteContext::set(new Site(['id' => 1, 'slug' => 'test-site', 'name' => 'Test Site']));
+        $site = Mockery::mock(Site::class)->makePartial();
+        $site->id = 1;
+        $site->slug = 'test-site';
+        $site->name = 'Test Site';
+        SiteContext::set($site);
 
         $this->registry = new WidgetRegistry();
         $this->settingsRepository = Mockery::mock(WidgetSettingsRepository::class);
@@ -41,6 +45,37 @@ class WidgetResolverTest extends TestCase
             $widget->shouldReceive('visibleFor')->andReturn($key === 'onboarding' ? false : true);
             $this->registry->register($widget, config("dashboard.widget_permissions.{$key}", []));
         }
+
+        $this->registry->registerComponent([
+            'key' => 'contributor.invitation',
+            'type' => 'page_panel',
+            'surface' => 'contributor.show',
+            'label' => 'Invitation',
+            'capabilities' => ['contributor.invitation.view'],
+            'component' => \App\Services\UI\Components\Contributor\ContributorInvitationPanel::class,
+            'sort_order' => 20,
+            'enabled' => true,
+        ]);
+        $this->registry->registerComponent([
+            'key' => 'contributor.details',
+            'type' => 'page_panel',
+            'surface' => 'contributor.show',
+            'label' => 'Details',
+            'capabilities' => ['contributor.details.view'],
+            'component' => \App\Services\UI\Components\Contributor\ContributorDetailsPanel::class,
+            'sort_order' => 10,
+            'enabled' => true,
+        ]);
+        $this->registry->registerComponent([
+            'key' => 'contributor.disabled_panel',
+            'type' => 'page_panel',
+            'surface' => 'contributor.show',
+            'label' => 'Disabled',
+            'capabilities' => ['contributor.activity.view'],
+            'component' => \App\Services\UI\Components\Contributor\ContributorCapabilitiesPanel::class,
+            'sort_order' => 30,
+            'enabled' => false,
+        ]);
 
         $this->resolver = new WidgetResolver(
             $this->registry,
@@ -61,7 +96,7 @@ class WidgetResolverTest extends TestCase
         $this->permissionResolver->shouldReceive('allows')->with(5, 1, 'onboarding.view')->andReturn(false);
         $this->settingsRepository->shouldReceive('getForUser')->with(5)->andReturn(new Collection([]));
 
-        $widgets = $this->resolver->resolveForUser(new User(['id' => 5, 'role' => 'contributor']));
+        $widgets = $this->resolver->resolveForUser($this->makeUser(5));
 
         $this->assertSame(['drafts', 'earnings', 'activity', 'quick_links'], array_map(fn($widget) => $widget->key(), $widgets));
     }
@@ -72,7 +107,7 @@ class WidgetResolverTest extends TestCase
         $this->permissionResolver->shouldReceive('allows')->with(7, 1, 'onboarding.view')->andReturn(false);
         $this->settingsRepository->shouldReceive('getForUser')->with(7)->andReturn(new Collection([]));
 
-        $widgets = $this->resolver->resolveForUser(new User(['id' => 7, 'role' => 'editor']));
+        $widgets = $this->resolver->resolveForUser($this->makeUser(7));
 
         $this->assertSame(['review_queue', 'approvals', 'activity'], array_map(fn($widget) => $widget->key(), $widgets));
     }
@@ -83,7 +118,7 @@ class WidgetResolverTest extends TestCase
         $this->permissionResolver->shouldReceive('allows')->with(9, 1, 'onboarding.view')->andReturn(false);
         $this->settingsRepository->shouldReceive('getForUser')->with(9)->andReturn(new Collection([]));
 
-        $widgets = $this->resolver->resolveForUser(new User(['id' => 9, 'role' => 'finance']));
+        $widgets = $this->resolver->resolveForUser($this->makeUser(9));
 
         $this->assertSame(['activity', 'quick_links'], array_map(fn($widget) => $widget->key(), $widgets));
     }
@@ -94,7 +129,7 @@ class WidgetResolverTest extends TestCase
         $this->permissionResolver->shouldReceive('allows')->with(11, 1, 'onboarding.view')->andReturn(false);
         $this->settingsRepository->shouldReceive('getForUser')->with(11)->andReturn(new Collection([]));
 
-        $widgets = $this->resolver->resolveForUser(new User(['id' => 11, 'role' => 'user']));
+        $widgets = $this->resolver->resolveForUser($this->makeUser(11));
 
         $this->assertSame(['drafts', 'earnings', 'activity', 'quick_links'], array_map(fn($widget) => $widget->key(), $widgets));
     }
@@ -108,7 +143,7 @@ class WidgetResolverTest extends TestCase
             ['widget_key' => 'drafts', 'enabled' => false, 'position' => 6],
         ]));
 
-        $widgets = $this->resolver->availableForUser(new User(['id' => 13, 'role' => 'contributor']));
+        $widgets = $this->resolver->availableForUser($this->makeUser(13));
 
         $this->assertSame([
             ['key' => 'earnings', 'enabled' => true, 'position' => 0],
@@ -142,8 +177,57 @@ class WidgetResolverTest extends TestCase
         $this->permissionResolver->shouldReceive('allows')->with(15, 1, 'onboarding.view')->andReturn(true);
         $this->settingsRepository->shouldReceive('getForUser')->never();
 
-        $widgets = $resolver->availableForUser(new User(['id' => 15, 'role' => 'contributor']));
+        $widgets = $resolver->availableForUser($this->makeUser(15));
 
         $this->assertSame([], $widgets);
+    }
+
+    public function test_allowed_for_surface_returns_dashboard_widgets_in_resolved_order(): void
+    {
+        $this->permissionResolver->shouldReceive('forUser')->with(21, 1)->andReturn(['content.create', 'payout.request']);
+        $this->permissionResolver->shouldReceive('allows')->with(21, 1, 'onboarding.view')->andReturn(false);
+        $this->settingsRepository->shouldReceive('getForUser')->with(21)->andReturn(new Collection([]));
+
+        $components = $this->resolver->allowedForSurface(21, 1, 'dashboard.index');
+
+        $this->assertSame(
+            ['drafts', 'earnings', 'activity', 'quick_links'],
+            array_column($components, 'key')
+        );
+    }
+
+    public function test_allowed_for_surface_returns_page_panels_for_non_dashboard_surface(): void
+    {
+        $this->permissionResolver->shouldReceive('allows')->with(22, 1, 'contributor.invitation.view')->andReturn(true);
+        $this->permissionResolver->shouldReceive('allows')->with(22, 1, 'contributor.details.view')->andReturn(true);
+
+        $components = $this->resolver->allowedForSurface(22, 1, 'contributor.show');
+
+        $this->assertSame(
+            ['contributor.details', 'contributor.invitation'],
+            array_column($components, 'key')
+        );
+    }
+
+    public function test_allowed_for_surface_excludes_disabled_components(): void
+    {
+        $this->permissionResolver->shouldReceive('allows')->with(23, 1, 'contributor.invitation.view')->andReturn(true);
+        $this->permissionResolver->shouldReceive('allows')->with(23, 1, 'contributor.details.view')->andReturn(true);
+
+        $components = $this->resolver->allowedForSurface(23, 1, 'contributor.show');
+
+        $this->assertNotContains('contributor.disabled_panel', array_column($components, 'key'));
+    }
+
+    public function test_allowed_for_surface_returns_empty_array_for_unknown_surface(): void
+    {
+        $this->assertSame([], $this->resolver->allowedForSurface(24, 1, 'missing.surface'));
+    }
+
+    private function makeUser(int $id): User
+    {
+        $user = Mockery::mock(User::class)->makePartial();
+        $user->id = $id;
+        return $user;
     }
 }

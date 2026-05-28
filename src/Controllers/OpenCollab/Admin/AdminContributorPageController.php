@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -19,6 +20,8 @@ use App\Repositories\OpenCollab\InvitationRepository;
  */
 class AdminContributorPageController extends Controller
 {
+    use ResolvesUiComponents;
+
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
         private readonly InvitationRepository $invitationRepository,
@@ -34,6 +37,7 @@ class AdminContributorPageController extends Controller
     {
         $query = $request->get('q');
         $results = $this->contributorRepository->searchForSite(SiteContext::getId(), $query, 25);
+        $pagePanels = $this->allowedUiPanelsForSurface('contributors.index');
 
         $items = $results['data'] ?? $results;
         if (is_object($items) && method_exists($items, 'toArray')) {
@@ -47,6 +51,7 @@ class AdminContributorPageController extends Controller
             'activeNav' => 'contributors',
             'breadcrumbs' => [['label' => 'Contributors']],
             'currentUser' => Auth::user(),
+            'pagePanels' => $pagePanels,
             'site' => SiteContext::slug(),
         ]);
     }
@@ -69,9 +74,23 @@ class AdminContributorPageController extends Controller
             ? $this->invitationRepository->getAllForEmail($values['email'], SiteContext::getId())
             : collect([]);
 
+        $allowedComponentKeys = $this->allowedUiComponentKeysForSurface('contributor.show');
+        $panels = $this->allowedUiPanelsForSurface('contributor.show');
+        $overviewPanels = array_values(array_filter(
+            $panels,
+            static fn($panel): bool => $panel->key() !== 'contributor.capabilities'
+        ));
+        $capabilitiesPanels = array_values(array_filter(
+            $panels,
+            static fn($panel): bool => $panel->key() === 'contributor.capabilities'
+        ));
+
         return $this->view('open-collab.admin.contributors.show', [
             'contributor' => $values,
             'invitations' => $invitations,
+            'allowedComponentKeys' => $allowedComponentKeys,
+            'overviewPanels' => $overviewPanels,
+            'capabilitiesPanels' => $capabilitiesPanels,
             'pageTitle' => 'Contributor: ' . ($values['name'] ?? ''),
             'activeNav' => 'contributors',
             'breadcrumbs' => [

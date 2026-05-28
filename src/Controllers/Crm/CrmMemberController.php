@@ -153,8 +153,6 @@ class CrmMemberController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->resourceResponse(['success' => false, 'message' => 'Failed to create member.'], 500);
         }
     }

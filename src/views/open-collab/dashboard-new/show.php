@@ -13,6 +13,7 @@
 $pageTitle = 'Dashboard';
 $activeNav = 'dashboard';
 $breadcrumbs = [['label' => 'Dashboard']];
+$openCollabBase = '/' . trim((string) $site, '/') . '/open-collab';
 $headerActions = '
 <button onclick="DashboardWidgetManager.openManager()"
         class="oc-btn oc-btn--ghost oc-btn--sm"
@@ -22,7 +23,7 @@ $headerActions = '
   </svg>
   Customise
 </button>
-<a href="/articles/create" class="oc-btn oc-btn--amber" style="display:inline-flex;align-items:center;gap:6px;">
+<a href="' . $openCollabBase . '/articles/create" class="oc-btn oc-btn--amber" style="display:inline-flex;align-items:center;gap:6px;">
   <svg viewBox="0 0 20 20" fill="currentColor" width="14">
     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
   </svg>
@@ -39,6 +40,7 @@ $headerActions = '
     window.DASHBOARD_WIDGETS = {!! json_encode($widgets) !!};
     window.DASHBOARD_SITE    = {!! json_encode($site) !!};
     window.DASHBOARD_TOKEN   = {!! json_encode($ocToken ?? '') !!};
+    window.DASHBOARD_BASE_PATH = {!! json_encode($openCollabBase) !!};
 </script>
 
 <!-- Widget management panel (hidden until Customise is clicked) -->
@@ -146,15 +148,6 @@ $headerActions = '
     <?php endif; ?>
 </div>
 
-<?php foreach ($widgets as $widget): ?>
-    <?php
-    $widgetPath = __DIR__ . '/widgets/' . $widget['key'] . '.php';
-    if (file_exists($widgetPath)) {
-        include $widgetPath;
-    }
-    ?>
-<?php endforeach; ?>
-
 @endsection
 
 <script>
@@ -192,7 +185,7 @@ $headerActions = '
                     ? breakdown.map(item => `
                         <tr>
                           <td>
-                            <a href="/articles/${item.page_id}/edit"
+                            <a href="${window.DASHBOARD_BASE_PATH}/articles/edit/${item.page_id}"
                                style="font-weight:500;color:var(--navy);text-decoration:none;">
                               ${escHtml(item.title ?? 'Untitled')}
                             </a>
@@ -241,7 +234,7 @@ $headerActions = '
                          <div style="font-weight:500;font-size:.9rem;color:var(--navy);margin-bottom:4px;">${escHtml(payment.email ?? 'Stripe account')}</div>
                          <div style="font-size:.75rem;color:var(--green);font-weight:600;">● Active via Stripe</div>
                        </div>
-                       <a href="/contributor/settings#payment" class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--block">Update payout details</a>`
+                       <a href="${window.DASHBOARD_BASE_PATH}/settings#payment" class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--block">Update payout details</a>`
                     : `<div style="padding:16px;text-align:center;border:1.5px dashed var(--border);border-radius:var(--radius);margin-bottom:16px;">
                          <svg viewBox="0 0 20 20" fill="currentColor" width="28" style="color:var(--slate-light);display:block;margin:0 auto 8px;">
                            <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
@@ -249,7 +242,7 @@ $headerActions = '
                          </svg>
                          <div style="font-size:.85rem;font-weight:500;margin-bottom:4px;">No payout method</div>
                          <div style="font-size:.78rem;color:var(--slate);margin-bottom:12px;">Set up to receive payments</div>
-                         <a href="/onboarding" class="oc-btn oc-btn--amber oc-btn--sm">Set up now</a>
+                         <a href="${window.DASHBOARD_BASE_PATH}/onboarding" class="oc-btn oc-btn--amber oc-btn--sm">Set up now</a>
                        </div>`;
 
                 return `
@@ -333,7 +326,7 @@ $headerActions = '
             review_queue(data) {
                 const count = data.pending_count ?? 0;
                 const rows  = (data.items ?? []).map(item => `
-                    <a href="/contributor/pages/${item.id}/edit"
+                    <a href="${window.DASHBOARD_BASE_PATH}/articles/edit/${item.id}"
                        style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f2ee;text-decoration:none;color:var(--navy);font-size:.875rem;">
                         <span>${escHtml(item.title ?? 'Untitled')}</span>
                         <span style="font-size:.75rem;color:var(--slate);">${item.updated_at ? fmtDate(item.updated_at) : ''}</span>
@@ -353,9 +346,9 @@ $headerActions = '
             approvals(data) {
                 const rows = (data.items ?? []).map(item => `
                     <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f2ee;">
-                        <a href="/contributor/pages/${item.id}/edit"
+                        <a href="${window.DASHBOARD_BASE_PATH}/articles/edit/${item.id}"
                            style="font-size:.875rem;color:var(--navy);text-decoration:none;">${escHtml(item.title ?? 'Untitled')}</a>
-                        <a href="/contributor/pages/${item.id}/approve"
+                        <a href="${window.DASHBOARD_BASE_PATH}/articles/${item.id}/approve"
                            style="font-size:.75rem;font-weight:600;color:var(--amber);text-decoration:none;">Approve →</a>
                     </div>`).join('');
                 return `
@@ -379,12 +372,12 @@ $headerActions = '
                           <td><span class="oc-badge oc-badge--${escHtml(a.status)}">${ucFirst(a.status)}</span></td>
                           <td>${a.is_paid ? '<span class="oc-badge oc-badge--paid">PAID</span>' : '<span class="oc-badge oc-badge--free">Free</span>'}</td>
                           <td style="text-align:right;">
-                            <a href="/articles/${a.id}/edit" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</a>
+                            <a href="${window.DASHBOARD_BASE_PATH}/articles/edit/${a.id}" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</a>
                           </td>
                         </tr>`).join('')
                     : `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--slate);">
                          No articles yet.
-                         <a href="/articles/create" class="oc-btn oc-btn--primary oc-btn--sm" style="margin-left:8px;">Create one</a>
+                         <a href="${window.DASHBOARD_BASE_PATH}/articles/create" class="oc-btn oc-btn--primary oc-btn--sm" style="margin-left:8px;">Create one</a>
                        </td></tr>`;
                 return `
                     <div class="oc-card">
@@ -392,7 +385,7 @@ $headerActions = '
                         <span class="oc-card__title">Your Articles</span>
                         <div style="display:flex;gap:8px;align-items:center;">
                           <span style="font-size:.8rem;color:var(--slate);">${data.published_count} published · ${data.draft_count} drafts</span>
-                          <a href="/articles" class="oc-btn oc-btn--ghost oc-btn--sm">View all</a>
+                          <a href="${window.DASHBOARD_BASE_PATH}/articles" class="oc-btn oc-btn--ghost oc-btn--sm">View all</a>
                         </div>
                       </div>
                       <table class="oc-table">
@@ -428,31 +421,31 @@ $headerActions = '
                     profile: {
                         title: 'Complete your profile',
                         description: 'Add a bio so readers know who you are.',
-                        action: { label: 'Complete profile', href: '/contributor/settings#profile' },
+                        action: { label: 'Complete profile', href: `${window.DASHBOARD_BASE_PATH}/settings#profile` },
                         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>`,
                     },
                     payment: {
                         title: 'Set up payouts',
                         description: 'Connect Stripe to receive your earnings.',
-                        action: { label: 'Set up payouts', href: '/contributor/settings#stripe-connect' },
+                        action: { label: 'Set up payouts', href: `${window.DASHBOARD_BASE_PATH}/settings#stripe-connect` },
                         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/></svg>`,
                     },
                     contract: {
                         title: 'Sign contributor agreement',
                         description: 'Review and sign the platform contributor contract.',
-                        action: { label: 'Review contract', href: '/contributor/onboarding/contract' },
+                        action: { label: 'Review contract', href: `${window.DASHBOARD_BASE_PATH}/onboarding/contract` },
                         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/></svg>`,
                     },
                     guidelines: {
                         title: 'Acknowledge brand guidelines',
                         description: 'Confirm you have read the editorial standards.',
-                        action: { label: 'Read guidelines', href: '/contributor/onboarding/guidelines' },
+                        action: { label: 'Read guidelines', href: `${window.DASHBOARD_BASE_PATH}/onboarding/guidelines` },
                         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"/></svg>`,
                     },
                     age_verification: {
                         title: 'Verify your age',
                         description: 'Confirm you meet the minimum contributor age requirement.',
-                        action: { label: 'Verify age', href: '/contributor/settings#profile' },
+                        action: { label: 'Verify age', href: `${window.DASHBOARD_BASE_PATH}/settings#profile` },
                         icon: `<svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>`,
                     },
                 };
@@ -506,7 +499,7 @@ $headerActions = '
                       </div>
                       <h2 style="font-family:var(--font-display);font-size:1.35rem;color:var(--navy);margin-bottom:8px;">You're ready to create content</h2>
                       <p style="font-size:.9rem;color:var(--slate);line-height:1.6;max-width:380px;margin:0 auto 20px;">All onboarding requirements are complete.</p>
-                      <a href="/contributor/dashboard" class="oc-btn oc-btn--primary">Go to dashboard</a>
+                      <a href="${window.DASHBOARD_BASE_PATH}/dashboard" class="oc-btn oc-btn--primary">Go to dashboard</a>
                     </div>`;
                 return `
                     <div style="max-width:700px;">

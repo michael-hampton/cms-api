@@ -9,6 +9,9 @@
  *   $currentUser  — AuthenticatedUser
  */
 
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$canApproveArticle = in_array('articles.pending.approve_action', $allowedComponentKeys, true);
+$canRejectArticle = in_array('articles.pending.reject_action', $allowedComponentKeys, true);
 $pageTitle = 'Approval Queue';
 $activeNav = 'articles';
 $breadcrumbs = [['label' => 'Approval Queue']];
@@ -147,23 +150,29 @@ $breadcrumbs = [['label' => 'Approval Queue']];
 
                     <!-- Action buttons -->
                     <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-                        <div style="display:flex;gap:8px;">
-                            <button onclick="approveArticle(<?= (int)$article->id ?>, this)"
-                                    class="oc-btn oc-btn--primary oc-btn--sm"
-                                    id="approve-btn-<?= (int)$article->id ?>">
-                                <svg viewBox="0 0 20 20" fill="currentColor" width="13">
-                                    <path fill-rule="evenodd"
-                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                          clip-rule="evenodd"/>
-                                </svg>
-                                Approve
-                            </button>
-                            <button onclick="openRejectModal(<?= (int)$article->id ?>)"
-                                    class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    style="border-color:#fecaca;color:var(--red);">
-                                Reject
-                            </button>
-                        </div>
+                        <?php if ($canApproveArticle || $canRejectArticle): ?>
+                            <div style="display:flex;gap:8px;">
+                                <?php if ($canApproveArticle): ?>
+                                    <button onclick="approveArticle(<?= (int)$article->id ?>, this)"
+                                            class="oc-btn oc-btn--primary oc-btn--sm"
+                                            id="approve-btn-<?= (int)$article->id ?>">
+                                        <svg viewBox="0 0 20 20" fill="currentColor" width="13">
+                                            <path fill-rule="evenodd"
+                                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Approve
+                                    </button>
+                                <?php endif; ?>
+                                <?php if ($canRejectArticle): ?>
+                                    <button onclick="openRejectModal(<?= (int)$article->id ?>)"
+                                            class="oc-btn oc-btn--ghost oc-btn--sm"
+                                            style="border-color:#fecaca;color:var(--red);">
+                                        Reject
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                         <button onclick="togglePreview(<?= (int)$article->id ?>)"
                                 class="oc-btn oc-btn--ghost oc-btn--sm"
                                 id="preview-toggle-<?= (int)$article->id ?>">

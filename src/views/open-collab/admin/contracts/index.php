@@ -1,5 +1,11 @@
 @section('logic')
 <?php
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$canCreateContract = in_array('contracts.create_action', $allowedComponentKeys, true);
+$canEditContract = in_array('contracts.edit_action', $allowedComponentKeys, true);
+$canPublishContract = in_array('contracts.publish_action', $allowedComponentKeys, true);
+$canDeleteContract = in_array('contracts.delete_action', $allowedComponentKeys, true);
+$canCloneContract = in_array('contracts.clone_action', $allowedComponentKeys, true);
 $pageTitle = 'Contract Templates';
 $activeNav = 'contracts';
 $breadcrumbs = [['label' => 'Contracts']];
@@ -134,6 +140,7 @@ $breadcrumbs = [['label' => 'Contracts']];
     </div>
 
     <div style="position:sticky;top:84px;">
+        <?php if ($canCreateContract): ?>
         <div class="oc-card">
             <div class="oc-card__header"><span class="oc-card__title">Create New Draft</span></div>
             <div class="oc-card__body">
@@ -155,6 +162,7 @@ $breadcrumbs = [['label' => 'Contracts']];
                 </div>
             </div>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -163,6 +171,11 @@ $breadcrumbs = [['label' => 'Contracts']];
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
+    const CAN_CREATE_CONTRACT = <?= $canCreateContract ? 'true' : 'false' ?>;
+    const CAN_EDIT_CONTRACT = <?= $canEditContract ? 'true' : 'false' ?>;
+    const CAN_PUBLISH_CONTRACT = <?= $canPublishContract ? 'true' : 'false' ?>;
+    const CAN_DELETE_CONTRACT = <?= $canDeleteContract ? 'true' : 'false' ?>;
+    const CAN_CLONE_CONTRACT = <?= $canCloneContract ? 'true' : 'false' ?>;
 
     class ContractTemplateManager {
         #site;
@@ -382,10 +395,10 @@ $breadcrumbs = [['label' => 'Contracts']];
                 </div>
                 <div style="display:flex;gap:6px;">
                     <button onclick="manager.viewContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                    ${status === 'draft' ? `<button onclick="manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                    ${status === 'draft' ? `<button onclick="manager.publishContract(${c.id},${c.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
-                    ${status === 'draft' && isLatest ? `<button onclick="manager.deleteContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
-                    ${status !== 'draft' ? `<button onclick="manager.cloneContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
+                    ${status === 'draft' && CAN_EDIT_CONTRACT ? `<button onclick="manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                    ${status === 'draft' && CAN_PUBLISH_CONTRACT ? `<button onclick="manager.publishContract(${c.id},${c.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
+                    ${status === 'draft' && isLatest && CAN_DELETE_CONTRACT ? `<button onclick="manager.deleteContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
+                    ${status !== 'draft' && CAN_CLONE_CONTRACT ? `<button onclick="manager.cloneContract(${c.id},${c.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
                 </div>`;
             return div;
         }
@@ -423,7 +436,7 @@ $breadcrumbs = [['label' => 'Contracts']];
             if (c.source_template_id) meta.push(`From template #${c.source_template_id}`);
             document.getElementById('view-modal-meta').innerHTML = meta.join(' · ');
             const btns = [`<button onclick="manager.closeViewModal()" class="oc-btn oc-btn--ghost">Close</button>`];
-            if (status === 'draft') btns.push(`<button onclick="manager.closeViewModal();manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
+            if (status === 'draft' && CAN_EDIT_CONTRACT) btns.push(`<button onclick="manager.closeViewModal();manager.editContract(${c.id},${c.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
             document.getElementById('view-modal-actions').innerHTML = btns.join('');
             document.getElementById('view-modal').classList.add('is-open');
         }

@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\AdminContributorRepository;
@@ -18,6 +19,8 @@ use App\Repositories\OpenCollab\AdminContributorRepository;
  */
 class AdminViolationPageController extends Controller
 {
+    use ResolvesUiComponents;
+
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
     )
@@ -31,6 +34,7 @@ class AdminViolationPageController extends Controller
     public function index()
     {
         return $this->view('open-collab.admin.violations.index', [
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('violations.index'),
             'pageTitle' => 'Violations',
             'activeNav' => 'violations',
             'breadcrumbs' => [['label' => 'Violations']],

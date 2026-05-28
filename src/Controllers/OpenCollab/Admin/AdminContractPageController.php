@@ -4,6 +4,7 @@ namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
@@ -14,6 +15,7 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
 class AdminContractPageController extends Controller
 {
     use AuthorizesSitePagePermissions;
+    use ResolvesUiComponents;
 
     public function __construct(
         private readonly OpenCollabAuthorizationService $authorization,
@@ -28,6 +30,7 @@ class AdminContractPageController extends Controller
         }
 
         return $this->view('open-collab.admin.contracts.index', [
+            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('contract.index'),
             'pageTitle' => 'Contributor Contracts',
             'activeNav' => 'contracts',
             'breadcrumbs' => [['label' => 'Contracts']],

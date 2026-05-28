@@ -149,12 +149,92 @@ class WidgetRegistryTest extends TestCase
         $this->assertSame([], $registry->permissionsFor('does_not_exist'));
     }
 
+    public function test_register_component_makes_page_panel_retrievable_by_surface(): void
+    {
+        $registry = new WidgetRegistry();
+
+        $registry->registerComponent([
+            'key' => 'contributor.invitation',
+            'type' => 'page_panel',
+            'surface' => 'contributor.show',
+            'label' => 'Invitation',
+            'capabilities' => ['contributor.invitation.view'],
+            'component' => \App\Services\UI\Components\Contributor\ContributorInvitationPanel::class,
+            'sort_order' => 20,
+            'enabled' => true,
+        ]);
+
+        $components = $registry->componentsForSurface('contributor.show');
+
+        $this->assertCount(1, $components);
+        $this->assertSame('contributor.invitation', $components[0]['key']);
+        $this->assertSame(['contributor.invitation.view'], $components[0]['capabilities']);
+    }
+
+    public function test_components_for_surface_are_sorted_by_sort_order_then_key(): void
+    {
+        $registry = new WidgetRegistry();
+
+        $registry->registerComponent([
+            'key' => 'b.action',
+            'type' => 'page_action',
+            'surface' => 'articles.index',
+            'label' => 'B',
+            'component' => 'BAction',
+            'sort_order' => 20,
+            'enabled' => true,
+        ]);
+        $registry->registerComponent([
+            'key' => 'a.action',
+            'type' => 'page_action',
+            'surface' => 'articles.index',
+            'label' => 'A',
+            'component' => 'AAction',
+            'sort_order' => 20,
+            'enabled' => true,
+        ]);
+        $registry->registerComponent([
+            'key' => 'c.action',
+            'type' => 'page_action',
+            'surface' => 'articles.index',
+            'label' => 'C',
+            'component' => 'CAction',
+            'sort_order' => 30,
+            'enabled' => true,
+        ]);
+
+        $components = $registry->componentsForSurface('articles.index');
+
+        $this->assertSame(['a.action', 'b.action', 'c.action'], array_column($components, 'key'));
+    }
+
+    public function test_register_component_accepts_single_capability_key(): void
+    {
+        $registry = new WidgetRegistry();
+
+        $registry->registerComponent([
+            'key' => 'contributor.capabilities',
+            'type' => 'page_panel',
+            'surface' => 'contributor.show',
+            'label' => 'Capabilities',
+            'capability' => 'contributor.capabilities.view',
+            'component' => \App\Services\UI\Components\Contributor\ContributorCapabilitiesPanel::class,
+            'sort_order' => 30,
+            'enabled' => true,
+        ]);
+
+        $components = $registry->componentsForSurface('contributor.show');
+
+        $this->assertSame(['contributor.capabilities.view'], $components[0]['capabilities']);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────
 
     private function mockWidget(string $key): DashboardWidgetInterface&\Mockery\MockInterface
     {
         $widget = Mockery::mock(DashboardWidgetInterface::class);
         $widget->shouldReceive('key')->andReturn($key);
+        $widget->shouldReceive('title')->andReturn(ucfirst($key));
         return $widget;
     }
 }

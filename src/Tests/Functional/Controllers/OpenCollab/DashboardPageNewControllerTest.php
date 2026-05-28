@@ -63,4 +63,32 @@ class DashboardPageNewControllerTest extends FunctionalTestCase
         $this->assertSame('review_queue', $payload['key']);
         $this->assertArrayHasKey('data', $payload);
     }
+
+    public function test_widget_index_keeps_legacy_dashboard_manifest_shape(): void
+    {
+        $user = $this->createUser([
+            'email' => 'dashboard-creator@example.com',
+            'role' => 'user',
+            'is_contributor' => true,
+        ]);
+        $this->actingAs($user);
+
+        $role = OpenCollabRole::where('slug', 'creator')->first();
+        OpenCollabSiteUserRole::create([
+            'site_id' => $this->siteId,
+            'user_id' => $user->id,
+            'role_id' => $role->id,
+        ]);
+
+        $response = $this->getForSite('/api/open-collab/dashboard/widgets');
+        $payload = json_decode($response->getContent(), true);
+        $widgets = $payload['data']['widgets'] ?? [];
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertNotEmpty($widgets);
+        $this->assertArrayHasKey('key', $widgets[0]);
+        $this->assertArrayHasKey('title', $widgets[0]);
+        $this->assertArrayHasKey('enabled', $widgets[0]);
+        $this->assertArrayHasKey('position', $widgets[0]);
+    }
 }

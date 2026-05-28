@@ -8,16 +8,18 @@
  *   $currentUser — AuthenticatedUser
  */
 
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$canCreateArticle = in_array('articles.create_action', $allowedComponentKeys, true);
 $pageTitle = 'My Articles';
 $activeNav = 'articles';
 $breadcrumbs = [['label' => 'Dashboard', 'url' => "/{$site}/open-collab/dashboard"], ['label' => 'My Articles']];
-$headerActions = '
+$headerActions = $canCreateArticle ? '
 <a href="/' . $site . '/open-collab/articles/create" class="oc-btn oc-btn--amber">
   <svg viewBox="0 0 20 20" fill="currentColor" width="15">
     <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
   </svg>
   New article
-</a>';
+</a>' : '';
 
 $statusOrder = ['on_hold' => 0, 'draft' => 1, 'waiting_approval' => 2, 'published' => 3, 'archived' => 4];
 ?>
@@ -65,9 +67,11 @@ $statusOrder = ['on_hold' => 0, 'draft' => 1, 'waiting_approval' => 2, 'publishe
         <div style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
             Start writing your first article and build an audience.
         </div>
-        <a href="/<?= $site ?>/open-collab/articles/create" class="oc-btn oc-btn--amber">
-            Write your first article
-        </a>
+        <?php if ($canCreateArticle): ?>
+            <a href="/<?= $site ?>/open-collab/articles/create" class="oc-btn oc-btn--amber">
+                Write your first article
+            </a>
+        <?php endif; ?>
     </div>
 <?php else: ?>
 

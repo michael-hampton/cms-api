@@ -1,5 +1,11 @@
 @section('logic')
 <?php
+$allowedComponentKeys = $allowedComponentKeys ?? [];
+$canCreateGuideline = in_array('guidelines.create_action', $allowedComponentKeys, true);
+$canEditGuideline = in_array('guidelines.edit_action', $allowedComponentKeys, true);
+$canPublishGuideline = in_array('guidelines.publish_action', $allowedComponentKeys, true);
+$canDeleteGuideline = in_array('guidelines.delete_action', $allowedComponentKeys, true);
+$canCloneGuideline = in_array('guidelines.clone_action', $allowedComponentKeys, true);
 $pageTitle = 'Brand Guidelines';
 $activeNav = 'guidelines';
 $breadcrumbs = [['label' => 'Guidelines']];
@@ -133,6 +139,7 @@ $breadcrumbs = [['label' => 'Guidelines']];
     </div>
 
     <div style="position:sticky;top:84px;">
+        <?php if ($canCreateGuideline): ?>
         <div class="oc-card">
             <div class="oc-card__header"><span class="oc-card__title">Create New Draft</span></div>
             <div class="oc-card__body">
@@ -154,6 +161,7 @@ $breadcrumbs = [['label' => 'Guidelines']];
                 </div>
             </div>
         </div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -162,6 +170,11 @@ $breadcrumbs = [['label' => 'Guidelines']];
 @section('scripts')
 <script>
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
+    const CAN_CREATE_GUIDELINE = <?= $canCreateGuideline ? 'true' : 'false' ?>;
+    const CAN_EDIT_GUIDELINE = <?= $canEditGuideline ? 'true' : 'false' ?>;
+    const CAN_PUBLISH_GUIDELINE = <?= $canPublishGuideline ? 'true' : 'false' ?>;
+    const CAN_DELETE_GUIDELINE = <?= $canDeleteGuideline ? 'true' : 'false' ?>;
+    const CAN_CLONE_GUIDELINE = <?= $canCloneGuideline ? 'true' : 'false' ?>;
 
     class GuidelinesTemplateManager {
         #site;
@@ -382,10 +395,10 @@ $breadcrumbs = [['label' => 'Guidelines']];
                 </div>
                 <div style="display:flex;gap:6px;">
                     <button onclick="manager.viewGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">View</button>
-                    ${status === 'draft' ? `<button onclick="manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
-                    ${status === 'draft' ? `<button onclick="manager.publishGuideline(${g.id},${g.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
-                    ${status === 'draft' && isLatest ? `<button onclick="manager.deleteGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
-                    ${status !== 'draft' ? `<button onclick="manager.cloneGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
+                    ${status === 'draft' && CAN_EDIT_GUIDELINE ? `<button onclick="manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Edit</button>` : ''}
+                    ${status === 'draft' && CAN_PUBLISH_GUIDELINE ? `<button onclick="manager.publishGuideline(${g.id},${g.version})" class="oc-btn oc-btn--sm oc-btn--amber">Publish</button>` : ''}
+                    ${status === 'draft' && isLatest && CAN_DELETE_GUIDELINE ? `<button onclick="manager.deleteGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);">Delete</button>` : ''}
+                    ${status !== 'draft' && CAN_CLONE_GUIDELINE ? `<button onclick="manager.cloneGuideline(${g.id},${g.version})" class="oc-btn oc-btn--ghost oc-btn--sm">Clone</button>` : ''}
                 </div>`;
             return div;
         }
@@ -423,7 +436,7 @@ $breadcrumbs = [['label' => 'Guidelines']];
             if (g.source_template_id) meta.push(`From template #${g.source_template_id}`);
             document.getElementById('view-modal-meta').innerHTML = meta.join(' · ');
             const btns = [`<button onclick="manager.closeViewModal()" class="oc-btn oc-btn--ghost">Close</button>`];
-            if (status === 'draft') btns.push(`<button onclick="manager.closeViewModal();manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
+            if (status === 'draft' && CAN_EDIT_GUIDELINE) btns.push(`<button onclick="manager.closeViewModal();manager.editGuideline(${g.id},${g.version})" class="oc-btn oc-btn--amber">Edit Draft</button>`);
             document.getElementById('view-modal-actions').innerHTML = btns.join('');
             document.getElementById('view-modal').classList.add('is-open');
         }

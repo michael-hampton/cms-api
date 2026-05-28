@@ -373,6 +373,9 @@ class ApiApplication
             $registry->register($this->container->make(ReviewQueueWidget::class), $widgetPermissions['review_queue'] ?? []);
             $registry->register($this->container->make(ApprovalWidget::class), $widgetPermissions['approvals'] ?? []);
 
+            foreach (config('dashboard.components', []) as $component) {
+                $registry->registerComponent($component);
+            }
 
             return $registry;
         });

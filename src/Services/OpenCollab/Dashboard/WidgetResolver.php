@@ -56,6 +56,47 @@ final class WidgetResolver
         return $this->resolveFullWidgetSet($user);
     }
 
+    /**
+     * Returns the allowed UI components for a named surface.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function allowedForSurface(
+        int $userId,
+        int $siteId,
+        string $surface
+    ): array {
+        if ($surface === 'dashboard.index') {
+            return $this->allowedDashboardComponents($userId);
+        }
+
+        $components = $this->registry->componentsForSurface($surface);
+        if ($components === []) {
+            return [];
+        }
+
+        $allowed = array_values(array_filter($components, function (array $component) use ($userId, $siteId): bool {
+            if (($component['enabled'] ?? true) !== true) {
+                return false;
+            }
+
+            foreach ($component['capabilities'] ?? [] as $capability) {
+                if (!$this->permissionResolver->allows($userId, $siteId, $capability)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+
+        usort($allowed, static function (array $a, array $b): int {
+            $sort = ((int) $a['sort_order']) <=> ((int) $b['sort_order']);
+            return $sort !== 0 ? $sort : strcmp((string) $a['key'], (string) $b['key']);
+        });
+
+        return $allowed;
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     /**
@@ -160,6 +201,32 @@ final class WidgetResolver
         usort($resolved, fn($a, $b) => $a['position'] <=> $b['position']);
 
         return array_map(fn($item) => $item['widget'], $resolved);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function allowedDashboardComponents(int $userId): array
+    {
+        $widgets = $this->resolveForUser($this->lightweightUser($userId));
+        $allowed = [];
+
+        foreach ($widgets as $sortOrder => $widget) {
+            $component = $this->registry->component($widget->key());
+            $component['sort_order'] = $sortOrder;
+            $allowed[] = $component;
+        }
+
+        return $allowed;
+    }
+
+    private function lightweightUser(int $userId): User
+    {
+        /** @var User $user */
+        $user = (new \ReflectionClass(User::class))->newInstanceWithoutConstructor();
+        $user->id = $userId;
+
+        return $user;
     }
 
     /**
