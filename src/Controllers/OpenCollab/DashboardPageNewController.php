@@ -27,7 +27,7 @@ class DashboardPageNewController extends Controller
     {
         $user = Auth::getUser();
 
-        return $this->resourceResponse([
+        return $this->jsonResponse([
             'widgets' => $this->widgetResolver->availableForUser(User::hydrateStatic($user)),
         ]);
     }

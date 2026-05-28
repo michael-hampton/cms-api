@@ -607,7 +607,10 @@ $headerActions = '
                     credentials: 'same-origin',
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const { widgets } = await res.json();
+                const payload = await res.json();
+                const widgets = Array.isArray(payload.widgets)
+                    ? payload.widgets
+                    : (Array.isArray(payload.data?.widgets) ? payload.data.widgets : []);
                 state.manager.manifest = widgets;
                 state.manager.dirty    = false;
                 _managerRender();

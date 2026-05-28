@@ -671,8 +671,8 @@ class ApiApplication
     private function loadRoutes(): void
     {
         $routeFiles = [
-            'routes/api.php',
-            'routes/web.php',
+            __DIR__ . '/routes/api.php',
+            __DIR__ . '/routes/web.php',
         ];
 
         foreach ($routeFiles as $routeFile) {

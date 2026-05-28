@@ -284,7 +284,7 @@ final class WidgetResolver
     public function availableForUser(User $user): array
     {
         if ($this->isOnboardingGated($user)) {
-            return [];
+            return $this->availableOnboardingWidgetManifest($user);
         }
 
         $baseKeys    = $this->baseKeysForUser($user);
@@ -322,5 +322,29 @@ final class WidgetResolver
         usort($available, fn($a, $b) => $a['position'] <=> $b['position']);
 
         return $available;
+    }
+
+    /**
+     * Returns the legacy manifest shape for the gated onboarding-only state.
+     *
+     * @return array<int, array{key: string, title: string, enabled: bool, position: int}>
+     */
+    private function availableOnboardingWidgetManifest(User $user): array
+    {
+        if (!$this->registry->has('onboarding')) {
+            return [];
+        }
+
+        $widget = $this->registry->get('onboarding');
+        if (!$widget->visibleFor($user)) {
+            return [];
+        }
+
+        return [[
+            'key' => 'onboarding',
+            'title' => $widget->title(),
+            'enabled' => true,
+            'position' => 0,
+        ]];
     }
 }

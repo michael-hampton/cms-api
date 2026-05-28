@@ -157,7 +157,7 @@ class WidgetResolverTest extends TestCase
         ], $widgets));
     }
 
-    public function test_available_for_user_returns_empty_array_when_onboarding_gate_is_active(): void
+    public function test_available_for_user_returns_onboarding_manifest_when_onboarding_gate_is_active(): void
     {
         $registry = new WidgetRegistry();
         foreach (['onboarding', 'drafts', 'earnings', 'activity', 'quick_links'] as $key) {
@@ -179,7 +179,12 @@ class WidgetResolverTest extends TestCase
 
         $widgets = $resolver->availableForUser($this->makeUser(15));
 
-        $this->assertSame([], $widgets);
+        $this->assertSame([[
+            'key' => 'onboarding',
+            'title' => 'Onboarding',
+            'enabled' => true,
+            'position' => 0,
+        ]], $widgets);
     }
 
     public function test_allowed_for_surface_returns_dashboard_widgets_in_resolved_order(): void
