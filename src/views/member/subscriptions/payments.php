@@ -484,6 +484,32 @@
 </main>
 
 <script>
+    class PaymentsStore {
+        constructor() {
+            this.state = {
+                payments: [],
+                paymentSummary: null,
+                loading: false,
+                error: null,
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+    }
+
     /**
      * PaymentsPage — drives the Payment History view.
      * All DOM construction goes through app-core UI helpers.
@@ -498,17 +524,51 @@
             this.statsStrip = document.getElementById('statsStrip');
             this.paymentsBody = document.getElementById('paymentsBody');
             this.recordCount = document.getElementById('recordCount');
+            this.store = new PaymentsStore();
+
+            this.store.subscribe(state => this.render(state));
         }
 
         async init() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const res = await api(this.apiUrl);
-                this.renderStats(res.data.paymentSummary);
-                this.renderTable(res.data.payments);
+                const payload = res.data ?? res;
+                this.store.setState({
+                    paymentSummary: payload.paymentSummary ?? {
+                        total_count: 0,
+                        currency: 'GBP',
+                        total_paid: 0,
+                        successful_count: 0,
+                        failed_count: 0,
+                    },
+                    payments: payload.payments || [],
+                    loading: false,
+                });
             } catch (err) {
+                this.store.setState({
+                    loading: false,
+                    error: err.message || 'Failed to load payments',
+                });
                 UI.toast(err.message || 'Failed to load payments', 'error');
-                this.renderError();
             }
+        }
+
+        render(state) {
+            if (state.loading) return;
+
+            if (state.error) {
+                this.renderError();
+                return;
+            }
+
+            if (!state.paymentSummary) {
+                return;
+            }
+
+            this.renderStats(state.paymentSummary);
+            this.renderTable(state.payments);
         }
 
         // ── Stats ──────────────────────────────────────────────────────────────
