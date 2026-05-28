@@ -20,18 +20,25 @@ Voucher extends Model
         'description',
         'type',
         'value',
+        'discount_type',
+        'discount_amount',
+        'discount_percentage',
         'minimum_order_value',
         'maximum_discount',
         'usage_limit',
         'usage_count',
         'per_user_limit',
+        'applies_to_orders',
         'starts_at',
         'expires_at',
         'status',
         'clone_history',
         'applies_to_subscriptions',
         'subscription_plan_ids',
+        'subscription_discount_duration',
+        'subscription_duration_months',
         'stripe_coupon_id',
+        'stripe_coupon_synced_at',
         'duration_in_months',
         'is_stackable',
         'merchant_id',
@@ -41,16 +48,22 @@ Voucher extends Model
     protected $casts = [
         'site_id' => 'integer',
         'value' => 'float',
+        'discount_amount' => 'integer',
+        'discount_percentage' => 'integer',
         'minimum_order_value' => 'float',
         'maximum_discount' => 'float',
         'usage_limit' => 'integer',
         'usage_count' => 'integer',
         'per_user_limit' => 'integer',
+        'applies_to_orders' => 'boolean',
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'clone_history' => 'array',
         'applies_to_subscriptions' => 'boolean',
         'subscription_plan_ids' => 'array',
+        'subscription_duration_months' => 'integer',
+        'duration_in_months' => 'integer',
+        'stripe_coupon_synced_at' => 'datetime',
     ];
 
     public function isValid(): bool
@@ -197,6 +210,17 @@ Voucher extends Model
         return $this->hasMany(Subscription::class, 'voucher_id', 'id', $returnRelation);
     }
 
+    public function subscriptionPlans($returnRelation = false)
+    {
+        return $this->belongsToMany(
+            SubscriptionPlan::class,
+            'voucher_subscription_plan',
+            'voucher_id',
+            'subscription_plan_id',
+            $returnRelation
+        );
+    }
+
     public function appliesToSubscriptions(): bool
     {
         return $this->applies_to_subscriptions ?? false;
@@ -230,6 +254,80 @@ Voucher extends Model
         }
 
         return round($discount, 2);
+    }
+
+    public function getStripeDiscountType(): string
+    {
+        return $this->discount_type ?: $this->type;
+    }
+
+    public function getStripeAmountOff(): ?int
+    {
+        if ($this->getStripeDiscountType() !== VoucherType::Fixed->value) {
+            return null;
+        }
+
+        if ($this->discount_amount !== null) {
+            return (int) $this->discount_amount;
+        }
+
+        return (int) round(((float) $this->value) * 100);
+    }
+
+    public function getStripePercentOff(): ?int
+    {
+        if ($this->getStripeDiscountType() !== VoucherType::Percentage->value) {
+            return null;
+        }
+
+        if ($this->discount_percentage !== null) {
+            return (int) $this->discount_percentage;
+        }
+
+        return (int) round((float) $this->value);
+    }
+
+    public function getSubscriptionDiscountDuration(): ?string
+    {
+        if (!empty($this->subscription_discount_duration)) {
+            return $this->subscription_discount_duration;
+        }
+
+        if (!empty($this->subscription_duration_months) || !empty($this->duration_in_months)) {
+            return 'repeating';
+        }
+
+        return $this->appliesToSubscriptions() ? 'once' : null;
+    }
+
+    public function getSubscriptionDurationMonths(): ?int
+    {
+        if ($this->subscription_duration_months !== null) {
+            return (int) $this->subscription_duration_months;
+        }
+
+        if ($this->duration_in_months !== null) {
+            return (int) $this->duration_in_months;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function subscriptionCouponConfiguration(): array
+    {
+        return [
+            'code' => $this->code,
+            'name' => $this->name,
+            'applies_to_subscriptions' => $this->appliesToSubscriptions(),
+            'discount_type' => $this->getStripeDiscountType(),
+            'discount_amount' => $this->getStripeAmountOff(),
+            'discount_percentage' => $this->getStripePercentOff(),
+            'subscription_discount_duration' => $this->getSubscriptionDiscountDuration(),
+            'subscription_duration_months' => $this->getSubscriptionDurationMonths(),
+        ];
     }
 
     public function isNonStackable(): bool

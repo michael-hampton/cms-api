@@ -103,6 +103,11 @@ class VoucherServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->with($voucherId)
+            ->andReturn(new Voucher());
+
         $this->repository->shouldReceive('update')
             ->once()
             ->with($voucherId, $data)
@@ -112,6 +117,54 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $this->assertInstanceOf(Voucher::class, $result);
         $this->assertEquals('Updated Voucher', $result->name);
+    }
+
+    public function testUpdateVoucherInvalidatesSyncedStripeCouponWhenSubscriptionConfigChanges(): void
+    {
+        $voucherId = 1;
+        $existingVoucher = new Voucher();
+        $existingVoucher->stripe_coupon_id = 'coupon_123';
+        $existingVoucher->code = 'SAVE15';
+        $existingVoucher->name = 'Save 15';
+        $existingVoucher->applies_to_subscriptions = true;
+        $existingVoucher->discount_type = VoucherType::Fixed->value;
+        $existingVoucher->discount_amount = 1500;
+        $existingVoucher->discount_percentage = null;
+        $existingVoucher->subscription_discount_duration = 'repeating';
+        $existingVoucher->subscription_duration_months = 1;
+        $existingVoucher->type = VoucherType::Fixed->value;
+        $existingVoucher->value = 15;
+
+        $updatedVoucher = new Voucher();
+        $updatedVoucher->stripe_coupon_id = null;
+
+        $data = [
+            'discount_amount' => 2000,
+        ];
+
+        $this->databaseMock->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->with($voucherId)
+            ->andReturn($existingVoucher);
+
+        $this->repository->shouldReceive('update')
+            ->once()
+            ->with($voucherId, Mockery::on(function (array $payload) {
+                return $payload['discount_amount'] === 2000
+                    && array_key_exists('stripe_coupon_id', $payload)
+                    && $payload['stripe_coupon_id'] === null
+                    && array_key_exists('stripe_coupon_synced_at', $payload)
+                    && $payload['stripe_coupon_synced_at'] === null;
+            }))
+            ->andReturn($updatedVoucher);
+
+        $result = $this->service->update($voucherId, $data);
+
+        $this->assertInstanceOf(Voucher::class, $result);
     }
 
     public function testDeleteVoucherWithNoUsage()
@@ -470,6 +523,7 @@ class VoucherServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->repository->shouldNotReceive('find');
         $this->repository->shouldReceive('update')
             ->once()
             ->andReturn($voucher);
@@ -649,6 +703,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher->id = 1;
 
         $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('find')->never();
         $this->repository->expects('update')->andReturn($voucher);
         $this->repository->expects('syncProducts')->with(1, [7])->once();
         $this->repository->expects('syncCategories')->with(1, [8])->once();
@@ -669,6 +724,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $voucher = Mockery::mock(Voucher::class)->makePartial();
 
         $this->databaseMock->expects('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->repository->expects('find')->never();
         $this->repository->expects('update')->andReturn($voucher);
         $this->repository->expects('syncProducts')->never();
         $this->repository->expects('syncCategories')->never();
@@ -697,6 +753,7 @@ class VoucherServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->repository->shouldNotReceive('find');
         $this->repository->shouldReceive('update')
             ->once()
             ->andReturn($voucher);
@@ -731,6 +788,7 @@ class VoucherServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->repository->shouldNotReceive('find');
         $this->repository->shouldReceive('syncBrands')
             ->once()
             ->with($voucherId, [6, 7]);
@@ -750,6 +808,8 @@ class VoucherServiceTest extends FunctionalTestCase
 
         $voucher = Mockery::mock(Voucher::class)->makePartial();
         $voucher->name = 'Updated Voucher';
+        $existingVoucher = new Voucher();
+        $existingVoucher->stripe_coupon_id = null;
 
         $this->repository->shouldReceive('update')
             ->once()
@@ -761,6 +821,10 @@ class VoucherServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
+        $this->repository->shouldReceive('find')
+            ->once()
+            ->with($voucherId)
+            ->andReturn($existingVoucher);
         $this->repository->shouldNotReceive('syncCategories');
         $this->repository->shouldNotReceive('syncBrands');
 
@@ -1129,8 +1193,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->validationService
             ->expects('validate')
             ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
-                // min(15.00, 12.00) = 12.00
-                return $ctx->orderValue == 15;
+                return $ctx->orderValue == 12;
             })
             ->andReturn($validResult);
 
@@ -1163,8 +1226,7 @@ class VoucherServiceTest extends FunctionalTestCase
         $this->validationService
             ->expects('validate')
             ->withArgs(function (Voucher $v, VoucherValidationContext $ctx) {
-                // min(20.00, 18.00) = 18.00
-                return $ctx->orderValue == 20;
+                return $ctx->orderValue == 18;
             })
             ->andReturn($validResult);
 

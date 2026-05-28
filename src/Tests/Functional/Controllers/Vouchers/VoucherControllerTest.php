@@ -77,6 +77,32 @@ class VoucherControllerTest extends FunctionalTestCase
         $this->assertEquals('New Test Voucher', $data['data']['voucher']['name']);
     }
 
+    public function testStoreCreatesSubscriptionVoucherWithStripeCompatibleFields(): void
+    {
+        $voucherData = [
+            'code' => 'INTRO15',
+            'name' => 'Intro offer',
+            'type' => VoucherType::Fixed->value,
+            'value' => 15,
+            'discount_type' => VoucherType::Fixed->value,
+            'discount_amount' => 1500,
+            'applies_to_subscriptions' => true,
+            'subscription_discount_duration' => 'repeating',
+            'subscription_duration_months' => 1,
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(201, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertTrue($data['data']['voucher']['applies_to_subscriptions']);
+        $this->assertSame('repeating', $data['data']['voucher']['subscription_discount_duration']);
+        $this->assertSame(1, $data['data']['voucher']['subscription_duration_months']);
+        $this->assertSame(1500, $data['data']['voucher']['discount_amount']);
+    }
+
     public function testStoreNormalizesCodeToUppercase()
     {
         $voucherData = [
@@ -160,6 +186,39 @@ class VoucherControllerTest extends FunctionalTestCase
             'value' => 10,
             'starts_at' => '2025-12-31',
             'expires_at' => '2025-01-01' // Before start date
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreRejectsRepeatingSubscriptionVoucherWithoutDurationMonths(): void
+    {
+        $voucherData = [
+            'code' => 'REPEATFAIL',
+            'name' => 'Invalid repeating voucher',
+            'type' => VoucherType::Fixed->value,
+            'value' => 15,
+            'applies_to_subscriptions' => true,
+            'subscription_discount_duration' => 'repeating',
+        ];
+
+        $response = $this->postForSite('/api/vouchers', $voucherData);
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function testStoreRejectsNonRepeatingSubscriptionVoucherWithDurationMonths(): void
+    {
+        $voucherData = [
+            'code' => 'ONCEFAIL',
+            'name' => 'Invalid once voucher',
+            'type' => VoucherType::Percentage->value,
+            'value' => 10,
+            'applies_to_subscriptions' => true,
+            'subscription_discount_duration' => 'once',
+            'subscription_duration_months' => 2,
         ];
 
         $response = $this->postForSite('/api/vouchers', $voucherData);

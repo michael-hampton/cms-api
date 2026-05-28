@@ -163,7 +163,7 @@ class VoucherController extends Controller
         try {
             $code = $request->get('code');
             $orderValue = (float)$request->get('order_value', 0);
-            $userId = $request->get('user_id', null);
+            $userId = $request->get('user_id', $request->get('member_id', null));
             $productId = $request->get('product_id', null);
             $planId = $request->get('plan_id', null); // ADD THIS
             $isSubscription = $request->get('is_subscription', false); // ADD THIS
@@ -221,7 +221,9 @@ class VoucherController extends Controller
                 ]);
             }
 
-            $result = $this->voucherService->validateVoucherForCheckout($code, $this->cartService->getItems(), $userId);
+            $result = ($productId !== null || $request->get('order_value', null) !== null)
+                ? $this->voucherService->validateVoucher($code, $orderValue, $userId, $productId)
+                : $this->voucherService->validateVoucherForCheckout($code, $this->cartService->getItems(), $userId);
 
             if ($result->valid === true) {
                 Session::put('applied_voucher_code', ['discount' => $result->discount, 'voucher_id' => $result->voucher->id, 'code' => $result->voucher->code]);

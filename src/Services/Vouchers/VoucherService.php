@@ -30,8 +30,9 @@ class VoucherService
             $productIds = $data['product_ids'] ?? [];
             $categoryIds = $data['category_ids'] ?? [];
             $brandIds = $data['brand_ids'] ?? [];
+            $subscriptionPlanIds = $data['subscription_plan_ids'] ?? [];
 
-            unset($data['product_ids'], $data['category_ids'], $data['brand_ids']);
+            unset($data['product_ids'], $data['category_ids'], $data['brand_ids'], $data['subscription_plan_ids']);
 
             $voucher = $this->repository->create($data);
 
@@ -47,6 +48,10 @@ class VoucherService
                 $this->repository->syncBrands($voucher->id, $brandIds);
             }
 
+            if (!empty($subscriptionPlanIds)) {
+                $this->repository->syncSubscriptionPlans($voucher->id, $subscriptionPlanIds);
+            }
+
             return $voucher;
         });
     }
@@ -57,8 +62,18 @@ class VoucherService
             $productIds = $data['product_ids'] ?? null;
             $categoryIds = $data['category_ids'] ?? null;
             $brandIds = $data['brand_ids'] ?? null;
+            $subscriptionPlanIds = $data['subscription_plan_ids'] ?? null;
 
-            unset($data['product_ids'], $data['category_ids'], $data['brand_ids']);
+            if ($this->mayAffectSubscriptionCouponConfiguration($data)) {
+                $existingVoucher = $this->repository->find($voucherId);
+
+                if ($existingVoucher && $this->subscriptionCouponConfigurationChanged($existingVoucher, $data)) {
+                    $data['stripe_coupon_id'] = null;
+                    $data['stripe_coupon_synced_at'] = null;
+                }
+            }
+
+            unset($data['product_ids'], $data['category_ids'], $data['brand_ids'], $data['subscription_plan_ids']);
 
             $voucher = $this->repository->update($voucherId, $data);
 
@@ -72,6 +87,10 @@ class VoucherService
 
             if ($brandIds !== null) {
                 $this->repository->syncBrands($voucherId, $brandIds);
+            }
+
+            if ($subscriptionPlanIds !== null) {
+                $this->repository->syncSubscriptionPlans($voucherId, $subscriptionPlanIds);
             }
 
             return $voucher;
@@ -225,6 +244,42 @@ class VoucherService
             }
 
             if (isset($item['price']) && isset($item['base_price']) && $item['price'] < $item['base_price']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function subscriptionCouponConfigurationChanged(Voucher $voucher, array $newData): bool
+    {
+        if (empty($voucher->stripe_coupon_id)) {
+            return false;
+        }
+
+        $updated = clone $voucher;
+
+        foreach ($newData as $key => $value) {
+            $updated->{$key} = $value;
+        }
+
+        return $voucher->subscriptionCouponConfiguration() !== $updated->subscriptionCouponConfiguration();
+    }
+
+    private function mayAffectSubscriptionCouponConfiguration(array $data): bool
+    {
+        foreach ([
+            'type',
+            'value',
+            'discount_type',
+            'discount_amount',
+            'discount_percentage',
+            'applies_to_subscriptions',
+            'subscription_discount_duration',
+            'subscription_duration_months',
+            'duration_in_months',
+        ] as $key) {
+            if (array_key_exists($key, $data)) {
                 return true;
             }
         }
