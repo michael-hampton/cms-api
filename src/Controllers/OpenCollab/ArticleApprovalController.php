@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\RejectionReason;
+use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -125,6 +126,11 @@ class ArticleApprovalController extends Controller
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article submitted for review.',
             ]);
+        } catch (OnboardingIncompleteException $e) {
+            return $this->errorResponse($e->getMessage(), 403, [
+                'pending_steps' => $e->getPendingSteps(),
+                'redirect' => '/contributor/onboarding',
+            ]);
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         } catch (\InvalidArgumentException $e) {
@@ -148,6 +154,11 @@ class ArticleApprovalController extends Controller
             return $this->jsonResponse([
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article resubmitted for review.',
+            ]);
+        } catch (OnboardingIncompleteException $e) {
+            return $this->errorResponse($e->getMessage(), 403, [
+                'pending_steps' => $e->getPendingSteps(),
+                'redirect' => '/contributor/onboarding',
             ]);
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);

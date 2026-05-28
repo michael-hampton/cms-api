@@ -88,6 +88,7 @@ class ContributorSettingsController extends Controller
 
             return $this->successResponse('Avatar removed.');
         } catch (Exception $e) {
+            dd($e->getMessage());
             return $this->errorResponse('Could not remove avatar. Please try again.', 500);
         }
     }

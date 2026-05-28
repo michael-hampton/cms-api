@@ -399,13 +399,13 @@ class PageGridServiceTest extends FunctionalTestCase
         $this->service->createPageGrid($data);
     }
 
-    private function createUser()
+    protected function createUser(array $attributes = []): User
     {
-        return User::create([
+        return User::create(array_merge([
             'name' => 'John Doe',
             'email' => '<EMAIL>',
             'password' => '<PASSWORD>',
-        ]);
+        ], $attributes));
     }
 
     public function testAddAuthorToGrid()

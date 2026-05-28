@@ -9,6 +9,13 @@ const UI = {
             if (k === 'className') el.className = v;
             else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
             else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2).toLowerCase(), v);
+            else if (typeof v === 'boolean') {
+                if (k in el) {
+                    el[k] = v;
+                } else if (v) {
+                    el.setAttribute(k, '');
+                }
+            }
             else if (v !== null && v !== undefined) el.setAttribute(k, v);
         }
         for (const child of children) {

@@ -37,7 +37,7 @@ class ContributorProfileServiceTest extends TestCase
         $this->profileRepo
             ->shouldReceive('createForUser')
             ->once()
-            ->with(1, 10, ['avatar' => '/uploads/open-collab/avatars/test.jpg'])
+            ->with(1, ['avatar' => '/uploads/open-collab/avatars/test.jpg'])
             ->andReturn($this->makeProfile(['avatar' => '/open-collab/avatars/test.jpg']));
 
         $url = $this->service->uploadAvatar(1, 10, $file);
@@ -141,7 +141,7 @@ class ContributorProfileServiceTest extends TestCase
         $profile = $this->makeProfile(['id' => 7, 'avatar' => '/avatars/foo.jpg']);
 
         $this->profileRepo
-            ->shouldReceive('findByUserAndSite')
+            ->shouldReceive('findByUserId')
             ->once()
             ->andReturn($profile);
 
@@ -163,7 +163,7 @@ class ContributorProfileServiceTest extends TestCase
     public function test_removeAvatar_is_noop_when_no_profile(): void
     {
         $this->profileRepo
-            ->shouldReceive('findByUserAndSite')
+            ->shouldReceive('findByUserId')
             ->once()
             ->andReturnNull();
 
@@ -181,7 +181,7 @@ class ContributorProfileServiceTest extends TestCase
         $profile = $this->makeProfile(['id' => 3, 'avatar' => null]);
 
         $this->profileRepo
-            ->shouldReceive('findByUserAndSite')
+            ->shouldReceive('findByUserId')
             ->once()
             ->andReturn($profile);
 
@@ -229,7 +229,7 @@ class ContributorProfileServiceTest extends TestCase
         $this->profileRepo
             ->shouldReceive('createForUser')
             ->once()
-            ->with(1, 10, ['expertise' => 'Health'])
+            ->with(1, ['expertise' => 'Health'])
             ->andReturn($created);
 
         $result = $this->service->saveExpertise(1, 10, ['Health']);
@@ -300,7 +300,7 @@ class ContributorProfileServiceTest extends TestCase
         $profile = $this->makeProfile(['id' => 2, 'bio' => 'Old bio', 'avatar' => null]);
         $fresh = $this->makeProfile(['id' => 2, 'bio' => 'New bio', 'avatar' => null]);
 
-        $this->profileRepo->shouldReceive('findByUserAndSite')->andReturn($profile);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
         $profile->shouldReceive('fresh')->andReturn($fresh);
 
         $this->profileRepo
@@ -319,7 +319,7 @@ class ContributorProfileServiceTest extends TestCase
         $profile = $this->makeProfile(['id' => 2, 'bio' => null, 'avatar' => '/old.jpg']);
         $fresh = $this->makeProfile(['id' => 2, 'bio' => null, 'avatar' => null]);
 
-        $this->profileRepo->shouldReceive('findByUserAndSite')->andReturn($profile);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
         $profile->shouldReceive('fresh')->andReturn($fresh);
 
         $this->uploadService
@@ -354,7 +354,7 @@ class ContributorProfileServiceTest extends TestCase
         $profile = $this->makeProfile(['id' => 2, 'bio' => '', 'avatar' => '/keep.jpg']);
         $fresh = $this->makeProfile(['id' => 2, 'bio' => 'Hi', 'avatar' => '/keep.jpg']);
 
-        $this->profileRepo->shouldReceive('findByUserAndSite')->andReturn($profile);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
         $profile->shouldReceive('fresh')->andReturn($fresh);
 
         $this->profileRepo

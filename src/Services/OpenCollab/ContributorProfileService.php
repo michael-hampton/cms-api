@@ -63,7 +63,7 @@ class ContributorProfileService
         if ($profile) {
             $this->profileRepository->update($profile->id, ['avatar' => $url]);
         } else {
-            $this->profileRepository->createForUser($userId, $siteId, ['avatar' => $url]);
+            $this->profileRepository->createForUser($userId, ['avatar' => $url]);
         }
 
         return $url;
@@ -94,7 +94,7 @@ class ContributorProfileService
      */
     public function removeAvatar(int $userId, int $siteId): void
     {
-        $profile = $this->profileRepository->findByUserAndSite($userId, $siteId);
+        $profile = $this->profileRepository->findByUserId($userId);
 
         if (!$profile || empty($profile->avatar)) {
             return;
@@ -124,7 +124,7 @@ class ContributorProfileService
             return $profile->fresh();
         }
 
-        return $this->profileRepository->createForUser($userId, $siteId, [
+        return $this->profileRepository->createForUser($userId, [
             'expertise' => implode(',', $tags),
         ]);
     }
@@ -186,7 +186,7 @@ class ContributorProfileService
 
             if ($avatar === '' || $avatar === null) {
                 // Explicit removal — delete file if we have a path
-                $existing = $this->profileRepository->findByUserAndSite($userId, $siteId);
+                $existing = $this->profileRepository->findByUserId($userId);
                 if ($existing?->avatar) {
                     $this->imageUploadService->delete(ltrim($existing->avatar, '/'));
                 }
@@ -199,11 +199,11 @@ class ContributorProfileService
 
         if (empty($fields)) {
             // Nothing to update; return or create the profile as-is
-            return $this->profileRepository->findByUserAndSite($userId, $siteId)
-                ?? $this->profileRepository->createForUser($userId, $siteId, []);
+            return $this->profileRepository->findByUserId($userId)
+                ?? $this->profileRepository->createForUser($userId);
         }
 
-        $profile = $this->profileRepository->findByUserAndSite($userId, $siteId);
+        $profile = $this->profileRepository->findByUserId($userId);
 
         if ($profile) {
             $this->profileRepository->update($profile->id, $fields);
@@ -211,6 +211,6 @@ class ContributorProfileService
             return $profile->fresh();
         }
 
-        return $this->profileRepository->createForUser($userId, $siteId, $fields);
+        return $this->profileRepository->createForUser($userId, $fields);
     }
 }

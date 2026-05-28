@@ -138,6 +138,7 @@ use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
+use App\Middleware\OpenCollab\OnboardingRouteGuard;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
 use App\Controllers\Subscription\WorkflowRunController;
@@ -298,6 +299,9 @@ $router->group(['prefix' => 'api/{site}/member', 'middleware' => [AuthenticateMe
     $router->get('/subscriptions/overview',
         [MemberSubscriptionsApiController::class, 'overview']);
 
+    $router->get('/subscriptions/{subscriptionId}/history',
+        [MemberSubscriptionsApiController::class, 'history']);
+
     $router->post('/subscriptions/{subscriptionId}/cancel',
         [MemberSubscriptionsApiController::class, 'cancel']);
 
@@ -365,6 +369,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ContributorSettingsController::class, 'uploadAvatar']
         );
 
+        $router->delete(
+            '/open-collab/contributor/avatar',
+            [ContributorSettingsController::class, 'removeAvatar']
+        );
+
+        $router->put(
+            '/open-collab/contributor',
+            [ContributorSettingsController::class, 'updateProfile']
+        );
+
         $router->get(
             '/open-collab/dashboard',
             [ContributorDashboardController::class, 'show']
@@ -376,20 +390,22 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ContributorPageController::class, 'index']
         );
 
-        $router->post(
-            '/open-collab/pages',
-            [ContributorPageController::class, 'store']
-        );
+        $router->group(['middleware' => [OnboardingRouteGuard::class]], function ($router) {
+            $router->post(
+                '/open-collab/pages',
+                [ContributorPageController::class, 'store']
+            );
 
-        $router->put(
-            '/open-collab/pages/{id}',
-            [ContributorPageController::class, 'update']
-        );
+            $router->put(
+                '/open-collab/pages/{id}',
+                [ContributorPageController::class, 'update']
+            );
 
-        $router->delete(
-            '/open-collab/pages/{id}',
-            [ContributorPageController::class, 'destroy']
-        );
+            $router->delete(
+                '/open-collab/pages/{id}',
+                [ContributorPageController::class, 'destroy']
+            );
+        });
 
         $router->get(
             '/open-collab/admin/contributors',
@@ -527,15 +543,17 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ArticleApprovalController::class, 'reject']
         );
 
-        $router->post(
-            '/open-collab/pages/{id}/submit',
-            [ArticleApprovalController::class, 'submit']
-        );
+        $router->group(['middleware' => [OnboardingRouteGuard::class]], function ($router) {
+            $router->post(
+                '/open-collab/pages/{id}/submit',
+                [ArticleApprovalController::class, 'submit']
+            );
 
-        $router->post(
-            '/open-collab/pages/{id}/resubmit',
-            [ArticleApprovalController::class, 'resubmit']
-        );
+            $router->post(
+                '/open-collab/pages/{id}/resubmit',
+                [ArticleApprovalController::class, 'resubmit']
+            );
+        });
 
         $router->get(
             '/open-collab/payouts/balance',

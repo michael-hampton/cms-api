@@ -6,6 +6,7 @@ use App\Enums\OpenCollab\GuidelineStatus;
 use App\Events\OpenCollab\GuidelineArchivedEvent;
 use App\Events\OpenCollab\GuidelineDraftCreatedEvent;
 use App\Events\OpenCollab\GuidelinePublishedEvent;
+use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
@@ -105,6 +106,12 @@ class GuidelineService
                 siteId: $published->site_id,
                 version: $published->version,
                 publishedByUserId: $publishedByUserId,
+            ));
+
+            event(new GuidelinesVersionBumpedEvent(
+                guideline: $published,
+                siteId: $published->site_id,
+                newVersion: $published->version,
             ));
 
             return $published;

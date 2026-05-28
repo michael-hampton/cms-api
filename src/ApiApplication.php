@@ -461,7 +461,8 @@ class ApiApplication
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
                 ),
-                app(VoucherRepository::class)
+                app(VoucherRepository::class),
+                app(Database::class)
             )
         );
 

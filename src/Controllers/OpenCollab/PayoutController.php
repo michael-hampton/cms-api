@@ -3,6 +3,7 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
+use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
@@ -109,6 +110,11 @@ class PayoutController extends Controller
             ], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (OnboardingIncompleteException $e) {
+            return $this->errorResponse($e->getMessage(), 409, [
+                'pending_steps' => $e->getPendingSteps(),
+                'redirect' => '/contributor/onboarding',
+            ]);
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (\RuntimeException $e) {

@@ -35,7 +35,7 @@ use App\Services\OpenCollab\Policies\ContributorPolicy;
 class PayoutService
 {
     private const MINIMUM_PAYOUT_PENCE = 5000; // £50.00
-    private const VALID_METHODS = ['bank_transfer', 'stripe'];
+    private const VALID_METHODS = ['bank_transfer', 'paypal', 'other', 'stripe'];
 
     public function __construct(
         private readonly PayoutRepository         $payoutRepository,

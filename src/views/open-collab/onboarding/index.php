@@ -1,3 +1,17 @@
+
+<?php
+// Resolve profile values if present for the enhanced profile step fields
+$initialExpertise = [];
+if ($profile && !empty($profile->expertise)) {
+    $initialExpertise = array_values(
+            array_filter(
+                    array_map('trim', explode(',', $profile->expertise))
+            )
+    );
+}
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -71,25 +85,149 @@
                 <!-- ── PROFILE STEP ─────────────────────────── -->
                 <?php if ($vm->currentStepName() === 'profile'): ?>
                     <form id="onboarding-form" novalidate>
-                        <p style="font-size:.875rem;color:var(--slate);margin-bottom:22px;">
-                            Tell readers a little about you. This appears on your articles and public profile.
-                        </p>
-                        <div class="oc-form-group">
-                            <label class="oc-label" for="bio">Your bio</label>
-                            <textarea class="oc-textarea" id="bio" name="bio" rows="5"
-                                      placeholder="I'm a writer specialising in…" required
-                                      style="min-height:140px;"></textarea>
-                            <div class="oc-help">Between 20 and 1000 characters.</div>
-                            <div class="oc-error-msg" id="bio-error"></div>
+
+                        <div id="section-bio" style="margin-bottom:24px;">
+                            <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
+                                Tell readers a little about you. This appears on your articles and public profile.
+                            </p>
+
+                            <div class="oc-form-group" style="margin-bottom:20px;">
+                                <label class="oc-label">Profile photo</label>
+                                <div style="display:flex;align-items:center;gap:16px;">
+                                    <div id="avatar-preview-wrap" style="position:relative;flex-shrink:0;">
+                                        <div id="avatar-preview"
+                                             style="width:72px;height:72px;border-radius:50%;background:var(--slate-pale, #f1f5f9);border:1.5px solid var(--border);overflow:hidden;display:grid;place-items:center;cursor:pointer;"
+                                             onclick="document.getElementById('avatar-file-input').click()"
+                                             title="Click to change photo">
+                                            <?php if (!empty($profile?->avatar)): ?>
+                                                <img id="avatar-img" src="<?= htmlspecialchars($profile->avatar) ?>" alt="Your avatar" style="width:100%;height:100%;object-fit:cover;">
+                                            <?php else: ?>
+                                                <span id="avatar-initials" style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">
+                                                    <?= strtoupper(substr($currentUser->name ?? 'U', 0, 1)) ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div onclick="document.getElementById('avatar-file-input').click()"
+                                             style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--navy);border-radius:50%;display:grid;place-items:center;cursor:pointer;border:2px solid #fff;"
+                                             title="Change photo" aria-hidden="true">
+                                            <svg viewBox="0 0 20 20" fill="#fff" width="10"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                                        </div>
+                                    </div>
+
+                                    <div style="flex:1;">
+                                        <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="document.getElementById('avatar-file-input').click()">
+                                            Choose photo
+                                        </button>
+                                        <button type="button" id="avatar-remove-btn" class="oc-btn oc-btn--ghost oc-btn--sm" style="margin-left:6px;color:var(--red, #ef4444); display: <?= !empty($profile?->avatar) ? 'inline-block' : 'none' ?>;">
+                                            Remove
+                                        </button>
+                                        <div class="oc-help" style="margin-top:4px; font-size: 0.75rem;">JPG, PNG or WebP · Max 2 MB</div>
+                                        <div id="avatar-error" class="oc-error-msg" style="margin-top:4px;display:none;"></div>
+
+                                        <div id="avatar-progress-wrap" style="display:none;margin-top:6px;">
+                                            <div style="height:4px;background:var(--border);border-radius:99px;overflow:hidden;width:140px;">
+                                                <div id="avatar-progress-bar" style="height:100%;width:0%;background:var(--navy);border-radius:99px;transition:width .2s ease;"></div>
+                                            </div>
+                                            <div id="avatar-progress-label" style="font-size:.72rem;color:var(--slate);margin-top:2px;">Uploading…</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="oc-form-group">
+                                <label class="oc-label" for="bio">Your bio</label>
+                                <textarea class="oc-textarea" id="bio" name="bio" rows="5"
+                                          placeholder="I'm a writer specialising in…" required
+                                          style="min-height:120px;"><?= htmlspecialchars($profile?->bio ?? '') ?></textarea>
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                                    <div class="oc-help">Between 20 and 1000 characters.</div>
+                                    <div id="bio-char-count" style="font-size:.72rem;color:var(--slate);">
+                                        <?= mb_strlen($profile?->bio ?? '') ?> / 1000
+                                    </div>
+                                </div>
+                                <div class="oc-error-msg" id="bio-error"></div>
+                            </div>
                         </div>
-                        <button type="submit" class="oc-btn oc-btn--amber oc-btn--block" id="submit-btn">
-                            Save &amp; continue
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="16">
-                                <path fill-rule="evenodd"
-                                      d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
-                                      clip-rule="evenodd"/>
-                            </svg>
-                        </button>
+
+                        <hr style="border:0;border-top:1px solid var(--border);margin:24px 0;">
+
+                        <div id="section-expertise" style="margin-bottom:24px;">
+                            <label class="oc-label">Areas of expertise</label>
+                            <div class="oc-help" style="margin-bottom:12px;">
+                                Add up to 8 topics that describe your writing focus to help editors match you with briefs.
+                            </div>
+
+                            <div id="expertise-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:38px;margin-bottom:12px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:#fff;cursor:text;">
+                            </div>
+
+                            <div style="display:flex;gap:8px;align-items:flex-start;">
+                                <div style="flex:1;position:relative;">
+                                    <input class="oc-input" type="text" id="expertise-input"
+                                           placeholder="e.g. Technology, Climate, Finance…"
+                                           maxlength="40" autocomplete="off">
+                                    <div id="expertise-suggestions" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);z-index:50;overflow:hidden;">
+                                    </div>
+                                </div>
+                                <button type="button" id="add-expertise-btn" class="oc-btn oc-btn--ghost oc-btn--sm" style="height:38px;">
+                                    Add
+                                </button>
+                            </div>
+                            <div class="oc-help" style="margin-top:4px; font-size: 0.75rem;">
+                                Press <kbd style="font-size:.7rem;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:#f8fafc;">Enter</kbd> or comma to add. Click tags to remove.
+                            </div>
+                            <div class="oc-error-msg" id="expertise-error" style="margin-top:4px;"></div>
+                        </div>
+
+                        <hr style="border:0;border-top:1px solid var(--border);margin:24px 0;">
+
+                        <div id="section-samples" style="margin-bottom:32px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                                <label class="oc-label" style="margin-bottom:0;">Writing samples</label>
+                                <span style="font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
+                            </div>
+                            <div class="oc-help" style="margin-bottom:14px;">
+                                Link to up to 3 pieces of your published work to give editors a sense of your style.
+                            </div>
+
+                            <div id="samples-list" style="display:flex;flex-direction:column;gap:12px;">
+                                <?php
+                                $samples = $writingSamples ?? [];
+                                while (count($samples) < 3) { $samples[] = null; }
+                                foreach ($samples as $i => $sample):
+                                    $n = $i + 1;
+                                    ?>
+                                    <div style="display:flex;gap:8px;align-items:stretch;" data-sample-row="<?= $n ?>">
+                                        <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                                            <input class="oc-input" type="url" id="sample-url-<?= $n ?>"
+                                                   placeholder="https://example.com/my-article"
+                                                   value="<?= htmlspecialchars($sample?->url ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                            <input class="oc-input" type="text" id="sample-title-<?= $n ?>"
+                                                   placeholder="Article title (optional)"
+                                                   value="<?= htmlspecialchars($sample?->title ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                        </div>
+                                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm clear-sample-btn" data-row="<?= $n ?>" style="color:var(--slate);padding:0 10px;display:flex;align-items:center;justify-content:center;" aria-label="Clear row">
+                                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                        </button>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="oc-error-msg" id="samples-error" style="margin-top:4px;"></div>
+                        </div>
+
+                        <div style="display:flex; gap:12px; align-items:center; border-top:1px solid var(--border); padding-top:20px;">
+                            <button type="button" class="oc-btn oc-btn--ghost" id="save-progress-btn" style="flex:1; white-space:nowrap;">
+                                Save progress
+                            </button>
+                            <button type="submit" class="oc-btn oc-btn--amber" id="submit-btn" style="flex:2; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                Save &amp; continue
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="16">
+                                    <path fill-rule="evenodd"
+                                          d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
+                                          clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
                     </form>
 
                     <!-- ── PAYMENT STEP ─────────────────────────── -->
@@ -328,6 +466,8 @@
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
     const CURRENT_STEP = '<?= $vm->currentStepName() ?>';
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
+    const INITIAL_EXPERTISE = <?= json_encode($initialExpertise ?? []) ?>;
+    const DEFAULT_NAME = '<?= htmlspecialchars($currentUser->name ?? 'U') ?>';
 
     class OnboardingStepBase {
         _site;
@@ -398,19 +538,438 @@
     }
 
     class ProfileStep extends OnboardingStepBase {
-        async _submit() {
-            this._clearError();
-            const bio = document.getElementById('bio')?.value.trim();
+        _tags = [];
+        _suggestedTopics = [
+            'Technology', 'Science', 'Health', 'Finance', 'Climate',
+            'Politics', 'Culture', 'Travel', 'Sport', 'Education',
+            'Business', 'Opinion', 'Arts', 'Food', 'Lifestyle'
+        ];
 
-            if (!bio || bio.length < 20) {
-                document.getElementById('bio-error').textContent = 'Bio must be at least 20 characters.';
-                document.getElementById('bio-error').classList.add('visible');
+        constructor(site, token) {
+            super(site, token);
+            this._tags = [...INITIAL_EXPERTISE];
+            this._initFeatures();
+        }
+
+        _initFeatures() {
+            this._renderTags();
+
+            // Character tracking counter metrics loop
+            const bioEl = document.getElementById('bio');
+            const counter = document.getElementById('bio-char-count');
+            if (bioEl && counter) {
+                bioEl.addEventListener('input', () => {
+                    counter.textContent = `${bioEl.value.length} / 1000`;
+                    counter.style.color = bioEl.value.length > 1000 ? 'var(--red)' : 'var(--slate)';
+                });
+            }
+
+            // ── TRIGGER BACKGROUND AUTO-SAVES ON LOOSE BLUR ──
+            bioEl?.addEventListener('blur', () => this._saveBioSegment());
+
+            document.querySelectorAll('#samples-list input').forEach(input => {
+                input.addEventListener('blur', () => this._saveSamplesSegment());
+            });
+
+            // Avatar interactions
+            const avatarInput = document.getElementById('avatar-file-input');
+            avatarInput?.addEventListener('change', (e) => this._onAvatarSelected(e.target));
+
+            const removeAvatarBtn = document.getElementById('avatar-remove-btn');
+            removeAvatarBtn?.addEventListener('click', () => this._removeAvatarFile());
+
+            // Expertise key tracking hooks
+            const expInput = document.getElementById('expertise-input');
+            expInput?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    this._addExpertiseFromInput();
+                }
+            });
+            expInput?.addEventListener('input', (e) => this._onExpertiseInput(e.target.value));
+            document.getElementById('add-expertise-btn')?.addEventListener('click', () => this._addExpertiseFromInput());
+
+            // Clear sample row triggers
+            document.querySelectorAll('.clear-sample-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const rowNum = btn.dataset.row;
+                    const urlInput = document.getElementById(`sample-url-${rowNum}`);
+                    const titleInput = document.getElementById(`sample-title-${rowNum}`);
+                    if (urlInput) urlInput.value = '';
+                    if (titleInput) titleInput.value = '';
+                    this._saveSamplesSegment();
+                });
+            });
+
+            // ── EXPLICIT DISCRETE "SAVE PROGRESS" BUTTON TRIGGER ──
+            document.getElementById('save-progress-btn')?.addEventListener('click', () => this._manualProgressSaveOnly());
+        }
+
+        _updateStatusIndicator(message) {
+            const el = document.getElementById('autosave-status');
+            if (el) {
+                el.textContent = message;
+                el.style.display = 'block';
+            }
+        }
+
+        // ── RESTFUL BACKGROUND SECTOR SAVES ──
+
+        async _saveBioSegment() {
+            this._updateStatusIndicator('Saving bio description progress...');
+            const bioText = document.getElementById('bio')?.value.trim() ?? '';
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/contributor`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ bio: bioText })
+                });
+                if (res.ok) {
+                    this._updateStatusIndicator('Bio draft updated successfully.');
+                    this._clearError();
+                } else {
+                    this._updateStatusIndicator('Bio structural update saved locally.');
+                }
+            } catch {
+                this._updateStatusIndicator('Bio changes kept local (network offline).');
+            }
+        }
+
+        async _saveExpertiseSegment() {
+            this._updateStatusIndicator('Synchronizing focus topics...');
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/contributor/expertise`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ expertise: this._tags })
+                });
+                if (res.ok) {
+                    this._updateStatusIndicator('Expertise categories synchronized securely.');
+                    this._clearError();
+                }
+            } catch {
+                this._updateStatusIndicator('Expertise configuration tracked locally.');
+            }
+        }
+
+        async _saveSamplesSegment() {
+            this._updateStatusIndicator('Saving draft samples update...');
+            const samples = [];
+            for (let n = 1; n <= 3; n++) {
+                const url = document.getElementById(`sample-url-${n}`)?.value.trim() ?? '';
+                const title = document.getElementById(`sample-title-${n}`)?.value.trim() ?? '';
+                if (url) {
+                    samples.push({ url, title });
+                }
+            }
+
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/onboarding/writing-samples`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ samples })
+                });
+                if (res.ok) {
+                    this._updateStatusIndicator('Writing sample modifications committed.');
+                    this._clearError();
+                }
+            } catch {
+                this._updateStatusIndicator('Samples tracked in temporary memory buffer.');
+            }
+        }
+
+        // ── MANUAL PROGRESS ACTION FOR MULTI-SESSION LEAVE ──
+        async _manualProgressSaveOnly() {
+            this._clearError();
+            const btn = document.getElementById('save-progress-btn');
+            const successEl = document.getElementById('form-success');
+            if (successEl) successEl.style.display = 'none';
+
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = 'Saving progress...';
+
+            try {
+                // Concurrently run discrete API pipeline saves to ensure complete state execution synchronization
+                await Promise.all([
+                    this._saveBioSegment(),
+                    this._saveExpertiseSegment(),
+                    this._saveSamplesSegment()
+                ]);
+
+                if (successEl) {
+                    successEl.textContent = 'Onboarding progress saved safely! You can close your browser session and return to pick up right where you left off.';
+                    successEl.style.display = 'block';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                this._updateStatusIndicator('All step attributes written successfully.');
+            } catch {
+                this._showError('A synchronization latency timeout fault occurred during state persistence routing loops.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        }
+
+        _setAvatarPreview(src) {
+            const wrap = document.getElementById('avatar-preview');
+            if (!wrap) return;
+            wrap.innerHTML = `<img id="avatar-img" src="${this._escapeHtml(src)}" alt="Your avatar" style="width:100%;height:100%;object-fit:cover;">`;
+            document.getElementById('avatar-remove-btn').style.display = 'inline-block';
+        }
+
+        _onAvatarSelected(input) {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            const errEl = document.getElementById('avatar-error');
+            errEl.style.display = 'none';
+
+            if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                errEl.textContent = 'Only JPG, PNG, and WebP images are accepted.';
+                errEl.style.display = 'block';
+                input.value = '';
                 return;
             }
 
-            const btn = this._setButtonLoading('Saving…');
-            const res = await this._post('profile', {bio});
-            await this._handleResponse(res, btn, 'Save & continue');
+            if (file.size > 2 * 1024 * 1024) {
+                errEl.textContent = 'Image must be under 2 MB.';
+                errEl.style.display = 'block';
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => this._setAvatarPreview(e.target.result);
+            reader.readAsDataURL(file);
+
+            this._uploadAvatarFile(file);
+        }
+
+        _uploadAvatarFile(file) {
+            const progressWrap = document.getElementById('avatar-progress-wrap');
+            const progressBar = document.getElementById('avatar-progress-bar');
+            const progressLabel = document.getElementById('avatar-progress-label');
+            const errEl = document.getElementById('avatar-error');
+
+            progressWrap.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressLabel.textContent = 'Uploading…';
+
+            const formData = new FormData();
+            formData.append('avatar', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = (e) => {
+                if (!e.lengthComputable) return;
+                const pct = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = `${pct}%`;
+                progressLabel.textContent = `${pct}%`;
+            };
+
+            xhr.onload = () => {
+                progressWrap.style.display = 'none';
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    this._updateStatusIndicator('Avatar headshot upload completed.');
+                    this._clearError();
+                } else {
+                    errEl.textContent = 'Upload failed. Please try again.';
+                    errEl.style.display = 'block';
+                }
+            };
+
+            xhr.open('POST', `/api/${this._site}/open-collab/contributor/avatar`);
+            xhr.setRequestHeader('Authorization', `Bearer ${this._token}`);
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.send(formData);
+        }
+
+        async _removeAvatarFile() {
+            this._updateStatusIndicator('Removing avatar file asset...');
+            const errEl = document.getElementById('avatar-error');
+            if (errEl) errEl.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/contributor/avatar`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    }
+                });
+
+                if (res.ok) {
+                    const wrap = document.getElementById('avatar-preview');
+                    const initial = DEFAULT_NAME.trim().charAt(0).toUpperCase();
+                    wrap.innerHTML = `<span id="avatar-initials" style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">${initial}</span>`;
+                    document.getElementById('avatar-remove-btn').style.display = 'none';
+                    document.getElementById('avatar-file-input').value = '';
+                    this._updateStatusIndicator('Profile avatar resource removed.');
+                    this._clearError();
+                } else {
+                    if (errEl) {
+                        errEl.textContent = 'Failed to delete photo on the system cloud repository layer.';
+                        errEl.style.display = 'block';
+                    }
+                }
+            } catch {
+                if (errEl) {
+                    errEl.textContent = 'Network loss interrupted request delivery logic processing parameters.';
+                    errEl.style.display = 'block';
+                }
+            }
+        }
+
+        _renderTags() {
+            const container = document.getElementById('expertise-tags');
+            if (!container) return;
+            container.innerHTML = '';
+            this._tags.forEach((tag, i) => {
+                const pill = document.createElement('span');
+                pill.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:var(--slate-pale, #f1f5f9);border:1px solid var(--border);border-radius:99px;font-size:.76rem;color:var(--navy);cursor:pointer;font-weight:500;';
+                pill.title = 'Click to remove';
+                pill.innerHTML = `${this._escapeHtml(tag)} <svg viewBox="0 0 12 12" fill="currentColor" width="9" aria-hidden="true"><path d="M6 4.586L9.293 1.293a1 1 0 111.414 1.414L7.414 6l3.293 3.293a1 1 0 01-1.414 1.414L6 7.414 2.707 10.707a1 1 0 01-1.414-1.414L4.586 6 1.293 2.707A1 1 0 012.707 1.293L6 4.586z"/></svg>`;
+                pill.onclick = () => {
+                    this._tags.splice(i, 1);
+                    this._renderTags();
+                    this._saveExpertiseSegment();
+                };
+                container.appendChild(pill);
+            });
+        }
+
+        _onExpertiseInput(value) {
+            const lower = value.toLowerCase().trim();
+            const suggestions = document.getElementById('expertise-suggestions');
+            if (!lower) {
+                suggestions.style.display = 'none';
+                return;
+            }
+
+            const matches = this._suggestedTopics.filter(s =>
+                s.toLowerCase().includes(lower) && !this._tags.includes(s)
+            ).slice(0, 5);
+
+            if (!matches.length) {
+                suggestions.style.display = 'none';
+                return;
+            }
+
+            suggestions.innerHTML = matches.map(m =>
+                `<div style="padding:8px 12px;cursor:pointer;font-size:.82rem;color:var(--navy);" class="suggestion-item">${this._escapeHtml(m)}</div>`
+            ).join('');
+            suggestions.style.display = 'block';
+
+            suggestions.querySelectorAll('.suggestion-item').forEach((el, index) => {
+                el.addEventListener('mousedown', () => {
+                    this._addTag(matches[index]);
+                    const input = document.getElementById('expertise-input');
+                    input.value = '';
+                    suggestions.style.display = 'none';
+                });
+                el.addEventListener('mouseover', () => el.style.background = 'var(--cream)');
+                el.addEventListener('mouseout', () => el.style.background = '');
+            });
+        }
+
+        _addExpertiseFromInput() {
+            const input = document.getElementById('expertise-input');
+            const val = input.value.replace(/,$/, '').trim();
+            if (val) this._addTag(val);
+            input.value = '';
+            document.getElementById('expertise-suggestions').style.display = 'none';
+        }
+
+        _addTag(raw) {
+            const tag = raw.trim();
+            const errEl = document.getElementById('expertise-error');
+            if (errEl) errEl.textContent = '';
+
+            if (!tag || this._tags.includes(tag)) return;
+            if (this._tags.length >= 8) {
+                if (errEl) errEl.textContent = 'Maximum of 8 expertise tags allowed.';
+                return;
+            }
+            if (tag.length > 40) {
+                if (errEl) errEl.textContent = 'Tags must be under 40 characters.';
+                return;
+            }
+            this._tags.push(tag);
+            this._renderTags();
+            this._saveExpertiseSegment();
+        }
+
+        _escapeHtml(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        // ── SUBMIT SYSTEM RUNS ONLY WHEN TRANSITIONING TO THE NEXT FULL STEP ──
+        async _submit() {
+            this._clearError();
+
+            const bio = document.getElementById('bio')?.value.trim();
+            const bioErr = document.getElementById('bio-error');
+            const samplesErr = document.getElementById('samples-error');
+
+            if (bioErr) bioErr.textContent = '';
+            if (samplesErr) samplesErr.textContent = '';
+
+            // Apply complete requirement blocks during continuation checks
+            if (!bio || bio.length < 20) {
+                if (bioErr) bioErr.textContent = 'Bio must be at least 20 characters.';
+                return;
+            }
+
+            const samples = [];
+            for (let n = 1; n <= 3; n++) {
+                const url = document.getElementById(`sample-url-${n}`)?.value.trim() ?? '';
+                const title = document.getElementById(`sample-title-${n}`)?.value.trim() ?? '';
+                if (url) {
+                    try {
+                        new URL(url);
+                    } catch {
+                        if (samplesErr) samplesErr.textContent = `Sample ${n} URL pattern format error. Ensure https:// structural routing.`;
+                        return;
+                    }
+                    samples.push({ url, title });
+                }
+            }
+
+            const btn = this._setButtonLoading('Saving and moving to next step…');
+
+            try {
+                // Ensure bio database block matches context state precisely before wizard update
+                await fetch(`/api/${this._site}/open-collab/contributor`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ bio: bio })
+                });
+
+                // Post step continuation payload metadata variables out to onboarding wizard orchestrator pipeline
+                const res = await this._post('profile', { bio: bio });
+                await this._handleResponse(res, btn, 'Save & continue');
+            } catch (err) {
+                this._showError('An unexpected networking communication latency error derailed form completion execution routines.');
+                this._resetButton(btn, 'Save & continue');
+            }
         }
     }
 

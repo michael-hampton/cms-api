@@ -959,9 +959,26 @@ abstract class FunctionalTestCase extends TestCase
         ]);
     }
 
-    private function createUser()
+    protected function createUser(array $attributes = []): User
     {
+        $defaults = [
+            'name' => $attributes['name'] ?? 'Test User',
+            'email' => $attributes['email'] ?? ('test-user-' . uniqid() . '@example.com'),
+            'password' => $attributes['password'] ?? password_hash('password', PASSWORD_DEFAULT),
+            'site_id' => $attributes['site_id'] ?? $this->siteId,
+            'role' => $attributes['role'] ?? 'user',
+        ];
 
+        $user = User::create(array_merge($defaults, $attributes));
+
+        if (!empty($user->site_id)) {
+            UserSite::firstOrCreate([
+                'user_id' => $user->id,
+                'site_id' => $user->site_id,
+            ]);
+        }
+
+        return $user;
     }
 
 }

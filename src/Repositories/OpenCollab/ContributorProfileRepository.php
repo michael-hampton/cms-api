@@ -110,7 +110,7 @@ class ContributorProfileRepository extends Repository
      *
      * @param array<string, mixed> $extra Additional columns to set on creation.
      */
-    public function createForUser(int $userId, int $siteId, array $extra = []): Model
+    public function createForUser(int $userId, array $extra = []): Model
     {
         return ContributorProfile::create(array_merge([
             'user_id' => $userId,

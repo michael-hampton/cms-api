@@ -122,7 +122,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
 
         $response = $this->postForSite("/api/open-collab/pages/{$page->id}/submit");
 
-        $this->assertEquals(302, $response->getStatusCode());
+        $this->assertEquals(403, $response->getStatusCode());
     }
 
     public function test_submit_returns_403_for_page_owned_by_another_contributor(): void
@@ -179,7 +179,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
 
         ContributorProfile::firstOrCreate(
             ['user_id' => $this->contributor->id],
-            ['bio' => 'test bio'],
+            ['bio' => 'test bio', 'date_of_birth' => '1990-01-01'],
         );
 
         $this->setupSiteOnboarding();
@@ -189,5 +189,10 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
             'role' => 'contributor',
             'is_contributor' => true,
         ]);
+
+        ContributorProfile::firstOrCreate(
+            ['user_id' => $this->otherContributor->id],
+            ['bio' => 'test bio', 'date_of_birth' => '1990-01-01'],
+        );
     }
 }

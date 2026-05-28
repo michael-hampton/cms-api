@@ -36,7 +36,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
     {
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 5, 'version' => 2]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 2, 99);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 
@@ -88,7 +88,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
     {
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 5]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 1, 99);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 
@@ -131,7 +131,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
     {
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 6]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 1, 99);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 
@@ -210,7 +210,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
         // listener fires, user is notified with correct pending step detail.
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 6, 'version' => 2]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 2, 99);
         $contributor = $this->makeContributor(['id' => 7]);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
@@ -246,7 +246,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
     {
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 5]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 1, 99);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 
@@ -277,7 +277,7 @@ class InvalidateContributorOnboardingListenerTest extends FunctionalTestCase
     {
         $site = $this->makeSite(['id' => 1]);
         $contract = $this->makeContract(['id' => 5]);
-        $event = new ContractPublishedEvent($contract, 1);
+        $event = new ContractPublishedEvent($contract, 1, 1, 99);
 
         $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 

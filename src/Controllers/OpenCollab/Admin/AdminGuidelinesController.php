@@ -4,7 +4,6 @@ namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
-use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
@@ -206,7 +205,6 @@ class AdminGuidelinesController extends Controller
 
         try {
             $published = $this->guidelineService->publishVersion($guideline, Auth::id());
-            event(new GuidelinesVersionBumpedEvent($published, SiteContext::getId(), $published->version));
         } catch (GuidelineNotPublishableException $e) {
             return $this->errorResponse($e->getMessage(), 409);
         }

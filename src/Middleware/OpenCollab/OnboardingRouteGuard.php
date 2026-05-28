@@ -67,7 +67,7 @@ class OnboardingRouteGuard implements MiddlewareInterface
         $pending = $this->onboardingService->pendingSteps($userId, $site);
 
         if ($this->isApiRequest($request)) {
-            return new JsonResponse([
+            return JsonResponse::json([
                 'error' => 'onboarding_incomplete',
                 'message' => 'You must complete onboarding before accessing this feature.',
                 'pending_steps' => $pending,
@@ -81,7 +81,7 @@ class OnboardingRouteGuard implements MiddlewareInterface
     private function deny(Request $request, string $message, int $status): Response
     {
         if ($this->isApiRequest($request)) {
-            return new JsonResponse(['error' => 'unauthorized', 'message' => $message], $status);
+            return JsonResponse::json(['error' => 'unauthorized', 'message' => $message], $status);
         }
 
         return new RedirectResponse('/login');
@@ -89,8 +89,8 @@ class OnboardingRouteGuard implements MiddlewareInterface
 
     private function isApiRequest(Request $request): bool
     {
-        return str_starts_with($request->path(), '/api/')
-            || $request->expectsJson();
+        return str_starts_with($request->getPath(), '/api/')
+            || $request->wantsJson();
     }
 
     private function resolveSite(): ?Site

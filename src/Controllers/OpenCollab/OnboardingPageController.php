@@ -8,6 +8,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
+use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
@@ -22,6 +23,7 @@ class OnboardingPageController extends Controller
         private readonly ContractRepository $contractRepository,
         private readonly GuidelinesRepository $guidelinesRepository,
         private readonly OpenCollabAuthorizationService $authorization,
+        private readonly ContributorProfileRepository $contributorProfileRepository,
     )
     {
         parent::__construct();
@@ -63,6 +65,7 @@ class OnboardingPageController extends Controller
             'site' => SiteContext::slug(),
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'currentUser' => Auth::user(),
+            'profile' => $this->contributorProfileRepository->findByUserId(Auth::id()),
         ]);
     }
 

@@ -157,6 +157,8 @@ class PayoutControllerTest extends FunctionalTestCase
             'reference_id' => 'sale-3',
         ]);
 
+        $this->setupSiteOnboarding();
+
         $response = $this->postForSite('/api/open-collab/payouts', [
             'method' => 'paypal',
         ]);

@@ -3,7 +3,6 @@
 namespace App\Tests\Unit\Repositories\Cms;
 
 use App\Models\Brief;
-use App\Models\Model;
 use App\Models\Page;
 use App\Models\User;
 use App\Repositories\Cms\CollaboratorRepository;
@@ -44,7 +43,7 @@ class CollaboratorRepositoryTest extends RepositoryTestCase
         $this->assertEquals('editor', $collaborator->role);
     }
 
-    private function createUser(array $data = []): Model
+    protected function createUser(array $data = []): User
     {
         return User::create(array_merge([
             'email' => 'test@example.com',

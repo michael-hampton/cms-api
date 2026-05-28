@@ -4,9 +4,6 @@ namespace App\Controllers\Crm;
 
 use App\Actions\Subscriptions\SuspendSubscriptionAction;
 use App\Controllers\Controller;
-use App\Events\Subscriptions\SubscriptionCancelled;
-use App\Events\Subscriptions\SubscriptionPaused;
-use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\Logger;
@@ -209,12 +206,6 @@ class CrmSubscriptionController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to cancel subscription.'], 500);
         }
 
-        event(new SubscriptionCancelled(
-            subscriptionId: $subscription->id,
-            cancelAtPeriodEnd: $cancelAtPeriodEnd,
-            endDate: now(),
-        ));
-
         return $this->resourceResponse([
             'success' => true,
             'message' => $cancelAtPeriodEnd
@@ -238,13 +229,6 @@ class CrmSubscriptionController extends Controller
 
         $result = $this->deliveryService->pauseDelivery($subscriptionId, $pauseStart, $pauseEnd, $reason);
 
-        event(new SubscriptionPaused(
-            subscription: $subscription,
-            pausedUntil: $pauseEnd->format('Y-m-d H:i:s'),
-            pauseStart: $pauseStart->format('Y-m-d H:i:s'),
-            reason: $reason,
-        ));
-
         return $this->resourceResponse($result);
     }
 
@@ -257,11 +241,6 @@ class CrmSubscriptionController extends Controller
         }
 
         $result = $this->deliveryService->resumeDelivery($subscriptionId);
-
-        event(new SubscriptionResumed(
-            subscription: $subscription,
-            memberId: $memberId,
-        ));
 
         return $this->resourceResponse($result);
     }
