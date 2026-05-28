@@ -11,6 +11,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\ContributorProfile;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 use App\Repositories\OpenCollab\RbacRepository;
@@ -340,6 +341,24 @@ class AdminContributorController extends Controller
             'is_active' => (bool)($values['is_active'] ?? false),
             'is_contributor' => (bool)($values['is_contributor'] ?? false),
             'created_at' => $values['created_at'] ?? null,
+            'profile' => $this->formatProfile((int)($values['id'] ?? 0)),
+        ];
+    }
+
+    private function formatProfile(int $userId): array
+    {
+        if ($userId <= 0) {
+            return ['sample_links' => []];
+        }
+
+        $profile = ContributorProfile::where('user_id', $userId)
+            ->first();
+
+        return [
+            'bio' => $profile?->bio,
+            'avatar' => $profile?->avatar,
+            'expertise' => $profile?->expertise_array ?? [],
+            'sample_links' => $profile?->sample_links ?? [],
         ];
     }
 

@@ -7,6 +7,7 @@ use App\Models\Contract;
 use App\Models\ContributorProfile;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
+use App\Repositories\OpenCollab\ContributorOnboardingStepRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorAgeValidationService;
@@ -16,6 +17,7 @@ use DateTimeImmutable;
 use DateTimeZone;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
+use Mockery\MockInterface;
 
 class ContributorOnboardingServiceTest extends FunctionalTestCase
 {
@@ -30,6 +32,9 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
     /** @var GuidelinesRepository&MockInterface */
     private GuidelinesRepository $guidelinesRepo;
 
+    /** @var ContributorOnboardingStepRepository&MockInterface */
+    private ContributorOnboardingStepRepository $onboardingStepRepo;
+
     private ContributorAgeValidationService $ageService;
 
     protected function setUp(): void
@@ -37,12 +42,19 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
         parent::setUp();
 
         $this->profileRepo = Mockery::mock(ContributorProfileRepository::class);
+        $this->onboardingStepRepo = Mockery::mock(ContributorOnboardingStepRepository::class);
         $this->contractRepo = Mockery::mock(ContractRepository::class);
         $this->guidelinesRepo = Mockery::mock(GuidelinesRepository::class);
         $this->ageService = new ContributorAgeValidationService();
+        $this->onboardingStepRepo
+            ->shouldReceive('isCompleted')
+            ->withAnyArgs()
+            ->andReturn(true)
+            ->byDefault();
 
         $this->service = new ContributorOnboardingService(
             profileRepository: $this->profileRepo,
+            onboardingStepRepository: $this->onboardingStepRepo,
             contractRepository: $this->contractRepo,
             guidelinesRepository: $this->guidelinesRepo,
             ageValidationService: $this->ageService,
@@ -112,6 +124,72 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
         $this->assertEquals('profile', $pending[0]['step']);
         $this->assertNotEmpty($pending[0]['reason']);
         $this->assertIsArray($pending[0]['meta']);
+    }
+
+    public function test_pending_steps_returns_profile_step_when_bio_saved_but_step_not_completed(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => 'A valid contributor bio.']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(false);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertCount(1, $pending);
+        $this->assertSame('profile', $pending[0]['step']);
+        $this->assertTrue($pending[0]['meta']['has_bio']);
+        $this->assertFalse($pending[0]['meta']['step_completed']);
+    }
+
+    public function test_pending_steps_excludes_profile_when_bio_saved_and_step_completed(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => 'A valid contributor bio.']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(true);
+
+        $this->assertSame([], $this->service->pendingSteps(1, $site));
+    }
+
+    public function test_pending_steps_returns_profile_when_bio_removed_after_step_completed(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => '']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
+        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(true);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertCount(1, $pending);
+        $this->assertSame('profile', $pending[0]['step']);
+        $this->assertFalse($pending[0]['meta']['has_bio']);
+        $this->assertTrue($pending[0]['meta']['step_completed']);
+    }
+
+    public function test_partial_profile_save_marks_step_in_progress_only(): void
+    {
+        $this->onboardingStepRepo->shouldReceive('markInProgress')->once()->with(1, 10, 'profile');
+        $this->onboardingStepRepo->shouldNotReceive('markCompleted');
+
+        $this->service->markProfileInProgress(1, 10);
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_profile_step_validates_required_bio(): void
+    {
+        $site = $this->makeSite(['id' => 10]);
+        $profile = $this->makeProfile(['bio' => '']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->once()->with(1)->andReturn($profile);
+        $this->onboardingStepRepo->shouldNotReceive('markCompleted');
+
+        $result = $this->service->completeProfileStep(1, $site);
+
+        $this->assertFalse($result['ok']);
+        $this->assertArrayHasKey('bio', $result['errors']);
     }
 
     public function test_pending_steps_returns_payment_step_when_not_setup(): void

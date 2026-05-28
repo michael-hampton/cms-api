@@ -32,6 +32,7 @@ use RuntimeException;
  * Routes:
  *   GET  /api/{site}/open-collab/onboarding/status
  *   POST /api/{site}/open-collab/onboarding/profile
+ *   POST /api/{site}/open-collab/onboarding/steps/profile/complete
  *   POST /api/{site}/open-collab/onboarding/payment
  *   GET  /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/contract
@@ -88,11 +89,34 @@ class OnboardingController extends Controller
                 'bio' => $data['bio'],
                 'avatar' => $data['avatar'] ?? null,
             ]);
+            $this->onboardingService->markProfileInProgress($userId, $this->currentSite()->id);
 
             return $this->successResponse('Profile saved.');
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/onboarding/steps/profile/complete
+     */
+    public function completeProfileStep(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $site = $this->currentSite();
+        $result = $this->onboardingService->completeProfileStep(Auth::id(), $site);
+
+        if (!$result['ok']) {
+            return $this->errorResponse('Validation failed', 422, $result['errors']);
+        }
+
+        return $this->jsonResponse([
+            'message' => 'Profile step completed.',
+            'onboarding' => $result['status'],
+        ]);
     }
 
     /**

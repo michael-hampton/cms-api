@@ -672,14 +672,14 @@ if ($profile && !empty($profile->expertise)) {
             }
 
             try {
-                const res = await fetch(`/api/${this._site}/open-collab/onboarding/writing-samples`, {
-                    method: 'POST',
+                const res = await fetch(`/api/${this._site}/open-collab/profile/sample-links`, {
+                    method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json',
                         'Authorization': `Bearer ${this._token}`
                     },
-                    body: JSON.stringify({ samples })
+                    body: JSON.stringify({ sample_links: samples })
                 });
                 if (res.ok) {
                     this._updateStatusIndicator('Writing sample modifications committed.');
@@ -963,8 +963,8 @@ if ($profile && !empty($profile->expertise)) {
                     body: JSON.stringify({ bio: bio })
                 });
 
-                // Post step continuation payload metadata variables out to onboarding wizard orchestrator pipeline
-                const res = await this._post('profile', { bio: bio });
+                // Explicitly complete the profile step after the draft has been saved.
+                const res = await this._post('steps/profile/complete', {});
                 await this._handleResponse(res, btn, 'Save & continue');
             } catch (err) {
                 this._showError('An unexpected networking communication latency error derailed form completion execution routines.');

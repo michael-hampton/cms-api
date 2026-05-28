@@ -57,6 +57,17 @@ class ContributorProfileRepository extends Repository
         return ContributorProfile::where('user_id', $userId)->first();
     }
 
+    public function findOrCreateForUserAndSite(int $userId, int $siteId): ContributorProfile
+    {
+        $profile = $this->findByUserId($userId);
+
+        if ($profile) {
+            return $profile;
+        }
+
+        return $this->createForUser($userId, [], $siteId);
+    }
+
     public function isPaymentSetup(int $userId): bool
     {
         $profile = $this->findByUserId($userId);
@@ -110,11 +121,10 @@ class ContributorProfileRepository extends Repository
      *
      * @param array<string, mixed> $extra Additional columns to set on creation.
      */
-    public function createForUser(int $userId, array $extra = []): Model
+    public function createForUser(int $userId, array $extra = [], ?int $siteId = null): Model
     {
         return ContributorProfile::create(array_merge([
             'user_id' => $userId,
-            'site_id' => $siteId,
         ], $extra));
     }
 

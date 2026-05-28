@@ -7,6 +7,7 @@ use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\ContributorProfile;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 
@@ -69,6 +70,13 @@ class AdminContributorPageController extends Controller
         }
 
         $values = is_array($contributor) ? $contributor : $contributor->toArray();
+        $profile = ContributorProfile::where('user_id', (int)($values['id'] ?? 0))->first();
+        $values['profile'] = [
+            'bio' => $profile?->bio,
+            'avatar' => $profile?->avatar,
+            'expertise' => $profile?->expertise_array ?? [],
+            'sample_links' => $profile?->sample_links ?? [],
+        ];
 
         $invitations = !empty($values['email'])
             ? $this->invitationRepository->getAllForEmail($values['email'], SiteContext::getId())

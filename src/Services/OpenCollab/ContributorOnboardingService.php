@@ -7,6 +7,7 @@ use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Models\ContributorOnboarding;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
+use App\Repositories\OpenCollab\ContributorOnboardingStepRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 
@@ -32,6 +33,7 @@ class ContributorOnboardingService
 {
     public function __construct(
         private readonly ContributorProfileRepository    $profileRepository,
+        private readonly ContributorOnboardingStepRepository $onboardingStepRepository,
         private readonly ContractRepository              $contractRepository,
         private readonly GuidelinesRepository            $guidelinesRepository,
         private readonly ContributorAgeValidationService $ageValidationService,
@@ -158,6 +160,52 @@ class ContributorOnboardingService
         return empty($this->pendingSteps($userId, $site));
     }
 
+    public function markProfileInProgress(int $userId, int $siteId): void
+    {
+        $this->onboardingStepRepository->markInProgress($userId, $siteId, 'profile');
+    }
+
+    public function completeProfileStep(int $userId, Site $site): array
+    {
+        $profile = $this->profileRepository->findByUserId($userId);
+
+        if (!$profile || !trim((string)$profile->bio)) {
+            return [
+                'ok' => false,
+                'errors' => ['bio' => ['A short bio is required before you can complete your profile.']],
+            ];
+        }
+
+        if (mb_strlen(trim((string)$profile->bio)) < 20) {
+            return [
+                'ok' => false,
+                'errors' => ['bio' => ['Your bio must be at least 20 characters.']],
+            ];
+        }
+
+        $this->onboardingStepRepository->markCompleted($userId, (int)$site->id, 'profile');
+        $this->syncStatus($userId, $site);
+
+        return [
+            'ok' => true,
+            'status' => $this->statusPayload($userId, $site),
+        ];
+    }
+
+    public function statusPayload(int $userId, Site $site): array
+    {
+        $pending = $this->pendingSteps($userId, $site);
+        $completed = $this->completedSteps($userId, $site);
+
+        return [
+            'isComplete' => empty($pending),
+            'completedCount' => count($completed),
+            'totalSteps' => count($this->applicableStepsFromRequirements($this->mapSiteToRequirements($site))),
+            'completedSteps' => $completed,
+            'pendingSteps' => $pending,
+        ];
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     private function mapSiteToRequirements(Site $site): OnboardingRequirements
@@ -211,12 +259,17 @@ class ContributorOnboardingService
 
         // ── Profile ───────────────────────────────────────────────────────────
         $profile = $this->profileRepository->findByUserId($userId);
+        $hasBio = (bool)trim((string)($profile?->bio ?? ''));
+        $profileComplete = $this->onboardingStepRepository->isCompleted($userId, $req->siteId, 'profile');
 
-        if (!$profile || !$profile->bio) {
+        if (!$profile || !$hasBio || !$profileComplete) {
             $pending[] = [
                 'step' => 'profile',
-                'reason' => 'Your profile bio is required before contributing.',
-                'meta' => [],
+                'reason' => 'Complete your contributor profile before contributing.',
+                'meta' => [
+                    'has_bio' => $hasBio,
+                    'step_completed' => $profileComplete,
+                ],
             ];
         }
 

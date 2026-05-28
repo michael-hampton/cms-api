@@ -21,6 +21,9 @@ class ContributorProfileService
 {
     private const MAX_EXPERTISE_TAGS = 8;
     private const MAX_TAG_LENGTH = 40;
+    private const MAX_SAMPLE_LINKS = 5;
+    private const MAX_SAMPLE_TITLE_LENGTH = 150;
+    private const MAX_SAMPLE_DESCRIPTION_LENGTH = 500;
     private const AVATAR_MAX_BYTES = 2 * 1024 * 1024; // 2 MB
     private const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -158,6 +161,93 @@ class ContributorProfileService
         }
 
         return $normalised;
+    }
+
+    /**
+     * Save optional writing sample links without affecting onboarding progress.
+     *
+     * @throws ValidationException
+     */
+    public function updateSampleLinks(int $userId, int $siteId, array $links): ContributorProfile
+    {
+        $normalised = $this->normaliseSampleLinks($links);
+        $profile = $this->profileRepository->findOrCreateForUserAndSite($userId, $siteId);
+
+        $this->profileRepository->update($profile->id, ['sample_links' => $normalised]);
+
+        return $profile->fresh();
+    }
+
+    /**
+     * @return array<int, array{url: string, title: string|null, description: string|null, sort_order: int}>
+     * @throws ValidationException
+     */
+    private function normaliseSampleLinks(array $links): array
+    {
+        if (count($links) > self::MAX_SAMPLE_LINKS) {
+            throw new ValidationException('You may add a maximum of ' . self::MAX_SAMPLE_LINKS . ' writing sample links.', [
+                'sample_links' => ['You may add a maximum of ' . self::MAX_SAMPLE_LINKS . ' writing sample links.'],
+            ]);
+        }
+
+        $normalised = [];
+        $errors = [];
+
+        foreach (array_values($links) as $index => $row) {
+            if (!is_array($row)) {
+                $errors["sample_links.$index"][] = 'Each writing sample must be an object.';
+                continue;
+            }
+
+            $url = trim((string)($row['url'] ?? ''));
+            $title = trim((string)($row['title'] ?? ''));
+            $description = trim((string)($row['description'] ?? ''));
+
+            if ($url === '' && $title === '' && $description === '') {
+                continue;
+            }
+
+            if ($url === '') {
+                $errors["sample_links.$index.url"][] = 'A URL is required for each writing sample.';
+                continue;
+            }
+
+            if (!$this->isValidHttpUrl($url)) {
+                $errors["sample_links.$index.url"][] = 'Writing sample URLs must be valid http or https URLs.';
+            }
+
+            if (mb_strlen($title) > self::MAX_SAMPLE_TITLE_LENGTH) {
+                $errors["sample_links.$index.title"][] = 'Title must be ' . self::MAX_SAMPLE_TITLE_LENGTH . ' characters or fewer.';
+            }
+
+            if (mb_strlen($description) > self::MAX_SAMPLE_DESCRIPTION_LENGTH) {
+                $errors["sample_links.$index.description"][] = 'Description must be ' . self::MAX_SAMPLE_DESCRIPTION_LENGTH . ' characters or fewer.';
+            }
+
+            $normalised[] = [
+                'url' => $url,
+                'title' => $title !== '' ? $title : null,
+                'description' => $description !== '' ? $description : null,
+                'sort_order' => count($normalised) + 1,
+            ];
+        }
+
+        if (!empty($errors)) {
+            throw new ValidationException('Validation failed', $errors);
+        }
+
+        return $normalised;
+    }
+
+    private function isValidHttpUrl(string $url): bool
+    {
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return false;
+        }
+
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+
+        return in_array($scheme, ['http', 'https'], true);
     }
 
     /**

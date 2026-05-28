@@ -8,6 +8,8 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Resources\OpenCollab\ContributorProfileResource;
+use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorProfileService;
 use Exception;
 
@@ -27,6 +29,7 @@ class ContributorSettingsController extends Controller
 {
     public function __construct(
         private readonly ContributorProfileService $profileService,
+        private readonly ContributorOnboardingService $onboardingService,
     )
     {
         parent::__construct();
@@ -168,13 +171,10 @@ class ContributorSettingsController extends Controller
                 siteId: SiteContext::getId(),
                 data: $filtered,
             );
+            $this->onboardingService->markProfileInProgress($userId, SiteContext::getId());
 
             return $this->jsonResponse([
-                'profile' => [
-                    'bio' => $profile->bio,
-                    'avatar' => $profile->avatar,
-                    'expertise' => $profile->expertise_array,
-                ],
+                'profile' => (new ContributorProfileResource($profile))->toArray(),
                 'message' => 'Profile updated.',
             ]);
         } catch (ValidationException $e) {

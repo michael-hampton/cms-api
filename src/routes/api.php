@@ -100,6 +100,7 @@ use App\Controllers\OpenCollab\ContributorAuthController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorNotificationPreferenceController;
 use App\Controllers\OpenCollab\ContributorPageController;
+use App\Controllers\OpenCollab\ContributorProfileSampleLinksController;
 use App\Controllers\OpenCollab\ContributorRequestController;
 use App\Controllers\OpenCollab\ContributorSettingsController;
 use App\Controllers\OpenCollab\DashboardPageNewController;
@@ -377,6 +378,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put(
             '/open-collab/contributor',
             [ContributorSettingsController::class, 'updateProfile']
+        );
+
+        $router->put(
+            '/open-collab/profile/sample-links',
+            [ContributorProfileSampleLinksController::class, 'update']
+        );
+
+        $router->post(
+            '/open-collab/profile/sample-links',
+            [ContributorProfileSampleLinksController::class, 'update']
         );
 
         $router->get(
@@ -1686,6 +1697,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
     $router->group(['prefix' => 'onboarding'], function () use ($router) {
         $router->get('/status', [OnboardingController::class, 'status']);
         $router->post('/profile', [OnboardingController::class, 'storeProfile']);
+        $router->post('/steps/profile/complete', [OnboardingController::class, 'completeProfileStep']);
         $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
         $router->get('/contract', [OnboardingController::class, 'getContract']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);

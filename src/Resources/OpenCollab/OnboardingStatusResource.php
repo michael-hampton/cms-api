@@ -24,7 +24,9 @@ class OnboardingStatusResource extends JsonResource
 
     private function resolveCompleted(array $pending): array
     {
-        $all = ['profile', 'payment', 'contract', 'guidelines'];
-        return array_values(array_diff($all, $pending));
+        $all = ['profile', 'payment', 'contract', 'guidelines', 'age_verification'];
+        $pendingNames = array_column($pending, 'step');
+
+        return array_values(array_diff($all, $pendingNames));
     }
 }

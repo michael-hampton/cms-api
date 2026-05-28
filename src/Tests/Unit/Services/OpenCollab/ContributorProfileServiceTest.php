@@ -369,6 +369,97 @@ class ContributorProfileServiceTest extends TestCase
         $this->assertSame('/keep.jpg', $result->avatar);
     }
 
+    public function test_updateSampleLinks_normalises_and_persists_links(): void
+    {
+        $profile = $this->makeProfile(['id' => 12, 'bio' => 'Keep me']);
+        $fresh = $this->makeProfile([
+            'id' => 12,
+            'bio' => 'Keep me',
+            'sample_links' => [
+                [
+                    'url' => 'https://example.com/first',
+                    'title' => 'First',
+                    'description' => 'Context',
+                    'sort_order' => 1,
+                ],
+                [
+                    'url' => 'https://example.com/second',
+                    'title' => null,
+                    'description' => null,
+                    'sort_order' => 2,
+                ],
+            ],
+        ]);
+
+        $this->profileRepo
+            ->shouldReceive('findOrCreateForUserAndSite')
+            ->once()
+            ->with(1, 10)
+            ->andReturn($profile);
+
+        $profile->shouldReceive('fresh')->once()->andReturn($fresh);
+
+        $this->profileRepo
+            ->shouldReceive('update')
+            ->once()
+            ->with(12, [
+                'sample_links' => [
+                    [
+                        'url' => 'https://example.com/first',
+                        'title' => 'First',
+                        'description' => 'Context',
+                        'sort_order' => 1,
+                    ],
+                    [
+                        'url' => 'https://example.com/second',
+                        'title' => null,
+                        'description' => null,
+                        'sort_order' => 2,
+                    ],
+                ],
+            ])
+            ->andReturn($profile);
+
+        $result = $this->service->updateSampleLinks(1, 10, [
+            ['url' => '', 'title' => '', 'description' => ''],
+            ['url' => ' https://example.com/first ', 'title' => ' First ', 'description' => ' Context '],
+            ['url' => 'https://example.com/second', 'title' => ' ', 'description' => ''],
+        ]);
+
+        $this->assertSame('Keep me', $result->bio);
+        $this->assertSame(2, $result->sample_links[1]['sort_order']);
+    }
+
+    public function test_updateSampleLinks_rejects_non_http_urls(): void
+    {
+        $this->profileRepo->shouldNotReceive('findOrCreateForUserAndSite');
+        $this->profileRepo->shouldNotReceive('update');
+
+        $this->expectException(ValidationException::class);
+
+        $this->service->updateSampleLinks(1, 10, [
+            ['url' => 'ftp://example.com/file', 'title' => 'Bad'],
+        ]);
+    }
+
+    public function test_updateSampleLinks_rejects_more_than_five_links(): void
+    {
+        $this->profileRepo->shouldNotReceive('findOrCreateForUserAndSite');
+        $this->profileRepo->shouldNotReceive('update');
+
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('maximum of 5');
+
+        $this->service->updateSampleLinks(1, 10, [
+            ['url' => 'https://example.com/1'],
+            ['url' => 'https://example.com/2'],
+            ['url' => 'https://example.com/3'],
+            ['url' => 'https://example.com/4'],
+            ['url' => 'https://example.com/5'],
+            ['url' => 'https://example.com/6'],
+        ]);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

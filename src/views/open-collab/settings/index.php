@@ -165,6 +165,30 @@ $pageClass = '';
         </div>
     </div>
 
+    <!-- Writing samples section -->
+    <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .415s ease;" id="writing-samples">
+        <div class="oc-card__header">
+            <span class="oc-card__title">Writing Sample Links</span>
+        </div>
+        <div class="oc-card__body">
+            <div id="sample-links-success" class="oc-alert oc-alert--success" style="display:none;"></div>
+            <div id="sample-links-errors" class="oc-form-errors" style="display:none;"></div>
+
+            <div id="sample-links-list" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;"></div>
+
+            <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" id="sample-link-add-btn"
+                        onclick="sampleLinksManager.add()">
+                    Add link
+                </button>
+                <button type="button" class="oc-btn oc-btn--primary" id="sample-links-save-btn"
+                        onclick="sampleLinksManager.save()" disabled>
+                    Save writing samples
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Payment details section -->
     <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .42s ease;" id="stripe-connect">
         <div class="oc-card__header">
@@ -401,6 +425,7 @@ $pageClass = '';
     const STRIPE_KEY = '<?= htmlspecialchars($stripePublicKey ?? '') ?>';
     const SITE = '<?= htmlspecialchars($site ?? '') ?>';
     const INITIAL_EXPERTISE = <?= json_encode(array_filter(array_map('trim', explode(',', $profile?->expertise ?? ''))) ?: []) ?>;
+    const INITIAL_SAMPLE_LINKS = <?= json_encode($profile?->sample_links ?? []) ?>;
 
     class NotificationPreferencesManager {
         #site;
@@ -852,6 +877,206 @@ $pageClass = '';
         }
     }
 
+    class SampleLinksManager {
+        static MAX_LINKS = 5;
+        #site;
+        #token;
+        #links = [];
+        #dirty = false;
+
+        constructor(site, token, initialLinks) {
+            this.#site = site;
+            this.#token = token;
+            this.#links = Array.isArray(initialLinks) ? initialLinks.map((link) => ({
+                url: link.url || '',
+                title: link.title || '',
+                description: link.description || '',
+            })) : [];
+
+            if (this.#links.length === 0) {
+                this.#links.push({url: '', title: '', description: ''});
+            }
+
+            this.#render();
+        }
+
+        add() {
+            if (this.#links.length >= SampleLinksManager.MAX_LINKS) return;
+            this.#links.push({url: '', title: '', description: ''});
+            this.#dirty = true;
+            this.#render();
+        }
+
+        async save() {
+            this.#read();
+            this.#clearErrors();
+
+            const btn = document.getElementById('sample-links-save-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
+
+            const payload = {
+                sample_links: this.#links.map((link) => ({
+                    url: link.url.trim(),
+                    title: link.title.trim(),
+                    description: link.description.trim(),
+                })),
+            };
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/profile/sample-links`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    this.#showErrors(data.errors || {'sample_links': [data.error || 'Save failed.']});
+                    return;
+                }
+
+                this.#links = data.data?.profile?.sample_links || [];
+                if (this.#links.length === 0) {
+                    this.#links.push({url: '', title: '', description: ''});
+                }
+                this.#dirty = false;
+                this.#render();
+
+                const ok = document.getElementById('sample-links-success');
+                ok.textContent = 'Writing sample links saved.';
+                ok.style.display = 'flex';
+                setTimeout(() => ok.style.display = 'none', 3000);
+            } catch {
+                this.#showErrors({'sample_links': ['Network error. Please try again.']});
+            } finally {
+                btn.textContent = 'Save writing samples';
+                btn.disabled = !this.#dirty;
+            }
+        }
+
+        #render() {
+            const list = document.getElementById('sample-links-list');
+            list.innerHTML = '';
+
+            this.#links.forEach((link, index) => {
+                list.insertAdjacentHTML('beforeend', `
+                    <div class="sample-link-row" data-index="${index}" style="border:1px solid var(--border);border-radius:var(--radius);padding:14px;background:#fff;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                            <span style="font-size:.78rem;font-weight:700;color:var(--slate);">#${index + 1}</span>
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" data-action="up" ${index === 0 ? 'disabled' : ''}>Up</button>
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" data-action="down" ${index === this.#links.length - 1 ? 'disabled' : ''}>Down</button>
+                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" data-action="remove" style="margin-left:auto;color:var(--red);">Remove</button>
+                        </div>
+                        <div class="oc-form-group">
+                            <label class="oc-label">URL</label>
+                            <input class="oc-input" data-field="url" type="url" value="${this.#esc(link.url || '')}" placeholder="https://example.com/article">
+                            <div class="sample-link-field-error" data-error-for="url" style="display:none;font-size:.75rem;color:var(--red);margin-top:4px;"></div>
+                        </div>
+                        <div class="oc-form-group">
+                            <label class="oc-label oc-label--optional">Title</label>
+                            <input class="oc-input" data-field="title" maxlength="150" value="${this.#esc(link.title || '')}">
+                            <div class="sample-link-field-error" data-error-for="title" style="display:none;font-size:.75rem;color:var(--red);margin-top:4px;"></div>
+                        </div>
+                        <div class="oc-form-group" style="margin-bottom:0;">
+                            <label class="oc-label oc-label--optional">Description</label>
+                            <textarea class="oc-textarea" data-field="description" maxlength="500" rows="2">${this.#esc(link.description || '')}</textarea>
+                            <div class="sample-link-field-error" data-error-for="description" style="display:none;font-size:.75rem;color:var(--red);margin-top:4px;"></div>
+                        </div>
+                    </div>
+                `);
+            });
+
+            list.querySelectorAll('input, textarea').forEach((el) => {
+                el.addEventListener('input', () => {
+                    this.#dirty = true;
+                    document.getElementById('sample-links-save-btn').disabled = false;
+                });
+            });
+
+            list.querySelectorAll('button[data-action]').forEach((button) => {
+                button.addEventListener('click', () => this.#handleAction(button));
+            });
+
+            document.getElementById('sample-link-add-btn').disabled = this.#links.length >= SampleLinksManager.MAX_LINKS;
+            document.getElementById('sample-links-save-btn').disabled = !this.#dirty;
+        }
+
+        #handleAction(button) {
+            this.#read();
+            const row = button.closest('.sample-link-row');
+            const index = Number(row.dataset.index);
+            const action = button.dataset.action;
+
+            if (action === 'remove') {
+                this.#links.splice(index, 1);
+                if (this.#links.length === 0) this.#links.push({url: '', title: '', description: ''});
+            }
+
+            if (action === 'up' && index > 0) {
+                [this.#links[index - 1], this.#links[index]] = [this.#links[index], this.#links[index - 1]];
+            }
+
+            if (action === 'down' && index < this.#links.length - 1) {
+                [this.#links[index + 1], this.#links[index]] = [this.#links[index], this.#links[index + 1]];
+            }
+
+            this.#dirty = true;
+            this.#render();
+        }
+
+        #read() {
+            this.#links = Array.from(document.querySelectorAll('.sample-link-row')).map((row) => ({
+                url: row.querySelector('[data-field="url"]').value,
+                title: row.querySelector('[data-field="title"]').value,
+                description: row.querySelector('[data-field="description"]').value,
+            }));
+        }
+
+        #showErrors(errors) {
+            const box = document.getElementById('sample-links-errors');
+            const messages = [];
+
+            document.querySelectorAll('.sample-link-field-error').forEach((el) => {
+                el.textContent = '';
+                el.style.display = 'none';
+            });
+
+            Object.entries(errors).forEach(([key, value]) => {
+                const message = Array.isArray(value) ? value[0] : value;
+                const match = key.match(/^sample_links\.(\d+)\.(url|title|description)$/);
+                if (match) {
+                    const row = document.querySelector(`.sample-link-row[data-index="${match[1]}"]`);
+                    const target = row?.querySelector(`[data-error-for="${match[2]}"]`);
+                    if (target) {
+                        target.textContent = message;
+                        target.style.display = 'block';
+                        return;
+                    }
+                }
+                messages.push(message);
+            });
+
+            box.innerHTML = messages.map((message) => `<div>${this.#esc(String(message))}</div>`).join('');
+            box.style.display = messages.length ? 'block' : 'none';
+            document.getElementById('sample-links-save-btn').disabled = false;
+        }
+
+        #clearErrors() {
+            document.getElementById('sample-links-errors').style.display = 'none';
+            document.querySelectorAll('.sample-link-field-error').forEach((el) => {
+                el.textContent = '';
+                el.style.display = 'none';
+            });
+        }
+
+        #esc(str) {
+            const d = document.createElement('div');
+            d.textContent = str;
+            return d.innerHTML;
+        }
+    }
+
     // ── ProfileManager ────────────────────────────────────────────────────────
     class ProfileManager {
         #site;
@@ -1063,18 +1288,21 @@ $pageClass = '';
         #notif;
         #avatar;
         #expertise;
+        #sampleLinks;
 
-        constructor({site, token, stripeKey, expectedEmail, initialExpertise}) {
+        constructor({site, token, stripeKey, expectedEmail, initialExpertise, initialSampleLinks}) {
             this.#notif = new NotificationPreferencesManager(site, token);
             this.#profile = new ProfileManager(site, token);
             this.#payment = new PaymentDetailsManager(site, token, stripeKey);
             this.#closure = new AccountClosureManager(site, token, expectedEmail);
             this.#avatar = new AvatarManager(site, token);
             this.#expertise = new ExpertiseManager(site, token, initialExpertise);
+            this.#sampleLinks = new SampleLinksManager(site, token, initialSampleLinks);
 
             // Expose avatarManager globally for inline HTML handlers
             window.avatarManager = this.#avatar;
             window.expertiseManager = this.#expertise;
+            window.sampleLinksManager = this.#sampleLinks;
         }
 
         init() {
@@ -1176,6 +1404,7 @@ $pageClass = '';
         stripeKey: STRIPE_KEY,
         expectedEmail: CURRENT_USER_EMAIL,
         initialExpertise: INITIAL_EXPERTISE,
+        initialSampleLinks: INITIAL_SAMPLE_LINKS,
     });
 
     settingsManager.init();

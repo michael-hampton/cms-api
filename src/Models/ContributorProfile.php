@@ -11,6 +11,7 @@ class ContributorProfile extends Model
         'bio',
         'avatar',
         'expertise',
+        'sample_links',
         'payment_method_type',
         'payment_details',
         'tax_country',
@@ -25,6 +26,10 @@ class ContributorProfile extends Model
 
     protected $hidden = [
         'payment_details', // encrypted; never expose raw
+    ];
+
+    protected $casts = [
+        'sample_links' => 'array',
     ];
 
     /**
