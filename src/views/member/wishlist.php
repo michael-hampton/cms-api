@@ -505,15 +505,55 @@
 <script>
     const API_BASE = '/api/' + SITE_SLUG;
 
+    class WishlistStore {
+        constructor() {
+            this.state = {
+                items: [],
+                loading: false,
+                error: null,
+                removingIds: new Set(),
+                addingIds: new Set(),
+            };
+            this.listeners = [];
+        }
+
+        subscribe(listener) {
+            this.listeners.push(listener);
+            listener(this.state);
+        }
+
+        setState(patch) {
+            this.state = {
+                ...this.state,
+                ...patch,
+            };
+
+            this.listeners.forEach(listener => listener(this.state));
+        }
+
+        setFlag(key, id, enabled) {
+            const ids = new Set(this.state[key]);
+
+            if (enabled) {
+                ids.add(id);
+            } else {
+                ids.delete(id);
+            }
+
+            this.setState({[key]: ids});
+        }
+    }
+
     /* ─── UI COMPONENTS ─────────────────────────────────────── */
 
     /**
      * Component: Individual Wishlist Product Card
      */
     class WishlistItem {
-        constructor(item, manager) {
+        constructor(item, manager, options = {}) {
             this.data = item;
             this.manager = manager;
+            this.options = options;
             this.el = null;
         }
 
@@ -521,10 +561,13 @@
             const i = this.data;
             const hasDiscount = i.discount_percentage > 0;
             const isInStock = true; // Logic preserved from original
+            const isRemoving = !!this.options.removing;
+            const isAdding = !!this.options.adding;
 
             const cartBtnProps = {
                 className: 'add-to-cart-btn',
-                onclick: (e) => this.handleAddToCart(e)
+                onclick: (e) => this.handleAddToCart(e),
+                disabled: isAdding ? 'disabled' : undefined,
             };
 
             if (!isInStock) {
@@ -543,6 +586,7 @@
                     UI.el('button', {
                         className: 'remove-wishlist-btn',
                         title: 'Remove from wishlist',
+                        disabled: isRemoving,
                         onclick: () => this.handleRemove()
                     }, [
                         // Inline Heart/Remove Icon
@@ -568,7 +612,7 @@
                     UI.el('div', {className: 'product-actions'}, [
                         UI.el('button', cartBtnProps, [
                             UI.rawEl('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>'),
-                            UI.el('span', {style: {marginLeft: '8px'}}, [isInStock ? 'Add to Cart' : 'Unavailable'])
+                            UI.el('span', {style: {marginLeft: '8px'}}, [isAdding ? 'Adding…' : (isInStock ? 'Add to Cart' : 'Unavailable')])
                         ]),
                         UI.el('button', {
                             className: 'view-btn',
@@ -580,8 +624,6 @@
                     ])
                 ])
             ]);
-
-            alert('good')
 
             return this.el;
         }
@@ -606,13 +648,15 @@
             btn.disabled = true;
             btn.innerHTML = 'Adding...';
 
-            const success = await this.manager.addToCartApi(this.data.product_id);
+            const result = await this.manager.addToCartApi(this.data.product_id);
 
             btn.disabled = false;
             btn.innerHTML = originalContent;
 
-            if (success) {
-                UI.toast('Added to cart!');
+            if (result.success) {
+                UI.toast(result.message || 'Added to cart!', 'success');
+            } else if (result.message) {
+                UI.toast(result.message, 'error');
             }
         }
     }
@@ -625,7 +669,8 @@
             this.emptyState = document.getElementById('empty-wishlist');
             this.container = document.getElementById('wishlist-container');
             this.countLabel = document.getElementById('items-count');
-            this.items = [];
+            this.store = new WishlistStore();
+            this.store.subscribe(state => this.render(state));
             this.init();
         }
 
@@ -634,17 +679,29 @@
         }
 
         async loadWishlist() {
+            this.store.setState({loading: true, error: null});
+
             try {
                 const res = await api(`${API_BASE}/wishlist`);
-                this.items = res.items || [];
-                this.render();
-            } catch (e) {
+                this.store.setState({
+                    items: res.items || [],
+                    loading: false,
+                });
+            } catch (_) {
+                this.store.setState({
+                    loading: false,
+                    error: 'Failed to load wishlist',
+                });
                 UI.toast('Failed to load wishlist', 'error');
             }
         }
 
-        render() {
-            if (this.items.length === 0) {
+        render(state) {
+            if (state.loading || state.error) {
+                return;
+            }
+
+            if (state.items.length === 0) {
                 this.emptyState.style.display = 'block';
                 this.container.style.display = 'none';
                 return;
@@ -653,9 +710,10 @@
             this.emptyState.style.display = 'none';
             this.container.style.display = 'block';
 
-            const cards = this.items.map(item => new WishlistItem(item, this).render());
-
-            console.log('cards', cards)
+            const cards = state.items.map(item => new WishlistItem(item, this, {
+                removing: state.removingIds.has(item.product_id),
+                adding: state.addingIds.has(item.product_id),
+            }).render());
             UI.render(this.grid, cards);
             this.updateCount();
         }
@@ -668,9 +726,12 @@
 
         async removeItem(productId) {
             try {
-                const res = await api(`${API_BASE}/wishlist/${productId}`, {method: 'DELETE'});
+                this.store.setFlag('removingIds', productId, true);
+                const res = await api(`${API_BASE}/wishlist/remove/${productId}`, {method: 'DELETE'});
                 if (res.success) {
-                    this.items = this.items.filter(item => item.product_id !== productId);
+                    this.store.setState({
+                        items: this.store.state.items.filter(item => item.product_id !== productId),
+                    });
                     UI.toast('Removed from wishlist', 'success');
                     return true;
                 }
@@ -678,31 +739,42 @@
             } catch (e) {
                 UI.toast(e.message || 'Error removing item', 'error');
                 return false;
+            } finally {
+                this.store.setFlag('removingIds', productId, false);
             }
         }
 
         async addToCartApi(productId) {
             try {
-                const res = await api(`${API_BASE}/cart`, {
+                this.store.setFlag('addingIds', productId, true);
+                const res = await api(`${API_BASE}/cart/add`, {
                     method: 'POST',
                     body: JSON.stringify({product_id: productId, quantity: 1})
                 });
-                return res.success;
-            } catch (e) {
-                return false;
+                return {
+                    success: res.success !== false,
+                    message: res.message || 'Added to cart!',
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    message: error.message || 'Failed to add item to cart',
+                };
+            } finally {
+                this.store.setFlag('addingIds', productId, false);
             }
         }
 
         async addAllToCart() {
-            if (!this.items.length) return;
+            if (!this.store.state.items.length) return;
 
             let successCount = 0;
             const btn = document.querySelector('.btn-primary');
             btn.disabled = true;
 
-            for (const item of this.items) {
-                const success = await this.addToCartApi(item.product_id);
-                if (success) successCount++;
+            for (const item of this.store.state.items) {
+                const result = await this.addToCartApi(item.product_id);
+                if (result.success) successCount++;
             }
 
             btn.disabled = false;
