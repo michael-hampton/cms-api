@@ -64,6 +64,7 @@ Voucher extends Model
         'subscription_duration_months' => 'integer',
         'duration_in_months' => 'integer',
         'stripe_coupon_synced_at' => 'datetime',
+        'is_stackable' => 'boolean',
     ];
 
     public function isValid(): bool

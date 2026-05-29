@@ -7,6 +7,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Requests\Voucher\CreateSubscriptionVoucherRequest;
 use App\Requests\Voucher\UpdateSubscriptionVoucherRequest;
@@ -83,6 +84,7 @@ class SubscriptionVoucherController extends Controller
     {
         try {
             $validated = $request->validated();
+            $validated['site_id'] = SiteContext::getId();
 
             $voucher = $this->voucherService->create($validated);
 

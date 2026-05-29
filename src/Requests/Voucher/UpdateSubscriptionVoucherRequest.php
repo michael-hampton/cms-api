@@ -4,6 +4,7 @@ namespace App\Requests\Voucher;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Requests\Concerns\HandlesSubscriptionVoucherFields;
 
@@ -127,7 +128,7 @@ class UpdateSubscriptionVoucherRequest extends FormRequest
     private function validateCodeUniqueness($request): void
     {
         $code       = $request->input('code');
-        $siteId     = $request->input('site_id');
+        $siteId     = SiteContext::getId();
         // The route param name must be 'id' — matches the controller signature
         // PUT /api/{site}/subscription-vouchers/{id}
         $voucherId  = $this->route('id');

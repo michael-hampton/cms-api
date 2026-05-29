@@ -255,6 +255,7 @@ class SubscriptionVoucherControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(201, $response);
         $data    = json_decode($response->getContent(), true);
+
         $planIds = $data['data']['voucher']['subscription_plan_ids'];
 
         $this->assertContains($plan1->id, $planIds);

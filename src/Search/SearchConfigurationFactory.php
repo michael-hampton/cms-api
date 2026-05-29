@@ -32,6 +32,7 @@ use App\Search\Configurations\RewardSearchConfiguration;
 use App\Search\Configurations\SubscriptionPaymentSearchConfiguration;
 use App\Search\Configurations\SubscriptionPlanPricingSearchConfiguration;
 use App\Search\Configurations\SubscriptionPlanSearchConfiguration;
+use App\Search\Configurations\SubscriptionVoucherSearchConfiguration;
 use App\Search\Configurations\TagSearchConfiguration;
 use App\Search\Configurations\TerritorySearchConfiguration;
 use App\Search\Configurations\UserSearchConfiguration;
@@ -78,7 +79,8 @@ class SearchConfigurationFactory
         'payment' => SubscriptionPaymentSearchConfiguration::class,
         'newsletter_layout' => NewsletterLayoutSearchConfiguration::class,
         'print-fulfilment' => PrintFulfilmentSearchConfiguration::class,
-        'workflow-run' => WorkflowRunSearchConfiguration::class
+        'workflow-run' => WorkflowRunSearchConfiguration::class,
+        'subscription_voucher' => SubscriptionVoucherSearchConfiguration::class,
     ];
 
     public static function create(string $type): SearchConfiguration

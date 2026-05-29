@@ -4,6 +4,7 @@ namespace App\Requests\Voucher;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
+use App\Framework\Support\SiteContext;
 use App\Repositories\Vouchers\VoucherRepository;
 use App\Requests\Concerns\HandlesSubscriptionVoucherFields;
 
@@ -155,7 +156,7 @@ class CreateSubscriptionVoucherRequest extends FormRequest
     private function validateCodeUniqueness($request): void
     {
         $code   = $request->input('code');
-        $siteId = $request->input('site_id');
+        $siteId = SiteContext::getId();
 
         if ($this->voucherRepository->codeExistsInSite($code, $siteId)) {
             throw new ValidationException('Voucher code already exists for this site');

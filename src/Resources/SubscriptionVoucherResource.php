@@ -38,8 +38,9 @@ class SubscriptionVoucherResource extends JsonResource
 
             // Subscription-specific
             'applies_to_subscriptions'       => $this->getAttribute('applies_to_subscriptions', true),
-            'subscription_plan_ids'          => $this->getAttribute('subscription_plan_ids') ?? [],
-            'subscription_discount_duration' => $this->getAttribute('subscription_discount_duration'),
+            'subscription_plan_ids' => is_array($this->resource)
+                ? array_column($this->resource['subscriptionPlans'] ?? [], 'id')
+                : ($this->resource->subscriptionPlans?->pluck('id')->toArray() ?? []),            'subscription_discount_duration' => $this->getAttribute('subscription_discount_duration'),
             'subscription_duration_months'   => $this->getAttribute('subscription_duration_months'),
             'duration_in_months'             => $this->getAttribute('duration_in_months'),
 

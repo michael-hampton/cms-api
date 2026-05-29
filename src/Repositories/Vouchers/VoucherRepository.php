@@ -3,6 +3,7 @@
 namespace App\Repositories\Vouchers;
 
 use App\Framework\Support\Collection;
+use App\Models\Segment;
 use App\Models\Voucher;
 use App\Models\VoucherRedemption;
 use App\Repositories\Repository;
@@ -10,6 +11,7 @@ use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
 use App\Search\SearchEngine;
+use App\Services\MemberInsights\Segmentation\RenewalOfferFilter;
 
 class VoucherRepository extends Repository
 {
@@ -20,6 +22,36 @@ class VoucherRepository extends Repository
         parent::__construct();
         $config = SearchConfigurationFactory::create('voucher');
         $this->searchEngine = new SearchEngine($config);
+    }
+
+    public function findBestForSubscriptionSegment(
+        Segment $segment,
+        int $planId,
+        RenewalOfferFilter $filter
+    ): ?Voucher {
+        if (!$segment->target_voucher_id) {
+            return null;
+        }
+
+        $activeDate = $filter->activeDate ?? now_datetime()->toDateString();
+
+        return Voucher::where('id', $segment->target_voucher_id)
+            ->where('applies_to_subscriptions', true)
+            ->where('status', 'active')
+            ->where(function ($query) use ($planId) {
+                $query->whereNull('subscription_plan_ids')
+                    ->orWhereJsonLength('subscription_plan_ids', 0)
+                    ->orWhereJsonContains('subscription_plan_ids', $planId);
+            })
+            ->where(function ($query) use ($activeDate) {
+                $query->whereNull('starts_at')
+                    ->orWhereDate('starts_at', '<=', $activeDate);
+            })
+            ->where(function ($query) use ($activeDate) {
+                $query->whereNull('expires_at')
+                    ->orWhereDate('expires_at', '>=', $activeDate);
+            })
+            ->first();
     }
 
     protected function getModelClass(): string
