@@ -37,12 +37,12 @@ class ContributorProfileServiceTest extends TestCase
         $this->profileRepo
             ->shouldReceive('createForUser')
             ->once()
-            ->with(1, ['avatar' => '/uploads/open-collab/avatars/test.jpg'])
+            ->with(1, ['avatar' => '/storage/uploads/open-collab/avatars/test.jpg'])
             ->andReturn($this->makeProfile(['avatar' => '/open-collab/avatars/test.jpg']));
 
         $url = $this->service->uploadAvatar(1, 10, $file);
 
-        $this->assertSame('/uploads/open-collab/avatars/test.jpg', $url);
+        $this->assertSame('/storage/uploads/open-collab/avatars/test.jpg', $url);
     }
 
     private function makeValidAvatarFile(): MockInterface|UploadedFile
@@ -96,12 +96,12 @@ class ContributorProfileServiceTest extends TestCase
         $this->profileRepo
             ->shouldReceive('update')
             ->once()
-            ->with(5, ['avatar' => '/uploads/open-collab/avatars/new.jpg'])
+            ->with(5, ['avatar' => '/storage/uploads/open-collab/avatars/new.jpg'])
             ->andReturn($profile);
 
         $url = $this->service->uploadAvatar(1, 10, $file);
 
-        $this->assertSame('/uploads/open-collab/avatars/new.jpg', $url);
+        $this->assertSame('/storage/uploads/open-collab/avatars/new.jpg', $url);
     }
 
     public function test_uploadAvatar_throws_on_invalid_mime_type(): void

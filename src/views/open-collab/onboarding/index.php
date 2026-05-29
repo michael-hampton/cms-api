@@ -192,7 +192,8 @@ if ($profile && !empty($profile->expertise)) {
 
                             <div id="samples-list" style="display:flex;flex-direction:column;gap:12px;">
                                 <?php
-                                $samples = $writingSamples ?? [];
+                                $samples = $profile?->sample_links ?? [];
+
                                 while (count($samples) < 3) { $samples[] = null; }
                                 foreach ($samples as $i => $sample):
                                     $n = $i + 1;
@@ -201,10 +202,10 @@ if ($profile && !empty($profile->expertise)) {
                                         <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
                                             <input class="oc-input" type="url" id="sample-url-<?= $n ?>"
                                                    placeholder="https://example.com/my-article"
-                                                   value="<?= htmlspecialchars($sample?->url ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                                   value="<?= htmlspecialchars($sample['url'] ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
                                             <input class="oc-input" type="text" id="sample-title-<?= $n ?>"
                                                    placeholder="Article title (optional)"
-                                                   value="<?= htmlspecialchars($sample?->title ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                                   value="<?= htmlspecialchars($sample['title'] ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
                                         </div>
                                         <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm clear-sample-btn" data-row="<?= $n ?>" style="color:var(--slate);padding:0 10px;display:flex;align-items:center;justify-content:center;" aria-label="Clear row">
                                             <svg viewBox="0 0 20 20" fill="currentColor" width="14" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
@@ -930,6 +931,7 @@ if ($profile && !empty($profile->expertise)) {
 
             // Apply complete requirement blocks during continuation checks
             if (!bio || bio.length < 20) {
+                alert('bio must be at least 20 chars')
                 if (bioErr) bioErr.textContent = 'Bio must be at least 20 characters.';
                 return;
             }

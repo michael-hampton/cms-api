@@ -60,8 +60,8 @@ class ContributorProfileService
         );
 
         $url = str_starts_with($relativePath, '/uploads/')
-            ? '/' . ltrim($relativePath, '/')
-            : '/uploads/' . ltrim($relativePath, '/');
+            ? '/storage/' . ltrim($relativePath, '/')
+            : '/storage/uploads/' . ltrim($relativePath, '/');
 
         if ($profile) {
             $this->profileRepository->update($profile->id, ['avatar' => $url]);
