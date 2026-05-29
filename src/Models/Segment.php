@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Member\SegmentSubjectType;
 
 class Segment extends Model
 {
@@ -12,12 +13,19 @@ class Segment extends Model
         'name',
         'description',
         'category',
+        'subject_type',
+        'priority',
         'is_active',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
+        'is_active'    => 'boolean',
+        'priority'     => 'integer',
     ];
+
+    // -------------------------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------------------------
 
     public function rules()
     {
@@ -32,5 +40,22 @@ class Segment extends Model
     public function memberSegments()
     {
         return $this->hasMany(MemberSegment::class);
+    }
+
+    public function plans()
+    {
+        return $this->belongsToMany(SubscriptionPlan::class, 'plan_segment');
+    }
+
+    // -------------------------------------------------------------------------
+    // Scopes
+    // -------------------------------------------------------------------------
+
+    /**
+     * Filter segments to a specific subject type.
+     */
+    public function scopeForSubject($query, SegmentSubjectType $subjectType): void
+    {
+        $query->where('subject_type', $subjectType->value);
     }
 }
