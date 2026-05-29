@@ -473,4 +473,15 @@ class SubscriptionPlan extends Model
 
         return $issue !== null && $issue->isInStock();
     }
+
+    public function segments($relation = false)
+    {
+        return $this->belongsToMany(
+            Segment::class,
+            'plan_segment',
+            'plan_id',
+            'segment_id',
+            $relation
+        );
+    }
 }

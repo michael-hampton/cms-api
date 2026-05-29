@@ -91,6 +91,21 @@ class SubscriptionRepository extends Repository
             ->exists();
     }
 
+    /**
+     * Chunk through active subscriptions for a specific plan.
+     *
+     * @param mixed $planId
+     * @param int $chunkSize
+     * @param callable $callback
+     * @return bool
+     */
+    public function chunkActiveByPlan($planId, int $chunkSize, callable $callback): bool
+    {
+        return Subscription::where('plan_id', $planId)
+            ->where('status', 'active') // Adjust this column/value based on your DB schema
+            ->chunk($chunkSize, $callback);
+    }
+
     protected function getModelClass(): string
     {
         return Subscription::class;

@@ -7,12 +7,14 @@ use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Models\SubscriptionPlanRegionSet;
 use App\Repositories\Repository;
 use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
 use App\Search\SearchEngine;
+use App\Services\MemberInsights\Segmentation\RenewalOfferFilter;
 
 class SubscriptionPlanRepository extends Repository
 {
@@ -122,6 +124,53 @@ class SubscriptionPlanRepository extends Repository
             $this->update($id, ['sort_order' => $order]);
         }
         return true;
+    }
+
+    public function findDiscountedPricingForPlan(
+        int $planId,
+        RenewalOfferFilter $filter
+    ): Collection {
+        $query = SubscriptionPlanPricing::where('plan_id', $planId)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query
+                    ->where(function ($q) {
+                        $q->whereNotNull('sale_price')
+                            ->whereColumn('sale_price', '<', 'price');
+                    })
+                    ->orWhere(function ($q) {
+                        $q->whereNotNull('digital_sale_price')
+                            ->whereColumn('digital_sale_price', '<', 'digital_price');
+                    });
+            });
+
+        if ($filter->edition !== null) {
+            $query->where('edition', $filter->edition);
+        }
+
+        if ($filter->region !== null) {
+            $query->where('region', $filter->region);
+        }
+
+        if ($filter->paymentType !== null) {
+            $query->where('payment_type', $filter->paymentType);
+        }
+
+        $activeDate = $filter->activeDate ?? now_datetime()->toDateString();
+
+        $query->where(function ($q) use ($activeDate) {
+            $q->whereNull('starts_at')
+                ->orWhereDate('starts_at', '<=', $activeDate);
+        });
+
+        $query->where(function ($q) use ($activeDate) {
+            $q->whereNull('ends_at')
+                ->orWhereDate('ends_at', '>=', $activeDate);
+        });
+
+        return $query
+            ->orderBy('price')
+            ->get();
     }
 
     protected function getModelClass(): string

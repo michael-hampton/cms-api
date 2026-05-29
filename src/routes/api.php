@@ -64,10 +64,12 @@ use App\Controllers\Members\Api\MemberReadingHistoryApiController;
 use App\Controllers\Members\Api\MemberRewardsApiController;
 use App\Controllers\Members\Api\MemberStatsApiController;
 use App\Controllers\Members\Api\NewsletterRecommendationsController;
+use App\Controllers\Members\Api\PlanSegmentApiController;
 use App\Controllers\Members\Api\SegmentAdminApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPaymentsApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPlansApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionsApiController;
+use App\Controllers\Members\Api\SubscriptionSegmentApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
@@ -1583,6 +1585,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/subscription-plans/{planId}/pricing/{pricingId}', [SubscriptionPlanPricingController::class, 'destroy']);
         $router->post('/subscription-plans/{planId}/pricing/{pricingId}/set-default', [SubscriptionPlanPricingController::class, 'setDefault']);
         $router->post('/subscription-plans/{planId}/pricing/{pricingId}/toggle-active', [SubscriptionPlanPricingController::class, 'toggleActive']);
+
+        $router->post('/subscription-plans/{planId}/segments/assign', [PlanSegmentApiController::class, 'assign']);
+        $router->delete('/subscription-plans/{planId}/segments/{segmentId}', [PlanSegmentApiController::class, 'remove']);
+
+        $router->get('/subscriptions/{subscriptionId}/segment', [SubscriptionSegmentApiController::class, 'show']);
 
         $router->post('/newsletters/{newsletterId}/branding', [NewsletterBrandingController::class, 'save']);
         $router->get('/newsletters/{newsletterId}/branding', [NewsletterBrandingController::class, 'show']);

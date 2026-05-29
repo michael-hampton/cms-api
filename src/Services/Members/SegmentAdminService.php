@@ -4,6 +4,7 @@ namespace App\Services\Members;
 
 use App\Enums\Member\SegmentRuleBoolean;
 use App\Enums\Member\SegmentRuleOperator;
+use App\Enums\Member\SegmentSubjectType;
 use App\Framework\Database\Database;
 use App\Models\Segment;
 use App\Repositories\MemberInsights\SegmentRepository;
@@ -15,8 +16,7 @@ class SegmentAdminService
         private readonly SegmentRepository     $segmentRepository,
         private readonly SegmentRuleRepository $segmentRuleRepository,
         private readonly Database              $database,
-    )
-    {
+    ) {
     }
 
     public function list(
@@ -25,13 +25,13 @@ class SegmentAdminService
         ?string $search = null,
         string  $sortBy = 'name',
         string  $sortOrder = 'asc',
-    ): array
-    {
+    ): array {
         return $this->segmentRepository->paginateAdmin($perPage, $page, $search, $sortBy, $sortOrder);
     }
 
     public function create(array $payload): Segment
     {
+        $this->validateSubjectType($payload);
         $this->validateRules($payload['rules'] ?? []);
 
         if ($this->segmentRepository->existsByKey($payload['key'])) {
@@ -40,17 +40,94 @@ class SegmentAdminService
 
         return $this->database->transaction(function () use ($payload) {
             $segment = $this->segmentRepository->create([
-                'key' => trim($payload['key']),
-                'name' => trim($payload['name']),
-                'description' => $payload['description'] ?? null,
-                'category' => $payload['category'] ?? null,
-                'is_active' => $payload['is_active'] ?? true,
+                'key'          => trim($payload['key']),
+                'name'         => trim($payload['name']),
+                'description'  => $payload['description'] ?? null,
+                'category'     => $payload['category'] ?? null,
+                'subject_type' => $payload['subject_type'] ?? SegmentSubjectType::Member->value,
+                'priority'     => $payload['priority'] ?? 100,
+                'is_active'    => $payload['is_active'] ?? true,
             ]);
 
             $this->segmentRuleRepository->createManyForSegment($segment->id, $payload['rules'] ?? []);
 
             return $this->find($segment->id);
         });
+    }
+
+    public function find(int $id): Segment
+    {
+        $segment = $this->segmentRepository->findWithRules($id);
+
+        if ($segment === null) {
+            throw new \InvalidArgumentException("Segment #{$id} not found.");
+        }
+
+        return $segment;
+    }
+
+    public function update(int $id, array $payload): Segment
+    {
+        $segment = $this->find($id);
+
+        if (
+            isset($payload['key']) &&
+            $this->segmentRepository->existsByKey($payload['key'], $segment->id)
+        ) {
+            throw new \InvalidArgumentException("Segment key \"{$payload['key']}\" already exists.");
+        }
+
+        if (isset($payload['subject_type'])) {
+            $this->validateSubjectType($payload);
+        }
+
+        if (array_key_exists('rules', $payload)) {
+            $this->validateRules($payload['rules'] ?? []);
+        }
+
+        return $this->database->transaction(function () use ($segment, $payload) {
+            $this->segmentRepository->update($segment->id, array_filter([
+                'key'          => isset($payload['key']) ? trim($payload['key']) : null,
+                'name'         => isset($payload['name']) ? trim($payload['name']) : null,
+                'description'  => $payload['description'] ?? null,
+                'category'     => $payload['category'] ?? null,
+                'subject_type' => $payload['subject_type'] ?? null,
+                'priority'     => $payload['priority'] ?? null,
+                'is_active'    => $payload['is_active'] ?? null,
+            ], fn($value) => $value !== null));
+
+            if (array_key_exists('rules', $payload)) {
+                $this->segmentRuleRepository->deleteBySegmentId($segment->id);
+                $this->segmentRuleRepository->createManyForSegment($segment->id, $payload['rules'] ?? []);
+            }
+
+            return $this->find($segment->id);
+        });
+    }
+
+    public function delete(int $id): void
+    {
+        $segment = $this->find($id);
+
+        $this->database->transaction(function () use ($segment) {
+            $this->segmentRepository->delete($segment->id);
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation helpers
+    // -------------------------------------------------------------------------
+
+    private function validateSubjectType(array $payload): void
+    {
+        $value = $payload['subject_type'] ?? null;
+
+        if ($value !== null && SegmentSubjectType::tryFrom($value) === null) {
+            $allowed = implode(', ', SegmentSubjectType::values());
+            throw new \InvalidArgumentException(
+                "subject_type \"{$value}\" is invalid. Allowed values: {$allowed}."
+            );
+        }
     }
 
     private function validateRules(array $rules): void
@@ -77,58 +154,5 @@ class SegmentAdminService
                 throw new \InvalidArgumentException("Rule #{$position}: boolean is invalid.");
             }
         }
-    }
-
-    public function find(int $id): Segment
-    {
-        $segment = $this->segmentRepository->findWithRules($id);
-
-        if ($segment === null) {
-            throw new \InvalidArgumentException("Segment #{$id} not found.");
-        }
-
-        return $segment;
-    }
-
-    public function update(int $id, array $payload): Segment
-    {
-        $segment = $this->find($id);
-
-        if (
-            isset($payload['key']) &&
-            $this->segmentRepository->existsByKey($payload['key'], $segment->id)
-        ) {
-            throw new \InvalidArgumentException("Segment key \"{$payload['key']}\" already exists.");
-        }
-
-        if (array_key_exists('rules', $payload)) {
-            $this->validateRules($payload['rules'] ?? []);
-        }
-
-        return $this->database->transaction(function () use ($segment, $payload) {
-            $this->segmentRepository->update($segment->id, array_filter([
-                'key' => isset($payload['key']) ? trim($payload['key']) : null,
-                'name' => isset($payload['name']) ? trim($payload['name']) : null,
-                'description' => $payload['description'] ?? null,
-                'category' => $payload['category'] ?? null,
-                'is_active' => $payload['is_active'] ?? null,
-            ], fn($value) => $value !== null));
-
-            if (array_key_exists('rules', $payload)) {
-                $this->segmentRuleRepository->deleteBySegmentId($segment->id);
-                $this->segmentRuleRepository->createManyForSegment($segment->id, $payload['rules'] ?? []);
-            }
-
-            return $this->find($segment->id);
-        });
-    }
-
-    public function delete(int $id): void
-    {
-        $segment = $this->find($id);
-
-        $this->database->transaction(function () use ($segment) {
-            $this->segmentRepository->delete($segment->id);
-        });
     }
 }
