@@ -1,13 +1,14 @@
 <?php
 
-namespace App\Requests;
+namespace App\Requests\Voucher;
 
+use App\Enums\Vouchers\VoucherType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\FormRequest;
-use App\Requests\Concerns\HandlesSubscriptionVoucherFields;
 use App\Repositories\Vouchers\VoucherRepository;
+use App\Requests\Concerns\HandlesSubscriptionVoucherFields;
 
-class CreateVoucherRequest extends FormRequest
+class UpdateVoucherRequest extends FormRequest
 {
     use HandlesSubscriptionVoucherFields;
 
@@ -21,7 +22,7 @@ class CreateVoucherRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return $this->user() && $this->user()->can('create', 'Voucher');
+        return $this->user() && $this->user()->can('update', 'Voucher');
     }
 
     public function rules(): array
@@ -56,13 +57,14 @@ class CreateVoucherRequest extends FormRequest
             function ($request) {
                 $code = $request->input('code');
                 $siteId = $request->input('site_id');
+                $voucherId = $this->route('id');
 
-                if ($this->voucherRepository->codeExistsInSite($code, $siteId)) {
+                if ($this->voucherRepository->codeExistsInSite($code, $siteId, $voucherId)) {
                     throw new ValidationException('Voucher code already exists');
                 }
 
                 // Validate percentage type
-                if ($request->input('type') === 'percentage' && $request->input('value') > 100) {
+                if ($request->input('type') === VoucherType::Percentage->value && $request->input('value') > 100) {
                     throw new ValidationException('Percentage value cannot exceed 100');
                 }
 
@@ -88,14 +90,6 @@ class CreateVoucherRequest extends FormRequest
 
         if (empty($this->data['site_id'])) {
             $this->data['site_id'] = config('app.default_site_id');
-        }
-
-        if (!isset($this->data['status'])) {
-            $this->data['status'] = 'active';
-        }
-
-        if (!isset($this->data['usage_count'])) {
-            $this->data['usage_count'] = 0;
         }
 
         $this->normalizeSubscriptionVoucherFields();

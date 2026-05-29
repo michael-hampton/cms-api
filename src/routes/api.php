@@ -139,6 +139,7 @@ use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
+use App\Controllers\Vouchers\SubscriptionVoucherController;
 use App\Middleware\OpenCollab\OnboardingRouteGuard;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
@@ -1462,6 +1463,38 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/vouchers/{id}/redemptions', VoucherController::class, 'redemptions');
         $router->post('/vouchers/bulk-status', [VoucherController::class, 'bulkUpdateStatus']);
         $router->post('/vouchers/bulk-delete', [VoucherController::class, 'bulkDelete']);
+
+        $router->get(
+            '/subscription-vouchers',
+            [SubscriptionVoucherController::class, 'index'],
+        );
+
+        $router->post(
+            '/subscription-vouchers',
+            [SubscriptionVoucherController::class, 'store'],
+        );
+
+        // ⚠️ Static segment /deletable must be registered BEFORE /{id} so the router
+        // resolves GET /subscription-vouchers/123/deletable to checkDelete, not show.
+        $router->get(
+            '/subscription-vouchers/{id}/deletable',
+            [SubscriptionVoucherController::class, 'checkDelete'],
+        );
+
+        $router->get(
+            '/subscription-vouchers/{id}',
+            [SubscriptionVoucherController::class, 'show'],
+        );
+
+        $router->put(
+            '/subscription-vouchers/{id}',
+            [SubscriptionVoucherController::class, 'update'],
+        );
+
+        $router->delete(
+            '/subscription-vouchers/{id}',
+            [SubscriptionVoucherController::class, 'destroy'],
+        );
 
         $router->post('/newsletter/signup', NewsletterController::class, 'signup');
         $router->post('/newsletter/confirm', NewsletterController::class, 'confirm');
