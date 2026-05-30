@@ -25,8 +25,9 @@ class SegmentAdminService
         ?string $search = null,
         string  $sortBy = 'name',
         string  $sortOrder = 'asc',
+        string $subjectType = SegmentSubjectType::Member->value
     ): array {
-        return $this->segmentRepository->paginateAdmin($perPage, $page, $search, $sortBy, $sortOrder);
+        return $this->segmentRepository->paginateAdmin($perPage, $page, $search, $sortBy, $sortOrder, $subjectType);
     }
 
     public function create(array $payload): Segment

@@ -793,4 +793,9 @@ class Subscription extends Model
     {
         return $this->belongsTo(Member::class, 'gifted_by_member_id', 'id');
     }
+
+    public function subscriptionSegments($relation = false)
+    {
+        return $this->hasMany(SubscriptionSegment::class, 'subscription_id', 'id', $relation);
+    }
 }

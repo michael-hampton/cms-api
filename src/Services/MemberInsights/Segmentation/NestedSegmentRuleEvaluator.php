@@ -85,9 +85,7 @@ class NestedSegmentRuleEvaluator
                 continue;
             }
 
-            $boolean = $rule->boolean instanceof SegmentRuleBoolean
-                ? $rule->boolean
-                : SegmentRuleBoolean::from((string) $rule->boolean);
+            $boolean = $this->boolean($this->value($child, 'boolean'));
 
             $result = $boolean === SegmentRuleBoolean::AND
                 ? $result && $childResult
@@ -159,10 +157,28 @@ class NestedSegmentRuleEvaluator
             return null;
         }
 
+        // 1. Safe-check: If it's an Eloquent model, grab raw attributes to prevent mock lazy-loading
+        if (method_exists($target, 'getAttributes')) {
+            $attributes = $target->getAttributes();
+            if (array_key_exists($key, $attributes)) {
+                return $attributes[$key];
+            }
+        }
+
+        // 2. Safe-check: Check already loaded relations
+        if (method_exists($target, 'getRelations')) {
+            $relations = $target->getRelations();
+            if (array_key_exists($key, $relations)) {
+                return $relations[$key];
+            }
+        }
+
+        // 3. Fallback to direct public properties (for standard objects like rule tokens)
         if (isset($target->{$key})) {
             return $target->{$key};
         }
 
+        // 4. Fallback to default Eloquent getters
         if (method_exists($target, 'getAttribute')) {
             $value = $target->getAttribute($key);
 

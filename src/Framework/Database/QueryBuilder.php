@@ -276,7 +276,110 @@ class QueryBuilder
             }
         }
 
+        // Dynamically merge subquery bindings only if they are part of the active selection
+        foreach ($selects as $select) {
+            if ($select instanceof SubqueryExpression) {
+                $bindings = array_merge($select->bindings, $bindings);
+            }
+        }
+
         return [$sql, $bindings];
+    }
+
+    /**
+     * Add a left join subquery to the query.
+     *
+     * @param \Closure|\App\Framework\Database\QueryBuilder|string $query
+     * @param string $alias
+     * @param string $first
+     * @param string $operator
+     * @param string $second
+     * @return $this
+     */
+    public function leftJoinSub(
+        mixed $query,
+        string $alias,
+        string|\Closure $first,
+        ?string $operator = null,
+        ?string $second = null,
+    ): self {
+        return $this->joinSub(
+            $query,
+            $alias,
+            $first,
+            $operator,
+            $second,
+            'LEFT'
+        );
+    }
+
+    public function joinSub(
+        mixed $query,
+        string $alias,
+        string|\Closure $first,
+        ?string $operator = null,
+        ?string $second = null,
+        string $type = 'INNER',
+    ): self {
+        [$subSql, $subBindings] = $this->parseSubQuery($query);
+
+        if ($first instanceof Closure) {
+            throw new InvalidArgumentException(
+                'Closure join conditions are not supported by this QueryBuilder join storage yet.'
+            );
+        }
+
+        if ($operator === null || $second === null) {
+            throw new InvalidArgumentException(
+                'Join operator and second column are required.'
+            );
+        }
+
+        $this->joins[] = [
+            'type' => strtoupper($type),
+            'table' => new RawExpression("({$subSql}) AS {$alias}"),
+            'first' => $first,
+            'operator' => $operator,
+            'second' => $second,
+            'bindings' => $subBindings,
+        ];
+
+        return $this;
+    }
+
+    private function parseSubQuery(mixed $query): array
+    {
+        if ($query instanceof Closure) {
+            $builder = new self('', $this->relationManager, $this->database);
+            $query($builder);
+
+            return $builder->toSql();
+        }
+
+        if ($query instanceof self) {
+            return $query->toSql();
+        }
+
+        if (is_string($query)) {
+            return [$query, []];
+        }
+
+        throw new InvalidArgumentException(
+            'Subquery must be a Closure, QueryBuilder instance, or SQL string.'
+        );
+    }
+
+    /**
+     * Helper to handle combining subquery parameters safely.
+     */
+    private function mergeBindings(array $newBindings): void
+    {
+        // Adjust this to match how your QueryBuilder maps array values to PDO bindings
+        if (isset($this->bindings) && is_array($this->bindings)) {
+            $this->bindings = array_merge($this->bindings, $newBindings);
+        } else {
+            $this->bindings = $newBindings;
+        }
     }
 
     private function quoteTable(string $table): string
@@ -2177,6 +2280,42 @@ class QueryBuilder
             default:
                 throw new BadMethodCallException("Unknown relation type: {$relationData['type']}");
         }
+    }
+
+    /**
+     * Add a subquery select expression to the query.
+     *
+     * @param  \Closure|\App\Framework\Database\QueryBuilder|string  $query
+     * @param  string  $as
+     * @return $this
+     */
+    public function selectSub($query, string $as): self
+    {
+        $subBindings = [];
+
+        if ($query instanceof Closure) {
+            $callback = $query;
+            $query = new self($this->table, $this->relationManager, $this->database);
+            $callback($query);
+        }
+
+        if ($query instanceof self) {
+            [$subSql, $subBindings] = $query->toSql();
+            $expression = "({$subSql}) as `{$as}`";
+        } elseif (is_string($query)) {
+            $expression = "({$query}) as `{$as}`";
+        } else {
+            throw new InvalidArgumentException('Invalid subquery provided to selectSub.');
+        }
+
+        if ($this->selects === ['*']) {
+            $this->selects = [];
+        }
+
+        // Use our helper so toSql() knows how to harvest bindings dynamically
+        $this->selects[] = new SubqueryExpression($expression, $subBindings);
+
+        return $this;
     }
 
 }

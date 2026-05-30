@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Member\SubscriptionSegmentSource;
 use App\Enums\Member\SubscriptionSegmentStatus;
 
 class SubscriptionSegment extends Model
@@ -14,13 +15,19 @@ class SubscriptionSegment extends Model
         'assigned_at',
         'evaluated_at',
         'status',
+        'source',
+        'reason',
+        'expires_at',
+        'assigned_by_user_id',
         'metadata',
     ];
 
     protected $casts = [
         'assigned_at'  => 'datetime',
         'evaluated_at' => 'datetime',
+        'expires_at'   => 'datetime',
         'status'       => SubscriptionSegmentStatus::class,
+        'source'       => SubscriptionSegmentSource::class,
         'metadata'     => 'array',
     ];
 
@@ -32,5 +39,30 @@ class SubscriptionSegment extends Model
     public function segment()
     {
         return $this->belongsTo(Segment::class);
+    }
+
+    public function assignedByUser()
+    {
+        return $this->belongsTo(User::class, 'assigned_by_user_id');
+    }
+
+    /**
+     * Returns true if this is a manual override that has not yet expired.
+     */
+    public function isActiveManualOverride(): bool
+    {
+        if ($this->source !== SubscriptionSegmentSource::Manual) {
+            return false;
+        }
+
+        if ($this->status !== SubscriptionSegmentStatus::Active) {
+            return false;
+        }
+
+        if ($this->expires_at !== null && $this->expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
     }
 }

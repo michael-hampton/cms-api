@@ -3,6 +3,7 @@
 namespace App\Controllers\Members\Api;
 
 use App\Controllers\Controller;
+use App\Enums\Member\SegmentSubjectType;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -29,6 +30,7 @@ class SegmentAdminApiController extends Controller
             search: $request->get('search') ?: null,
             sortBy: $request->get('sort_by', 'name'),
             sortOrder: $request->get('sort_order', 'asc'),
+            subjectType: $request->get('subject_type', SegmentSubjectType::Member->value),
         );
 
         return $this->resourceResponse([

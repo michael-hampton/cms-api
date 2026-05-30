@@ -55,6 +55,20 @@ class PlanSegmentRepository extends Repository
             ->get();
     }
 
+    /**
+     * Return all plan-segment assignments for a given segment,
+     * with the plan relation eager-loaded so callers can access plan->name.
+     *
+     * @return \App\Framework\Support\Collection<\App\Models\PlanSegment>
+     */
+    public function getAssignmentsForSegment(int $segmentId): \App\Framework\Support\Collection
+    {
+        return PlanSegment::with('plan')
+            ->where('segment_id', $segmentId)
+            ->orderBy('priority')
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return PlanSegment::class;

@@ -66,10 +66,14 @@ use App\Controllers\Members\Api\MemberStatsApiController;
 use App\Controllers\Members\Api\NewsletterRecommendationsController;
 use App\Controllers\Members\Api\PlanSegmentApiController;
 use App\Controllers\Members\Api\SegmentAdminApiController;
+use App\Controllers\Members\Api\SegmentFieldsApiController;
+use App\Controllers\Members\Api\SegmentPreviewApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPaymentsApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionPlansApiController;
 use App\Controllers\Members\Api\Subscriptions\MemberSubscriptionsApiController;
 use App\Controllers\Members\Api\SubscriptionSegmentApiController;
+use App\Controllers\Members\Api\SubscriptionSegmentOverrideApiController;
+use App\Controllers\Members\Api\SubscriptionSegmentsApiController;
 use App\Controllers\Members\MemberBadgeController;
 use App\Controllers\Members\MemberPaymentMethodsController;
 use App\Controllers\Members\Subscriptions\AdminSubscriptionPremiumAccessController;
@@ -1588,6 +1592,12 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->post('/subscription-plans/{planId}/segments/assign', [PlanSegmentApiController::class, 'assign']);
         $router->delete('/subscription-plans/{planId}/segments/{segmentId}', [PlanSegmentApiController::class, 'remove']);
+        $router->get('/segments/{segmentId}/subscription-plans', [PlanSegmentApiController::class, 'plansForSegment']);
+        $router->post('/segments/{segmentId}/subscription-plans/assign', [PlanSegmentApiController::class, 'assignPlansToSegment']);
+        $router->post('/segments/{segmentId}/preview', [SegmentPreviewApiController::class, 'preview']);
+        $router->post('/subscriptions/{subscriptionId}/segment/assign', [SubscriptionSegmentOverrideApiController::class, 'assign']);
+        $router->get('/admin/segment-fields', [SegmentFieldsApiController::class, '__invoke']);
+        $router->get('/segments/subscription', [SubscriptionSegmentsApiController::class, 'index']);
 
         $router->get('/subscriptions/{subscriptionId}/segment', [SubscriptionSegmentApiController::class, 'show']);
 

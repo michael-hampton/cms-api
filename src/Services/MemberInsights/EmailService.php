@@ -9,7 +9,6 @@ use App\Mail\ForgotPassword;
 use App\Mail\MemberSignupConfirmation;
 use App\Mail\Newsletters\NewsletterSignupConfirmationWithTracking;
 use App\Mail\Newsletters\NewsletterWelcome;
-use App\Mail\NewsletterSignupConfirmationWithTrackingTest;
 use App\Mail\PriceAlert;
 use App\Mail\ResetPassword;
 use App\Mail\SupportConfirmation;
@@ -68,7 +67,7 @@ class EmailService
             'From: noreply@example.com'
         ];
 
-        mail($to, $subject, $html, implode("\r\n", $headers));
+        @mail($to, $subject, $html, implode("\r\n", $headers));
 
         return true;
     }

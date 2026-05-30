@@ -16,11 +16,13 @@ class Segment extends Model
         'subject_type',
         'priority',
         'is_active',
+        'last_recalculated_at',
     ];
 
     protected $casts = [
-        'is_active'    => 'boolean',
-        'priority'     => 'integer',
+        'is_active'             => 'boolean',
+        'priority'              => 'integer',
+        'last_recalculated_at'  => 'datetime',
     ];
 
     // -------------------------------------------------------------------------
@@ -51,9 +53,6 @@ class Segment extends Model
     // Scopes
     // -------------------------------------------------------------------------
 
-    /**
-     * Filter segments to a specific subject type.
-     */
     public function scopeForSubject($query, SegmentSubjectType $subjectType): void
     {
         $query->where('subject_type', $subjectType->value);

@@ -12,8 +12,8 @@ class SubscriptionResource extends JsonResource
         return [
             'id' => $this->getAttribute('id'),
             'member_id' => $this->getAttribute('member_id'),
-            'member_name' => $this->getAttribute('member')->first_name . ' ' . $this->getAttribute('member')->last_name,
-            'member_email' => $this->getAttribute('member')->email,
+            'member_name' => $this->getAttribute('member')?->first_name . ' ' . $this->getAttribute('member')?->last_name,
+            'member_email' => $this->getAttribute('member')?->email,
             'site_id' => $this->getAttribute('site_id'),
             'plan_id' => $this->getAttribute('plan_id'),
             'plan_name' => $this->getAttribute('plan')?->name,

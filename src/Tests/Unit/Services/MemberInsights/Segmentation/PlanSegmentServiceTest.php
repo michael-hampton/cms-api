@@ -21,6 +21,10 @@ class PlanSegmentServiceTest extends TestCase
     private SubscriptionPlanRepository|MockInterface $planRepository;
     private PlanSegmentService $service;
 
+    // -------------------------------------------------------------------------
+    // assign() — single plan
+    // -------------------------------------------------------------------------
+
     public function test_it_assigns_segment_to_plan(): void
     {
         $plan       = $this->makePlan(1);
@@ -112,6 +116,134 @@ class PlanSegmentServiceTest extends TestCase
         $this->planSegmentRepository->allows('findByPlanAndSegment')->andReturnNull();
 
         $this->service->remove(1, 10);
+    }
+
+    // -------------------------------------------------------------------------
+    // assignPlans() — bulk
+    // -------------------------------------------------------------------------
+
+    public function test_assign_plans_assigns_all_new_plans(): void
+    {
+        $segment     = $this->makeSegment(10, SegmentSubjectType::Subscription);
+        $plan1       = $this->makePlan(1);
+        $plan2       = $this->makePlan(2);
+        $assignment1 = Mockery::mock(PlanSegment::class)->makePartial();
+        $assignment2 = Mockery::mock(PlanSegment::class)->makePartial();
+
+        $this->segmentRepository->allows('findWithRules')->with(10)->andReturn($segment);
+        $this->planRepository->allows('find')->with(1)->andReturn($plan1);
+        $this->planRepository->allows('find')->with(2)->andReturn($plan2);
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->andReturnNull();
+        $this->planSegmentRepository->expects('assign')->with(1, 10, [])->andReturn($assignment1);
+        $this->planSegmentRepository->expects('assign')->with(2, 10, [])->andReturn($assignment2);
+
+        $result = $this->service->assignPlans(10, [1, 2]);
+
+        $this->assertCount(2, $result['assigned']);
+        $this->assertCount(0, $result['skipped']);
+        $this->assertSame($assignment1, $result['assigned'][0]);
+        $this->assertSame($assignment2, $result['assigned'][1]);
+    }
+
+    public function test_assign_plans_skips_already_assigned_plans(): void
+    {
+        $segment    = $this->makeSegment(10, SegmentSubjectType::Subscription);
+        $plan1      = $this->makePlan(1);
+        $plan2      = $this->makePlan(2);
+        $existing   = Mockery::mock(PlanSegment::class)->makePartial();
+        $assignment = Mockery::mock(PlanSegment::class)->makePartial();
+
+        $this->segmentRepository->allows('findWithRules')->andReturn($segment);
+        $this->planRepository->allows('find')->with(1)->andReturn($plan1);
+        $this->planRepository->allows('find')->with(2)->andReturn($plan2);
+        // Plan 1 already assigned, plan 2 is new
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->with(1, 10)->andReturn($existing);
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->with(2, 10)->andReturnNull();
+        $this->planSegmentRepository->expects('assign')->once()->with(2, 10, [])->andReturn($assignment);
+
+        $result = $this->service->assignPlans(10, [1, 2]);
+
+        $this->assertCount(1, $result['assigned']);
+        $this->assertCount(1, $result['skipped']);
+        $this->assertContains(1, $result['skipped']);
+    }
+
+    public function test_assign_plans_returns_empty_when_all_already_assigned(): void
+    {
+        $segment  = $this->makeSegment(10, SegmentSubjectType::Subscription);
+        $plan     = $this->makePlan(1);
+        $existing = Mockery::mock(PlanSegment::class)->makePartial();
+
+        $this->segmentRepository->allows('findWithRules')->andReturn($segment);
+        $this->planRepository->allows('find')->andReturn($plan);
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->andReturn($existing);
+        $this->planSegmentRepository->expects('assign')->never();
+
+        $result = $this->service->assignPlans(10, [1]);
+
+        $this->assertCount(0, $result['assigned']);
+        $this->assertCount(1, $result['skipped']);
+    }
+
+    public function test_assign_plans_throws_when_segment_not_found(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Segment #99 not found/');
+
+        $this->segmentRepository->allows('findWithRules')->with(99)->andReturnNull();
+
+        $this->service->assignPlans(99, [1, 2]);
+    }
+
+    public function test_assign_plans_throws_when_segment_is_member_type(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/member segment/');
+
+        $segment = $this->makeSegment(5, SegmentSubjectType::Member);
+        $this->segmentRepository->allows('findWithRules')->andReturn($segment);
+
+        $this->service->assignPlans(5, [1]);
+    }
+
+    public function test_assign_plans_throws_when_any_plan_not_found(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Plan #999 not found/');
+
+        $segment = $this->makeSegment(10, SegmentSubjectType::Subscription);
+        $plan1   = $this->makePlan(1);
+
+        $this->segmentRepository->allows('findWithRules')->andReturn($segment);
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->andReturnNull();
+
+        // 👇 ADD THIS LINE to allow the repository to handle the assignment of the first plan
+        $this->planSegmentRepository->allows('assign')->andReturn(Mockery::mock(PlanSegment::class)->makePartial());
+
+        $this->planRepository->allows('find')->with(1)->andReturn($plan1);
+        $this->planRepository->allows('find')->with(999)->andReturnNull();
+
+        $this->service->assignPlans(10, [1, 999]);
+    }
+
+    public function test_assign_plans_passes_options_to_repository(): void
+    {
+        $segment    = $this->makeSegment(10, SegmentSubjectType::Subscription);
+        $plan       = $this->makePlan(1);
+        $assignment = Mockery::mock(PlanSegment::class)->makePartial();
+        $options    = ['priority' => 50, 'is_active' => true];
+
+        $this->segmentRepository->allows('findWithRules')->andReturn($segment);
+        $this->planRepository->allows('find')->andReturn($plan);
+        $this->planSegmentRepository->allows('findByPlanAndSegment')->andReturnNull();
+        $this->planSegmentRepository->expects('assign')
+            ->once()
+            ->with(1, 10, $options)
+            ->andReturn($assignment);
+
+        $this->service->assignPlans(10, [1], $options);
+
+        $this->addToAssertionCount(1);
     }
 
     // -------------------------------------------------------------------------

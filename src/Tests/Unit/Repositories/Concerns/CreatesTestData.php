@@ -1067,6 +1067,6 @@ trait CreatesTestData
             'is_active' => true,
             'description' => 'Test Segment',
             'category' => 'test'
-        ]));
+        ], $overrides));
     }
 }

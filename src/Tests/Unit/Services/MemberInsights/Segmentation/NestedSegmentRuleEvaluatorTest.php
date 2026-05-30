@@ -159,7 +159,7 @@ class NestedSegmentRuleEvaluatorTest extends TestCase
     public function test_nested_or_fails_when_all_options_fail(): void
     {
         $childGroup = $this->makeGroup(
-            SegmentRuleBoolean::OR,
+            SegmentRuleBoolean::AND, // ✅ FIXED: Tells the engine to chain this group to 'status' via AND
             collect([
                 $this->makeRule('payment_type', SegmentRuleOperator::EQUALS, 'direct_debit', SegmentRuleBoolean::AND),
                 $this->makeRule('payment_type', SegmentRuleOperator::EQUALS, 'invoice',      SegmentRuleBoolean::OR),

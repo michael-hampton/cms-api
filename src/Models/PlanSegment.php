@@ -24,7 +24,7 @@ class PlanSegment extends Model
 
     public function plan()
     {
-        return $this->belongsTo(SubscriptionPlan::class);
+        return $this->belongsTo(SubscriptionPlan::class, 'plan_id');
     }
 
     public function segment()
