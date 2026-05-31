@@ -1243,6 +1243,7 @@ $apiBase = '/api/' . $site;
             if (!item.promotion || !item.id) return;
 
             const promo = item.promotion;
+
             const label = promo.type === 'percentage'
                 ? parseFloat(promo.value).toFixed(0) + '% off'
                 : currency + parseFloat(promo.value).toFixed(2) + ' off';
@@ -1257,7 +1258,7 @@ $apiBase = '/api/' . $site;
             // structure this is a no-op (graceful degradation).
             const row = document.querySelector('[data-item-id="' + item.id + '"]');
             if (row) {
-                const nameEl = row.querySelector('.item-name, .summary-item-name, .cart-item-name');
+                const nameEl = row.querySelector('.cs-item-name');
                 if (nameEl) nameEl.insertAdjacentElement('afterend', pill);
             }
         });

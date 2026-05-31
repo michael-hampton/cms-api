@@ -87,7 +87,7 @@ $groupIndex = 0;
             }
             ?>
 
-            <div class="cs-item">
+            <div class="cs-item" data-item-id="<?= $item['id'] ?>">
                 <!-- Thumbnail -->
                 <?php if ($productImg): ?>
                     <img src="<?= htmlspecialchars($productImg) ?>"
