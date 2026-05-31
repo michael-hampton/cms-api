@@ -286,4 +286,14 @@ class VoucherService
 
         return false;
     }
+
+    /**
+     * Find an active promotion voucher automatically attached to a plan.
+     * Called when no user-entered voucher code was provided at checkout.
+     * Returns null if the plan has no active promotion.
+     */
+    public function findActivePromotionForPlan(int $planId): ?Voucher
+    {
+        return $this->repository->findActivePromotionForPlan($planId);
+    }
 }

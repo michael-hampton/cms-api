@@ -2095,6 +2095,24 @@ class QueryBuilder
         return $this;
     }
 
+    public function orWhereColumn(string $first, string $operatorOrSecond, ?string $second = null): self
+    {
+        if ($second === null) {
+            $second = $operatorOrSecond;
+            $operatorOrSecond = '=';
+        }
+
+        $this->wheres[] = [
+            'type' => 'ColumnComparison',
+            'first' => $first,
+            'operator' => $operatorOrSecond,
+            'second' => $second,
+            'boolean' => 'OR',
+        ];
+
+        return $this;
+    }
+
     public function whereJsonContains(string $column, $tags, string $boolean = 'AND'): self
     {
         if (!is_array($tags)) {

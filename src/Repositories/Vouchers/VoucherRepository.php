@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Vouchers;
 
+use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
 use App\Models\Segment;
 use App\Models\Voucher;
@@ -234,5 +235,33 @@ class VoucherRepository extends Repository
     public function getByMerchant(int $merchantId): Collection
     {
         return Voucher::where('merchant_id', $merchantId)->get();
+    }
+
+    /**
+     * Find the first active promotion voucher attached to a plan via the pivot.
+     * A promotion voucher has no user-entered code — it is automatically applied.
+     * Only vouchers that apply_to_subscriptions and are currently valid are returned.
+     */
+    public function findActivePromotionForPlan(int $planId): ?Voucher
+    {
+        return Voucher::query()
+            ->join('voucher_subscription_plan', 'vouchers.id', '=', 'voucher_subscription_plan.voucher_id')
+            ->where('voucher_subscription_plan.subscription_plan_id', $planId)
+            ->where('vouchers.applies_to_subscriptions', true)
+            ->where('vouchers.status', 'active')
+            ->where(function (QueryBuilder $q) {
+                $q->whereNull('vouchers.starts_at')
+                    ->orWhere('vouchers.starts_at', '<=', now());
+            })
+            ->where(function (QueryBuilder $q) {
+                $q->whereNull('vouchers.expires_at')
+                    ->orWhere('vouchers.expires_at', '>', now());
+            })
+            ->where(function (QueryBuilder $q) {
+                $q->whereNull('vouchers.usage_limit')
+                    ->orWhereColumn('vouchers.usage_count', '<', 'vouchers.usage_limit');
+            })
+            ->select('vouchers.*')
+            ->first();
     }
 }

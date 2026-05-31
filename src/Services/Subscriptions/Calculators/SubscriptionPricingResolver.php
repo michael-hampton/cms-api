@@ -114,6 +114,20 @@ class SubscriptionPricingResolver
             }
         }
 
+        // Step 2a: No user voucher — check if the plan has an automatic promotion.
+        // A promotion is a voucher attached to the plan via the pivot table that
+        // requires no code entry. It is only applied when the member has not already
+        // provided a voucher code (user codes take precedence).
+        if ($voucherId === null) {
+            $promotion = $this->voucherService->findActivePromotionForPlan($plan->id);
+
+            if ($promotion !== null) {
+                $effectivePrice = $salePrice ?? $basePrice;
+                $discountAmount = $promotion->calculateSubscriptionDiscount($effectivePrice);
+                $voucherId = $promotion->id;
+            }
+        }
+
         // Step 3: Build resolved price
         if ($pricingTier) {
             return ResolvedSubscriptionPrice::fromPricingTier(
