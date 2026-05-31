@@ -42,13 +42,23 @@ class SegmentRuleEngine
             return false;
         }
 
-        $data   = $subscription->toArray();
+        $data = $subscription->toArray();
+
+        if ($subscription->plan !== null) {
+            $data['plan'] = $subscription->plan->toArray();
+        }
+
         $result = null;
 
         foreach ($rules as $rule) {
+
             $actual = data_get($data, $rule->field);
 
-            $match = $this->evaluate($rule->operator, $actual, $rule->value);
+            $match = $this->evaluate(
+                $rule->operator,
+                $actual,
+                $rule->value
+            );
 
             if ($result === null) {
                 $result = $match;
@@ -80,9 +90,7 @@ class SegmentRuleEngine
      */
     private function evaluate(mixed $operator, mixed $actual, mixed $expected): bool
     {
-        $op = $operator instanceof SubscriptionRuleOperator
-            ? $operator
-            : SubscriptionRuleOperator::tryFrom((string) $operator);
+        $op = $this->resolveOperator($operator);
 
         if ($op === null) {
             // Unknown operator — fail safe.
@@ -191,5 +199,27 @@ class SegmentRuleEngine
         }
 
         throw new \InvalidArgumentException("Cannot parse date from: " . gettype($value));
+    }
+
+    private function resolveOperator(mixed $operator): ?SubscriptionRuleOperator
+    {
+        if ($operator instanceof SubscriptionRuleOperator) {
+            return $operator;
+        }
+
+        return match ((string) $operator) {
+            '=', 'equals'                   => SubscriptionRuleOperator::Equals,
+            '!=', '<>', 'not_equals'        => SubscriptionRuleOperator::NotEquals,
+            '>', 'greater_than'             => SubscriptionRuleOperator::GreaterThan,
+            '<', 'less_than'                => SubscriptionRuleOperator::LessThan,
+            'between'                       => SubscriptionRuleOperator::Between,
+            'contains'                      => SubscriptionRuleOperator::Contains,
+            'in'                            => SubscriptionRuleOperator::In,
+            'not_in'                        => SubscriptionRuleOperator::NotIn,
+            'before'                        => SubscriptionRuleOperator::Before,
+            'after'                         => SubscriptionRuleOperator::After,
+            'within_next_days'              => SubscriptionRuleOperator::WithinNextDays,
+            default                         => null,
+        };
     }
 }

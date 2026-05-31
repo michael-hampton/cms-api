@@ -327,6 +327,72 @@ class SegmentRuleEngineTest extends TestCase
         $this->assertFalse($this->engine->matches($subscription, $segment));
     }
 
+    public function test_equals_matches_plan_field(): void
+    {
+        $subscription = $this->makeSubscription([
+            'plan' => [
+                'billing_period' => 'monthly',
+            ],
+        ]);
+
+        $segment = $this->makeSegment([
+            [
+                'field' => 'plan.billing_period',
+                'operator' => 'equals',
+                'value' => 'monthly',
+            ],
+        ]);
+
+        $this->assertTrue(
+            $this->engine->matches($subscription, $segment)
+        );
+    }
+
+    public function test_equals_does_not_match_different_plan_field(): void
+    {
+        $subscription = $this->makeSubscription([
+            'plan' => [
+                'billing_period' => 'annual',
+            ],
+        ]);
+
+        $segment = $this->makeSegment([
+            [
+                'field' => 'plan.billing_period',
+                'operator' => 'equals',
+                'value' => 'monthly',
+            ],
+        ]);
+
+        $this->assertFalse(
+            $this->engine->matches($subscription, $segment)
+        );
+    }
+
+    public function test_contains_matches_plan_categories(): void
+    {
+        $subscription = $this->makeSubscription([
+            'plan' => [
+                'categories' => [
+                    'Digital Only',
+                    'Monthly',
+                ],
+            ],
+        ]);
+
+        $segment = $this->makeSegment([
+            [
+                'field' => 'plan.categories',
+                'operator' => 'contains',
+                'value' => 'Monthly',
+            ],
+        ]);
+
+        $this->assertTrue(
+            $this->engine->matches($subscription, $segment)
+        );
+    }
+
     // =========================================================================
     // Helpers
     // =========================================================================
@@ -334,7 +400,10 @@ class SegmentRuleEngineTest extends TestCase
     private function makeSubscription(array $attributes): Subscription
     {
         $sub = Mockery::mock(Subscription::class)->makePartial();
+
         $sub->allows('toArray')->andReturn($attributes);
+
+        $sub->plan = null;
 
         return $sub;
     }
