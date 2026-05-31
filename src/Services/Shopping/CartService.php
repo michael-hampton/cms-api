@@ -890,12 +890,15 @@ class CartService
      */
     public function containsSubscriptionBundleItems(): bool
     {
-        $items = $this->getItems();
+        $items = $this->cartRepository->findBySessionOrUser(
+            $this->getUserId(),
+            $this->getSessionId()
+        );
 
         foreach ($items as $item) {
-            $options = is_string($item['options'] ?? null)
-                ? json_decode($item['options'], true)
-                : ($item['options'] ?? []);
+            $options = is_string($item->options)
+                ? json_decode($item->options, true)
+                : ($item->options ?? []);
 
             if (isset($options['bundle_id'])) {
                 return true;
@@ -985,7 +988,7 @@ class CartService
                 // Resolve and cache active promotion voucher for this plan.
                 // The result is stored in options so cart/checkout pages can
                 // display it without additional DB queries.
-                $promotion = $plan
+                $promotion = ($plan && $plan->id)
                     ? $this->voucherRepository->findActivePromotionForPlan($plan->id)
                     : null;
 

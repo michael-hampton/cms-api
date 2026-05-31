@@ -1501,11 +1501,6 @@ class CartServiceTest extends FunctionalTestCase
         $plan->currency = 'GBP';
         $plan->pricingTiers = collect([]);
 
-        $this->subscriptionPlanRepository->shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($plan);
-
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
 
@@ -1523,11 +1518,6 @@ class CartServiceTest extends FunctionalTestCase
         $plan->name = 'Test Plan';
         $plan->currency = 'GBP';
         $plan->pricingTiers = collect([]);
-
-        $this->subscriptionPlanRepository->shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($plan);
 
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
@@ -1554,11 +1544,6 @@ class CartServiceTest extends FunctionalTestCase
         $plan->name = 'Test Plan';
         $plan->currency = 'GBP';
         $plan->pricingTiers = collect([]);
-
-        $this->subscriptionPlanRepository->shouldReceive('find')
-            ->once()
-            ->with(1)
-            ->andReturn($plan);
 
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart]));
@@ -1587,16 +1572,6 @@ class CartServiceTest extends FunctionalTestCase
         $plan2->name = 'Plan 2';
         $plan2->currency = 'GBP';
         $plan2->pricingTiers = collect([]);
-
-        $this->subscriptionPlanRepository->shouldReceive('find')
-            ->with(1)
-            ->once()
-            ->andReturn($plan1);
-
-        $this->subscriptionPlanRepository->shouldReceive('find')
-            ->with(2)
-            ->once()
-            ->andReturn($plan2);
 
         $this->cartRepository->shouldReceive('findBySessionOrUser')
             ->andReturn(collect([$cart1, $cart2]));
