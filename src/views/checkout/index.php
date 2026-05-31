@@ -95,6 +95,7 @@ $subscriptionCartSnapshot = array_values(array_map(function ($item) {
             'pricing_tier_id' => $options['pricing_tier_id'] ?? null,
             'start_date' => $options['start_date'] ?? null,
             'is_one_time' => $plan?->isOneTime() ?? false,
+            'promotion' => $item['promotion'] ?? null,
     ];
 }, $cartSubscriptionItems));
 
@@ -528,6 +529,19 @@ $apiBase = '/api/' . $site;
             'initialSubtotal' => (float)($subtotal ?? 0),
             'initialShipping' => (float)($shipping ?? 0),
             'subscriptionCartSnapshot' => $subscriptionCartSnapshot,
+            'cartItems' => array_values(array_map(function ($item) {
+                return [
+                        'id'                   => $item['id'] ?? null,
+                        'product_name'         => $item['product_name'] ?? $item['plan_name'] ?? 'Subscription',
+                        'plan_name'            => $item['plan_name'] ?? null,
+                        'subscription_plan_id' => $item['subscription_plan_id'] ?? null,
+                        'price'                => (float)($item['price'] ?? 0),
+                        'subtotal'             => (float)($item['subtotal'] ?? 0),
+                        'quantity'             => (int)($item['quantity'] ?? 1),
+                        'options'              => $item['options'] ?? [],
+                        'promotion'            => $item['promotion'] ?? null,
+                ];
+            }, $items ?? [])),
     ]) ?>;
 
     const API_BASE = CHECKOUT_BOOTSTRAP.apiBase;
@@ -1219,6 +1233,35 @@ $apiBase = '/api/' . $site;
     window.checkoutManager.init().then(() => {
         window.checkoutManager.syncPlaceOrderButton();
     });
+
+    // ── Promotion badges in order summary ────────────────────────────────
+    // After the DOM is ready, inject promotion pills into the server-rendered
+    // order summary sidebar for any subscription item that carries a promotion.
+    (function injectPromotionBadges() {
+        const currency = CHECKOUT_BOOTSTRAP.planCurrency ?? '£';
+        (CHECKOUT_BOOTSTRAP.cartItems ?? []).forEach(function (item) {
+            if (!item.promotion || !item.id) return;
+
+            const promo = item.promotion;
+            const label = promo.type === 'percentage'
+                ? parseFloat(promo.value).toFixed(0) + '% off'
+                : currency + parseFloat(promo.value).toFixed(2) + ' off';
+            const name = promo.name ? promo.name.replace(/</g, '&lt;').replace(/>/g, '&gt;') : '';
+
+            const pill = document.createElement('div');
+            pill.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:100px;padding:.15rem .65rem;font-size:.72rem;font-weight:600;color:#92400e;margin-top:.35rem;';
+            pill.innerHTML = '🏷️ ' + name + ' &mdash; ' + label + ' applied at checkout';
+
+            // The sidebar renders items in [data-item-id] rows or as list entries.
+            // Try to find a matching element; if the sidebar uses a different
+            // structure this is a no-op (graceful degradation).
+            const row = document.querySelector('[data-item-id="' + item.id + '"]');
+            if (row) {
+                const nameEl = row.querySelector('.item-name, .summary-item-name, .cart-item-name');
+                if (nameEl) nameEl.insertAdjacentElement('afterend', pill);
+            }
+        });
+    })();
 
     if (appliedVoucher) {
         window.appliedVoucher = appliedVoucher;

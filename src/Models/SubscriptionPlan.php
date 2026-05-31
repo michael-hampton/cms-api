@@ -484,4 +484,14 @@ class SubscriptionPlan extends Model
             $relation
         );
     }
+
+    public function promotion()
+    {
+        return $this->belongsToMany(
+            Voucher::class,
+            'voucher_subscription_plan',
+            'subscription_plan_id',
+            'voucher_id'
+        );
+    }
 }

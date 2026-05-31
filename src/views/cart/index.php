@@ -386,6 +386,17 @@ $apiBase = '/api/' . $site;
                                                 🎁 <?= (int)$item['trial_days'] ?>-day free trial included
                                             </div>
                                         <?php endif; ?>
+                                        <?php if (!empty($item['promotion'])): ?>
+                                            <?php
+                                            $promo = $item['promotion'];
+                                            $promoLabel = ($promo['type'] === 'percentage')
+                                                    ? number_format((float)$promo['value'], 0) . '% off'
+                                                    : (htmlspecialchars($currencySymbol) . number_format((float)$promo['value'], 2) . ' off');
+                                            ?>
+                                            <div style="display:inline-flex;align-items:center;gap:.35rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:100px;padding:.2rem .75rem;font-size:.75rem;font-weight:600;color:#92400e;margin-top:.4rem;">
+                                                🏷️ <?= htmlspecialchars($promo['name']) ?> &mdash; <?= $promoLabel ?> applied at checkout
+                                            </div>
+                                        <?php endif; ?>
                                         <div class="item-price">
                                             <?php if ($isFreeGift): ?>
                                                 <span style="color:#10b981;font-weight:700;">FREE</span>

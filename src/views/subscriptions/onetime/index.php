@@ -423,6 +423,21 @@ $selectedTags = !empty($filters['tags'])
 
         .plan-card__btn--cart { transition: background 0.2s, color 0.2s, border-color 0.2s; }
 
+        .plan-card__promo {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 100px;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #92400e;
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+
         .plan-card__btn--cart.is-in-cart {
             background: #d1fae5 !important;
             color: #065f46 !important;
@@ -1093,6 +1108,21 @@ $selectedTags = !empty($filters['tags'])
                                     </div>
                                 <?php endif; ?>
 
+                                <?php
+                                // $plan->promotion is set by the controller via
+                                // CartService::getPromotionForPlan() or null when none active.
+                                $planPromo = $plan->promotion()?->first();
+
+                                if ($planPromo):
+                                    $promoLabel = ($planPromo->type === 'percentage')
+                                            ? number_format((float)$planPromo->value, 0) . '% off'
+                                            : ($currencySymbol . number_format((float)$planPromo->value, 2) . ' off');
+                                    ?>
+                                    <div class="plan-card__promo">
+                                        🏷️ <?= htmlspecialchars($planPromo->name) ?> — <?= htmlspecialchars($promoLabel) ?>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if (!empty($plan->description)): ?>
                                     <p class="plan-card__desc">
                                         <?= htmlspecialchars(mb_substr($plan->description, 0, 110)) ?>
@@ -1632,6 +1662,16 @@ $selectedTags = !empty($filters['tags'])
             const tagPills  = (plan.tags       || []).slice(0, 2).map(t => `<span class="meta-pill meta-pill--tag">${escHtml(t.replace(/-/g,' ').replace(/\b\w/g, l => l.toUpperCase()))}</span>`).join('');
             const cartDt    = escHtml(plan.delivery_type || 'digital');
 
+            // Promotion pill — only rendered when the API includes promotion data.
+            let promoHtml = '';
+            if (plan.promotion) {
+                const p = plan.promotion;
+                const promoLabel = p.type === 'percentage'
+                    ? parseFloat(p.value).toFixed(0) + '% off'
+                    : CURRENCY_SYMBOL + parseFloat(p.value).toFixed(2) + ' off';
+                promoHtml = `<div class="plan-card__promo">🏷️ ${escHtml(p.name)} &mdash; ${escHtml(promoLabel)}</div>`;
+            }
+
             // Cover image with optional issue label
             const cover = this._resolveCoverImage(plan);
             let coverHtml;
@@ -1644,7 +1684,7 @@ $selectedTags = !empty($filters['tags'])
                 coverHtml = `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
             }
 
-            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" data-pricing-tier-id="${plan.pricing_tier_id || ''}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
+            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${promoHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" data-pricing-tier-id="${plan.pricing_tier_id || ''}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
         }
 
         _renderPagination(p) {

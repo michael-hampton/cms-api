@@ -257,6 +257,12 @@ $coverIsIssue     = (bool) $issueCoverImage;
         .trial-banner__title { font-weight:700; font-size:.95rem; color:#065f46; }
         .trial-banner__body { font-size:.8rem; color:#047857; margin-top:.2rem; line-height:1.6; }
 
+        .promo-banner { display:flex; align-items:flex-start; gap:.875rem; background:#fff7ed; border:1.5px solid #fed7aa; border-radius:var(--radius); padding:1rem 1.1rem; margin-bottom:1.25rem; }
+        .promo-banner__icon { font-size:1.5rem; line-height:1; flex-shrink:0; margin-top:.1rem; }
+        .promo-banner__title { font-weight:700; font-size:.95rem; color:#92400e; }
+        .promo-banner__body { font-size:.8rem; color:#b45309; margin-top:.2rem; line-height:1.6; }
+        .promo-banner__badge { display:inline-block; background:#f59e0b; color:white; font-size:.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:.03em; margin-left:.4rem; vertical-align:middle; }
+
         @media (max-width:768px) {
             .plan-layout { grid-template-columns:1fr; }
             .plan-left { position:static; display:grid; grid-template-columns:180px 1fr; gap:1rem; align-items:start; }
@@ -370,6 +376,36 @@ $coverIsIssue     = (bool) $issueCoverImage;
                                 <strong><?= (new DateTimeImmutable())->modify("+{$plan->trial_days} days")->format('F j, Y') ?></strong>.
                                 Cancel any time during the trial at no cost.
                             </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php
+                // $promotion is provided by the controller via CartService::getPromotionForPlan()
+                $promotion = $plan->promotion?->first() ?? null;
+                ?>
+                <?php if (!empty($promotion)): ?>
+                    <?php
+                    $promoLabel = $promotion->type === 'percentage'
+                            ? number_format((float)$promotion->value, 0) . '% off'
+                            : ($currencySymbol . number_format((float)$promotion->value, 2) . ' off');
+                    ?>
+                    <div class="promo-banner" role="note" aria-label="Promotional offer">
+                        <span class="promo-banner__icon" aria-hidden="true">🏷️</span>
+                        <div>
+                            <div class="promo-banner__title">
+                                <?= htmlspecialchars($promotion->name) ?>
+                                <span class="promo-banner__badge"><?= htmlspecialchars($promoLabel) ?></span>
+                            </div>
+                            <?php if (!empty($promotion->description)): ?>
+                                <div class="promo-banner__body">
+                                    <?= htmlspecialchars($promotion->description) ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="promo-banner__body">
+                                    This plan includes an automatic discount of <strong><?= htmlspecialchars($promoLabel) ?></strong> — applied at checkout.
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>

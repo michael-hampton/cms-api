@@ -15,6 +15,7 @@ use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\Factories\CartItemFactory;
 use App\Services\Shopping\Resolvers\CartPriceResolver;
@@ -41,6 +42,7 @@ class CartService
         private readonly ShippingService                  $shippingService,
         private readonly SubscriptionBundleRepository     $subscriptionBundleRepository,
         private readonly SubscriptionBundlePriceAllocator $bundlePriceAllocator,
+        private readonly VoucherRepository                $voucherRepository,
     )
     {
     }
@@ -903,6 +905,34 @@ class CartService
         return false;
     }
 
+    /**
+     * Return the active promotion voucher for a plan, if any.
+     *
+     * Used by the plan detail page (show.php) to display a promo banner
+     * before the customer adds the plan to the cart, and also available
+     * for any other page that needs plan-level promotion data.
+     *
+     * Returns null when no active promotion exists.
+     */
+    public function getPromotionForPlan(int $planId): ?array
+    {
+        $promotion = $this->voucherRepository->findActivePromotionForPlan($planId);
+
+        if (!$promotion) {
+            return null;
+        }
+
+        return [
+            'voucher_id'    => $promotion->id,
+            'code'          => $promotion->code,
+            'name'          => $promotion->name,
+            'type'          => $promotion->type,
+            'value'         => $promotion->value,
+            'discount_type' => $promotion->getStripeDiscountType(),
+            'description'   => $promotion->description,
+        ];
+    }
+
     public function getItems(): array
     {
         $sessionId = $this->getSessionId();
@@ -951,6 +981,27 @@ class CartService
                 $itemData['tier_duration_months'] = $pricingTier?->duration_months ?? null;
                 $itemData['tier_issue_count'] = $pricingTier?->issue_count ?? null;
                 $itemData['price'] = $pricingTier?->getEffectivePrice($options['delivery_type']) ?? $plan->price ?? null;
+
+                // Resolve and cache active promotion voucher for this plan.
+                // The result is stored in options so cart/checkout pages can
+                // display it without additional DB queries.
+                $promotion = $plan
+                    ? $this->voucherRepository->findActivePromotionForPlan($plan->id)
+                    : null;
+
+                if ($promotion) {
+                    $itemData['promotion'] = [
+                        'voucher_id'   => $promotion->id,
+                        'code'         => $promotion->code,
+                        'name'         => $promotion->name,
+                        'type'         => $promotion->type,
+                        'value'        => $promotion->value,
+                        'discount_type' => $promotion->getStripeDiscountType(),
+                        'description'  => $promotion->description,
+                    ];
+                } else {
+                    $itemData['promotion'] = null;
+                }
             }
 
             //dd($itemData);

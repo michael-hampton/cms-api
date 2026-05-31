@@ -23,6 +23,7 @@ use App\Repositories\Product\ProductVariantRepository;
 use App\Repositories\Shopping\CartRepository;
 use App\Repositories\Subscriptions\SubscriptionBundleRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
+use App\Repositories\Vouchers\VoucherRepository;
 use App\Services\Billing\Preorder\Contracts\AvailabilityPolicyInterface;
 use App\Services\Shipping\ShippingService;
 use App\Services\Shopping\CartService;
@@ -56,6 +57,7 @@ class CartServiceTest extends FunctionalTestCase
     private ShippingService $shippingService;
     private SubscriptionBundleRepository $subscriptionBundleRepository;
     private SubscriptionBundlePriceAllocator $subscriptionBundlePriceAllocator;
+    private VoucherRepository $voucherRepository;
 
     public function testGetItemsReturnsEmptyArrayWhenNoItems()
     {
@@ -1815,6 +1817,11 @@ class CartServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(Database::class);
         $this->subscriptionBundleRepository = Mockery::mock(SubscriptionBundleRepository::class);
         $this->subscriptionBundlePriceAllocator = Mockery::mock(SubscriptionBundlePriceAllocator::class);
+        $this->voucherRepository = Mockery::mock(VoucherRepository::class);
+        // Default: no active promotion for any plan (overridden in promotion-specific tests)
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')
+            ->andReturn(null)
+            ->byDefault();
 
         // Real collaborators
         $this->stockResolver = new CartStockResolver();
@@ -1836,7 +1843,8 @@ class CartServiceTest extends FunctionalTestCase
             $this->itemFactory,
             $this->shippingService,
             $this->subscriptionBundleRepository,
-            $this->subscriptionBundlePriceAllocator
+            $this->subscriptionBundlePriceAllocator,
+            $this->voucherRepository,
         );
 
         $_SESSION['cart_session_id'] = 'test_session_123';
@@ -1844,6 +1852,224 @@ class CartServiceTest extends FunctionalTestCase
 
 
     // Helper — calls a private method via reflection (add to CartServiceTest base)
+
+    // -----------------------------------------------------------------------
+    // Promotion voucher display
+    // -----------------------------------------------------------------------
+
+    public function testGetItemsIncludesNullPromotionWhenNoneActive(): void
+    {
+        $product = new Product(['id' => 1, 'name' => 'Mag', 'slug' => 'mag']);
+
+        $cartItem = new CartItem([
+            'id'                   => 1,
+            'product_id'           => 1,
+            'subscription_plan_id' => 5,
+            'quantity'             => 1,
+            'price'                => 29.99,
+            'subtotal'             => 29.99,
+            'options'              => ['delivery_type' => 'digital'],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id       = 5;
+        $plan->name     = 'Test Mag';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(5)->andReturn($plan);
+        $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect([$cartItem]));
+
+        // Explicitly return null (default already does this, but explicit is clearer)
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')->with(5)->once()->andReturn(null);
+
+        $items = $this->service->getItems();
+
+        $this->assertCount(1, $items);
+        $this->assertNull($items[0]['promotion']);
+    }
+
+    public function testGetItemsIncludesPromotionWhenActiveVoucherExists(): void
+    {
+        $product = new Product(['id' => 1, 'name' => 'Mag', 'slug' => 'mag']);
+
+        $cartItem = new CartItem([
+            'id'                   => 1,
+            'product_id'           => 1,
+            'subscription_plan_id' => 5,
+            'quantity'             => 1,
+            'price'                => 29.99,
+            'subtotal'             => 29.99,
+            'options'              => ['delivery_type' => 'print'],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id       = 5;
+        $plan->name     = 'Test Mag';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $voucher = Mockery::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id          = 99;
+        $voucher->code        = 'SAVE10';
+        $voucher->name        = '10% Off';
+        $voucher->type        = 'percentage';
+        $voucher->value       = 10.0;
+        $voucher->description = 'Get 10% off this plan';
+        $voucher->shouldReceive('getStripeDiscountType')->andReturn('percentage');
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(5)->andReturn($plan);
+        $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect([$cartItem]));
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')->with(5)->once()->andReturn($voucher);
+
+        $items = $this->service->getItems();
+
+        $this->assertCount(1, $items);
+        $this->assertNotNull($items[0]['promotion']);
+        $this->assertEquals(99, $items[0]['promotion']['voucher_id']);
+        $this->assertEquals('SAVE10', $items[0]['promotion']['code']);
+        $this->assertEquals('10% Off', $items[0]['promotion']['name']);
+        $this->assertEquals('percentage', $items[0]['promotion']['type']);
+        $this->assertEquals(10.0, $items[0]['promotion']['value']);
+        $this->assertEquals('percentage', $items[0]['promotion']['discount_type']);
+        $this->assertEquals('Get 10% off this plan', $items[0]['promotion']['description']);
+    }
+
+    public function testGetItemsIncludesFixedAmountPromotion(): void
+    {
+        $product = new Product(['id' => 2, 'name' => 'Mag2', 'slug' => 'mag2']);
+
+        $cartItem = new CartItem([
+            'id'                   => 2,
+            'product_id'           => 2,
+            'subscription_plan_id' => 7,
+            'quantity'             => 1,
+            'price'                => 49.99,
+            'subtotal'             => 49.99,
+            'options'              => ['delivery_type' => 'digital'],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id       = 7;
+        $plan->name     = 'Test Mag 2';
+        $plan->currency = 'GBP';
+        $plan->pricingTiers = collect([]);
+
+        $voucher = Mockery::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id          = 42;
+        $voucher->code        = 'FIXED5';
+        $voucher->name        = '£5 Off';
+        $voucher->type        = 'fixed';
+        $voucher->value       = 5.0;
+        $voucher->description = null;
+        $voucher->shouldReceive('getStripeDiscountType')->andReturn('fixed');
+
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(7)->andReturn($plan);
+        $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect([$cartItem]));
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')->with(7)->once()->andReturn($voucher);
+
+        $items = $this->service->getItems();
+
+        $this->assertNotNull($items[0]['promotion']);
+        $this->assertEquals('fixed', $items[0]['promotion']['type']);
+        $this->assertEquals(5.0, $items[0]['promotion']['value']);
+        $this->assertNull($items[0]['promotion']['description']);
+    }
+
+    public function testGetItemsDoesNotQueryPromotionForNonSubscriptionItems(): void
+    {
+        $product = new Product(['id' => 1, 'name' => 'Widget', 'slug' => 'widget']);
+
+        $cartItem = new CartItem([
+            'id'         => 1,
+            'product_id' => 1,
+            'quantity'   => 1,
+            'price'      => 9.99,
+            'subtotal'   => 9.99,
+            'options'    => [],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect([$cartItem]));
+
+        // Must NOT be called for non-subscription items
+        $this->voucherRepository->shouldNotReceive('findActivePromotionForPlan');
+
+        $items = $this->service->getItems();
+
+        $this->assertCount(1, $items);
+        $this->assertArrayNotHasKey('promotion', $items[0]);
+    }
+
+    public function testGetPromotionForPlanReturnsNullWhenNoPromotion(): void
+    {
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')
+            ->with(10)
+            ->once()
+            ->andReturn(null);
+
+        $result = $this->service->getPromotionForPlan(10);
+
+        $this->assertNull($result);
+    }
+
+    public function testGetPromotionForPlanReturnsFormattedArrayWhenPromotionExists(): void
+    {
+        $voucher = Mockery::mock(\App\Models\Voucher::class)->makePartial();
+        $voucher->id          = 55;
+        $voucher->code        = 'LAUNCH20';
+        $voucher->name        = 'Launch 20% Off';
+        $voucher->type        = 'percentage';
+        $voucher->value       = 20.0;
+        $voucher->description = 'Special launch offer';
+        $voucher->shouldReceive('getStripeDiscountType')->andReturn('percentage');
+
+        $this->voucherRepository->shouldReceive('findActivePromotionForPlan')
+            ->with(10)
+            ->once()
+            ->andReturn($voucher);
+
+        $result = $this->service->getPromotionForPlan(10);
+
+        $this->assertIsArray($result);
+        $this->assertEquals(55, $result['voucher_id']);
+        $this->assertEquals('LAUNCH20', $result['code']);
+        $this->assertEquals('Launch 20% Off', $result['name']);
+        $this->assertEquals('percentage', $result['type']);
+        $this->assertEquals(20.0, $result['value']);
+        $this->assertEquals('percentage', $result['discount_type']);
+        $this->assertEquals('Special launch offer', $result['description']);
+    }
+
+    public function testGetItemsPromotionIsNullWhenPlanNotFound(): void
+    {
+        $product = new Product(['id' => 1, 'name' => 'Mag', 'slug' => 'mag']);
+
+        $cartItem = new CartItem([
+            'id'                   => 1,
+            'product_id'           => 1,
+            'subscription_plan_id' => 999,
+            'quantity'             => 1,
+            'price'                => 29.99,
+            'subtotal'             => 29.99,
+            'options'              => ['delivery_type' => 'digital'],
+        ]);
+        $cartItem->setRelation('product', $product);
+
+        // Plan not found
+        $this->subscriptionPlanRepository->shouldReceive('find')->with(999)->andReturn(null);
+        $this->cartRepository->shouldReceive('findBySessionOrUser')->once()->andReturn(collect([$cartItem]));
+
+        // findActivePromotionForPlan must NOT be called when plan is null
+        $this->voucherRepository->shouldNotReceive('findActivePromotionForPlan');
+
+        $items = $this->service->getItems();
+
+        $this->assertNull($items[0]['promotion']);
+    }
 
     protected function tearDown(): void
     {
