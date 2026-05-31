@@ -34,23 +34,23 @@ use RuntimeException;
  *   POST /api/{site}/open-collab/onboarding/profile
  *   POST /api/{site}/open-collab/onboarding/steps/profile/complete
  *   POST /api/{site}/open-collab/onboarding/payment
+ *   POST /api/{site}/open-collab/onboarding/steps/payment/complete
  *   GET  /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/guidelines
+ *   POST /api/{site}/open-collab/onboarding/age-verification
  */
 class OnboardingController extends Controller
 {
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly ContributorOnboardingService $onboardingService,
-        private readonly ContributorProfileRepository $profileRepository,
-        private readonly ContractRepository           $contractRepository,
-        private readonly GuidelinesRepository         $guidelinesRepository,
-        private readonly ContributorProfileRepository $contributorProfileRepository,
+        private readonly ContributorOnboardingService    $onboardingService,
+        private readonly ContributorProfileRepository   $profileRepository,
+        private readonly ContractRepository             $contractRepository,
+        private readonly GuidelinesRepository           $guidelinesRepository,
         private readonly OpenCollabAuthorizationService $authorization,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
@@ -63,8 +63,8 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site = $this->currentSite();
-        $userId = Auth::id();
+        $site    = $this->currentSite();
+        $userId  = Auth::id();
         $pending = $this->onboardingService->pendingSteps($userId, $site);
 
         return $this->jsonResponse(
@@ -74,6 +74,10 @@ class OnboardingController extends Controller
 
     /**
      * POST /api/{site}/open-collab/onboarding/profile
+     *
+     * Persists profile fields without advancing the onboarding step.
+     * The frontend calls this on "Save progress" and again before calling
+     * steps/profile/complete.
      */
     public function storeProfile(StoreOnboardingProfileRequest $request): JsonResponse
     {
@@ -82,14 +86,13 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data = $request->validated();
+            $data   = $request->validated();
             $userId = Auth::id();
 
             $this->profileRepository->createOrUpdate($userId, [
-                'bio' => $data['bio'],
+                'bio'    => $data['bio'],
                 'avatar' => $data['avatar'] ?? null,
             ]);
-            $this->onboardingService->markProfileInProgress($userId, $this->currentSite()->id);
 
             return $this->successResponse('Profile saved.');
         } catch (ValidationException $e) {
@@ -99,6 +102,9 @@ class OnboardingController extends Controller
 
     /**
      * POST /api/{site}/open-collab/onboarding/steps/profile/complete
+     *
+     * Validates the saved profile is complete and advances the step.
+     * Frontend calls this only when the user clicks "Save & continue".
      */
     public function completeProfileStep(): JsonResponse
     {
@@ -106,7 +112,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site = $this->currentSite();
+        $site   = $this->currentSite();
         $result = $this->onboardingService->completeProfileStep(Auth::id(), $site);
 
         if (!$result['ok']) {
@@ -114,13 +120,15 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'message' => 'Profile step completed.',
+            'message'    => 'Profile step completed.',
             'onboarding' => $result['status'],
         ]);
     }
 
     /**
      * POST /api/{site}/open-collab/onboarding/payment
+     *
+     * Persists payment method details without advancing the onboarding step.
      * Raw card data MUST NOT be sent here — Stripe.js tokenises first.
      */
     public function storePaymentDetails(StorePaymentDetailsRequest $request): JsonResponse
@@ -130,22 +138,43 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data = $request->validated();
+            $data   = $request->validated();
             $userId = Auth::id();
 
-
-
             $this->profileRepository->markPaymentSetup(
-                userId: $userId,
+                userId:      $userId,
                 stripeToken: $data['stripe_token'] ?? $data['payment_method_type'],
             );
-
-            die('here');
 
             return $this->successResponse('Payment details saved.');
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/onboarding/steps/payment/complete
+     *
+     * Validates that payment details have been saved and advances the step.
+     * Frontend calls this only when the user clicks "Confirm & continue".
+     */
+    public function completePaymentStep(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $site   = $this->currentSite();
+        $result = $this->onboardingService->completePaymentStep(Auth::id(), $site);
+
+        if (!$result['ok']) {
+            return $this->errorResponse('Validation failed', 422, $result['errors']);
+        }
+
+        return $this->jsonResponse([
+            'message'    => 'Payment step completed.',
+            'onboarding' => $result['status'],
+        ]);
     }
 
     /**
@@ -157,7 +186,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site = $this->currentSite();
+        $site     = $this->currentSite();
         $contract = $this->contractRepository->latestForSite($site->id);
 
         if (!$contract) {
@@ -165,7 +194,7 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'id' => $contract->id,
+            'id'      => $contract->id,
             'version' => $contract->version,
             'content' => $contract->content,
         ]);
@@ -181,17 +210,16 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data = $request->validated();
-            $userId = Auth::id();
-            $site = $this->currentSite();
-
+            $data     = $request->validated();
+            $userId   = Auth::id();
+            $site     = $this->currentSite();
             $contract = $this->contractRepository->latestForSite($site->id);
 
             if (!$contract) {
                 return $this->errorResponse('No contract found for this site.', 404);
             }
 
-            if ((int)$data['contract_id'] !== $contract->id) {
+            if ((int) $data['contract_id'] !== $contract->id) {
                 return $this->errorResponse(
                     'Contract version mismatch. Please reload and try again.',
                     409
@@ -199,11 +227,17 @@ class OnboardingController extends Controller
             }
 
             if ($this->contractRepository->hasSigned($userId, $contract->id)) {
+                $this->onboardingService->completeStep($userId, $site, 'contract');
                 return $this->successResponse('Contract already signed.');
             }
 
-            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-            $this->contractRepository->recordSignature($userId, $contract->id, $ip);
+            $this->contractRepository->recordSignature(
+                $userId,
+                $contract->id,
+                $this->clientIp($request),
+            );
+
+            $this->onboardingService->completeStep($userId, $site, 'contract');
 
             return $this->successResponse('Contract signed.');
         } catch (ValidationException $e) {
@@ -211,6 +245,9 @@ class OnboardingController extends Controller
         }
     }
 
+    /**
+     * POST /api/{site}/open-collab/onboarding/age-verification
+     */
     public function updateAgeVerification(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
@@ -218,14 +255,16 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data = $request->all();
+            $data   = $request->all();
             $userId = Auth::id();
+            $site   = $this->currentSite();
 
-            $this->contributorProfileRepository->updateDob($userId, $data['date_of_birth']);
+            $this->profileRepository->updateDob($userId, $data['date_of_birth']);
+            $this->profileRepository->markAgeVerified($userId, AgeVerificationMethod::SelfDeclared);
 
-            $this->contributorProfileRepository->markAgeVerified($userId, AgeVerificationMethod::SelfDeclared);
+            $this->onboardingService->completeStep($userId, $site, 'age_verification');
 
-            return $this->successResponse('Profile saved.');
+            return $this->successResponse('Age verification saved.');
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
@@ -241,13 +280,12 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data = $request->validated();
-            $userId = Auth::id();
-            $site = $this->currentSite();
+            $data           = $request->validated();
+            $userId         = Auth::id();
+            $site           = $this->currentSite();
+            $currentVersion = (int) ($site->guidelines_version ?? 1);
 
-            $currentVersion = (int)($site->guidelines_version ?? 1);
-
-            if ((int)$data['version'] < $currentVersion) {
+            if ((int) $data['version'] < $currentVersion) {
                 return $this->errorResponse(
                     'Guidelines have been updated. Please review the latest version.',
                     409
@@ -255,10 +293,13 @@ class OnboardingController extends Controller
             }
 
             if ($this->guidelinesRepository->hasAcknowledged($userId, $site->id, $currentVersion)) {
+                $this->onboardingService->completeStep($userId, $site, 'guidelines');
                 return $this->successResponse('Guidelines already acknowledged.');
             }
 
             $this->guidelinesRepository->record($userId, $site->id, $currentVersion);
+
+            $this->onboardingService->completeStep($userId, $site, 'guidelines');
 
             return $this->successResponse('Guidelines acknowledged.');
         } catch (ValidationException $e) {
@@ -277,5 +318,15 @@ class OnboardingController extends Controller
         }
 
         return $site;
+    }
+
+    /**
+     * Reads the client IP from the request object rather than from the $_SERVER
+     * superglobal, keeping infrastructure details out of the controller body.
+     * Falls back to '0.0.0.0' if the header is absent.
+     */
+    private function clientIp(Request $request): string
+    {
+        return $request->ip() ?? '0.0.0.0';
     }
 }

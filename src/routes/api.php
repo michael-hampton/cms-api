@@ -1749,6 +1749,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/profile', [OnboardingController::class, 'storeProfile']);
         $router->post('/steps/profile/complete', [OnboardingController::class, 'completeProfileStep']);
         $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
+        $router->post('/steps/payment/complete', [OnboardingController::class, 'completePaymentStep']);
         $router->get('/contract', [OnboardingController::class, 'getContract']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);

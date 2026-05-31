@@ -4,17 +4,20 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
+use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Models\User;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Services\OpenCollab\Dashboard\WidgetRegistry;
+use App\Services\OpenCollab\Dashboard\WidgetResolver;
 use App\Services\OpenCollab\EarningsService;
 
 class DashboardPageController extends Controller
 {
     public function __construct(
-        private readonly PageRepository     $pageRepository,
         private readonly EarningsService    $earningsService,
-        private readonly ActivityRepository $activityRepository,
+        private readonly WidgetResolver $widgetResolver,
     )
     {
         parent::__construct();
@@ -25,17 +28,19 @@ class DashboardPageController extends Controller
      */
     public function index()
     {
-        $userId = Auth::id();
-        $siteId = SiteContext::getId();
+        $user = User::hydrateStatic(Auth::getUser());
+        $widgets = $this->widgetResolver->resolveForUser($user);
 
-        return $this->view('open-collab.dashboard.show', [
-            'articles' => $this->pageRepository->getContributorPages($userId, $siteId),
-            'earnings' => [
-                'total' => $this->earningsService->totalEarningsForContributor($userId),
-                'breakdown' => $this->earningsService->earningsBreakdownForContributor($userId),
-            ],
-            'activity' => $this->activityRepository->forContributor($userId, 10),
-            'currentUser' => Auth::user(),
+        // Pass only keys and titles to the view.
+        // Actual data is fetched per-widget via the JS widget manager.
+        $widgetManifest = array_map(
+            fn($w) => ['key' => $w->key(), 'title' => $w->title()],
+            $widgets
+        );
+
+        return $this->view('open-collab.dashboard-new.show', [
+            'widgets' => $widgetManifest,
+            'currentUser' => $user,
             'site' => SiteContext::slug(),
         ]);
     }

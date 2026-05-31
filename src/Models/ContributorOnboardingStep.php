@@ -17,11 +17,13 @@ class ContributorOnboardingStep extends Model
         'completed_at',
         'created_at',
         'updated_at',
+        'completed_meta'
     ];
 
     protected $casts = [
         'completed_at' => 'date',
         'created_at' => 'date',
         'updated_at' => 'date',
+        'completed_meta' => 'array'
     ];
 }

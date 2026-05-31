@@ -1,4 +1,3 @@
-
 <?php
 // Resolve profile values if present for the enhanced profile step fields
 $initialExpertise = [];
@@ -313,14 +312,19 @@ if ($profile && !empty($profile->expertise)) {
                             <div class="oc-help">Used for tax reporting purposes only.</div>
                         </div>
 
-                        <button type="submit" class="oc-btn oc-btn--amber oc-btn--block" id="submit-btn">
-                            Save payment details
-                            <svg viewBox="0 0 20 20" fill="currentColor" width="16">
-                                <path fill-rule="evenodd"
-                                      d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
-                                      clip-rule="evenodd"/>
-                            </svg>
-                        </button>
+                        <div style="display:flex; gap:12px; align-items:center; border-top:1px solid var(--border); padding-top:20px;">
+                            <button type="button" class="oc-btn oc-btn--ghost" id="save-payment-btn" style="flex:1; white-space:nowrap;">
+                                Save details
+                            </button>
+                            <button type="submit" class="oc-btn oc-btn--amber" id="submit-btn" style="flex:2; display:flex; align-items:center; justify-content:center; gap:8px;">
+                                Confirm &amp; continue
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="16">
+                                    <path fill-rule="evenodd"
+                                          d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z"
+                                          clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
                     </form>
 
                     <!-- ── CONTRACT STEP ─────────────────────────── -->
@@ -821,13 +825,13 @@ if ($profile && !empty($profile->expertise)) {
                     this._clearError();
                 } else {
                     if (errEl) {
-                        errEl.textContent = 'Failed to delete photo on the system cloud repository layer.';
+                        errEl.textContent = 'Failed to remove photo. Please try again.';
                         errEl.style.display = 'block';
                     }
                 }
             } catch {
                 if (errEl) {
-                    errEl.textContent = 'Network loss interrupted request delivery logic processing parameters.';
+                    errEl.textContent = 'Could not remove photo. Please check your connection.';
                     errEl.style.display = 'block';
                 }
             }
@@ -929,9 +933,7 @@ if ($profile && !empty($profile->expertise)) {
             if (bioErr) bioErr.textContent = '';
             if (samplesErr) samplesErr.textContent = '';
 
-            // Apply complete requirement blocks during continuation checks
             if (!bio || bio.length < 20) {
-                alert('bio must be at least 20 chars')
                 if (bioErr) bioErr.textContent = 'Bio must be at least 20 characters.';
                 return;
             }
@@ -944,7 +946,7 @@ if ($profile && !empty($profile->expertise)) {
                     try {
                         new URL(url);
                     } catch {
-                        if (samplesErr) samplesErr.textContent = `Sample ${n} URL pattern format error. Ensure https:// structural routing.`;
+                        if (samplesErr) samplesErr.textContent = `Sample ${n} is not a valid URL. Please include https://.`;
                         return;
                     }
                     samples.push({ url, title });
@@ -969,7 +971,7 @@ if ($profile && !empty($profile->expertise)) {
                 const res = await this._post('steps/profile/complete', {});
                 await this._handleResponse(res, btn, 'Save & continue');
             } catch (err) {
-                this._showError('An unexpected networking communication latency error derailed form completion execution routines.');
+                this._showError('Something went wrong. Please check your connection and try again.');
                 this._resetButton(btn, 'Save & continue');
             }
         }
@@ -983,6 +985,72 @@ if ($profile && !empty($profile->expertise)) {
             super(site, token);
             if (stripeKey) this.#initStripe(stripeKey);
             this.#bindMethodToggle();
+            this.#bindSaveButton();
+        }
+
+        #bindSaveButton() {
+            document.getElementById('save-payment-btn')?.addEventListener('click', () => this.#saveOnly());
+        }
+
+        async #collectPayload() {
+            const pmType = document.querySelector('[name="payment_method_type"]:checked')?.value;
+
+            if (pmType === 'stripe' && this.#stripe && this.#cardElement) {
+                const { token: stripeToken, error } = await this.#stripe.createToken(this.#cardElement);
+                if (error) {
+                    document.getElementById('stripe-card-errors').textContent = error.message;
+                    return null;
+                }
+                return {
+                    payment_method_type: 'stripe',
+                    stripe_token: stripeToken.id,
+                    tax_country: document.getElementById('tax-country')?.value || '',
+                };
+            }
+
+            return {
+                payment_method_type: 'bank_transfer',
+                stripe_token: document.getElementById('bank-account')?.value || 'bank',
+                tax_country: document.getElementById('tax-country')?.value || '',
+            };
+        }
+
+        async #saveOnly() {
+            this._clearError();
+            const successEl = document.getElementById('form-success');
+            if (successEl) successEl.style.display = 'none';
+
+            const btn = document.getElementById('save-payment-btn');
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = 'Saving…';
+
+            const payload = await this.#collectPayload();
+            if (!payload) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                return;
+            }
+
+            try {
+                const res = await this._post('payment', payload);
+                const data = await res.json();
+                if (res.ok) {
+                    if (successEl) {
+                        successEl.textContent = 'Payment details saved. You can come back and continue later.';
+                        successEl.style.display = 'block';
+                    }
+                } else {
+                    let msg = data.message || 'An error occurred.';
+                    if (data.errors) msg = Object.values(data.errors).flat().join(' ');
+                    this._showError(msg);
+                }
+            } catch {
+                this._showError('Could not save payment details. Please check your connection.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
         }
 
         #initStripe(key) {
@@ -1030,29 +1098,27 @@ if ($profile && !empty($profile->expertise)) {
         async _submit() {
             this._clearError();
             const btn = this._setButtonLoading('Saving…');
-            const pmType = document.querySelector('[name="payment_method_type"]:checked')?.value;
 
-            if (pmType === 'stripe' && this.#stripe && this.#cardElement) {
-                const {token: stripeToken, error} = await this.#stripe.createToken(this.#cardElement);
-                if (error) {
-                    document.getElementById('stripe-card-errors').textContent = error.message;
-                    this._resetButton(btn, 'Save payment details');
-                    return;
-                }
-                const res = await this._post('payment', {
-                    payment_method_type: 'stripe',
-                    stripe_token: stripeToken.id,
-                    tax_country: document.getElementById('tax-country')?.value || '',
-                });
-                await this._handleResponse(res, btn, 'Save payment details');
-            } else {
-                const res = await this._post('payment', {
-                    payment_method_type: 'bank_transfer',
-                    stripe_token: document.getElementById('bank-account')?.value || 'bank',
-                    tax_country: document.getElementById('tax-country')?.value || '',
-                });
-                await this._handleResponse(res, btn, 'Save payment details');
+            const payload = await this.#collectPayload();
+            if (!payload) {
+                this._resetButton(btn, 'Confirm &amp; continue');
+                return;
             }
+
+            // Save payment details first, then advance the step.
+            const saveRes = await this._post('payment', payload);
+            if (!saveRes.ok) {
+                const data = await saveRes.json();
+                let msg = data.message || 'An error occurred.';
+                if (data.errors) msg = Object.values(data.errors).flat().join(' ');
+                this._showError(msg);
+                this._resetButton(btn, 'Confirm &amp; continue');
+                return;
+            }
+
+            btn.innerHTML = `<div class="oc-spinner"></div> Confirming…`;
+            const completeRes = await this._post('steps/payment/complete', {});
+            await this._handleResponse(completeRes, btn, 'Confirm &amp; continue');
         }
     }
 

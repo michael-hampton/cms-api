@@ -2,11 +2,14 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Models\Contract;
 use App\Models\ContributorProfile;
 use App\Models\Site;
+use App\Models\User;
 use App\Repositories\OpenCollab\ContractRepository;
+use App\Repositories\OpenCollab\ContributorOnboardingRepository;
 use App\Repositories\OpenCollab\ContributorOnboardingStepRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
@@ -16,175 +19,906 @@ use App\Tests\Functional\Controllers\FunctionalTestCase;
 use DateTimeImmutable;
 use DateTimeZone;
 use Mockery;
-use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
 use Mockery\MockInterface;
+use PHPUnit\Framework\TestCase;
 
-class ContributorOnboardingServiceTest extends FunctionalTestCase
+/**
+ * Unit tests for ContributorOnboardingService.
+ *
+ * The core rule under test:
+ *   A step is complete only when:
+ *     1. the site requires that step
+ *     2. the step row status === 'completed'
+ *     3. domain validation still passes
+ *
+ * Tests are grouped by the method they exercise, then by scenario.
+ */
+class ContributorOnboardingServiceTest extends TestCase
 {
     private ContributorOnboardingService $service;
 
     /** @var ContributorProfileRepository&MockInterface */
-    private ContributorProfileRepository $profileRepo;
-
-    /** @var ContractRepository&MockInterface */
-    private ContractRepository $contractRepo;
-
-    /** @var GuidelinesRepository&MockInterface */
-    private GuidelinesRepository $guidelinesRepo;
+    private MockInterface $profileRepo;
 
     /** @var ContributorOnboardingStepRepository&MockInterface */
-    private ContributorOnboardingStepRepository $onboardingStepRepo;
+    private MockInterface $stepRepo;
+
+    /** @var ContractRepository&MockInterface */
+    private MockInterface $contractRepo;
+
+    /** @var GuidelinesRepository&MockInterface */
+    private MockInterface $guidelinesRepo;
 
     private ContributorAgeValidationService $ageService;
+    private ContributorOnboardingRepository $contributorOnboardingRepository;
+
+    // ── Fixtures ──────────────────────────────────────────────────────────────
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->profileRepo = Mockery::mock(ContributorProfileRepository::class);
-        $this->onboardingStepRepo = Mockery::mock(ContributorOnboardingStepRepository::class);
-        $this->contractRepo = Mockery::mock(ContractRepository::class);
+        $this->profileRepo    = Mockery::mock(ContributorProfileRepository::class);
+        $this->stepRepo       = Mockery::mock(ContributorOnboardingStepRepository::class);
+        $this->contractRepo   = Mockery::mock(ContractRepository::class);
         $this->guidelinesRepo = Mockery::mock(GuidelinesRepository::class);
-        $this->ageService = new ContributorAgeValidationService();
-        $this->onboardingStepRepo
-            ->shouldReceive('isCompleted')
-            ->withAnyArgs()
-            ->andReturn(true)
-            ->byDefault();
+        $this->contributorOnboardingRepository = Mockery::mock(ContributorOnboardingRepository::class);
+        $this->ageService     = new ContributorAgeValidationService();
+
+        // Default: step repo reports no rows exist for any step.
+        $this->stepRepo->shouldReceive('getStatus')->andReturn(null)->byDefault();
+        $this->stepRepo->shouldReceive('markInvalidated')->byDefault();
 
         $this->service = new ContributorOnboardingService(
-            profileRepository: $this->profileRepo,
-            onboardingStepRepository: $this->onboardingStepRepo,
-            contractRepository: $this->contractRepo,
-            guidelinesRepository: $this->guidelinesRepo,
-            ageValidationService: $this->ageService,
+            profileRepository:         $this->profileRepo,
+            onboardingStepRepository:  $this->stepRepo,
+            contractRepository:        $this->contractRepo,
+            guidelinesRepository:      $this->guidelinesRepo,
+            ageValidationService:      $this->ageService,
+            contributorOnboardingRepository:  $this->contributorOnboardingRepository
         );
     }
 
-    public function test_it_returns_no_pending_steps_when_all_requirements_are_met(): void
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
+    // =========================================================================
+    // completeStep()
+    // =========================================================================
+
+    // ── step applicability ────────────────────────────────────────────────────
+
+    public function test_complete_step_throws_for_unknown_step_key(): void
     {
         $site = $this->makeSite();
-        $profile = $this->makeProfile();
-        $contract = $this->makeContract();
 
-        $this->profileRepo->expects('findByUserId')->with(1)->andReturn($profile);
-        $this->profileRepo->expects('isPaymentSetup')->with(1)->andReturnTrue();
-        $this->contractRepo->expects('latestForSite')->with(10)->andReturn($contract);
-        $this->contractRepo->expects('hasSigned')->with(1, 1)->andReturnTrue();
-        $this->guidelinesRepo->expects('latestAcknowledgedVersion')->with(1, 10)->andReturn(1);
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Unknown onboarding step/');
+
+        $this->service->completeStep(1, $site, 'not_a_real_step');
+    }
+
+    public function test_complete_step_throws_when_step_not_applicable_for_site(): void
+    {
+        // Site does not require contracts.
+        $site = $this->makeSite(['require_contracts' => false]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/not applicable/');
+
+        $this->service->completeStep(1, $site, 'contract');
+    }
+
+    public function test_complete_step_throws_when_payment_not_applicable_for_site(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/not applicable/');
+
+        $this->service->completeStep(1, $site, 'payment');
+    }
+
+    // ── domain validation before marking ─────────────────────────────────────
+
+    public function test_complete_step_throws_when_profile_bio_missing(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => '']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'profile');
+    }
+
+    public function test_complete_step_throws_when_payment_not_setup(): void
+    {
+        $site = $this->makeSite(['require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->profileRepo->shouldReceive('isPaymentSetup')->with(1)->andReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'payment');
+    }
+
+    public function test_complete_step_throws_when_contract_not_signed(): void
+    {
+        $site     = $this->makeSite(['require_payment_setup' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $contract = $this->makeContract(['id' => 5, 'version' => 1]);
+
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->with($site->id)->andReturn($contract);
+        $this->contractRepo->shouldReceive('hasSigned')->with(1, 5)->andReturn(false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'contract');
+    }
+
+    public function test_complete_step_throws_when_guidelines_not_acknowledged(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_age_verification' => false, 'guidelines_version' => 3]);
+
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->with(1, $site->id)->andReturn(1);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'guidelines');
+    }
+
+    public function test_complete_step_throws_when_age_not_verified(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'minimum_contributor_age' => 18]);
+
+        $profile = $this->makeProfile(['date_of_birth' => null]);
+        $profile->date_of_birth = null;
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'age_verification');
+    }
+
+    public function test_complete_step_throws_when_contributor_is_underage(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'minimum_contributor_age' => 18]);
+        $dob     = (new DateTimeImmutable('-16 years', new DateTimeZone('UTC')))->format('Y-m-d');
+        $profile = $this->makeProfile(['date_of_birth' => $dob]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/domain validation failed/');
+
+        $this->service->completeStep(1, $site, 'age_verification');
+    }
+
+    // ── successful completion ─────────────────────────────────────────────────
+
+    public function test_complete_step_marks_completed_when_domain_valid_for_profile(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile(['bio' => 'A valid bio with enough length.']);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->contributorOnboardingRepository->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, false)
+            ->andReturn(true);
+
+        $this->stepRepo->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'profile', null);
+
+        $this->service->completeStep(1, $site, 'profile');
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_marks_completed_with_meta_for_contract(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup'    => false,
+            'require_guidelines_ack'   => false,
+            'require_age_verification' => false,
+        ]);
+
+        $contract = $this->makeContract([
+            'id' => 7,
+            'version' => 2,
+        ]);
+
+        $profile = Mockery::mock(ContributorProfile::class)->makePartial();
+        $profile->bio = 'This is a valid contributor bio.';
+
+        $this->contractRepo
+            ->shouldReceive('latestPublishedForSite')
+            ->twice()
+            ->with($site->id)
+            ->andReturn($contract);
+
+        $this->contractRepo
+            ->shouldReceive('hasSigned')
+            ->twice()
+            ->with(1, 7)
+            ->andReturn(true);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->once()
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'contract', [
+                'contract_id' => 7,
+                'contract_version' => 2,
+            ]);
+
+        $this->stepRepo
+            ->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->once()
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->stepRepo
+            ->shouldReceive('getStatus')
+            ->with(1, $site->id, 'contract')
+            ->once()
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $this->service->completeStep(1, $site, 'contract', [
+            'contract_id' => 7,
+            'contract_version' => 2,
+        ]);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_marks_completed_for_payment(): void
+    {
+        $site = $this->makeSite([
+            'require_contracts'        => false,
+            'require_guidelines_ack'   => false,
+            'require_age_verification' => false,
+        ]);
+
+        $profile = $this->makeProfile([
+            'bio' => 'A valid bio with enough length.',
+        ]);
+
+        $this->profileRepo
+            ->shouldReceive('isPaymentSetup')
+            ->twice()
+            ->with(1)
+            ->andReturn(true);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->once()
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->mockStepStatuses(1, $site, [
+            'profile' => OnboardingStepStatus::Completed->value,
+            'payment' => OnboardingStepStatus::Completed->value,
+        ]);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'payment', null);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $this->service->completeStep(1, $site, 'payment');
+
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_marks_completed_for_guidelines(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup'    => false,
+            'require_contracts'        => false,
+            'require_age_verification' => false,
+            'guidelines_version'       => 2,
+        ]);
+
+        $profile = $this->makeProfile([
+            'bio' => 'A valid bio with enough length.',
+        ]);
+
+        $this->guidelinesRepo
+            ->shouldReceive('latestAcknowledgedVersion')
+            ->twice()
+            ->with(1, $site->id)
+            ->andReturn(2);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->once()
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->mockStepStatuses(1, $site, [
+            'profile'    => OnboardingStepStatus::Completed->value,
+            'guidelines' => OnboardingStepStatus::Completed->value,
+        ]);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'guidelines', null);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $this->service->completeStep(1, $site, 'guidelines');
+
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_marks_completed_for_age_verification(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup'     => false,
+            'require_contracts'         => false,
+            'require_guidelines_ack'    => false,
+            'minimum_contributor_age'   => 18,
+        ]);
+
+        $dob = (new DateTimeImmutable('-25 years', new DateTimeZone('UTC')))->format('Y-m-d');
+
+        $profile = $this->makeProfile([
+            'bio'           => 'A valid bio with enough length.',
+            'date_of_birth' => $dob,
+        ]);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->times(3)
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->mockStepStatuses(1, $site, [
+            'profile'          => OnboardingStepStatus::Completed->value,
+            'age_verification' => OnboardingStepStatus::Completed->value,
+        ]);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'age_verification', null);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $this->service->completeStep(1, $site, 'age_verification');
+
+        $this->assertTrue(true);
+    }
+
+    public function test_complete_step_calls_sync_status_after_marking(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup'    => false,
+            'require_contracts'        => false,
+            'require_guidelines_ack'   => false,
+            'require_age_verification' => false,
+        ]);
+
+        $profile = $this->makeProfile([
+            'bio' => 'A valid bio with enough length.',
+        ]);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->twice()
+            ->with(1)
+            ->andReturn($profile);
+
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'profile', null);
+
+        $this->stepRepo
+            ->shouldReceive('getStatus')
+            ->once()
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $this->service->completeStep(1, $site, 'profile');
+
+        $this->assertTrue(true);
+    }
+
+    // =========================================================================
+    // invalidateStep() / invalidateStepForAllContributors()
+    // =========================================================================
+
+    public function test_invalidate_step_throws_for_unknown_step(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->invalidateStep(1, 10, 'not_real');
+    }
+
+    public function test_invalidate_step_delegates_to_repository(): void
+    {
+        $this->stepRepo->shouldReceive('markInvalidated')
+            ->once()
+            ->with(1, 10, 'contract');
+
+        $this->service->invalidateStep(1, 10, 'contract');
+        $this->assertTrue(true);
+    }
+
+    public function test_invalidate_step_for_all_contributors_throws_for_unknown_step(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->invalidateStepForAllContributors(10, 'bad_step');
+    }
+
+    public function test_invalidate_step_for_all_contributors_delegates_and_returns_count(): void
+    {
+        $this->stepRepo->shouldReceive('bulkInvalidateCompletedStep')
+            ->once()
+            ->with(10, 'guidelines')
+            ->andReturn(5);
+
+        $count = $this->service->invalidateStepForAllContributors(10, 'guidelines');
+
+        $this->assertSame(5, $count);
+    }
+
+    // =========================================================================
+    // pendingSteps() — dual-check: row status AND domain validation
+    // =========================================================================
+
+    // ── no row exists ─────────────────────────────────────────────────────────
+
+    public function test_pending_steps_returns_all_applicable_steps_when_no_rows_exist(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        // No step rows exist (default mock returns null for getStatus).
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertCount(1, $pending);
+        $this->assertSame('profile', $pending[0]['step']);
+    }
+
+    public function test_pending_steps_returns_step_with_pending_status_when_no_row(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertSame(OnboardingStepStatus::Pending->value, $pending[0]['status']);
+    }
+
+    // ── row exists but step not completed ─────────────────────────────────────
+
+    public function test_pending_steps_reports_in_progress_status_from_row(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::InProgress->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertSame(OnboardingStepStatus::InProgress->value, $pending[0]['status']);
+    }
+
+    public function test_pending_steps_reports_invalidated_status_from_row(): void
+    {
+        $site     = $this->makeSite(['require_payment_setup' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $contract = $this->makeContract(['id' => 5, 'version' => 2]);
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'contract')
+            ->andReturn(OnboardingStepStatus::Invalidated->value);
+
+        // Profile step: completed row + valid domain.
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $profile = $this->makeProfile();
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn($contract);
+        $this->contractRepo->shouldReceive('hasSigned')->with(1, 5)->andReturn(false);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $contractStep = collect($pending)->firstWhere('step', 'contract');
+        $this->assertNotNull($contractStep);
+        $this->assertSame(OnboardingStepStatus::Invalidated->value, $contractStep['status']);
+    }
+
+    // ── row completed + domain passes → step is done ──────────────────────────
+
+    public function test_pending_steps_excludes_step_when_row_completed_and_domain_passes(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
 
         $pending = $this->service->pendingSteps(1, $site);
 
         $this->assertEmpty($pending);
     }
 
-    public function test_it_returns_is_complete_true_when_all_requirements_are_met(): void
+    public function test_pending_steps_returns_empty_when_all_steps_completed_and_valid(): void
     {
-        $site = $this->makeSite();
-        $profile = $this->makeProfile();
-        $contract = $this->makeContract();
+        $site     = $this->makeSite(['guidelines_version' => 2]);
+        $profile  = $this->makeProfile();
+        $contract = $this->makeContract(['id' => 3, 'version' => 1]);
 
-        $this->profileRepo->allows('findByUserId')->andReturn($profile);
-        $this->profileRepo->allows('isPaymentSetup')->andReturnTrue();
-        $this->contractRepo->allows('latestForSite')->andReturn($contract);
-        $this->contractRepo->allows('hasSigned')->andReturnTrue();
-        $this->guidelinesRepo->allows('latestAcknowledgedVersion')->andReturn(1);
+        foreach (['profile', 'payment', 'contract', 'guidelines', 'age_verification'] as $step) {
+            $this->stepRepo->shouldReceive('getStatus')
+                ->with(1, $site->id, $step)
+                ->andReturn(OnboardingStepStatus::Completed->value);
+        }
 
-        $this->assertTrue($this->service->isComplete(1, $site));
-    }
-
-    public function test_it_produces_pending_profile_step_when_profile_is_missing(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-
-        $this->profileRepo->expects('findByUserId')->with(1)->andReturnNull();
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn($contract);
+        $this->contractRepo->shouldReceive('hasSigned')->andReturn(true);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(2);
 
         $pending = $this->service->pendingSteps(1, $site);
 
-        $this->assertCount(2, $pending);
-        $this->assertSame('profile', $pending[0]['step']);
-        $this->assertSame('age_verification', $pending[1]['step']);
+        $this->assertEmpty($pending);
     }
 
-    // ── pendingSteps() — structured response ──────────────────────────────────
+    // ── row completed + domain fails → stale row invalidated ──────────────────
 
-    public function test_pending_steps_returns_profile_step_when_bio_missing(): void
+    public function test_pending_steps_invalidates_stale_contract_row_when_new_contract_published(): void
     {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => '']);
+        // Scenario: user completed contract step for contract v1.
+        // Admin publishes contract v2. User has NOT signed v2.
+        // pendingSteps() should detect the stale row and invalidate it.
+        $site        = $this->makeSite(['require_payment_setup' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $newContract = $this->makeContract(['id' => 6, 'version' => 2]);
+        $profile     = $this->makeProfile();
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'contract')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn($newContract);
+        $this->contractRepo->shouldReceive('hasSigned')->with(1, 6)->andReturn(false);
+
+        // The stale row must be invalidated.
+        $this->stepRepo->shouldReceive('markInvalidated')
+            ->once()
+            ->with(1, $site->id, 'contract');
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $contractStep = collect($pending)->firstWhere('step', 'contract');
+        $this->assertNotNull($contractStep);
+        $this->assertSame(OnboardingStepStatus::Invalidated->value, $contractStep['status']);
+    }
+
+    public function test_pending_steps_invalidates_stale_guidelines_row_when_version_bumped(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_age_verification' => false, 'guidelines_version' => 3]);
+        $profile = $this->makeProfile();
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'guidelines')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        // User only acknowledged version 1, but site is now on version 3.
         $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
 
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertCount(1, $pending);
-        $this->assertEquals('profile', $pending[0]['step']);
-        $this->assertNotEmpty($pending[0]['reason']);
-        $this->assertIsArray($pending[0]['meta']);
-    }
-
-    public function test_pending_steps_returns_profile_step_when_bio_saved_but_step_not_completed(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
-        $profile = $this->makeProfile(['bio' => 'A valid contributor bio.']);
-
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(false);
+        $this->stepRepo->shouldReceive('markInvalidated')
+            ->once()
+            ->with(1, $site->id, 'guidelines');
 
         $pending = $this->service->pendingSteps(1, $site);
 
-        $this->assertCount(1, $pending);
-        $this->assertSame('profile', $pending[0]['step']);
-        $this->assertTrue($pending[0]['meta']['has_bio']);
-        $this->assertFalse($pending[0]['meta']['step_completed']);
+        $guidelinesStep = collect($pending)->firstWhere('step', 'guidelines');
+        $this->assertNotNull($guidelinesStep);
+        $this->assertSame(OnboardingStepStatus::Invalidated->value, $guidelinesStep['status']);
     }
 
-    public function test_pending_steps_excludes_profile_when_bio_saved_and_step_completed(): void
+    public function test_pending_steps_invalidates_stale_payment_row_when_payment_revoked(): void
     {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
-        $profile = $this->makeProfile(['bio' => 'A valid contributor bio.']);
+        $site    = $this->makeSite(['require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(true);
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
 
-        $this->assertSame([], $this->service->pendingSteps(1, $site));
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'payment')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        // Payment was revoked since completion.
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
+
+        $this->stepRepo->shouldReceive('markInvalidated')
+            ->once()
+            ->with(1, $site->id, 'payment');
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $paymentStep = collect($pending)->firstWhere('step', 'payment');
+        $this->assertNotNull($paymentStep);
+        $this->assertSame(OnboardingStepStatus::Invalidated->value, $paymentStep['status']);
     }
 
-    public function test_pending_steps_returns_profile_when_bio_removed_after_step_completed(): void
+    public function test_pending_steps_invalidates_stale_age_row_when_dob_removed(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'minimum_contributor_age' => 18]);
+        $profile = $this->makeProfile(['date_of_birth' => null]);
+        $profile->date_of_birth = null;
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'age_verification')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $this->stepRepo->shouldReceive('markInvalidated')
+            ->once()
+            ->with(1, $site->id, 'age_verification');
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $ageStep = collect($pending)->firstWhere('step', 'age_verification');
+        $this->assertNotNull($ageStep);
+        $this->assertSame(OnboardingStepStatus::Invalidated->value, $ageStep['status']);
+    }
+
+    public function test_pending_steps_does_not_call_mark_invalidated_when_domain_still_valid(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        // markInvalidated must NOT be called for a non-stale step.
+        $this->stepRepo->shouldNotReceive('markInvalidated');
+
+        $pending = $this->service->pendingSteps(1, $site);
+        $this->assertEmpty($pending);
+    }
+
+    // ── step applicability is respected ──────────────────────────────────────
+
+    public function test_pending_steps_excludes_steps_not_required_by_site(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
+
+        $this->stepRepo->shouldReceive('getStatus')
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $stepNames = array_column($pending, 'step');
+        $this->assertNotContains('payment', $stepNames);
+        $this->assertNotContains('contract', $stepNames);
+        $this->assertNotContains('guidelines', $stepNames);
+        $this->assertNotContains('age_verification', $stepNames);
+    }
+
+    // ── structured response keys ──────────────────────────────────────────────
+
+    public function test_each_pending_step_has_required_keys(): void
     {
         $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+
+        foreach ($this->service->pendingSteps(1, $site) as $step) {
+            $this->assertArrayHasKey('step',   $step);
+            $this->assertArrayHasKey('status', $step);
+            $this->assertArrayHasKey('reason', $step);
+            $this->assertArrayHasKey('meta',   $step);
+            $this->assertIsString($step['step']);
+            $this->assertIsString($step['status']);
+            $this->assertIsString($step['reason']);
+            $this->assertIsArray($step['meta']);
+        }
+    }
+
+    public function test_pending_steps_reason_is_non_empty_for_each_pending_step(): void
+    {
+        $site = $this->makeSite();
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn($this->makeContract());
+        $this->contractRepo->shouldReceive('hasSigned')->andReturn(false);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(0);
+
+        foreach ($this->service->pendingSteps(1, $site) as $step) {
+            $this->assertNotEmpty($step['reason'], "Step [{$step['step']}] has an empty reason.");
+        }
+    }
+
+    // =========================================================================
+    // completedSteps()
+    // =========================================================================
+
+    public function test_completed_steps_returns_only_applicable_completed_steps(): void
+    {
+        // Site requires profile, guidelines (no payment, no contract, no age).
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_age_verification' => false, 'guidelines_version' => 1]);
+        $profile = $this->makeProfile();
+
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'guidelines')->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+
+        $completed = $this->service->completedSteps(1, $site);
+
+        $this->assertContains('profile', $completed);
+        $this->assertContains('guidelines', $completed);
+        $this->assertNotContains('payment', $completed);
+        $this->assertNotContains('contract', $completed);
+        $this->assertNotContains('age_verification', $completed);
+    }
+
+    public function test_completed_steps_excludes_steps_that_are_pending_in_step_table(): void
+    {
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
         $profile = $this->makeProfile(['bio' => '']);
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->onboardingStepRepo->shouldReceive('isCompleted')->once()->with(1, 10, 'profile')->andReturn(true);
+        // Row for profile exists but status is in_progress, not completed.
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::InProgress->value);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
 
-        $pending = $this->service->pendingSteps(1, $site);
+        $completed = $this->service->completedSteps(1, $site);
 
-        $this->assertCount(1, $pending);
-        $this->assertSame('profile', $pending[0]['step']);
-        $this->assertFalse($pending[0]['meta']['has_bio']);
-        $this->assertTrue($pending[0]['meta']['step_completed']);
+        $this->assertNotContains('profile', $completed);
     }
 
-    public function test_partial_profile_save_marks_step_in_progress_only(): void
+    public function test_completed_steps_excludes_stale_completed_rows(): void
     {
-        $this->onboardingStepRepo->shouldReceive('markInProgress')->once()->with(1, 10, 'profile');
-        $this->onboardingStepRepo->shouldNotReceive('markCompleted');
+        // Scenario: payment row says completed but isPaymentSetup now returns false.
+        $site    = $this->makeSite(['require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
 
-        $this->service->markProfileInProgress(1, 10);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'payment')->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
+
+        $this->stepRepo->shouldReceive('markInvalidated')->byDefault();
+
+        $completed = $this->service->completedSteps(1, $site);
+
+        $this->assertNotContains('payment', $completed);
+    }
+
+    // =========================================================================
+    // markStepInProgress()
+    // =========================================================================
+
+    public function test_mark_step_in_progress_throws_for_unknown_step(): void
+    {
+        $site = $this->makeSite();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Unknown onboarding step/');
+
+        $this->service->markStepInProgress(1, $site, 'bogus');
+    }
+
+    public function test_mark_step_in_progress_throws_when_step_not_applicable(): void
+    {
+        $site = $this->makeSite(['require_contracts' => false]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/not applicable/');
+
+        $this->service->markStepInProgress(1, $site, 'contract');
+    }
+
+    public function test_mark_step_in_progress_delegates_to_repository(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->stepRepo->shouldReceive('markInProgress')
+            ->once()
+            ->with(1, $site->id, 'profile');
+
+        $this->service->markStepInProgress(1, $site, 'profile');
         $this->assertTrue(true);
     }
 
-    public function test_complete_profile_step_validates_required_bio(): void
+    // =========================================================================
+    // completeProfileStep() — backwards-compat wrapper
+    // =========================================================================
+
+    public function test_complete_profile_step_returns_error_when_bio_missing(): void
     {
-        $site = $this->makeSite(['id' => 10]);
+        $site    = $this->makeSite();
         $profile = $this->makeProfile(['bio' => '']);
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->with(1)->andReturn($profile);
-        $this->onboardingStepRepo->shouldNotReceive('markCompleted');
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
 
         $result = $this->service->completeProfileStep(1, $site);
 
@@ -192,346 +926,102 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
         $this->assertArrayHasKey('bio', $result['errors']);
     }
 
-    public function test_pending_steps_returns_payment_step_when_not_setup(): void
+    public function test_complete_profile_step_returns_error_when_bio_too_short(): void
     {
-        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
+        $site    = $this->makeSite();
+        $profile = $this->makeProfile(['bio' => 'Short.']);
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(false);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
 
-        $pending = $this->service->pendingSteps(1, $site);
+        $result = $this->service->completeProfileStep(1, $site);
 
-        $this->assertCount(1, $pending);
-        $this->assertEquals('payment', $pending[0]['step']);
-        $this->assertNotEmpty($pending[0]['reason']);
+        $this->assertFalse($result['ok']);
+        $this->assertArrayHasKey('bio', $result['errors']);
     }
 
-    public function test_pending_steps_does_not_return_payment_step_when_profile_payment_setup_exists(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile([
-            'bio' => 'ok',
-            'payment_method_type' => 'stripe',
-            'payment_details' => 'tok_test_profile',
-        ]);
-
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertEmpty($pending);
-    }
-
-    public function test_pending_steps_returns_contract_step_when_not_signed(): void
-    {
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => false, 'require_contracts' => true, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-        $contract = $this->makeContract(['id' => 5, 'version' => 2]);
-
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->once()->with(10)->andReturn($contract);
-        $this->contractRepo->shouldReceive('hasSigned')->once()->with(1, 5)->andReturn(false);
-        //$this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->with(1, 10)->andReturn(1);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertCount(1, $pending);
-        $this->assertEquals('contract', $pending[0]['step']);
-        $this->assertNotEmpty($pending[0]['reason']);
-        $this->assertArrayHasKey('contract_id', $pending[0]['meta']);
-        $this->assertEquals(5, $pending[0]['meta']['contract_id']);
-    }
-
-    public function test_it_does_not_produce_contract_step_when_no_contract_exists(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile();
-
-        $this->profileRepo->expects('findByUserId')->andReturn($profile);
-        $this->contractRepo->expects('latestForSite')->andReturnNull();
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertEmpty($pending);
-    }
-
-    public function test_pending_steps_returns_guidelines_step_when_not_acknowledged(): void
-    {
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => true, 'guidelines_version' => 3]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->with(1, 10)->andReturn(1);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertCount(1, $pending);
-        $this->assertEquals('guidelines', $pending[0]['step']);
-        $this->assertArrayHasKey('required_version', $pending[0]['meta']);
-        $this->assertEquals(3, $pending[0]['meta']['required_version']);
-    }
-
-    public function test_it_produces_pending_age_verification_step_when_dob_is_missing(): void
+    public function test_complete_profile_step_calls_complete_step_on_success(): void
     {
         $site = $this->makeSite([
-            'require_payment_setup' => false,
-            'require_contracts' => false,
-            'require_guidelines_ack' => false,
-            'require_age_verification' => true,
-            'minimum_contributor_age' => 18,
-        ]);
-        $profile = $this->makeProfile(['date_of_birth' => null]);
-        $profile->date_of_birth = null;
-
-        $this->profileRepo->expects('findByUserId')->andReturn($profile);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertCount(1, $pending);
-        $this->assertSame('age_verification', $pending[0]['step']);
-        $this->assertSame(18, $pending[0]['meta']['minimum_age']);
-    }
-
-    public function test_it_produces_pending_age_verification_step_when_contributor_is_underage(): void
-    {
-        $site = $this->makeSite([
-            'require_payment_setup' => false,
-            'require_contracts' => false,
-            'require_guidelines_ack' => false,
-            'require_age_verification' => true,
-            'minimum_contributor_age' => 18,
-        ]);
-
-        // 16 years old
-        $dob = (new \DateTimeImmutable('-16 years'))->format('Y-m-d');
-        $profile = $this->makeProfile();
-        $profile->date_of_birth = $dob;
-
-        $this->profileRepo->expects('findByUserId')->andReturn($profile);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertCount(1, $pending);
-        $this->assertSame('age_verification', $pending[0]['step']);
-    }
-
-    public function test_it_does_not_produce_age_verification_step_when_contributor_is_eligible(): void
-    {
-        $site = $this->makeSite([
-            'require_payment_setup' => false,
-            'require_contracts' => false,
-            'require_guidelines_ack' => false,
-            'require_age_verification' => true,
-            'minimum_contributor_age' => 18,
-        ]);
-
-        $dob = (new \DateTimeImmutable('-20 years'))->format('Y-m-d');
-        $profile = $this->makeProfile(['date_of_birth' => $dob]);
-
-        $this->profileRepo->expects('findByUserId')->andReturn($profile);
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $this->assertEmpty($pending);
-    }
-
-    public function test_it_does_not_check_age_verification_when_not_required_by_site(): void
-    {
-        $site = $this->makeSite([
-            'require_payment_setup' => false,
-            'require_contracts' => false,
-            'require_guidelines_ack' => false,
+            'require_payment_setup'    => false,
+            'require_contracts'        => false,
+            'require_guidelines_ack'   => false,
             'require_age_verification' => false,
         ]);
-        $profile = $this->makeProfile(['date_of_birth' => null]); // missing DOB — irrelevant
 
-        $this->profileRepo->expects('findByUserId')->andReturn($profile);
+        $profile = $this->makeProfile([
+            'bio' => 'A valid bio that is long enough.',
+        ]);
 
-        $pending = $this->service->pendingSteps(1, $site);
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->atLeast()->once()->with(1)
+            ->andReturn($profile);
 
-        $this->assertEmpty($pending); // no age step because site doesn't require it
+        $this->stepRepo
+            ->shouldReceive('markCompleted')
+            ->once()
+            ->with(1, $site->id, 'profile', null);
+
+        $this->stepRepo
+            ->shouldReceive('getStatus')
+            ->atLeast()->once()
+            ->with(1, $site->id, 'profile')
+            ->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->contributorOnboardingRepository
+            ->shouldReceive('syncStatus')
+            ->once()
+            ->with(1, $site, true);
+
+        $result = $this->service->completeProfileStep(1, $site);
+
+        $this->assertTrue($result['ok']);
     }
 
-    public function test_pending_steps_returns_empty_when_all_complete(): void
+    // =========================================================================
+    // isComplete()
+    // =========================================================================
+
+    public function test_is_complete_returns_true_when_no_pending_steps(): void
     {
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => true, 'require_contracts' => true, 'require_guidelines_ack' => true, 'guidelines_version' => 2]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-        $contract = $this->makeContract(['id' => 5]);
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->once()->andReturn($contract);
-        $this->contractRepo->shouldReceive('hasSigned')->once()->andReturn(true);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->andReturn(2);
-
-        $this->assertEquals([], $this->service->pendingSteps(1, $site));
-    }
-
-    public function test_pending_steps_every_entry_has_required_keys(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => true, 'id' => 10]);
-        $profile = $this->makeProfile(['bio' => '']);
-
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
 
-        foreach ($this->service->pendingSteps(1, $site) as $step) {
-            $this->assertArrayHasKey('step', $step, 'each entry must have step');
-            $this->assertArrayHasKey('reason', $step, 'each entry must have reason');
-            $this->assertArrayHasKey('meta', $step, 'each entry must have meta');
-            $this->assertIsString($step['step']);
-            $this->assertIsString($step['reason']);
-            $this->assertIsArray($step['meta']);
-        }
-    }
-
-    // ── NEW: acceptance criteria — invalidation on contract change ─────────────
-
-    public function test_invalidates_onboarding_when_contract_changes(): void
-    {
-        // Scenario: user has completed onboarding, then a new contract is published.
-        // isComplete() must return false and pendingSteps() must include 'contract'.
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => true, 'require_contracts' => true, 'require_guidelines_ack' => true, 'guidelines_version' => 1]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-
-        // New contract (id=6) has been published — user only signed id=5.
-        $newContract = $this->makeContract(['id' => 6, 'version' => 2]);
-
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn($newContract);
-        $this->contractRepo->shouldReceive('hasSigned')->with(1, 6)->andReturn(false);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        $this->assertFalse($this->service->isComplete(1, $site));
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $stepNames = array_column($pending, 'step');
-        $this->assertContains('contract', $stepNames);
-    }
-
-    public function test_invalidates_onboarding_when_guidelines_version_increases(): void
-    {
-        // Scenario: user acknowledged v1, site is now on v2.
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => true, 'require_contracts' => true, 'require_guidelines_ack' => true, 'guidelines_version' => 2]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-        $contract = $this->makeContract(['id' => 5]);
-
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn($contract);
-        $this->contractRepo->shouldReceive('hasSigned')->andReturn(true);
-        // User only acknowledged version 1, site is now on version 2.
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        $this->assertFalse($this->service->isComplete(1, $site));
-
-        $pending = $this->service->pendingSteps(1, $site);
-
-        $stepNames = array_column($pending, 'step');
-        $this->assertContains('guidelines', $stepNames);
-    }
-
-    public function test_no_db_recalculation_needed_for_correctness(): void
-    {
-        // pendingSteps() derives truth at runtime — even with a stale status snapshot,
-        // the result is always accurate. This test proves that by checking two different
-        // contract states without touching any status column.
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => false, 'require_contracts' => true, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-
-        $oldContract = $this->makeContract(['id' => 5]);
-        $newContract = $this->makeContract(['id' => 6]);
-
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        // First: user has signed the current contract → complete.
-        $this->contractRepo->shouldReceive('latestForSite')->once()->andReturn($oldContract);
-        $this->contractRepo->shouldReceive('hasSigned')->with(1, 5)->once()->andReturn(true);
         $this->assertTrue($this->service->isComplete(1, $site));
+    }
 
-        // Then: new contract published → immediately incomplete, no DB status update needed.
-        $this->contractRepo->shouldReceive('latestForSite')->once()->andReturn($newContract);
-        $this->contractRepo->shouldReceive('hasSigned')->with(1, 6)->once()->andReturn(false);
+    public function test_is_complete_returns_false_when_any_step_pending(): void
+    {
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
+
         $this->assertFalse($this->service->isComplete(1, $site));
     }
 
-    // ── completedSteps() — derived from requirements ──────────────────────────
-
-    public function test_completed_steps_excludes_steps_not_required_by_site(): void
-    {
-        // Site does not require payment or contracts → only profile and guidelines exist.
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => true, 'guidelines_version' => 1]);
-        $profile = $this->makeProfile(['bio' => 'ok']);
-
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        $completed = $this->service->completedSteps(1, $site);
-
-        $this->assertContains('profile', $completed);
-        $this->assertContains('guidelines', $completed);
-        // These steps are not required — must not appear as completed.
-        $this->assertNotContains('payment', $completed);
-        $this->assertNotContains('contract', $completed);
-    }
-
-    public function test_completed_steps_excludes_pending_steps(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'id' => 10]);
-        $profile = $this->makeProfile(['bio' => '']); // profile is pending
-
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
-
-        $completed = $this->service->completedSteps(1, $site);
-
-        $this->assertNotContains('profile', $completed);
-    }
-
-    // ── requireComplete() ─────────────────────────────────────────────────────
+    // =========================================================================
+    // requireComplete()
+    // =========================================================================
 
     public function test_require_complete_throws_when_steps_pending(): void
     {
-        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => 'Hello']);
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->with(1)->andReturn($profile);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(null);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->with(1)->andReturn(false);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
 
         $this->expectException(OnboardingIncompleteException::class);
+
         $this->service->requireComplete(1, $site);
     }
 
-    public function test_require_complete_exception_carries_structured_pending_steps(): void
+    public function test_require_complete_exception_carries_pending_steps(): void
     {
-        $site = $this->makeSite(['require_payment_setup' => true, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => 'Hello']);
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
 
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(null);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
 
         try {
             $this->service->requireComplete(1, $site);
@@ -539,87 +1029,97 @@ class ContributorOnboardingServiceTest extends FunctionalTestCase
         } catch (OnboardingIncompleteException $e) {
             $steps = $e->getPendingSteps();
             $this->assertNotEmpty($steps);
-            $this->assertArrayHasKey('step', $steps[0]);
+            $this->assertArrayHasKey('step',   $steps[0]);
+            $this->assertArrayHasKey('status', $steps[0]);
             $this->assertArrayHasKey('reason', $steps[0]);
-            $this->assertArrayHasKey('meta', $steps[0]);
+            $this->assertArrayHasKey('meta',   $steps[0]);
         }
     }
 
-    public function test_require_complete_does_not_throw_when_fully_compliant(): void
+    public function test_require_complete_does_not_throw_when_all_steps_done(): void
     {
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => true, 'require_contracts' => true, 'require_guidelines_ack' => true, 'guidelines_version' => 2]);
-        $profile = $this->makeProfile(['bio' => 'Full Bio']);
-        $contract = $this->makeContract(['id' => 5]);
+        $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
+        $profile = $this->makeProfile();
 
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn($contract);
-        $this->contractRepo->shouldReceive('hasSigned')->andReturn(true);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(2);
 
         $this->service->requireComplete(1, $site);
+
         $this->assertTrue(true);
     }
 
-    // ── isComplete() ──────────────────────────────────────────────────────────
+    // =========================================================================
+    // Contract domain — no published contract edge case
+    // =========================================================================
 
-    public function test_is_complete_returns_true_when_all_conditions_met(): void
+    public function test_contract_step_is_complete_when_no_published_contract_exists(): void
     {
-        $site = $this->makeSite(['id' => 10, 'require_payment_setup' => true, 'require_contracts' => true, 'require_guidelines_ack' => true, 'guidelines_version' => 2]);
-        $profile = $this->makeProfile(['bio' => 'Full Bio']);
-        $contract = $this->makeContract(['id' => 5]);
+        // No published contract on the site → nothing to sign → domain passes.
+        $site = $this->makeSite(['require_payment_setup' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
 
-        $this->profileRepo->shouldReceive('findByUserId')->once()->with(1)->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->once()->with(1)->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->once()->with(10)->andReturn($contract);
-        $this->contractRepo->shouldReceive('hasSigned')->once()->with(1, 5)->andReturn(true);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->once()->with(1, 10)->andReturn(2);
+        $profile = $this->makeProfile();
 
-        $this->assertTrue($this->service->isComplete(1, $site));
-    }
-
-    public function test_is_complete_returns_false_when_steps_pending(): void
-    {
-        $site = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false]);
-        $profile = $this->makeProfile(['bio' => '']);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'contract')->andReturn(OnboardingStepStatus::Completed->value);
 
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(true);
-        $this->contractRepo->shouldReceive('latestForSite')->andReturn(null);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(1);
+        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn(null);
 
-        $this->assertFalse($this->service->isComplete(1, $site));
+        $pending = $this->service->pendingSteps(1, $site);
+
+        $this->assertEmpty(array_filter($pending, fn($p) => $p['step'] === 'contract'));
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // =========================================================================
+    // Helpers
+    // =========================================================================
 
     private function makeSite(array $attributes = []): Site
     {
         $defaults = [
-            'id' => 10,
-            'require_payment_setup' => true,
-            'require_contracts' => true,
-            'require_guidelines_ack' => true,
-            'guidelines_version' => 1,
+            'id'                       => 10,
+            'require_payment_setup'    => true,
+            'require_contracts'        => true,
+            'require_guidelines_ack'   => true,
+            'guidelines_version'       => 1,
+            'require_age_verification' => true,
+            'minimum_contributor_age'  => 18,
         ];
-        $site = new Site(array_merge($defaults, $attributes));
+
+        $site = Mockery::mock(Site::class)->makePartial();
         $site->exists = true;
+        $site->fill(array_merge($defaults, $attributes));
+
         return $site;
     }
 
     private function makeProfile(array $attributes = []): ContributorProfile
     {
         $profile = Mockery::mock(ContributorProfile::class)->makePartial();
-        $profile->date_of_birth = new DateTimeImmutable('today', new DateTimeZone('UTC'))->modify('-20 years')->format('Y-m-d');
-        $profile->bio = $attributes['bio'] ?? 'ok';
+        $profile->bio            = $attributes['bio'] ?? 'A valid contributor bio with enough length.';
+        $profile->date_of_birth  = $attributes['date_of_birth']
+            ?? (new DateTimeImmutable('-20 years', new DateTimeZone('UTC')))->format('Y-m-d');
+
         return $profile;
     }
 
     private function makeContract(array $attributes = []): Contract
     {
         $contract = Mockery::mock(Contract::class)->makePartial();
-        $contract->id = $attributes['id'] ?? 1;
+        $contract->id      = $attributes['id'] ?? 1;
         $contract->version = $attributes['version'] ?? 1;
         return $contract;
+    }
+
+    private function mockStepStatuses(int $userId, Site $site, array $statuses): void
+    {
+        foreach ($statuses as $step => $status) {
+            $this->stepRepo
+                ->shouldReceive('getStatus')
+                ->with($userId, $site->id, $step)
+                ->once()
+                ->andReturn($status);
+        }
     }
 }
