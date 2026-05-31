@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Newsletter\Renderers;
 
+use App\Framework\Support\Str;
 use App\Services\Newsletter\Contracts\EmailBlockRenderer;
 use App\Services\Newsletter\DTOs\BlockData\BaseBlockData;
 use App\Services\Newsletter\DTOs\BlockData\DividerBlockData;
