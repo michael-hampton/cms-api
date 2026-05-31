@@ -69,12 +69,12 @@ class SubscriptionRenewalService
      * @throws RuntimeException          For payment or persistence failures.
      */
     public function renew(
-        int    $subscriptionId,
-        int    $planId,
-        string $paymentMethodId,
-        float  $amountPaid,
-        int    $agentId,
-        int    $siteId,
+        int     $subscriptionId,
+        int     $planId,
+        ?string $paymentMethodId,   // null for automated (Stripe-led) renewals
+        float   $amountPaid,
+        ?int    $agentId,           // null for automated renewals
+        int     $siteId,
     ): array
     {
         // ── Validate before touching payment ──────────────────────────────
@@ -111,24 +111,28 @@ class SubscriptionRenewalService
         }
 
         // ── Charge payment BEFORE any DB mutation ─────────────────────────
-        $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
-            $oldSubscription,
-            $plan,
-            [
-                'payment_method_id' => $paymentMethodId,
-                'amount' => $amountPaid,
-                'metadata' => [
-                    'type' => 'subscription_renewal',
-                    'old_sub_id' => $subscriptionId,
-                    'agent_id' => $agentId,
-                ],
-            ],
-        );
+        $paymentResult = null;
 
-        if (!($paymentResult['success'] ?? false)) {
-            throw new RuntimeException(
-                'Payment failed: ' . ($paymentResult['message'] ?? 'Unknown error')
+        if ($paymentMethodId !== null) {
+            $paymentResult = $this->subscriptionPaymentService->processStripeSubscriptionPayment(
+                $oldSubscription,
+                $plan,
+                [
+                    'payment_method_id' => $paymentMethodId,
+                    'amount'            => $amountPaid,
+                    'metadata'          => [
+                        'type'        => 'subscription_renewal',
+                        'old_sub_id'  => $subscriptionId,
+                        'agent_id'    => $agentId,
+                    ],
+                ],
             );
+
+            if (!($paymentResult['success'] ?? false)) {
+                throw new RuntimeException(
+                    'Payment failed: ' . ($paymentResult['message'] ?? 'Unknown error')
+                );
+            }
         }
 
         // ── Atomic DB transaction ─────────────────────────────────────────
@@ -205,6 +209,61 @@ class SubscriptionRenewalService
                 'new_subscription' => $newSubscription,
             ];
         });
+    }
+
+    /**
+     * Process all subscriptions due for automated renewal.
+     *
+     * Stripe-led billing path: payment has already been (or will be) collected
+     * by Stripe. This method performs the hard-replace DB workflow for every
+     * subscription whose next_billing_date has passed.
+     *
+     * One failure never aborts the batch — errors are collected and returned
+     * so the command can report them without hiding partial success.
+     *
+     * @return array{
+     *     processed: int,
+     *     successful: int,
+     *     failed: int,
+     *     errors: list<string>,
+     * }
+     */
+    public function processRenewals(): array
+    {
+        $due = $this->subscriptionRepository->findAllDueForRenewal(new \DateTimeImmutable());
+
+        $processed  = 0;
+        $successful = 0;
+        $failed     = 0;
+        $errors     = [];
+
+        foreach ($due as $subscription) {
+            $processed++;
+
+            try {
+                $this->renew(
+                    subscriptionId:  (int) $subscription->id,
+                    planId:          (int) $subscription->plan_id,
+                    paymentMethodId: null,          // Stripe-led: no manual charge
+                    amountPaid:      (float) ($subscription->price ?? 0),
+                    agentId:         null,           // automated — no acting agent
+                    siteId:          (int) $subscription->site_id,
+                );
+
+                $successful++;
+            } catch (\Throwable $e) {
+                $failed++;
+                $errors[] = "Subscription #{$subscription->id}: {$e->getMessage()}";
+
+                Logger::error('Automated renewal failed', [
+                    'subscription_id' => $subscription->id,
+                    'member_id'       => $subscription->member_id,
+                    'error'           => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return compact('processed', 'successful', 'failed', 'errors');
     }
 
     private static function renewableStatuses(): array

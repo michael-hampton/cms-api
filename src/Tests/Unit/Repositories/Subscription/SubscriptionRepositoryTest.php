@@ -1061,4 +1061,173 @@ class SubscriptionRepositoryTest extends RepositoryTestCase
             'currency' => 'USD',
         ], $overrides));
     }
+
+    public function test_find_all_due_for_renewal_returns_due_subscriptions(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        $due = Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $this->siteId,
+            'plan_name'         => 'Due Plan',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+            'auto_renew'        => true,
+            'price'             => 29.99,
+            'currency'          => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(1, $result);
+        $this->assertEquals($due->id, $result->first()->id);
+    }
+
+    public function test_find_all_due_for_renewal_excludes_future_billing_date(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $this->siteId,
+            'plan_name'         => 'Not Yet Due',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->format('Y-m-d H:i:s'),
+            'next_billing_date' => $now->modify('+1 day')->format('Y-m-d H:i:s'),
+            'auto_renew'        => true,
+            'price'             => 29.99,
+            'currency'          => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_find_all_due_for_renewal_excludes_non_active_status(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        foreach (['cancelled', 'expired', 'replaced', 'past_due'] as $status) {
+            Subscription::create([
+                'member_id'         => $this->testMember->id,
+                'site_id'           => $this->siteId,
+                'plan_name'         => "Plan {$status}",
+                'status'            => $status,
+                'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+                'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+                'auto_renew'        => true,
+                'price'             => 29.99,
+                'currency'          => 'USD',
+            ]);
+        }
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_find_all_due_for_renewal_excludes_auto_renew_false(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $this->siteId,
+            'plan_name'         => 'No Auto Renew',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+            'auto_renew'        => false,
+            'price'             => 29.99,
+            'currency'          => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_find_all_due_for_renewal_excludes_null_billing_date(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $this->siteId,
+            'plan_name'         => 'No Billing Date',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date' => null,
+            'auto_renew'        => true,
+            'price'             => 29.99,
+            'currency'          => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $this->assertCount(0, $result);
+    }
+
+    public function test_find_all_due_for_renewal_is_cross_site(): void
+    {
+        $now       = new \DateTimeImmutable();
+        $otherSite = $this->createSite();
+
+        $site1Sub = Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $this->siteId,
+            'plan_name'         => 'Site 1 Plan',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+            'auto_renew'        => true,
+            'price'             => 29.99,
+            'currency'          => 'USD',
+        ]);
+
+        $site2Sub = Subscription::create([
+            'member_id'         => $this->testMember->id,
+            'site_id'           => $otherSite->id,
+            'plan_name'         => 'Site 2 Plan',
+            'status'            => SubscriptionStatus::ACTIVE->value,
+            'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+            'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+            'auto_renew'        => true,
+            'price'             => 19.99,
+            'currency'          => 'USD',
+        ]);
+
+        $result = $this->repository->findAllDueForRenewal($now);
+
+        $ids = $result->pluck('id')->all();
+
+        $this->assertCount(2, $result);
+        $this->assertContains($site1Sub->id, $ids);
+        $this->assertContains($site2Sub->id, $ids);
+    }
+
+    public function test_find_all_due_for_renewal_respects_limit(): void
+    {
+        $now = new \DateTimeImmutable();
+
+        for ($i = 0; $i < 5; $i++) {
+            Subscription::create([
+                'member_id'         => $this->testMember->id,
+                'site_id'           => $this->siteId,
+                'plan_name'         => "Plan {$i}",
+                'status'            => SubscriptionStatus::ACTIVE->value,
+                'start_date'        => $now->modify('-1 month')->format('Y-m-d H:i:s'),
+                'next_billing_date' => $now->modify('-1 hour')->format('Y-m-d H:i:s'),
+                'auto_renew'        => true,
+                'price'             => 29.99,
+                'currency'          => 'USD',
+            ]);
+        }
+
+        $result = $this->repository->findAllDueForRenewal($now, 3);
+
+        $this->assertCount(3, $result);
+    }
 }

@@ -534,4 +534,23 @@ class SubscriptionRepository extends Repository
             ->whereNotNull('trial_used_at')
             ->exists();
     }
+
+    /**
+     * Returns all active auto-renew subscriptions whose next_billing_date
+     * has passed, across all sites.
+     *
+     * Intentionally cross-site: the renewal command processes every site in
+     * one run. SiteContext is not available in a console context.
+     *
+     * The limit guards against unbounded result sets when the job falls behind.
+     */
+    public function findAllDueForRenewal(\DateTimeImmutable $asOf, int $limit = 500): Collection
+    {
+        return Subscription::where('status', SubscriptionStatus::ACTIVE->value)
+            ->where('auto_renew', true)
+            ->whereNotNull('next_billing_date')
+            ->where('next_billing_date', '<=', $asOf->format('Y-m-d H:i:s'))
+            ->limit($limit)
+            ->get();
+    }
 }
