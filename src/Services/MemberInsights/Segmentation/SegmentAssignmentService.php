@@ -2,6 +2,7 @@
 
 namespace App\Services\MemberInsights\Segmentation;
 
+use App\Events\Subscriptions\SubscriptionSegmentAssigned;
 use App\Framework\Database\Database;
 use App\Models\Subscription;
 use App\Models\SubscriptionSegment;
@@ -60,7 +61,7 @@ class SegmentAssignmentService
             }
 
             // First match found — assign inside a transaction.
-            return $this->database->transaction(function () use ($subscription, $segment) {
+            $newAssignment = $this->database->transaction(function () use ($subscription, $segment) {
                 $this->subscriptionSegmentRepository->replaceActive($subscription->id);
 
                 return $this->subscriptionSegmentRepository->createSubscriptionSegment(
@@ -69,6 +70,12 @@ class SegmentAssignmentService
                     now_datetime(),
                 );
             });
+
+            if ($newAssignment !== null) {
+                event(new SubscriptionSegmentAssigned($newAssignment));
+            }
+
+            return $newAssignment;
         }
 
         return null;

@@ -492,6 +492,7 @@ class Database
                 'params' => $params,
                 'error' => $e->getMessage(),
             ]);
+
             throw new Exception("Query failed: " . $e->getMessage());
         } catch (\Exception $exception) {
             echo $sql;

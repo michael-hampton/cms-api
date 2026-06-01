@@ -6,6 +6,7 @@ use App\Framework\Notifications\NotificationDispatcher;
 use App\Framework\Support\Logger;
 use App\Models\Campaign;
 use App\Models\Member;
+use App\Models\SubscriptionCommunication;
 use App\Notifications\CampaignNotification;
 
 class InAppNotificationDispatcher
@@ -42,6 +43,37 @@ class InAppNotificationDispatcher
             $this->logger->error('In-app notification dispatch failed', [
                 'member_id' => $member->id,
                 'campaign_id' => $campaign->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    public function dispatchForSubscriptionCommunication(
+        Member $member,
+        SubscriptionCommunication $communication,
+    ): bool {
+        try {
+            $notification = new CampaignNotification(
+                userId: (int)$member->id,
+                subject: (string)($communication->name ?? $communication->subject ?? 'Subscription update'),
+                body: (string)($communication->body ?? $communication->description ?? ''),
+            );
+
+            $count = $this->dispatcher->dispatch($notification);
+
+            $this->logger->info('Subscription communication in-app notification dispatched', [
+                'member_id' => $member->id,
+                'communication_id' => $communication->id,
+                'channels_hit' => $count,
+            ]);
+
+            return $count > 0;
+        } catch (\Throwable $e) {
+            $this->logger->error('Subscription communication in-app notification dispatch failed', [
+                'member_id' => $member->id,
+                'communication_id' => $communication->id,
                 'error' => $e->getMessage(),
             ]);
 

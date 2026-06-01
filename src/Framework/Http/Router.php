@@ -129,6 +129,40 @@ class Router
     }
 
     /**
+     * Register API resource routes for controllers with index/store/show/update/destroy actions.
+     */
+    public function apiResource(string $path, string $controller, array $middleware = []): self
+    {
+        $path = '/' . trim($path, '/');
+        $parameter = $this->resourceParameterName($path);
+
+        $this->get($path, [$controller, 'index'], middleware: $middleware);
+        $this->post($path, [$controller, 'store'], middleware: $middleware);
+        $this->get($path . '/{' . $parameter . '}', [$controller, 'show'], middleware: $middleware);
+        $this->put($path . '/{' . $parameter . '}', [$controller, 'update'], middleware: $middleware);
+        $this->delete($path . '/{' . $parameter . '}', [$controller, 'destroy'], middleware: $middleware);
+
+        return $this;
+    }
+
+    private function resourceParameterName(string $path): string
+    {
+        $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+        $resource = end($segments) ?: 'resource';
+        $resource = str_replace('-', '_', $resource);
+
+        if (str_ends_with($resource, 'ies')) {
+            return substr($resource, 0, -3) . 'y';
+        }
+
+        if (str_ends_with($resource, 's')) {
+            return substr($resource, 0, -1);
+        }
+
+        return $resource;
+    }
+
+    /**
      * Add route with flexible handler support and group awareness
      */
     private function addRoute(string $httpMethod, string $path, $handler, ?string $method = null, array $middleware = [], ?string $name = null): void

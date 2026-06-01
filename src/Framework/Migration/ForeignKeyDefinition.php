@@ -4,18 +4,32 @@ namespace App\Framework\Migration;
 
 class ForeignKeyDefinition
 {
-    private $column;
-    private $references;
-    private $on;
-    private $onDelete = 'RESTRICT';
-    private $onUpdate = 'RESTRICT';
-    private $name;
+    private string $column;
+    private ?string $references = null;
+    private string $on;
+    private string $onDelete = 'RESTRICT';
+    private string $onUpdate = 'RESTRICT';
+    private string $name;
 
     public function __construct(string $column, string $table)
     {
         $this->column = $column;
-        $this->name = 'fk_' . $table . '_' . $column;
         $this->on = $table;
+
+        $this->name = $this->makeIdentifier('fk', [$table, $column]);
+    }
+
+    private function makeIdentifier(string $prefix, array $parts, int $max = 64): string
+    {
+        $base = $prefix . '_' . implode('_', $parts);
+
+        if (strlen($base) <= $max) {
+            return $base;
+        }
+
+        $hash = substr(md5($base), 0, 8);
+
+        return substr($base, 0, $max - 9) . '_' . $hash;
     }
 
     public function references(string $column): self

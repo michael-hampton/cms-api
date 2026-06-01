@@ -143,6 +143,9 @@ use App\Controllers\SiteController;
 use App\Controllers\Subscription\IssueDeliveryController;
 use App\Controllers\Subscription\PrintFulfillmentController;
 use App\Controllers\Subscription\PrintRunController;
+use App\Controllers\Subscription\SubscriptionCommunicationController;
+use App\Controllers\Subscription\SubscriptionCommunicationHistoryController;
+use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Vouchers\SubscriptionVoucherController;
@@ -667,6 +670,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/open-collab/admin/contributor-requests/{id}/reject',
             [ContributorRequestController::class, 'reject']
         );
+
+        $router->get('/communications/subscription/open/{token}',  [SubscriptionCommunicationTrackingController::class, 'open'])->name('subscription-comms.open');
+        $router->get('/communications/subscription/click/{token}', [SubscriptionCommunicationTrackingController::class, 'click'])->name('subscription-comms.click');
+        $router->apiResource('/subscription-communications', SubscriptionCommunicationController::class);
+        $router->get('/subscriptions/{subscriptionId}/communication-history', [SubscriptionCommunicationHistoryController::class, 'index']);
+        $router->post('/subscription-communications/{id}/schedules', [SubscriptionCommunicationController::class, 'storeSchedule']);
+        $router->put('/subscription-communication-schedules/{id}',  [SubscriptionCommunicationController::class, 'updateSchedule']);
+        $router->delete('/subscription-communication-schedules/{id}', [SubscriptionCommunicationController::class, 'destroySchedule']);
+
 
         $router->get(
             '/crm/members/{memberId}/manual-payments',
@@ -1749,6 +1761,9 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/profile', [OnboardingController::class, 'storeProfile']);
         $router->post('/steps/profile/complete', [OnboardingController::class, 'completeProfileStep']);
         $router->post('/payment', [OnboardingController::class, 'storePaymentDetails']);
+        $router->get('/payment-methods', [OnboardingController::class, 'paymentMethods']);
+        $router->post('/payment-methods/{paymentMethodId}/default', [OnboardingController::class, 'setDefaultPaymentMethod']);
+        $router->delete('/payment-methods/{paymentMethodId}', [OnboardingController::class, 'removePaymentMethod']);
         $router->post('/steps/payment/complete', [OnboardingController::class, 'completePaymentStep']);
         $router->get('/contract', [OnboardingController::class, 'getContract']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);
