@@ -51,17 +51,21 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
         $this->assertDatabaseCount('oc_contributor_profiles', 1);
     }
 
-    public function test_mark_payment_setup_stores_stripe_token(): void
+    public function test_mark_payment_setup_stores_payment_method_reference_and_tax_country(): void
     {
-        $this->repository->markPaymentSetup($this->user->id, 'tok_test_abc');
+        $this->repository->markPaymentSetup(
+            userId: $this->user->id,
+            paymentDetails: 'manual-ref-123',
+            paymentMethodType: 'bank_transfer',
+            taxCountry: 'GB',
+        );
 
         $this->assertDatabaseHas('oc_contributor_profiles', [
             'user_id' => $this->user->id,
-            'payment_method_type' => 'stripe',
+            'payment_method_type' => 'bank_transfer',
+            'payment_details' => 'manual-ref-123',
+            'tax_country' => 'GB',
         ]);
-        // payment_details is encrypted at the model layer, so we just verify the record exists
-        $profile = ContributorProfile::where('user_id', $this->user->id)->first();
-        $this->assertNotNull($profile->payment_details);
     }
 
     public function test_is_payment_setup_returns_true_when_payouts_enabled(): void
@@ -106,6 +110,17 @@ class ContributorProfileRepositoryTest extends RepositoryTestCase
             'user_id' => $this->user->id,
             'payment_method_type' => 'stripe',
             'payment_details' => 'tok_test_profile',
+        ]);
+
+        $this->assertTrue($this->repository->isPaymentSetup($this->user->id));
+    }
+
+    public function test_is_payment_setup_returns_true_when_profile_has_stripe_customer_id(): void
+    {
+        ContributorProfile::create([
+            'user_id' => $this->user->id,
+            'payment_method_type' => 'stripe',
+            'stripe_customer_id' => 'cus_test_profile',
         ]);
 
         $this->assertTrue($this->repository->isPaymentSetup($this->user->id));

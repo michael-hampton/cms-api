@@ -1172,16 +1172,19 @@ $pageClass = '';
             btn.disabled = true;
             btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
 
-            let stripeToken = 'bank';
+            let paymentMethodId = null;
             if (this.#stripe && this.#cardElement) {
-                const {token, error} = await this.#stripe.createToken(this.#cardElement);
+                const {paymentMethod, error} = await this.#stripe.createPaymentMethod({
+                    type: 'card',
+                    card: this.#cardElement,
+                });
                 if (error) {
                     document.getElementById('stripe-card-errors').textContent = error.message;
                     btn.disabled = false;
                     btn.textContent = 'Save payment details';
                     return;
                 }
-                stripeToken = token.id;
+                paymentMethodId = paymentMethod.id;
             }
 
             const res = await fetch(`/api/${this.#site}/open-collab/onboarding/payment`, {
@@ -1189,7 +1192,7 @@ $pageClass = '';
                 headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
                 body: JSON.stringify({
                     payment_method_type: 'stripe',
-                    stripe_token: stripeToken,
+                    payment_method_id: paymentMethodId,
                     tax_country: document.getElementById('tax-country-settings')?.value || '',
                 }),
             });

@@ -9,6 +9,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
+use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
@@ -22,6 +23,7 @@ class OnboardingPageController extends Controller
         private readonly ContributorOnboardingService $onboardingService,
         private readonly ContractRepository $contractRepository,
         private readonly GuidelinesRepository $guidelinesRepository,
+        private readonly GuidelinesContentRepository $guidelinesContentRepository,
         private readonly OpenCollabAuthorizationService $authorization,
         private readonly ContributorProfileRepository $contributorProfileRepository,
     )
@@ -53,6 +55,9 @@ class OnboardingPageController extends Controller
         }
 
         $viewModel = new OnboardingPageViewModel($pending, $site);
+        $publishedGuidelines = $viewModel->currentStepName() === 'guidelines'
+            ? $this->guidelinesContentRepository->latestPublishedForSite($site->id)
+            : null;
 
         return $this->view('open-collab.onboarding.index', [
             'vm' => $viewModel,
@@ -61,7 +66,9 @@ class OnboardingPageController extends Controller
             'contract' => $viewModel->currentStepName() === 'contract'
                 ? $this->contractRepository->latestForSite($site->id)
                 : null,
-            'siteGuidelinesVersion' => $this->guidelinesRepository->latestVersion($site->id),
+            'siteGuidelines' => $publishedGuidelines,
+            'siteGuidelinesVersion' => $publishedGuidelines?->version
+                ?? $this->guidelinesRepository->latestVersion($site->id),
             'site' => SiteContext::slug(),
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'currentUser' => Auth::user(),

@@ -278,11 +278,21 @@ if ($profile && !empty($profile->expertise)) {
                         </div>
 
                         <div id="stripe-section">
+                            <div id="stripe-payment-methods"
+                                 style="display:none;margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;overflow:hidden;">
+                                <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:.84rem;color:var(--navy);">
+                                    Saved cards
+                                </div>
+                                <div id="stripe-payment-methods-list"></div>
+                            </div>
                             <div class="oc-form-group">
-                                <label class="oc-label">Card details</label>
+                                <label class="oc-label">Add a new card</label>
                                 <div id="stripe-card-element"
                                      style="border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;background:#fff;"></div>
                                 <div id="stripe-card-errors" class="oc-error-msg" style="margin-top:6px;"></div>
+                                <div class="oc-help" style="margin-top:6px;">
+                                    Existing cards are stored in Stripe. Add a new card here only if you want to replace or add one.
+                                </div>
                             </div>
                         </div>
 
@@ -299,15 +309,15 @@ if ($profile && !empty($profile->expertise)) {
                             <label class="oc-label" for="tax-country">Country of tax residence</label>
                             <select class="oc-select" id="tax-country" name="tax_country">
                                 <option value="">Select country…</option>
-                                <option value="GB">United Kingdom</option>
-                                <option value="US">United States</option>
-                                <option value="CA">Canada</option>
-                                <option value="AU">Australia</option>
-                                <option value="DE">Germany</option>
-                                <option value="FR">France</option>
-                                <option value="IE">Ireland</option>
-                                <option value="NL">Netherlands</option>
-                                <option value="OTHER">Other</option>
+                                <option value="GB" <?= ($profile?->tax_country ?? '') === 'GB' ? 'selected' : '' ?>>United Kingdom</option>
+                                <option value="US" <?= ($profile?->tax_country ?? '') === 'US' ? 'selected' : '' ?>>United States</option>
+                                <option value="CA" <?= ($profile?->tax_country ?? '') === 'CA' ? 'selected' : '' ?>>Canada</option>
+                                <option value="AU" <?= ($profile?->tax_country ?? '') === 'AU' ? 'selected' : '' ?>>Australia</option>
+                                <option value="DE" <?= ($profile?->tax_country ?? '') === 'DE' ? 'selected' : '' ?>>Germany</option>
+                                <option value="FR" <?= ($profile?->tax_country ?? '') === 'FR' ? 'selected' : '' ?>>France</option>
+                                <option value="IE" <?= ($profile?->tax_country ?? '') === 'IE' ? 'selected' : '' ?>>Ireland</option>
+                                <option value="NL" <?= ($profile?->tax_country ?? '') === 'NL' ? 'selected' : '' ?>>Netherlands</option>
+                                <option value="OTHER" <?= ($profile?->tax_country ?? '') === 'OTHER' ? 'selected' : '' ?>>Other</option>
                             </select>
                             <div class="oc-help">Used for tax reporting purposes only.</div>
                         </div>
@@ -370,21 +380,23 @@ if ($profile && !empty($profile->expertise)) {
                         <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
                             Before you start publishing, please review our editorial standards and brand guidelines.
                         </p>
-                        <div style="background:var(--cream-dark);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-                            <div>
-                                <div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:2px;">Brand
-                                    & Editorial Guidelines
+                        <div style="background:var(--cream-dark);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">
+                                <div>
+                                    <div style="font-weight:600;font-size:.9rem;color:var(--navy);margin-bottom:2px;">Brand
+                                        & Editorial Guidelines
+                                    </div>
+                                    <div style="font-size:.78rem;color:var(--slate);">
+                                        Version <?= (int)($siteGuidelinesVersion ?? 1) ?></div>
                                 </div>
-                                <div style="font-size:.78rem;color:var(--slate);">
-                                    Version <?= (int)($siteGuidelinesVersion ?? 1) ?></div>
                             </div>
-                            <a href="/guidelines" target="_blank" class="oc-btn oc-btn--ghost oc-btn--sm">
-                                <svg viewBox="0 0 20 20" fill="currentColor" width="14">
-                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
-                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
-                                </svg>
-                                Read now
-                            </a>
+                            <div style="max-height:360px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:.875rem;line-height:1.7;color:var(--navy);white-space:pre-wrap;">
+                                <?php if (!empty($siteGuidelines?->content)): ?>
+                                    <?= $siteGuidelines->content ?>
+                                <?php else: ?>
+                                    <p style="margin:0;color:var(--slate);">No published guidelines are currently available for this site.</p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <div class="oc-toggle-row" style="margin-bottom:20px;">
                             <label class="oc-toggle">
@@ -980,12 +992,17 @@ if ($profile && !empty($profile->expertise)) {
     class PaymentStep extends OnboardingStepBase {
         #stripe = null;
         #cardElement = null;
+        #cardComplete = false;
+        #paymentMethods = [];
+        #selectedPaymentMethodId = null;
 
         constructor(site, token, stripeKey) {
             super(site, token);
             if (stripeKey) this.#initStripe(stripeKey);
             this.#bindMethodToggle();
             this.#bindSaveButton();
+            this.#bindSavedPaymentMethods();
+            this.#loadPaymentMethods();
         }
 
         #bindSaveButton() {
@@ -996,14 +1013,31 @@ if ($profile && !empty($profile->expertise)) {
             const pmType = document.querySelector('[name="payment_method_type"]:checked')?.value;
 
             if (pmType === 'stripe' && this.#stripe && this.#cardElement) {
-                const { token: stripeToken, error } = await this.#stripe.createToken(this.#cardElement);
+                if (!this.#cardComplete && this.#selectedPaymentMethodId) {
+                    return {
+                        payment_method_type: 'stripe',
+                        payment_method_id: this.#selectedPaymentMethodId,
+                        tax_country: document.getElementById('tax-country')?.value || '',
+                    };
+                }
+
+                if (!this.#cardComplete) {
+                    document.getElementById('stripe-card-errors').textContent = 'Add a card or choose a saved card.';
+                    return null;
+                }
+
+                const {paymentMethod, error} = await this.#stripe.createPaymentMethod({
+                    type: 'card',
+                    card: this.#cardElement,
+                });
                 if (error) {
                     document.getElementById('stripe-card-errors').textContent = error.message;
                     return null;
                 }
+
                 return {
                     payment_method_type: 'stripe',
-                    stripe_token: stripeToken.id,
+                    payment_method_id: paymentMethod.id,
                     tax_country: document.getElementById('tax-country')?.value || '',
                 };
             }
@@ -1036,6 +1070,11 @@ if ($profile && !empty($profile->expertise)) {
                 const res = await this._post('payment', payload);
                 const data = await res.json();
                 if (res.ok) {
+                    this.#applyPaymentMethodsFromResponse(data);
+                    if (this.#cardElement) {
+                        this.#cardElement.clear();
+                        this.#cardComplete = false;
+                    }
                     if (successEl) {
                         successEl.textContent = 'Payment details saved. You can come back and continue later.';
                         successEl.style.display = 'block';
@@ -1068,8 +1107,15 @@ if ($profile && !empty($profile->expertise)) {
                 },
             });
             this.#cardElement.mount('#stripe-card-element');
-            this.#cardElement.on('change', ({error}) => {
+            this.#cardElement.on('change', ({complete, error}) => {
+                this.#cardComplete = complete;
                 document.getElementById('stripe-card-errors').textContent = error ? error.message : '';
+                if (complete) {
+                    this.#selectedPaymentMethodId = null;
+                    document.querySelectorAll('[name="saved_payment_method"]').forEach(input => {
+                        input.checked = false;
+                    });
+                }
             });
         }
 
@@ -1095,6 +1141,121 @@ if ($profile && !empty($profile->expertise)) {
             });
         }
 
+        #bindSavedPaymentMethods() {
+            document.getElementById('stripe-payment-methods-list')?.addEventListener('click', async event => {
+                const action = event.target.closest('[data-payment-method-action]');
+                if (!action) return;
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                const paymentMethodId = action.dataset.paymentMethodId;
+                if (!paymentMethodId) return;
+
+                action.disabled = true;
+                const method = action.dataset.paymentMethodAction;
+
+                try {
+                    const res = await fetch(`/api/${this._site}/open-collab/onboarding/payment-methods/${paymentMethodId}${method === 'default' ? '/default' : ''}`, {
+                        method: method === 'remove' ? 'DELETE' : 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'Authorization': `Bearer ${this._token}`,
+                        },
+                    });
+                    const data = await res.json();
+                    if (!res.ok) {
+                        this._showError(data.error || data.message || 'Could not update payment methods.');
+                        return;
+                    }
+                    this.#applyPaymentMethodsFromResponse(data);
+                } catch {
+                    this._showError('Could not update payment methods. Please check your connection.');
+                } finally {
+                    action.disabled = false;
+                }
+            });
+
+            document.getElementById('stripe-payment-methods-list')?.addEventListener('change', event => {
+                if (event.target.name === 'saved_payment_method') {
+                    this.#selectedPaymentMethodId = event.target.value;
+                    document.getElementById('stripe-card-errors').textContent = '';
+                    if (this.#cardElement) {
+                        this.#cardElement.clear();
+                        this.#cardComplete = false;
+                    }
+                }
+            });
+        }
+
+        async #loadPaymentMethods() {
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/onboarding/payment-methods`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`,
+                    },
+                });
+                if (!res.ok) return;
+                this.#applyPaymentMethodsFromResponse(await res.json());
+            } catch {
+                // The card form still works if the saved-method list cannot load.
+            }
+        }
+
+        #applyPaymentMethodsFromResponse(response) {
+            const payload = response.data?.data ?? response.data ?? response;
+            this.#paymentMethods = payload.payment_methods ?? [];
+            this.#selectedPaymentMethodId = payload.default_payment_method_id
+                ?? this.#paymentMethods.find(method => method.is_default)?.id
+                ?? this.#paymentMethods[0]?.id
+                ?? null;
+            this.#renderPaymentMethods();
+        }
+
+        #renderPaymentMethods() {
+            const wrap = document.getElementById('stripe-payment-methods');
+            const list = document.getElementById('stripe-payment-methods-list');
+            if (!wrap || !list) return;
+
+            if (!this.#paymentMethods.length) {
+                wrap.style.display = 'none';
+                list.innerHTML = '';
+                return;
+            }
+
+            wrap.style.display = 'block';
+            list.innerHTML = this.#paymentMethods.map(method => {
+                const checked = method.id === this.#selectedPaymentMethodId ? 'checked' : '';
+                const defaultBadge = method.is_default
+                    ? '<span style="font-size:.7rem;color:var(--green);font-weight:700;">Default</span>'
+                    : `<button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" data-payment-method-action="default" data-payment-method-id="${this.#escape(method.id)}">Set default</button>`;
+
+                return `
+                    <label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;">
+                        <input type="radio" name="saved_payment_method" value="${this.#escape(method.id)}" ${checked}>
+                        <div style="flex:1;">
+                            <div style="font-weight:600;color:var(--navy);font-size:.86rem;">
+                                ${this.#escape((method.brand || 'card').toUpperCase())} ending ${this.#escape(method.last4 || '')}
+                            </div>
+                            <div style="font-size:.74rem;color:var(--slate);">
+                                Expires ${this.#escape(String(method.exp_month || '').padStart(2, '0'))}/${this.#escape(method.exp_year || '')}
+                            </div>
+                        </div>
+                        ${defaultBadge}
+                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" style="color:var(--red);" data-payment-method-action="remove" data-payment-method-id="${this.#escape(method.id)}">Remove</button>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        #escape(value) {
+            const div = document.createElement('div');
+            div.textContent = value ?? '';
+            return div.innerHTML;
+        }
+
         async _submit() {
             this._clearError();
             const btn = this._setButtonLoading('Saving…');
@@ -1115,6 +1276,7 @@ if ($profile && !empty($profile->expertise)) {
                 this._resetButton(btn, 'Confirm &amp; continue');
                 return;
             }
+            this.#applyPaymentMethodsFromResponse(await saveRes.clone().json());
 
             btn.innerHTML = `<div class="oc-spinner"></div> Confirming…`;
             const completeRes = await this._post('steps/payment/complete', {});

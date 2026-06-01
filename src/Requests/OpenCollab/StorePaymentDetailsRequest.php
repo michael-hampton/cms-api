@@ -17,7 +17,9 @@ class StorePaymentDetailsRequest extends FormRequest
     {
         return [
             'payment_method_type' => ['required', 'string', 'in:stripe,bank_transfer'],
-            'stripe_token' => ['required_if:payment_method_type,stripe', 'string', 'max:500'],
+            'payment_method_id' => ['sometimes', 'string', 'max:500'],
+            'stripe_token' => ['sometimes', 'string', 'max:500'],
+            'tax_country' => ['sometimes', 'string', 'max:10'],
         ];
     }
 
@@ -26,7 +28,7 @@ class StorePaymentDetailsRequest extends FormRequest
         return [
             'payment_method_type.required' => 'A payment method type is required.',
             'payment_method_type.in' => 'Supported payment methods are: stripe, bank_transfer.',
-            'stripe_token.required_if' => 'A Stripe token is required when using card payments.',
+            'payment_method_id.required_if' => 'A Stripe payment method is required when using card payments.',
         ];
     }
 }

@@ -32,12 +32,23 @@ class ContributorProfileRepository extends Repository
             ->first();
     }
 
-    public function markPaymentSetup(int $userId, string $stripeToken): void
+    public function markPaymentSetup(
+        int $userId,
+        string $paymentDetails,
+        string $paymentMethodType = 'stripe',
+        ?string $taxCountry = null,
+    ): void
     {
-        $this->createOrUpdate($userId, [
-            'payment_method_type' => 'stripe',
-            'payment_details' => $stripeToken, // encrypted at model layer
-        ]);
+        $data = [
+            'payment_method_type' => $paymentMethodType,
+            'payment_details' => $paymentDetails,
+        ];
+
+        if ($taxCountry !== null) {
+            $data['tax_country'] = $taxCountry;
+        }
+
+        $this->createOrUpdate($userId, $data);
     }
 
     public function createOrUpdate(int $userId, array $data): ContributorProfile
@@ -72,7 +83,9 @@ class ContributorProfileRepository extends Repository
     {
         $profile = $this->findByUserId($userId);
 
-        if ($profile && !empty($profile->payment_method_type) && !empty($profile->payment_details)) {
+        if ($profile && !empty($profile->payment_method_type) && (
+            !empty($profile->payment_details) || !empty($profile->stripe_customer_id)
+        )) {
             return true;
         }
 

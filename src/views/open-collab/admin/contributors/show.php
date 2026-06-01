@@ -33,6 +33,115 @@ $canManageCapabilities = in_array('contributor.capabilities_manage_action', $all
     .oc-tab-panel.active { display: flex; flex-direction: column; gap: 20px; }
     .oc-tabbar__tab { border: none; background: none; border-bottom: 2px solid transparent; color: var(--slate); padding: 8px 4px; font-weight: 500; cursor: pointer; font-size: .95rem; }
     .oc-tabbar__tab.active { border-bottom-color: var(--navy); color: var(--navy); font-weight: 600; }
+
+    /* ── Capabilities Table Grid Styles ────────────────────────────────────── */
+    .oc-capabilities-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 4px;
+        text-align: left;
+    }
+    .oc-capabilities-table th {
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--slate);
+        padding: 12px 16px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .oc-capabilities-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #e2e8f0;
+        vertical-align: middle;
+    }
+    .oc-capabilities-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+    .oc-cap-label {
+        font-weight: 600;
+        color: var(--navy);
+        font-size: 0.92rem;
+    }
+    .oc-cap-key {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.75rem;
+        color: var(--slate);
+        background: #f1f5f9;
+        padding: 2px 6px;
+        border-radius: 4px;
+        display: inline-block;
+        margin-top: 4px;
+    }
+    .oc-cap-desc {
+        font-size: 0.8rem;
+        color: var(--slate);
+        margin-top: 6px;
+        line-height: 1.4;
+        max-width: 520px;
+    }
+    .oc-cap-effective {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 6px;
+    }
+    .oc-cap-effective--yes {
+        color: #16a34a;
+        background-color: #f0fdf4;
+    }
+    .oc-cap-effective--no {
+        color: var(--red);
+        background-color: #fef2f2;
+    }
+    .oc-cap-effective svg {
+        flex-shrink: 0;
+    }
+    .oc-cap-source-badge {
+        font-size: 0.75rem;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 12px;
+        display: inline-block;
+    }
+    .oc-cap-source-badge--role {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+    }
+    .oc-cap-source-badge--direct_grant {
+        background-color: #f0fdf4;
+        color: #16a34a;
+    }
+    .oc-cap-source-badge--direct_deny {
+        background-color: #fef2f2;
+        color: var(--red);
+    }
+    .oc-cap-source-badge--system {
+        background-color: #f1f5f9;
+        color: #475569;
+    }
+    .oc-cap-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    .oc-capabilities-loading,
+    .oc-capabilities-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 48px 24px;
+        color: var(--slate);
+        background: #fff;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.9rem;
+    }
 </style>
 
 <div id="status-toast"
@@ -78,43 +187,40 @@ $canManageCapabilities = in_array('contributor.capabilities_manage_action', $all
     <div style="display:flex;flex-direction:column;gap:20px;">
 
         <?php if ($hasOverviewPanels || $hasCapabilitiesPanels): ?>
-        <div class="oc-tabbar" style="display:flex;gap:20px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;">
-            <?php if ($hasOverviewPanels): ?>
-                <button type="button" class="oc-tabbar__tab active" data-tab-target="contributor-overview-panel">Overview</button>
-            <?php endif; ?>
-            <?php if ($hasCapabilitiesPanels): ?>
-                <button type="button" class="oc-tabbar__tab <?= !$hasOverviewPanels ? 'active' : '' ?>" data-tab-target="contributor-capabilities-panel">Capabilities Overrides</button>
-            <?php endif; ?>
-        </div>
+            <div class="oc-tabbar" style="display:flex;gap:20px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;">
+                <?php if ($hasOverviewPanels): ?>
+                    <button type="button" class="oc-tabbar__tab active" data-tab-target="contributor-overview-panel">Overview</button>
+                <?php endif; ?>
+                <?php if ($hasCapabilitiesPanels): ?>
+                    <button type="button" class="oc-tabbar__tab <?= !$hasOverviewPanels ? 'active' : '' ?>" data-tab-target="contributor-capabilities-panel">Capabilities Overrides</button>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
 
         <?php if ($hasOverviewPanels): ?>
-        <div id="contributor-overview-panel" class="oc-tab-panel active">
-            <?php foreach ($overviewPanels as $panel): ?>
-                <?= $panel->render([
-                    'contributor' => $contributor,
-                    'invitations' => $invitations,
-                    'site' => $site,
-                    'isActive' => $isActive,
-                    'canManageRole' => $canManageRole,
-                    'canManageSiteAccess' => $canManageSiteAccess,
-                    'canSendInvitation' => $canSendInvitation,
-                    'canManageCapabilities' => $canManageCapabilities,
-                ]) ?>
-            <?php endforeach; ?>
-        </div>
+            <div id="contributor-overview-panel" class="oc-tab-panel active">
+                <?php foreach ($overviewPanels as $panel): ?>
+                    <?= $panel->render([
+                            'contributor' => $contributor,
+                            'invitations' => $invitations,
+                            'site' => $site,
+                            'isActive' => $isActive,
+                            'canManageRole' => $canManageRole,
+                            'canManageSiteAccess' => $canManageSiteAccess,
+                            'canSendInvitation' => $canSendInvitation,
+                            'canManageCapabilities' => $canManageCapabilities,
+                    ]) ?>
+                <?php endforeach; ?>
+            </div>
         <?php endif; ?>
 
         <?php if ($hasCapabilitiesPanels): ?>
-        <div id="contributor-capabilities-panel" class="oc-tab-panel <?= !$hasOverviewPanels ? 'active' : '' ?>">
-            <?php foreach ($capabilitiesPanels as $panel): ?>
-                <?= $panel->render([
-                    'contributor' => $contributor,
-                    'site' => $site,
-                    'canManageCapabilities' => $canManageCapabilities,
-                ]) ?>
-            <?php endforeach; ?>
-        </div>
+            <div id="contributor-capabilities-panel" class="oc-tab-panel <?= !$hasOverviewPanels ? 'active' : '' ?>">
+                <div class="oc-card">
+                    <div class="oc-card__body" id="capabilities-list">
+                    </div>
+                </div>
+            </div>
         <?php endif; ?>
 
         <?php if (!$hasOverviewPanels && !$hasCapabilitiesPanels): ?>
@@ -217,6 +323,8 @@ $canManageCapabilities = in_array('contributor.capabilities_manage_action', $all
         </div>
     </div>
 </div>
+
+@include('open-collab/admin/contributors/panels/capabilities', ['canManageCapabilities' => $canManageCapabilities])
 
 @endsection
 
@@ -637,8 +745,8 @@ $canManageCapabilities = in_array('contributor.capabilities_manage_action', $all
 
             const rows = capabilities.map((cap) => {
                 const sourceLabel = sourceLabels[cap.source] ?? cap.source ?? '—';
-                const checkSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13"><polyline points="2,8 6,12 14,4"/></svg>`;
-                const crossSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" width="13" height="13"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>`;
+                const checkSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><polyline points="2,8 6,12 14,4"/></svg>`;
+                const crossSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>`;
                 const effectiveIcon = cap.effective ? checkSvg : crossSvg;
                 const canGrant = !cap.directGrant;
                 const canDeny = !cap.directDeny;
@@ -685,14 +793,14 @@ $canManageCapabilities = in_array('contributor.capabilities_manage_action', $all
             </tr>`;
             }).join('');
 
-            el.innerHTML = `<div style="overflow-x:auto;">
+            el.innerHTML = `<div style="overflow-x:auto; margin: -18px -20px;">
             <table class="oc-capabilities-table">
                 <thead>
                     <tr>
-                        <th>Capability</th>
+                        <th style="padding-left: 20px;">Capability</th>
                         <th>Effective</th>
                         <th>Source</th>
-                        <th style="text-align:right;">Actions</th>
+                        <th style="text-align:right; padding-right: 20px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>${rows}</tbody>

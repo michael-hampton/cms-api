@@ -32,7 +32,7 @@ class ContributorAccountPageController extends Controller
         return $this->view('open-collab.settings.index', [
             'profile' => $this->contributorProfileRepository->findByUserId($userId),
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
-            'contractSignatures' => $this->contractRepository->getForUser($userId, $contract->id)?->toArray() ?? [],
+            'contractSignatures' => !empty($contract) ? $this->contractRepository->getForUser($userId, $contract->id)?->toArray() ?? [] : [],
             'guidelinesAck' => $this->guidelinesRepository->getForUser($userId, $siteId),
             'site' => SiteContext::slug(),
             'currentUser' => User::find($userId)

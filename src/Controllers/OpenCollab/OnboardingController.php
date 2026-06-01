@@ -20,7 +20,9 @@ use App\Requests\OpenCollab\StoreOnboardingProfileRequest;
 use App\Requests\OpenCollab\StorePaymentDetailsRequest;
 use App\Resources\OpenCollab\OnboardingStatusResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\ContributorPaymentMethodService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\Models\User;
 use RuntimeException;
 
 /**
@@ -50,6 +52,7 @@ class OnboardingController extends Controller
         private readonly ContractRepository             $contractRepository,
         private readonly GuidelinesRepository           $guidelinesRepository,
         private readonly OpenCollabAuthorizationService $authorization,
+        private readonly ContributorPaymentMethodService $paymentMethodService,
     ) {
         parent::__construct();
     }
@@ -141,15 +144,94 @@ class OnboardingController extends Controller
             $data   = $request->validated();
             $userId = Auth::id();
 
+            if (($data['payment_method_type'] ?? null) === 'stripe') {
+                if (empty($data['payment_method_id'])) {
+                    return $this->errorResponse('A Stripe payment method is required when using card payments.', 422);
+                }
+
+                $result = $this->paymentMethodService->addForUser(
+                    $this->currentUser(),
+                    (string)$data['payment_method_id'],
+                    $data['tax_country'] ?? null,
+                    true,
+                );
+
+                if (!($result['success'] ?? false)) {
+                    return $this->errorResponse($result['message'] ?? 'Could not save payment method.', 422);
+                }
+
+                return $this->successResponse('Payment details saved.', [
+                    'payment_methods' => $result['payment_methods'] ?? [],
+                    'default_payment_method_id' => $result['default_payment_method_id'] ?? null,
+                ]);
+            }
+
             $this->profileRepository->markPaymentSetup(
-                userId:      $userId,
-                stripeToken: $data['stripe_token'] ?? $data['payment_method_type'],
+                userId: $userId,
+                paymentDetails: $data['stripe_token'] ?? $data['payment_method_type'],
+                paymentMethodType: 'bank_transfer',
+                taxCountry: $data['tax_country'] ?? null,
             );
 
             return $this->successResponse('Payment details saved.');
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
+    }
+
+    public function paymentMethods(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $result = $this->paymentMethodService->listForUser($this->currentUser());
+
+        if (!($result['success'] ?? false)) {
+            return $this->errorResponse($result['message'] ?? 'Could not load payment methods.', 500);
+        }
+
+        return $this->jsonResponse([
+            'payment_methods' => $result['payment_methods'] ?? [],
+            'default_payment_method_id' => $result['default_payment_method_id'] ?? null,
+        ]);
+    }
+
+    public function setDefaultPaymentMethod(Request $request, string $paymentMethodId): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $result = $this->paymentMethodService->setDefaultForUser($this->currentUser(), $paymentMethodId);
+
+        if (!($result['success'] ?? false)) {
+            return $this->errorResponse($result['message'] ?? 'Could not update payment method.', 422);
+        }
+
+        return $this->successResponse('Default payment method updated.', [
+            'payment_methods' => $result['payment_methods'] ?? [],
+            'default_payment_method_id' => $result['default_payment_method_id'] ?? null,
+        ]);
+    }
+
+    public function removePaymentMethod(string $paymentMethodId): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $result = $this->paymentMethodService->removeForUser($this->currentUser(), $paymentMethodId);
+
+        if (!($result['success'] ?? false)) {
+            $status = ($result['error_code'] ?? null) === 'unauthorized' ? 403 : 422;
+            return $this->errorResponse($result['message'] ?? 'Could not remove payment method.', $status);
+        }
+
+        return $this->successResponse('Payment method removed.', [
+            'payment_methods' => $result['payment_methods'] ?? [],
+            'default_payment_method_id' => $result['default_payment_method_id'] ?? null,
+        ]);
     }
 
     /**
@@ -318,6 +400,17 @@ class OnboardingController extends Controller
         }
 
         return $site;
+    }
+
+    private function currentUser(): User
+    {
+        $user = User::find(Auth::id());
+
+        if (!$user) {
+            throw new RuntimeException('Authenticated user could not be loaded.');
+        }
+
+        return $user;
     }
 
     /**

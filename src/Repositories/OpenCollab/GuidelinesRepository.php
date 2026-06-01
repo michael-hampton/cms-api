@@ -33,7 +33,7 @@ class GuidelinesRepository extends Repository
             ->max('version');
     }
 
-    public function getForUser(int $userId, int $siteId): UserGuidelinesAcknowledgement
+    public function getForUser(int $userId, int $siteId): ?UserGuidelinesAcknowledgement
     {
         return UserGuidelinesAcknowledgement::where('user_id', $userId)
             ->where('site_id', $siteId)

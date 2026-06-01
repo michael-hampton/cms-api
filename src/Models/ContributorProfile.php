@@ -14,6 +14,7 @@ class ContributorProfile extends Model
         'sample_links',
         'payment_method_type',
         'payment_details',
+        'stripe_customer_id',
         'tax_country',
         'account_status',
         'closure_reason',
