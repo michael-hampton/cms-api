@@ -48,6 +48,7 @@ class SubscriptionRenewalService
         private readonly SubscriptionPlanRepository $planRepository,
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly SubscriptionDateCalculator $dateCalculator,
+        private readonly SubscriptionRenewalTracker $renewalTracker,
         private readonly Database                   $database,
     )
     {
@@ -163,6 +164,11 @@ class SubscriptionRenewalService
                 : null;
 
             // Step 3 — Create new subscription
+            $firstRenewedAt = $oldSubscription->first_renewed_at;
+            if ($firstRenewedAt instanceof \DateTimeInterface) {
+                $firstRenewedAt = $firstRenewedAt->format('Y-m-d H:i:s');
+            }
+
             $newSubscription = $this->subscriptionRepository->createSubscription(
                 memberId: (int)$oldSubscription->member_id,
                 planId: $plan->id,
@@ -177,9 +183,17 @@ class SubscriptionRenewalService
                     'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
                     'renewed_from_subscription_id' => $oldSubscription->id,
                     'replacement_reason' => SubscriptionEndReason::RENEWAL->value,
+                    'renewal_count' => (int)($oldSubscription->renewal_count ?? 0),
+                    'first_renewed_at' => $firstRenewedAt,
                     'status' => SubscriptionStatus::ACTIVE->value,
                 ],
             );
+
+            if (!$newSubscription instanceof \App\Models\Subscription) {
+                throw new RuntimeException('Renewal tracking requires a Subscription model.');
+            }
+
+            $this->renewalTracker->recordRenewalReplacement($oldSubscription, $newSubscription);
 
             // Step 4 — Link old subscription to new
             $this->subscriptionRepository->update($oldSubscription->id, [

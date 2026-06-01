@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
-use App\Models\Model;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -14,6 +13,7 @@ use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
+use App\Services\Subscriptions\SubscriptionRenewalTracker;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Mockery;
@@ -26,6 +26,7 @@ class SubscriptionRenewalServiceTest extends TestCase
     private $planRepository;
     private $subscriptionPaymentService;
     private $dateCalculator;
+    private $renewalTracker;
     private $database;
 
     private SubscriptionRenewalService $service;
@@ -141,6 +142,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('update')->twice()->andReturn($mockModel);
         $this->subscriptionRepository->shouldReceive('createSubscription')->once()->andReturn($mockModel);
+        $this->renewalTracker->shouldReceive('recordRenewalReplacement')->once()->with($sub, $mockModel);
         $this->subscriptionRepository->shouldReceive('find')->andReturn($mockModel);
 
         $result = $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
@@ -178,6 +180,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('update')->twice()->andReturn($mockModel);
         $this->subscriptionRepository->shouldReceive('createSubscription')->once()->andReturn($mockModel);
+        $this->renewalTracker->shouldReceive('recordRenewalReplacement')->once()->with($sub, $mockModel);
         $this->subscriptionRepository->shouldReceive('find')->andReturn($mockModel);
 
         $result = $this->service->renew(
@@ -211,6 +214,56 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->service->renew(1, 200, null, 10.0, null, 10);
     }
 
+    public function test_tracks_renewal_when_subscription_renews(): void
+    {
+        $sub = $this->makeSubscription();
+        $sub->renewal_count = 2;
+        $sub->first_renewed_at = new DateTimeImmutable('2026-02-01 10:00:00');
+
+        $plan = $this->makePlan();
+        $newSubscription = $this->makeModel();
+
+        $this->subscriptionRepository->shouldReceive('find')->andReturn($sub, $sub);
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->dateCalculator
+            ->shouldReceive('calculateEndDate')
+            ->andReturn(new DateTimeImmutable('+1 month'));
+
+        $this->subscriptionRepository->shouldReceive('update')->twice()->andReturn($newSubscription);
+        $this->subscriptionRepository
+            ->shouldReceive('createSubscription')
+            ->once()
+            ->withArgs(function (
+                int $memberId,
+                int $planId,
+                int $siteId,
+                array $additionalData,
+            ): bool {
+                return $additionalData['renewal_count'] === 2
+                    && $additionalData['first_renewed_at'] === '2026-02-01 10:00:00';
+            })
+            ->andReturn($newSubscription);
+
+        $this->renewalTracker
+            ->shouldReceive('recordRenewalReplacement')
+            ->once()
+            ->with($sub, $newSubscription);
+
+        $result = $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+
+        $this->assertSame($newSubscription, $result['new_subscription']);
+    }
+
     // ── processRenewals() ─────────────────────────────────────────────────────
 
     public function test_process_renewals_returns_zero_counts_when_nothing_due(): void
@@ -235,6 +288,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->planRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
+            $this->renewalTracker,
             $this->database,
         ])->makePartial();
 
@@ -277,6 +331,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->planRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
+            $this->renewalTracker,
             $this->database,
         ])->makePartial();
 
@@ -372,9 +427,9 @@ class SubscriptionRenewalServiceTest extends TestCase
         return $plan;
     }
 
-    private function makeModel(): Model
+    private function makeModel(): Subscription
     {
-        $model = Mockery::mock(Model::class)->makePartial();
+        $model = Mockery::mock(Subscription::class)->makePartial();
         $model->id = 1;
 
         return $model;
@@ -390,6 +445,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->planRepository             = Mockery::mock(SubscriptionPlanRepository::class);
         $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->dateCalculator             = Mockery::mock(SubscriptionDateCalculator::class);
+        $this->renewalTracker             = Mockery::mock(SubscriptionRenewalTracker::class);
         $this->database                   = Mockery::mock(Database::class);
 
         $this->service = new SubscriptionRenewalService(
@@ -397,6 +453,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             $this->planRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
+            $this->renewalTracker,
             $this->database,
         );
     }

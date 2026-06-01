@@ -10,16 +10,20 @@ use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\AcceptedRule;
+use App\Framework\Validation\Rules\ArrayRule;
+use App\Framework\Validation\Rules\BooleanRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
 use App\Framework\Validation\Rules\MaxRule;
 use App\Framework\Validation\Rules\MinLengthRule;
 use App\Framework\Validation\Rules\MinRule;
 use App\Framework\Validation\Rules\NumericRule;
+use App\Framework\Validation\Rules\NullableRule;
 use App\Framework\Validation\Rules\RegexRule;
 use App\Framework\Validation\Rules\RequiredIfRule;
 use App\Framework\Validation\Rules\RequiredRule;
 use App\Framework\Validation\Rules\RequiredWithRule;
+use App\Framework\Validation\Rules\StringRule;
 use App\Framework\Validation\Rules\SometimesRule;
 use App\Framework\Validation\Rules\UniqueRule;
 use App\Framework\Validation\Rules\UrlRule;
@@ -238,10 +242,13 @@ class Validator
             'unique' => UniqueRule::class,
             'max' => MaxLengthRule::class,
             'min' => MinLengthRule::class,
+            'string' => StringRule::class,
+            'array' => ArrayRule::class,
+            'boolean' => BooleanRule::class,
             'email' => EmailRule::class,
             'url' => UrlRule::class,
             'numeric' => NumericRule::class,
-            'nullable' => NumericRule::class,
+            'nullable' => NullableRule::class,
             'integer' => IntegerRule::class,
             'date' => DateRule::class,
             'in' => InRule::class,

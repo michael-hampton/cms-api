@@ -11,8 +11,8 @@ final class SubscriptionRenewedAndReplaced
         public readonly int    $productId,
         public readonly int    $planId,
         public readonly float  $amountPaid,
-        public readonly ?int    $agentId = null,
         public readonly string $timestamp,
+        public readonly ?int    $agentId = null,
     )
     {
     }
