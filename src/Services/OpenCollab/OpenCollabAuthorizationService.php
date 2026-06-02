@@ -33,4 +33,11 @@ class OpenCollabAuthorizationService
             throw new UnauthorizedException($message);
         }
     }
+
+    public function assert(int $userId, int $siteId, string $permission, string $message = 'Forbidden.'): void
+    {
+        if (!$this->allows($userId, $siteId, $permission)) {
+            throw new UnauthorizedException($message);
+        }
+    }
 }

@@ -13,7 +13,8 @@ class SubscriptionPricing
         public string $deliveryType,
         public ?int   $voucherId = null,
         public ?array $shippingAddressSnapshot = [],
-        public ?float $originalAmount = 0
+        public ?float $originalAmount = 0,
+        public ?int   $pricingTierId = null,
     )
     {
     }

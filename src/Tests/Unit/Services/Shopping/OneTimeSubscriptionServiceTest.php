@@ -172,7 +172,9 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         $this->subscriptionRepository->shouldReceive('create')
             ->once()
             ->with(m::on(function ($data) {
-                return isset($data['price_paid_cents']) && $data['price_paid_cents'] === 20;
+                return isset($data['price_paid_cents'])
+                    && $data['price_paid_cents'] === 20
+                    && $data['subscription_plan_pricing_id'] === 77;
             }))
             ->andReturn($subscription);
 
@@ -190,7 +192,8 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
             20,
             20,
             20,
-            SubscriptionType::DIGITAL->value
+            SubscriptionType::DIGITAL->value,
+            pricingTierId: 77,
         );
 
         $result = $this->service->createOneTimeSubscription(

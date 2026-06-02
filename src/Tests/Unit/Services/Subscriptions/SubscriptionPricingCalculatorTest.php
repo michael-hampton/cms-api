@@ -250,6 +250,42 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $this->assertEquals(6000, $pricing->subtotalCents);
     }
 
+    public function test_calculate_carries_resolved_pricing_tier_id(): void
+    {
+        $plan = $this->createMockPlan(60.00);
+        $member = $this->createMockMember();
+
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $resolvedPrice = ResolvedSubscriptionPrice::fromPricingTier(
+            pricingTierId: 77,
+            variant: SubscriptionType::DIGITAL->value,
+            basePrice: 60.00,
+            salePrice: 45.00,
+            currency: 'USD',
+            discountAmount: 0,
+            voucherId: null
+        );
+
+        $this->pricingResolver->shouldReceive('resolve')
+            ->once()
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => 77, 'voucher_code' => null], 123)
+            ->andReturn($resolvedPrice);
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'options' => [
+                'delivery_type' => SubscriptionType::DIGITAL->value,
+                'pricing_tier_id' => 77,
+            ],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, null, $member, []);
+
+        $this->assertSame(77, $pricing->pricingTierId);
+        $this->assertSame(4500, $pricing->subtotalCents);
+    }
+
     public function test_calculate_throws_on_invalid_plan(): void
     {
         $this->expectException(\InvalidArgumentException::class);

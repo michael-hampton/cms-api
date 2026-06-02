@@ -4,6 +4,7 @@ namespace App\Controllers\Cms;
 
 use App\Controllers\Controller;
 use App\DTO\Briefs\DuplicateBriefOptions;
+use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -25,13 +26,15 @@ use App\Requests\Briefs\UpdateBriefTaskRequest;
 use App\Resources\BriefResource;
 use App\Search\SearchCriteriaParser;
 use App\Services\Cms\BriefService;
+use App\Services\Cms\ContentWorkflowAuthorizationService;
 use Exception;
 
 class BriefController extends Controller
 {
     public function __construct(
         private readonly BriefService $briefService,
-        private readonly BriefTaskRepository $taskRepository
+        private readonly BriefTaskRepository $taskRepository,
+        private readonly ContentWorkflowAuthorizationService $workflowAuthorization,
     )
     {
         parent::__construct();
@@ -271,11 +274,22 @@ class BriefController extends Controller
     public function updateStatus(int $id, Request $request, string $site): JsonResponse
     {
         try {
+            $userId = (int) $request->get('user_id');
+            $status = (string) $request->get('status');
+
+            if (!$userId) {
+                return $this->errorResponse('User ID is required', 422);
+            }
+
+            $this->authorizeBriefStatusChange($id, $status, $userId);
+
             $brief = $this->briefService->updateStatus($id, $request->get('status'), $request->get('user_id'));
 
             return $this->resourceResponse([
                 'data' => BriefResource::make($brief)->toArray(),
             ]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -295,11 +309,45 @@ class BriefController extends Controller
                 return $this->errorResponse('Invalid status', 400);
             }
 
+            $userId = (int) $request->get('user_id');
+            if (!$userId) {
+                return $this->errorResponse('User ID is required', 422);
+            }
+
+            foreach ($briefIds as $briefId) {
+                $this->authorizeBriefStatusChange((int) $briefId, $status, $userId);
+            }
+
             $count = $this->briefService->bulkUpdateStatus($briefIds, $status);
 
             return $this->successResponse("Updated {$count} briefs to {$status}");
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    private function authorizeBriefStatusChange(int $briefId, string $newStatus, int $userId): void
+    {
+        $brief = $this->briefService->getCompleteBrief($briefId);
+
+        if (!$brief) {
+            throw new Exception("Brief not found: {$briefId}");
+        }
+
+        if ($newStatus === 'in_review') {
+            $this->workflowAuthorization->assertCanRequestApproval($userId, SiteContext::getId());
+            return;
+        }
+
+        if ($newStatus === 'ready') {
+            $this->workflowAuthorization->assertCanApprove($userId, SiteContext::getId());
+            return;
+        }
+
+        if ($brief->status === 'in_review' && $newStatus === 'draft') {
+            $this->workflowAuthorization->assertCanReject($userId, SiteContext::getId());
         }
     }
 

@@ -76,6 +76,14 @@ class SubscriptionCommunicationDeliveryRepository
             ->get();
     }
 
+    public function getForCommunication(int $communicationId): Collection
+    {
+        return SubscriptionCommunicationDelivery::where('subscription_communication_id', $communicationId)
+            ->with(['communication', 'schedule'])
+            ->orderByDesc('id')
+            ->get();
+    }
+
     public function findByToken(string $token): ?SubscriptionCommunicationDelivery
     {
         return SubscriptionCommunicationDelivery::where('token', $token)->first();

@@ -155,9 +155,6 @@ class PageService
             // Use BlockParserService to validate and parse blocks
             $this->blockParserService->replacePageBlocks($pageId, $blocks);
         } catch (ValidationException $e) {
-            dd($e->getErrors());
-            echo $e->getMessage();
-            die('here');
             throw new ValidationException('Block validation failed', $e->getErrors());
         } catch (Exception $e) {
             throw new Exception("Failed to process blocks: {$e->getMessage()}");

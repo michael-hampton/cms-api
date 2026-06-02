@@ -46,6 +46,7 @@ class Subscription extends Model
         'auto_renew',
         'price',
         'price_paid_cents',
+        'subscription_plan_pricing_id',
         'currency',
         'plan_id',
         'next_billing_date',
@@ -86,7 +87,8 @@ class Subscription extends Model
         'cancel_at_period_end',
         'stripe_customer_id',
         'stripe_schedule_id',
-        'trial_used_at'
+        'trial_used_at',
+        'offer_type'
     ];
 
     protected $casts = [
@@ -96,6 +98,7 @@ class Subscription extends Model
         'auto_renew' => 'boolean',
         'price' => 'float',
         'price_paid_cents' => 'integer',
+        'subscription_plan_pricing_id' => 'integer',
         'renewal_count' => 'integer',
         'first_renewed_at' => 'datetime',
         'last_renewed_at' => 'datetime',

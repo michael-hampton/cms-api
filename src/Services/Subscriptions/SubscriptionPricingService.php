@@ -110,6 +110,7 @@ class SubscriptionPricingService
                 ? $this->captureShippingAddress($checkoutData)
                 : null,
             originalAmount: $item['price'] ?? 0,
+            pricingTierId: $item['options']['pricing_tier_id'] ?? null,
         );
     }
 
@@ -181,6 +182,7 @@ class SubscriptionPricingService
                 ? $this->captureShippingAddress($checkoutData)
                 : null,
             originalAmount: $originalAmount,
+            pricingTierId: $resolvedPrice->pricingTierId,
         );
     }
 

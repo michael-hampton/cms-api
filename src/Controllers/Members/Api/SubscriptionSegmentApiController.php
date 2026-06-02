@@ -29,7 +29,7 @@ class SubscriptionSegmentApiController extends Controller
 
         $assignment = $this->subscriptionSegmentRepository->findActive($subscriptionId);
 
-        if ($assignment === null) {
+        if (empty($assignment)) {
             return $this->resourceResponse(['segment' => null]);
         }
 
@@ -39,7 +39,7 @@ class SubscriptionSegmentApiController extends Controller
                 'key'         => $assignment->segment->key,
                 'name'        => $assignment->segment->name,
                 'assigned_at' => $assignment->assigned_at->format('c'),
-                'status'      => $assignment->status->value,
+                'status'      => $assignment->status,
             ],
         ]);
     }

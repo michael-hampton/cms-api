@@ -57,12 +57,14 @@ class CrmSubscriptionCreationService
      * @throws CheckoutException         Propagated from the checkout service
      */
     public function createSubscription(
-        int    $memberId,
-        int    $planId,
-        string $paymentMethodId,
-        int    $siteId,
-        ?int   $deliveryAddressId = null,
-        ?array $deliveryAddress = null
+        int     $memberId,
+        int     $planId,
+        string  $paymentMethodId,
+        int     $siteId,
+        ?int    $deliveryAddressId = null,
+        ?array  $deliveryAddress = null,
+        ?int    $pricingId = null,
+        ?string $offerType = null,
     ): array
     {
         // ── Validate ──────────────────────────────────────────────────────────
@@ -116,7 +118,14 @@ class CrmSubscriptionCreationService
         Session::put('member_id', $memberId);
 
         try {
-            $this->cartService->addSubscriptionToCart($planId, $plan->getDeliveryOptions()[0] ?? null);
+            $this->cartService->addSubscriptionToCart(
+                $planId,
+                $plan->getDeliveryOptions()[0] ?? 'digital',
+                array_filter([
+                    'pricing_tier_id' => $pricingId,
+                    'offer_type'      => $offerType,
+                ], fn($v) => $v !== null),
+            );
 
             // processCheckout() expects the same $data array the frontend POSTs.
             // payment_method_id is the Stripe PM the admin collected.
@@ -196,25 +205,5 @@ class CrmSubscriptionCreationService
         }
 
         return $this->subscriptionRepository->find((int)$ids[0]);
-    }
-
-    /**
-     * Build a cart item array in the shape CartService / OneTimeSubscriptionCheckoutService
-     * expects for a subscription item.
-     */
-    private function buildCartItem(object $plan): array
-    {
-        return [
-            'subscription_plan_id' => $plan->id,
-            'quantity' => 1,
-            'price' => $plan->price,
-            'base_price' => $plan->price,
-            'name' => $plan->name,
-            'options' => [
-                'delivery_type' => $plan->default_delivery_type ?? 'digital',
-                'pricing_tier_id' => null,
-                'type' => 'subscription',
-            ],
-        ];
     }
 }

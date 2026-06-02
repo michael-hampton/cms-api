@@ -38,6 +38,7 @@ use App\Controllers\Crm\CrmMemberNoteController;
 use App\Controllers\Crm\CrmMemberPaymentMethodsController;
 use App\Controllers\Crm\CrmOrderController;
 use App\Controllers\Crm\CrmSubscriptionController;
+use App\Controllers\Crm\CrmSubscriptionOfferController;
 use App\Controllers\Crm\RtbfController;
 use App\Controllers\Crm\SarExportController;
 use App\Controllers\Crm\StripeConfigController;
@@ -673,8 +674,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
         $router->get('/communications/subscription/open/{token}',  [SubscriptionCommunicationTrackingController::class, 'open'])->name('subscription-comms.open');
         $router->get('/communications/subscription/click/{token}', [SubscriptionCommunicationTrackingController::class, 'click'])->name('subscription-comms.click');
-        $router->apiResource('/subscription-communications', SubscriptionCommunicationController::class);
         $router->get('/subscriptions/{subscriptionId}/communication-history', [SubscriptionCommunicationHistoryController::class, 'index']);
+        $router->get('/subscription-communications/{communicationId}/history', [SubscriptionCommunicationHistoryController::class, 'communication']);
+        $router->get('/subscription-communications/{id}/schedules', [SubscriptionCommunicationController::class, 'schedules']);
+        $router->apiResource('/subscription-communications', SubscriptionCommunicationController::class);
         $router->post('/subscription-communications/{id}/schedules', [SubscriptionCommunicationController::class, 'storeSchedule']);
         $router->put('/subscription-communication-schedules/{id}',  [SubscriptionCommunicationController::class, 'updateSchedule']);
         $router->delete('/subscription-communication-schedules/{id}', [SubscriptionCommunicationController::class, 'destroySchedule']);
@@ -684,6 +687,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/crm/members/{memberId}/manual-payments',
             [CrmManualPaymentController::class, 'index']
         );
+
+        $router->post(
+            '/crm/members/{memberId}/payments/{paymentId}/refund',
+            [CrmSubscriptionController::class, 'refundPayment']
+        );
+        $router->post(
+            '/crm/members/{memberId}/payments/bulk-refund',
+            [CrmSubscriptionController::class, 'bulkRefundPayments']
+        );
+
         $router->post(
             '/crm/members/{memberId}/manual-payments',
             [CrmManualPaymentController::class, 'store']
@@ -714,6 +727,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/crm/members/{memberId}/charging/enable',
             [CrmChargingController::class, 'enable']
         );
+
+        $router->get('/crm/subscription-offers', [CrmSubscriptionOfferController::class, 'index']);
 
 // Retry a specific failed payment (charging-policy-aware)
         $router->post(

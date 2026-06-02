@@ -1345,6 +1345,18 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals(400, $response->getStatusCode());
     }
 
+    public function testApprovePageRequiresApprovePermission()
+    {
+        $user = $this->createUser(['role' => 'user']);
+        $page = $this->createPage(['status' => 'waiting_approval', 'requires_approval' => true]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/approve", [
+            'user_id' => $user->id
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
+    }
+
     public function testRejectPageSuccessfully()
     {
         $page = $this->createPage(['status' => 'waiting_approval', 'requires_approval' => true]);
@@ -1360,6 +1372,19 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals('draft', $data['data']['page']['status']);
         $this->assertNull($data['data']['page']['approved_by']);
         $this->assertNull($data['data']['page']['approved_at']);
+    }
+
+    public function testRejectPageRequiresRejectPermission()
+    {
+        $user = $this->createUser(['role' => 'user']);
+        $page = $this->createPage(['status' => 'waiting_approval', 'requires_approval' => true]);
+
+        $response = $this->postForSite("/api/pages/{$page->id}/reject", [
+            'user_id' => $user->id,
+            'reason' => 'Needs work'
+        ]);
+
+        $this->assertEquals(403, $response->getStatusCode());
     }
 
     public function testPutPageOnHoldSuccessfully()

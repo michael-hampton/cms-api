@@ -2,6 +2,7 @@
 
 namespace App\Tests\Functional\Controllers\Crm;
 
+use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Framework\Container;
 use App\Models\Member;
 use App\Models\Model;
@@ -10,8 +11,12 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Services\Billing\PaymentProviders\NullStripePaymentProcessor;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
+use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\OpenCollab\ArticlePaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Mockery;
 
 /**
  * Functional tests for CrmSubscriptionController.
@@ -813,7 +818,308 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(404, $response);
     }
 
+    // ── refund payment ────────────────────────────────────────────────────────
+
+    public function test_refund_payment_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $payment = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_refund_payment_returns_404_for_non_existent_payment(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/999999/refund',
+            []
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_refund_payment_returns_404_when_payment_belongs_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+        $otherSub    = $this->createSubscriptionRecord(['member_id' => $otherMember->id]);
+        $payment     = $this->createPaymentForSubscription($otherSub->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_refund_payment_returns_422_when_payment_already_refunded(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['status' => 'refunded']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('already been refunded', $data['message']);
+    }
+
+    public function test_refund_payment_returns_422_when_payment_is_not_completed(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['status' => 'pending']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+    }
+
+    public function test_refund_payment_returns_422_when_amount_exceeds_original(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 9.99]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            ['amount' => 99.99]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('cannot exceed', $data['message']);
+    }
+
+    public function test_refund_payment_returns_422_when_amount_is_zero(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            ['amount' => 0]
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_refund_payment_returns_200_with_full_refund_by_default(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 9.99]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            ['reason' => 'customer_request']
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('refund_payment', $data);
+        $this->assertArrayHasKey('amount', $data);
+        $this->assertEquals(9.99, $data['amount']);
+    }
+
+    public function test_refund_payment_returns_200_for_partial_refund(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 20.00]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            ['amount' => 5.00, 'reason' => 'partial_service_failure']
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals(5.00, $data['amount']);
+    }
+
+    public function test_refund_payment_marks_original_payment_as_refunded(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 9.99]);
+
+        $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $refreshed = Payment::find($payment->id);
+        $this->assertEquals('refunded', $refreshed->status);
+    }
+
+    public function test_refund_payment_response_includes_success_message(): void
+    {
+        $payment = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/' . $payment->id . '/refund',
+            []
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('processed successfully', $data['message']);
+    }
+
+    // ── bulk refund payments ──────────────────────────────────────────────────
+
+    public function test_bulk_refund_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [1, 2]]
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_bulk_refund_returns_422_when_payment_ids_is_empty(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => []]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsString('payment_ids', $data['message']);
+    }
+
+    public function test_bulk_refund_returns_422_when_payment_ids_is_missing(): void
+    {
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            []
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_bulk_refund_returns_422_when_exceeding_50_payments(): void
+    {
+        $ids = range(1, 51);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => $ids]
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsString('50', $data['message']);
+    }
+
+    public function test_bulk_refund_returns_200_and_refunds_all_eligible_payments(): void
+    {
+        $p1 = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 9.99]);
+        $p2 = $this->createPaymentForSubscription($this->subscription->id, ['amount' => 19.99]);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [$p1->id, $p2->id], 'reason' => 'customer_request']
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertEquals(2, $data['succeeded']);
+        $this->assertEquals(0, $data['failed']);
+        $this->assertCount(2, $data['results']);
+    }
+
+    public function test_bulk_refund_marks_all_original_payments_as_refunded(): void
+    {
+        $p1 = $this->createPaymentForSubscription($this->subscription->id);
+        $p2 = $this->createPaymentForSubscription($this->subscription->id);
+
+        $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [$p1->id, $p2->id]]
+        );
+
+        $this->assertEquals('refunded', Payment::find($p1->id)->status);
+        $this->assertEquals('refunded', Payment::find($p2->id)->status);
+    }
+
+    public function test_bulk_refund_reports_partial_failure_when_some_payments_are_ineligible(): void
+    {
+        $eligible   = $this->createPaymentForSubscription($this->subscription->id, ['status' => 'completed']);
+        $alreadyRefunded = $this->createPaymentForSubscription($this->subscription->id, ['status' => 'refunded']);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [$eligible->id, $alreadyRefunded->id]]
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertFalse($data['success']); // not all succeeded
+        $this->assertEquals(1, $data['succeeded']);
+        $this->assertEquals(1, $data['failed']);
+    }
+
+    public function test_bulk_refund_skips_payments_belonging_to_different_member(): void
+    {
+        $otherMember = $this->createMember();
+        $otherSub    = $this->createSubscriptionRecord(['member_id' => $otherMember->id]);
+        $otherPayment = $this->createPaymentForSubscription($otherSub->id);
+
+        $own = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [$own->id, $otherPayment->id]]
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertEquals(1, $data['succeeded']);
+        $this->assertEquals(1, $data['failed']);
+    }
+
+    public function test_bulk_refund_results_array_contains_per_payment_outcome(): void
+    {
+        $p1 = $this->createPaymentForSubscription($this->subscription->id);
+
+        $response = $this->postForSite(
+            '/api/crm/members/' . $this->member->id . '/payments/bulk-refund',
+            ['payment_ids' => [$p1->id]]
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $result = $data['results'][0];
+
+        $this->assertArrayHasKey('payment_id', $result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertEquals($p1->id, $result['payment_id']);
+        $this->assertTrue($result['success']);
+        $this->assertArrayHasKey('amount', $result);
+    }
+
     // ── setup / helpers ───────────────────────────────────────────────────────
+
 
     public function test_issues_returns_404_for_non_existent_subscription(): void
     {
@@ -914,28 +1220,17 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $this->assertStringContainsString('payment_method_id', $data['error']);
     }
 
-    public function test_renew_returns_422_when_amount_is_zero(): void
+    public function test_renew_does_not_require_amount(): void
     {
         $response = $this->postForSite(
             '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
-            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => 0]
+            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_valid']
         );
 
-        $this->assertResponseStatus(422, $response);
+        $this->assertResponseStatus(201, $response);
 
         $data = json_decode($response->getContent(), true);
-        $this->assertFalse($data['success']);
-        $this->assertStringContainsString('amount', $data['error']);
-    }
-
-    public function test_renew_returns_422_when_amount_is_negative(): void
-    {
-        $response = $this->postForSite(
-            '/api/crm/members/' . $this->member->id . '/subscriptions/' . $this->subscription->id . '/renew',
-            ['plan_id' => $this->plan->id, 'payment_method_id' => 'pm_test_123', 'amount' => -5.00]
-        );
-
-        $this->assertResponseStatus(422, $response);
+        $this->assertTrue($data['success']);
     }
 
     public function test_renew_returns_201_with_old_and_new_subscription(): void
@@ -1433,6 +1728,27 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'is_active' => true,
         ]);
 
+        $this->createPricingTier(['plan_id' => $this->plan->id, 'is_default' => true, 'stripe_price_id' => 'abc', 'is_active' => true]);
+
+        Container::getInstance()->bind(StripeCustomerGateway::class, function (Container $container) {
+            $mock = Mockery::mock(StripeCustomerGateway::class);
+
+            $mock->shouldReceive('getOrCreate')->andReturn('abc');
+            $mock->shouldReceive('attachPaymentMethod')->andReturn('abc');
+
+           return $mock;
+        });
+
+        Container::getInstance()->bind(StripeSubscriptionGateway::class, function (Container $container) {
+            $mock = Mockery::mock(StripeSubscriptionGateway::class);
+
+            $dto = new StripeSubscriptionResultDto(1, null, 'active', null, 1, 2, 'abc', 'abc', 'abc', false);
+
+            $mock->shouldReceive('create')->andReturn($dto);
+
+            return $mock;
+        });
+
         $this->subscription = $this->createSubscriptionRecord([
             'member_id' => $this->member->id,
             'plan_id' => $this->plan->id,
@@ -1448,6 +1764,8 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'is_active' => true,
             'print_shipping_required' => true,
         ]);
+
+        $this->createPricingTier(['plan_id' => $this->newPlan->id, 'is_default' => true, 'stripe_price_id' => 'abc', 'is_active' => true, 'duration_months' => 3]);
 
         $this->createIssueDelivery(['subscription_plan_id' => $this->newPlan->id, 'stock_quantity' => 100]);
 

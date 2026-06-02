@@ -62,7 +62,14 @@ class SubscriptionCommunicationControllerTest extends FunctionalTestCase
 
         $this->assertEquals(201, $createResponse->getStatusCode());
         $created = json_decode($createResponse->getContent(), true);
-        $scheduleId = $created['data']['schedule']['id'];
+        $createdSchedule = $created['data']['schedule'] ?? $created['schedule'];
+        $scheduleId = $createdSchedule['id'];
+
+        $indexResponse = $this->getForSite('/api/subscription-communications/' . $communication->id . '/schedules');
+        $this->assertEquals(200, $indexResponse->getStatusCode());
+        $index = json_decode($indexResponse->getContent(), true);
+        $this->assertCount(1, $index['schedules']);
+        $this->assertEquals('Initial schedule', $index['schedules'][0]['name']);
 
         $updateResponse = $this->putForSite(
             '/api/subscription-communication-schedules/' . $scheduleId,
@@ -71,8 +78,9 @@ class SubscriptionCommunicationControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $updateResponse->getStatusCode());
         $updated = json_decode($updateResponse->getContent(), true);
-        $this->assertEquals('Updated schedule', $updated['data']['schedule']['name']);
-        $this->assertEquals(14, (int) $updated['data']['schedule']['offset_days']);
+        $updatedSchedule = $updated['data']['schedule'] ?? $updated['schedule'];
+        $this->assertEquals('Updated schedule', $updatedSchedule['name']);
+        $this->assertEquals(14, (int) $updatedSchedule['offset_days']);
 
         $deleteResponse = $this->deleteForSite('/api/subscription-communication-schedules/' . $scheduleId);
         $this->assertEquals(200, $deleteResponse->getStatusCode());
@@ -108,6 +116,37 @@ class SubscriptionCommunicationControllerTest extends FunctionalTestCase
         $this->assertCount(1, $data['data']['history']);
         $this->assertEquals('Acknowledgement', $data['data']['history'][0]['communication']);
         $this->assertEquals('sent', $data['data']['history'][0]['status']);
+    }
+
+    public function testItReturnsCommunicationHistoryForCommunicationModal(): void
+    {
+        $member = $this->createMember();
+        $subscription = Subscription::create([
+            'member_id'  => $member->id,
+            'site_id'    => $this->siteId,
+            'plan_name'  => 'Digital',
+            'status'     => 'active',
+            'start_date' => date('Y-m-d H:i:s'),
+            'type'       => 'paid',
+        ]);
+        $communication = $this->createCommunication(['name' => 'Renewal reminder']);
+
+        SubscriptionCommunicationDelivery::create([
+            'subscription_communication_id' => $communication->id,
+            'subscription_id'               => $subscription->id,
+            'member_id'                     => $member->id,
+            'channel'                       => 'in_app',
+            'status'                        => CommunicationDeliveryStatus::SENT->value,
+            'sent_at'                       => date('Y-m-d H:i:s'),
+        ]);
+
+        $response = $this->getForSite('/api/subscription-communications/' . $communication->id . '/history');
+
+        $this->assertEquals(200, $response->getStatusCode());
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(1, $data['data']['history']);
+        $this->assertEquals($subscription->id, $data['data']['history'][0]['subscription_id']);
+        $this->assertEquals('Renewal reminder', $data['data']['history'][0]['communication']);
     }
 
     private function createCommunication(array $overrides = []): SubscriptionCommunication

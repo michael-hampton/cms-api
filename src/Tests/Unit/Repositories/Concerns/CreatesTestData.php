@@ -76,6 +76,7 @@ use App\Models\Segment;
 use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Models\Tag;
 use App\Models\Territory;
 use App\Models\Site;
@@ -1067,6 +1068,22 @@ trait CreatesTestData
             'is_active' => true,
             'description' => 'Test Segment',
             'category' => 'test'
+        ], $overrides));
+    }
+
+    protected function createPricingTier(array $overrides = []): Model
+    {
+        return SubscriptionPlanPricing::create(array_merge([
+            'plan_id' => $this->plan->id,
+            'duration_months' => 1,
+            'issue_count' => 1,
+            'price' => 9.99,
+            'label' => 'Standard',
+            'period_description' => 'per month',
+            'is_default' => false,
+            'is_active' => true,
+            'sort_order' => 0,
+            'site_id' => $this->siteId
         ], $overrides));
     }
 }

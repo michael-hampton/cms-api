@@ -6,15 +6,13 @@ use App\Controllers\Controller;
 use App\Enums\Subscriptions\CommunicationTypeEnum;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
-use App\Models\SubscriptionCommunication;
-use App\Models\SubscriptionCommunicationSchedule;
-use App\Repositories\Subscriptions\SubscriptionCommunicationRepository;
 use App\Requests\Subscription\SubscriptionCommunicationRequest;
+use App\Services\Subscriptions\Communications\SubscriptionCommunicationService;
 
 class SubscriptionCommunicationController extends Controller
 {
     public function __construct(
-        private readonly SubscriptionCommunicationRepository $repository,
+        private readonly SubscriptionCommunicationService $service,
     )
     {
         parent::__construct();
@@ -23,7 +21,7 @@ class SubscriptionCommunicationController extends Controller
     public function index(): JsonResponse
     {
         return $this->resourceResponse([
-            'communications' => SubscriptionCommunication::with('schedules')->orderBy('sort_order')->get()->toArray(),
+            'communications' => $this->service->all(),
         ]);
     }
 
@@ -36,7 +34,7 @@ class SubscriptionCommunicationController extends Controller
         $data = $this->communicationData($request);
 
         try {
-            $communication = SubscriptionCommunication::create($data);
+            $communication = $this->service->create($data);
 
             return $this->jsonResponse(['communication' => $communication->toArray()], 201);
         } catch (\Exception $exception) {
@@ -103,7 +101,7 @@ class SubscriptionCommunicationController extends Controller
 
     public function show(int $subscription_communication): JsonResponse
     {
-        $communication = $this->repository->findWithSchedules($subscription_communication);
+        $communication = $this->service->findWithSchedules($subscription_communication);
 
         if ($communication === null) {
             return $this->errorResponse('Not found.', 404);
@@ -114,53 +112,68 @@ class SubscriptionCommunicationController extends Controller
 
     public function destroy(int $subscription_communication): JsonResponse
     {
-        SubscriptionCommunication::findOrFail($subscription_communication)->delete();
+        if (!$this->service->delete($subscription_communication)) {
+            return $this->errorResponse('Not found.', 404);
+        }
 
         return $this->jsonResponse(['message' => 'Subscription communication deleted.']);
     }
 
+    public function schedules(int $id): JsonResponse
+    {
+        try {
+            return $this->resourceResponse([
+                'schedules' => $this->service->schedulesForCommunication($id),
+            ]);
+        } catch (\RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), 404);
+        }
+    }
+
     public function storeSchedule(int $id, SubscriptionCommunicationRequest $request): JsonResponse
     {
-        $communication = SubscriptionCommunication::findOrFail($id);
-
-        $data = $request->validated();
-
-        $schedule = SubscriptionCommunicationSchedule::create(array_merge($data, [
-            'subscription_communication_id' => $communication->id,
-        ]));
+        try {
+            $schedule = $this->service->createSchedule($id, $request->validated());
+        } catch (\RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), 404);
+        }
 
         return $this->resourceResponse(['schedule' => $schedule->toArray()], 201);
     }
 
     public function updateSchedule(int $id, SubscriptionCommunicationRequest $request): JsonResponse
     {
-        $schedule = SubscriptionCommunicationSchedule::findOrFail($id);
+        $schedule = $this->service->updateSchedule($id, $request->validated());
 
-        $data = $request->validated();
-
-        $schedule->update($data);
+        if (!$schedule) {
+            return $this->errorResponse('Subscription communication schedule not found.', 404);
+        }
 
         return $this->resourceResponse(['schedule' => $schedule->toArray()]);
     }
 
     public function update(int $subscription_communication, Request $request): JsonResponse
     {
-        $communication = SubscriptionCommunication::findOrFail($subscription_communication);
-
         if ($errors = $this->communicationErrors($request)) {
             return $this->errorResponse('Validation failed', 422, $errors);
         }
 
         $data = $this->communicationData($request);
 
-        $communication->update($data);
+        $communication = $this->service->update($subscription_communication, $data);
+
+        if (!$communication) {
+            return $this->errorResponse('Not found.', 404);
+        }
 
         return $this->jsonResponse(['communication' => $communication->toArray()]);
     }
 
     public function destroySchedule(int $id): JsonResponse
     {
-        SubscriptionCommunicationSchedule::findOrFail($id)->delete();
+        if (!$this->service->deleteSchedule($id)) {
+            return $this->errorResponse('Subscription communication schedule not found.', 404);
+        }
 
         return $this->jsonResponse(['message' => 'Subscription communication schedule deleted.']);
     }

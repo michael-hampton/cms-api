@@ -6,6 +6,7 @@ use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeCustomerGateway;

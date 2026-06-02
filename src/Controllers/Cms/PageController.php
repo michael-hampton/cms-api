@@ -20,6 +20,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Container;
+use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -35,6 +36,7 @@ use App\Requests\StorePageRequest;
 use App\Requests\UpdatePageRequest;
 use App\Resources\PageResource;
 use App\Search\SearchCriteriaParser;
+use App\Services\Cms\ContentWorkflowAuthorizationService;
 use App\Services\Cms\Pages\PageService;
 use Exception;
 
@@ -48,6 +50,7 @@ class PageController extends Controller
         private readonly TagRepository      $tagRepository,
         private readonly AuthorRepository   $authorRepository,
         private readonly PageCollaboratorRepository $collaboratorRepository,
+        private readonly ContentWorkflowAuthorizationService $workflowAuthorization,
     )
     {
         parent::__construct();
@@ -458,9 +461,13 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
+            $this->workflowAuthorization->assertCanApprove((int) $userId, SiteContext::getId());
+
             $page = $this->pageService->approvePage($id, $userId);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
         }
@@ -476,9 +483,13 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
+            $this->workflowAuthorization->assertCanReject((int) $userId, SiteContext::getId());
+
             $page = $this->pageService->rejectPage($id, $userId, $reason);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
         }

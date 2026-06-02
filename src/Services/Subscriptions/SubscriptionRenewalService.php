@@ -10,6 +10,8 @@ use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
+use App\Models\SubscriptionPlanPricing;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
@@ -46,6 +48,7 @@ class SubscriptionRenewalService
     public function __construct(
         private readonly SubscriptionRepository     $subscriptionRepository,
         private readonly SubscriptionPlanRepository $planRepository,
+        private readonly SubscriptionPlanPricingRepository $pricingRepository,
         private readonly SubscriptionPaymentService $subscriptionPaymentService,
         private readonly SubscriptionDateCalculator $dateCalculator,
         private readonly SubscriptionRenewalTracker $renewalTracker,
@@ -60,7 +63,7 @@ class SubscriptionRenewalService
      * @param int $subscriptionId The subscription being renewed.
      * @param int $planId The plan for the new subscription (may differ from old if agent overrode).
      * @param string $paymentMethodId Stripe pm_xxx — payment is charged here before DB mutations.
-     * @param float $amountPaid Resolved price for the new subscription.
+     * @param float|null $amountPaid Optional client/calculated amount for sanity checking only.
      * @param int $agentId ID of the acting CRM agent.
      * @param int $siteId Current site.
      *
@@ -72,10 +75,12 @@ class SubscriptionRenewalService
     public function renew(
         int     $subscriptionId,
         int     $planId,
-        ?string $paymentMethodId,   // null for automated (Stripe-led) renewals
-        float   $amountPaid,
-        ?int    $agentId,           // null for automated renewals
+        ?string $paymentMethodId,
+        ?float  $amountPaid,
+        ?int    $agentId,
         int     $siteId,
+        ?int    $pricingId = null,
+        ?string $offerType = null,
     ): array
     {
         // ── Validate before touching payment ──────────────────────────────
@@ -111,6 +116,18 @@ class SubscriptionRenewalService
             throw new InvalidArgumentException("Plan does not belong to this site.");
         }
 
+        $pricingTier = $pricingId !== null
+            ? $this->resolvePricingTier($pricingId, (int)$plan->id)
+            : null;
+
+        $resolvedAmountPaid = $pricingTier !== null
+            ? $this->resolveAmountPaid($pricingTier, $offerType ?? (string)($oldSubscription->delivery_type ?? 'print'))
+            : (float)$plan->price;
+
+        if ($amountPaid !== null && abs($amountPaid - $resolvedAmountPaid) > 0.01) {
+            throw new InvalidArgumentException('Submitted amount does not match the selected pricing tier.');
+        }
+
         // ── Charge payment BEFORE any DB mutation ─────────────────────────
         $paymentResult = null;
 
@@ -120,7 +137,7 @@ class SubscriptionRenewalService
                 $plan,
                 [
                     'payment_method_id' => $paymentMethodId,
-                    'amount'            => $amountPaid,
+                    'amount'            => $resolvedAmountPaid,
                     'metadata'          => [
                         'type'        => 'subscription_renewal',
                         'old_sub_id'  => $subscriptionId,
@@ -141,8 +158,10 @@ class SubscriptionRenewalService
             $oldSubscription,
             $plan,
             $paymentResult,
-            $amountPaid,
+            $resolvedAmountPaid,
             $agentId,
+            $pricingTier,
+            $offerType,
         ): array {
             $now = now_datetime();
 
@@ -177,7 +196,8 @@ class SubscriptionRenewalService
                     'start_date' => $startDate->format('Y-m-d H:i:s'),
                     'end_date' => $endDate?->format('Y-m-d H:i:s'),
                     'next_billing_date' => $endDate?->format('Y-m-d H:i:s'),
-                    'price' => $amountPaid,
+                    'price' => $resolvedAmountPaid,
+                    'price_paid_cents' => (int)round($resolvedAmountPaid * 100),
                     'delivery_type' => $oldSubscription->delivery_type,
                     'delivery_address_id' => $oldSubscription->delivery_address_id ?? null,
                     'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
@@ -186,6 +206,8 @@ class SubscriptionRenewalService
                     'renewal_count' => (int)($oldSubscription->renewal_count ?? 0),
                     'first_renewed_at' => $firstRenewedAt,
                     'status' => SubscriptionStatus::ACTIVE->value,
+                    'subscription_plan_pricing_id' => $pricingTier?->id,
+                    'offer_type' => $offerType,
                 ],
             );
 
@@ -207,7 +229,7 @@ class SubscriptionRenewalService
                 newSubscriptionId: $newSubscription->id,
                 productId: $plan->id,
                 planId: $plan->id,
-                amountPaid: $amountPaid,
+                amountPaid: $resolvedAmountPaid,
                 agentId: $agentId,
                 timestamp: $now->format('Y-m-d H:i:s'),
             ));
@@ -223,6 +245,41 @@ class SubscriptionRenewalService
                 'new_subscription' => $newSubscription,
             ];
         });
+    }
+
+    private function resolvePricingTier(int $pricingId, int $planId): SubscriptionPlanPricing
+    {
+        $pricingTier = $this->pricingRepository->find($pricingId);
+
+        if (!$pricingTier || !$pricingTier->is_active) {
+            throw new InvalidArgumentException("Pricing tier #{$pricingId} not found or inactive.");
+        }
+
+        if ((int)$pricingTier->plan_id !== $planId) {
+            throw new InvalidArgumentException("Pricing tier does not belong to the selected plan.");
+        }
+
+        return $pricingTier;
+    }
+
+    private function resolveAmountPaid(SubscriptionPlanPricing $pricingTier, string $offerType): float
+    {
+        return match ($offerType) {
+            'print' => $pricingTier->getEffectivePrintPrice(),
+            'digital' => $pricingTier->getEffectiveDigitalPrice(),
+            'intro' => $this->resolveIntroPrice($pricingTier),
+            'voucher' => $pricingTier->getEffectivePrice('print'),
+            default => throw new InvalidArgumentException("Invalid offer_type: {$offerType}."),
+        };
+    }
+
+    private function resolveIntroPrice(SubscriptionPlanPricing $pricingTier): float
+    {
+        if (!$pricingTier->hasIntroPricing()) {
+            throw new InvalidArgumentException('Selected pricing tier does not have intro pricing.');
+        }
+
+        return (float)$pricingTier->intro_price;
     }
 
     /**
@@ -259,9 +316,13 @@ class SubscriptionRenewalService
                     subscriptionId:  (int) $subscription->id,
                     planId:          (int) $subscription->plan_id,
                     paymentMethodId: null,          // Stripe-led: no manual charge
-                    amountPaid:      (float) ($subscription->price ?? 0),
+                    amountPaid:      null,
                     agentId:         null,           // automated — no acting agent
                     siteId:          (int) $subscription->site_id,
+                    pricingId:       isset($subscription->subscription_plan_pricing_id)
+                        ? (int)$subscription->subscription_plan_pricing_id
+                        : null,
+                    offerType:       $subscription->offer_type ?? $subscription->delivery_type ?? null,
                 );
 
                 $successful++;

@@ -4,36 +4,27 @@ namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
-use App\Repositories\Subscriptions\SubscriptionCommunicationDeliveryRepository;
+use App\Services\Subscriptions\Communications\SubscriptionCommunicationService;
 
 class SubscriptionCommunicationHistoryController extends Controller
 {
     public function __construct(
-        private readonly SubscriptionCommunicationDeliveryRepository $deliveryRepository,
+        private readonly SubscriptionCommunicationService $service,
     ) {
         parent::__construct();
     }
 
     public function index(int $subscriptionId): JsonResponse
     {
-        $deliveries = $this->deliveryRepository->getForSubscription($subscriptionId);
-
-        $history = $deliveries->map(fn($delivery) => [
-            'id'            => $delivery->id,
-            'communication' => $delivery->communication?->name,
-            'type'          => $this->enumValue($delivery->communication?->type),
-            'channel'       => $delivery->channel,
-            'status'        => $this->enumValue($delivery->status),
-            'sent_at'       => $delivery->sent_at?->format(DATE_ATOM),
-            'opened_at'     => $delivery->opened_at?->format(DATE_ATOM),
-            'clicked_at'    => $delivery->clicked_at?->format(DATE_ATOM),
-        ])->toArray();
-
-        return $this->jsonResponse(['history' => $history]);
+        return $this->resourceResponse(['history' => $this->service->historyForSubscription($subscriptionId)]);
     }
 
-    private function enumValue(mixed $value): mixed
+    public function communication(int $communicationId): JsonResponse
     {
-        return $value instanceof \BackedEnum ? $value->value : $value;
+        try {
+            return $this->jsonResponse(['history' => $this->service->historyForCommunication($communicationId)]);
+        } catch (\RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), 404);
+        }
     }
 }

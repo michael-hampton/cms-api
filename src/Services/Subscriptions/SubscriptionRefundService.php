@@ -118,6 +118,12 @@ class SubscriptionRefundService
             'calculated_amount'    => $result->meta['original_amount'] ?? $result->amount,
         ];
 
+        foreach (['internal_notes', 'notify_customer', 'refunded_by', 'bulk_refund'] as $metaKey) {
+            if (array_key_exists($metaKey, $result->meta)) {
+                $auditMeta[$metaKey] = $result->meta[$metaKey];
+            }
+        }
+
         if ($result->type === 'pro_rated') {
             $auditMeta['unused_days'] = $result->meta['unused_days'];
             $auditMeta['total_days']  = $result->meta['total_days'];

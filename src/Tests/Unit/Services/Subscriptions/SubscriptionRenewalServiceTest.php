@@ -8,6 +8,8 @@ use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\SubscriptionPlanPricing;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
@@ -24,6 +26,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 {
     private $subscriptionRepository;
     private $planRepository;
+    private $pricingRepository;
     private $subscriptionPaymentService;
     private $dateCalculator;
     private $renewalTracker;
@@ -43,7 +46,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10, 300, 'print');
     }
 
     public function test_site_mismatch(): void
@@ -55,7 +58,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10, 300, 'print');
     }
 
     public function test_non_renewable_status_rejected(): void
@@ -76,7 +79,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             "Subscription cannot be renewed from status: replaced."
         );
 
-        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10, 300, 'print');
     }
 
     public function test_plan_not_found_or_inactive(): void
@@ -93,7 +96,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
 
-        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10, 300, 'print');
     }
 
     // ── renew() — agent path (paymentMethodId provided) ──────────────────────
@@ -105,6 +108,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('find')->with(300)->andReturn($this->makePricingTier());
 
         $this->subscriptionPaymentService
             ->shouldReceive('processStripeSubscriptionPayment')
@@ -113,7 +117,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->expectException(RuntimeException::class);
 
-        $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $this->service->renew(1, 200, 'pm_123', 9.99, 1, 10, 300, 'print');
     }
 
     public function test_successful_renewal_flow(): void
@@ -123,6 +127,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('find')->with(300)->andReturn($this->makePricingTier());
 
         $this->subscriptionPaymentService
             ->shouldReceive('processStripeSubscriptionPayment')
@@ -145,10 +150,64 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->renewalTracker->shouldReceive('recordRenewalReplacement')->once()->with($sub, $mockModel);
         $this->subscriptionRepository->shouldReceive('find')->andReturn($mockModel);
 
-        $result = $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $result = $this->service->renew(1, 200, 'pm_123', 9.99, 1, 10, 300, 'print');
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('old_subscription', $result);
+        $this->assertArrayHasKey('new_subscription', $result);
+    }
+
+    public function test_renewal_uses_plan_price_when_pricing_tier_is_missing(): void
+    {
+        $sub  = $this->makeSubscription();
+        $plan = $this->makePlan();
+        $plan->price = 12.34;
+
+        $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('find')->never();
+
+        $this->subscriptionPaymentService
+            ->shouldReceive('processStripeSubscriptionPayment')
+            ->once()
+            ->withArgs(fn($subscription, $resolvedPlan, array $data): bool =>
+                $subscription === $sub
+                && $resolvedPlan === $plan
+                && $data['amount'] === 12.34
+            )
+            ->andReturn(['success' => true]);
+
+        $mockModel = $this->makeModel();
+
+        $this->database
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $this->dateCalculator
+            ->shouldReceive('calculateEndDate')
+            ->andReturn(new DateTimeImmutable('+1 month'));
+
+        $this->subscriptionRepository->shouldReceive('update')->twice()->andReturn($mockModel);
+        $this->subscriptionRepository
+            ->shouldReceive('createSubscription')
+            ->once()
+            ->withArgs(fn(
+                int $memberId,
+                int $planId,
+                int $siteId,
+                array $additionalData,
+            ): bool =>
+                $additionalData['price'] === 12.34
+                && $additionalData['price_paid_cents'] === 1234
+                && $additionalData['subscription_plan_pricing_id'] === null
+            )
+            ->andReturn($mockModel);
+        $this->renewalTracker->shouldReceive('recordRenewalReplacement')->once()->with($sub, $mockModel);
+        $this->subscriptionRepository->shouldReceive('find')->andReturn($mockModel);
+
+        $result = $this->service->renew(1, 200, 'pm_123', null, 1, 10);
+
         $this->assertArrayHasKey('new_subscription', $result);
     }
 
@@ -161,6 +220,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('find')->with(300)->andReturn($this->makePricingTier());
 
         // No Stripe charge must be attempted in the automated path
         $this->subscriptionPaymentService
@@ -187,9 +247,11 @@ class SubscriptionRenewalServiceTest extends TestCase
             subscriptionId:  1,
             planId:          200,
             paymentMethodId: null,   // automated path
-            amountPaid:      10.0,
+            amountPaid:      9.99,
             agentId:         null,   // no acting agent
             siteId:          10,
+            pricingId:       300,
+            offerType:       'print',
         );
 
         $this->assertArrayHasKey('old_subscription', $result);
@@ -211,7 +273,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             "Subscription cannot be renewed from status: replaced."
         );
 
-        $this->service->renew(1, 200, null, 10.0, null, 10);
+        $this->service->renew(1, 200, null, 10.0, null, 10, 300, 'print');
     }
 
     public function test_tracks_renewal_when_subscription_renews(): void
@@ -225,6 +287,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository->shouldReceive('find')->andReturn($sub, $sub);
         $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('find')->with(300)->andReturn($this->makePricingTier());
         $this->subscriptionPaymentService
             ->shouldReceive('processStripeSubscriptionPayment')
             ->once()
@@ -259,7 +322,7 @@ class SubscriptionRenewalServiceTest extends TestCase
             ->once()
             ->with($sub, $newSubscription);
 
-        $result = $this->service->renew(1, 200, 'pm_123', 10.0, 1, 10);
+        $result = $this->service->renew(1, 200, 'pm_123', 9.99, 1, 10, 300, 'print');
 
         $this->assertSame($newSubscription, $result['new_subscription']);
     }
@@ -286,6 +349,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $service = Mockery::mock(SubscriptionRenewalService::class, [
             $this->subscriptionRepository,
             $this->planRepository,
+            $this->pricingRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
             $this->renewalTracker,
@@ -329,6 +393,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $service = Mockery::mock(SubscriptionRenewalService::class, [
             $this->subscriptionRepository,
             $this->planRepository,
+            $this->pricingRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
             $this->renewalTracker,
@@ -427,6 +492,18 @@ class SubscriptionRenewalServiceTest extends TestCase
         return $plan;
     }
 
+    private function makePricingTier(): SubscriptionPlanPricing
+    {
+        $pricingTier = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
+        $pricingTier->id = 300;
+        $pricingTier->plan_id = 200;
+        $pricingTier->is_active = true;
+        $pricingTier->price = 9.99;
+        $pricingTier->sale_price = null;
+
+        return $pricingTier;
+    }
+
     private function makeModel(): Subscription
     {
         $model = Mockery::mock(Subscription::class)->makePartial();
@@ -443,6 +520,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->subscriptionRepository     = Mockery::mock(SubscriptionRepository::class);
         $this->planRepository             = Mockery::mock(SubscriptionPlanRepository::class);
+        $this->pricingRepository          = Mockery::mock(SubscriptionPlanPricingRepository::class);
         $this->subscriptionPaymentService = Mockery::mock(SubscriptionPaymentService::class);
         $this->dateCalculator             = Mockery::mock(SubscriptionDateCalculator::class);
         $this->renewalTracker             = Mockery::mock(SubscriptionRenewalTracker::class);
@@ -451,6 +529,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->service = new SubscriptionRenewalService(
             $this->subscriptionRepository,
             $this->planRepository,
+            $this->pricingRepository,
             $this->subscriptionPaymentService,
             $this->dateCalculator,
             $this->renewalTracker,

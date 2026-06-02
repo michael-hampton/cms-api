@@ -18,10 +18,13 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
+use App\Services\Subscriptions\Refunds\RefundResult;
+use App\Services\Subscriptions\Refunds\RefundStrategy;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Services\Subscriptions\SubscriptionHistoryService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
+use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
 
 class CrmSubscriptionController extends Controller
@@ -43,6 +46,7 @@ class CrmSubscriptionController extends Controller
         private readonly SubscriptionRenewalService       $renewalService,
         private readonly SubscriptionProductSwitchService $productSwitchService,
         private readonly FulfilmentReplacementService     $replacementService,
+        private readonly SubscriptionRefundService        $refundService,
         private readonly SuspendSubscriptionAction        $suspendAction,
     )
     {
@@ -104,6 +108,8 @@ class CrmSubscriptionController extends Controller
         $siteId = SiteContext::getId();
         $planId = (int)$request->input('plan_id');
         $paymentMethodId = trim((string)$request->input('payment_method_id', ''));
+        $pricingId = $request->input('pricing_id') ? (int)$request->input('pricing_id') : null;
+        $offerType = trim((string)$request->input('offer_type', '')) ?: null;
 
         if (!$planId) {
             return $this->jsonResponse(['success' => false, 'message' => 'plan_id is required.'], 422);
@@ -129,6 +135,8 @@ class CrmSubscriptionController extends Controller
                 siteId: $siteId,
                 deliveryAddressId: $deliveryAddressId,
                 deliveryAddress: $deliveryAddress,
+                pricingId: $pricingId,
+                offerType: $offerType,
             );
 
             return $this->resourceResponse([
@@ -332,7 +340,8 @@ class CrmSubscriptionController extends Controller
      * Body:
      *   plan_id            int     required — plan for new subscription (may differ from current)
      *   payment_method_id  string  required — Stripe pm_xxx
-     *   amount             float   required — amount to charge (plan price)
+     *   pricing_id         int     optional — selected pricing tier
+     *   offer_type         string  optional — selected offer/delivery type
      *
      * Workflow:
      *   1. Validate membership + subscription ownership.
@@ -356,7 +365,8 @@ class CrmSubscriptionController extends Controller
 
         $planId = (int)$request->input('plan_id');
         $paymentMethodId = trim((string)$request->input('payment_method_id', ''));
-        $amount = (float)$request->input('amount', 0);
+        $pricingId = $request->input('pricing_id') ? (int)$request->input('pricing_id') : null;
+        $offerType = trim((string)$request->input('offer_type', '')) ?: null;
 
         if (!$planId) {
             return $this->errorResponse('plan_id is required.', 422);
@@ -366,10 +376,6 @@ class CrmSubscriptionController extends Controller
             return $this->errorResponse('payment_method_id is required.', 422);
         }
 
-        if ($amount <= 0) {
-            return $this->errorResponse('amount must be greater than zero.', 422);
-        }
-
         $agentId = (int)Auth::id();
 
         try {
@@ -377,9 +383,11 @@ class CrmSubscriptionController extends Controller
                 subscriptionId: $subscriptionId,
                 planId: $planId,
                 paymentMethodId: $paymentMethodId,
-                amountPaid: $amount,
+                amountPaid: null,
                 agentId: $agentId,
                 siteId: $siteId,
+                pricingId: $pricingId,
+                offerType: $offerType,
             );
 
             return $this->resourceResponse([
@@ -718,6 +726,283 @@ class CrmSubscriptionController extends Controller
 
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to load payments.'], 500);
         }
+    }
+
+    /**
+     * POST /api/{site}/crm/members/{memberId}/payments/{paymentId}/refund
+     *
+     * Refund a single payment back to the customer via Stripe.
+     *
+     * Body:
+     *   amount         float   optional — partial refund; omit for full refund
+     *   reason         string  optional — reason code forwarded to Stripe
+     *   internal_notes string  optional — stored in metadata only
+     *   notify_customer bool   optional (default true)
+     */
+    public function refundPayment(Request $request, int $memberId, int $paymentId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $payment = $this->paymentRepository->find($paymentId);
+
+        if (!$payment || $payment->site_id !== $siteId) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Payment not found.'], 404);
+        }
+
+        // Verify the payment belongs to this member (via subscription or order)
+        if (!$this->paymentBelongsToMember($payment, $memberId)) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Payment not found.'], 404);
+        }
+
+        $subscription = $payment->subscription_id
+            ? $this->subscriptionRepository->find((int)$payment->subscription_id)
+            : null;
+
+        if (!$subscription) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Subscription payment not found.'], 404);
+        }
+
+        if ($payment->status === 'refunded') {
+            return $this->resourceResponse(['success' => false, 'message' => 'Payment has already been refunded.'], 422);
+        }
+
+        if (!in_array($payment->status, ['completed', 'paid'], true)) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Only completed payments can be refunded.'], 422);
+        }
+
+        $rawAmount = $request->input('amount');
+        $refundAmount = $rawAmount !== null ? (float)$rawAmount : (float)$payment->amount;
+
+        if ($refundAmount <= 0) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Refund amount must be greater than zero.'], 422);
+        }
+
+        if ($refundAmount > (float)$payment->amount) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Refund amount cannot exceed the original payment.'], 422);
+        }
+
+        $reason         = trim((string)$request->input('reason', 'customer_request'));
+        $internalNotes  = trim((string)$request->input('internal_notes', ''));
+        $notifyCustomer = (bool)$request->input('notify_customer', true);
+
+        try {
+            $result = $this->refundService->executeWithStrategy(
+                $subscription,
+                $this->refundStrategyForPayment($payment, $refundAmount, $reason, [
+                    'internal_notes'  => $internalNotes,
+                    'notify_customer' => $notifyCustomer,
+                    'refunded_by'     => Auth::id(),
+                ])
+            );
+
+            $refundPayment = $result['refund_payment'];
+
+            $this->paymentRepository->update($payment->id, ['status' => 'refunded']);
+
+            Logger::info('CRM payment refund processed', [
+                'payment_id'        => $payment->id,
+                'refund_payment_id' => $refundPayment->id,
+                'amount'            => $refundAmount,
+                'member_id'         => $memberId,
+                'agent_id'          => Auth::id(),
+            ]);
+
+            return $this->resourceResponse([
+                'success'        => true,
+                'message'        => 'Refund processed successfully.',
+                'refund_payment' => $refundPayment,
+                'amount'         => $result['amount'],
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Failed to process payment refund', [
+                'payment_id' => $paymentId,
+                'member_id'  => $memberId,
+                'error'      => $e->getMessage(),
+            ]);
+
+            return $this->jsonResponse(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * POST /api/{site}/crm/members/{memberId}/payments/bulk-refund
+     *
+     * Refund multiple payments in one request.
+     *
+     * Body:
+     *   payment_ids    int[]   required — IDs to refund
+     *   reason         string  optional
+     *   internal_notes string  optional
+     *   notify_customer bool   optional (default true)
+     *
+     * Returns per-payment results so the caller can surface partial failures.
+     */
+    public function bulkRefundPayments(Request $request, int $memberId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $paymentIds = $request->input('payment_ids', []);
+
+        if (!is_array($paymentIds) || count($paymentIds) === 0) {
+            return $this->resourceResponse(['success' => false, 'message' => 'payment_ids must be a non-empty array.'], 422);
+        }
+
+        if (count($paymentIds) > 50) {
+            return $this->resourceResponse(['success' => false, 'message' => 'Cannot bulk refund more than 50 payments at once.'], 422);
+        }
+
+        $reason         = trim((string)$request->input('reason', 'customer_request'));
+        $internalNotes  = trim((string)$request->input('internal_notes', ''));
+        $notifyCustomer = (bool)$request->input('notify_customer', true);
+
+        $results   = [];
+        $succeeded = 0;
+        $failed    = 0;
+
+        foreach ($paymentIds as $paymentId) {
+            $paymentId = (int)$paymentId;
+
+            try {
+                $payment = $this->paymentRepository->find($paymentId);
+
+                if (!$payment || $payment->site_id !== $siteId || !$this->paymentBelongsToMember($payment, $memberId)) {
+                    $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => 'Payment not found.'];
+                    $failed++;
+                    continue;
+                }
+
+                if ($payment->status === 'refunded') {
+                    $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => 'Already refunded.'];
+                    $failed++;
+                    continue;
+                }
+
+                if (!in_array($payment->status, ['completed', 'paid'], true)) {
+                    $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => 'Payment is not refundable (status: ' . $payment->status . ').'];
+                    $failed++;
+                    continue;
+                }
+
+                $subscription = $payment->subscription_id
+                    ? $this->subscriptionRepository->find((int)$payment->subscription_id)
+                    : null;
+
+                if (!$subscription) {
+                    $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => 'Subscription payment not found.'];
+                    $failed++;
+                    continue;
+                }
+
+                $refundAmount = (float)$payment->amount;
+
+                $result = $this->refundService->executeWithStrategy(
+                    $subscription,
+                    $this->refundStrategyForPayment($payment, $refundAmount, $reason, [
+                        'internal_notes'  => $internalNotes,
+                        'notify_customer' => $notifyCustomer,
+                        'refunded_by'     => Auth::id(),
+                        'bulk_refund'     => true,
+                    ])
+                );
+
+                $refundPayment = $result['refund_payment'];
+
+                $this->paymentRepository->update($payment->id, ['status' => 'refunded']);
+
+                $results[] = [
+                    'payment_id'     => $paymentId,
+                    'success'        => true,
+                    'amount'         => $result['amount'],
+                    'refund_payment' => $refundPayment,
+                ];
+
+                $succeeded++;
+            } catch (\Exception $e) {
+                Logger::error('Bulk refund failed for payment', [
+                    'payment_id' => $paymentId,
+                    'member_id'  => $memberId,
+                    'error'      => $e->getMessage(),
+                ]);
+
+                $results[] = ['payment_id' => $paymentId, 'success' => false, 'message' => $e->getMessage()];
+                $failed++;
+            }
+        }
+
+        Logger::info('CRM bulk refund completed', [
+            'member_id' => $memberId,
+            'agent_id'  => Auth::id(),
+            'succeeded' => $succeeded,
+            'failed'    => $failed,
+        ]);
+
+        return $this->resourceResponse([
+            'success'   => $failed === 0,
+            'message'   => "{$succeeded} refund(s) processed" . ($failed > 0 ? ", {$failed} failed." : '.'),
+            'results'   => $results,
+            'succeeded' => $succeeded,
+            'failed'    => $failed,
+        ]);
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private function paymentBelongsToMember(mixed $payment, int $memberId): bool
+    {
+        // Check via subscription
+        if ($payment->subscription_id) {
+            $sub = $this->subscriptionRepository->find($payment->subscription_id);
+            if ($sub && $sub->member_id === $memberId) {
+                return true;
+            }
+        }
+
+        // Check via order
+        if ($payment->order_id) {
+            $order = $this->orderRepository->find($payment->order_id);
+            if ($order && (int)$order->user_id === $memberId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function refundStrategyForPayment(mixed $payment, float $amount, string $reason, array $metadata = []): RefundStrategy
+    {
+        return new class($payment, $amount, $reason, $metadata) implements RefundStrategy {
+            public function __construct(
+                private readonly mixed $payment,
+                private readonly float $amount,
+                private readonly string $reason,
+                private readonly array $metadata,
+            ) {
+            }
+
+            public function calculate(\App\Models\Subscription $subscription): RefundResult
+            {
+                return new RefundResult(
+                    amount: $this->amount,
+                    type: $this->amount < (float)$this->payment->amount ? 'manual' : 'full',
+                    meta: array_merge($this->metadata, [
+                        'original_payment_id' => $this->payment->id,
+                        'original_amount'     => $this->payment->amount,
+                        'transaction_id'      => $this->payment->transaction_id,
+                        'payment_method'      => $this->payment->payment_method,
+                        'payment_provider'    => $this->payment->payment_provider,
+                        'reason'              => $this->reason,
+                    ]),
+                );
+            }
+        };
     }
 
     /** GET /api/{site}/crm/subscriptions/plans/{planId} */

@@ -30,26 +30,6 @@ class SubscriptionPlanPricingControllerTest extends FunctionalTestCase
     }
 
     // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    private function createPricingTier(array $overrides = []): Model
-    {
-        return SubscriptionPlanPricing::create(array_merge([
-            'plan_id' => $this->plan->id,
-            'duration_months' => 1,
-            'issue_count' => 1,
-            'price' => 9.99,
-            'label' => 'Standard',
-            'period_description' => 'per month',
-            'is_default' => false,
-            'is_active' => true,
-            'sort_order' => 0,
-            'site_id' => $this->siteId
-        ], $overrides));
-    }
-
-    // =========================================================================
     // GET /api/subscription-plans/{planId}/pricing
     // =========================================================================
 
