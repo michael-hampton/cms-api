@@ -28,7 +28,7 @@ class SubscriptionCommunicationControllerTest extends FunctionalTestCase
         $indexResponse = $this->getForSite('/api/subscription-communications');
         $this->assertEquals(200, $indexResponse->getStatusCode());
         $index = json_decode($indexResponse->getContent(), true);
-        $this->assertCount(1, $index['data']['communications']);
+        $this->assertCount(1, $index['communications']);
 
         $showResponse = $this->getForSite('/api/subscription-communications/' . $communicationId);
         $this->assertEquals(200, $showResponse->getStatusCode());

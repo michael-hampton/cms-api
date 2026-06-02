@@ -9,6 +9,7 @@ use App\Enums\Workflow\WorkflowRunStatus;
 use App\Events\Subscriptions\AllFulfilmentsCreated;
 use App\Framework\Support\Logger;
 use App\Jobs\Subscriptions\BuildPrintBatchesJob;
+use App\Jobs\Subscriptions\GeneratePrintOrderJob;
 use App\Services\Workflow\WorkflowRunRecorderFactory;
 
 /**
@@ -30,6 +31,8 @@ class AllFulfilmentsCreatedListener
     public function handle(AllFulfilmentsCreated $event): void
     {
         $printRun = $event->printRun;
+
+        dispatch(GeneratePrintOrderJob::for((int)$printRun->issue_delivery_id));
 
         dispatch(BuildPrintBatchesJob::for((int)$printRun->id));
 
