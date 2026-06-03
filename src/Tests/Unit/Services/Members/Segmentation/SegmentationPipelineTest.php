@@ -10,9 +10,14 @@ use App\Jobs\SendCampaignJob;
 use App\Models\Campaign;
 use App\Models\Member;
 use App\Repositories\MemberInsights\MemberSegmentationProfileRepository;
+use App\Repositories\MemberInsights\CampaignExecutionRepository;
 use App\Repositories\Members\MemberRepository;
+use App\Services\MemberInsights\Audiences\AudienceMatcher;
+use App\Services\MemberInsights\Audiences\AudienceRegistry;
 use App\Services\MemberInsights\Campaigns\CampaignCooldownChecker;
 use App\Services\MemberInsights\Campaigns\CampaignMatcher;
+use App\Services\MemberInsights\Campaigns\CampaignPriorityResolver;
+use App\Services\MemberInsights\DeliveryRateLimiter;
 use App\Services\MemberInsights\Segmentation\MemberSegmentResolver;
 use App\Services\MemberInsights\Segmentation\SegmentPersister;
 use Mockery;
@@ -27,6 +32,10 @@ class SegmentationPipelineTest extends TestCase
     private SegmentPersister|MockInterface $persister;
     private CampaignMatcher|MockInterface $matcher;
     private CampaignCooldownChecker|MockInterface $cooldownChecker;
+    private CampaignExecutionRepository|MockInterface $executionRepository;
+    private CampaignPriorityResolver $priorityResolver;
+    private DeliveryRateLimiter $rateLimiter;
+    private AudienceMatcher $audienceMatcher;
     private Dispatcher|MockInterface $dispatcher;
 
     public function test_pipeline_persists_resolved_segments_from_member_stats_profile(): void
@@ -91,6 +100,11 @@ class SegmentationPipelineTest extends TestCase
         $this->resolver->shouldReceive('resolve')->andReturn(['churning', 'lurker', 'high_value', 'reactivation']);
         $this->persister->shouldReceive('persist')->once();
         $this->matcher->shouldReceive('match')->once()->andReturn($campaigns);
+        $this->executionRepository
+            ->shouldReceive('countMarketingExecutionsSince')
+            ->once()
+            ->with(5, Mockery::type(\DateTimeInterface::class))
+            ->andReturn(0);
         $this->cooldownChecker->shouldReceive('isEligible')->times(3)->andReturn(true);
         $this->dispatcher->shouldReceive('dispatch')
             ->times(3)
@@ -122,6 +136,10 @@ class SegmentationPipelineTest extends TestCase
         $this->persister = Mockery::mock(SegmentPersister::class);
         $this->matcher = Mockery::mock(CampaignMatcher::class);
         $this->cooldownChecker = Mockery::mock(CampaignCooldownChecker::class);
+        $this->executionRepository = Mockery::mock(CampaignExecutionRepository::class);
+        $this->priorityResolver = new CampaignPriorityResolver();
+        $this->rateLimiter = new DeliveryRateLimiter($this->executionRepository);
+        $this->audienceMatcher = new AudienceMatcher(new AudienceRegistry());
         $this->dispatcher = Mockery::mock(Dispatcher::class);
 
         Container::getInstance()->instance(MemberRepository::class, $this->memberRepository);
@@ -130,6 +148,9 @@ class SegmentationPipelineTest extends TestCase
         Container::getInstance()->instance(SegmentPersister::class, $this->persister);
         Container::getInstance()->instance(CampaignMatcher::class, $this->matcher);
         Container::getInstance()->instance(CampaignCooldownChecker::class, $this->cooldownChecker);
+        Container::getInstance()->instance(CampaignPriorityResolver::class, $this->priorityResolver);
+        Container::getInstance()->instance(DeliveryRateLimiter::class, $this->rateLimiter);
+        Container::getInstance()->instance(AudienceMatcher::class, $this->audienceMatcher);
         Container::getInstance()->instance(Dispatcher::class, $this->dispatcher);
     }
 }

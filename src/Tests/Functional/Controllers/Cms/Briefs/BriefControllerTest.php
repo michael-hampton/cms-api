@@ -1414,7 +1414,7 @@ class BriefControllerTest extends FunctionalTestCase
 
         $this->assertStringContainsString('Copy', $data['data']['title']);
         $this->assertEquals(1500, $data['data']['target_word_count']);
-        //$this->assertCount(1, $data['data']['attachments']); //todo
+        $this->assertCount(1, $data['data']['attachments']); //todo
     }
 
     // Comment Resolution Tests

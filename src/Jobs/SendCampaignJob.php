@@ -103,9 +103,9 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
         // ── Resolve mailable class ────────────────────────────────────────
         // Variant may supply its own template; fall back to campaign template.
-        $template = ($variant !== null && !empty($variant->template))
+        $template = (string)(($variant !== null && !empty($variant->template))
             ? $variant->template
-            : $campaign->template;
+            : $campaign->template);
 
         if (!ctype_digit($template) && !class_exists($template)) {
             Logger::error('SendCampaignJob: mailable class does not exist', [
@@ -122,7 +122,6 @@ class SendCampaignJob extends BaseJob implements ShouldQueue
 
         foreach ($channels as $channel) {
             if (!$this->consentChecker->canSend($member, CampaignPurpose::tryFrom($campaign->purpose), $channel)) {
-                echo 'no';
                 Logger::info('SendCampaignJob: consent blocked, trying fallback', [
                     'member_id' => $this->memberId,
                     'campaign_id' => $this->campaignId,

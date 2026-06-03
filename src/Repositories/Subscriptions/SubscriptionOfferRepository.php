@@ -125,8 +125,6 @@ class SubscriptionOfferRepository extends Repository
             ->offset($offset)
             ->get();
 
-        //dd($items);
-
         return [
             'items' => $items,
             'total' => $total,

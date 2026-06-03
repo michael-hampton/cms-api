@@ -1672,7 +1672,11 @@ abstract class Model
             return $this->relations[$key] !== null;
         }
 
-        // 👇 important: allow computed properties
+        if (array_key_exists($key, $this->eagerLoaded)) {
+            return $this->eagerLoaded[$key] !== null;
+        }
+
+        // Allow computed properties.
         return method_exists($this, 'get' . Str::studly($key) . 'Attribute');
     }
 
