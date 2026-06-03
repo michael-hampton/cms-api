@@ -14,17 +14,19 @@ use App\Requests\Crm\UpdateMemberRequest;
 use App\Services\Billing\Stripe\StripeCustomerProfileSyncService;
 use App\Services\Members\CrmMemberProfileService;
 use App\Services\Members\CrmMemberService;
+use App\Services\Members\MemberDuplicateDetectionService;
 use Exception;
 use InvalidArgumentException;
 
 class CrmMemberController extends Controller
 {
     public function __construct(
-        private readonly CrmMemberRepository     $crmMemberRepository,
-        private readonly CrmMemberService        $crmMemberService,
-        private readonly AddressRepository       $addressRepository,
-        private readonly CrmMemberProfileService $crmMemberProfileService,
+        private readonly CrmMemberRepository              $crmMemberRepository,
+        private readonly CrmMemberService                 $crmMemberService,
+        private readonly AddressRepository                $addressRepository,
+        private readonly CrmMemberProfileService          $crmMemberProfileService,
         private readonly StripeCustomerProfileSyncService $stripeCustomerProfileSyncService,
+        private readonly MemberDuplicateDetectionService  $duplicateDetectionService,
     ) {
         parent::__construct();
     }
@@ -33,8 +35,8 @@ class CrmMemberController extends Controller
      * GET /crm/members
      *
      * Supports two search modes:
-     *   • Legacy broad search  — ?search=   (name / email / order number)
-     *   • Advanced field search — ?order_number= &last_name= &postcode= &email= &phone=
+     * • Legacy broad search  — ?search=   (name / email / order number)
+     * • Advanced field search — ?order_number= &last_name= &postcode= &email= &phone=
      *
      * Both modes may be combined with the standard status / country / subscription_status
      * / agent_id filters.
@@ -66,11 +68,25 @@ class CrmMemberController extends Controller
 
         $agents = $this->crmMemberRepository->getAgents($siteId);
 
-        return $this->resourceResponse([
-            'items' => $result['data']->map(fn($m) => [
+        // Map over the paginated items and dynamically scan for the best duplicate match per row
+        $enrichedItems = $result['data']->map(function($m) {
+            // Grab the highest confidence match from the detection service
+            $bestMatch = $this->duplicateDetectionService->detectForMember($m)->first();
+
+            return [
                 ...$m->toArray(),
-                'created_at' => $m->created_at?->format('Y-m-d H:i:s'),
-            ]),
+                'created_at'        => $m->created_at?->format('Y-m-d H:i:s'),
+                'duplicate_warning' => [
+                    'has_duplicate'       => $bestMatch !== null,
+                    'match_type'          => $bestMatch ? ($bestMatch->matchType instanceof \BackedEnum ? $bestMatch->matchType->value : strtolower($bestMatch->matchType->name ?? (string)$bestMatch->matchType)) : null,
+                    'confidence_score'    => $bestMatch ? $bestMatch->confidenceScore : null,
+                    'duplicate_member_id' => $bestMatch ? $bestMatch->duplicateMember->id : null,
+                ]
+            ];
+        });
+
+        return $this->resourceResponse([
+            'items' => $enrichedItems,
             'pagination' => [
                 'total'        => $result['total'],
                 'per_page'     => $result['per_page'],
@@ -95,8 +111,19 @@ class CrmMemberController extends Controller
             return $this->redirect('/crm/members')->withErrors(['message' => 'Member not found.']);
         }
 
+        $payload = $this->crmMemberProfileService->buildDetailPayload($member, SiteContext::getId());
+
+        // Also keep show() updated in case individual records are ever re-fetched/freshened deep in the SPA
+        $bestMatch = $this->duplicateDetectionService->detectForMember($member)->first();
+        $payload['duplicate_warning'] = [
+            'has_duplicate'       => $bestMatch !== null,
+            'match_type'          => $bestMatch ? ($bestMatch->matchType instanceof \BackedEnum ? $bestMatch->matchType->value : strtolower($bestMatch->matchType->name ?? (string)$bestMatch->matchType)) : null,
+            'confidence_score'    => $bestMatch ? $bestMatch->confidenceScore : null,
+            'duplicate_member_id' => $bestMatch ? $bestMatch->duplicateMember->id : null,
+        ];
+
         return $this->resourceResponse([
-            'member' => $this->crmMemberProfileService->buildDetailPayload($member, SiteContext::getId()),
+            'member' => $payload,
         ]);
     }
 

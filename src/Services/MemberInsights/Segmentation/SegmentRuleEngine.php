@@ -5,6 +5,7 @@ namespace App\Services\MemberInsights\Segmentation;
 use App\Enums\Member\SubscriptionRuleOperator;
 use App\Enums\Member\SegmentRuleBoolean;
 use App\Models\Segment;
+use App\Models\SegmentRule;
 use App\Models\Subscription;
 
 /**
@@ -44,8 +45,12 @@ class SegmentRuleEngine
 
         $data = $subscription->toArray();
 
-        if ($subscription->plan !== null) {
-            $data['plan'] = $subscription->plan->toArray();
+        $relations = method_exists($subscription, 'getRelations')
+            ? $subscription->getRelations()
+            : [];
+
+        if (isset($relations['plan']) && !isset($data['plan'])) {
+            $data['plan'] = $relations['plan']->toArray();
         }
 
         $result = null;
@@ -57,7 +62,9 @@ class SegmentRuleEngine
             $match = $this->evaluate(
                 $rule->operator,
                 $actual,
-                $rule->value
+                $rule instanceof SegmentRule
+                    ? $rule->decodedValue()
+                    : SegmentRule::decodeValue($rule->value ?? null)
             );
 
             if ($result === null) {

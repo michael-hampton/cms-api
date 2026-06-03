@@ -485,6 +485,43 @@ class PaymentRepositoryTest extends RepositoryTestCase
         $this->assertCount(0, $payments);
     }
 
+    public function test_record_invoice_payment_succeeded_persists_member_id(): void
+    {
+        $subscription = $this->createSubscriptionForMember($this->createMember()->id);
+
+        $payment = $this->repository->recordInvoicePaymentSucceeded(
+            subscriptionId: $subscription->id,
+            stripeInvoiceId: 'in_member_success',
+            stripePaymentIntentId: 'pi_member_success',
+            amountCents: 1299,
+            currency: 'gbp',
+            paidAt: new \DateTimeImmutable('2026-06-03 10:00:00'),
+            memberId: $subscription->member_id,
+        );
+
+        $this->assertSame((int)$subscription->member_id, (int)$payment->member_id);
+        $this->assertSame('pi_member_success', $payment->payment_intent_id);
+    }
+
+    public function test_record_invoice_payment_failed_persists_member_id(): void
+    {
+        $subscription = $this->createSubscriptionForMember($this->createMember()->id);
+
+        $payment = $this->repository->recordInvoicePaymentFailed(
+            subscriptionId: $subscription->id,
+            stripeInvoiceId: 'in_member_failed',
+            stripePaymentIntentId: 'pi_member_failed',
+            amountCents: 1299,
+            currency: 'gbp',
+            failureReason: 'Card declined',
+            failureCode: 'card_declined',
+            memberId: $subscription->member_id,
+        );
+
+        $this->assertSame((int)$subscription->member_id, (int)$payment->member_id);
+        $this->assertSame('pi_member_failed', $payment->payment_intent_id);
+    }
+
     private function createSubscriptionForMember(int $memberId): Model
     {
         return Subscription::create([

@@ -12,4 +12,6 @@ interface StripeRefundGatewayInterface
      * @return array{success: bool, refund_id?: string, amount?: float, status?: string, message?: string, error_code?: string}
      */
     public function refund(string $transactionId, float $amount, array $options = []): array;
+
+    public function findRefundableTransactionForInvoice(string $invoiceId): ?string;
 }

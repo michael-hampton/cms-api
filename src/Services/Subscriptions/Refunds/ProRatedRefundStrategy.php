@@ -81,6 +81,9 @@ class ProRatedRefundStrategy implements RefundStrategy
             meta: [
                 'original_payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
+                'payment_intent_id' => $payment->payment_intent_id,
+                'stripe_invoice_id' => $payment->stripe_invoice_id,
+                'provider_transaction_id' => $payment->payment_intent_id ?: $payment->transaction_id,
                 'payment_method' => $payment->payment_method,
                 'payment_provider' => $payment->payment_provider,
                 'paid_amount' => $paidAmount,

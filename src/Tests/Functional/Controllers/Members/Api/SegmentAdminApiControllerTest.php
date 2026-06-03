@@ -47,6 +47,39 @@ class SegmentAdminApiControllerTest extends FunctionalTestCase
         $this->assertCount(1, $body['rules']);
     }
 
+    public function test_show_decodes_json_rule_values_but_leaves_plain_strings(): void
+    {
+        $segment = Segment::create([
+            'key' => 'mixed_values',
+            'name' => 'Mixed Values',
+            'is_active' => true,
+        ]);
+
+        SegmentRule::create([
+            'segment_id' => $segment->id,
+            'field' => 'status',
+            'operator' => '=',
+            'value' => 'active',
+            'boolean' => 'AND',
+            'sort_order' => 0,
+        ]);
+        SegmentRule::create([
+            'segment_id' => $segment->id,
+            'field' => 'payment_type',
+            'operator' => 'IN',
+            'value' => ['card', 'invoice'],
+            'boolean' => 'AND',
+            'sort_order' => 1,
+        ]);
+
+        $response = $this->getForSite("/api/admin/segments/{$segment->id}");
+
+        $this->assertResponseOk($response);
+        $body = $this->decodeJson($response);
+        $this->assertSame('active', $body['rules'][0]['value']);
+        $this->assertSame(['card', 'invoice'], $body['rules'][1]['value']);
+    }
+
     public function test_update_replaces_rules(): void
     {
         $segment = Segment::create([

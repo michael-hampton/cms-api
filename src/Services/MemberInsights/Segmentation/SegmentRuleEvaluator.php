@@ -36,7 +36,9 @@ class SegmentRuleEvaluator
         foreach ($rules as $rule) {
             $actual = data_get($profile, $rule->field);
 
-            $expected = $rule->value;
+            $expected = $rule instanceof SegmentRule
+                ? $rule->decodedValue()
+                : SegmentRule::decodeValue($rule->value ?? null);
 
             $operator = $rule->operator instanceof SegmentRuleOperator
                 ? $rule->operator

@@ -57,6 +57,8 @@ class CrmSubscriptionOfferController extends Controller
             isActive:        $this->nullableBool($request->input('is_active'), default: true),
             page:            max(1, (int) $request->input('page', 1)),
             perPage:         min(50, max(1, (int) $request->input('per_page', 15))),
+            minPrice:        $request->input('min_price') ? (int) $request->input('min_price') : null,
+            maxPrice:        $request->input('max_price') ? (int) $request->input('max_price') : null,
         );
 
         try {

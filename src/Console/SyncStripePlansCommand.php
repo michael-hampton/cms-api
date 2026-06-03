@@ -59,6 +59,8 @@ class SyncStripePlansCommand extends Command
                 $result->incrementSucceeded();
                 $result->addMessage("Synced {$label} → {$stripeProductId}");
             } catch (\Throwable $e) {
+                echo $e->getMessage();
+                die;
                 $this->reportFailure(
                     result: $result,
                     message: "Failed to sync {$label}: {$e->getMessage()}",

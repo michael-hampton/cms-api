@@ -74,6 +74,7 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
                 Mockery::type('int'),
                 'GBP',
                 Mockery::type(\DateTimeImmutable::class),
+                $subscription->member_id,
             )
             ->andReturn($payment);
 
@@ -196,6 +197,7 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
                 'GBP',
                 'Your card was declined.',
                 'card_declined',
+                $subscription->member_id,
             )
             ->andReturn($payment);
 
@@ -289,6 +291,7 @@ class SubscriptionInvoiceHandlerTest extends FunctionalTestCase
     {
         $subscription = Mockery::mock(Subscription::class)->makePartial();
         $subscription->id = 99;
+        $subscription->member_id = 77;
         $subscription->payment_subscription_id = $stripeSubscriptionId;
 
         // Wire Subscription::where() to return this mock when matching the stripe ID.

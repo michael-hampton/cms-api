@@ -21,5 +21,7 @@ final class SubscriptionOfferFilters
         public readonly ?bool      $isActive        = true,
         public readonly int        $page            = 1,
         public readonly int        $perPage         = 15,
+        public readonly ?int $minPrice    = null,
+        public readonly ?int $maxPrice      = null,
     ) {}
 }

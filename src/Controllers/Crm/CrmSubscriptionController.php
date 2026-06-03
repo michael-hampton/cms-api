@@ -110,6 +110,16 @@ class CrmSubscriptionController extends Controller
         $paymentMethodId = trim((string)$request->input('payment_method_id', ''));
         $pricingId = $request->input('pricing_id') ? (int)$request->input('pricing_id') : null;
         $offerType = trim((string)$request->input('offer_type', '')) ?: null;
+        $giftData = [];
+
+        if (filter_var($request->input('is_gift', false), FILTER_VALIDATE_BOOLEAN)) {
+            $giftData = [
+                'is_gift' => true,
+                'recipient_email' => trim((string)$request->input('recipient_email', '')) ?: null,
+                'recipient_first_name' => trim((string)$request->input('recipient_first_name', '')) ?: null,
+                'recipient_last_name' => trim((string)$request->input('recipient_last_name', '')) ?: null,
+            ];
+        }
 
         if (!$planId) {
             return $this->jsonResponse(['success' => false, 'message' => 'plan_id is required.'], 422);
@@ -137,6 +147,7 @@ class CrmSubscriptionController extends Controller
                 deliveryAddress: $deliveryAddress,
                 pricingId: $pricingId,
                 offerType: $offerType,
+                giftData: $giftData,
             );
 
             return $this->resourceResponse([
@@ -996,6 +1007,9 @@ class CrmSubscriptionController extends Controller
                         'original_payment_id' => $this->payment->id,
                         'original_amount'     => $this->payment->amount,
                         'transaction_id'      => $this->payment->transaction_id,
+                        'payment_intent_id'   => $this->payment->payment_intent_id,
+                        'stripe_invoice_id'   => $this->payment->stripe_invoice_id,
+                        'provider_transaction_id' => $this->payment->payment_intent_id ?: $this->payment->transaction_id,
                         'payment_method'      => $this->payment->payment_method,
                         'payment_provider'    => $this->payment->payment_provider,
                         'reason'              => $this->reason,

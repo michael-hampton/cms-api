@@ -31,6 +31,7 @@ use App\Controllers\Crm\CrmAddressController;
 use App\Controllers\Crm\CrmAttachmentController;
 use App\Controllers\Crm\CrmChargingController;
 use App\Controllers\Crm\CrmCommunicationsController;
+use App\Controllers\Crm\CrmDuplicateController;
 use App\Controllers\Crm\CrmManualPaymentController;
 use App\Controllers\Crm\CrmMemberConsentController;
 use App\Controllers\Crm\CrmMemberController;
@@ -682,6 +683,25 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->put('/subscription-communication-schedules/{id}',  [SubscriptionCommunicationController::class, 'updateSchedule']);
         $router->delete('/subscription-communication-schedules/{id}', [SubscriptionCommunicationController::class, 'destroySchedule']);
 
+        $router->get(
+            '/crm/members/{memberId}/duplicates',
+            [CrmDuplicateController::class, 'index']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/duplicates/{duplicateMemberId}/compare',
+            [CrmDuplicateController::class, 'compare']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/duplicates/{duplicateMemberId}/merge',
+            [CrmDuplicateController::class, 'merge']
+        );
+
+        $router->get(
+            '/crm/members/{memberId}/duplicates/{duplicateMemberId}/conflicts',
+            [CrmDuplicateController::class, 'conflicts']
+        );
 
         $router->get(
             '/crm/members/{memberId}/manual-payments',

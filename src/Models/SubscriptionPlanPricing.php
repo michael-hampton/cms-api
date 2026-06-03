@@ -132,6 +132,44 @@ class SubscriptionPlanPricing extends Model
             : $this->getEffectiveDigitalPrice();
     }
 
+    public function getStripeBillingPriceForPlan(SubscriptionPlan $plan): float
+    {
+        if ($plan->hasDigitalOption()) {
+            return $this->resolveRequiredStripePrice(
+                $this->digital_sale_price,
+                $this->digital_price,
+                'digital_price'
+            );
+        }
+
+        if ($plan->hasPrintOption()) {
+            return $this->resolveRequiredStripePrice(
+                $this->sale_price,
+                $this->price,
+                'price'
+            );
+        }
+
+        return $this->resolveRequiredStripePrice(
+            $this->sale_price,
+            $this->price,
+            'price'
+        );
+    }
+
+    private function resolveRequiredStripePrice(mixed $salePrice, mixed $price, string $priceField): float
+    {
+        if (is_numeric($salePrice) && (float)$salePrice > 0) {
+            return (float)$salePrice;
+        }
+
+        if (is_numeric($price) && (float)$price > 0) {
+            return (float)$price;
+        }
+
+        throw new \InvalidArgumentException("{$priceField} is required to create a Stripe price");
+    }
+
     public function hasTrial(): bool
     {
         return $this->trial_days !== null && $this->trial_days > 0;

@@ -47,6 +47,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
 
         $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->id = 1;
+        $subscription->member_id = 123;
         $subscription->site_id = 1;
         $subscription->price_paid_cents = 2499;
         $subscription->currency = 'USD';
@@ -183,6 +184,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->paymentRepository->shouldReceive('create')
             ->once()
             ->with(m::on(fn($data) => $data['subscription_id'] === $subscriptionId
+                && $data['member_id'] === $memberId
                 && $data['status'] === 'pending'
                 && isset($data['metadata']['subscription_initial_payment'])
             ))
@@ -240,6 +242,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
 
         $mockSubscription = m::mock(Subscription::class)->makePartial();
         $mockSubscription->id = $subscriptionId;
+        $mockSubscription->member_id = 55;
         $mockSubscription->site_id = 1;
         $mockSubscription->price = 29.99;
         $mockSubscription->currency = 'USD';
@@ -267,6 +270,7 @@ class SubscriptionPaymentServiceTest extends FunctionalTestCase
         $this->paymentRepository->shouldReceive('create')
             ->once()
             ->with(m::on(fn($data) => $data['subscription_id'] === $subscriptionId
+                && $data['member_id'] === 55
                 && $data['status'] === 'pending'
                 && isset($data['metadata']['subscription_renewal'])
             ))

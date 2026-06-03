@@ -41,7 +41,7 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
             }
 
             if (!empty($options['reason'])) {
-                $params['reason'] = $options['reason'];
+                $params['reason'] = $this->normaliseRefundReason((string)$options['reason']);
             }
 
             if (!empty($options['metadata'])) {
@@ -64,5 +64,82 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
                 'error_code' => $e->getStripeCode(),
             ];
         }
+    }
+
+    public function findRefundableTransactionForInvoice(string $invoiceId): ?string
+    {
+        try {
+            $invoice = $this->stripe->invoices->retrieve($invoiceId, [
+                'expand' => ['payment_intent'],
+            ]);
+
+            $paymentIntent = $invoice->payment_intent ?? null;
+
+            if (is_string($paymentIntent)) {
+                return $paymentIntent;
+            }
+
+            if (is_object($paymentIntent) && !empty($paymentIntent->id)) {
+                return $paymentIntent->id;
+            }
+
+            $legacyCharge = $invoice->charge ?? null;
+
+            if (is_string($legacyCharge)) {
+                return $legacyCharge;
+            }
+
+            if (is_object($legacyCharge) && !empty($legacyCharge->id)) {
+                return $legacyCharge->id;
+            }
+
+            $payments = $this->stripe->invoicePayments->all([
+                'invoice' => $invoiceId,
+                'limit' => 10,
+                'expand' => [
+                    'data.payment.payment_intent',
+                    'data.payment.charge',
+                ],
+            ]);
+
+            foreach ($payments->data ?? [] as $invoicePayment) {
+                if (($invoicePayment->status ?? null) !== 'paid') {
+                    continue;
+                }
+
+                $payment = $invoicePayment->payment ?? null;
+                $paymentIntent = is_object($payment) ? ($payment->payment_intent ?? null) : null;
+                $charge = is_object($payment) ? ($payment->charge ?? null) : null;
+
+                if (is_string($paymentIntent)) {
+                    return $paymentIntent;
+                }
+
+                if (is_object($paymentIntent) && !empty($paymentIntent->id)) {
+                    return $paymentIntent->id;
+                }
+
+                if (is_string($charge)) {
+                    return $charge;
+                }
+
+                if (is_object($charge) && !empty($charge->id)) {
+                    return $charge->id;
+                }
+            }
+
+            return null;
+        } catch (ApiErrorException) {
+            return null;
+        }
+    }
+
+    private function normaliseRefundReason(string $reason): string
+    {
+        return match ($reason) {
+            'duplicate', 'fraudulent', 'requested_by_customer' => $reason,
+            'customer_request', 'early_cancellation', 'manual_override', 'partial_service_failure' => 'requested_by_customer',
+            default => 'requested_by_customer',
+        };
     }
 }

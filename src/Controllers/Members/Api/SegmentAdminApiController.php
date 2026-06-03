@@ -52,7 +52,7 @@ class SegmentAdminApiController extends Controller
                     'id' => $rule->id,
                     'field' => $rule->field,
                     'operator' => $rule->operator,
-                    'value' => $rule->value,
+                    'value' => $rule->decodedValue(),
                     'boolean' => $rule->boolean,
                     'sort_order' => $rule->sort_order,
                 ])->toArray() ?? [],

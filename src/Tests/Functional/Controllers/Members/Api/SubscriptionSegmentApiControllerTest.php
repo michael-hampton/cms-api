@@ -51,8 +51,6 @@ class SubscriptionSegmentApiControllerTest extends FunctionalTestCase
 
         $response = $this->getForSite("/api/subscriptions/{$subscription->id}/segment");
 
-        dd($response);
-
         $this->assertResponseOk($response);
         $body = $this->decodeJson($response);
         $this->assertNotNull($body['segment']);

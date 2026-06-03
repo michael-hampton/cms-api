@@ -65,6 +65,69 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
         $this->assertSame(SyncStripePricesCommand::SUCCESS, $exitCode);
     }
 
+    public function test_syncs_print_sale_price_for_standard_stripe_price(): void
+    {
+        $plan = $this->makePlan(id: 1, stripeProductId: 'prod_print', printShippingRequired: true);
+        $pricing = $this->makePricing(
+            id: 10,
+            planId: 1,
+            price: 86.31,
+            stripePriceId: null,
+            salePrice: 14.39,
+        );
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_print', 1439, 'GBP', 'month')
+            ->andReturn('price_print_sale');
+
+        $this->pricingRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(10, ['stripe_price_id' => 'price_print_sale']);
+
+        $command = $this->makeCommand(plans: [$plan], standardRows: [$pricing], introRows: []);
+
+        $exitCode = $command->handle();
+
+        $this->assertSame(SyncStripePricesCommand::SUCCESS, $exitCode);
+    }
+
+    public function test_syncs_digital_sale_price_for_standard_stripe_price(): void
+    {
+        $plan = $this->makePlan(
+            id: 1,
+            stripeProductId: 'prod_digital',
+            digitalDownloadUrl: 'https://example.com/file.zip',
+        );
+        $pricing = $this->makePricing(
+            id: 10,
+            planId: 1,
+            price: 86.31,
+            stripePriceId: null,
+            digitalPrice: 29.99,
+            digitalSalePrice: 12.49,
+        );
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_digital', 1249, 'GBP', 'month')
+            ->andReturn('price_digital_sale');
+
+        $this->pricingRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(10, ['stripe_price_id' => 'price_digital_sale']);
+
+        $command = $this->makeCommand(plans: [$plan], standardRows: [$pricing], introRows: []);
+
+        $exitCode = $command->handle();
+
+        $this->assertSame(SyncStripePricesCommand::SUCCESS, $exitCode);
+    }
+
     public function test_skips_standard_row_when_plan_has_no_stripe_product_id(): void
     {
         $plan    = $this->makePlan(id: 1, stripeProductId: null);
@@ -88,8 +151,14 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
 
         $this->stripePriceGateway
             ->shouldReceive('createRecurringPrice')
-            ->twice()
-            ->andThrow(new \RuntimeException('Stripe error'))
+            ->once()
+            ->with('prod_abc', 999, 'GBP', 'month')
+            ->andThrow(new \RuntimeException('Stripe error'));
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_abc', 1999, 'GBP', 'month')
             ->andReturn('price_std_11');
 
         // Second row should still be attempted despite first failing
@@ -268,8 +337,14 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
 
         $this->stripePriceGateway
             ->shouldReceive('createRecurringPrice')
-            ->twice()
-            ->andThrow(new \RuntimeException('Stripe error'))
+            ->once()
+            ->with('prod_abc', 100, 'GBP', 'month')
+            ->andThrow(new \RuntimeException('Stripe error'));
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_abc', 200, 'GBP', 'month')
             ->andReturn('price_intro_11');
 
         $this->pricingRepository
@@ -336,13 +411,20 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private function makePlan(int $id, ?string $stripeProductId): SubscriptionPlan
+    private function makePlan(
+        int $id,
+        ?string $stripeProductId,
+        ?string $digitalDownloadUrl = null,
+        bool $printShippingRequired = false,
+    ): SubscriptionPlan
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
         $plan->id                = $id;
         $plan->name              = "Plan {$id}";
         $plan->stripe_product_id = $stripeProductId;
         $plan->stripe_price_id   = null;
+        $plan->digital_download_url = $digitalDownloadUrl;
+        $plan->print_shipping_required = $printShippingRequired;
 
         return $plan;
     }
@@ -358,11 +440,17 @@ class SyncStripePricesCommandTest extends FunctionalTestCase
         string  $currency           = 'GBP',
         ?string $interval           = 'month',
         bool    $isDefault          = false,
+        ?float  $salePrice          = null,
+        ?float  $digitalPrice       = null,
+        ?float  $digitalSalePrice   = null,
     ): SubscriptionPlanPricing {
         $pricing = m::mock(SubscriptionPlanPricing::class)->makePartial();
         $pricing->id                    = $id;
         $pricing->plan_id               = $planId;
         $pricing->price                 = $price;
+        $pricing->sale_price            = $salePrice;
+        $pricing->digital_price         = $digitalPrice;
+        $pricing->digital_sale_price    = $digitalSalePrice;
         $pricing->stripe_price_id       = $stripePriceId;
         $pricing->intro_price           = $introPrice;
         $pricing->intro_cycles          = $introCycles;

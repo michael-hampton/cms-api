@@ -68,6 +68,7 @@ class ReplacePlanPriceActionTest extends TestCase
         $pricing->stripe_price_id = $stripePriceId;
         $pricing->is_default = $isDefault;
         $pricing->sort_order = $sortOrder;
+        $pricing->price = 9.99;
         return $pricing;
     }
 
@@ -161,6 +162,42 @@ class ReplacePlanPriceActionTest extends TestCase
         // createRecurringPrice must be called exactly once (create, not update).
         $this->stripePriceGateway->shouldReceive('createRecurringPrice')->never(); // already set in scaffoldHappyPath
         $this->action->execute(20, ['amount_cents' => 799, 'currency' => 'gbp', 'interval' => 'month']);
+    }
+
+    public function test_it_uses_overridden_print_sale_price_for_new_stripe_price(): void
+    {
+        $oldPricing = $this->makePricing(22, 4, true, 'price_old22', false, 1);
+        $oldPricing->price = 86.31;
+        $oldPricing->sale_price = null;
+
+        $newPricing = $this->makePricing(23, 4, true, 'price_new23', false, 1);
+
+        $plan = $this->makePlan(4, 'prod_print_replace');
+        $plan->print_shipping_required = true;
+        $plan->digital_download_url = null;
+
+        $this->pricingRepository->shouldReceive('find')->andReturn($oldPricing);
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->currencyValidator->shouldReceive('validate')->andReturn('gbp');
+        $this->domainGuard->shouldReceive('assertNoDefaultConflict')->once();
+        $this->domainGuard->shouldReceive('assertUniqueSortOrder')->once();
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_print_replace', 1439, 'gbp', 'month')
+            ->andReturn('price_sale_replace');
+
+        $this->database->shouldReceive('transaction')->andReturnUsing(fn($cb) => $cb());
+        $this->pricingRepository->shouldReceive('create')->andReturn($newPricing);
+        $this->pricingRepository->shouldReceive('update')->once();
+
+        $this->action->execute(22, [
+            'amount_cents' => 8631,
+            'currency' => 'gbp',
+            'interval' => 'month',
+            'sale_price' => 14.39,
+        ]);
     }
 
     // ---------------------------------------------------------------------------

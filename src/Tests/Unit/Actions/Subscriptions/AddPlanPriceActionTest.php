@@ -104,7 +104,64 @@ class AddPlanPriceActionTest extends TestCase
         $pricing = Mockery::mock(SubscriptionPlanPricing::class)->makePartial();
         $pricing->id = $id;
         $pricing->stripe_price_id = $stripePriceId;
+        $pricing->price = 9.99;
         return $pricing;
+    }
+
+    public function test_it_uses_print_sale_price_for_stripe_when_plan_requires_shipping(): void
+    {
+        $plan = $this->makePlan(8, 'prod_print');
+        $plan->print_shipping_required = true;
+        $plan->digital_download_url = null;
+
+        $pricing = $this->makePricing(80, null);
+        $pricing->price = 86.31;
+        $pricing->sale_price = 14.39;
+
+        $this->currencyValidator->shouldReceive('validate')->andReturn('gbp');
+        $this->domainGuard->shouldReceive('assertNoDefaultConflict')->once();
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('create')->andReturn($pricing);
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_print', 1439, 'gbp', 'month')
+            ->andReturn('price_print_sale');
+
+        $this->pricingRepository->shouldReceive('update')->once();
+        $this->planRepository->shouldReceive('update')->once();
+
+        $this->action->execute(8, ['amount_cents' => 8631, 'currency' => 'gbp', 'interval' => 'month']);
+    }
+
+    public function test_it_uses_digital_sale_price_for_stripe_when_plan_has_download_url(): void
+    {
+        $plan = $this->makePlan(9, 'prod_digital');
+        $plan->digital_download_url = 'https://example.com/download.pdf';
+        $plan->print_shipping_required = false;
+
+        $pricing = $this->makePricing(90, null);
+        $pricing->price = 86.31;
+        $pricing->sale_price = 14.39;
+        $pricing->digital_price = 29.99;
+        $pricing->digital_sale_price = 12.49;
+
+        $this->currencyValidator->shouldReceive('validate')->andReturn('gbp');
+        $this->domainGuard->shouldReceive('assertNoDefaultConflict')->once();
+        $this->planRepository->shouldReceive('find')->andReturn($plan);
+        $this->pricingRepository->shouldReceive('create')->andReturn($pricing);
+
+        $this->stripePriceGateway
+            ->shouldReceive('createRecurringPrice')
+            ->once()
+            ->with('prod_digital', 1249, 'gbp', 'month')
+            ->andReturn('price_digital_sale');
+
+        $this->pricingRepository->shouldReceive('update')->once();
+        $this->planRepository->shouldReceive('update')->once();
+
+        $this->action->execute(9, ['amount_cents' => 8631, 'currency' => 'gbp', 'interval' => 'month']);
     }
 
     public function test_stripe_price_gateway_is_called_exactly_once(): void
@@ -188,7 +245,7 @@ class AddPlanPriceActionTest extends TestCase
 
         $this->stripePriceGateway
             ->shouldReceive('createRecurringPrice')->once()
-            ->with('prod_plan3', 500, 'gbp', 'month')
+            ->with('prod_plan3', 999, 'gbp', 'month')
             ->andReturn('price_gbp');
 
         $this->pricingRepository->shouldReceive('update')->once();

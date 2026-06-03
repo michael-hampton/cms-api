@@ -97,6 +97,169 @@ class SubscriptionRefundServiceTest extends TestCase
         $this->assertNotNull($result['provider_refund']);
     }
 
+    public function testCreateFullRefundUsesPaymentIntentWhenTransactionIdIsStripeSubscription(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $subscription->member_id = 44;
+
+        $lastPayment = $this->createMockPayment();
+        $lastPayment->transaction_id = 'sub_1TdvRvGvaZO1S9EXmJA1uRME';
+        $lastPayment->payment_intent_id = 'pi_refundable_123';
+
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->with($subscription->id)
+            ->andReturn($lastPayment);
+
+        $this->stripeRefundGateway
+            ->shouldReceive('refund')
+            ->once()
+            ->with('pi_refundable_123', $lastPayment->amount, ['reason' => 'customer_request'])
+            ->andReturn([
+                'success' => true,
+                'refund_id' => 're_123',
+                'amount' => $lastPayment->amount,
+            ]);
+
+        $refundPayment = $this->createMockPayment();
+
+        $this->mockPaymentRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) use ($subscription) {
+                return $data['member_id'] === $subscription->member_id
+                    && $data['transaction_id'] === 're_123'
+                    && $data['metadata']['original_transaction_id'] === 'sub_1TdvRvGvaZO1S9EXmJA1uRME'
+                    && $data['metadata']['payment_intent_id'] === 'pi_refundable_123'
+                    && $data['metadata']['provider_transaction_id'] === 'pi_refundable_123';
+            }))
+            ->andReturn($refundPayment);
+
+        $result = $this->service->createFullRefund($subscription);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testCreateFullRefundResolvesPaymentIntentFromInvoiceWhenPaymentRowOnlyHasSubscriptionId(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $subscription->member_id = 44;
+
+        $lastPayment = $this->createMockPayment();
+        $lastPayment->transaction_id = 'sub_1TeAvQGvaZO1S9EXRHFrys06';
+        $lastPayment->payment_intent_id = null;
+        $lastPayment->stripe_invoice_id = 'in_1TeAvQGvaZO1S9EXiQOBs2cO';
+
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->with($subscription->id)
+            ->andReturn($lastPayment);
+
+        $this->stripeRefundGateway
+            ->shouldReceive('findRefundableTransactionForInvoice')
+            ->once()
+            ->with('in_1TeAvQGvaZO1S9EXiQOBs2cO')
+            ->andReturn('pi_from_invoice_123');
+
+        $this->stripeRefundGateway
+            ->shouldReceive('refund')
+            ->once()
+            ->with('pi_from_invoice_123', $lastPayment->amount, ['reason' => 'customer_request'])
+            ->andReturn([
+                'success' => true,
+                'refund_id' => 're_123',
+                'amount' => $lastPayment->amount,
+            ]);
+
+        $refundPayment = $this->createMockPayment();
+
+        $this->mockPaymentRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function ($data) {
+                return $data['metadata']['original_transaction_id'] === 'sub_1TeAvQGvaZO1S9EXRHFrys06'
+                    && $data['metadata']['stripe_invoice_id'] === 'in_1TeAvQGvaZO1S9EXiQOBs2cO'
+                    && $data['metadata']['provider_transaction_id'] === 'pi_from_invoice_123';
+            }))
+            ->andReturn($refundPayment);
+
+        $result = $this->service->createFullRefund($subscription);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function testCreateFullRefundFailsWhenInvoiceDoesNotExposePaymentIntent(): void
+    {
+        $subscription = $this->createMockSubscription();
+
+        $lastPayment = $this->createMockPayment();
+        $lastPayment->transaction_id = 'sub_1TeAvQGvaZO1S9EXRHFrys06';
+        $lastPayment->payment_intent_id = null;
+        $lastPayment->stripe_invoice_id = 'in_1TeAvQGvaZO1S9EXiQOBs2cO';
+
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->with($subscription->id)
+            ->andReturn($lastPayment);
+
+        $this->stripeRefundGateway
+            ->shouldReceive('findRefundableTransactionForInvoice')
+            ->once()
+            ->with('in_1TeAvQGvaZO1S9EXiQOBs2cO')
+            ->andReturn(null);
+
+        $this->stripeRefundGateway->shouldNotReceive('refund');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('invoice in_1TeAvQGvaZO1S9EXiQOBs2cO did not expose a refundable payment intent or charge');
+
+        $this->service->createFullRefund($subscription);
+    }
+
+    public function testCreateFullRefundFailsBeforeStripeWhenNoRefundableProviderIdExists(): void
+    {
+        $subscription = $this->createMockSubscription();
+        $lastPayment = $this->createMockPayment();
+        $lastPayment->transaction_id = 'sub_1TdvRvGvaZO1S9EXmJA1uRME';
+        $lastPayment->payment_intent_id = null;
+
+        $this->mockDatabase
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($callback) => $callback());
+
+        $this->mockPaymentRepository
+            ->shouldReceive('getLastSubscriptionPayment')
+            ->once()
+            ->with($subscription->id)
+            ->andReturn($lastPayment);
+
+        $this->stripeRefundGateway->shouldNotReceive('refund');
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('No refundable Stripe charge or payment intent found for payment #1');
+
+        $this->service->createFullRefund($subscription);
+    }
+
     public function testCreateFullRefundThrowsExceptionWhenNoPaymentFound()
     {
         $subscription = $this->createMockSubscription();
@@ -155,6 +318,8 @@ class SubscriptionRefundServiceTest extends TestCase
     {
         $subscription = $this->createMockSubscription();
         $subscription->stripe_subscription_id = null;
+        $subscription->shouldReceive('hasStripeSubscription')
+            ->andReturn(false);
         $lastPayment = $this->createMockPayment();
         $lastPayment->transaction_id = null;
 
@@ -316,7 +481,8 @@ class SubscriptionRefundServiceTest extends TestCase
         $subscription->stripe_subscription_id = 'sub_123';
 
         $subscription->shouldReceive('hasStripeSubscription')
-            ->andReturn(true);
+            ->andReturn(true)
+            ->byDefault();
 
         return $subscription;
     }
@@ -336,6 +502,8 @@ class SubscriptionRefundServiceTest extends TestCase
         $payment->subscription_id = 1;
         $payment->amount = 100.00;
         $payment->transaction_id = 'ch_123';
+        $payment->payment_intent_id = null;
+        $payment->stripe_invoice_id = null;
         $payment->payment_method = 'stripe';
         $payment->payment_provider = 'stripe';
         return $payment;

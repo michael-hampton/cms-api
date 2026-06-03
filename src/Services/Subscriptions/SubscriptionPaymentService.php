@@ -179,6 +179,7 @@ class SubscriptionPaymentService
 
             return $this->paymentRepository->create([
                 'subscription_id' => $subscriptionId,
+                'member_id'       => $subscription->member_id,
                 'site_id'         => $subscription->site_id,
                 'payment_method'  => 'stripe',
                 'payment_provider'=> 'stripe',

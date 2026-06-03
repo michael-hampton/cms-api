@@ -73,13 +73,32 @@ class SubscriptionRefundService
 
     private function persistRefund(Subscription $subscription, RefundResult $result): array
     {
-        $transactionId  = $result->meta['transaction_id']   ?? null;
+        $transactionId  = $result->meta['provider_transaction_id']
+            ?? $result->meta['payment_intent_id']
+            ?? $result->meta['transaction_id']
+            ?? null;
         $paymentMethod  = $result->meta['payment_method']   ?? 'stripe';
         $paymentProvider = $result->meta['payment_provider'] ?? 'stripe';
+        $stripeInvoiceId = $result->meta['stripe_invoice_id'] ?? null;
 
         $providerRefund = null;
 
-        if ($subscription->hasStripeSubscription() && $transactionId) {
+        if ($subscription->hasStripeSubscription()) {
+            if (!$this->isRefundableStripeTransaction((string)$transactionId) && $stripeInvoiceId) {
+                $transactionId = $this->refundGateway->findRefundableTransactionForInvoice($stripeInvoiceId);
+            }
+
+            if (!$transactionId || !$this->isRefundableStripeTransaction($transactionId)) {
+                $message = 'No refundable Stripe charge or payment intent found for payment #' .
+                    ($result->meta['original_payment_id'] ?? 'unknown');
+
+                if ($stripeInvoiceId) {
+                    $message .= " (invoice {$stripeInvoiceId} did not expose a refundable payment intent or charge)";
+                }
+
+                throw new Exception($message);
+            }
+
             $refundOptions = ['reason' => $result->meta['reason'] ?? 'customer_request'];
 
             if ($result->type === 'pro_rated') {
@@ -110,6 +129,10 @@ class SubscriptionRefundService
         $auditMeta = [
             'refund_type'          => $refundType,
             'original_payment_id'  => $result->meta['original_payment_id'] ?? null,
+            'original_transaction_id' => $result->meta['transaction_id'] ?? null,
+            'payment_intent_id'    => $result->meta['payment_intent_id'] ?? null,
+            'stripe_invoice_id'    => $stripeInvoiceId,
+            'provider_transaction_id' => $transactionId,
             'reason'               => $result->meta['reason'] ?? null,
             'provider_refund'      => $providerRefund !== null,
             'strategy'             => $result->type,
@@ -131,6 +154,7 @@ class SubscriptionRefundService
 
         $refundPayment = $this->paymentRepository->create([
             'subscription_id' => $subscription->id,
+            'member_id'       => $subscription->member_id,
             'site_id'         => $subscription->site_id,
             'payment_method'  => $paymentMethod,
             'payment_provider'=> $paymentProvider,
@@ -163,5 +187,11 @@ class SubscriptionRefundService
         }
 
         return $response;
+    }
+
+    private function isRefundableStripeTransaction(string $transactionId): bool
+    {
+        return str_starts_with($transactionId, 'pi_')
+            || str_starts_with($transactionId, 'ch_');
     }
 }

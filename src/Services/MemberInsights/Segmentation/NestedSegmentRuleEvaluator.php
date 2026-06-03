@@ -5,6 +5,7 @@ namespace App\Services\MemberInsights\Segmentation;
 use App\Enums\Member\SegmentRuleBoolean;
 use App\Enums\Member\SegmentRuleOperator;
 use App\Models\Segment;
+use App\Models\SegmentRule;
 use App\Models\SegmentRuleGroup;
 
 class NestedSegmentRuleEvaluator
@@ -124,7 +125,9 @@ class NestedSegmentRuleEvaluator
     private function evaluateRule(array $data, mixed $rule): bool
     {
         $actual = data_get($data, $this->value($rule, 'field'));
-        $expected = $this->value($rule, 'value');
+        $expected = $rule instanceof SegmentRule
+            ? $rule->decodedValue()
+            : SegmentRule::decodeValue($this->value($rule, 'value'));
 
         $operator = $this->value($rule, 'operator');
 

@@ -54,6 +54,7 @@ class SubscriptionInvoiceHandler
                 amountCents: $event->amountPaid,
                 currency: $event->currency,
                 paidAt: $event->paidAt(),
+                memberId: $subscription->member_id,
             );
 
             // Only update billing-related fields — never blindly overwrite.
@@ -128,6 +129,7 @@ class SubscriptionInvoiceHandler
                 currency: $event->currency,
                 failureReason: $event->failureReason,
                 failureCode: $event->failureCode,
+                memberId: $subscription->member_id,
             );
 
             // PAST_DUE, not cancelled — Stripe retries automatically.

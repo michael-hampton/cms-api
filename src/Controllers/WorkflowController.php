@@ -38,7 +38,6 @@ class WorkflowController extends Controller
     private const LISTEN_BATCH_MAX = 500;
 
     public function __construct(
-        private readonly Container                 $container,
         private readonly Dispatcher                $dispatcher,
         private readonly Logger                    $logger,
         private readonly JobExecutionLogRepository $logRepository,
@@ -350,7 +349,7 @@ class WorkflowController extends Controller
     private function instantiate(string $jobClass, array $params, bool $hydrateServices): object
     {
         if (!is_subclass_of($jobClass, BaseJob::class)) {
-            return $this->container->resolve($jobClass);
+            return Container::getInstance()->resolve($jobClass);
         }
 
         $constructor = (new \ReflectionClass($jobClass))->getConstructor();

@@ -41,9 +41,20 @@ class SubscriptionOfferSearchService
 
         $offers = [];
 
+        $offerType = $filters->offerType;
+
+        if ($filters->hasVoucher === true && $offerType === null) {
+            $offerType = OfferType::VOUCHER;
+        }
+
         foreach ($result['items'] as $tier) {
-            $derived = $this->deriveOffersFromTier($tier, $filters->offerType);
+            $derived = $this->deriveOffersFromTier($tier, $offerType);
+
             foreach ($derived as $offer) {
+                if (!$this->offerMatchesPriceRange($offer, $filters)) {
+                    continue;
+                }
+
                 $offers[] = $offer;
             }
         }
@@ -51,10 +62,10 @@ class SubscriptionOfferSearchService
         $lastPage = max(1, (int) ceil($result['total'] / $filters->perPage));
 
         return [
-            'items'    => $offers,
-            'total'    => $result['total'],
-            'page'     => $filters->page,
-            'per_page' => $filters->perPage,
+            'items'     => $offers,
+            'total'     => $result['total'],
+            'page'      => $filters->page,
+            'per_page'  => $filters->perPage,
             'last_page' => $lastPage,
         ];
     }
@@ -205,7 +216,8 @@ class SubscriptionOfferSearchService
         ?string $currency,
     ): array
     {
-        $vouchers = $tier->plan?->promotion ?? collect();
+        $vouchers = $this->vouchersForTier($tier);
+
         $offers   = [];
 
         foreach ($vouchers as $voucher) {
@@ -231,6 +243,23 @@ class SubscriptionOfferSearchService
         }
 
         return $offers;
+    }
+
+    private function vouchersForTier(SubscriptionPlanPricing $tier): mixed
+    {
+        if (isset($tier->vouchers)) {
+            return $tier->vouchers;
+        }
+
+        if ($tier->plan && isset($tier->plan->promotion)) {
+            return $tier->plan->promotion;
+        }
+
+        if ($tier->plan && method_exists($tier->plan, 'promotion')) {
+            return $tier->plan->promotion();
+        }
+
+        return collect();
     }
 
     private function buildOffer(
@@ -269,5 +298,20 @@ class SubscriptionOfferSearchService
         }
 
         return (int) round((($original - $discounted) / $original) * 100);
+    }
+
+    private function offerMatchesPriceRange(
+        SubscriptionOfferData $offer,
+        SubscriptionOfferFilters $filters,
+    ): bool {
+        if ($filters->minPrice !== null && $offer->offerPrice < $filters->minPrice) {
+            return false;
+        }
+
+        if ($filters->maxPrice !== null && $offer->offerPrice > $filters->maxPrice) {
+            return false;
+        }
+
+        return true;
     }
 }

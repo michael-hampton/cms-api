@@ -76,7 +76,6 @@ abstract class BaseJob extends Job
         try {
             $reflection = new \ReflectionObject($this);
             $refProperty = $reflection->getProperty($property);
-            $refProperty->setAccessible(true);
 
             if ($refProperty->isInitialized($this)) {
                 $value = $refProperty->getValue($this);
@@ -91,8 +90,6 @@ abstract class BaseJob extends Job
 
             return $value;
         } catch (\ReflectionException) {
-            // Fall back to a direct resolve if the property is missing.
-            // This keeps the helper safe for incremental adoption.
             return Container::getInstance()->resolve($type);
         }
     }

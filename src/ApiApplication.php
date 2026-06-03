@@ -307,7 +307,7 @@ class ApiApplication
         $this->container->bind(ProductRepositoryInterface::class, ProductRepository::class);
         $this->container->bind(ClockInterface::class, SystemClock::class);
         $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
-        $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
+        //$this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
         $this->container->bind(
             QueueDriverInterface::class,
@@ -316,9 +316,11 @@ class ApiApplication
                 : DatabaseQueueDriver::class
         );
 
-        $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
+        //$this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(AddressLookupServiceInterface::class, AddressLookupService::class);
         //$this->container->bind(PaymentIntentGateway::class, StripePaymentIntentGateway::class);
+
+        $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
 
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 

@@ -30,6 +30,7 @@ class PaymentRecorder
 
         return $this->paymentRepository->create([
             'subscription_id' => $subscription->id,
+            'member_id' => $subscription->member_id,
             'site_id' => $subscription->site_id,
             'payment_method' => 'stripe',
             'payment_provider' => 'stripe',

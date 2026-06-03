@@ -72,9 +72,13 @@ class SubscriptionOfferRepository extends Repository
             $query->where(function ($q) {
                 $q->where(function ($inner) {
                     $inner->whereNull('subscription_plan_pricing.sale_price')
+                        ->orWhere('subscription_plan_pricing.sale_price', '<=', 0)
                         ->orWhereColumn('subscription_plan_pricing.sale_price', '>=', 'subscription_plan_pricing.price');
                 })->where(function ($inner) {
-                    $inner->whereNull('subscription_plan_pricing.digital_sale_price')
+                    $inner->whereNull('subscription_plan_pricing.digital_price')
+                        ->orWhere('subscription_plan_pricing.digital_price', '<=', 0)
+                        ->orWhereNull('subscription_plan_pricing.digital_sale_price')
+                        ->orWhere('subscription_plan_pricing.digital_sale_price', '<=', 0)
                         ->orWhereColumn('subscription_plan_pricing.digital_sale_price', '>=', 'subscription_plan_pricing.digital_price');
                 });
             });
@@ -93,15 +97,21 @@ class SubscriptionOfferRepository extends Repository
 
         // ── Voucher filter: plan has at least one linked voucher ───────────
         if ($filters->hasVoucher === true) {
-            $query->whereExists(function ($sub) {
-                $sub->from('voucher_subscription_plan')
-                    ->whereColumn('voucher_subscription_plan.subscription_plan_id', 'subscription_plan_pricing.plan_id');
-            });
+            $query->whereRaw(
+                'EXISTS (
+            SELECT 1
+            FROM voucher_subscription_plan
+            WHERE voucher_subscription_plan.subscription_plan_id = subscription_plan_pricing.plan_id
+        )'
+            );
         } elseif ($filters->hasVoucher === false) {
-            $query->whereNotExists(function ($sub) {
-                $sub->from('voucher_subscription_plan')
-                    ->whereColumn('voucher_subscription_plan.subscription_plan_id', 'subscription_plan_pricing.plan_id');
-            });
+            $query->whereRaw(
+                'NOT EXISTS (
+            SELECT 1
+            FROM voucher_subscription_plan
+            WHERE voucher_subscription_plan.subscription_plan_id = subscription_plan_pricing.plan_id
+        )'
+            );
         }
 
         $total = (clone $query)->count();
@@ -114,6 +124,8 @@ class SubscriptionOfferRepository extends Repository
             ->limit($filters->perPage)
             ->offset($offset)
             ->get();
+
+        //dd($items);
 
         return [
             'items' => $items,

@@ -174,6 +174,26 @@ class SegmentRuleEngineTest extends TestCase
         $this->assertTrue($this->engine->matches($subscription, $segment));
     }
 
+    public function test_in_operator_decodes_json_text_expected_list(): void
+    {
+        $subscription = $this->makeSubscription(['payment_type' => 'invoice']);
+        $segment      = $this->makeSegment([
+            ['field' => 'payment_type', 'operator' => 'in', 'value' => '["direct_debit","invoice"]'],
+        ]);
+
+        $this->assertTrue($this->engine->matches($subscription, $segment));
+    }
+
+    public function test_between_operator_decodes_json_text_expected_range(): void
+    {
+        $subscription = $this->makeSubscription(['price' => 15]);
+        $segment      = $this->makeSegment([
+            ['field' => 'price', 'operator' => 'between', 'value' => '[10,20]'],
+        ]);
+
+        $this->assertTrue($this->engine->matches($subscription, $segment));
+    }
+
     public function test_not_in_operator_matches_when_actual_not_in_list(): void
     {
         $subscription = $this->makeSubscription(['payment_type' => 'card']);

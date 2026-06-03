@@ -135,6 +135,7 @@ class PaymentRepository extends Repository
         string  $currency,
         ?string $failureReason,
         ?string $failureCode,
+        ?int    $memberId = null,
     ): Payment
     {
         return Payment::updateOrCreate(
@@ -142,6 +143,7 @@ class PaymentRepository extends Repository
                 'transaction_id' => $stripeInvoiceId],
             [
                 'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
                 'payment_intent_id' => $stripePaymentIntentId,
                 'amount' => $amountCents,
                 'currency' => strtoupper($currency),
@@ -162,12 +164,14 @@ class PaymentRepository extends Repository
         int                $amountCents,
         string             $currency,
         \DateTimeImmutable $paidAt,
+        ?int               $memberId = null,
     ): Payment
     {
         return Payment::updateOrCreate(
             ['transaction_id' => $stripeInvoiceId],
             [
                 'subscription_id' => $subscriptionId,
+                'member_id' => $memberId,
                 'payment_intent_id' => $stripePaymentIntentId,
                 'amount' => $amountCents,
                 'currency' => strtoupper($currency),

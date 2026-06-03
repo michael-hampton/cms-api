@@ -65,6 +65,7 @@ class CrmSubscriptionCreationService
         ?array  $deliveryAddress = null,
         ?int    $pricingId = null,
         ?string $offerType = null,
+        array   $giftData = [],
     ): array
     {
         // ── Validate ──────────────────────────────────────────────────────────
@@ -131,7 +132,17 @@ class CrmSubscriptionCreationService
             // payment_method_id is the Stripe PM the admin collected.
             // one_time_subscription must be falsy so the recurring Stripe
             // subscription path is taken (not a one-time PaymentIntent charge).
-            $data = [
+            $giftFields = [];
+            if (!empty($giftData['is_gift'])) {
+                $giftFields = array_filter([
+                    'is_gift' => true,
+                    'recipient_email' => $giftData['recipient_email'] ?? null,
+                    'recipient_first_name' => $giftData['recipient_first_name'] ?? null,
+                    'recipient_last_name' => $giftData['recipient_last_name'] ?? null,
+                ], fn($value) => $value !== null && $value !== '');
+            }
+
+            $data = array_merge([
                 'payment_method_id' => $paymentMethodId,
                 'one_time_subscription' => false,
                 'admin_created' => true,
@@ -143,7 +154,7 @@ class CrmSubscriptionCreationService
                 'email' => $member->email,
                 'phone' => $member->phone ?? '',
                 'saved_address' => $deliveryAddressId ?? null
-            ];
+            ], $giftFields);
 
             $result = $this->checkoutService->processCheckout($data, $siteId);
 
@@ -155,6 +166,7 @@ class CrmSubscriptionCreationService
                 [
                     'payment_method_id' => $paymentMethodId,
                     'order_id' => $result['order_id'],
+                    'pricing_tier_id' => $pricingId,
                 ],
             );
 

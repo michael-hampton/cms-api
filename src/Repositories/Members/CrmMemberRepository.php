@@ -161,7 +161,7 @@ class CrmMemberRepository extends Repository
     public function findForSite(int $memberId, int $siteId, array $relations = []): ?Member
     {
         return Member::where('id', $memberId)
-            ->where('site_id', $siteId)
+            //->where('site_id', $siteId)
             ->where('anonymous', false)
             ->first();
     }

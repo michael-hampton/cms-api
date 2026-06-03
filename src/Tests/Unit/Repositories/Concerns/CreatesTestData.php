@@ -1074,7 +1074,7 @@ trait CreatesTestData
     protected function createPricingTier(array $overrides = []): Model
     {
         return SubscriptionPlanPricing::create(array_merge([
-            'plan_id' => $this->plan->id,
+            'plan_id' => $this->plan?->id ?? null,
             'duration_months' => 1,
             'issue_count' => 1,
             'price' => 9.99,

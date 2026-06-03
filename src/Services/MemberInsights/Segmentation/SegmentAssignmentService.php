@@ -59,7 +59,7 @@ class SegmentAssignmentService
             if (!$this->ruleEngine->matches($subscription, $segment)) {
                 continue;
             }
-
+            
             // First match found — assign inside a transaction.
             $newAssignment = $this->database->transaction(function () use ($subscription, $segment) {
                 $this->subscriptionSegmentRepository->replaceActive($subscription->id);

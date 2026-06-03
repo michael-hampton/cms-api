@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Models;
 
 use App\Models\SubscriptionPlanPricing;
+use App\Models\SubscriptionPlan;
 use Mockery as m;
 use PHPUnit\Framework\TestCase;
 
@@ -91,6 +92,60 @@ class SubscriptionPlanPricingModelTest extends TestCase
 
         $this->assertEquals(49.99, $tier->getEffectivePrice('print'));
         $this->assertEquals(29.99, $tier->getEffectivePrice('digital'));
+    }
+
+    public function testGetStripeBillingPriceForDigitalPlanUsesDigitalSalePrice(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->digital_download_url = 'https://example.com/download.pdf';
+        $plan->print_shipping_required = false;
+
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price = 86.31;
+        $tier->sale_price = 14.39;
+        $tier->digital_price = 29.99;
+        $tier->digital_sale_price = 12.49;
+
+        $this->assertEquals(12.49, $tier->getStripeBillingPriceForPlan($plan));
+    }
+
+    public function testGetStripeBillingPriceForDigitalPlanUsesDigitalPriceWhenNoDigitalSale(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->digital_download_url = 'https://example.com/download.pdf';
+
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price = 86.31;
+        $tier->sale_price = 14.39;
+        $tier->digital_price = 29.99;
+        $tier->digital_sale_price = null;
+
+        $this->assertEquals(29.99, $tier->getStripeBillingPriceForPlan($plan));
+    }
+
+    public function testGetStripeBillingPriceForPrintPlanUsesSalePrice(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->digital_download_url = null;
+        $plan->print_shipping_required = true;
+
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price = 86.31;
+        $tier->sale_price = 14.39;
+
+        $this->assertEquals(14.39, $tier->getStripeBillingPriceForPlan($plan));
+    }
+
+    public function testGetStripeBillingPriceForPrintPlanUsesPriceWhenNoSale(): void
+    {
+        $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->print_shipping_required = true;
+
+        $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
+        $tier->price = 86.31;
+        $tier->sale_price = null;
+
+        $this->assertEquals(86.31, $tier->getStripeBillingPriceForPlan($plan));
     }
 
     // ── getSavingsText ───────────────────────────────────────────────────────

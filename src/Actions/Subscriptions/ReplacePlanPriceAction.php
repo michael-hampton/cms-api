@@ -90,9 +90,11 @@ class ReplacePlanPriceAction
         // 3. Create the new Stripe Price before the transaction.
         //    Stripe failure → DB is untouched; old price stays active.
         //    DB failure → orphaned Stripe price (acceptable; it is unused and immutable).
+        $effectivePricing = $this->buildEffectivePricing($currentPricing, $newPricingData);
+
         $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
             $plan->stripe_product_id,
-            $newPricingData['amount_cents'],
+            $this->toAmountCents($effectivePricing->getStripeBillingPriceForPlan($plan)),
             $currency,
             $newPricingData['interval'] ?? 'month',
         );
@@ -155,5 +157,28 @@ class ReplacePlanPriceAction
                 'is_active'             => true,
             ]
         );
+    }
+
+    private function buildEffectivePricing(SubscriptionPlanPricing $current, array $overrides): SubscriptionPlanPricing
+    {
+        $pricing = new SubscriptionPlanPricing();
+
+        foreach ([
+            'price',
+            'sale_price',
+            'digital_price',
+            'digital_sale_price',
+        ] as $field) {
+            $pricing->{$field} = array_key_exists($field, $overrides)
+                ? $overrides[$field]
+                : $current->{$field};
+        }
+
+        return $pricing;
+    }
+
+    private function toAmountCents(float $amount): int
+    {
+        return (int)round($amount * 100);
     }
 }

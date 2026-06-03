@@ -89,7 +89,7 @@ class AddPlanPriceAction
         // 5. Create Stripe Price — throws on failure; pricing row exists but stripe_price_id stays null.
         $stripePriceId = $this->stripePriceGateway->createRecurringPrice(
             $plan->stripe_product_id,
-            $pricingData['amount_cents'],
+            $this->toAmountCents($pricing->getStripeBillingPriceForPlan($plan)),
             $currency,
             $pricingData['interval'] ?? 'month',
         );
@@ -104,5 +104,10 @@ class AddPlanPriceAction
         $pricing->stripe_price_id = $stripePriceId;
 
         return $pricing;
+    }
+
+    private function toAmountCents(float $amount): int
+    {
+        return (int)round($amount * 100);
     }
 }
