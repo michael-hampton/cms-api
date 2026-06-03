@@ -542,4 +542,302 @@ class MemberRepositoryTest extends RepositoryTestCase
 
         $this->assertFalse($called);
     }
+
+    public function test_find_possible_duplicates_by_email_matches_normalised_email_within_same_site(): void
+    {
+        $member = $this->createMember([
+            'email' => ' John@Example.com ',
+            'site_id' => $this->siteId,
+        ]);
+
+        $duplicate = $this->createMember([
+            'email' => 'john@example.com',
+            'site_id' => $this->siteId,
+        ]);
+
+        $this->createMember([
+            'email' => 'john@example.com',
+            'site_id' => $this->createSite(['slug' => 'other-site-email'])->id,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByEmail($member);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($duplicate->id, $results->first()->id);
+    }
+
+    public function test_find_possible_duplicates_by_phone_returns_empty_when_phone_missing(): void
+    {
+        $member = $this->createMember([
+            'phone' => null,
+            'site_id' => $this->siteId,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByPhone($member);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_possible_duplicates_by_phone_matches_same_site_and_excludes_self(): void
+    {
+        $member = $this->createMember([
+            'phone' => '07123456789',
+            'site_id' => $this->siteId,
+        ]);
+
+        $duplicate = $this->createMember([
+            'phone' => '07123456789',
+            'site_id' => $this->siteId,
+        ]);
+
+        $this->createMember([
+            'phone' => '07123456789',
+            'site_id' => $this->createSite(['slug' => 'other-site-phone'])->id,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByPhone($member);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($duplicate->id, $results->first()->id);
+    }
+
+    public function test_find_possible_duplicates_by_stripe_customer_id_returns_empty_when_missing(): void
+    {
+        $member = $this->createMember([
+            'stripe_customer_id' => null,
+            'site_id' => $this->siteId,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByStripeCustomerId($member);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_possible_duplicates_by_stripe_customer_id_matches_same_site_and_excludes_self(): void
+    {
+        $member = $this->createMember([
+            'stripe_customer_id' => 'cus_123',
+            'site_id' => $this->siteId,
+        ]);
+
+        $duplicate = $this->createMember([
+            'stripe_customer_id' => 'cus_123',
+            'site_id' => $this->siteId,
+        ]);
+
+        $this->createMember([
+            'stripe_customer_id' => 'cus_123',
+            'site_id' => $this->createSite(['slug' => 'other-site-stripe'])->id,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByStripeCustomerId($member);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($duplicate->id, $results->first()->id);
+    }
+
+    public function test_mark_as_merged_deactivates_member_and_records_merge_metadata(): void
+    {
+        $secondary = $this->createMember([
+            'is_active' => true,
+            'status' => 'active',
+            'site_id' => $this->siteId,
+        ]);
+
+        $primary = $this->createMember([
+            'site_id' => $this->siteId,
+        ]);
+
+        $mergedAt = now_datetime()->format('Y-m-d H:i:s');
+
+        $updated = $this->repository->markAsMerged(
+            memberId: $secondary->id,
+            mergedIntoMemberId: $primary->id,
+            mergedBy: 99,
+            mergedAt: $mergedAt,
+        );
+
+        $this->assertNotNull($updated);
+        $this->assertFalse((bool) $updated->is_active);
+        $this->assertEquals('merged', $updated->status);
+        $this->assertEquals($primary->id, $updated->merged_into_member_id);
+        $this->assertEquals(99, $updated->merged_by);
+        $this->assertEquals($mergedAt, $updated->merged_at);
+    }
+
+    public function test_find_possible_duplicates_by_name_and_postcode_returns_empty_when_member_has_no_default_billing_postcode(): void
+    {
+        $member = $this->createMember([
+            'last_name' => 'Smith',
+            'site_id' => $this->siteId,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByNameAndPostcode($member);
+
+        $this->assertCount(0, $results);
+    }
+
+    public function test_find_possible_duplicates_by_name_and_postcode_matches_normalised_last_name_and_postcode(): void
+    {
+        $member = $this->createMember([
+            'last_name' => ' Smith ',
+            'site_id' => $this->siteId,
+        ]);
+
+        $duplicate = $this->createMember([
+            'last_name' => 'smith',
+            'site_id' => $this->siteId,
+        ]);
+
+        $noise = $this->createMember([
+            'last_name' => 'Smith',
+            'site_id' => $this->siteId,
+        ]);
+
+        \App\Models\Address::create([
+            'member_id' => $member->id,
+            'type' => 'billing',
+            'address_line_1' => '1 Test Street',
+            'city' => 'London',
+            'postcode' => 'AB12 3CD',
+            'country' => 'GB',
+            'is_default' => 1,
+        ]);
+
+        \App\Models\Address::create([
+            'member_id' => $duplicate->id,
+            'type' => 'billing',
+            'address_line_1' => '2 Test Street',
+            'city' => 'London',
+            'postcode' => 'ab123cd',
+            'country' => 'GB',
+            'is_default' => true,
+        ]);
+
+        \App\Models\Address::create([
+            'member_id' => $noise->id,
+            'type' => 'billing',
+            'address_line_1' => '3 Test Street',
+            'city' => 'London',
+            'postcode' => 'ZZ99 9ZZ',
+            'country' => 'GB',
+            'is_default' => true,
+        ]);
+
+        $results = $this->repository->findPossibleDuplicatesByNameAndPostcode($member);
+
+        $this->assertCount(1, $results);
+        $this->assertEquals($duplicate->id, $results->first()->id);
+    }
+
+    public function test_reassign_orders_updates_user_id_and_returns_count(): void
+    {
+        $from = $this->createMember();
+        $to = $this->createMember();
+
+        $order1 = $this->createOrder(['user_id' => $from->id]);
+        $order2 = $this->createOrder(['user_id' => $from->id]);
+        $other = $this->createOrder(['user_id' => $to->id]);
+
+        $count = $this->repository->reassignOrders($from->id, $to->id);
+
+        $this->assertEquals(2, $count);
+        $this->assertEquals($to->id, $order1->fresh()->user_id);
+        $this->assertEquals($to->id, $order2->fresh()->user_id);
+        $this->assertEquals($to->id, $other->fresh()->user_id);
+    }
+
+    public function test_reassign_subscriptions_updates_member_id_and_returns_count(): void
+    {
+        $from = $this->createMember();
+        $to = $this->createMember();
+
+        $sub1 = $this->createSubscription(['member_id' => $from->id, 'status' => 'active']);
+        $sub2 = $this->createSubscription(['member_id' => $from->id, 'status' => 'cancelled']);
+
+        $count = $this->repository->reassignSubscriptions($from->id, $to->id);
+
+        $this->assertEquals(2, $count);
+        $this->assertEquals($to->id, $sub1->fresh()->member_id);
+        $this->assertEquals($to->id, $sub2->fresh()->member_id);
+    }
+
+    public function test_reassign_payments_updates_member_id_and_returns_count(): void
+    {
+        $from = $this->createMember();
+        $to = $this->createMember();
+
+        $payment1 = \App\Models\Payment::create(['member_id' => $from->id, 'status' => 'completed', 'payment_method' => 'card', 'amount' => 100]);
+        $payment2 = \App\Models\Payment::create(['member_id' => $from->id, 'status' => 'pending', 'payment_method' => 'card', 'amount' => 100]);
+
+        $count = $this->repository->reassignPayments($from->id, $to->id);
+
+        $this->assertEquals(2, $count);
+        $this->assertEquals($to->id, $payment1->fresh()->member_id);
+        $this->assertEquals($to->id, $payment2->fresh()->member_id);
+    }
+
+    public function test_reassign_notes_updates_member_id_and_returns_count(): void
+    {
+        $from = $this->createMember();
+        $to = $this->createMember();
+
+        $note1 = \App\Models\MemberNote::create(['member_id' => $from->id, 'body' => 'One', 'site_id' => $this->siteId]);
+        $note2 = \App\Models\MemberNote::create(['member_id' => $from->id, 'body' => 'Two', 'site_id' => $this->siteId]);
+
+        $count = $this->repository->reassignNotes($from->id, $to->id);
+
+        $this->assertEquals(2, $count);
+        $this->assertEquals($to->id, $note1->fresh()->member_id);
+        $this->assertEquals($to->id, $note2->fresh()->member_id);
+    }
+
+    public function test_merge_addresses_copies_non_duplicate_addresses_only(): void
+    {
+        $from = $this->createMember();
+        $to = $this->createMember();
+
+        \App\Models\Address::create([
+            'member_id' => $to->id,
+            'type' => 'billing',
+            'address_line_1' => 'Existing Billing',
+            'city' => 'London',
+            'postcode' => 'AB12 3CD',
+            'country' => 'GB',
+            'is_default' => true,
+        ]);
+
+        \App\Models\Address::create([
+            'member_id' => $from->id,
+            'type' => 'billing',
+            'address_line_1' => 'Duplicate Billing',
+            'city' => 'London',
+            'postcode' => 'AB123CD',
+            'country' => 'GB',
+            'is_default' => true,
+        ]);
+
+        \App\Models\Address::create([
+            'member_id' => $from->id,
+            'type' => 'shipping',
+            'address_line_1' => 'New Shipping',
+            'city' => 'London',
+            'postcode' => 'ZZ99 9ZZ',
+            'country' => 'GB',
+            'is_default' => true,
+        ]);
+
+        $copied = $this->repository->mergeAddresses($from->id, $to->id);
+
+        $this->assertEquals(1, $copied);
+
+        $this->assertDatabaseHas('addresses', [
+            'member_id' => $to->id,
+            'type' => 'shipping',
+            'postcode' => 'ZZ99 9ZZ',
+            'is_default' => false,
+        ]);
+
+        $this->assertCount(2, \App\Models\Address::where('member_id', $to->id)->get());
+    }
 }

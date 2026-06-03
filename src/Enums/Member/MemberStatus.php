@@ -6,6 +6,7 @@ enum MemberStatus: string
 {
     case Active = 'active';
     case Inactive = 'inactive';
+    case Merged = 'merged';
 
     public static function fromBool(bool $isActive): self
     {

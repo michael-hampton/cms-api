@@ -47,7 +47,11 @@ class Member extends Model
         'charging_disabled',
         'charging_disabled_reason',
         'charging_disabled_at',
-        'charging_disabled_by'
+        'charging_disabled_by',
+        'status',
+        'merged_into_member_id',
+        'merged_by',
+        'merged_at',
     ];
     protected $hidden = [
         'password',

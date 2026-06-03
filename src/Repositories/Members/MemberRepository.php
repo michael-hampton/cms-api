@@ -2,10 +2,13 @@
 
 namespace App\Repositories\Members;
 
+use App\Enums\Member\MemberStatus;
 use App\Framework\Database\Exceptions\UniqueConstraintViolationException;
 use App\Framework\Support\Collection;
 use App\Models\Member;
 use App\Models\Model;
+use App\Models\Payment;
+use App\Models\Subscription;
 use App\Repositories\Repository;
 
 class MemberRepository extends Repository
@@ -245,5 +248,248 @@ class MemberRepository extends Repository
             ->chunkById($chunkSize, function ($members) use ($callback) {
                 $callback($members->all());
             });
+    }
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THESE METHODS to App\Repositories\Members\MemberRepository
+//
+// Replaces the previous MemberRepository_duplicate_methods.php patch.
+// Includes both the duplicate-detection queries (Ticket 1) and the merge
+// state mutations (Ticket 4).
+// ─────────────────────────────────────────────────────────────────────────────
+
+    // =========================================================================
+    // Duplicate detection queries
+    // =========================================================================
+
+    /**
+     * Find members whose normalised email matches the given member's email,
+     * excluding the member itself.
+     *
+     * Uses LOWER(TRIM(email)) until a normalised_email column exists.
+     *
+     * @return \App\Framework\Support\Collection<\App\Models\Member>
+     */
+    public function findPossibleDuplicatesByEmail(Member $member): Collection
+    {
+        $normalisedEmail = strtolower(trim($member->email));
+
+        return $this->model::whereRaw(
+            'LOWER(TRIM(email)) = :email',
+            ['email' => $normalisedEmail]
+        )
+            ->where('id', '!=', $member->id)
+            ->where('site_id', $member->site_id)
+            ->get();
+    }
+
+    /**
+     * Find members sharing the same non-empty phone number, excluding self.
+     *
+     * @return \App\Framework\Support\Collection<\App\Models\Member>
+     */
+    public function findPossibleDuplicatesByPhone(\App\Models\Member $member): \App\Framework\Support\Collection
+    {
+        if (empty($member->phone)) {
+            return collect();
+        }
+
+        return $this->model::where('phone', $member->phone)
+            ->where('id', '!=', $member->id)
+            ->where('site_id', $member->site_id)
+            ->get();
+    }
+
+    /**
+     * Find members sharing the same Stripe customer ID, excluding self.
+     *
+     * @return \App\Framework\Support\Collection<\App\Models\Member>
+     */
+    public function findPossibleDuplicatesByStripeCustomerId(\App\Models\Member $member): \App\Framework\Support\Collection
+    {
+        if (empty($member->stripe_customer_id)) {
+            return collect();
+        }
+
+        return $this->model::where('stripe_customer_id', $member->stripe_customer_id)
+            ->where('id', '!=', $member->id)
+            ->where('site_id', $member->site_id)
+            ->get();
+    }
+
+    /**
+     * Find members with the same normalised last name AND the same billing
+     * postcode (via the default billing address), excluding self.
+     *
+     * @return \App\Framework\Support\Collection<\App\Models\Member>
+     */
+    public function findPossibleDuplicatesByNameAndPostcode(Member $member): Collection
+    {
+        if (empty($member->last_name)) {
+            return collect();
+        }
+
+        $postcode = \App\Models\Address::where('member_id', $member->id)
+            ->where('is_default', 1)
+            ->whereIn('type', ['billing', 'both'])
+            ->whereNotNull('postcode')
+            ->value('postcode');
+
+        if (empty($postcode)) {
+            return collect();
+        }
+
+        $normalisedLastName = strtolower(trim($member->last_name));
+        $normalisedPostcode = strtolower(str_replace(' ', '', $postcode));
+
+        return $this->model::join('addresses', 'addresses.member_id', '=', 'members.id')
+            ->where('members.id', '!=', $member->id)
+            ->where('members.site_id', $member->site_id)
+            ->where('addresses.is_default', 1)
+            ->whereIn('addresses.type', ['billing', 'both'])
+            ->whereRaw("LOWER(TRIM(members.last_name)) = '{$normalisedLastName}'")
+            ->whereRaw("LOWER(REPLACE(addresses.postcode, ' ', '')) = '{$normalisedPostcode}'")
+            ->select('members.*')
+            ->get();
+    }
+
+    /**
+     * Mark a member as merged: deactivate them and record which account
+     * absorbed them.
+     *
+     * This is the only write that touches member status during a merge.
+     * Called inside the transaction boundary in MemberMergeService.
+     */
+    public function markAsMerged(
+        int    $memberId,
+        int    $mergedIntoMemberId,
+        int    $mergedBy,
+        string $mergedAt,
+    ): ?Model
+    {
+        return $this->update($memberId, [
+            'is_active' => false,
+            'status' => MemberStatus::Merged->value,
+            'merged_into_member_id' => $mergedIntoMemberId,
+            'merged_at' => $mergedAt,
+            'merged_by' => $mergedBy,
+        ]);
+    }
+
+    /**
+     * Reassign all orders from the secondary member to the primary member.
+     * Orders use user_id as the member FK.
+     *
+     * Returns the number of rows updated.
+     */
+    public function reassignOrders(int $fromMemberId, int $toMemberId): int
+    {
+        return \App\Models\Order::where('user_id', $fromMemberId)
+            ->update(['user_id' => $toMemberId]);
+    }
+
+    /**
+     * Reassign all subscriptions from the secondary member to the primary.
+     *
+     * Returns the number of rows updated.
+     */
+    public function reassignSubscriptions(int $fromMemberId, int $toMemberId): int
+    {
+        return \App\Models\Subscription::where('member_id', $fromMemberId)
+            ->update(['member_id' => $toMemberId]);
+    }
+
+    /**
+     * Reassign all payments from the secondary member to the primary.
+     * Payments have a direct member_id column.
+     *
+     * Returns the number of rows updated.
+     */
+    public function reassignPayments(int $fromMemberId, int $toMemberId): int
+    {
+        return \App\Models\Payment::where('member_id', $fromMemberId)
+            ->update(['member_id' => $toMemberId]);
+    }
+
+    /**
+     * Reassign notes from the secondary member to the primary member.
+     *
+     * Returns the number of rows updated.
+     */
+    public function reassignNotes(int $fromMemberId, int $toMemberId): int
+    {
+        return \App\Models\MemberNote::where('member_id', $fromMemberId)
+            ->update(['member_id' => $toMemberId]);
+    }
+
+    /**
+     * Copy addresses from the secondary member to the primary, skipping any
+     * address where an existing primary address already matches on both type
+     * and normalised postcode (deduplication).
+     *
+     * Returns the number of addresses copied.
+     */
+    public function mergeAddresses(int $fromMemberId, int $toMemberId): int
+    {
+        $secondaryAddresses = \App\Models\Address::where('member_id', $fromMemberId)->get();
+
+        $existingAddresses = \App\Models\Address::where('member_id', $toMemberId)->get();
+
+        $existingSignatures = $existingAddresses->map(fn($a) => $this->addressSignature($a))->all();
+
+        $copied = 0;
+
+        foreach ($secondaryAddresses as $address) {
+            $signature = $this->addressSignature($address);
+
+            if (in_array($signature, $existingSignatures, true)) {
+                continue;
+            }
+
+            \App\Models\Address::create([
+                'member_id' => $toMemberId,
+                'type' => $address->type,
+                'address_line_1' => $address->address_line_1,
+                'address_line_2' => $address->address_line_2,
+                'city' => $address->city,
+                'state' => $address->state,
+                'postcode' => $address->postcode,
+                'country' => $address->country,
+                'label' => $address->label,
+                'is_default' => false, // never override the primary's default
+            ]);
+
+            $existingSignatures[] = $signature;
+            $copied++;
+        }
+
+        return $copied;
+    }
+
+    // ─── Private helpers ──────────────────────────────────────────────────────
+
+    /**
+     * Produces a deduplication key for an address: type + normalised postcode.
+     */
+    private function addressSignature(\App\Models\Address $address): string
+    {
+        $normalisedPostcode = strtolower(str_replace(' ', '', (string)$address->postcode));
+        return $address->type . '|' . $normalisedPostcode;
+    }
+
+    public function countActiveSubscriptions(int $memberId): int
+    {
+        return Subscription::where('member_id', $memberId)
+            ->whereIn('status', ['active', 'trialing'])
+            ->count();
+    }
+
+    public function hasPendingPayments(int $memberId): bool
+    {
+        return Payment::where('member_id', $memberId)
+            ->whereIn('status', ['pending', 'processing'])
+            ->exists();
     }
 }
