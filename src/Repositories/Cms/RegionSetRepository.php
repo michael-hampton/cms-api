@@ -118,4 +118,13 @@ class RegionSetRepository extends Repository
         return PageRegionSet::where('region_set_id', $oldRegionSetId)
             ->update(['region_set_id' => $newRegionSetId]);
     }
+
+    public function getActiveForSite(int $siteId): Collection
+    {
+        return RegionSet::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+    }
 }

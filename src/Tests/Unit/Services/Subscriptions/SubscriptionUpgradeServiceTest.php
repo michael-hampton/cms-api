@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\DTO\Stripe\PaymentIntentResultDto;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Subscriptions\InactiveSubscriptionException;
 use App\Exceptions\Subscriptions\InvalidUpgradePlanException;
@@ -536,7 +537,7 @@ class SubscriptionUpgradeServiceTest extends TestCase
         $upgradePlan->name = 'Premium';
         $upgradePlan->price = 39.99;
         $upgradePlan->features = ['Premium Feature 1', 'Premium Feature 2'];
-        $upgradePlan->delivery_type = 'both';
+        $upgradePlan->delivery_type = SubscriptionDeliveryType::PRINT_AND_DIGITAL->value;
 
         $this->subscriptionRepository
             ->shouldReceive('find')

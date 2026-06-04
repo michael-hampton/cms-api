@@ -128,6 +128,7 @@ class SubscriptionPlansSeeder extends Seeder
             'is_featured' => $template['is_featured'] ?? false,
             'sort_order' => $index,
             'plan_type' => 'onetime',
+            'delivery_type' => $template['digital_only'] ? 'digital' : 'print',
             'digital_download_url' => $template['digital_only'] ? 'https://example.com/download' : null,
             'print_shipping_required' => $template['print_only'] || !$template['digital_only'],
             'includes_insider' => $template['is_featured'] ?? false,

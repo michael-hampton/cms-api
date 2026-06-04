@@ -92,7 +92,8 @@ $apiBase = '/api/' . $site;
 
             <div class="sub-plans">
                 <?php foreach ($plans as $plan):
-                    $deliveryType = $plan->digital_download_url ? 'digital' : 'print';
+                    $deliveryOptions = $plan->getDeliveryOptions();
+                    $deliveryType = $deliveryOptions[0] ?? '';
                     ?>
                     <div class="sub-plan <?= $plan->is_featured ? 'featured' : '' ?>"
                          data-plan-id="<?= (int)$plan->id ?>"
@@ -1735,6 +1736,18 @@ $apiBase = '/api/' . $site;
                 return Array.isArray(value) ? value : [value];
             }
 
+            getCartItemIdForPlan(cartResult) {
+                const item = (cartResult.items || []).find((cartItem) => {
+                    return parseInt(cartItem.subscription_plan_id, 10) === this.selectedPlan.id;
+                });
+
+                return item?.id ?? null;
+            }
+
+            isAlreadyInCartResult(cartResult) {
+                return /already in cart/i.test(cartResult.message || '');
+            }
+
             async confirmPayment(intentId, paymentMethodId) {
                 const payload = {order_id: this.orderId};
                 if (intentId) payload.payment_intent_id = intentId;
@@ -1759,21 +1772,23 @@ $apiBase = '/api/' . $site;
                 this.setCardError('');
 
                 let cartItemId = null;
+                let shouldRollbackCartItem = false;
 
                 try {
                     const checkoutData = this.buildCheckoutPayload();
 
                     this.setLoading(true, 'Adding plan to cart...');
                     const cartResult = await this.api.addPlanToCart(this.selectedPlan);
-                    if (!cartResult.success) {
+                    cartItemId = cartResult.item?.id ?? cartResult.id ?? this.getCartItemIdForPlan(cartResult);
+                    shouldRollbackCartItem = cartResult.success && !!cartItemId;
+
+                    if (!cartResult.success && (!cartItemId || !this.isAlreadyInCartResult(cartResult))) {
                         throw new Error(cartResult.message || 'Could not add plan to cart. Please try again.');
                     }
-                    cartItemId = cartResult.item?.id ?? cartResult.id ?? null;
 
                     this.setLoading(true, 'Creating your subscription...');
                     const result = await this.api.createSubscriptionCheckout(checkoutData);
                     if (!result.success) {
-                        await this.api.rollbackCartItem(cartItemId);
                         throw new Error(result.message || 'Checkout failed. Please try again.');
                     }
 
@@ -1803,6 +1818,9 @@ $apiBase = '/api/' . $site;
                     this.setLoading(true, 'Activating your subscription...');
                     await this.confirmPayment(null, paymentMethod.id);
                 } catch (error) {
+                    if (shouldRollbackCartItem) {
+                        await this.api.rollbackCartItem(cartItemId);
+                    }
                     console.error('Modal payment error:', error);
                     this.setCardError(error.message || 'An unexpected error occurred. Please try again.');
                 } finally {

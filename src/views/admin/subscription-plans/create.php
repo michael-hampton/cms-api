@@ -198,6 +198,27 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label">Delivery Type *</label>
+                <select name="delivery_type" class="form-control" id="delivery_type" required>
+                    <option value="digital">Digital</option>
+                    <option value="print">Print</option>
+                    <option value="print_and_digital">Print + Digital</option>
+                </select>
+            </div>
+
+            <div class="form-group" data-delivery-digital>
+                <label class="form-label">Download URL</label>
+                <input type="url" name="digital_download_url" class="form-control" id="digital_download_url">
+            </div>
+
+            <div class="form-group" data-delivery-print>
+                <div class="checkbox-group">
+                    <input type="checkbox" name="print_shipping_required" value="1" id="print_shipping_required">
+                    <label for="print_shipping_required">Requires print shipping</label>
+                </div>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Features</label>
                 <div id="featuresList" class="features-list">
                     <div class="feature-item">
@@ -241,6 +262,29 @@
     `;
         list.appendChild(item);
     }
+
+    const deliveryType = document.getElementById('delivery_type');
+    const downloadUrl = document.getElementById('digital_download_url');
+    const printShipping = document.getElementById('print_shipping_required');
+    const digitalFields = document.querySelectorAll('[data-delivery-digital]');
+    const printFields = document.querySelectorAll('[data-delivery-print]');
+
+    function syncDeliveryFields() {
+        const value = deliveryType.value;
+        const includesDigital = value === 'digital' || value === 'print_and_digital';
+        const includesPrint = value === 'print' || value === 'print_and_digital';
+
+        digitalFields.forEach((field) => field.style.display = includesDigital ? '' : 'none');
+        printFields.forEach((field) => field.style.display = includesPrint ? '' : 'none');
+
+        downloadUrl.required = includesDigital;
+        downloadUrl.disabled = !includesDigital;
+        printShipping.checked = includesPrint;
+        printShipping.disabled = value === 'digital';
+    }
+
+    deliveryType.addEventListener('change', syncDeliveryFields);
+    syncDeliveryFields();
 </script>
 </body>
 </html>

@@ -7,7 +7,6 @@ use App\Enums\CartItemType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\SubscriptionPlan;
-use App\Models\Voucher;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Services\Shipping\ShippingService;
 use App\Services\Subscriptions\Calculators\SubscriptionPricingResolver;
@@ -170,9 +169,6 @@ class SubscriptionPricingCalculatorTest extends TestCase
 
         $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
 
-        $voucher = Mockery::mock(Voucher::class)->makePartial();
-        $voucher->id = 999;
-
         $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
             planPrice: 50.00,
             currency: 'USD',
@@ -180,7 +176,6 @@ class SubscriptionPricingCalculatorTest extends TestCase
             discountAmount: 10.00,
             voucherId: 999
         );
-        $resolvedPrice->voucher = $voucher;
 
         $this->pricingResolver->shouldReceive('resolve')
             ->once()
@@ -197,6 +192,43 @@ class SubscriptionPricingCalculatorTest extends TestCase
         $this->assertEquals(4000, $pricing->subtotalCents);
         $this->assertEquals(1000, $pricing->discountCents);
         $this->assertEquals(999, $pricing->voucherId);
+    }
+
+    public function test_calculate_uses_posted_discount_when_voucher_resolves_with_zero_discount(): void
+    {
+        $plan = $this->createMockPlan(50.00);
+        $member = $this->createMockMember();
+
+        $this->planRepository->shouldReceive('find')->with(1)->andReturn($plan);
+
+        $resolvedPrice = ResolvedSubscriptionPrice::fromPlanPrice(
+            planPrice: 50.00,
+            currency: 'USD',
+            variant: SubscriptionType::DIGITAL->value,
+            discountAmount: 0,
+            voucherId: 11
+        );
+
+        $this->pricingResolver->shouldReceive('resolve')
+            ->once()
+            ->with($plan, ['variant' => SubscriptionType::DIGITAL->value, 'pricing_tier_id' => null, 'voucher_code' => 'SAVE20'], 123)
+            ->andReturn($resolvedPrice);
+
+        $item = [
+            'subscription_plan_id' => 1,
+            'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
+        ];
+
+        $pricing = $this->calculator->calculateForCartItem($item, 'SAVE20', $member, [
+            'voucher_code' => 'SAVE20',
+            'voucher_id' => 11,
+            'discount_amount' => 0.50,
+        ]);
+
+        $this->assertSame(4950, $pricing->subtotalCents);
+        $this->assertSame(50, $pricing->discountCents);
+        $this->assertSame(4950, $pricing->totalCents);
+        $this->assertSame(11, $pricing->voucherId);
     }
 
     public function test_calculate_with_invalid_voucher_applies_no_discount(): void

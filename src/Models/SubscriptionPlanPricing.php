@@ -8,6 +8,7 @@ class SubscriptionPlanPricing extends Model
 
     protected $fillable = [
         'plan_id',
+        'entitlement_type',
         'duration_months',
         'issue_count',
         'price',
@@ -44,6 +45,8 @@ class SubscriptionPlanPricing extends Model
         'replaced_by_price_id' => 'integer',
         'trial_days'   => 'integer',
         'intro_cycles' => 'integer',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function plan()
@@ -83,7 +86,7 @@ class SubscriptionPlanPricing extends Model
 
     public function getPricePerIssue(): float
     {
-        if ($this->issue_count <= 0) {
+        if (($this->issue_count ?? 0) <= 0) {
             return 0;
         }
 
@@ -135,11 +138,15 @@ class SubscriptionPlanPricing extends Model
     public function getStripeBillingPriceForPlan(SubscriptionPlan $plan): float
     {
         if ($plan->hasDigitalOption()) {
-            return $this->resolveRequiredStripePrice(
-                $this->digital_sale_price,
-                $this->digital_price,
-                'digital_price'
-            );
+            $digitalPrice = is_numeric($this->digital_price) && (float)$this->digital_price > 0
+                ? $this->digital_price
+                : $this->price;
+
+            $digitalSalePrice = is_numeric($this->digital_sale_price) && (float)$this->digital_sale_price > 0
+                ? $this->digital_sale_price
+                : $this->sale_price;
+
+            return $this->resolveRequiredStripePrice($digitalSalePrice, $digitalPrice, 'price');
         }
 
         if ($plan->hasPrintOption()) {

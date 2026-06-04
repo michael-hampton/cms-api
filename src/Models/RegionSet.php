@@ -57,6 +57,11 @@ class RegionSet extends Model
         return Territory::where('region_set_id', $this->id)->count();
     }
 
+    public function products(): object
+    {
+        return $this->belongsToMany(Product::class, 'product_region_sets', 'region_set_id', 'product_id');
+    }
+
     public function getPageCount(): int
     {
         return PageRegionSet::where('region_set_id', $this->id)->count();

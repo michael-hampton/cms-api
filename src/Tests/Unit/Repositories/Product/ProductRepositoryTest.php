@@ -11,6 +11,7 @@ use App\Models\ProductMerchant;
 use App\Models\ProductSpecification;
 use App\Models\ProductSpecificationGroup;
 use App\Models\ProductVariant;
+use App\Models\RegionSet;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Search\SearchCriteria;
@@ -1945,6 +1946,70 @@ class ProductRepositoryTest extends RepositoryTestCase
         $this->assertEquals(15, Product::find($product->id)->stock_quantity);
     }
 
+    public function test_search_returns_all_products_when_no_region_filter(): void
+    {
+        $this->createProduct();
+        $this->createProduct();
 
+        $criteria = new SearchCriteria();
+        $result = $this->repository->search($criteria);
 
+        $this->assertCount(2, $result->getData());
+    }
+
+    public function test_search_filters_products_by_region_set(): void
+    {
+        $regionSet = RegionSet::create([
+            'name' => 'UK', 'slug' => 'uk', 'site_id' => $this->siteId, 'is_active' => true,
+        ]);
+
+        $inRegion  = $this->createProduct();
+        $outRegion = $this->createProduct();
+
+        $inRegion->regionSets(true)->attach($regionSet->id);
+
+        $criteria = new SearchCriteria(filters: ['region_set_ids' => [$regionSet->id]]);
+        $result = $this->repository->search($criteria);
+
+        $ids = array_column($result->getData(), 'id');
+        $this->assertContains($inRegion->id, $ids);
+        $this->assertNotContains($outRegion->id, $ids);
+    }
+
+    public function test_search_filters_products_assigned_to_multiple_regions(): void
+    {
+        $regionA = RegionSet::create(['name' => 'UK',     'slug' => 'uk',     'site_id' => $this->siteId, 'is_active' => true]);
+        $regionB = RegionSet::create(['name' => 'Europe', 'slug' => 'europe', 'site_id' => $this->siteId, 'is_active' => true]);
+
+        $product = $this->createProduct();
+        $product->regionSets(true)->sync([$regionA->id, $regionB->id]);
+
+        $criteriaA = new SearchCriteria(filters: ['region_set_ids' => [$regionA->id]]);
+        $criteriaB = new SearchCriteria(filters: ['region_set_ids' => [$regionB->id]]);
+
+        $this->assertContains($product->id, array_column($this->repository->search($criteriaA)->getData(), 'id'));
+        $this->assertContains($product->id, array_column($this->repository->search($criteriaB)->getData(), 'id'));
+    }
+
+    public function test_search_excludes_products_not_assigned_to_selected_region(): void
+    {
+        $regionSet = RegionSet::create(['name' => 'US', 'slug' => 'us', 'site_id' => $this->siteId, 'is_active' => true]);
+
+        $unassigned = $this->createProduct();
+
+        $criteria = new SearchCriteria(filters: ['region_set_ids' => [$regionSet->id]]);
+        $result = $this->repository->search($criteria);
+
+        $this->assertNotContains($unassigned->id, array_column($result->getData(), 'id'));
+    }
+
+    public function test_search_handles_invalid_region_filter_gracefully(): void
+    {
+        $this->createProduct();
+
+        $criteria = new SearchCriteria(filters: ['region_set_ids' => [99999]]);
+        $result = $this->repository->search($criteria);
+
+        $this->assertIsArray($result->getData());
+    }
 }

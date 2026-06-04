@@ -4,6 +4,8 @@ namespace App\Services\Subscriptions;
 
 use App\Actions\Subscriptions\CreatePlanAction;
 use App\DTO\Subscriptions\SubscriptionPlanData;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;
@@ -57,6 +59,7 @@ class SubscriptionPlanService
     public function createPlan(array $data, int $siteId): SubscriptionPlan
     {
         return $this->database->transaction(function () use ($data, $siteId) {
+            $data = $this->normaliseAndValidateDeliveryType($data);
             $planDataDto = SubscriptionPlanData::fromArray($data, $siteId);
 
             $plan = $this->createPlanAction->execute($planDataDto->toArray());
@@ -91,11 +94,15 @@ class SubscriptionPlanService
     private function preparePricingData(array $data): array
     {
         $durationMonths = $data['duration_months'] ?? $this->billingPeriodToDurationMonths($data['billing_period']);
+        $deliveryType = SubscriptionDeliveryType::tryFrom((string)($data['delivery_type'] ?? ''));
 
-        return [
+        $pricingData = [
             'price' => $data['price'],
             'currency' => $data['currency'],
             'interval' => $this->billingPeriodToInterval($data['billing_period']),
+            'entitlement_type' => $data['entitlement_type'] === SubscriptionEntitlementType::MIXED->value
+                ? ($data['pricing_entitlement_type'] ?? \App\Enums\Subscriptions\PricingEntitlementType::TIME->value)
+                : null,
             'duration_months' => $durationMonths,
             'issue_count' => $data['issue_count'] ?? 1,
             'is_default' => true,
@@ -104,6 +111,12 @@ class SubscriptionPlanService
             'period_description' => $this->billingPeriodToInterval($data['billing_period']),
             'site_id' => $data['site_id']
         ];
+
+        if ($deliveryType === SubscriptionDeliveryType::DIGITAL) {
+            $pricingData['digital_price'] = $data['digital_price'] ?? $data['price'];
+        }
+
+        return $pricingData;
     }
 
     private function billingPeriodToDurationMonths(string $billingPeriod): int
@@ -148,6 +161,7 @@ class SubscriptionPlanService
             }
         }
 
+        $data = $this->normaliseAndValidateDeliveryType($data, $existingPlan);
         $planDataDto = SubscriptionPlanData::fromArray($data);
         $plan = $this->planRepository->update($planId, $planDataDto->toArray());
 
@@ -157,6 +171,62 @@ class SubscriptionPlanService
         }
 
         return $plan;
+    }
+
+    private function normaliseAndValidateDeliveryType(array $data, ?SubscriptionPlan $existingPlan = null): array
+    {
+        $deliveryType = SubscriptionDeliveryType::tryFrom(
+            (string)($data['delivery_type'] ?? $existingPlan?->delivery_type ?? '')
+        );
+
+        if (!$deliveryType && !array_key_exists('delivery_type', $data)) {
+            $downloadUrlForInference = array_key_exists('digital_download_url', $data)
+                ? trim((string)$data['digital_download_url'])
+                : trim((string)($existingPlan?->digital_download_url ?? ''));
+
+            $printShippingForInference = array_key_exists('print_shipping_required', $data)
+                ? filter_var($data['print_shipping_required'], FILTER_VALIDATE_BOOLEAN)
+                : (bool)($existingPlan?->print_shipping_required ?? false);
+
+            if ($downloadUrlForInference !== '' && $printShippingForInference) {
+                $deliveryType = SubscriptionDeliveryType::PRINT_AND_DIGITAL;
+            } elseif ($downloadUrlForInference !== '') {
+                $deliveryType = SubscriptionDeliveryType::DIGITAL;
+            } elseif ($printShippingForInference) {
+                $deliveryType = SubscriptionDeliveryType::PRINT;
+            } else {
+                return $data;
+            }
+        }
+
+        if (!$deliveryType) {
+            throw new \InvalidArgumentException('A valid delivery type is required');
+        }
+
+        $downloadUrl = array_key_exists('digital_download_url', $data)
+            ? trim((string)$data['digital_download_url'])
+            : trim((string)($existingPlan?->digital_download_url ?? ''));
+
+        $printShippingRequired = array_key_exists('print_shipping_required', $data)
+            ? filter_var($data['print_shipping_required'], FILTER_VALIDATE_BOOLEAN)
+            : (bool)($existingPlan?->print_shipping_required ?? false);
+
+        if ($deliveryType->includesDigital() && $downloadUrl === '') {
+            throw new \InvalidArgumentException('Download URL is required for digital delivery plans');
+        }
+
+        if ($deliveryType === SubscriptionDeliveryType::DIGITAL && $printShippingRequired) {
+            throw new \InvalidArgumentException('Digital delivery plans cannot require print shipping');
+        }
+
+        if ($deliveryType->includesPrint() && !$printShippingRequired) {
+            throw new \InvalidArgumentException('Print delivery plans must require print shipping');
+        }
+
+        $data['delivery_type'] = $deliveryType->value;
+        $data['print_shipping_required'] = $printShippingRequired;
+
+        return $data;
     }
 
     public function deletePlan(int $planId): bool

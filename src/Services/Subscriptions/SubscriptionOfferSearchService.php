@@ -24,6 +24,7 @@ class SubscriptionOfferSearchService
 {
     public function __construct(
         private readonly SubscriptionOfferRepository $repository,
+        private readonly ?SubscriptionEntitlementResolver $entitlementResolver = null,
     ) {}
 
     /**
@@ -201,6 +202,8 @@ class SubscriptionOfferSearchService
             savingAmount:     $this->savingAmount($basePrice, $introPrice),
             savingPercentage: $this->savingPercentage($basePrice, $introPrice),
             pricingLabel:     $tier->label,
+            entitlementType:  $tier->entitlement_type,
+            effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
             introCycles:      $introCycles,
             currency:         $currency,
         );
@@ -237,6 +240,8 @@ class SubscriptionOfferSearchService
                 savingAmount:     $this->savingAmount($basePrice, $discountedPrice),
                 savingPercentage: $this->savingPercentage($basePrice, $discountedPrice),
                 pricingLabel:     $tier->label,
+                entitlementType:  $tier->entitlement_type,
+                effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
                 voucherCode:      $voucher->code,
                 currency:         $currency,
             );
@@ -282,8 +287,21 @@ class SubscriptionOfferSearchService
             savingAmount:     $this->savingAmount($original, $discounted),
             savingPercentage: $this->savingPercentage($original, $discounted),
             pricingLabel:     $tier->label,
+            entitlementType:  $tier->entitlement_type,
+            effectiveEntitlementType: $this->resolveEffectiveEntitlementType($tier),
             currency:         $currency,
         );
+    }
+
+    private function resolveEffectiveEntitlementType(SubscriptionPlanPricing $tier): ?string
+    {
+        if (!$tier->plan) {
+            return $tier->entitlement_type;
+        }
+
+        return ($this->entitlementResolver ?? new SubscriptionEntitlementResolver())
+            ->resolve($tier->plan, $tier)
+            ->value;
     }
 
     private function savingAmount(float $original, float $discounted): float

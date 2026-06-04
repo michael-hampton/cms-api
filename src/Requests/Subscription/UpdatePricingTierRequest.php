@@ -2,6 +2,7 @@
 
 namespace App\Requests\Subscription;
 
+use App\Enums\Subscriptions\PricingEntitlementType;
 use App\Framework\Http\FormRequest;
 
 class UpdatePricingTierRequest extends FormRequest
@@ -9,9 +10,10 @@ class UpdatePricingTierRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'duration_months'    => ['required', 'integer', 'min_number:1'],
-            'issue_count'        => ['required', 'integer', 'min_number:1'],
-            'price'              => ['required', 'numeric', 'min_number:0'],
+            'entitlement_type'   => ['nullable', 'in:' . implode(',', PricingEntitlementType::values())],
+            'duration_months'    => ['nullable', 'integer', 'min_number:1'],
+            'issue_count'        => ['nullable', 'integer', 'min_number:1'],
+            'price'              => ['nullable', 'numeric', 'min_number:0'],
             'sale_price'         => ['nullable', 'numeric', 'min_number:0'],
             'original_price'     => ['nullable', 'numeric', 'min_number:0'],
             'digital_price'      => ['nullable', 'numeric', 'min_number:0'],

@@ -368,73 +368,80 @@ class ImageService
         return $pathInfo['dirname'] . '/thumbs/' . $size . '/' . $pathInfo['basename'];
     }
 
-    private function createThumbnail(string $sourcePath, string $destPath, int $width, int $height): void
+    private function createThumbnail(string $sourcePath, string $destPath, int $maxWidth, int $maxHeight): void
     {
         $sourceInfo = getimagesize($sourcePath);
-        if (!$sourceInfo) {
+
+        if ($sourceInfo === false) {
             throw new Exception('Cannot read source image');
         }
 
         [$sourceWidth, $sourceHeight, $sourceType] = $sourceInfo;
 
-        // Create source image resource
-        switch ($sourceType) {
-            case IMAGETYPE_JPEG:
-                $sourceImage = imagecreatefromjpeg($sourcePath);
-                break;
-            case IMAGETYPE_PNG:
-                $sourceImage = imagecreatefrompng($sourcePath);
-                break;
-            case IMAGETYPE_GIF:
-                $sourceImage = imagecreatefromgif($sourcePath);
-                break;
-            case IMAGETYPE_WEBP:
-                $sourceImage = imagecreatefromwebp($sourcePath);
-                break;
-            default:
-                throw new Exception('Unsupported image type for thumbnail generation');
+        $sourceImage = match ($sourceType) {
+            IMAGETYPE_JPEG => imagecreatefromjpeg($sourcePath),
+            IMAGETYPE_PNG  => imagecreatefrompng($sourcePath),
+            IMAGETYPE_GIF  => imagecreatefromgif($sourcePath),
+            IMAGETYPE_WEBP => imagecreatefromwebp($sourcePath),
+            default => throw new Exception('Unsupported image type for thumbnail generation'),
+        };
+
+        if (!$sourceImage) {
+            throw new Exception('Could not create source image');
         }
 
-        // Calculate dimensions maintaining aspect ratio
-        $aspectRatio = $sourceWidth / $sourceHeight;
-        if ($width / $height > $aspectRatio) {
-            // Explicitly cast or round the resulting float to an integer
-            $width = (int)($height * $aspectRatio);
+        $ratio = min($maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
+
+        $thumbWidth = max(1, (int) round($sourceWidth * $ratio));
+        $thumbHeight = max(1, (int) round($sourceHeight * $ratio));
+
+        $thumbnail = imagecreatetruecolor($thumbWidth, $thumbHeight);
+
+        if (!$thumbnail) {
+            throw new Exception('Could not create thumbnail image');
+        }
+
+        if ($sourceType === IMAGETYPE_JPEG) {
+            $white = imagecolorallocate($thumbnail, 255, 255, 255);
+            imagefilledrectangle($thumbnail, 0, 0, $thumbWidth, $thumbHeight, $white);
         } else {
-            // Explicitly cast or round the resulting float to an integer
-            $height = (int)($width / $aspectRatio); // Fix for line 411
-        }
-
-        // Create thumbnail
-        $thumbnail = imagecreatetruecolor($width, $height);
-
-        // Preserve transparency for PNG and GIF
-        if ($sourceType == IMAGETYPE_PNG || $sourceType == IMAGETYPE_GIF) {
-            imagecolortransparent($thumbnail, imagecolorallocatealpha($thumbnail, 0, 0, 0, 127));
             imagealphablending($thumbnail, false);
             imagesavealpha($thumbnail, true);
+
+            $transparent = imagecolorallocatealpha($thumbnail, 0, 0, 0, 127);
+            imagefilledrectangle($thumbnail, 0, 0, $thumbWidth, $thumbHeight, $transparent);
+
+            imagealphablending($thumbnail, true);
         }
 
-        imagecopyresampled($thumbnail, $sourceImage, 0, 0, 0, 0, $width, $height, $sourceWidth, $sourceHeight);
+        $resampled = imagecopyresampled(
+            $thumbnail,
+            $sourceImage,
+            0,
+            0,
+            0,
+            0,
+            $thumbWidth,
+            $thumbHeight,
+            $sourceWidth,
+            $sourceHeight
+        );
 
-        // Save thumbnail
-        switch ($sourceType) {
-            case IMAGETYPE_JPEG:
-                imagejpeg($thumbnail, $destPath, 85);
-                break;
-            case IMAGETYPE_PNG:
-                imagepng($thumbnail, $destPath);
-                break;
-            case IMAGETYPE_GIF:
-                imagegif($thumbnail, $destPath);
-                break;
-            case IMAGETYPE_WEBP:
-                imagewebp($thumbnail, $destPath, 85);
-                break;
+        if (!$resampled) {
+            throw new Exception('Failed to resize image');
         }
 
-        imagedestroy($sourceImage);
-        imagedestroy($thumbnail);
+        $saved = match ($sourceType) {
+            IMAGETYPE_JPEG => imagejpeg($thumbnail, $destPath, 85),
+            IMAGETYPE_PNG  => imagepng($thumbnail, $destPath),
+            IMAGETYPE_GIF  => imagegif($thumbnail, $destPath),
+            IMAGETYPE_WEBP => imagewebp($thumbnail, $destPath, 85),
+            default => false,
+        };
+
+        if (!$saved) {
+            throw new Exception('Failed to save thumbnail');
+        }
     }
 
     private function deleteThumbnails(Image $image): void

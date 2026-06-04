@@ -156,18 +156,24 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
     {
         $this->addPlanPriceAction->shouldReceive('execute')->never();
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Duration months');
+        $this->expectExceptionMessage('duration_months');
 
         $this->service->createPricingTier(1, $this->validPricingData(['duration_months' => null]));
     }
 
-    public function testCreateRejectsMissingIssueCount(): void
+    public function testCreateAllowsMissingIssueCountForTimeEntitlement(): void
     {
-        $this->addPlanPriceAction->shouldReceive('execute')->never();
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Issue count');
+        $pricing = $this->makePricing(1);
 
-        $this->service->createPricingTier(1, $this->validPricingData(['issue_count' => null]));
+        $this->addPlanPriceAction
+            ->shouldReceive('execute')->once()
+            ->with(1, Mockery::on(fn($d) => array_key_exists('issue_count', $d) && $d['issue_count'] === null))
+            ->andReturn($pricing);
+
+        $this->assertSame(
+            $pricing,
+            $this->service->createPricingTier(1, $this->validPricingData(['issue_count' => null]))
+        );
     }
 
     public function testCreateRejectsMissingPrice(): void
@@ -244,13 +250,19 @@ class SubscriptionPlanPricingServiceTest extends FunctionalTestCase
     // updatePricingTier — structural validation
     // ---------------------------------------------------------------------------
 
-    public function testUpdateRejectsMissingDurationMonths(): void
+    public function testUpdateDelegatesMissingDurationWhenPricingIsNotPreloaded(): void
     {
-        $this->replacePlanPriceAction->shouldReceive('execute')->never();
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Duration months');
+        $pricing = $this->makePricing(1);
 
-        $this->service->updatePricingTier(1, $this->validPricingData(['duration_months' => null]));
+        $this->replacePlanPriceAction
+            ->shouldReceive('execute')->once()
+            ->with(1, Mockery::on(fn($d) => $d['amount_cents'] === 999))
+            ->andReturn($pricing);
+
+        $this->assertSame(
+            $pricing,
+            $this->service->updatePricingTier(1, $this->validPricingData(['duration_months' => null]))
+        );
     }
 
     public function testUpdateRejectsMissingPrice(): void

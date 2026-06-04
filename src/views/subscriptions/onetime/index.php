@@ -1180,7 +1180,7 @@ $selectedTags = !empty($filters['tags'])
                                     <button class="plan-card__btn plan-card__btn--cart"
                                             data-plan-id="<?= $plan->id ?>"
                                             data-pricing-tier-id="<?= $tierId ?>"
-                                            data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
+                                            data-delivery_type="<?= htmlspecialchars($plan->getDeliveryOptions()[0] ?? '') ?>"
                                             title="Add to cart"
                                             onclick="window.shop.cart.addItem('plan', <?= $plan->id ?>, this)">
                                         🛒
@@ -1608,15 +1608,11 @@ $selectedTags = !empty($filters['tags'])
         }
 
         _deliveryPills(plan) {
-            const hasPrint   = plan.print_shipping_required || plan.delivery_type === 'print'   || plan.delivery_type === 'both';
-            const hasDigital = !!plan.digital_download_url  || plan.delivery_type === 'digital' || plan.delivery_type === 'both';
+            const hasPrint   = plan.delivery_type === 'print' || plan.delivery_type === 'print_and_digital';
+            const hasDigital = plan.delivery_type === 'digital' || plan.delivery_type === 'print_and_digital';
             const pills = [];
             if (hasPrint)   pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
             if (hasDigital) pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
-            if (!pills.length) {
-                if (plan.delivery_type === 'print')   pills.push(`<span class="meta-pill meta-pill--print">📰 Print</span>`);
-                if (plan.delivery_type === 'digital') pills.push(`<span class="meta-pill meta-pill--digital">📱 Digital</span>`);
-            }
             return pills.join('');
         }
 

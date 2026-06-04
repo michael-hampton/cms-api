@@ -68,8 +68,8 @@ class SubscriptionUpgradeService
                 'name' => $upgradePlan->name,
                 'price' => $upgradePlan->price,
                 'features' => $upgradePlan->features,
-                'includes_print' => in_array($upgradePlan->delivery_type, [SubscriptionType::PRINTED->value, 'both']),
-                'includes_digital' => true,
+                'includes_print' => $upgradePlan->hasPrintOption(),
+                'includes_digital' => $upgradePlan->hasDigitalOption(),
                 'includes_insider' => $upgradePlan->includes_insider,
             ],
             'pricing' => [

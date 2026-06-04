@@ -7,6 +7,7 @@ use App\DTO\Checkout\EligibilityResult;
 use App\DTO\Checkout\EstimatedDelivery;
 use App\DTO\Subscriptions\SubscriptionPricing;
 use App\Enums\PaymentStatus;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Exceptions\Checkout\CheckoutException;
@@ -161,7 +162,9 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
         $this->setDeliveryEstimateExpectations();
 
         $this->expectException(CheckoutException::class);
-        $this->expectExceptionMessage('All items were invalid and removed from the cart.');
+        $this->expectExceptionMessage(
+            'No eligible subscriptions remain in the cart after validation. Removed: subscription_plan_id=1.'
+        );
 
         $this->service->processCheckout(['one_time_subscription' => true], 1);
     }
@@ -1212,6 +1215,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
 
         $this->subscriptionPlanRepository->shouldReceive('lockForUpdate')
@@ -1251,6 +1255,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->name = 'Test Magazine';
         $plan->shouldReceive('availabilityPolicy')->andReturn($policy);
         $plan->shouldReceive('getNextIssue')->once()->andReturn(null);
@@ -1294,6 +1299,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
         $plan->shouldReceive('getNextIssue')->once()->andReturn($nextIssue);
 
@@ -1337,6 +1343,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
         $plan->shouldReceive('getNextIssue')->once()->andReturn($nextIssue);
 
@@ -1375,25 +1382,29 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
                 ]
             ]);
 
+        $resolvedDiscounts = new ResolvedDiscounts(
+            items: [],
+            baseSubtotalCents: 5000,
+            finalSubtotalCents: 4000,
+            offerDiscountCents: 0,
+            tieredDiscountCents: 0,
+            voucherDiscountCents: 1000,
+            rewardDiscountCents: 0,
+            storeCreditCents: 0,
+            merchantFundedCents: 0,
+            platformFundedCents: 1000,
+            customerCreditCents: 0
+        );
+
         $this->discountResolver->shouldReceive('resolve')
             ->once()
             ->with(Mockery::on(function ($context) {
                 return $context->voucherContext !== null
-                    && $context->voucherContext->voucherData['voucher_code'] === 'SAVE20';
+                    && $context->voucherContext->voucherData['voucher_code'] === 'SAVE20'
+                    && $context->voucherContext->voucherData['voucher_id'] === 22
+                    && $context->voucherContext->voucherData['pricing_tier_id'] === 99;
             }))
-            ->andReturn(new \App\Services\Vouchers\ResolvedDiscounts(
-                items: [],
-                baseSubtotalCents: 5000,
-                finalSubtotalCents: 4000,
-                offerDiscountCents: 0,
-                tieredDiscountCents: 0,
-                voucherDiscountCents: 1000,
-                rewardDiscountCents: 0,
-                storeCreditCents: 0,
-                merchantFundedCents: 0,
-                platformFundedCents: 1000,
-                customerCreditCents: 0
-            ));
+            ->andReturn($resolvedDiscounts);
 
         $order = $this->createMockOrder();
         $subscription = $this->createMockSubscription();
@@ -1406,10 +1417,25 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
             ->once()
+            ->with(
+                Mockery::type('array'),
+                Mockery::subset(['voucher_code' => 'SAVE20', 'voucher_id' => 22]),
+                $member,
+                1,
+                $resolvedDiscounts
+            )
             ->andReturn($subscriptions);
 
         $this->orderDraftService->shouldReceive('createPendingOrder')
             ->once()
+            ->with(
+                $subscriptions,
+                $member,
+                1,
+                Mockery::subset(['voucher_code' => 'SAVE20', 'voucher_id' => 22]),
+                $resolvedDiscounts,
+                false
+            )
             ->andReturn($order);
 
         $this->paymentIntentService->shouldReceive('createForOrder')
@@ -1427,7 +1453,118 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
             )
             ->andReturn(['success' => true]);
 
-        $result = $this->service->processCheckout(['one_time_subscription' => true, 'voucher_code' => 'SAVE20', 'voucher_id' => null], 1);
+        $result = $this->service->processCheckout(['one_time_subscription' => true, 'voucher_code' => 'SAVE20', 'voucher_id' => 22], 1);
+
+        $this->assertTrue($result['success']);
+    }
+
+    public function test_process_checkout_normalises_applied_voucher_payload_before_persisting(): void
+    {
+        $member = $this->createMockMember();
+        $this->setupAuthenticatedMember($member);
+        $this->setDeliveryEstimateExpectations();
+
+        $this->cartService->shouldReceive('getItems')
+            ->once()
+            ->andReturn([
+                [
+                    'subscription_plan_id' => 1,
+                    'price' => 50.00,
+                    'base_price' => 50.00,
+                    'quantity' => 1,
+                    'options' => ['delivery_type' => SubscriptionType::DIGITAL->value],
+                ]
+            ]);
+
+        $resolvedDiscounts = new ResolvedDiscounts(
+            items: [],
+            baseSubtotalCents: 5000,
+            finalSubtotalCents: 3500,
+            offerDiscountCents: 0,
+            tieredDiscountCents: 0,
+            voucherDiscountCents: 1500,
+            rewardDiscountCents: 0,
+            storeCreditCents: 0,
+            merchantFundedCents: 0,
+            platformFundedCents: 1500,
+            customerCreditCents: 0
+        );
+
+        $this->discountResolver->shouldReceive('resolve')
+            ->once()
+            ->with(Mockery::on(function ($context) {
+                return $context->voucherContext !== null
+                    && $context->voucherContext->voucherData['voucher_code'] === 'SAVE30'
+                    && $context->voucherContext->voucherData['voucher_id'] === 303;
+            }))
+            ->andReturn($resolvedDiscounts);
+
+        $this->database->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $order = $this->createMockOrder();
+        $subscription = $this->createMockSubscription();
+        $discountedPricing = new SubscriptionPricing(
+            subtotalCents: 5000,
+            discountCents: 1500,
+            shippingCents: 0,
+            taxCents: 0,
+            totalCents: 3500,
+            deliveryType: SubscriptionType::DIGITAL->value,
+            voucherId: 303,
+            shippingAddressSnapshot: null,
+            originalAmount: 50
+        );
+        $subscriptions = [['subscription' => $subscription, 'pricing' => $discountedPricing]];
+
+        $this->subscriptionBatchFactory->shouldReceive('createPendingSubscriptions')
+            ->once()
+            ->with(
+                Mockery::type('array'),
+                Mockery::subset([
+                    'voucher_code' => 'SAVE30',
+                    'voucher_id' => 303,
+                    'discount_amount' => 15.00,
+                ]),
+                $member,
+                1,
+                $resolvedDiscounts
+            )
+            ->andReturn($subscriptions);
+
+        $this->orderDraftService->shouldReceive('createPendingOrder')
+            ->once()
+            ->with(
+                $subscriptions,
+                $member,
+                1,
+                Mockery::subset([
+                    'voucher_code' => 'SAVE30',
+                    'voucher_id' => 303,
+                    'discount_amount' => 15.00,
+                ]),
+                $resolvedDiscounts,
+                false
+            )
+            ->andReturn($order);
+
+        $paymentResult = ['success' => true, 'payment_intent_id' => 'pi_123'];
+        $this->paymentIntentService->shouldReceive('createForOrder')->once()->andReturn($paymentResult);
+        $this->orderDraftService->shouldReceive('attachPaymentIntent')->once();
+        $this->responseBuilder->shouldReceive('buildCheckoutResponse')
+            ->once()
+            ->with($order, $subscriptions, $paymentResult, false)
+            ->andReturn(['success' => true]);
+
+        $result = $this->service->processCheckout([
+            'one_time_subscription' => true,
+            'applied_voucher_code' => [
+                'code' => 'SAVE30',
+                'voucher_id' => 303,
+                'discount' => 15.00,
+            ],
+        ], 1);
 
         $this->assertTrue($result['success']);
     }
@@ -1530,6 +1667,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
         $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
 
@@ -1735,6 +1873,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
         $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
 
@@ -1819,6 +1958,7 @@ class OneTimeSubscriptionCheckoutServiceTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('availabilityPolicy')->andReturn($planPolicy);
         $plan->shouldReceive('getNextIssue')->andReturn($nextIssue);
 

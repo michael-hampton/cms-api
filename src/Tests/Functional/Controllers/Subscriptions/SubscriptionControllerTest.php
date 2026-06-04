@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\Subscriptions;
 
 use App\Framework\Container;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Models\Payment;
 use App\Models\RegionSet;
 use App\Models\SubscriptionPlan;
@@ -149,6 +150,7 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'is_active' => true,
             'is_featured' => false,
             'sort_order' => 5,
+            'delivery_type' => SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
             'digital_download_url' => 'https://example.com/plan-download',
             'print_shipping_required' => true,
             'includes_insider' => true,
@@ -236,7 +238,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => "Plan {$period}",
             'billing_period' => trim($period),
             'price' => 9.99,
-            'currency' => 'GBP'
+            'currency' => 'GBP',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -337,6 +341,8 @@ class SubscriptionControllerTest extends FunctionalTestCase
                 'billing_period' => 'monthly',
                 'price' => 9.99,
                 'currency' => $currency,
+                'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+                'digital_download_url' => 'https://example.com/download',
             ]);
 
             $this->assertEquals(200, $response->getStatusCode(), "Expected 200 for currency: {$currency}");
@@ -349,7 +355,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => 'Auto Slug Plan',
             'billing_period' => 'monthly',
             'price' => 22,
-            'currency' => 'GBP'
+            'currency' => 'GBP',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());
@@ -369,6 +377,7 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'is_active' => true,
             'digital_download_url' => null,
             'print_shipping_required' => false,
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
             'is_upgrade_option' => false,
             'dispatch_days' => 0,
             'pre_release_enabled' => false,
@@ -377,6 +386,7 @@ class SubscriptionControllerTest extends FunctionalTestCase
 
         $payload = [
             'name' => 'Updated Plan Name',
+            'delivery_type' => SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
             'digital_download_url' => 'https://example.com/updated-download',
             'print_shipping_required' => true,
             'is_upgrade_option' => true,
@@ -484,7 +494,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => 'Ghost Plan',
             'currency' => 'GBP',
             'price' => 22,
-            'billing_period' => 'monthly'
+            'billing_period' => 'monthly',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
         ]);
 
         $this->assertEquals(500, $response->getStatusCode());
@@ -581,6 +593,8 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'billing_period' => 'monthly',
             'price' => 22,
             'currency' => 'GBP',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
             'region_set_ids' => [$regionSet1->id, $regionSet2->id],
         ]);
 
@@ -605,7 +619,9 @@ class SubscriptionControllerTest extends FunctionalTestCase
             'name' => 'Auto Slug Plan',
             'billing_period' => 'monthly',
             'price' => 22,
-            'currency' => 'GBP'
+            'currency' => 'GBP',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
         ]);
 
         $this->assertEquals(200, $response->getStatusCode());

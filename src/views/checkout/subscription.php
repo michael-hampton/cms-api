@@ -200,7 +200,7 @@ $planPrice = (float)$plan->price;
                     <h4>⚠️ Pre-Release Subscription</h4>
                     <p>
                         <strong>Access begins:</strong> <?= $plan->release_date->format('F j, Y') ?><br>
-                        <?php if (!empty($plan->print_shipping_required)): ?>
+                        <?php if ($plan->hasPrintOption()): ?>
                             <strong>First print issue ships:</strong> <?= $plan->release_date->format('F j, Y') ?><br>
                         <?php endif; ?>
                         You will be charged today but access begins on the date above.

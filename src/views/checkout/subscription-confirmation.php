@@ -571,7 +571,7 @@
 
                 $deliveryType = $subscription['delivery_type']
                         ?? $subscription->options['delivery_type']
-                        ?? ($plan->digital_download_url ? 'digital' : 'print');
+                        ?? ($plan->getDeliveryOptions()[0] ?? '');
                 $isDigital = strtolower($deliveryType) === 'digital';
                 ?>
                 <div style="margin-top:1.25rem; display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;">
@@ -685,7 +685,7 @@
         </div>
 
         <!-- 3 · Delivery / access details ────────────────────── -->
-        <?php if ($isDigital && !empty($plan->digital_download_url)): ?>
+        <?php if ($isDigital && $plan->hasDigitalOption() && !empty($plan->digital_download_url)): ?>
             <div class="card" style="border: 2px solid #bfdbfe;">
                 <div class="card-header" style="background:#eff6ff">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)"

@@ -17,7 +17,7 @@ class RelationshipFilter extends FilterSpecification
 
     public function apply($query, mixed $value)
     {
-        if (str_contains($value, ',')) {
+        if (is_string($value) && str_contains($value, ',')) {
             $value = explode(',', $value);
         }
 

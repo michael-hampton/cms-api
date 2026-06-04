@@ -2,6 +2,7 @@
 
 namespace App\Requests\Subscription;
 
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Framework\Http\FormRequest;
 use App\Framework\Support\Str;
 
@@ -14,6 +15,7 @@ class CreateSubscriptionPlanRequest extends FormRequest
             'slug' => ['string', 'max:255'],
             'description' => ['string'],
             'billing_period' => ['required', 'in:weekly,monthly,quarterly,yearly'],
+            'entitlement_type' => ['required', 'in:' . implode(',', SubscriptionEntitlementType::values())],
             'price' => ['required', 'numeric', 'min_number:0'],
             'currency' => ['required', 'string', 'max:3'],
             'duration_months' => ['integer', 'min_number:1'],
@@ -29,6 +31,10 @@ class CreateSubscriptionPlanRequest extends FormRequest
     {
         if (empty($this->data['slug']) && !empty($this->data['name'])) {
             $this->data['slug'] = Str::slug($this->data['name']);
+        }
+
+        if (empty($this->data['entitlement_type'])) {
+            $this->data['entitlement_type'] = SubscriptionEntitlementType::TIME->value;
         }
     }
 }

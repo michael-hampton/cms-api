@@ -2,6 +2,8 @@
 namespace App\Models;
 
 use App\Enums\Subscriptions\IssueDeliveryStatus;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\QueryBuilder;
 use App\Framework\Support\Collection;
@@ -29,6 +31,8 @@ class SubscriptionPlan extends Model
         'stripe_price_id',
         'stripe_product_id',
         'plan_type',
+        'delivery_type',
+        'entitlement_type',
         'digital_download_url',
         'print_shipping_required',
         'includes_insider',
@@ -163,12 +167,44 @@ class SubscriptionPlan extends Model
 
     public function hasDigitalOption(): bool
     {
-        return $this->digital_download_url && strlen($this->digital_download_url) > 0;
+        return $this->getDeliveryType()?->includesDigital() ?? false;
     }
 
     public function hasPrintOption(): bool
     {
-        return $this->print_shipping_required ?? false;
+        return $this->getDeliveryType()?->includesPrint() ?? false;
+    }
+
+    public function getDeliveryType(): ?SubscriptionDeliveryType
+    {
+        $deliveryType = SubscriptionDeliveryType::tryFrom((string)$this->delivery_type);
+
+        if ($deliveryType) {
+            return $deliveryType;
+        }
+
+        $hasDigitalDownload = trim((string)($this->digital_download_url ?? '')) !== '';
+        $requiresPrintShipping = (bool)($this->print_shipping_required ?? false);
+
+        if ($hasDigitalDownload && $requiresPrintShipping) {
+            return SubscriptionDeliveryType::PRINT_AND_DIGITAL;
+        }
+
+        if ($hasDigitalDownload) {
+            return SubscriptionDeliveryType::DIGITAL;
+        }
+
+        if ($requiresPrintShipping) {
+            return SubscriptionDeliveryType::PRINT;
+        }
+
+        return null;
+    }
+
+    public function getEntitlementType(): SubscriptionEntitlementType
+    {
+        return SubscriptionEntitlementType::tryFrom((string)($this->entitlement_type ?? 'time'))
+            ?? SubscriptionEntitlementType::TIME;
     }
 
     public function getLowestEffectivePrice(): array

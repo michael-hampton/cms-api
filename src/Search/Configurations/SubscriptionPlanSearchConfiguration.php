@@ -2,6 +2,7 @@
 
 namespace App\Search\Configurations;
 
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Search\Filters\BooleanFilter;
 use App\Search\Filters\CustomFilter;
 use App\Search\Filters\InFilter;
@@ -22,9 +23,15 @@ class SubscriptionPlanSearchConfiguration extends SearchConfiguration implements
                 // Value can be comma-separated tag IDs
 
                 if (!empty($value) && $value === 'digital') {
-                    $query->whereNotNull('digital_download_url');
+                    $query->whereIn('delivery_type', [
+                        SubscriptionDeliveryType::DIGITAL->value,
+                        SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+                    ]);
                 } else if ($value === 'print') {
-                    $query->where('print_shipping_required', 1);
+                    $query->whereIn('delivery_type', [
+                        SubscriptionDeliveryType::PRINT->value,
+                        SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+                    ]);
                 } else {
                     $query->where('plan_type', $value);
                 }

@@ -10,6 +10,7 @@ use App\Framework\Support\SiteContext;
 use App\Models\Menu;
 use App\Repositories\Cms\BrandRepository;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\RegionSetRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
@@ -41,6 +42,8 @@ class DealsController extends Controller
         private readonly FilterInputSanitiser                $inputSanitiser,
         private readonly WishlistRepository $wishlistRepository,
         private readonly CartRepository     $cartRepository,
+        private readonly RegionSetRepository $regionSetRepository,
+
     ) {
         parent::__construct();
     }
@@ -78,6 +81,12 @@ class DealsController extends Controller
             ->pluck('product_id')
             ->all();
 
+        $regionSets = $this->regionSetRepository->getActiveForSite($siteId);
+        $selectedRegionSlug = $request->get('region', '');
+        $selectedRegionSet = $selectedRegionSlug
+            ? $regionSets->first(fn($r) => $r->slug === $selectedRegionSlug)
+            : null;
+
         return $this->view('deals.index', [
             'categories' => $categories->toArray(),
             'brands' => $brands->toArray(),
@@ -94,6 +103,9 @@ class DealsController extends Controller
             'wishlistProductIds' => $wishlistProductIds,
             'cartCount' => $this->cartRepository->getCountBySessionOrUser($userId, $sessionId),
             'cartProductIds' => $cartProductIds,
+            'regionSets'          => $regionSets->toArray(),
+            'selectedRegionSlug'  => $selectedRegionSlug,
+            'selectedRegionSetId' => $selectedRegionSet?->id,
         ]);
     }
 

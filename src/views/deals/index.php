@@ -306,6 +306,43 @@
                         </label>
                     </div>
 
+                    <?php if (!empty($regionSets)): ?>
+                        <div class="sidebar-section collapsible" data-section="region">
+                            <button type="button" class="section-toggle" onclick="toggleSection('region')">
+                                <h3 class="sidebar-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                    </svg>
+                                    Region
+                                </h3>
+                                <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </button>
+                            <div class="section-content open">
+                                <div class="filter-list" id="region-filter-list">
+                                    <label class="filter-checkbox-label">
+                                        <input type="radio" name="region_set" value="" class="filter-checkbox"
+                                                <?= empty($selectedRegionSlug) ? 'checked' : '' ?>>
+                                        <span class="filter-name">All Regions</span>
+                                    </label>
+                                    <?php foreach ($regionSets as $regionSet): ?>
+                                        <label class="filter-checkbox-label">
+                                            <input type="radio" name="region_set"
+                                                   value="<?= htmlspecialchars($regionSet['slug']) ?>"
+                                                   data-region-id="<?= (int)$regionSet['id'] ?>"
+                                                   class="filter-checkbox"
+                                                    <?= ($selectedRegionSlug === $regionSet['slug']) ? 'checked' : '' ?>>
+                                            <span class="filter-name"><?= htmlspecialchars($regionSet['name']) ?></span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
                     <button class="btn btn-primary btn-block" id="apply-filters">Apply Filters</button>
                     <button class="btn btn-secondary btn-block" id="reset-filters">Reset</button>
 
@@ -395,10 +432,11 @@
     CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
     window.INITIAL_DATA = {
         cartCount: <?= $cartCount ?>,
-        cartProductIds: <?=json_encode($cartProductIds)?>,
+        cartProductIds: <?= json_encode($cartProductIds) ?>,
         wishlistCount: <?= $wishlistCount ?>,
-        wishlistProductIds: <?=json_encode($wishlistProductIds)?>
-    }
+        wishlistProductIds: <?= json_encode($wishlistProductIds) ?>,
+        selectedRegionSetId: <?= json_encode($selectedRegionSetId) ?>,
+    };
 </script>
 
 @js('deals-carousel.js')

@@ -3,6 +3,8 @@
 namespace App\DTO\Subscriptions;
 
 use App\Enums\Subscriptions\BillingPeriod;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Framework\Support\Str;
 
 final class SubscriptionPlanData
@@ -69,6 +71,16 @@ final class SubscriptionPlanData
             $prepared['billing_period'] = $billingPeriod->value;
         }
 
+        if (isset($data['entitlement_type'])) {
+            $entitlementType = SubscriptionEntitlementType::tryFrom($data['entitlement_type']);
+
+            if (!$entitlementType) {
+                throw new \InvalidArgumentException("Invalid entitlement type: {$data['entitlement_type']}");
+            }
+
+            $prepared['entitlement_type'] = $entitlementType->value;
+        }
+
         if (isset($data['trial_days'])) {
             $trialDays = (int)$data['trial_days'];
 
@@ -103,6 +115,16 @@ final class SubscriptionPlanData
 
         if (isset($data['print_shipping_required'])) {
             $prepared['print_shipping_required'] = (bool)$data['print_shipping_required'];
+        }
+
+        if (isset($data['delivery_type'])) {
+            $deliveryType = SubscriptionDeliveryType::tryFrom($data['delivery_type']);
+
+            if (!$deliveryType) {
+                throw new \InvalidArgumentException("Invalid delivery type: {$data['delivery_type']}");
+            }
+
+            $prepared['delivery_type'] = $deliveryType->value;
         }
 
         if (isset($data['includes_insider'])) {
@@ -157,10 +179,6 @@ final class SubscriptionPlanData
             }
         }
 
-        if (isset($data['digital_download_url'])) {
-            $prepared['digital_download_url'] = $data['digital_download_url'];
-        }
-
         return new self($prepared);
     }
 
@@ -179,4 +197,3 @@ final class SubscriptionPlanData
         return $this->attributes;
     }
 }
-

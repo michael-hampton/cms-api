@@ -67,7 +67,7 @@ class SubscriptionConfirmationController extends Controller
         if (MemberAuth::check()) {
             $memberId = (int)MemberAuth::getMember()->id;
             foreach ($subscriptions as $subscription) {
-                if ((int)$subscription['member_id'] !== $memberId && $subscription['gifted_by_member_id'] !== $memberId) {
+                if ((int)$subscription['member_id'] !== $memberId && (int)($subscription['gifted_by_member_id'] ?? 0) !== $memberId) {
                     return $this->redirect('/');
                 }
             }
@@ -76,12 +76,19 @@ class SubscriptionConfirmationController extends Controller
         // The page reveals only what was just purchased and the URL is unguessable.
 
         /* ── 4. Attach resolved plan to each subscription — single query ── */
-        $planIds = array_unique(array_column($subscriptions, 'subscription_plan_id'));
-        $plansById = $this->subscriptionPlanRepository->findMany($planIds)->toArray();
+        $planIds = array_values(array_unique(array_filter(array_map(
+            fn(array $subscription) => (int)($subscription['plan_id'] ?? $subscription['subscription_plan_id'] ?? 0),
+            $subscriptions
+        ))));
+
+        $plansById = [];
+        foreach ($this->subscriptionPlanRepository->findMany($planIds)->all() as $plan) {
+            $plansById[(int)$plan->id] = $plan;
+        }
 
         $subscriptions = array_map(function ($subscription) use ($plansById) {
-            $subscription['resolvedPlan'] = $subscription['plan_id']
-                ?? $plansById[$subscription['plan_id']]
+            $planId = (int)($subscription['plan_id'] ?? $subscription['subscription_plan_id'] ?? 0);
+            $subscription['resolvedPlan'] = $plansById[$planId]
                 ?? null;
             return $subscription;
         }, $subscriptions);
@@ -114,7 +121,7 @@ class SubscriptionConfirmationController extends Controller
             // Contact & delivery
             'customerEmail' => $this->resolveEmail($primary, $order),
             'shippingAddress' => $this->resolveShippingAddress($primary, $order),
-            'paymentMethod' => $order?->payment_method ?? $primary->payment_method ?? null,
+            'paymentMethod' => $order?->payment_method ?? $primary['payment_method'] ?? null,
             'isDigital' => $this->isDigitalDelivery($primary, $plan),
 
             // Financials — order totals preferred; fall back to plan price
@@ -124,8 +131,8 @@ class SubscriptionConfirmationController extends Controller
             'total' => $order?->total ?? $plan->price ?? null,
 
             // Dates
-            'startDate' => $primary->starts_at ?? $primary->start_date ?? now(),
-            'nextBillingDate' => $primary->next_billing_date ?? $primary->renews_at ?? null,
+            'startDate' => $primary['starts_at'] ?? $primary['start_date'] ?? now(),
+            'nextBillingDate' => $primary['next_billing_date'] ?? $primary['renews_at'] ?? null,
 
             // Site
             'siteSlug' => SiteContext::slug(),
@@ -186,7 +193,7 @@ class SubscriptionConfirmationController extends Controller
 
     private function resolveShippingAddress(mixed $subscription, mixed $order): array|object|null
     {
-        return $subscription->shipping_address
+        return $subscription['shipping_address'] ?? null
             ?? $order?->shipping_address
             ?? null;
     }
@@ -197,23 +204,27 @@ class SubscriptionConfirmationController extends Controller
             return MemberAuth::getMember()->email ?? '';
         }
 
+        $member = $subscription['member'] ?? null;
+        $memberEmail = is_array($member)
+            ? ($member['email'] ?? null)
+            : ($member?->email ?? null);
+
         return $order?->user?->email
-            ?? $subscription->member?->email
-            ?? $subscription->email
+            ?? $memberEmail
+            ?? $subscription['email'] ?? null
             ?? '';
     }
 
     private function isDigitalDelivery(mixed $subscription, mixed $plan): bool
     {
-        $deliveryType = $subscription->delivery_type
-            ?? $subscription->options['delivery_type']
+        $deliveryType = $subscription['delivery_type']
+            ?? $subscription['options']['delivery_type']
             ?? null;
 
         if ($deliveryType !== null) {
-            return strtolower($deliveryType) === 'digital';
+            return in_array(strtolower($deliveryType), ['digital', 'print_and_digital'], true);
         }
 
-        // No explicit delivery_type — presence of a download URL implies digital
-        return !empty($plan->digital_download_url);
+        return $plan?->hasDigitalOption() ?? false;
     }
 }

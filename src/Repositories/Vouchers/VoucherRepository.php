@@ -68,8 +68,7 @@ class VoucherRepository extends Repository
 
     public function findByCode(string $code): ?Voucher
     {
-        $query = Voucher::where('code', $code);
-        return $this->applySiteFilter($query)->first();
+       return Voucher::where('code', $code)->first();
     }
 
     public function getActiveVouchers(): Collection

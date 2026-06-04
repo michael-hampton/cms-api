@@ -46,6 +46,7 @@ class OneTimeSubscriptionCheckoutService
 
     public function processCheckout(array $data, int $siteId): array
     {
+        $data = $this->normaliseVoucherData($data);
         $subscriptionItems = $this->getSubscriptionItems();
 
         if (empty($subscriptionItems)) {
@@ -86,10 +87,15 @@ class OneTimeSubscriptionCheckoutService
                         ? array_map(fn($item) => array_merge($item, $giftFields), $subscriptionItems)
                         : $subscriptionItems
                 );
+
+
                 $subscriptionItems = $eligibility->valid;
 
                 if (empty($subscriptionItems)) {
-                    throw new CheckoutException('All items were invalid and removed from the cart.');
+                    throw new CheckoutException(
+                        'No eligible subscriptions remain in the cart after validation. '
+                        . $this->describeRemovedItems($eligibility->removed)
+                    );
                 }
 
                 $baseSubtotalCents = $this->calculateBaseSubtotalCents($subscriptionItems);
@@ -118,7 +124,7 @@ class OneTimeSubscriptionCheckoutService
                     siteId: $siteId,
                     voucherContext: !empty($data['voucher_code']) ? new VoucherContext([
                         'voucher_code' => $data['voucher_code'],
-                        'voucher_id' => $data['voucher_id'],
+                        'voucher_id' => $data['voucher_id'] ?? null,
                         'applies_to' => 'subscription_first_cycle',
                         'subscription_plan_id' => $subscriptionItems[0]['subscription_plan_id'] ?? null,
                         'pricing_tier_id' => $subscriptionItems[0]['options']['pricing_tier_id'] ?? null,
@@ -230,6 +236,55 @@ class OneTimeSubscriptionCheckoutService
     // Private helpers
     // =========================================================================
 
+    private function normaliseVoucherData(array $data): array
+    {
+        if (!empty($data['voucher_code'])) {
+            return $data;
+        }
+
+        $voucher = $data['applied_voucher_code']
+            ?? $data['applied_voucher']
+            ?? null;
+
+        if (!is_array($voucher) || empty($voucher['code'])) {
+            return $data;
+        }
+
+        $data['voucher_code'] = $voucher['code'];
+        $data['voucher_id'] = $voucher['voucher_id'] ?? null;
+
+        if (isset($voucher['discount']) && !isset($data['discount_amount'])) {
+            $data['discount_amount'] = $voucher['discount'];
+        }
+
+        return $data;
+    }
+
+    private function describeRemovedItems(array $removedItems): string
+    {
+        if (empty($removedItems)) {
+            return 'No removal details were provided.';
+        }
+
+        $descriptions = array_map(function ($item) {
+            if (!is_array($item)) {
+                return (string)$item;
+            }
+
+            $label = $item['plan_name']
+                ?? $item['name']
+                ?? (!empty($item['subscription_plan_id'])
+                    ? 'subscription_plan_id=' . $item['subscription_plan_id']
+                    : 'unknown subscription');
+
+            $reason = $item['reason'] ?? $item['message'] ?? $item['error'] ?? null;
+
+            return $reason ? "{$label} ({$reason})" : $label;
+        }, $removedItems);
+
+        return 'Removed: ' . implode(', ', $descriptions) . '.';
+    }
+
     private function getSubscriptionItems(): array
     {
         return array_values(array_filter(
@@ -265,7 +320,7 @@ class OneTimeSubscriptionCheckoutService
             $isPreorder = false;
             $nextIssue = null;
 
-            if ($plan->print_shipping_required) {
+            if ($plan->hasPrintOption()) {
                 $nextIssue = $plan->getNextIssue();
 
                 if (!$nextIssue) {
@@ -341,7 +396,7 @@ class OneTimeSubscriptionCheckoutService
             if (($item['options']['type'] ?? '') === CartItemType::FREE_GIFT->value) {
                 continue;
             }
-            $priceCents = (int)round(($item['base_price'] ?? $item['price']) * 100);
+            $priceCents = (int)round(($item['base_price'] ?? $item['price'] ?? 0) * 100);
             $quantity = $item['quantity'] ?? 1;
             $totalCents += $priceCents * $quantity;
         }

@@ -156,6 +156,19 @@ class DealsRepository
             $query->whereHas('activeVouchers');
         }
 
+        if (!empty($filters['region_set_ids'])) {
+            $regionSetIds = is_array($filters['region_set_ids'])
+                ? $filters['region_set_ids']
+                : explode(',', $filters['region_set_ids']);
+            $regionSetIds = array_filter(array_map('intval', $regionSetIds));
+
+            if (!empty($regionSetIds)) {
+                $query->whereHas('regionSets', function ($q) use ($regionSetIds) {
+                    $q->whereIn('region_sets.id', $regionSetIds);
+                });
+            }
+        }
+
         // Apply sorting
         $validSortFields = ['created_at', 'price', 'sale_price', 'title', 'name'];
         $sortBy = in_array($sortBy, $validSortFields) ? $sortBy : 'created_at';

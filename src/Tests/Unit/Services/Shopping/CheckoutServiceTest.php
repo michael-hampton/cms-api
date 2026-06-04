@@ -561,7 +561,7 @@ class CheckoutServiceTest extends FunctionalTestCase
         $result = $this->service->processCheckout($data, $siteId);
 
         $this->assertFalse($result['success']);
-        $this->assertEquals('Payment processor error', $result['message']);
+        $this->assertEquals('Payment failed', $result['message']);
     }
 
     public function test_it_uses_database_transaction_for_checkout(): void

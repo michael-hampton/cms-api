@@ -4,10 +4,13 @@ namespace App\Services\Subscriptions;
 
 use App\Actions\Subscriptions\AddPlanPriceAction;
 use App\Actions\Subscriptions\ReplacePlanPriceAction;
+use App\Enums\Subscriptions\SubscriptionEntitlementType;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
+use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 
 class SubscriptionPlanPricingService
 {
@@ -16,6 +19,8 @@ class SubscriptionPlanPricingService
         private readonly Database               $database,
         private readonly AddPlanPriceAction     $addPlanPriceAction,
         private readonly ReplacePlanPriceAction $replacePlanPriceAction,
+        private readonly ?SubscriptionPlanRepository $planRepository = null,
+        private readonly ?SubscriptionEntitlementResolver $entitlementResolver = null,
     )
     {
     }
@@ -41,9 +46,13 @@ class SubscriptionPlanPricingService
      */
     public function createPricingTier(int $planId, array $data): SubscriptionPlanPricing
     {
-        $this->validatePricingData($data);
+        $plan = $this->resolvePlanForValidation($planId);
+        $data = $this->normalisePricingDataForEntitlement($plan, $data);
+        $this->validatePricingData($data, $plan);
 
-        $data['amount_cents'] = $this->toAmountCents($data['price']);
+        $data['amount_cents'] = $this->toAmountCents(
+            $this->resolveStripeBillingAmount($plan, $data)
+        );
 
         return $this->addPlanPriceAction->execute($planId, $data);
     }
@@ -62,9 +71,41 @@ class SubscriptionPlanPricingService
      */
     public function updatePricingTier(int $pricingId, array $data): SubscriptionPlanPricing
     {
-        $this->validatePricingData($data);
+        try {
+            $currentPricing = $this->pricingRepository->find($pricingId);
+        } catch (\Throwable) {
+            $currentPricing = null;
+        }
 
-        $data['amount_cents'] = $this->toAmountCents($data['price']);
+        if (!$currentPricing && $this->planRepository !== null) {
+            throw new \RuntimeException("PlanPricing {$pricingId} not found.");
+        }
+
+        if ($currentPricing) {
+            $plan = $this->resolvePlanForValidation((int)$currentPricing->plan_id);
+            $data = array_merge([
+                'entitlement_type' => $currentPricing->entitlement_type,
+                'duration_months' => $currentPricing->duration_months,
+                'issue_count' => $currentPricing->issue_count,
+                'price' => $currentPricing->price,
+                'sale_price' => $currentPricing->sale_price,
+                'digital_price' => $currentPricing->digital_price,
+                'digital_sale_price' => $currentPricing->digital_sale_price,
+                'currency' => $currentPricing->currency,
+                'trial_days' => $currentPricing->trial_days,
+                'intro_price' => $currentPricing->intro_price,
+                'intro_cycles' => $currentPricing->intro_cycles,
+            ], $data);
+            $data = $this->normalisePricingDataForEntitlement($plan, $data);
+        } else {
+            $plan = $this->resolvePlanForValidation((int)($data['plan_id'] ?? 0));
+        }
+
+        $this->validatePricingData($data, $plan);
+
+        $data['amount_cents'] = $this->toAmountCents(
+            $this->resolveStripeBillingAmount($plan, $data)
+        );
 
         return $this->replacePlanPriceAction->execute($pricingId, $data);
     }
@@ -81,19 +122,30 @@ class SubscriptionPlanPricingService
         return (int)round((float)$price * 100);
     }
 
-    private function validatePricingData(array $data): void
+    private function validatePricingData(array $data, SubscriptionPlan $plan): void
     {
-        if (!isset($data['duration_months']) || !is_numeric($data['duration_months'])) {
-            throw new \InvalidArgumentException('Duration months is required and must be numeric');
-        }
-        if (!isset($data['issue_count']) || !is_numeric($data['issue_count'])) {
-            throw new \InvalidArgumentException('Issue count is required and must be numeric');
-        }
-        if (!isset($data['price']) || !is_numeric($data['price'])) {
-            throw new \InvalidArgumentException('Price is required and must be numeric');
-        }
+        $this->validateBasePricingData($data, $plan);
+    }
+
+    private function validateBasePricingData(array $data, SubscriptionPlan $plan): void
+    {
         if (empty($data['currency'])) {
             throw new \InvalidArgumentException('currency is required');
+        }
+
+        if ($plan->hasPrintOption() || !$plan->hasDigitalOption()) {
+            if (!isset($data['price']) || !is_numeric($data['price'])) {
+                throw new \InvalidArgumentException('Price is required and must be numeric');
+            }
+        }
+
+        if ($plan->hasDigitalOption() && !$plan->hasPrintOption()) {
+            $hasDigitalPrice = isset($data['digital_price']) && is_numeric($data['digital_price']);
+            $hasDigitalSalePrice = isset($data['digital_sale_price']) && is_numeric($data['digital_sale_price']);
+
+            if (!$hasDigitalPrice && !$hasDigitalSalePrice) {
+                throw new \InvalidArgumentException('digital_price is required and must be numeric for digital delivery plans');
+            }
         }
 
         // Intro pricing cross-field rules
@@ -106,7 +158,7 @@ class SubscriptionPlanPricingService
                 throw new \InvalidArgumentException('intro_price must be numeric');
             }
 
-            if ((float) $introPrice >= (float) $data['price']) {
+            if ((float) $introPrice >= $this->resolveStripeBillingAmount($plan, $data)) {
                 throw new \InvalidArgumentException(
                     'intro_price must be less than the standard price'
                 );
@@ -131,6 +183,65 @@ class SubscriptionPlanPricingService
                 throw new \InvalidArgumentException('trial_days must be between 1 and 365');
             }
         }
+    }
+
+    private function normalisePricingDataForEntitlement(SubscriptionPlan $plan, array $data): array
+    {
+        $pricing = new SubscriptionPlanPricing();
+        $pricing->entitlement_type = $data['entitlement_type'] ?? null;
+
+        $effectiveType = ($this->entitlementResolver ?? new SubscriptionEntitlementResolver())
+            ->resolve($plan, $pricing);
+
+        if ($plan->getEntitlementType() !== SubscriptionEntitlementType::MIXED) {
+            $data['entitlement_type'] = null;
+        }
+
+        if ($effectiveType === SubscriptionEntitlementType::TIME) {
+            if (!isset($data['duration_months']) || !is_numeric($data['duration_months']) || (int)$data['duration_months'] < 1) {
+                throw new \InvalidArgumentException('duration_months is required and must be greater than zero for time entitlements.');
+            }
+
+            $data['issue_count'] = null;
+            return $data;
+        }
+
+        if (!isset($data['issue_count']) || !is_numeric($data['issue_count']) || (int)$data['issue_count'] < 1) {
+            throw new \InvalidArgumentException('issue_count is required and must be greater than zero for issue entitlements.');
+        }
+
+        $data['duration_months'] = null;
+        return $data;
+    }
+
+    private function resolvePlanForValidation(int $planId): SubscriptionPlan
+    {
+        $plan = $this->planRepository?->find($planId) ?? SubscriptionPlan::find($planId);
+
+        if ($plan) {
+            return $plan;
+        }
+
+        $plan = new SubscriptionPlan();
+        $plan->entitlement_type = SubscriptionEntitlementType::TIME->value;
+
+        return $plan;
+    }
+
+    private function resolveStripeBillingAmount(SubscriptionPlan $plan, array $data): float
+    {
+        $pricing = new SubscriptionPlanPricing();
+
+        foreach ([
+            'price',
+            'sale_price',
+            'digital_price',
+            'digital_sale_price',
+        ] as $field) {
+            $pricing->{$field} = $data[$field] ?? null;
+        }
+
+        return $pricing->getStripeBillingPriceForPlan($plan);
     }
 
     public function setAsDefault(int $pricingId): bool

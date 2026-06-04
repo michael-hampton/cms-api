@@ -3,6 +3,7 @@
 namespace App\Services\Shopping;
 
 use App\Enums\Subscriptions\SubscriptionSortOption;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
 use App\Models\Member;
@@ -112,12 +113,17 @@ class SubscriptionCatalogService
     private function applyDeliveryTypeFilter($query, string $deliveryType): mixed
     {
         if ($deliveryType === SubscriptionType::DIGITAL->value) {
-            return $query->whereNotNull('digital_download_url')
-                ->where('digital_download_url', '!=', '');
+            return $query->whereIn('delivery_type', [
+                SubscriptionDeliveryType::DIGITAL->value,
+                SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+            ]);
         }
 
         if ($deliveryType === SubscriptionType::PRINTED->value) {
-            return $query->where('print_shipping_required', true);
+            return $query->whereIn('delivery_type', [
+                SubscriptionDeliveryType::PRINT->value,
+                SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+            ]);
         }
 
         return $query;

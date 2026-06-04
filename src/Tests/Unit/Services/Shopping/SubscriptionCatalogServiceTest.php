@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Shopping;
 
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionSortOption;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
@@ -91,14 +92,12 @@ class SubscriptionCatalogServiceTest extends MockeryTestCase
 
         $this->repository->shouldReceive('buildCatalogQuery')->andReturn($this->queryMock);
 
-        $this->queryMock->shouldReceive('whereNotNull')
+        $this->queryMock->shouldReceive('whereIn')
             ->once()
-            ->with('digital_download_url')
-            ->andReturnSelf();
-
-        $this->queryMock->shouldReceive('where')
-            ->once()
-            ->with('digital_download_url', '!=', '')
+            ->with('delivery_type', [
+                SubscriptionDeliveryType::DIGITAL->value,
+                SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+            ])
             ->andReturnSelf();
 
         $this->queryMock->shouldReceive('orderBy')->andReturnSelf();

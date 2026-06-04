@@ -3,6 +3,7 @@
 namespace App\Resources;
 
 use App\Framework\Resource\JsonResource;
+use App\Services\Subscriptions\SubscriptionEntitlementResolver;
 
 class SubscriptionPlanPricingResource extends JsonResource
 {
@@ -12,6 +13,8 @@ class SubscriptionPlanPricingResource extends JsonResource
             'id' => $this->getAttribute('id'),
             'plan_id' => $this->getAttribute('plan_id'),
             'site_id' => $this->getAttribute('site_id'),
+            'entitlement_type' => $this->getAttribute('entitlement_type'),
+            'effective_entitlement_type' => $this->getEffectiveEntitlementType(),
             'duration_months' => $this->getAttribute('duration_months'),
             'issue_count' => $this->getAttribute('issue_count'),
             'price' => $this->getAttribute('price'),
@@ -32,5 +35,27 @@ class SubscriptionPlanPricingResource extends JsonResource
             'intro_cycles'          => $this->getAttribute('intro_cycles'),
             'stripe_intro_price_id' => $this->getAttribute('stripe_intro_price_id'),
         ];
+    }
+
+    private function getEffectiveEntitlementType(): ?string
+    {
+        if (
+            !is_object($this->resource)
+            || !method_exists($this->resource, 'plan')
+        ) {
+            return $this->getAttribute('entitlement_type');
+        }
+
+        $plan = $this->resource->relationLoaded('plan')
+            ? $this->resource->plan
+            : $this->resource->plan()->first();
+
+        if (!$plan) {
+            return $this->getAttribute('entitlement_type');
+        }
+
+        return (new SubscriptionEntitlementResolver())
+            ->resolve($plan, $this->resource)
+            ->value;
     }
 }

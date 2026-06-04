@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Shopping;
 
 use App\Enums\CartItemType;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Database\Database;
 use App\Models\CartItem;
@@ -1669,6 +1670,7 @@ class CartServiceTest extends FunctionalTestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);
@@ -1696,6 +1698,7 @@ class CartServiceTest extends FunctionalTestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(false);
@@ -1726,6 +1729,7 @@ class CartServiceTest extends FunctionalTestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);
@@ -1757,6 +1761,7 @@ class CartServiceTest extends FunctionalTestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $policy = Mockery::mock(AvailabilityPolicyInterface::class);
         $policy->shouldReceive('canPurchase')->andReturn(true);

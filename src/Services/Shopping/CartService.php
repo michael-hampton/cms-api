@@ -173,7 +173,7 @@ class CartService
                     return ['success' => false, 'message' => 'Subscription is no longer available for purchase'];
                 }
 
-                if ($plan->print_shipping_required) {
+                if ($plan->hasPrintOption()) {
                     $nextIssue = $plan->getNextIssue();
 
                     if ($nextIssue) {

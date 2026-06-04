@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Actions\Subscriptions\CreatePlanAction;
 use App\DTO\Vouchers\VoucherValidationResult;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Exceptions\Subscriptions\AlreadySubscribedException;
 use App\Exceptions\Subscriptions\PlanHasActiveSubscriptionsException;
 use App\Exceptions\Subscriptions\PlanNotFoundException;
@@ -135,6 +136,50 @@ class SubscriptionPlanServiceTest extends FunctionalTestCase
             'currency' => 'usd',
             'billing_period' => 'monthly',
             'is_active' => '1',
+        ], 1);
+
+        $this->assertSame($plan, $result);
+    }
+
+    public function testCreateDigitalPlanMapsPlanPriceToDigitalPricingTier(): void
+    {
+        $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
+        $plan->id = 1;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) {
+                return $callback();
+            });
+
+        $this->createPlanAction
+            ->shouldReceive('execute')
+            ->once()
+            ->with(Mockery::on(function ($prepared) {
+                return $prepared['delivery_type'] === SubscriptionDeliveryType::DIGITAL->value
+                    && $prepared['digital_download_url'] === 'https://example.com/download'
+                    && $prepared['print_shipping_required'] === false;
+            }))
+            ->andReturn($plan);
+
+        $this->pricingService
+            ->shouldReceive('createPricingTier')
+            ->once()
+            ->with(1, Mockery::on(function ($d) {
+                return $d['price'] === 22
+                    && $d['digital_price'] === 22
+                    && $d['currency'] === 'USD';
+            }));
+
+        $result = $this->service->createPlan([
+            'name' => 'Digital Plan',
+            'price' => 22,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'delivery_type' => SubscriptionDeliveryType::DIGITAL->value,
+            'digital_download_url' => 'https://example.com/download',
+            'print_shipping_required' => false,
         ], 1);
 
         $this->assertSame($plan, $result);

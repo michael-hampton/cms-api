@@ -14,6 +14,7 @@ use App\Models\ProductImpression;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Cms\BrandRepository;
 use App\Repositories\Cms\CategoryRepository;
+use App\Repositories\Cms\RegionSetRepository;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductSpecificationGroupRepository;
 use App\Repositories\Product\ProductViewRepository;
@@ -46,6 +47,7 @@ class ProductListController extends Controller
         private readonly FilterInputSanitiser                $inputSanitiser,
         private readonly WishlistRepository $wishlistRepository,
         private readonly CartRepository     $cartRepository,
+        private readonly RegionSetRepository $regionSetRepository,
     )
     {
         parent::__construct();
@@ -60,16 +62,17 @@ class ProductListController extends Controller
         $categories = $this->categoryRepository->getAllWithProductCounts($siteId);
         $brands = $this->brandRepository->getAllWithProductCounts($siteId);
         $specificationGroups = $this->specRepository->getAllWithCounts($siteId);
+        $regionSets = $this->regionSetRepository->getActiveForSite($siteId);
+
+        $selectedRegionSlug = $request->get('region', '');
+        $selectedRegionSet = $selectedRegionSlug
+            ? $regionSets->first(fn($r) => $r->slug === $selectedRegionSlug)
+            : null;
 
         $menu = $this->resolveHeaderMenu($siteId);
-
         $currencyCode = $this->currencyResolver->resolveUpperCase();
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
 
-        // Resolve cart and wishlist state once on the server so the page
-        // doesn't need extra API calls just to seed the initial badge counts
-        // and button active-states.  The view renders these into INITIAL_DATA
-        // which products.js picks up via seedInitialState().
         $wishlistProductIds = $this->wishlistRepository
             ->getProductIdsBySessionOrUser($userId, $sessionId);
 
@@ -79,18 +82,20 @@ class ProductListController extends Controller
             ->all();
 
         return $this->view('products.index', [
-            'categories' => $categories->toArray(),
-            'brands' => $brands->toArray(),
-            'menu' => $menu,
-            'menuRenderer' => new MenuRenderer(),
+            'categories'          => $categories->toArray(),
+            'brands'              => $brands->toArray(),
+            'menu'                => $menu,
+            'menuRenderer'        => new MenuRenderer(),
             'specificationGroups' => $specificationGroups->toArray(),
-            'currencyCode' => $currencyCode,
-            'currencySymbol' => $currencySymbol,
-            // Passed to the view for INITIAL_DATA injection
-            'wishlistCount' => count($wishlistProductIds),
-            'wishlistProductIds' => $wishlistProductIds,
-            'cartCount' => $this->cartRepository->getCountBySessionOrUser($userId, $sessionId),
-            'cartProductIds' => $cartProductIds,
+            'currencyCode'        => $currencyCode,
+            'currencySymbol'      => $currencySymbol,
+            'regionSets'          => $regionSets->toArray(),
+            'selectedRegionSlug'  => $selectedRegionSlug,
+            'selectedRegionSetId' => $selectedRegionSet?->id,
+            'wishlistCount'       => count($wishlistProductIds),
+            'wishlistProductIds'  => $wishlistProductIds,
+            'cartCount'           => $this->cartRepository->getCountBySessionOrUser($userId, $sessionId),
+            'cartProductIds'      => $cartProductIds,
         ]);
     }
 
@@ -99,13 +104,14 @@ class ProductListController extends Controller
         $input = $this->inputSanitiser->sanitise($request->all());
 
         $filters = array_filter([
-            'categories' => $input['category_ids'],
-            'brands' => $input['brand_ids'],
+            'categories'    => $input['category_ids'],
+            'brands'        => $input['brand_ids'],
             'specifications' => $input['spec_ids'],
-            'on_sale' => $input['on_sale'] ?: null,
-            'min_rating' => $input['min_rating'],
-            'min_discount' => $input['min_discount'],
-            'has_voucher' => $input['has_voucher'] ?: null,
+            'on_sale'       => $input['on_sale'] ?: null,
+            'min_rating'    => $input['min_rating'],
+            'min_discount'  => $input['min_discount'],
+            'has_voucher'   => $input['has_voucher'] ?: null,
+            'region_set_ids' => $input['region_set_ids'] ?: null,
         ], static fn($value) => $value !== null && $value !== [] && $value !== '');
 
         $criteria = new SearchCriteria(

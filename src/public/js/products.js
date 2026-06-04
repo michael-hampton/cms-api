@@ -74,6 +74,7 @@ class ProductStateManager {
                 minRating: null,
                 minDiscount: null,
                 hasVoucher: false,
+                regionSetIds: [],
             },
             activeSuggestedFilters: new Set(),
             lastSuggestions: [],
@@ -110,6 +111,9 @@ class ProductStateManager {
         if (Array.isArray(d.wishlistProductIds)) {
             this.state.wishlistProductIds = new Set(d.wishlistProductIds.map(Number));
         }
+        if (d.selectedRegionSetId) {
+            this.state.filters.regionSetIds = [d.selectedRegionSetId];
+        }
         this.notify('initial_seeded');
     }
 
@@ -131,6 +135,9 @@ class ProductStateManager {
         this.state.filters.minRating = params.get('min_rating') ? parseInt(params.get('min_rating')) : null;
         this.state.filters.minDiscount = params.get('min_discount') ? parseInt(params.get('min_discount')) : null;
         this.state.filters.hasVoucher = params.get('has_voucher') === '1';
+        this.state.filters.regionSetIds = params.get('region_set_ids')
+            ? params.get('region_set_ids').split(',').map(Number)
+            : [];
 
         this.notify('url_loaded');
     }
@@ -155,6 +162,9 @@ class ProductStateManager {
         if (this.state.filters.minRating) params.set('min_rating', this.state.filters.minRating);
         if (this.state.filters.minDiscount) params.set('min_discount', this.state.filters.minDiscount);
         if (this.state.filters.hasVoucher) params.set('has_voucher', '1');
+        if (this.state.filters.regionSetIds.length) {
+            params.set('region_set_ids', this.state.filters.regionSetIds.join(','));
+        }
 
         const newURL = `${window.location.pathname}${params.toString() ? '?' + params.toString() : ''}`;
         window.history.pushState({}, '', newURL);
@@ -171,7 +181,8 @@ class ProductStateManager {
             onSale: false,
             minRating: null,
             minDiscount: null,
-            hasVoucher: false
+            hasVoucher: false,
+            regionSetIds: [],
         };
         this.state.activeSuggestedFilters.clear();
         this.state.lastSuggestions = [];
@@ -194,6 +205,7 @@ class ProductApiService {
             min_price: state.filters.minPrice,
             max_price: state.filters.maxPrice,
             on_sale: state.filters.onSale ? '1' : '',
+            region_set_ids: state.filters.regionSetIds.join(','),
         });
 
         if (state.filters.minRating) params.set('min_rating', state.filters.minRating);
@@ -946,6 +958,9 @@ class FilterControlsUI {
             this.app.stateManager.updateURL();
             this.app.fetchAndRender();
         });
+
+        document.querySelectorAll('input[name="region_set"]')
+            .forEach(el => el.addEventListener('change', triggerDebouncedUpdate));
     }
 
     syncFormInputsToState() {
@@ -962,6 +977,11 @@ class FilterControlsUI {
         state.filters.maxPrice = this.inputs.maxPriceInput ? this.inputs.maxPriceInput.value : '';
         state.filters.onSale = this.inputs.onSaleFilter ? this.inputs.onSaleFilter.checked : false;
         state.currentPage = 1;
+
+        const selectedRegion = document.querySelector('input[name="region_set"]:checked');
+        state.filters.regionSetIds = selectedRegion?.value
+            ? [parseInt(selectedRegion.dataset.regionId)]
+            : [];
     }
 
     syncStateToFormUI(state) {
@@ -986,6 +1006,13 @@ class FilterControlsUI {
         if (resetBtn && this.inputs.searchInput) {
             resetBtn.style.display = this.inputs.searchInput.value.trim() ? 'block' : 'none';
         }
+
+        const regionSetId = state.filters.regionSetIds[0] ?? null;
+        document.querySelectorAll('input[name="region_set"]').forEach(radio => {
+            radio.checked = regionSetId
+                ? parseInt(radio.dataset.regionId) === regionSetId
+                : radio.value === '';
+        });
     }
 
     executeManualSearch() {

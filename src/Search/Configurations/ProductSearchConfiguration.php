@@ -4,6 +4,7 @@ namespace App\Search\Configurations;
 
 use App\Search\Filters\CustomFilter;
 use App\Search\Filters\InFilter;
+use App\Search\Filters\RelationshipFilter;
 use App\Search\HasSite;
 use App\Search\SearchConfiguration;
 use App\Search\SortSpecification;
@@ -17,6 +18,7 @@ class ProductSearchConfiguration extends SearchConfiguration implements SearchCo
         // Filters
         $this->addFilter(new InFilter('categories', 'category_id'))
             ->addFilter(new InFilter('brands', 'brand_id'))
+            ->addFilter(new RelationshipFilter('region_set_ids', 'regionSets', 'id'))
             ->addFilter(new CustomFilter('specifications', function ($query, $value) {
                 return $query->whereHas('specifications', function ($q) use ($value) {
                     // Check if values are numeric (IDs) or strings (names)

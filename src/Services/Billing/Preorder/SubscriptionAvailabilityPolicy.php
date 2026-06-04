@@ -21,7 +21,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
                 return false;
             }
 
-            if (!$this->plan->print_shipping_required) {
+            if (!$this->plan->hasPrintOption()) {
                 return true;
             }
 
@@ -30,7 +30,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
         }
 
         // Digital
-        if (!$this->plan->print_shipping_required) {
+        if (!$this->plan->hasPrintOption()) {
             return true;
         }
 
@@ -54,7 +54,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
 
     public function isPreOrder(): bool
     {
-        if (!$this->plan->print_shipping_required) {
+        if (!$this->plan->hasPrintOption()) {
             return false;
         }
 
@@ -74,7 +74,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
             && $this->plan->release_date > now_datetime()
             && $this->plan->pre_release_enabled;
 
-        if (!$this->plan->print_shipping_required) {
+        if (!$this->plan->hasPrintOption()) {
             // Digital: only check plan release
             return $planIsPreRelease;
         }
@@ -106,7 +106,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
             return "Available from {$date}";
         }
 
-        if (!$this->plan->print_shipping_required) {
+        if (!$this->plan->hasPrintOption()) {
             // Digital subscription - plan is released
             return 'Available Now';
         }
@@ -123,7 +123,7 @@ class SubscriptionAvailabilityPolicy implements AvailabilityPolicyInterface
 
     public function getExpectedShipDate(): ?\DateTime
     {
-        if (!$this->plan->print_shipping_required) {
+        if (!$this->plan->hasPrintOption()) {
             return null;
         }
 

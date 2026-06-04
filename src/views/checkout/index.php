@@ -585,7 +585,7 @@ $apiBase = '/api/' . $site;
     let isLoggedIn = false;
     let currentMember = null;
     let selectedAddressId = null;
-    let appliedVoucher = <?= json_encode($appliedVoucher) ?>;
+    window.appliedVoucher = <?= json_encode($appliedVoucher) ?>;
     const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
     const SITE = <?= json_encode($site) ?>;
 
@@ -1040,10 +1040,11 @@ $apiBase = '/api/' . $site;
                 throw new Error('Please fill in all required fields.');
             }
 
-            if (includeVoucher && appliedVoucher) {
-                data.voucher_code = appliedVoucher.code;
-                data.voucher_id = appliedVoucher.voucher_id;
-                data.discount_amount = appliedVoucher.discount;
+            const voucher = window.appliedVoucher || null;
+            if (includeVoucher && voucher) {
+                data.voucher_code = voucher.code;
+                data.voucher_id = voucher.voucher_id;
+                data.discount_amount = voucher.discount;
             }
 
             data.multi_merchant = true;
@@ -1153,7 +1154,7 @@ $apiBase = '/api/' . $site;
 
             try {
                 await this.cartFlow.replaceCart(oneTimeItems);
-                await this.handleOneTimeFlow(this.buildPayload({includeVoucher: false}));
+                await this.handleOneTimeFlow(this.buildPayload());
             } catch (error) {
                 this.storePendingOneTimeState(oneTimeItems);
                 await this.cartFlow.replaceCart(oneTimeItems);
@@ -1264,8 +1265,7 @@ $apiBase = '/api/' . $site;
         });
     })();
 
-    if (appliedVoucher) {
-        window.appliedVoucher = appliedVoucher;
+    if (window.appliedVoucher) {
         displayAppliedVoucher();
     }
 

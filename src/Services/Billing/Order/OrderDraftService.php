@@ -105,6 +105,16 @@ class OrderDraftService
         // Tax is not included in individual pricing->totalCents; add it once here.
         $totalCents += $totalTaxCents;
 
+        $voucherDiscountCents = $resolvedDiscounts ? $resolvedDiscounts->voucherDiscountCents : 0;
+        if ($voucherDiscountCents <= 0 && !empty($checkoutData['voucher_code']) && isset($checkoutData['discount_amount'])) {
+            $voucherDiscountCents = (int)round((float)$checkoutData['discount_amount'] * 100);
+        }
+
+        $platformFundedCents = $resolvedDiscounts ? $resolvedDiscounts->platformFundedCents : 0;
+        if ($platformFundedCents <= 0 && $voucherDiscountCents > 0) {
+            $platformFundedCents = $voucherDiscountCents;
+        }
+
         $orderData = [
             'user_id'          => $member->id,
             'status'           => 'pending',
@@ -116,12 +126,13 @@ class OrderDraftService
             'discount'         => $totalDiscountCents / 100,
             'total'            => $totalCents / 100,
             'currency'         => 'USD',
+            'voucher_code'     => $checkoutData['voucher_code'] ?? null,
             'reward_discount'  => $resolvedDiscounts ? $resolvedDiscounts->rewardDiscountCents / 100  : 0,
             'offer_discount'   => $resolvedDiscounts ? $resolvedDiscounts->offerDiscountCents / 100   : 0,
-            'voucher_discount' => $resolvedDiscounts ? $resolvedDiscounts->voucherDiscountCents / 100 : 0,
+            'voucher_discount' => $voucherDiscountCents / 100,
             'tiered_discount'  => $resolvedDiscounts ? $resolvedDiscounts->tieredDiscountCents / 100  : 0,
             'merchant_funded'  => $resolvedDiscounts ? $resolvedDiscounts->merchantFundedCents / 100  : 0,
-            'platform_funded'  => $resolvedDiscounts ? $resolvedDiscounts->platformFundedCents / 100  : 0,
+            'platform_funded'  => $platformFundedCents / 100,
         ];
 
         if ($isFreeOrder) {

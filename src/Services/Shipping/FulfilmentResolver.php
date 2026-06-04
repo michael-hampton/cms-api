@@ -15,7 +15,7 @@ class FulfilmentResolver
         }
 
         if ($purchasable instanceof SubscriptionPlan) {
-            return $purchasable->hasDigitalOption() && !$purchasable->print_shipping_required
+            return $purchasable->hasDigitalOption() && !$purchasable->hasPrintOption()
                 ? new DigitalSubscriptionFulfilment($purchasable)
                 : new PrintedSubscriptionFulfilment($purchasable);
         }

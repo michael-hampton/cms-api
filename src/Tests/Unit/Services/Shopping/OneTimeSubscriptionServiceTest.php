@@ -307,6 +307,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
                 return $data['price'] == 89.99
                     && $data['price_paid_cents'] == 20
                     && $data['discount_amount'] == 10
+                    && $data['voucher_id'] == 123
                     && $data['original_price'] == 99.99;
             }))
             ->andReturn($subscription);
@@ -324,7 +325,7 @@ class OneTimeSubscriptionServiceTest extends FunctionalTestCase
         );
 
         $result = $this->service->createOneTimeSubscription(
-            1, 1, SubscriptionType::DIGITAL->value, 1, null, $pricing // 1000 cents = $10
+            1, 1, SubscriptionType::DIGITAL->value, 1, 123, $pricing // 1000 cents = $10
         );
 
         $this->assertInstanceOf(Subscription::class, $result);

@@ -154,6 +154,11 @@ class SubscriptionPricingService
             : $resolvedPrice->basePrice;
         $voucherId = $resolvedPrice->voucherId;
 
+        if ($voucherCode && $voucherId && $discountCents <= 0) {
+            $discountCents = $this->postedVoucherDiscountCents($checkoutData, $subtotalCents);
+            $subtotalCents = max(0, $subtotalCents - $discountCents);
+        }
+
         $afterDiscountCents = $subtotalCents;
 
         // Calculate shipping for print delivery
@@ -204,5 +209,16 @@ class SubscriptionPricingService
             'postcode' => $data['postal_code'] ?? '',
             'country' => $data['country'] ?? '',
         ];
+    }
+
+    private function postedVoucherDiscountCents(array $checkoutData, int $maxDiscountCents): int
+    {
+        if (empty($checkoutData['voucher_code']) || !isset($checkoutData['discount_amount'])) {
+            return 0;
+        }
+
+        $discountCents = (int)round((float)$checkoutData['discount_amount'] * 100);
+
+        return max(0, min($discountCents, $maxDiscountCents));
     }
 }

@@ -664,6 +664,47 @@ class SubscriptionBatchFactoryTest extends TestCase
         $this->assertSame(4000, $result[0]['price_paid_cents']);
     }
 
+    public function testVoucherIdAndDiscountPricingArePassedToSubscriptionCreation(): void
+    {
+        $member = $this->makeMember();
+        $item = $this->makeCartItem();
+        $pricing = $this->makePricing(
+            voucherId: 123,
+            subtotalCents: 5000,
+            discountCents: 1000,
+            totalCents: 4000
+        );
+        $subscription = $this->makeSubscription();
+        $checkoutData = ['voucher_code' => 'SAVE10'];
+
+        $this->defaultNonGiftResolver($member);
+
+        $this->pricingCalculator
+            ->expects('calculateForCartItem')
+            ->with($item, 'SAVE10', $member, $checkoutData)
+            ->andReturn($pricing);
+
+        $this->subscriptionService
+            ->expects('createOneTimeSubscription')
+            ->with(
+                $member->id,
+                1,
+                $pricing->deliveryType,
+                1,
+                123,
+                Mockery::on(fn($passedPricing) => $passedPricing->discountCents === 1000),
+                SubscriptionStatus::PENDING,
+                null,
+                null
+            )
+            ->andReturn($subscription);
+
+        $result = $this->factory->createPendingSubscriptions([$item], $checkoutData, $member, 1, null);
+
+        $this->assertSame(123, $result[0]['pricing']->voucherId);
+        $this->assertSame(1000, $result[0]['pricing']->discountCents);
+    }
+
     public function testMetadataFromCartItemIsPreserved(): void
     {
         $member = $this->makeMember();

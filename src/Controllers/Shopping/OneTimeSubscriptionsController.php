@@ -92,10 +92,6 @@ class OneTimeSubscriptionsController extends Controller
                 'currencyCode' => $currencyCode,
                 'currencySymbol' => $currencySymbol,
                 'plans' => $catalogData['data']->map(function ($plan) {
-                    $plan->delivery_type = !empty($plan->digital_download_url)
-                        ? SubscriptionType::DIGITAL->value
-                        : SubscriptionType::PRINTED->value;
-
                     return $plan;
                 }),
                 'pagination' => [
@@ -161,10 +157,6 @@ class OneTimeSubscriptionsController extends Controller
             'currencyCode' => $currencyCode,
             'currencySymbol' => $currencySymbol,
             'plans' => $catalogData['data']->map(function ($plan) {
-                $plan->delivery_type = !empty($plan->digital_download_url)
-                    ? SubscriptionType::DIGITAL->value
-                    : SubscriptionType::PRINTED->value;
-
                 return $plan;
             }),
             'pagination' => [

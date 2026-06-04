@@ -702,10 +702,10 @@ $totalDeals = count($plans) + count($bundles);
                                 <div class="plan-card__name"><?= htmlspecialchars($plan->name) ?></div>
 
                                 <div class="plan-card__meta">
-                                    <?php if ($plan->delivery_type === 'digital' || $plan->hasDigitalOption()): ?>
+                                    <?php if ($plan->hasDigitalOption()): ?>
                                         <span class="meta-pill meta-pill--digital">📱 Digital</span>
                                     <?php endif; ?>
-                                    <?php if ($plan->delivery_type === 'print' || $plan->hasPrintOption()): ?>
+                                    <?php if ($plan->hasPrintOption()): ?>
                                         <span class="meta-pill meta-pill--print">📰 Print</span>
                                     <?php endif; ?>
                                     <?php foreach (array_slice((array)($plan->tags ?? []), 0, 2) as $tag): ?>
@@ -744,7 +744,7 @@ $totalDeals = count($plans) + count($bundles);
                                         <?= $hasSale ? '🔥 View deal' : 'View details' ?>
                                     </a>
                                     <button class="plan-card__btn plan-card__btn--cart"
-                                            data-delivery_type="<?= $plan->delivery_type === 'digital' || $plan->hasDigitalOption() ? 'digital' : 'print' ?>"
+                                            data-delivery_type="<?= htmlspecialchars($plan->getDeliveryOptions()[0] ?? '') ?>"
                                             title="Add to cart"
                                             onclick="addToCart('plan', <?= $plan->id ?>, this)">
                                         🛒
@@ -803,8 +803,8 @@ $totalDeals = count($plans) + count($bundles);
 
     function deliveryPills(type) {
         const b = [];
-        if (type === 'digital' || type === 'both') b.push('<span class="meta-pill meta-pill--digital">📱 Digital</span>');
-        if (type === 'print' || type === 'both') b.push('<span class="meta-pill meta-pill--print">📰 Print</span>');
+        if (type === 'digital' || type === 'print_and_digital') b.push('<span class="meta-pill meta-pill--digital">📱 Digital</span>');
+        if (type === 'print' || type === 'print_and_digital') b.push('<span class="meta-pill meta-pill--print">📰 Print</span>');
         return b.join('');
     }
 

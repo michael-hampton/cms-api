@@ -65,14 +65,14 @@ class SubscriptionBundleSeeder extends Seeder
                     'bundle_id' => $bundle->id,
                     'subscription_plan_id' => $planA->id,
                     'quantity' => 1,
-                    'delivery_type' => $planA->hasDigitalOption() ? 'digital' : 'print',
+                    'delivery_type' => $planA->getDeliveryOptions()[0] ?? null,
                 ]);
 
                 SubscriptionBundleItem::create([
                     'bundle_id' => $bundle->id,
                     'subscription_plan_id' => $planB->id,
                     'quantity' => 1,
-                    'delivery_type' => $planB->hasDigitalOption() ? 'digital' : 'print',
+                    'delivery_type' => $planB->getDeliveryOptions()[0] ?? null,
                 ]);
 
                 echo "Created bundle {$bundle->name} (£{$bundlePrice} instead of £{$totalPrice})\n";

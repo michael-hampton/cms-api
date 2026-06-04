@@ -129,6 +129,7 @@ class ReplacePlanPriceAction
         // Copy all logical properties from the current row.
             [
                 'plan_id'            => $current->plan_id,
+                'entitlement_type'   => $current->entitlement_type,
                 'duration_months'    => $current->duration_months,
                 'issue_count'        => $current->issue_count,
                 'price'              => $current->price,
@@ -161,7 +162,7 @@ class ReplacePlanPriceAction
 
     private function buildEffectivePricing(SubscriptionPlanPricing $current, array $overrides): SubscriptionPlanPricing
     {
-        $pricing = new SubscriptionPlanPricing();
+        $pricing = clone $current;
 
         foreach ([
             'price',

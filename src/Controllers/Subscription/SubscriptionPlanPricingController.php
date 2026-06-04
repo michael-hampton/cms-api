@@ -60,7 +60,7 @@ class SubscriptionPlanPricingController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Pricing tier created successfully',
-                'data' => $pricing->toArray()
+                'data' => (new SubscriptionPlanPricingResource($pricing))->toArray()
             ]);
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
@@ -93,7 +93,7 @@ class SubscriptionPlanPricingController extends Controller
             return $this->resourceResponse([
                 'success' => true,
                 'message' => 'Pricing tier updated successfully',
-                'data' => $pricing->toArray()
+                'data' => (new SubscriptionPlanPricingResource($pricing))->toArray()
             ]);
         } catch (ValidationException $validationException) {
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());

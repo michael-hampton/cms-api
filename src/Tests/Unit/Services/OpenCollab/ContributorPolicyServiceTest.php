@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Models\Site;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -14,6 +15,7 @@ class ContributorPolicyServiceTest extends FunctionalTestCase
 {
     private ContributorPolicyService $service;
     private MockInterface $onboarding;
+    private OpenCollabAuthorizationService $authorizationService;
 
     // ── canCreateArticle() ────────────────────────────────────────────────────
 
@@ -179,7 +181,12 @@ class ContributorPolicyServiceTest extends FunctionalTestCase
     {
         parent::setUp();
         $this->onboarding = Mockery::mock(ContributorOnboardingService::class);
-        $this->service = new ContributorPolicyService($this->onboarding);
+        $this->authorizationService = Mockery::mock(OpenCollabAuthorizationService::class);
+
+        $this->authorizationService->shouldReceive('allowsAny')->byDefault()->andReturn(true);
+        $this->authorizationService->shouldReceive('allows')->byDefault()->andReturn(true);
+
+        $this->service = new ContributorPolicyService($this->onboarding, $this->authorizationService);
     }
 
     protected function tearDown(): void

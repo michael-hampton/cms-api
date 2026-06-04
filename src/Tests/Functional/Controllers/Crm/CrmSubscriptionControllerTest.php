@@ -2,6 +2,8 @@
 
 namespace App\Tests\Functional\Controllers\Crm;
 
+use App\DTO\Cart\TaxData;
+use App\DTO\Stripe\PaymentIntentResultDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Framework\Container;
 use App\Models\Member;
@@ -12,7 +14,10 @@ use App\Models\SubscriptionPlan;
 use App\Services\Billing\PaymentProviders\NullStripePaymentProcessor;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
 use App\Services\Billing\Stripe\StripeCustomerGateway;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 use App\Services\Billing\Stripe\StripeSubscriptionGateway;
+use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
+use App\Services\Billing\TaxCalculatorService;
 use App\Services\OpenCollab\ArticlePaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -1712,6 +1717,8 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        $_ENV['STRIPE_SECRET_KEY'] = $_ENV['STRIPE_SECRET_KEY'] ?? 'sk_test_subscription_switch';
+
         parent::setUp();
 
         $this->member = $this->createMember([
@@ -1773,5 +1780,39 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             StripePaymentProcessor::class,
             NullStripePaymentProcessor::class
         );
+
+        Container::getInstance()->bind(TaxCalculatorService::class, function () {
+            $mock = Mockery::mock(TaxCalculatorService::class);
+            $mock->shouldReceive('calculateOrderTax')->andReturn(new TaxData(
+                rate: 0,
+                taxCents: 0,
+                taxableAmountCents: 0,
+            ));
+
+            return $mock;
+        });
+
+        Container::getInstance()->bind(StripePaymentIntentGateway::class, function () {
+            $mock = Mockery::mock(StripePaymentIntentGateway::class);
+            $mock->shouldReceive('createWithCustomer')->andReturn(new PaymentIntentResultDto(
+                success: true,
+                paymentIntentId: 'pi_test_switch',
+                clientSecret: 'pi_test_switch_secret',
+                status: 'succeeded',
+                customerId: 'cus_test_switch',
+            ));
+
+            return $mock;
+        });
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('update')->andReturn([
+                'success' => true,
+                'stripe_subscription_id' => 'sub_test_switch',
+            ]);
+
+            return $mock;
+        });
     }
 }

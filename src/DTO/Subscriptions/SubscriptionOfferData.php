@@ -21,6 +21,8 @@ final class SubscriptionOfferData
         public readonly int       $savingPercentage,
         // Optional enrichment fields
         public readonly ?string   $pricingLabel       = null,
+        public readonly ?string   $entitlementType    = null,
+        public readonly ?string   $effectiveEntitlementType = null,
         public readonly ?int      $introCycles        = null,
         public readonly ?string   $voucherCode        = null,
         public readonly ?string   $currency           = null,
@@ -47,6 +49,8 @@ final class SubscriptionOfferData
             'saving_amount'     => $this->savingAmount,
             'saving_percentage' => $this->savingPercentage,
             'pricing_label'     => $this->pricingLabel,
+            'entitlement_type'   => $this->entitlementType,
+            'effective_entitlement_type' => $this->effectiveEntitlementType,
             'intro_cycles'      => $this->introCycles,
             'voucher_code'      => $this->voucherCode,
             'currency'          => $this->currency,

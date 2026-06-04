@@ -6,6 +6,7 @@ namespace App\Repositories\Subscriptions;
 
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Enums\Subscriptions\PrintRegion;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
@@ -43,10 +44,12 @@ class PrintOrderRepository
             ->whereDate('print_order_date', $date)
             ->where('print_order_done', false)
             ->whereHas('subscriptionPlans', function ($q) {
-                // Plan must exist and be active; requires_print_order is
-                // approximated by the plan having print_shipping_required.
+                // Plan must exist, be active, and include print delivery.
                 $q->where('is_active', true)
-                    ->where('print_shipping_required', true);
+                    ->whereIn('delivery_type', [
+                        SubscriptionDeliveryType::PRINT->value,
+                        SubscriptionDeliveryType::PRINT_AND_DIGITAL->value,
+                    ]);
             })
             ->whereExists(function ($q) {
                 // Fast guard: at least one active print subscriber.

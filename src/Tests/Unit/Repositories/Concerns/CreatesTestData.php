@@ -662,6 +662,8 @@ trait CreatesTestData
             'features' => ['Feature 1', 'Feature 2'],
             'is_active' => true,
             'is_featured' => false,
+            'delivery_type' => 'print',
+            'print_shipping_required' => true,
             'sort_order' => 0,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s')

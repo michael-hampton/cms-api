@@ -571,6 +571,41 @@ class OrderDraftServiceTest extends TestCase
         $this->assertSame($order, $result);
     }
 
+    public function testCreatePendingOrderPersistsPostedVoucherFallbackWhenResolvedDiscountsAreZero(): void
+    {
+        $member = $this->makeMember();
+        $order = $this->makeOrder();
+        $pricing = $this->makePricing([
+            'subtotalCents' => 4950,
+            'discountCents' => 50,
+            'totalCents' => 4950,
+            'voucherId' => 11,
+        ]);
+        $rd = $this->makeResolvedDiscounts(['voucherDiscountCents' => 0, 'platformFundedCents' => 0]);
+
+        $this->taxCalculatorService->expects('calculateOrderTax')->andReturn($this->makeTaxResult(0));
+
+        $this->orderCreationService
+            ->expects('create')
+            ->withArgs(function ($data) {
+                return ($data['voucher_code'] ?? null) === 'SAVE20'
+                    && ($data['discount'] ?? null) === 0.5
+                    && ($data['voucher_discount'] ?? null) === 0.5
+                    && ($data['platform_funded'] ?? null) === 0.5;
+            })
+            ->andReturn($order);
+
+        $result = $this->service->createPendingOrder(
+            [$this->makeSubData($pricing)],
+            $member,
+            1,
+            ['country' => 'GB', 'voucher_code' => 'SAVE20', 'voucher_id' => 11, 'discount_amount' => 0.5],
+            $rd
+        );
+
+        $this->assertSame($order, $result);
+    }
+
     public function testCreatePendingOrderTotalIsSumOfAllSubscriptionTotals(): void
     {
         $member = $this->makeMember();

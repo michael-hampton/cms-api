@@ -70,7 +70,7 @@
             if (result.data?.valid) {
                 window.appliedVoucher = {
                     code,
-                    discount: result.data.discount,
+                    discount: parseFloat(result.data.discount || 0),
                     voucher_id: result.data.voucher_id,
                 };
                 displayAppliedVoucher();
@@ -119,10 +119,12 @@
         const discountAmount = document.getElementById('discount-amount');
 
         if (codeDisplay) codeDisplay.textContent = v.code;
-        if (discountDisplay) discountDisplay.textContent = PLAN_CURRENCY + ' ' + v.discount.toFixed(2);
+        const discount = parseFloat(v.discount || 0);
+
+        if (discountDisplay) discountDisplay.textContent = PLAN_CURRENCY + ' ' + discount.toFixed(2);
         if (appliedEl) appliedEl.style.display = 'block';
         if (discountRow) discountRow.style.display = 'flex';
-        if (discountAmount) discountAmount.textContent = '-' + PLAN_CURRENCY + ' ' + v.discount.toFixed(2);
+        if (discountAmount) discountAmount.textContent = '-' + PLAN_CURRENCY + ' ' + discount.toFixed(2);
 
         updateTotals();
     };

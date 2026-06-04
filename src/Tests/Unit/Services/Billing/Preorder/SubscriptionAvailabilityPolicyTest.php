@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Billing\Preorder;
 
 use App\Models\IssueDelivery;
 use App\Models\SubscriptionPlan;
+use App\Enums\Subscriptions\SubscriptionDeliveryType;
 use App\Services\Billing\Preorder\IssueAvailabilityPolicy;
 use App\Services\Billing\Preorder\SubscriptionAvailabilityPolicy;
 use Mockery;
@@ -16,7 +17,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = null;
         $plan->pre_release_enabled = false;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -35,7 +36,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = new \DateTime('-7 days');
         $plan->pre_release_enabled = false;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -51,7 +52,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -68,7 +69,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = false;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -84,7 +85,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -98,7 +99,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = false;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -113,7 +114,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = null;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
         $plan->shouldReceive('getNextIssue')->andReturn(null);
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
@@ -126,7 +127,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = null;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
         $nextIssue->stock_quantity = 100;
@@ -155,7 +156,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
     {
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = null;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $restockDate = new \DateTime('+7 days');
 
@@ -188,7 +189,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
         $nextIssue->stock_quantity = 100;
@@ -215,7 +216,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = null; // Plan already released
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
         $nextIssue->on_sale_date = $onSaleDate;
@@ -243,7 +244,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $planReleaseDate;
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = true;
+        $plan->delivery_type = SubscriptionDeliveryType::PRINT->value;
 
         $nextIssue = Mockery::mock(IssueDelivery::class)->makePartial();
         $nextIssue->stock_quantity = 0;
@@ -278,7 +279,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = new \DateTime('+7 days');
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -292,7 +293,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
@@ -306,17 +307,17 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
 
     public function test_availability_message_includes_formatted_date_when_not_available(): void
     {
-        $releaseDate = new \DateTime('2026-05-15');
+        $releaseDate = new \DateTime('2027-05-15');
 
         $plan = Mockery::mock(SubscriptionPlan::class)->makePartial();
         $plan->release_date = $releaseDate;
         $plan->pre_release_enabled = false;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
 
         $message = $policy->getAvailabilityMessage();
-        $this->assertStringContainsString('Available from May 15, 2026', $message);
+        $this->assertStringContainsString('Available from May 15, 2027', $message);
     }
 
     public function test_transitions_from_pre_release_to_available(): void
@@ -326,7 +327,7 @@ class SubscriptionAvailabilityPolicyTest extends TestCase
         // Initially pre-release
         $plan->release_date = new \DateTime('+1 day');
         $plan->pre_release_enabled = true;
-        $plan->print_shipping_required = false;
+        $plan->delivery_type = SubscriptionDeliveryType::DIGITAL->value;
 
         $policy = new SubscriptionAvailabilityPolicy($plan);
         $this->assertTrue($policy->isPreRelease());

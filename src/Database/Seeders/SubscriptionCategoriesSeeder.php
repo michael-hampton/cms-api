@@ -168,17 +168,17 @@ class SubscriptionCategoriesSeeder extends Seeder
         }
 
         // Digital only plans
-        if ($plan->digital_download_url && !$plan->print_shipping_required) {
+        if ($plan->delivery_type === 'digital') {
             $categories[] = 'Digital Only';
         }
 
         // Print only plans
-        if ($plan->print_shipping_required && !$plan->digital_download_url) {
+        if ($plan->delivery_type === 'print') {
             $categories[] = 'Print Edition';
         }
 
         // Both digital and print
-        if ($plan->digital_download_url && $plan->print_shipping_required) {
+        if ($plan->delivery_type === 'print_and_digital') {
             $categories[] = 'Premium';
         }
 
@@ -208,11 +208,11 @@ class SubscriptionCategoriesSeeder extends Seeder
         }
 
         // Add delivery type tags
-        if ($plan->digital_download_url) {
+        if (in_array($plan->delivery_type, ['digital', 'print_and_digital'], true)) {
             $tags[] = 'digital';
         }
 
-        if ($plan->print_shipping_required) {
+        if (in_array($plan->delivery_type, ['print', 'print_and_digital'], true)) {
             $tags[] = 'print';
         }
 

@@ -45,6 +45,7 @@ final class FilterInputSanitiser
             'min_rating' => $this->sanitiseRating($raw['min_rating'] ?? null),
             'min_discount' => $this->sanitiseDiscount($raw['min_discount'] ?? null),
             'has_voucher' => $this->sanitiseBool($raw['has_voucher'] ?? ''),
+            'region_set_ids' => $this->sanitiseIntList($raw['region_set_ids'] ?? ''),
         ];
     }
 

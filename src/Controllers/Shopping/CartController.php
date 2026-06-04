@@ -333,7 +333,7 @@ class CartController extends Controller
             'plan' => $plan,
             'member' => $member,
             'isSubscription' => true,
-            'requiresShipping' => empty($plan->digital_download_url),
+            'requiresShipping' => $plan->hasPrintOption(),
         ]);
     }
 
