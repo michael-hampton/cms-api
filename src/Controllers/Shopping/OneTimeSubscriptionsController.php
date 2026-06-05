@@ -91,9 +91,7 @@ class OneTimeSubscriptionsController extends Controller
                 'success' => true,
                 'currencyCode' => $currencyCode,
                 'currencySymbol' => $currencySymbol,
-                'plans' => $catalogData['data']->map(function ($plan) {
-                    return $plan;
-                }),
+                'plans' => $catalogData['data']->map(fn($plan) => $this->serializeCatalogPlan($plan)),
                 'pagination' => [
                     'current_page' => $catalogData['pagination']['current_page'],
                     'total_pages' => $catalogData['pagination']['last_page'],
@@ -204,7 +202,7 @@ class OneTimeSubscriptionsController extends Controller
             'success' => true,
             'currency_code' => $currencyCode,
             'currency_symbol' => $currencySymbol,
-            'plans' => $catalogData['data'],
+            'plans' => $catalogData['data']->map(fn($plan) => $this->serializeCatalogPlan($plan)),
             'pagination' => [
                 'current_page' => $catalogData['pagination']['current_page'],
                 'total_pages' => $catalogData['pagination']['last_page'],
@@ -212,6 +210,50 @@ class OneTimeSubscriptionsController extends Controller
                 'total' => $catalogData['pagination']['total'],
             ],
         ]);
+    }
+
+    private function serializeCatalogPlan($plan): array
+    {
+        $bestSale = $plan->getBestSale();
+        $price = $plan->getLowestEffectivePrice();
+        $tier = $price['tier'] ?? null;
+        $nextIssue = $plan->getNextIssue();
+        $promotion = $plan->promotion()?->first();
+
+        return [
+            'id' => (int)$plan->id,
+            'name' => (string)$plan->name,
+            'slug' => (string)$plan->slug,
+            'description' => $plan->description,
+            'price' => (float)($price['min'] ?? $plan->price ?? 0),
+            'sale_price' => isset($bestSale['sale']) ? (float)$bestSale['sale'] : null,
+            'original_price' => isset($bestSale['original']) ? (float)$bestSale['original'] : null,
+            'has_sale' => $bestSale !== null,
+            'savings_pct' => $bestSale['savingPct'] ?? null,
+            'pricing_tier_id' => $tier?->id,
+            'billing_period' => $plan->billing_period,
+            'delivery_type' => $plan->delivery_type,
+            'categories' => $plan->categories ?? [],
+            'tags' => $plan->tags ?? [],
+            'features' => $plan->features ?? [],
+            'is_featured' => (bool)$plan->is_featured,
+            'is_limited_offer' => $plan->end_date && $plan->end_date->diffInDays(now()) <= 30,
+            'release_date' => $plan->release_date?->format('Y-m-d'),
+            'site_name' => $plan->site->name ?? $plan->site_name ?? '',
+            'detail_url' => url('/press-stack/' . $plan->slug),
+            'print_image_url' => $plan->print_image_url,
+            'digital_image_url' => $plan->digital_image_url,
+            'next_issue' => $nextIssue ? [
+                'id' => (int)$nextIssue->id,
+                'issue_number' => $nextIssue->issue_number,
+                'cover_image' => $nextIssue->cover_image,
+            ] : null,
+            'promotion' => $promotion ? [
+                'name' => $promotion->name,
+                'type' => $promotion->type,
+                'value' => $promotion->value,
+            ] : null,
+        ];
     }
 
     public function checkout(Request $request)

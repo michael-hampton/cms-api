@@ -19,6 +19,8 @@ enum SubscriptionStatus: string
     case SUSPENDED = 'suspended';
     case REPLACED = 'replaced';
 
+    case RETRYING = 'retrying';
+
     /**
      * Statuses that grant access to subscription content/features.
      * Used by entitlement checks — single source of truth.
@@ -29,6 +31,7 @@ enum SubscriptionStatus: string
             self::ACTIVE->value,
             self::TRIALING->value,
             self::GRACE_PERIOD->value,
+            self::RETRYING->value,
         ];
     }
 

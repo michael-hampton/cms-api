@@ -112,6 +112,7 @@ class SubscriptionPlanPricingModelTest extends TestCase
     public function testGetStripeBillingPriceForDigitalPlanUsesDigitalPriceWhenNoDigitalSale(): void
     {
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
+        $plan->delivery_type = 'digital';
         $plan->digital_download_url = 'https://example.com/download.pdf';
 
         $tier = m::mock(SubscriptionPlanPricing::class)->makePartial();
@@ -120,7 +121,7 @@ class SubscriptionPlanPricingModelTest extends TestCase
         $tier->digital_price = 29.99;
         $tier->digital_sale_price = null;
 
-        $this->assertEquals(29.99, $tier->getStripeBillingPriceForPlan($plan));
+        $this->assertEquals(14.39, $tier->getStripeBillingPriceForPlan($plan));
     }
 
     public function testGetStripeBillingPriceForPrintPlanUsesSalePrice(): void

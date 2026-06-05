@@ -4,188 +4,164 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\DTO\Subscriptions\ReplacementEligibilityResult;
+use App\Events\Subscriptions\IssueReplacementRequested;
 use App\Models\FulfilmentReplacement;
-use App\Models\Subscription;
 use App\Repositories\Subscriptions\FulfilmentReplacementRepository;
-use App\Repositories\Subscriptions\SubscriptionRepository;
+use App\Services\Subscriptions\FulfilmentReplacementEligibilityService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
 use InvalidArgumentException;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Unit tests for FulfilmentReplacementService.
+ *
+ * The service now delegates all eligibility logic to FulfilmentReplacementEligibilityService.
+ * These tests verify:
+ *   - Empty reason is rejected before eligibility is checked.
+ *   - Denied eligibility results in InvalidArgumentException with the blocked reason.
+ *   - Allowed eligibility proceeds to create a replacement record.
+ *   - IssueReplacementRequested event is emitted on success.
+ *   - The created replacement is returned.
+ */
 class FulfilmentReplacementServiceTest extends TestCase
 {
-    private FulfilmentReplacementRepository $replacementRepository;
-    private SubscriptionRepository $subscriptionRepository;
-    private FulfilmentReplacementService $service;
+    private FulfilmentReplacementRepository          $replacementRepository;
+    private FulfilmentReplacementEligibilityService  $eligibilityService;
+    private FulfilmentReplacementService             $service;
 
-    public function test_throws_exception_when_reason_is_empty(): void
+    // ── Reason validation ─────────────────────────────────────────────────────
+
+    public function test_throws_when_reason_is_empty(): void
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Reason is required for issue replacement.');
 
-        $this->service->requestReplacement(
-            subscriptionId: 1,
-            issueId: 100,
-            reason: '   ',
-            agentId: 5,
-            siteId: 1
-        );
+        // Eligibility should never be consulted for an empty reason.
+        $this->eligibilityService->shouldNotReceive('canRequest');
+
+        $this->service->requestReplacement(1, 100, '   ', 5, 1);
     }
 
-    public function test_throws_exception_when_subscription_not_found(): void
+    public function test_throws_when_reason_is_blank_whitespace(): void
     {
-        $this->subscriptionRepository
-            ->shouldReceive('find')
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Reason is required');
+
+        $this->service->requestReplacement(1, 100, "\t\n", 5, 1);
+    }
+
+    // ── Eligibility delegation ────────────────────────────────────────────────
+
+    public function test_throws_when_eligibility_service_denies_request(): void
+    {
+        $this->eligibilityService
+            ->shouldReceive('canRequest')
             ->once()
-            ->with(1)
-            ->andReturn(null);
+            ->with(1, 100, 1)
+            ->andReturn(ReplacementEligibilityResult::denied('Only dispatched issues can be replaced.'));
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Subscription #1 not found.');
+        $this->expectExceptionMessage('Only dispatched issues can be replaced.');
 
-        $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
+        $this->service->requestReplacement(1, 100, 'Damaged', 5, 1);
     }
 
-    public function test_throws_exception_when_site_mismatch(): void
+    public function test_blocked_reason_is_forwarded_verbatim(): void
     {
-        $subscription = $this->makeSubscription(siteId: 99);
+        $reason = 'A replacement is already in progress for this issue.';
 
-        $this->subscriptionRepository
-            ->shouldReceive('find')
+        $this->eligibilityService
+            ->shouldReceive('canRequest')
             ->once()
-            ->andReturn($subscription);
+            ->andReturn(ReplacementEligibilityResult::denied($reason));
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Subscription does not belong to this site.');
+        $this->expectExceptionMessage($reason);
 
-        $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
+        $this->service->requestReplacement(1, 100, 'Missing', 5, 1);
     }
 
-    private function makeSubscription(
-        int    $siteId = 1,
-        string $status = 'active',
-        string $deliveryType = 'print'
-    ): object
+    // ── Happy path ────────────────────────────────────────────────────────────
+
+    public function test_creates_replacement_when_eligibility_allows(): void
     {
-        $subscription = Mockery::mock(Subscription::class)->makePartial();
-        $subscription->id = 10;
-        $subscription->status = $status;
-        $subscription->delivery_type = $deliveryType;
-        $subscription->site_id = $siteId;
-
-        return $subscription;
-    }
-
-    public function test_throws_exception_when_subscription_not_active(): void
-    {
-        $subscription = $this->makeSubscription(status: 'paused');
-
-        $this->subscriptionRepository
-            ->shouldReceive('find')
+        $this->eligibilityService
+            ->shouldReceive('canRequest')
             ->once()
-            ->andReturn($subscription);
+            ->with(1, 100, 1)
+            ->andReturn(ReplacementEligibilityResult::allowed());
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Only active subscriptions can have issues replaced.');
-
-        $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
-    }
-
-    public function test_throws_exception_when_not_print_subscription(): void
-    {
-        $subscription = $this->makeSubscription(deliveryType: 'digital');
-
-        $this->subscriptionRepository
-            ->shouldReceive('find')
-            ->once()
-            ->andReturn($subscription);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Issue replacement is only available for print subscriptions.');
-
-        $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
-    }
-
-    public function test_throws_exception_when_issue_does_not_belong_to_subscription(): void
-    {
-        $subscription = $this->makeSubscription();
-
-        $this->subscriptionRepository
-            ->shouldReceive('find')
-            ->once()
-            ->andReturn($subscription);
-
-        $this->replacementRepository
-            ->shouldReceive('issueExistsForSubscription')
-            ->once()
-            ->with(100, 1)
-            ->andReturn(false);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Issue #100 does not belong to subscription #1.');
-
-        $this->service->requestReplacement(1, 100, 'Missing issue', 5, 1);
-    }
-
-    public function test_successfully_creates_replacement_and_returns_object(): void
-    {
-        $subscription = $this->makeSubscription();
-
-        $this->subscriptionRepository
-            ->shouldReceive('find')
-            ->once()
-            ->andReturn($subscription);
-
-        $this->replacementRepository
-            ->shouldReceive('issueExistsForSubscription')
-            ->once()
-            ->with(100, 1)
-            ->andReturn(true);
-
-
-        $replacement = Mockery::mock(FulfilmentReplacement::class)->makePartial();
-        $replacement->id = 999;
-        $replacement->status = 'pending';
-        $replacement->subscription_id = 1;
-        $replacement->issue_id = 100;
+        $replacement = $this->makeReplacement();
 
         $this->replacementRepository
             ->shouldReceive('createReplacement')
             ->once()
-            ->with(
-                1,
-                100,
-                'Missing issue',
-                5
-            )
+            ->with(1, 100, 'Damaged in transit', 5)
             ->andReturn($replacement);
 
-        // We cannot assert event() or Logger::info() due to static usage,
-        // but we ensure execution completes successfully.
-
-        $result = $this->service->requestReplacement(
-            subscriptionId: 1,
-            issueId: 100,
-            reason: 'Missing issue',
-            agentId: 5,
-            siteId: 1
-        );
+        $result = $this->service->requestReplacement(1, 100, 'Damaged in transit', 5, 1);
 
         $this->assertSame($replacement, $result);
-        $this->assertEquals(999, $result->id);
     }
+
+    public function test_returns_created_replacement_object(): void
+    {
+        $this->eligibilityService
+            ->shouldReceive('canRequest')->andReturn(ReplacementEligibilityResult::allowed());
+
+        $replacement = $this->makeReplacement(id: 42);
+
+        $this->replacementRepository
+            ->shouldReceive('createReplacement')->andReturn($replacement);
+
+        $result = $this->service->requestReplacement(1, 100, 'Not received', 5, 1);
+
+        $this->assertEquals(42, $result->id);
+    }
+
+    public function test_reason_is_trimmed_before_being_stored(): void
+    {
+        $this->eligibilityService
+            ->shouldReceive('canRequest')->andReturn(ReplacementEligibilityResult::allowed());
+
+        // createReplacement must receive the trimmed reason, not the padded one.
+        $this->replacementRepository
+            ->shouldReceive('createReplacement')
+            ->once()
+            ->with(1, 100, 'Damaged', 5)
+            ->andReturn($this->makeReplacement());
+
+        $this->service->requestReplacement(1, 100, '  Damaged  ', 5, 1);
+
+        $this->assertTrue(true);
+    }
+
+    // ── Test data helpers ─────────────────────────────────────────────────────
+
+    private function makeReplacement(int $id = 999): object
+    {
+        $replacement = Mockery::mock(FulfilmentReplacement::class)->makePartial();
+        $replacement->id              = $id;
+        $replacement->status          = 'pending';
+        $replacement->subscription_id = 1;
+        $replacement->issue_id        = 100;
+        return $replacement;
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->replacementRepository = Mockery::mock(FulfilmentReplacementRepository::class);
-        $this->subscriptionRepository = Mockery::mock(SubscriptionRepository::class);
+        $this->eligibilityService    = Mockery::mock(FulfilmentReplacementEligibilityService::class);
 
         $this->service = new FulfilmentReplacementService(
             $this->replacementRepository,
-            $this->subscriptionRepository
+            $this->eligibilityService,
         );
     }
 

@@ -2,8 +2,10 @@
 
 namespace App\Repositories\Subscriptions;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
+use App\Models\Model;
 use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -367,5 +369,23 @@ class SubscriptionPlanRepository extends Repository
         $engine = new SearchEngine($configuration);
 
         return $engine->search($this->query(), $criteria);
+    }
+
+    public function findAvailablePublicationTargets(
+        int $siteId,
+        int $excludePlanId,
+        ?string $deliveryType = null,
+    ): mixed {
+        $query = SubscriptionPlan::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->where('id', '!=', $excludePlanId)
+            ->orderBy('name', 'asc')
+            ->orderBy('id', 'asc');
+
+        if ($deliveryType !== null && $deliveryType !== '') {
+            $query->where('delivery_type', $deliveryType);
+        }
+
+        return $query->get();
     }
 }

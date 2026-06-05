@@ -8,6 +8,7 @@ use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\IssueDelivery;
+use App\Models\Model;
 use App\Repositories\Repository;
 use App\Search\Configurations\IssueDeliverySearchConfiguration;
 use App\Search\PaginatedResult;
@@ -204,6 +205,52 @@ class IssueDeliveryRepository extends Repository
         }
 
         return parent::delete($id);
+    }
+
+    public function findFutureIssuesForPlanStartingFromIssue(
+        int $subscriptionPlanId,
+        int $startingIssueDeliveryId,
+        int $limit,
+    ): Collection {
+        $startingIssue = IssueDelivery::where('id', $startingIssueDeliveryId)
+            ->where('subscription_plan_id', $subscriptionPlanId)
+            ->where('status', IssueScheduleStatus::ACTIVE->value)
+            ->first();
+
+        if (!$startingIssue) {
+            return new Collection([]);
+        }
+
+        return IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->where('status', IssueScheduleStatus::ACTIVE->value)
+            ->where('on_sale_date', '>=', $startingIssue->on_sale_date instanceof \DateTimeInterface
+                ? $startingIssue->on_sale_date->format('Y-m-d H:i:s')
+                : (string) $startingIssue->on_sale_date
+            )
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('issue_number', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Find active future issue/edition schedule rows for a subscription plan.
+     *
+     * These are plan-level schedule rows, not customer fulfilment rows.
+     *
+     * @return mixed Collection<IssueDelivery>
+     */
+    public function findAvailableEditionsForSubscriptionPlan(
+        int $subscriptionPlanId,
+        \DateTimeInterface $fromDate,
+    ): Collection {
+        return IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->whereNull('subscription_id')
+            ->where('status', IssueScheduleStatus::ACTIVE->value)
+            ->where('on_sale_date', '>=', $fromDate->format('Y-m-d H:i:s'))
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('issue_number', 'asc')
+            ->get();
     }
 
     protected function getModelClass(): string
@@ -536,5 +583,155 @@ class IssueDeliveryRepository extends Repository
             'total' => $total,
             'last_page' => max(1, (int)ceil($total / $perPage)),
         ];
+    }
+
+    /**
+     * All fulfilment rows for a subscription whose status is in $statuses.
+     *
+     * @param  string[] $statuses
+     * @return IssueDelivery[]
+     */
+    public function getFutureDeliveriesForSubscription(int $subscriptionId, array $statuses): array
+    {
+        return IssueDelivery::where('subscription_id', $subscriptionId)
+            ->whereIn('status', $statuses)
+            ->get()
+            ->all();
+    }
+
+    /**
+     * Future issue rows for a plan.
+     *
+     * Edition changes resolve the current/old edition from the subscription's
+     * current plan only. Do not scope by subscription_id here: the source of
+     * truth for the edition is issue_deliveries.subscription_plan_id.
+     *
+     * @param  string[] $statuses
+     * @return IssueDelivery[]
+     */
+    public function getFutureDeliveriesForPlan(
+        int $subscriptionPlanId,
+        array $statuses,
+    ): array {
+        return IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->whereIn('status', $statuses)
+            ->get()
+            ->all();
+    }
+
+    /**
+     * Find future active issue schedule rows for a subscription plan.
+     *
+     * These are the source schedule issues used when rebuilding a subscription's
+     * future deliveries after changing edition/plan.
+     *
+     * @return Collection<IssueDelivery>
+     */
+    public function findFutureIssuesForPlan(
+        int $subscriptionPlanId,
+        \DateTimeInterface $fromDate,
+        int $limit,
+    ): Collection {
+        return IssueDelivery::where('subscription_plan_id', $subscriptionPlanId)
+            ->where('status', IssueScheduleStatus::ACTIVE->value)
+            ->where('on_sale_date', '>=', $fromDate->format('Y-m-d H:i:s'))
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('issue_number', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Find the current/next undispatched edition row for a subscription.
+     *
+     * This is used to audit the old edition before switching to a new edition.
+     *
+     * @return IssueDelivery|null
+     */
+    public function findCurrentOrNextForSubscription(int $subscriptionId): ?Model
+    {
+        return IssueDelivery::where('subscription_id', $subscriptionId)
+            ->whereIn('status', [
+                'pending',
+                'scheduled',
+                'not_dispatched',
+            ])
+            ->orderBy('on_sale_date', 'asc')
+            ->orderBy('issue_number', 'asc')
+            ->first();
+    }
+
+    /**
+     * Bulk-update status for a set of fulfilment row IDs.
+     *
+     * @param int[]  $ids
+     */
+    public function supersedeManyByIds(array $ids): void
+    {
+        if (empty($ids)) {
+            return;
+        }
+
+        IssueDelivery::whereIn('id', $ids)
+            ->update(['status' => 'superseded']);
+    }
+
+    /**
+     * Count of future fulfilment rows for a subscription.
+     *
+     * @param  string[] $futureStatuses
+     */
+    public function countFutureForSubscription(int $subscriptionId, array $futureStatuses): int
+    {
+        return IssueDelivery::where('subscription_id', $subscriptionId)
+            ->whereIn('status', $futureStatuses)
+            ->count();
+    }
+
+    /**
+     * Next $limit schedule rows for an edition, ordered by on_sale_date ascending.
+     * Schedule rows have subscription_plan_id set and subscription_id null.
+     *
+     * @param  string[] $scheduleStatuses  e.g. ['active', 'scheduled']
+     * @return Collection<IssueDelivery>
+     */
+    public function getUpcomingScheduleIssues(
+        int   $editionId,
+        int   $limit,
+        array $scheduleStatuses = ['active', 'scheduled'],
+    ): Collection {
+        return IssueDelivery::where('subscription_plan_id', $editionId)
+            ->whereNull('subscription_id')
+            ->whereIn('status', $scheduleStatuses)
+            ->orderBy('on_sale_date', 'asc')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Create a single fulfilment row for a subscription, copied from a
+     * schedule issue record.
+     */
+    public function createFulfilmentFromSchedule(
+        int          $subscriptionId,
+        int          $editionId,
+        IssueDelivery $scheduleIssue,
+    ): Model {
+        $now = date('Y-m-d H:i:s');
+
+        return IssueDelivery::create([
+            'subscription_id'         => $subscriptionId,
+            'subscription_plan_id'    => $editionId,
+            'issue_number'            => $scheduleIssue->issue_number,
+            'issue_title'             => $scheduleIssue->issue_title,
+            'on_sale_date'            => $scheduleIssue->on_sale_date,
+            'estimated_delivery_date' => $scheduleIssue->estimated_delivery_date,
+            'status'                  => 'pending',
+            'site_id'                 => $scheduleIssue->site_id,
+            'issue_code'              => $scheduleIssue->issue_code,
+            'cut_off_date'            => $scheduleIssue->cut_off_date,
+            'created_at'              => $now,
+            'updated_at'              => $now,
+        ]);
     }
 }

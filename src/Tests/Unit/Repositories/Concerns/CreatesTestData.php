@@ -73,16 +73,16 @@ use App\Models\PromotionIssueExclusion;
 use App\Models\RegionSet;
 use App\Models\RewardDefinition;
 use App\Models\Segment;
+use App\Models\Site;
 use App\Models\Subscriber;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPlanPricing;
 use App\Models\Tag;
 use App\Models\Territory;
-use App\Models\Site;
 use App\Models\User;
-use App\Models\UserSite;
 use App\Models\UserNotification;
+use App\Models\UserSite;
 use App\Models\Voucher;
 
 trait CreatesTestData
@@ -102,6 +102,18 @@ trait CreatesTestData
             'estimated_delivery_date' => now(),
             'status' => 'active'
         ]);
+    }
+
+    public function createSegment(array $overrides = []): Model
+    {
+        return Segment::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Segment',
+            'key' => uniqid(),
+            'is_active' => true,
+            'description' => 'Test Segment',
+            'category' => 'test'
+        ], $overrides));
     }
 
     protected function createRegionSet(array $overrides = []): RegionSet
@@ -285,6 +297,8 @@ trait CreatesTestData
             ->create($overrides);
     }
 
+    // Product-related factories
+
     /**
      * Attach author to page
      */
@@ -292,8 +306,6 @@ trait CreatesTestData
     {
         return RelationshipFactory::attach($page, $author, PageAuthor::class, $overrides);
     }
-
-    // Product-related factories
 
     /**
      * Create custom field definition
@@ -633,43 +645,6 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    protected function createIssueDelivery(array $overrides = [])
-    {
-        $plan = $attributes['subscription_plan'] ?? $this->createSubscriptionPlan();
-        return IssueDelivery::create(array_merge([
-            'site_id' => $this->siteId,
-            'subscription_id' => null,
-            'subscription_plan_id' => $plan->id,
-            'issue_number' => rand(100, 999),
-            'issue_title' => 'Test Issue ' . uniqid(),
-            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
-            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+37 days')),
-            'status' => 'active',
-            'cut_off_date' => date('Y-m-d', strtotime('+25 days')),
-        ], $overrides));
-    }
-
-    protected function createSubscriptionPlan(array $attributes = []): Model
-    {
-        return SubscriptionPlan::create(array_merge([
-            'site_id' => $this->siteId,
-            'name' => 'Test Plan ' . uniqid(),
-            'slug' => 'test-plan-' . uniqid(),
-            'description' => 'A test subscription plan',
-            'price' => 29.99,
-            'currency' => 'USD',
-            'billing_period' => 'monthly',
-            'features' => ['Feature 1', 'Feature 2'],
-            'is_active' => true,
-            'is_featured' => false,
-            'delivery_type' => 'print',
-            'print_shipping_required' => true,
-            'sort_order' => 0,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ], $attributes));
-    }
-
     protected function createSubscriber(array $attributes = []): Subscriber
     {
         $defaults = [
@@ -975,8 +950,6 @@ trait CreatesTestData
         ]);
     }
 
-    // ─── Gift Promotion ──────────────────────────────────────────────────────────
-
     protected function createGiftPromotionWithTriggers(array $promotionOverrides = [], array $triggers = []): GiftPromotion
     {
         $promotion = $this->createGiftPromotion($promotionOverrides);
@@ -993,6 +966,8 @@ trait CreatesTestData
 
         return $promotion;
     }
+
+    // ─── Gift Promotion ──────────────────────────────────────────────────────────
 
     protected function createGiftPromotion(array $overrides = []): Model
     {
@@ -1039,6 +1014,47 @@ trait CreatesTestData
         return IssuesDelivered::create(array_merge(['subscription_id' => $subscription->id, 'issue_delivery_id' => $issueDelivery->id], $overrides));
     }
 
+    protected function createIssueDelivery(array $overrides = [])
+    {
+        if (empty($overrides['subscription_plan_id'])) {
+            $plan = $attributes['subscription_plan'] ?? $this->createSubscriptionPlan();
+            $overrides['subscription_plan_id'] = $plan->id;
+        }
+
+        return IssueDelivery::create(array_merge([
+            'site_id' => $this->siteId,
+            'subscription_id' => null,
+            'subscription_plan_id' => $overrides['subscription_plan_id'],
+            'issue_number' => rand(100, 999),
+            'issue_title' => 'Test Issue ' . uniqid(),
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+7 days')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+37 days')),
+            'status' => 'active',
+            'cut_off_date' => date('Y-m-d', strtotime('+25 days')),
+        ], $overrides));
+    }
+
+    protected function createSubscriptionPlan(array $attributes = []): Model
+    {
+        return SubscriptionPlan::create(array_merge([
+            'site_id' => $this->siteId,
+            'name' => 'Test Plan ' . uniqid(),
+            'slug' => 'test-plan-' . uniqid(),
+            'description' => 'A test subscription plan',
+            'price' => 29.99,
+            'currency' => 'USD',
+            'billing_period' => 'monthly',
+            'features' => ['Feature 1', 'Feature 2'],
+            'is_active' => true,
+            'is_featured' => false,
+            'delivery_type' => 'print',
+            'print_shipping_required' => true,
+            'sort_order' => 0,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ], $attributes));
+    }
+
     protected function createPrintBatch(array $overrides = [])
     {
         $issueDelivery = $this->createIssueDelivery();
@@ -1059,18 +1075,6 @@ trait CreatesTestData
         ], $overrides);
 
         return UserNotification::create($data);
-    }
-
-    public function createSegment(array $overrides = []): Model
-    {
-        return Segment::create(array_merge([
-            'site_id' => $this->siteId,
-            'name' => 'Test Segment',
-            'key' => uniqid(),
-            'is_active' => true,
-            'description' => 'Test Segment',
-            'category' => 'test'
-        ], $overrides));
     }
 
     protected function createPricingTier(array $overrides = []): Model

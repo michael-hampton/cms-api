@@ -45,4 +45,37 @@ class StripeSubscriptionPlanUpdater
             ];
         }
     }
+
+    public function updateSubscriptionItemPrice(
+        string $stripeSubscriptionItemId,
+        string $stripePriceId,
+        array $options = [],
+    ): array {
+        try {
+            $payload = array_merge([
+                // CRM publication switches should not invoice automatically in
+                // this first implementation; future billing strategy can pass a
+                // different proration_behavior explicitly.
+                'price' => $stripePriceId,
+                'proration_behavior' => 'none',
+            ], $options);
+
+            $item = $this->stripe->subscriptionItems->update(
+                $stripeSubscriptionItemId,
+                $payload,
+            );
+
+            return [
+                'success' => true,
+                'stripe_subscription_item_id' => $stripeSubscriptionItemId,
+                'stripe_price_id' => $stripePriceId,
+                'stripe_subscription_id' => $item->subscription ?? null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
 }

@@ -2,15 +2,18 @@
 
 namespace App\Tests\Unit\Repositories\Subscription;
 
+use App\Enums\Subscriptions\SubscriptionType;
 use App\Models\Member;
 use App\Models\Site;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
 class SubscriptionPlanRepositoryTest extends FunctionalTestCase
 {
+    use CreatesTestData;
     private SubscriptionPlanRepository $repository;
 
     public function testGetActivePlans(): void
@@ -215,6 +218,307 @@ class SubscriptionPlanRepositoryTest extends FunctionalTestCase
         $this->assertNull($result);
     }
 
+    public function test_find_available_publication_targets_returns_active_plans_for_site(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Target Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($targetPlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_excludes_current_plan(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Other Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertNotContains($currentPlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_excludes_inactive_plans(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $inactivePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Inactive Plan',
+            'delivery_type' => 'print',
+            'is_active'     => false,
+        ]);
+
+        $activePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Active Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($activePlan->id, $ids);
+        $this->assertNotContains($inactivePlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_excludes_plans_from_other_sites(): void
+    {
+        $otherSite = $this->createSite();
+
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $sameSitePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Same Site Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $otherSitePlan = $this->createSubscriptionPlan([
+            'site_id'       => $otherSite->id,
+            'name'          => 'Other Site Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($sameSitePlan->id, $ids);
+        $this->assertNotContains($otherSitePlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_filters_by_delivery_type(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $printPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Another Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $digitalPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Digital Plan',
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($printPlan->id, $ids);
+        $this->assertNotContains($digitalPlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_does_not_filter_by_delivery_type_when_null(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $printPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $digitalPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Digital Plan',
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: null,
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($printPlan->id, $ids);
+        $this->assertContains($digitalPlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_does_not_filter_by_delivery_type_when_empty_string(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $printPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $digitalPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Digital Plan',
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: '',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertContains($printPlan->id, $ids);
+        $this->assertContains($digitalPlan->id, $ids);
+    }
+
+    public function test_find_available_publication_targets_orders_by_name_then_id(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $planB = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Bravo',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $planA1 = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Alpha',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $planA2 = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Alpha',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $ids = $results->pluck('id')->all();
+
+        $this->assertEquals([
+            $planA1->id,
+            $planA2->id,
+            $planB->id,
+        ], $ids);
+    }
+
+    public function test_find_available_publication_targets_returns_empty_collection_when_no_matches(): void
+    {
+        $currentPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Digital Only',
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $results = $this->repository->findAvailablePublicationTargets(
+            siteId: $this->siteId,
+            excludePlanId: $currentPlan->id,
+            deliveryType: 'print',
+        );
+
+        $this->assertCount(0, $results);
+    }
+
     public function testGetUpgradePlansForReturnsEmptyCollectionWhenNoneExist(): void
     {
         $plan = SubscriptionPlan::create($this->planAttributes(['slug' => 'lonely']));
@@ -236,20 +540,6 @@ class SubscriptionPlanRepositoryTest extends FunctionalTestCase
             'is_featured' => false,
             'sort_order' => 0,
         ], $overrides);
-    }
-
-    private function createActiveSubscription(int $memberId, int $planId): Subscription
-    {
-        return Subscription::create([
-            'member_id' => $memberId,
-            'site_id' => $this->siteId,
-            'plan_id' => $planId,
-            'plan_name' => 'Test Plan',
-            'status' => 'active',
-            'start_date' => date('Y-m-d H:i:s'),
-            'price' => 10.00,
-            'currency' => 'USD',
-        ]);
     }
 
     protected function setUp(): void

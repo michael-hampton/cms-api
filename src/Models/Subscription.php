@@ -53,6 +53,12 @@ class Subscription extends Model
         'last_payment_date',
         'payment_intent_id',
         'payment_subscription_id',
+        'stripe_subscription_id',
+        'stripe_subscription_item_id',
+        'stripe_price_id',
+        'stripe_sync_status',
+        'stripe_sync_error',
+        'stripe_synced_at',
         'voucher_id',
         'discount_amount',
         'original_price',
@@ -118,6 +124,7 @@ class Subscription extends Model
         'access_starts_at' => 'datetime',
         'first_shipment_at' => 'datetime',
         'is_linked' => 'boolean',
+        'stripe_synced_at' => 'datetime',
     ];
 
     public function member($relation = false)

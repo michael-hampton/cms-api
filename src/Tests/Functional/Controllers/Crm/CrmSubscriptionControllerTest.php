@@ -6,10 +6,12 @@ use App\DTO\Cart\TaxData;
 use App\DTO\Stripe\PaymentIntentResultDto;
 use App\DTO\Stripe\StripeSubscriptionResultDto;
 use App\Framework\Container;
+use App\Models\FulfilmentReplacement;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Payment;
 use App\Models\Subscription;
+use App\Models\SubscriptionChange;
 use App\Models\SubscriptionPlan;
 use App\Services\Billing\PaymentProviders\NullStripePaymentProcessor;
 use App\Services\Billing\PaymentProviders\StripePaymentProcessor;
@@ -51,6 +53,11 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
     private SubscriptionPlan $plan;
     private Subscription $subscription;
     private SubscriptionPlan $newPlan;
+    private SubscriptionPlan $printPlan;        // current edition (print, publication A)
+    private SubscriptionPlan $digitalPlan;      // incompatible delivery type
+
+    private SubscriptionPlan $newPrintPlan;     // target edition  (print, publication B)
+
 
     // ── history ───────────────────────────────────────────────────────────────
 
@@ -1601,8 +1608,11 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
     public function test_request_issue_replacement_returns_201_with_replacement_key(): void
     {
         $issue = $this->createIssueDelivery([
-            'subscription_id' => $this->subscription->id,
-            'plan_id' => $this->plan->id,
+            'subscription_id'      => $this->subscription->id,
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status'              => 'dispatched',
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 month +7 days')),
         ]);
 
         $response = $this->postForSite(
@@ -1615,6 +1625,7 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $this->assertResponseStatus(201, $response);
 
         $data = json_decode($response->getContent(), true);
+
         $this->assertTrue($data['success']);
         $this->assertArrayHasKey('replacement', $data);
         $this->assertStringContainsString('replacement requested', $data['message']);
@@ -1735,6 +1746,24 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
             'is_active' => true,
         ]);
 
+        $this->newPrintPlan = $this->createSubscriptionPlan([
+            'site_id'        => $this->siteId,
+            'delivery_type'  => 'print',
+            'is_active'      => true,
+        ]);
+
+        $this->printPlan    = $this->createSubscriptionPlan([
+            'site_id'        => $this->siteId,
+            'delivery_type'  => 'print',
+            'is_active'      => true,
+        ]);
+
+        $this->digitalPlan  = $this->createSubscriptionPlan([
+            'site_id'        => $this->siteId,
+            'delivery_type'  => 'digital',
+            'is_active'      => true,
+        ]);
+
         $this->createPricingTier(['plan_id' => $this->plan->id, 'is_default' => true, 'stripe_price_id' => 'abc', 'is_active' => true]);
 
         Container::getInstance()->bind(StripeCustomerGateway::class, function (Container $container) {
@@ -1814,5 +1843,1674 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
 
             return $mock;
         });
+    }
+
+    public function test_issues_endpoint_includes_can_request_replacement_field(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertArrayHasKey('issues', $data);
+        $this->assertNotEmpty($data['issues']);
+        $this->assertArrayHasKey('can_request_replacement', $data['issues'][0]);
+    }
+
+    public function test_issues_endpoint_includes_replacement_blocked_reason_field(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertArrayHasKey('replacement_blocked_reason', $data['issues'][0]);
+    }
+
+    public function test_dispatched_print_issue_with_no_open_replacement_returns_true(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertTrue($data['issues'][0]['can_request_replacement']);
+        $this->assertNull($data['issues'][0]['replacement_blocked_reason']);
+    }
+
+    public function test_digital_subscription_returns_false_for_all_issues(): void
+    {
+        [$member, $subscription] = $this->createDigitalSubscription();
+        $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        foreach ($data['issues'] as $row) {
+            $this->assertFalse($row['can_request_replacement']);
+            $this->assertNotNull($row['replacement_blocked_reason']);
+        }
+    }
+
+    public function test_pending_issue_returns_false_and_reason(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+
+        $this->createIssueDelivery([
+            'subscription_id' => $subscription->id,
+            'status'          => 'pending',
+            'subscription_plan_id'         => $subscription->plan_id,
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertFalse($data['issues'][0]['can_request_replacement']);
+        $this->assertStringContainsString('dispatched', $data['issues'][0]['replacement_blocked_reason']);
+    }
+
+    public function test_open_replacement_blocks_only_that_issue(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+
+        $blockedIssue  = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+        $allowedIssue  = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        // Create an open replacement for $blockedIssue only.
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $blockedIssue->id,
+            'status'            => 'pending',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $rows = array_column($data['issues'], null, 'id');
+
+        $this->assertFalse($rows[$blockedIssue->id]['can_request_replacement']);
+        $this->assertStringContainsString('in progress', $rows[$blockedIssue->id]['replacement_blocked_reason']);
+
+        $this->assertTrue($rows[$allowedIssue->id]['can_request_replacement']);
+        $this->assertNull($rows[$allowedIssue->id]['replacement_blocked_reason']);
+    }
+
+    public function test_queued_replacement_blocks_issue(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $issue = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status'            => 'queued',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertFalse($data['issues'][0]['can_request_replacement']);
+    }
+
+    public function test_dispatched_replacement_blocks_issue(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $issue = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status'            => 'dispatched',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertFalse($data['issues'][0]['can_request_replacement']);
+    }
+
+    public function test_failed_replacement_does_not_block_new_request(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $issue = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status'            => 'failed',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertTrue($data['issues'][0]['can_request_replacement']);
+    }
+
+    public function test_rejected_replacement_does_not_block_new_request(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $issue = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status'            => 'rejected',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertTrue($data['issues'][0]['can_request_replacement']);
+    }
+
+    public function test_cancelled_replacement_does_not_block_new_request(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+        $issue = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $this->createFulfilmentReplacement([
+            'subscription_id'   => $subscription->id,
+            'issue_delivery_id' => $issue->id,
+            'status'            => 'cancelled',
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        $this->assertTrue($data['issues'][0]['can_request_replacement']);
+    }
+
+    public function test_cancelled_subscription_returns_false_for_all_issues(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription(['status' => 'cancelled']);
+        $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+
+        foreach ($data['issues'] as $row) {
+            $this->assertFalse($row['can_request_replacement']);
+        }
+    }
+
+    public function test_mixed_issue_list_returns_mixed_eligibility(): void
+    {
+        [$member, $subscription] = $this->createPrintSubscription();
+
+        $dispatched = $this->createDispatchedIssueDelivery($subscription->id, $subscription->plan_id);
+        $pending    = $this->createIssueDelivery([
+            'subscription_id' => $subscription->id,
+            'status'          => 'pending',
+            'subscription_plan_id' => $subscription->plan_id,
+        ]);
+
+        $data = $this->fetchIssues($member->id, $subscription->id);
+        $rows = array_column($data['issues'], null, 'id');
+
+        $this->assertTrue($rows[$dispatched->id]['can_request_replacement']);
+        $this->assertFalse($rows[$pending->id]['can_request_replacement']);
+    }
+
+    // =========================================================================
+    // change-edition
+    // =========================================================================
+
+    public function test_change_edition_returns_200_on_valid_request(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        // Current future issue owed to the customer.
+        $currentFutureIssue = $this->createIssueDelivery([
+            'subscription_id'      => $this->subscription->id,
+            'subscription_plan_id' => $currentPlanId,
+            'status'              => 'pending',
+            'issue_number'        => 1,
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        // Target schedule issue from the SAME plan.
+        $targetIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $currentPlanId,
+            'status'              => 'active',
+            'issue_number'        => 2,
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('+2 months')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-edition",
+            [
+                'edition_id' => $targetIssue->id,
+                'reason'    => 'Agent requested',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($this->subscription->id, $data['subscription_id']);
+        $this->assertEquals($currentFutureIssue->id, $data['old_edition_id']);
+        $this->assertEquals($targetIssue->id, $data['new_edition_id']);
+
+        $this->subscription->refresh();
+
+        // Important: edition change must NOT change the plan.
+        $this->assertEquals($currentPlanId, (int) $this->subscription->plan_id);
+    }
+
+    public function test_change_edition_returns_401_for_unauthenticated(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-edition",
+            ['edition_id' => 999],
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_change_edition_returns_422_when_edition_id_missing(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-edition",
+            [],
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_change_edition_returns_422_for_cross_delivery_type(): void
+    {
+        $targetIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->digitalPlan->id,
+            'status'              => 'active',
+            'issue_number'        => 1,
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-edition",
+            [
+                'edition_id' => $targetIssue->id,
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsStringIgnoringCase(
+            'subscription plan',
+            $data['error'] ?? $data['message'] ?? ''
+        );
+    }
+
+    // =========================================================================
+    // change-publication
+    // =========================================================================
+
+    public function test_change_publication_returns_200_on_valid_request(): void
+    {
+        $this->createEnoughFutureIssuesForPlan($this->printPlan, 1);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->printPlan->id,
+                'reason'         => 'Customer requested alternative magazine',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($this->printPlan->id, $data['new_publication_id']);
+        $this->assertEquals($this->printPlan->id, $data['new_plan_id']);
+        $this->assertArrayHasKey('remaining_issues_transferred', $data);
+    }
+
+    public function test_change_publication_uses_publication_id_as_target_plan_when_edition_id_omitted(): void
+    {
+        // Existing future delivery owed to the customer.
+        $this->createIssueDelivery([
+            'subscription_id'      => $this->subscription->id,
+            'subscription_plan_id' => $this->printPlan->id,
+            'status'               => 'pending',
+            'on_sale_date'         => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+
+        // Replacement schedule issue for the target plan/publication.
+        $this->createEnoughFutureIssuesForPlan($this->printPlan, 1);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->printPlan->id,
+                'reason'         => 'No edition specified — publication id is the target plan id',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertEquals($this->printPlan->id, $data['new_publication_id']);
+        $this->assertEquals($this->printPlan->id, $data['new_plan_id']);
+        $this->assertEquals(1, $data['remaining_issues_transferred']);
+
+        // This is now the first issue/edition created from the target plan schedule.
+        $this->assertNotNull($data['new_edition_id']);
+    }
+
+    public function test_change_publication_returns_401_for_unauthenticated(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->printPlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_change_publication_returns_422_when_publication_id_missing(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            ['reason' => 'Missing publication_id'],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertFalse($data['success']);
+        $this->assertStringContainsStringIgnoringCase(
+            'publication_id is required',
+            $data['error']
+        );
+    }
+
+    public function test_change_publication_returns_422_for_same_publication(): void
+    {
+        // publication_id is currently treated as the target subscription_plans.id.
+        // To test "same publication", send the subscription's current plan_id.
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => (int) $this->subscription->plan_id,
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsStringIgnoringCase(
+            'same',
+            $data['error'] ?? $data['message'] ?? ''
+        );
+    }
+
+    public function test_change_publication_returns_422_for_edition_from_wrong_publication(): void
+    {
+        // newPrintPlan.id belongs to publication B, but we are passing publication B's ID
+        // while sneaking in an edition that belongs to publication A — should be rejected.
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->printPlan->publication_id,
+                'edition_id' => $this->printPlan->id, // ← belongs to pub A, not pub B
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsStringIgnoringCase('publication', $data['error']);
+    }
+
+    public function test_change_publication_returns_422_for_incompatible_delivery_type(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                // publication_id is now the target SubscriptionPlan id.
+                'publication_id' => $this->digitalPlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsStringIgnoringCase(
+            'delivery type',
+            $data['error'] ?? $data['message'] ?? ''
+        );
+    }
+
+    public function test_change_publication_returns_422_for_inactive_subscription(): void
+    {
+        $cancelledSub = $this->createPrintSubscription($this->member, $this->printPlan, ['status' => 'cancelled']);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$cancelledSub->id}/change-publication",
+            ['publication_id' => $this->printPlan->publication_id],
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_change_publication_returns_422_for_plan_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+
+        $otherSitePlan = $this->createSubscriptionPlan([
+            'site_id'       => $otherSite->id,
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $otherSitePlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsStringIgnoringCase(
+            'site',
+            $data['error'] ?? $data['message'] ?? ''
+        );
+    }
+
+    public function test_change_publication_returns_422_for_inactive_plan(): void
+    {
+        $inactivePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'delivery_type' => 'print',
+            'is_active'     => false,
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $inactivePlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertStringContainsStringIgnoringCase(
+            'not active',
+            $data['error'] ?? $data['message'] ?? ''
+        );
+    }
+
+    public function test_change_publication_creates_audit_row(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        $currentFutureIssue = $this->createIssueDelivery([
+            'subscription_id'      => $this->subscription->id,
+            'subscription_plan_id' => $currentPlanId,
+            'status'               => 'pending',
+            'on_sale_date'         => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $targetScheduleIssue = $this->createIssueDelivery([
+            'subscription_id'      => null,
+            'subscription_plan_id' => $this->newPrintPlan->id,
+            'status'               => 'active',
+            'issue_number'         => 1,
+            'on_sale_date'         => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                // publication_id is the target SubscriptionPlan id.
+                'publication_id' => $this->newPrintPlan->id,
+                'reason'         => 'Audit row test',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $change = SubscriptionChange::where('subscription_id', $this->subscription->id)
+            ->where('change_type', 'publication_change')
+            ->first();
+
+        $this->assertNotNull($change, 'Expected a subscription_changes row for publication_change.');
+
+        $this->assertEquals($currentPlanId, $change->old_publication_id);
+        $this->assertEquals($this->newPrintPlan->id, $change->new_publication_id);
+
+        $this->assertEquals($currentFutureIssue->id, $change->old_edition_id);
+        $this->assertEquals($targetScheduleIssue->id, $change->new_edition_id);
+
+        $this->assertEquals(1, $change->remaining_issues_transferred);
+        $this->assertEquals('Audit row test', $change->reason);
+    }
+
+    public function test_change_publication_transfers_remaining_issue_count(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        foreach (range(1, 3) as $i) {
+            $this->createIssueDelivery([
+                'subscription_id'      => $this->subscription->id,
+                'subscription_plan_id' => $currentPlanId,
+                'status'               => 'pending',
+                'issue_number'         => $i,
+                'on_sale_date'         => date('Y-m-d H:i:s', strtotime("+{$i} month")),
+                'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime("+{$i} month +7 days")),
+            ]);
+        }
+
+        $this->createEnoughFutureIssuesForPlan($this->newPrintPlan, 3);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                // publication_id is the target SubscriptionPlan id.
+                'publication_id' => $this->newPrintPlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals(3, $data['remaining_issues_transferred']);
+    }
+
+    public function test_change_publication_response_includes_remaining_issues_transferred(): void
+    {
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->newPrintPlan->id,
+            ],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertArrayHasKey('remaining_issues_transferred', $data);
+        $this->assertIsInt($data['remaining_issues_transferred']);
+    }
+
+    public function test_change_publication_with_same_stripe_price_does_not_call_stripe(): void
+    {
+        $currentTier = $this->createPricingTier([
+            'plan_id' => $this->plan->id,
+            'duration_months' => 6,
+            'issue_count' => 6,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_same',
+            'is_active' => true,
+        ]);
+
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+        ]);
+
+        $targetTier = $this->createPricingTier([
+            'plan_id' => $targetPlan->id,
+            'duration_months' => 6,
+            'issue_count' => 6,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_same',
+            'is_active' => true,
+        ]);
+
+        $this->subscription->update([
+            'subscription_plan_pricing_id' => $currentTier->id,
+            'stripe_price_id' => 'price_same',
+            'payment_subscription_id' => 'sub_same',
+            'stripe_subscription_item_id' => 'si_same',
+        ]);
+
+        $this->createIssueDelivery([
+            'subscription_id' => $this->subscription->id,
+            'subscription_plan_id' => $this->plan->id,
+            'status' => 'pending',
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldNotReceive('updateSubscriptionItemPrice');
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            ['publication_id' => $targetPlan->id],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertSame('synced', $data['stripe_sync_status']);
+
+        $subscription = Subscription::find($this->subscription->id);
+        $this->assertEquals($targetTier->id, $subscription->subscription_plan_pricing_id);
+        $this->assertSame('price_same', $subscription->stripe_price_id);
+    }
+
+    public function test_change_publication_with_different_stripe_price_syncs_after_commit(): void
+    {
+        $currentTier = $this->createPricingTier([
+            'plan_id' => $this->plan->id,
+            'duration_months' => 12,
+            'issue_count' => 12,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_old',
+            'is_active' => true,
+        ]);
+
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+        ]);
+
+        $this->createPricingTier([
+            'plan_id' => $targetPlan->id,
+            'duration_months' => 12,
+            'issue_count' => 12,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_new',
+            'is_active' => true,
+        ]);
+
+        $this->subscription->update([
+            'subscription_plan_pricing_id' => $currentTier->id,
+            'stripe_price_id' => 'price_old',
+            'payment_subscription_id' => 'sub_change',
+            'stripe_subscription_item_id' => 'si_change',
+        ]);
+
+        $this->createIssueDelivery([
+            'subscription_id' => $this->subscription->id,
+            'subscription_plan_id' => $this->plan->id,
+            'status' => 'pending',
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('updateSubscriptionItemPrice')
+                ->once()
+                ->with('si_change', 'price_new', ['proration_behavior' => 'none'])
+                ->andReturn(['success' => true]);
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            ['publication_id' => $targetPlan->id],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertSame('synced', $data['stripe_sync_status']);
+        $this->assertNull($data['stripe_sync_error']);
+    }
+
+    public function test_change_publication_returns_422_when_compatible_pricing_tier_missing(): void
+    {
+        $currentTier = $this->createPricingTier([
+            'plan_id' => $this->plan->id,
+            'duration_months' => 12,
+            'issue_count' => 12,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_old',
+            'is_active' => true,
+        ]);
+
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+        ]);
+
+        $this->subscription->update([
+            'subscription_plan_pricing_id' => $currentTier->id,
+            'stripe_price_id' => 'price_old',
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            ['publication_id' => $targetPlan->id],
+        );
+
+        $this->assertResponseStatus(422, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertStringContainsStringIgnoringCase('no compatible pricing tier', $data['error']);
+    }
+
+    public function test_change_publication_marks_failed_when_stripe_sync_fails(): void
+    {
+        $currentTier = $this->createPricingTier([
+            'plan_id' => $this->plan->id,
+            'duration_months' => 3,
+            'issue_count' => 3,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_old',
+            'is_active' => true,
+        ]);
+
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+        ]);
+
+        $this->createPricingTier([
+            'plan_id' => $targetPlan->id,
+            'duration_months' => 3,
+            'issue_count' => 3,
+            'currency' => 'GBP',
+            'stripe_price_id' => 'price_new',
+            'is_active' => true,
+        ]);
+
+        $this->subscription->update([
+            'subscription_plan_pricing_id' => $currentTier->id,
+            'stripe_price_id' => 'price_old',
+            'payment_subscription_id' => 'sub_change',
+            'stripe_subscription_item_id' => 'si_change',
+        ]);
+
+        $this->createIssueDelivery([
+            'subscription_id' => $this->subscription->id,
+            'subscription_plan_id' => $this->plan->id,
+            'status' => 'pending',
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+        ]);
+        $this->createEnoughFutureIssuesForPlan($targetPlan, 1);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('updateSubscriptionItemPrice')
+                ->once()
+                ->andReturn(['success' => false, 'error' => 'Stripe refused this update.']);
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            ['publication_id' => $targetPlan->id],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertSame('failed', $data['stripe_sync_status']);
+        $this->assertSame('Stripe refused this update.', $data['stripe_sync_error']);
+    }
+
+    // =========================================================================
+    // GET /changes — Ticket 5
+    // =========================================================================
+
+    public function test_changes_returns_200_with_changes_array(): void
+    {
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('changes', $data);
+        $this->assertIsArray($data['changes']);
+    }
+
+    public function test_changes_returns_empty_array_when_no_history(): void
+    {
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertCount(0, $data['changes']);
+    }
+
+    public function test_changes_returns_401_for_unauthenticated(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_changes_returns_404_for_subscription_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+
+        $otherMember = $this->createMember([
+            'site_id' => $otherSite->id,
+        ]);
+
+        $otherPlan = $this->createSubscriptionPlan([
+            'site_id'       => $otherSite->id,
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $otherSub = $this->createSubscriptionRecord([
+            'member_id'      => $otherMember->id,
+            'site_id'        => $otherSite->id,
+            'plan_id'        => $otherPlan->id,
+            'plan_name'      => $otherPlan->name ?? 'Other Site Plan',
+            'status'         => 'active',
+            'delivery_type'  => 'print',
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$otherSub->id}/changes"
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_changes_includes_edition_change_after_change_edition_call(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        $currentFutureIssue = $this->createIssueDelivery([
+            'subscription_id'      => $this->subscription->id,
+            'subscription_plan_id' => $currentPlanId,
+            'status'              => 'pending',
+            'issue_number'        => 1,
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $targetIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $currentPlanId,
+            'status'              => 'active',
+            'issue_number'        => 2,
+            'on_sale_date'        => date('Y-m-d H:i:s', strtotime('+2 months')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
+        ]);
+
+        $changeResponse = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-edition",
+            [
+                'edition_id' => $targetIssue->id,
+                'reason'    => 'Edition test',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $changeResponse);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $changes = $data['changes'];
+
+        $this->assertCount(1, $changes);
+
+        $this->assertEquals('edition_change', $changes[0]['change_type']);
+        $this->assertArrayHasKey('old_edition', $changes[0]);
+        $this->assertArrayHasKey('new_edition', $changes[0]);
+        $this->assertArrayHasKey('reason', $changes[0]);
+        $this->assertArrayHasKey('created_by', $changes[0]);
+        $this->assertArrayHasKey('created_at', $changes[0]);
+
+        $this->assertEquals('Edition test', $changes[0]['reason']);
+    }
+
+    public function test_changes_includes_publication_change_after_change_publication_call(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        // Existing future delivery owed to the customer.
+        $this->createIssueDelivery([
+            'subscription_id'           => $this->subscription->id,
+            'subscription_plan_id'      => $currentPlanId,
+            'status'                    => 'pending',
+            'issue_number'              => 1,
+            'on_sale_date'              => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date'   => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        // Replacement schedule issue on the target plan/publication.
+        $this->createIssueDelivery([
+            'subscription_plan_id'      => $this->newPrintPlan->id,
+            'status'                    => 'active',
+            'issue_number'              => 1,
+            'on_sale_date'              => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date'   => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $changeResponse = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                // publication_id is the target SubscriptionPlan id.
+                'publication_id' => $this->newPrintPlan->id,
+                'reason'         => 'Pub change test',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $changeResponse);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $changes = $data['changes'];
+
+        $this->assertCount(1, $changes);
+
+        $row = $changes[0];
+
+        $this->assertEquals('publication_change', $row['change_type']);
+        $this->assertArrayHasKey('old_publication', $row);
+        $this->assertArrayHasKey('new_publication', $row);
+        $this->assertArrayHasKey('old_edition', $row);
+        $this->assertArrayHasKey('new_edition', $row);
+        $this->assertArrayHasKey('remaining_issues_transferred', $row);
+        $this->assertArrayHasKey('reason', $row);
+        $this->assertArrayHasKey('created_by', $row);
+        $this->assertArrayHasKey('created_at', $row);
+
+        $this->assertEquals('Pub change test', $row['reason']);
+        $this->assertEquals(1, $row['remaining_issues_transferred']);
+    }
+
+    public function test_changes_lists_most_recent_first(): void
+    {
+        $currentPlanId = (int) $this->subscription->plan_id;
+
+        $oldEdition = $this->createIssueDelivery([
+            'subscription_id'             => $this->subscription->id,
+            'subscription_plan_id'        => $currentPlanId,
+            'status'                      => 'delivered', // important: do not count as future
+            'issue_number'                => 1,
+            'on_sale_date'                => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'estimated_delivery_date'     => date('Y-m-d H:i:s', strtotime('-1 month +7 days')),
+        ]);
+
+        $newEdition = $this->createIssueDelivery([
+            'subscription_plan_id'        => $currentPlanId,
+            'status'                      => 'active',
+            'issue_number'                => 2,
+            'on_sale_date'                => date('Y-m-d H:i:s', strtotime('+2 months')),
+            'estimated_delivery_date'     => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
+        ]);
+
+        SubscriptionChange::create([
+            'subscription_id' => $this->subscription->id,
+            'change_type'    => 'edition_change',
+            'old_edition_id' => $oldEdition->id,
+            'new_edition_id' => $newEdition->id,
+            'reason'         => 'Edition change test',
+            'created_by'     => $this->actingUser->id ?? 1,
+            'created_at'     => date('Y-m-d H:i:s', strtotime('-1 minute')),
+            'updated_at'     => date('Y-m-d H:i:s', strtotime('-1 minute')),
+        ]);
+
+        // One real future delivery owed to the customer.
+        $this->createIssueDelivery([
+            'subscription_id'             => $this->subscription->id,
+            'subscription_plan_id'        => $currentPlanId,
+            'status'                      => 'pending',
+            'issue_number'                => 3,
+            'on_sale_date'                => date('Y-m-d H:i:s', strtotime('+3 months')),
+            'estimated_delivery_date'     => date('Y-m-d H:i:s', strtotime('+3 months +7 days')),
+        ]);
+
+        // Replacement schedule issue on the target plan/publication.
+        // Must match the remaining future delivery count: 1.
+        $this->createEnoughFutureIssuesForPlan($this->newPrintPlan, 1);
+
+        $publicationResponse = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/change-publication",
+            [
+                'publication_id' => $this->newPrintPlan->id,
+                'reason'         => 'Publication change test',
+            ],
+        );
+
+        $this->assertResponseStatus(200, $publicationResponse);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/changes"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $changes = $data['changes'];
+
+        $this->assertCount(2, $changes);
+
+        $this->assertEquals('publication_change', $changes[0]['change_type']);
+        $this->assertEquals('edition_change', $changes[1]['change_type']);
+    }
+
+    public function test_available_editions_returns_200_with_editions_array(): void
+    {
+        $issue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 1,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('editions', $data);
+
+        $ids = array_column($data['editions'], 'id');
+
+        $this->assertContains($issue->id, $ids);
+    }
+
+    public function test_available_editions_excludes_issues_from_other_plans(): void
+    {
+        $matchingIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 1,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $otherIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->newPrintPlan->id,
+            'status' => 'active',
+            'issue_number' => 2,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['editions'], 'id');
+
+        $this->assertContains($matchingIssue->id, $ids);
+        $this->assertNotContains($otherIssue->id, $ids);
+    }
+
+    public function test_available_editions_excludes_inactive_issues(): void
+    {
+        $activeIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 1,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+1 month +7 days')),
+        ]);
+
+        $inactiveIssue = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'inactive',
+            'issue_number' => 2,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('+2 months')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('+2 months +7 days')),
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['editions'], 'id');
+
+        $this->assertContains($activeIssue->id, $ids);
+        $this->assertNotContains($inactiveIssue->id, $ids);
+    }
+
+    public function test_available_editions_returns_empty_array_when_no_future_issues(): void
+    {
+        $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 1,
+            'on_sale_date' => date('Y-m-d H:i:s', strtotime('-1 month')),
+            'estimated_delivery_date' => date('Y-m-d H:i:s', strtotime('-1 month +7 days')),
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('editions', $data);
+        $this->assertCount(0, $data['editions']);
+    }
+
+    public function test_available_editions_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_available_editions_returns_404_for_subscription_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+
+        $otherMember = $this->createMember([
+            'site_id' => $otherSite->id,
+        ]);
+
+        $otherPlan = $this->createSubscriptionPlan([
+            'site_id' => $otherSite->id,
+            'delivery_type' => 'print',
+            'is_active' => true,
+        ]);
+
+        $otherSub = $this->createSubscriptionRecord([
+            'member_id' => $otherMember->id,
+            'site_id' => $otherSite->id,
+            'plan_id' => $otherPlan->id,
+            'status' => 'active',
+            'delivery_type' => 'print',
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$otherSub->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_available_editions_orders_by_on_sale_date_then_issue_number(): void
+    {
+        $issue3 = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 3,
+            'on_sale_date' => '2026-08-01 00:00:00',
+            'estimated_delivery_date' => '2026-08-08 00:00:00',
+        ]);
+
+        $issue2 = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 2,
+            'on_sale_date' => '2026-08-01 00:00:00',
+            'estimated_delivery_date' => '2026-08-08 00:00:00',
+        ]);
+
+        $issue1 = $this->createIssueDelivery([
+            'subscription_plan_id' => $this->subscription->plan_id,
+            'status' => 'active',
+            'issue_number' => 1,
+            'on_sale_date' => '2026-07-01 00:00:00',
+            'estimated_delivery_date' => '2026-07-08 00:00:00',
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-editions"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertEquals([
+            $issue1->id,
+            $issue2->id,
+            $issue3->id,
+        ], array_column($data['editions'], 'id'));
+    }
+
+    public function test_available_publications_returns_200_with_publications_array(): void
+    {
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Target Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('plans', $data);
+        $this->assertIsArray($data['plans']);
+
+        $ids = array_column($data['plans'], 'id');
+
+        $this->assertContains($targetPlan->id, $ids);
+    }
+
+    public function test_available_publications_excludes_current_subscription_plan(): void
+    {
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['plans'], 'id');
+
+        $this->assertNotContains((int) $this->subscription->plan_id, $ids);
+    }
+
+    public function test_available_publications_excludes_inactive_plans(): void
+    {
+        $inactivePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Inactive Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => false,
+        ]);
+
+        $activePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Active Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['plans'], 'id');
+
+        $this->assertContains($activePlan->id, $ids);
+        $this->assertNotContains($inactivePlan->id, $ids);
+    }
+
+    public function test_available_publications_excludes_plans_from_other_sites(): void
+    {
+        $otherSite = $this->createSite();
+
+        $sameSitePlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Same Site Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $otherSitePlan = $this->createSubscriptionPlan([
+            'site_id'       => $otherSite->id,
+            'name'          => 'Other Site Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['plans'], 'id');
+
+        $this->assertContains($sameSitePlan->id, $ids);
+        $this->assertNotContains($otherSitePlan->id, $ids);
+    }
+
+    public function test_available_publications_excludes_different_delivery_type(): void
+    {
+        $printPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Another Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $digitalPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Digital Plan',
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $ids = array_column($data['plans'], 'id');
+
+        $this->assertContains($printPlan->id, $ids);
+        $this->assertNotContains($digitalPlan->id, $ids);
+    }
+
+    public function test_available_publications_returns_401_for_unauthenticated_request(): void
+    {
+        $this->unauthenticate();
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(401, $response);
+    }
+
+    public function test_available_publications_returns_404_for_non_existent_subscription(): void
+    {
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/999999/available-publications"
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_available_publications_returns_404_for_subscription_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+
+        $otherMember = $this->createMember([
+            'site_id' => $otherSite->id,
+        ]);
+
+        $otherPlan = $this->createSubscriptionPlan([
+            'site_id'       => $otherSite->id,
+            'name'          => 'Other Site Current Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+        ]);
+
+        $otherSub = $this->createSubscriptionRecord([
+            'member_id'     => $otherMember->id,
+            'site_id'       => $otherSite->id,
+            'plan_id'       => $otherPlan->id,
+            'status'        => 'active',
+            'delivery_type' => 'print',
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$otherSub->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(404, $response);
+    }
+
+    public function test_available_publications_response_rows_have_expected_shape(): void
+    {
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'name'          => 'Shape Test Print Plan',
+            'delivery_type' => 'print',
+            'is_active'     => true,
+            'price'         => 9.99,
+            'currency'      => 'GBP',
+        ]);
+
+        $response = $this->getForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/available-publications"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $matchingRows = array_values(array_filter(
+            $data['plans'],
+            static fn (array $row): bool => (int) $row['id'] === (int) $targetPlan->id
+        ));
+
+        $this->assertNotEmpty($matchingRows);
+
+        $row = $matchingRows[0];
+
+        $this->assertArrayHasKey('id', $row);
+        $this->assertArrayHasKey('name', $row);
+        $this->assertArrayHasKey('delivery_type', $row);
+        $this->assertArrayHasKey('is_active', $row);
+        $this->assertArrayHasKey('price', $row);
+        $this->assertArrayHasKey('currency', $row);
+
+        $this->assertEquals($targetPlan->id, $row['id']);
+        $this->assertEquals('Shape Test Print Plan', $row['name']);
+        $this->assertEquals('print', $row['delivery_type']);
+    }
+
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    private function createPrintSubscription(
+        mixed $member = null,
+        ?SubscriptionPlan $plan = null,
+        array $overrides = [],
+    ): array|Model {
+        /*
+         * Backwards-compatible call styles:
+         *
+         *   createPrintSubscription()
+         *      -> returns [Member, Subscription]
+         *
+         *   createPrintSubscription(['status' => 'cancelled'])
+         *      -> returns [Member, Subscription]
+         *
+         *   createPrintSubscription($member, $plan)
+         *      -> returns Subscription
+         *
+         *   createPrintSubscription($member, $plan, ['status' => 'cancelled'])
+         *      -> returns Subscription
+         */
+
+        $returnTuple = false;
+
+        if (is_array($member)) {
+            $overrides = $member;
+            $member = null;
+            $plan = null;
+            $returnTuple = true;
+        }
+
+        if ($member === null) {
+            $returnTuple = true;
+
+            $member = $this->createMember([
+                'site_id'    => $this->siteId,
+                'is_active'  => true,
+                'anonymous'  => false,
+                'first_name' => 'Print',
+                'last_name'  => 'Subscriber',
+                'email'      => 'print.subscriber.' . uniqid() . '@example.com',
+            ]);
+        }
+
+        if (!$member instanceof Member) {
+            throw new \InvalidArgumentException('Expected Member or overrides array.');
+        }
+
+        if (!$plan instanceof SubscriptionPlan) {
+            $plan = $this->createSubscriptionPlan([
+                'site_id'       => $member->site_id ?? $this->siteId,
+                'delivery_type' => 'print',
+                'is_active'     => true,
+            ]);
+        }
+
+        $subscription = Subscription::create(array_merge([
+            'member_id'        => $member->id,
+            'site_id'          => $member->site_id ?? $this->siteId,
+            'plan_id'          => $plan->id,
+            'plan_name'        => $plan->name ?? 'Test Plan',
+            'status'           => 'active',
+            'delivery_type'    => 'print',
+            'start_date'       => date('Y-m-d H:i:s'),
+            'end_date'         => date('Y-m-d H:i:s', strtotime('+1 year')),
+            'next_billing_date'=> date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price'            => 9.99,
+            'currency'         => 'GBP',
+            'auto_renew'       => true,
+            'delivery_paused'  => false,
+            'created_at'       => date('Y-m-d H:i:s'),
+            'updated_at'       => date('Y-m-d H:i:s'),
+        ], $overrides));
+
+        if ($returnTuple) {
+            return [$member, $subscription];
+        }
+
+        return $subscription;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function fetchIssues(int $memberId, int $subscriptionId): array
+    {
+        $response = $this->getForSite(
+            "/api/crm/members/{$memberId}/subscriptions/{$subscriptionId}/issues"
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        return json_decode($response->getContent(), true);
+    }
+
+    /**
+     * @return array{0: \App\Models\Member, 1: \App\Models\Subscription}
+     */
+    /**
+     * @return array{0: \App\Models\Member, 1: \App\Models\Subscription}
+     */
+    private function createDigitalSubscription(): array
+    {
+        $member = $this->createMember([
+            'site_id'    => $this->siteId,
+            'is_active'  => true,
+            'anonymous'  => false,
+            'first_name' => 'Digital',
+            'last_name'  => 'Subscriber',
+            'email'      => 'digital.subscriber.' . uniqid() . '@example.com',
+        ]);
+
+        $plan = $this->createSubscriptionPlan([
+            'site_id'       => $this->siteId,
+            'delivery_type' => 'digital',
+            'is_active'     => true,
+        ]);
+
+        $subscription = Subscription::create([
+            'member_id'         => $member->id,
+            'site_id'           => $this->siteId,
+            'plan_id'           => $plan->id,
+            'plan_name'         => $plan->name ?? 'Digital Plan',
+            'status'            => 'active',
+            'delivery_type'     => 'digital',
+            'start_date'        => date('Y-m-d H:i:s'),
+            'end_date'          => date('Y-m-d H:i:s', strtotime('+1 year')),
+            'next_billing_date' => date('Y-m-d H:i:s', strtotime('+1 month')),
+            'price'             => 9.99,
+            'currency'          => 'GBP',
+            'auto_renew'        => true,
+            'delivery_paused'   => false,
+            'created_at'        => date('Y-m-d H:i:s'),
+            'updated_at'        => date('Y-m-d H:i:s'),
+        ]);
+
+        return [$member, $subscription];
+    }
+
+    private function createDispatchedIssueDelivery(int $subscriptionId, int $planId): Model
+    {
+        return $this->createIssueDelivery([
+            'subscription_id' => $subscriptionId,
+            'subscription_plan_id' => $planId,
+            'status'          => 'dispatched',
+        ]);
+    }
+
+    private function createFulfilmentReplacement(array $attributes): Model
+    {
+        return FulfilmentReplacement::create(array_merge([
+            'reason'     => 'Test reason',
+            'created_by' => 1,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], $attributes));
+    }
+
+    private function createEnoughFutureIssuesForPlan(
+        SubscriptionPlan $plan,
+        int $count = 3,
+    ): void {
+        for ($i = 1; $i <= $count; $i++) {
+            $this->createIssueDelivery([
+                'subscription_plan_id'      => $plan->id,
+                'subscription_id'           => null,
+                'issue_number'              => $i,
+                'status'                    => 'active',
+                'on_sale_date'              => date('Y-m-d H:i:s', strtotime("+{$i} month")),
+                'estimated_delivery_date'   => date('Y-m-d H:i:s', strtotime("+{$i} month +7 days")),
+            ]);
+        }
     }
 }

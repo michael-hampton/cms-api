@@ -14,15 +14,19 @@ use App\Repositories\MemberInsights\MemberActivityRepository;
 use App\Repositories\Members\MemberRepository;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\IssuesDeliveredRepository;
+use App\Repositories\Subscriptions\SubscriptionChangeRepository;
 use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\CrmSubscriptionCreationService;
+use App\Services\Subscriptions\FulfilmentReplacementEligibilityService;
 use App\Services\Subscriptions\FulfilmentReplacementService;
 use App\Services\Subscriptions\Refunds\RefundResult;
 use App\Services\Subscriptions\Refunds\RefundStrategy;
 use App\Services\Subscriptions\SubscriptionCancellationService;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
+use App\Services\Subscriptions\SubscriptionEditionChangeService;
 use App\Services\Subscriptions\SubscriptionHistoryService;
+use App\Services\Subscriptions\SubscriptionPlanChangeService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
@@ -48,6 +52,10 @@ class CrmSubscriptionController extends Controller
         private readonly FulfilmentReplacementService     $replacementService,
         private readonly SubscriptionRefundService        $refundService,
         private readonly SuspendSubscriptionAction        $suspendAction,
+        private readonly FulfilmentReplacementEligibilityService $replacementEligibilityService,
+        private readonly SubscriptionChangeRepository         $subscriptionChangeRepository,
+        private readonly SubscriptionEditionChangeService     $editionChangeService,
+         private readonly SubscriptionPlanChangeService $planChangeService,
     )
     {
         parent::__construct();
@@ -292,11 +300,20 @@ class CrmSubscriptionController extends Controller
     /**
      * GET /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/issues
      */
+    /**
+     * GET /api/{site}/crm/members/{memberId}/subscriptions/{subscriptionId}/issues
+     *
+     * Each issue row now includes:
+     *   can_request_replacement    bool
+     *   replacement_blocked_reason string|null
+     */
     public function issuesForSubscription(Request $request, int $memberId, int $subscriptionId): mixed
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+
+        $siteId = SiteContext::getId();
 
         $subscription = $this->subscriptionRepository->find($subscriptionId, ['plan']);
 
@@ -304,40 +321,403 @@ class CrmSubscriptionController extends Controller
             return $this->jsonResponse(['success' => false, 'message' => 'Subscription not found.'], 404);
         }
 
-        $filter = $request->input('filter', 'all');
+        $filter  = $request->input('filter', 'all');
         $fromRaw = $request->input('from');
-        $toRaw = $request->input('to');
-        $page = max(1, (int)$request->input('page', 1));
+        $toRaw   = $request->input('to');
+        $page    = max(1, (int)$request->input('page', 1));
         $perPage = min(50, max(1, (int)$request->input('per_page', 15)));
 
         try {
             $result = $this->issueDeliveryRepository->getPaginatedForSubscription(
-                planId: $subscription->plan_id,
+                planId:         $subscription->plan_id,
                 subscriptionId: $subscriptionId,
-                filter: $filter,
-                from: $fromRaw ? new \DateTime($fromRaw) : null,
-                to: $toRaw ? new \DateTime($toRaw) : null,
-                page: $page,
-                perPage: $perPage,
+                filter:         $filter,
+                from:           $fromRaw ? new \DateTime($fromRaw) : null,
+                to:             $toRaw   ? new \DateTime($toRaw)   : null,
+                page:           $page,
+                perPage:        $perPage,
+            );
+
+            // Collect every issue delivery ID on this page for one bulk eligibility query.
+            $issueIds = array_map(
+                static fn(array $row): int => (int)$row['id'],
+                $result['data']
+            );
+
+            $eligibilityMap = $this->replacementEligibilityService->canRequestForIssues(
+                subscriptionId: $subscriptionId,
+                issueIds:       $issueIds,
+                siteId:         $siteId,
+            );
+
+            $issues = array_map(
+                static function (array $row) use ($eligibilityMap): array {
+                    $issueId     = (int)$row['id'];
+                    $eligibility = $eligibilityMap[$issueId] ?? null;
+
+                    $row['can_request_replacement']    = $eligibility?->canRequestReplacement ?? false;
+                    $row['replacement_blocked_reason'] = $eligibility?->blockedReason ?? null;
+
+                    return $row;
+                },
+                $result['data']
             );
 
             return $this->resourceResponse([
-                'success' => true,
-                'issues' => $result['data'],
+                'success'    => true,
+                'issues'     => $issues,
                 'pagination' => [
-                    'total' => $result['total'],
-                    'per_page' => $perPage,
+                    'total'        => $result['total'],
+                    'per_page'     => $perPage,
                     'current_page' => $page,
-                    'last_page' => $result['last_page'],
+                    'last_page'    => $result['last_page'],
                 ],
             ]);
         } catch (\Exception $e) {
             Logger::error('Failed to fetch issues for subscription', [
                 'subscription_id' => $subscriptionId,
-                'error' => $e->getMessage(),
+                'error'           => $e->getMessage(),
             ]);
 
             return $this->jsonResponse(['success' => false, 'message' => 'Failed to load issues.'], 500);
+        }
+    }
+
+    /**
+     * POST /api/{site}/crm/subscriptions/{subscriptionId}/change-edition
+     *
+     * Body:
+     *   edition_id  int     required
+     *   reason      string  optional
+     */
+    public function changeEdition(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId  = SiteContext::getId();
+        $agentId = (int) Auth::id();
+
+        /**
+         * edition_id is IssueDelivery.id.
+         */
+        $newEditionId = (int) $request->input('edition_id');
+        $reason       = trim((string) $request->input('reason', '')) ?: null;
+
+        if ($newEditionId <= 0) {
+            return $this->errorResponse('edition_id is required.', 422);
+        }
+
+        try {
+            $result = $this->editionChangeService->changeEdition(
+                subscriptionId: $subscriptionId,
+                newEditionId: $newEditionId,
+                siteId: $siteId,
+                agentId: $agentId,
+                reason: $reason,
+            );
+
+            return $this->resourceResponse([
+                'success' => true,
+                'subscription_id' => $result->subscription_id,
+                'old_edition_id' => $result->old_edition_id,
+                'new_edition_id' => $result->new_edition_id,
+                'message' => $result->message,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to change subscription edition', [
+                'subscription_id' => $subscriptionId,
+                'edition_id' => $newEditionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/{site}/crm/subscriptions/{subscriptionId}/change-publication
+     *
+     * Backwards-compatible endpoint.
+     *
+     * Body:
+     *   publication_id  int     required for legacy clients
+     *   edition_id      int     required for current implementation
+     *   reason          string  optional
+     *
+     * Note:
+     *   The current SubscriptionPlanChangeService changes the subscription plan.
+     *   Therefore this endpoint requires edition_id/new plan id unless default
+     *   plan resolution is added separately.
+     */
+    public function changePublication(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId  = SiteContext::getId();
+        $agentId = (int) Auth::id();
+
+        /**
+         * Current domain:
+         *   SubscriptionPlan = publication
+         *
+         * So publication_id here is the target subscription_plans.id.
+         */
+        $newPlanId = (int) $request->input('publication_id');
+        $reason    = trim((string) $request->input('reason', '')) ?: null;
+
+        if ($newPlanId <= 0) {
+            return $this->errorResponse('publication_id is required.', 422);
+        }
+
+        try {
+            $result = $this->planChangeService->changePlan(
+                subscriptionId: $subscriptionId,
+                newPlanId:      $newPlanId,
+                siteId:         $siteId,
+                agentId:        $agentId,
+                reason:         $reason,
+            );
+
+            return $this->resourceResponse([
+                'success'                      => true,
+                'subscription_id'              => $result->subscription_id,
+
+                'old_plan_id'                  => $result->old_plan_id,
+                'new_plan_id'                  => $result->new_plan_id,
+
+                'old_publication_id'           => $result->old_plan_id,
+                'new_publication_id'           => $result->new_plan_id,
+
+                'old_edition_id'               => $result->old_edition_id,
+                'new_edition_id'               => $result->new_edition_id,
+                'remaining_issues_transferred' => $result->remaining_issues_transferred,
+                'stripe_sync_status'           => $result->stripe_sync_status ?? null,
+                'stripe_sync_error'            => $result->stripe_sync_error ?? null,
+
+                'message'                      => $result->message,
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to change subscription publication/plan', [
+                'subscription_id' => $subscriptionId,
+                'publication_id'  => $newPlanId,
+                'error'           => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/{site}/crm/subscriptions/{subscriptionId}/changes
+     *
+     * Returns the change history for a subscription, newest first.
+     */
+    public function subscriptionChanges(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            $changes = $this->subscriptionChangeRepository
+                ->findBySubscription($subscriptionId);
+
+            $rows = $changes
+                ->map(function ($change): array {
+                    $row = [
+                        'id'          => $change->id,
+                        'change_type' => $change->change_type,
+
+                        'old_edition_id' => $change->old_edition_id ?? null,
+                        'new_edition_id' => $change->new_edition_id ?? null,
+
+                        'old_edition' => $change->oldEdition?->name
+                            ?? $change->oldEdition?->issue_number
+                                ?? null,
+
+                        'new_edition' => $change->newEdition?->name
+                            ?? $change->newEdition?->issue_number
+                                ?? null,
+
+                        'reason'     => $change->reason,
+                        'created_by' => $change->agent?->name ?? null,
+                        'created_at' => $change->created_at instanceof \DateTimeInterface
+                            ? $change->created_at->format('Y-m-d H:i:s')
+                            : (string) $change->created_at,
+                    ];
+
+                    if ($change->change_type === 'publication_change') {
+                        $row['old_publication_id'] = $change->old_publication_id ?? null;
+                        $row['new_publication_id'] = $change->new_publication_id ?? null;
+
+                        $row['old_publication'] = $change->oldPublication?->name ?? null;
+                        $row['new_publication'] = $change->newPublication?->name ?? null;
+
+                        $row['remaining_issues_transferred'] =
+                            (int) ($change->remaining_issues_transferred ?? 0);
+                    }
+
+                    return $row;
+                })
+                ->values()
+                ->all();
+
+            return $this->resourceResponse([
+                'success' => true,
+                'changes' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to fetch subscription changes', [
+                'subscription_id' => $subscriptionId,
+                'error'           => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/{site}/crm/subscriptions/{subscriptionId}/available-publications
+     *
+     * Returns active compatible target publications/plans for a subscription.
+     *
+     * Current domain:
+     *   SubscriptionPlan = publication
+     */
+    public function availablePublications(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            $currentPlan = $this->planRepository->find((int) $subscription->plan_id);
+
+            if (!$currentPlan) {
+                return $this->errorResponse('Current subscription plan not found.', 404);
+            }
+
+            $currentDeliveryType = method_exists($currentPlan, 'getDeliveryType')
+                ? $currentPlan->getDeliveryType()
+                : null;
+
+            $plans = $this->planRepository
+                ->findAvailablePublicationTargets(
+                    siteId: $siteId,
+                    excludePlanId: (int) $subscription->plan_id,
+                    deliveryType: $currentDeliveryType?->value ?? $subscription->delivery_type ?? null,
+                );
+
+            $rows = $plans->map(function ($plan): array {
+                return [
+                    'id'            => (int) $plan->id,
+                    'name'          => $plan->name,
+                    'delivery_type' => $plan->delivery_type ?? null,
+                    'is_active'     => (bool) $plan->is_active,
+                    'price'         => $plan->price ?? null,
+                    'currency'      => $plan->currency ?? null,
+                ];
+            })->values()->all();
+
+            return $this->resourceResponse([
+                'success'      => true,
+                'plans' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to fetch available publications', [
+                'subscription_id' => $subscriptionId,
+                'error'           => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * GET /api/{site}/crm/subscriptions/{subscriptionId}/available-editions
+     *
+     * Returns active future issue/edition schedule rows for the subscription's
+     * current plan.
+     *
+     * Current domain:
+     *   SubscriptionPlan = publication / plan
+     *   IssueDelivery    = edition / issue
+     */
+    public function availableEditions(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId = SiteContext::getId();
+
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        try {
+            $editions = $this->issueDeliveryRepository
+                ->findAvailableEditionsForSubscriptionPlan(
+                    subscriptionPlanId: (int) $subscription->plan_id,
+                    fromDate: new \DateTimeImmutable(),
+                );
+
+            $rows = $editions
+                ->map(function ($edition): array {
+                    return [
+                        'id' => (int) $edition->id,
+                        'issue_number' => $edition->issue_number ?? null,
+                        'status' => $edition->status,
+                        'on_sale_date' => $edition->on_sale_date instanceof \DateTimeInterface
+                            ? $edition->on_sale_date->format('Y-m-d H:i:s')
+                            : (string) $edition->on_sale_date,
+                        'estimated_delivery_date' => $edition->estimated_delivery_date instanceof \DateTimeInterface
+                            ? $edition->estimated_delivery_date->format('Y-m-d H:i:s')
+                            : ($edition->estimated_delivery_date !== null
+                                ? (string) $edition->estimated_delivery_date
+                                : null),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return $this->resourceResponse([
+                'success' => true,
+                'editions' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to fetch available editions', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 

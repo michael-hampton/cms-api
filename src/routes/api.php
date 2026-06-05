@@ -708,6 +708,20 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [CrmManualPaymentController::class, 'index']
         );
 
+        $router->get(
+            '/crm/subscriptions/{subscriptionId}/available-editions',
+            [CrmSubscriptionController::class, 'availableEditions']
+        );
+
+        $router->get(
+            '/crm/subscriptions/{subscriptionId}/available-publications',
+            [CrmSubscriptionController::class, 'availablePublications']
+        );
+
+        $router->post('/crm/subscriptions/{subscriptionId}/change-edition', [CrmSubscriptionController::class, 'changeEdition']);
+        $router->post('/crm/subscriptions/{subscriptionId}/change-publication', [CrmSubscriptionController::class, 'changePublication']);
+        $router->get('/crm/subscriptions/{subscriptionId}/changes',  [CrmSubscriptionController::class, 'subscriptionChanges']);
+
         $router->post(
             '/crm/members/{memberId}/payments/{paymentId}/refund',
             [CrmSubscriptionController::class, 'refundPayment']

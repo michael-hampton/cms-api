@@ -49,7 +49,7 @@ class ImageService
         $this->imageRepository = $imageRepository;
         $this->imageUploadService = $imageUploadService;
         $this->uploadPath = rtrim(config('upload.path', 'uploads'), '/');
-        $this->publicPath = rtrim(config('app.url', ''), '/') . '/uploads';
+        $this->publicPath = rtrim(config('app.url', ''), '/') . '/storage/uploads';
     }
 
     /**
