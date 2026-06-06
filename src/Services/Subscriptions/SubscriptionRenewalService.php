@@ -201,6 +201,7 @@ class SubscriptionRenewalService
                     'delivery_type' => $oldSubscription->delivery_type,
                     'delivery_address_id' => $oldSubscription->delivery_address_id ?? null,
                     'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
+                    'stripe_subscription_item_id' => $paymentResult['stripe_subscription_item_id'] ?? null,
                     'renewed_from_subscription_id' => $oldSubscription->id,
                     'replacement_reason' => SubscriptionEndReason::RENEWAL->value,
                     'renewal_count' => (int)($oldSubscription->renewal_count ?? 0),

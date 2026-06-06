@@ -132,6 +132,7 @@ class StripeSubscriptionScheduleGateway implements StripeSubscriptionScheduleGat
             paymentIntentId:           $paymentIntentId,
             paymentIntentClientSecret: $clientSecret,
             requiresAction:            $requiresAction,
+            stripeSubscriptionItemId:   $subscription->items->data[0]->id ?? null,
         );
     }
 }

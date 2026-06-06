@@ -19,5 +19,6 @@ final class StripeSubscriptionResultDto
         public readonly ?string $paymentIntentId,
         public readonly ?string $paymentIntentClientSecret,
         public readonly bool    $requiresAction,
+        public readonly ?string $stripeSubscriptionItemId = null,
     ) {}
 }

@@ -208,6 +208,7 @@ class SubscriptionProductSwitchService
                 $newSubscription->id,
                 [
                     'payment_subscription_id' => $paymentResult['subscription_id'] ?? null,
+                    'stripe_subscription_item_id' => $paymentResult['stripe_subscription_item_id'] ?? null,
                     'renewed_from_subscription_id' => $oldSubscription->id,
                     'replacement_reason' => SubscriptionEndReason::PRODUCT_CHANGE->value,
                     'carried_over_credit' => $carriedOverCredit,

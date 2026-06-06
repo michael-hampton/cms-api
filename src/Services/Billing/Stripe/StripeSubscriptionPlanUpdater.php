@@ -78,4 +78,17 @@ class StripeSubscriptionPlanUpdater
             ];
         }
     }
+
+    public function findFirstSubscriptionItemId(string $stripeSubscriptionId): ?string
+    {
+        try {
+            $subscription = $this->stripe->subscriptions->retrieve($stripeSubscriptionId, [
+                'expand' => ['items.data.price'],
+            ]);
+
+            return $subscription->items->data[0]->id ?? null;
+        } catch (Exception) {
+            return null;
+        }
+    }
 }

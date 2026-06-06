@@ -356,6 +356,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
             paymentIntentId:           'pi_test',
             paymentIntentClientSecret: null,
             requiresAction:            false,
+            stripeSubscriptionItemId:   'si_abc',
         );
 
         $plan->shouldReceive('getDefaultPricing')->andReturn($pricingTier);
@@ -368,6 +369,7 @@ class StripeSubscriptionOrchestratorTest extends TestCase
             ->once()
             ->with(m::on(function (array $data) {
                 return $data['payment_subscription_id'] === 'sub_abc'
+                    && $data['stripe_subscription_item_id'] === 'si_abc'
                     && $data['stripe_schedule_id']       === 'sched_xyz'
                     && $data['stripe_customer_id']       === 'cus_test'
                     && $data['status']                   === 'active'

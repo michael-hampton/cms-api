@@ -30,6 +30,7 @@ use App\Services\Subscriptions\SubscriptionPlanChangeService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
 use App\Services\Subscriptions\SubscriptionRefundService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
+use App\Services\Subscriptions\SubscriptionStripePlanSyncService;
 
 class CrmSubscriptionController extends Controller
 {
@@ -56,6 +57,7 @@ class CrmSubscriptionController extends Controller
         private readonly SubscriptionChangeRepository         $subscriptionChangeRepository,
         private readonly SubscriptionEditionChangeService     $editionChangeService,
          private readonly SubscriptionPlanChangeService $planChangeService,
+        private readonly SubscriptionStripePlanSyncService $stripePlanSyncService,
     )
     {
         parent::__construct();
@@ -586,6 +588,57 @@ class CrmSubscriptionController extends Controller
             Logger::error('Failed to fetch subscription changes', [
                 'subscription_id' => $subscriptionId,
                 'error'           => $e->getMessage(),
+            ]);
+
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * POST /api/{site}/crm/subscriptions/{subscriptionId}/stripe-sync/retry
+     */
+    public function retryStripeSync(Request $request, int $subscriptionId): mixed
+    {
+        if (!Auth::check()) {
+            return $this->errorResponse('Unauthenticated.', 401);
+        }
+
+        $siteId = SiteContext::getId();
+        $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+        if (!$subscription || (int) $subscription->site_id !== (int) $siteId) {
+            return $this->errorResponse('Subscription not found.', 404);
+        }
+
+        $status = (string) ($subscription->stripe_sync_status ?? '');
+
+        if (!in_array($status, ['pending', 'failed'], true)) {
+            return $this->errorResponse('Only pending or failed Stripe syncs can be retried.', 422);
+        }
+
+        try {
+            $this->subscriptionRepository->update($subscriptionId, [
+                'stripe_sync_status' => 'pending',
+                'stripe_sync_error' => null,
+            ]);
+
+            $this->stripePlanSyncService->syncPlanChange($subscriptionId);
+
+            $subscription = $this->subscriptionRepository->find($subscriptionId);
+
+            return $this->resourceResponse([
+                'success' => true,
+                'subscription_id' => $subscriptionId,
+                'stripe_sync_status' => $subscription->stripe_sync_status ?? null,
+                'stripe_sync_error' => $subscription->stripe_sync_error ?? null,
+                'stripe_synced_at' => $subscription->stripe_synced_at instanceof \DateTimeInterface
+                    ? $subscription->stripe_synced_at->format('Y-m-d H:i:s')
+                    : ($subscription->stripe_synced_at ?? null),
+            ]);
+        } catch (\Throwable $e) {
+            Logger::error('Failed to retry subscription Stripe sync', [
+                'subscription_id' => $subscriptionId,
+                'error' => $e->getMessage(),
             ]);
 
             return $this->errorResponse($e->getMessage(), 500);

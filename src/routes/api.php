@@ -723,9 +723,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/crm/subscriptions/{subscriptionId}/changes',  [CrmSubscriptionController::class, 'subscriptionChanges']);
 
         $router->post(
+            '/crm/subscriptions/{subscriptionId}/stripe-sync/retry',
+            [CrmSubscriptionController::class, 'retryStripeSync']
+        );
+
+        $router->post(
             '/crm/members/{memberId}/payments/{paymentId}/refund',
             [CrmSubscriptionController::class, 'refundPayment']
         );
+
         $router->post(
             '/crm/members/{memberId}/payments/bulk-refund',
             [CrmSubscriptionController::class, 'bulkRefundPayments']

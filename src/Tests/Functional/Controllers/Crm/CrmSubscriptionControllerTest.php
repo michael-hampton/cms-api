@@ -1840,6 +1840,12 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
                 'success' => true,
                 'stripe_subscription_id' => 'sub_test_switch',
             ]);
+            $mock->shouldReceive('updateSubscriptionItemPrice')->byDefault()->andReturn([
+                'success' => true,
+                'stripe_subscription_item_id' => 'si_test_switch',
+                'stripe_price_id' => 'price_test_switch',
+                'stripe_subscription_id' => 'sub_test_switch',
+            ]);
 
             return $mock;
         });
@@ -2665,6 +2671,166 @@ class CrmSubscriptionControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
         $this->assertSame('failed', $data['stripe_sync_status']);
         $this->assertSame('Stripe refused this update.', $data['stripe_sync_error']);
+    }
+
+    public function test_retry_stripe_sync_retries_failed_subscription_item_sync(): void
+    {
+        $this->subscription->update([
+            'stripe_sync_status' => 'failed',
+            'stripe_sync_error' => 'Previous Stripe timeout.',
+            'payment_subscription_id' => 'sub_retry',
+            'stripe_subscription_item_id' => 'si_retry',
+            'stripe_price_id' => 'price_retry',
+        ]);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('updateSubscriptionItemPrice')
+                ->once()
+                ->with('si_retry', 'price_retry', ['proration_behavior' => 'none'])
+                ->andReturn([
+                    'success' => true,
+                    'stripe_subscription_item_id' => 'si_retry',
+                    'stripe_price_id' => 'price_retry',
+                    'stripe_subscription_id' => 'sub_retry',
+                ]);
+
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
+            [],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertSame('synced', $data['stripe_sync_status']);
+        $this->assertNull($data['stripe_sync_error']);
+
+        $subscription = Subscription::find($this->subscription->id);
+        $this->assertSame('synced', $subscription->stripe_sync_status);
+        $this->assertNull($subscription->stripe_sync_error);
+        $this->assertNotNull($subscription->stripe_synced_at);
+    }
+
+    public function test_retry_stripe_sync_returns_failed_status_when_stripe_rejects_retry(): void
+    {
+        $this->subscription->update([
+            'stripe_sync_status' => 'failed',
+            'stripe_sync_error' => 'Previous Stripe timeout.',
+            'payment_subscription_id' => 'sub_retry',
+            'stripe_subscription_item_id' => 'si_retry',
+            'stripe_price_id' => 'price_retry',
+        ]);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('updateSubscriptionItemPrice')
+                ->once()
+                ->andReturn(['success' => false, 'error' => 'Stripe is still unavailable.']);
+
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
+            [],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $data = json_decode($response->getContent(), true);
+        $this->assertTrue($data['success']);
+        $this->assertSame('failed', $data['stripe_sync_status']);
+        $this->assertSame('Stripe is still unavailable.', $data['stripe_sync_error']);
+    }
+
+    public function test_retry_stripe_sync_uses_plan_pricing_price_when_subscription_price_is_missing(): void
+    {
+        $targetPlan = $this->createSubscriptionPlan([
+            'site_id' => $this->siteId,
+            'is_active' => true,
+            'stripe_price_id' => 'price_plan_fallback',
+        ]);
+
+        $targetTier = $this->createPricingTier([
+            'plan_id' => $targetPlan->id,
+            'is_default' => true,
+            'is_active' => true,
+            'stripe_price_id' => 'price_tier_fallback',
+        ]);
+
+        $this->subscription->update([
+            'plan_id' => $targetPlan->id,
+            'subscription_plan_pricing_id' => $targetTier->id,
+            'stripe_sync_status' => 'failed',
+            'stripe_sync_error' => 'Missing denormalized price.',
+            'payment_subscription_id' => 'sub_retry',
+            'stripe_subscription_item_id' => 'si_retry',
+            'stripe_price_id' => null,
+        ]);
+
+        Container::getInstance()->bind(StripeSubscriptionPlanUpdater::class, function () {
+            $mock = Mockery::mock(StripeSubscriptionPlanUpdater::class);
+            $mock->shouldReceive('updateSubscriptionItemPrice')
+                ->once()
+                ->with('si_retry', 'price_tier_fallback', ['proration_behavior' => 'none'])
+                ->andReturn([
+                    'success' => true,
+                    'stripe_subscription_item_id' => 'si_retry',
+                    'stripe_price_id' => 'price_tier_fallback',
+                    'stripe_subscription_id' => 'sub_retry',
+                ]);
+
+            return $mock;
+        });
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
+            [],
+        );
+
+        $this->assertResponseStatus(200, $response);
+
+        $subscription = Subscription::find($this->subscription->id);
+        $this->assertSame('synced', $subscription->stripe_sync_status);
+        $this->assertSame('price_tier_fallback', $subscription->stripe_price_id);
+    }
+
+    public function test_retry_stripe_sync_returns_422_when_subscription_is_already_synced(): void
+    {
+        $this->subscription->update([
+            'stripe_sync_status' => 'synced',
+            'stripe_sync_error' => null,
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$this->subscription->id}/stripe-sync/retry",
+            [],
+        );
+
+        $this->assertResponseStatus(422, $response);
+    }
+
+    public function test_retry_stripe_sync_returns_404_for_subscription_on_different_site(): void
+    {
+        $otherSite = $this->createSite();
+        $otherMember = $this->createMember(['site_id' => $otherSite->id]);
+        $otherSubscription = $this->createSubscriptionRecord([
+            'member_id' => $otherMember->id,
+            'site_id' => $otherSite->id,
+            'stripe_sync_status' => 'failed',
+        ]);
+
+        $response = $this->postForSite(
+            "/api/crm/subscriptions/{$otherSubscription->id}/stripe-sync/retry",
+            [],
+        );
+
+        $this->assertResponseStatus(404, $response);
     }
 
     // =========================================================================

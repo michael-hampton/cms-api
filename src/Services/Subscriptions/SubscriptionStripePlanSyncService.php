@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Subscriptions;
 
 use App\Framework\Support\Logger;
+use App\Repositories\Subscriptions\SubscriptionPlanPricingRepository;
+use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Billing\Stripe\StripeSubscriptionPlanUpdater;
 
@@ -13,6 +15,8 @@ class SubscriptionStripePlanSyncService
     public function __construct(
         private readonly SubscriptionRepository $subscriptionRepository,
         private readonly StripeSubscriptionPlanUpdater $planUpdater,
+        private readonly SubscriptionPlanPricingRepository $pricingRepository,
+        private readonly SubscriptionPlanRepository $planRepository,
     ) {}
 
     public function syncPlanChange(int $subscriptionId): void
@@ -28,18 +32,34 @@ class SubscriptionStripePlanSyncService
                 ?: $subscription->payment_subscription_id
                 ?: null;
             $stripeItemId = $subscription->stripe_subscription_item_id ?? null;
-            $stripePriceId = $subscription->stripe_price_id ?? null;
+            $stripePriceId = $this->resolveTargetStripePriceId($subscription);
 
             if (!$stripeSubscriptionId) {
                 throw new \RuntimeException('Cannot sync Stripe plan change without a Stripe subscription id.');
             }
 
             if (!$stripeItemId) {
-                throw new \RuntimeException('Cannot sync Stripe plan change without a Stripe subscription item id.');
+                $stripeItemId = $this->planUpdater->findFirstSubscriptionItemId($stripeSubscriptionId);
+
+                if ($stripeItemId) {
+                    $this->subscriptionRepository->update($subscriptionId, [
+                        'stripe_subscription_item_id' => $stripeItemId,
+                    ]);
+                }
+            }
+
+            if (!$stripeItemId) {
+                throw new \RuntimeException('Cannot resolve Stripe subscription item id for this subscription.');
             }
 
             if (!$stripePriceId) {
                 throw new \RuntimeException('Cannot sync Stripe plan change without a target Stripe price id.');
+            }
+
+            if (($subscription->stripe_price_id ?? null) !== $stripePriceId) {
+                $this->subscriptionRepository->update($subscriptionId, [
+                    'stripe_price_id' => $stripePriceId,
+                ]);
             }
 
             $result = $this->planUpdater->updateSubscriptionItemPrice(
@@ -68,5 +88,36 @@ class SubscriptionStripePlanSyncService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function resolveTargetStripePriceId(object $subscription): ?string
+    {
+        if (!empty($subscription->stripe_price_id)) {
+            return (string) $subscription->stripe_price_id;
+        }
+
+        if (!empty($subscription->subscription_plan_pricing_id)) {
+            $pricing = $this->pricingRepository->find((int) $subscription->subscription_plan_pricing_id);
+
+            if (!empty($pricing?->stripe_price_id)) {
+                return (string) $pricing->stripe_price_id;
+            }
+        }
+
+        if (empty($subscription->plan_id)) {
+            return null;
+        }
+
+        $defaultPricing = $this->pricingRepository->getDefaultForPlan((int) $subscription->plan_id);
+
+        if (!empty($defaultPricing?->stripe_price_id)) {
+            return (string) $defaultPricing->stripe_price_id;
+        }
+
+        $plan = $this->planRepository->find((int) $subscription->plan_id);
+
+        return !empty($plan?->stripe_price_id)
+            ? (string) $plan->stripe_price_id
+            : null;
     }
 }

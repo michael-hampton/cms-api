@@ -99,6 +99,9 @@ class CrmMemberProfileService
                     'end_date' => $subscription->end_date?->format('Y-m-d H:i:s'),
                     'next_billing_date' => $subscription->next_billing_date?->format('Y-m-d H:i:s'),
                     'last_payment_date' => $subscription->last_payment_date?->format('Y-m-d H:i:s'),
+                    'stripe_sync_status' => $subscription->stripe_sync_status,
+                    'stripe_sync_error' => $subscription->stripe_sync_error,
+                    'stripe_synced_at' => $subscription->stripe_synced_at?->format('Y-m-d H:i:s'),
                 ]);
             }),
             'recent_orders' => $orders->map(function ($order) {

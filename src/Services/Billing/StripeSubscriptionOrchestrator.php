@@ -129,6 +129,7 @@ class StripeSubscriptionOrchestrator
             'payment_subscription_id' => $result->stripeSubscriptionId,
             'stripe_schedule_id'      => $result->stripeScheduleId,
             'stripe_customer_id'      => $result->stripeCustomerId,
+            'stripe_subscription_item_id' => $result->stripeSubscriptionItemId,
             'status'                  => $result->status,
             'current_period_start'    => $result->currentPeriodStart
                 ? date('Y-m-d H:i:s', $result->currentPeriodStart)

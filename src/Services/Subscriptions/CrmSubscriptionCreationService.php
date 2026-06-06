@@ -170,9 +170,15 @@ class CrmSubscriptionCreationService
                 ],
             );
 
-            $subscription->update([
+            $subscriptionUpdates = [
                 'payment_subscription_id' => $paymentResult['subscription_id'],
-            ]);
+            ];
+
+            if (!empty($paymentResult['stripe_subscription_item_id'])) {
+                $subscriptionUpdates['stripe_subscription_item_id'] = $paymentResult['stripe_subscription_item_id'];
+            }
+
+            $subscription->update($subscriptionUpdates);
 
         } catch (Exception $exception) {
             Logger::info('Failed to create subscription for member', [

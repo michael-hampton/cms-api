@@ -136,6 +136,7 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
             paymentIntentId:           $paymentIntentId,
             paymentIntentClientSecret: $clientSecret,
             requiresAction:            $requiresAction,
+            stripeSubscriptionItemId:   $subscription->items->data[0]->id ?? null,
         );
     }
 }

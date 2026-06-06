@@ -120,15 +120,6 @@ class SubscriptionPlanChangeService
                 && $targetStripePriceId !== null
                 && $currentStripePriceId !== $targetStripePriceId;
 
-            if (
-                $requiresStripeSync
-                && ($subscription->payment_subscription_id ?? $subscription->stripe_subscription_id ?? null)
-                && empty($subscription->stripe_subscription_item_id)
-            ) {
-                throw new \InvalidArgumentException(
-                    'Cannot change publication because the Stripe subscription item reference is missing.'
-                );
-            }
         }
 
         /**
@@ -245,10 +236,11 @@ class SubscriptionPlanChangeService
         SubscriptionPlanPricing $currentTier,
         object $newPlan,
     ): ?SubscriptionPlanPricing {
+
         return SubscriptionPlanPricing::where('plan_id', (int) $newPlan->id)
             ->where('is_active', true)
             ->where('duration_months', $currentTier->duration_months)
-            ->where('issue_count', $currentTier->issue_count)
+            //->where('issue_count', $currentTier->issue_count)
             ->where('currency', $currentTier->currency)
             ->orderBy('is_default', 'desc')
             ->orderBy('sort_order', 'asc')

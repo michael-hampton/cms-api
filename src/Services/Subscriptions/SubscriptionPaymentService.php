@@ -115,6 +115,7 @@ class SubscriptionPaymentService
             'requires_action'              => $stripeResult->requiresAction,
             'payment_intent_client_secret' => $stripeResult->paymentIntentClientSecret,
             'subscription_id'              => $stripeResult->stripeSubscriptionId,
+            'stripe_subscription_item_id'  => $stripeResult->stripeSubscriptionItemId,
             'status'                       => $stripeResult->status,
         ];
     }

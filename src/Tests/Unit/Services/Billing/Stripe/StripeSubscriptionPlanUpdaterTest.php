@@ -64,4 +64,26 @@ class StripeSubscriptionPlanUpdaterTest extends TestCase
             'stripe_subscription_id' => 'sub_123',
         ], $service->updateSubscriptionItemPrice('si_123', 'price_new'));
     }
+
+    public function test_find_first_subscription_item_id_retrieves_first_item_from_subscription(): void
+    {
+        $subscriptions = Mockery::mock(SubscriptionService::class);
+        $subscriptions->shouldReceive('retrieve')
+            ->once()
+            ->with('sub_123', ['expand' => ['items.data.price']])
+            ->andReturn((object) [
+                'items' => (object) [
+                    'data' => [
+                        (object) ['id' => 'si_123'],
+                    ],
+                ],
+            ]);
+
+        $stripe = Mockery::mock(StripeClient::class);
+        $stripe->subscriptions = $subscriptions;
+
+        $service = new StripeSubscriptionPlanUpdater($stripe);
+
+        $this->assertSame('si_123', $service->findFirstSubscriptionItemId('sub_123'));
+    }
 }
