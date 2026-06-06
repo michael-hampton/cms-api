@@ -259,13 +259,11 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         'label'    => 'Address',
         'required' => true,
         'class'    => 'full-width',
-        'value' => $prefill['address'],
         ])
         @include('checkout/components/form/form-group', [
         'name'  => 'address2',
         'label' => 'Apartment, suite, etc. (optional)',
         'class' => 'full-width',
-        'value' => $prefill['line_2'],
         ])
 
         @include('checkout/components/form/form-row')
@@ -273,12 +271,10 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         'name'     => 'city',
         'label'    => 'City',
         'required' => true,
-        'value' => $prefill['city'],
         ])
         @include('checkout/components/form/form-group', [
         'name'  => 'state',
         'label' => 'State / Province',
-        'value' => $prefill['county'],
         ])
         @include('checkout/components/form/form-row', ['close' => true])
 
@@ -287,7 +283,6 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         'name'     => 'postal_code',
         'label'    => 'Postal Code',
         'required' => true,
-        'value' => $prefill['postal_code'],
         ])
         @include('checkout/components/form/select', [
         'name'       => 'country',
@@ -297,7 +292,7 @@ $hasExistingAddress = !empty($prefill['address']) || !empty($prefill['postal_cod
         'blank'      => true,
         'blankLabel' => 'Select Country',
         'options'    => $countries,
-        'selected'   =>  $prefill['country'] ?? '',
+        'selected'   => $member?->country ?? '',
         'onChange'   => 'handleCountryChange(this.value)',
         ])
         @include('checkout/components/form/form-row', ['close' => true])
