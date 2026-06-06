@@ -167,8 +167,8 @@ class RbacRepository
 
     public function activeSiteAssignmentsForUser(int $userId): array
     {
-        $activeSiteIds = Site::where('is_active', true)
-            ->get()
+        $activeSiteIds = Site::all()
+            ->filter(fn($site) => (int) ($site->is_active ?? 1) === 1)
             ->pluck('id')
             ->map(fn($id) => (int) $id)
             ->toArray();

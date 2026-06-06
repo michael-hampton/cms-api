@@ -3,6 +3,8 @@
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
 use App\Enums\Pages\PageStatus;
+use App\Enums\OpenCollab\OnboardingStepStatus;
+use App\Models\ContributorOnboardingStep;
 use App\Models\ContributorProfile;
 use App\Models\Site;
 use App\Models\User;
@@ -167,6 +169,21 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
     }
 
+    private function completeProfileOnboarding(User $contributor): void
+    {
+        ContributorOnboardingStep::updateOrCreate(
+            [
+                'user_id' => $contributor->id,
+                'site_id' => $this->siteId,
+                'step' => 'profile',
+            ],
+            [
+                'status' => OnboardingStepStatus::Completed->value,
+                'completed_at' => date('Y-m-d H:i:s'),
+            ],
+        );
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -183,6 +200,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         );
 
         $this->setupSiteOnboarding();
+        $this->completeProfileOnboarding($this->contributor);
 
         $this->otherContributor = $this->createUser([
             'email' => 'other-article-owner@example.com',
@@ -194,5 +212,6 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
             ['user_id' => $this->otherContributor->id],
             ['bio' => 'test bio', 'date_of_birth' => '1990-01-01'],
         );
+        $this->completeProfileOnboarding($this->otherContributor);
     }
 }
