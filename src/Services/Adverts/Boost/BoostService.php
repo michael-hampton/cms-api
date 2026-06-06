@@ -9,6 +9,7 @@ use App\Events\Boost\BoostActivatedEvent;
 use App\Events\Boost\BoostCancelledEvent;
 use App\Events\Boost\BoostCreatedEvent;
 use App\Events\Boost\BoostExpiredEvent;
+use App\Events\Boost\BoostPausedEvent;
 use App\Events\Boost\BoostResumedEvent;
 use App\Exceptions\Boost\BoostNotFoundException;
 use App\Exceptions\Boost\BoostTransitionException;
@@ -90,7 +91,7 @@ class BoostService
                 'status' => BoostStatus::Paused->value,
             ]);
 
-            event(new BoostResumedEvent($updated));
+            event(new BoostPausedEvent($updated));
 
             return $updated;
         });

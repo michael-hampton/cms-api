@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Events\Subscriptions\SubscriptionRenewedAndReplaced;
 use App\Framework\Support\Collection;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
@@ -16,6 +17,7 @@ use App\Services\Subscriptions\Calculators\SubscriptionDateCalculator;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionRenewalService;
 use App\Services\Subscriptions\SubscriptionRenewalTracker;
+use App\Tests\Support\CapturingEventDispatcher;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Mockery;
@@ -31,6 +33,7 @@ class SubscriptionRenewalServiceTest extends TestCase
     private $dateCalculator;
     private $renewalTracker;
     private $database;
+    private CapturingEventDispatcher $events;
 
     private SubscriptionRenewalService $service;
 
@@ -155,6 +158,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->assertIsArray($result);
         $this->assertArrayHasKey('old_subscription', $result);
         $this->assertArrayHasKey('new_subscription', $result);
+        $this->events->assertDispatched(SubscriptionRenewedAndReplaced::class);
     }
 
     public function test_renewal_uses_plan_price_when_pricing_tier_is_missing(): void
@@ -209,6 +213,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $result = $this->service->renew(1, 200, 'pm_123', null, 1, 10);
 
         $this->assertArrayHasKey('new_subscription', $result);
+        $this->events->assertDispatched(SubscriptionRenewedAndReplaced::class);
     }
 
     // ── renew() — automated path (paymentMethodId null) ───────────────────────
@@ -256,6 +261,7 @@ class SubscriptionRenewalServiceTest extends TestCase
 
         $this->assertArrayHasKey('old_subscription', $result);
         $this->assertArrayHasKey('new_subscription', $result);
+        $this->events->assertDispatched(SubscriptionRenewedAndReplaced::class);
     }
 
     public function test_automated_renewal_still_validates_subscription_status(): void
@@ -325,6 +331,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $result = $this->service->renew(1, 200, 'pm_123', 9.99, 1, 10, 300, 'print');
 
         $this->assertSame($newSubscription, $result['new_subscription']);
+        $this->events->assertDispatched(SubscriptionRenewedAndReplaced::class);
     }
 
     // ── processRenewals() ─────────────────────────────────────────────────────
@@ -525,6 +532,7 @@ class SubscriptionRenewalServiceTest extends TestCase
         $this->dateCalculator             = Mockery::mock(SubscriptionDateCalculator::class);
         $this->renewalTracker             = Mockery::mock(SubscriptionRenewalTracker::class);
         $this->database                   = Mockery::mock(Database::class);
+        $this->events                     = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionRenewalService(
             $this->subscriptionRepository,

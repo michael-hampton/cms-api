@@ -5,11 +5,13 @@ namespace App\Tests\Unit\Services\Adverts\Boost;
 use App\Models\Boost;
 use App\Models\BoostLimit;
 use App\Models\BoostStat;
+use App\Events\Boost\BoostLimitBreachedEvent;
 use App\Repositories\Adverts\Boost\BoostRepository;
 use App\Repositories\Adverts\Boost\BoostStatRepository;
 use App\Services\Adverts\Boost\BoostLimitEnforcer;
 use App\Services\Adverts\Boost\BoostService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -19,6 +21,7 @@ class BoostLimitEnforcerTest extends FunctionalTestCase
     private MockInterface $boostStatRepository;
     private MockInterface $boostService;
     private BoostLimitEnforcer $enforcer;
+    private CapturingEventDispatcher $events;
 
     public function test_does_nothing_when_no_limit_set(): void
     {
@@ -60,7 +63,13 @@ class BoostLimitEnforcerTest extends FunctionalTestCase
         $this->boostService->shouldReceive('pauseBoost')->once()->with(1);
 
         $this->enforcer->enforce(1);
-        $this->assertTrue(true);
+        $this->events->assertDispatched(
+            BoostLimitBreachedEvent::class,
+            fn(BoostLimitBreachedEvent $event): bool => $event->boost === $boost
+                && $event->limitType === 'spend'
+                && $event->limitValue === 20.00
+                && $event->currentValue === 21.00
+        );
     }
 
     private function makeLimit(array $overrides = []): BoostLimit
@@ -161,6 +170,7 @@ class BoostLimitEnforcerTest extends FunctionalTestCase
         $this->boostRepository = Mockery::mock(BoostRepository::class);
         $this->boostStatRepository = Mockery::mock(BoostStatRepository::class);
         $this->boostService = Mockery::mock(BoostService::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->enforcer = new BoostLimitEnforcer(
             $this->boostRepository,

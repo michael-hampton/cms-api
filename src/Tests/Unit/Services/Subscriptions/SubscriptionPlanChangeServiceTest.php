@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Services\Subscriptions;
 use App\DTO\Subscriptions\PublicationChangeRebuildResult;
 use App\Enums\Subscriptions\SubscriptionStatus;
 use App\Enums\Subscriptions\SubscriptionDeliveryType;
+use App\Events\Subscriptions\SubscriptionPlanChanged;
 use App\Framework\Database\Database;
 use App\Models\Model;
 use App\Models\Subscription;
@@ -16,6 +17,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
 use App\Services\Subscriptions\SubscriptionPlanChangeService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +29,7 @@ class SubscriptionPlanChangeServiceTest extends TestCase
     private SubscriptionChangeRepository $changeRepository;
     private SubscriptionIssueDeliveryRebuildService $rebuildService;
     private Database $database;
+    private CapturingEventDispatcher $events;
 
     private SubscriptionPlanChangeService $service;
 
@@ -39,6 +42,7 @@ class SubscriptionPlanChangeServiceTest extends TestCase
         $this->changeRepository = Mockery::mock(SubscriptionChangeRepository::class);
         $this->rebuildService = Mockery::mock(SubscriptionIssueDeliveryRebuildService::class);
         $this->database = Mockery::mock(Database::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionPlanChangeService(
             $this->subscriptionRepository,
@@ -168,6 +172,13 @@ class SubscriptionPlanChangeServiceTest extends TestCase
         $this->assertSame(2001, $result->new_edition_id);
         $this->assertSame($remainingIssues, $result->remaining_issues_transferred);
         $this->assertSame('Subscription plan changed successfully.', $result->message);
+        $this->events->assertDispatched(
+            SubscriptionPlanChanged::class,
+            fn(SubscriptionPlanChanged $event): bool => $event->subscriptionId === $subscriptionId
+                && $event->oldPlanId === $oldPlanId
+                && $event->newPlanId === $newPlanId
+                && $event->agentId === $agentId
+        );
     }
 
     public function test_change_plan_throws_when_subscription_not_found(): void

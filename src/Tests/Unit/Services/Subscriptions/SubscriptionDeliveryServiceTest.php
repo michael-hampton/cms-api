@@ -3,12 +3,15 @@
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Framework\Database\Database;
+use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionResumed;
 use App\Models\IssueDelivery;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\IssueDeliveryRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionDeliveryService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery as m;
 
 class SubscriptionDeliveryServiceTest extends FunctionalTestCase
@@ -17,6 +20,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
     private $databaseMock;
     private SubscriptionDeliveryService $service;
     private $issueDeliveryRepository;
+    private CapturingEventDispatcher $events;
 
     public function test_pause_delivery_throws_exception_when_subscription_not_found(): void
     {
@@ -43,7 +47,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     public function test_pause_delivery_validates_end_date_after_start_date(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->shouldReceive('canPauseDelivery')
             ->once()
             ->andReturn(true);
@@ -70,7 +74,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     public function test_pause_delivery_validates_start_date_not_in_past(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->shouldReceive('canPauseDelivery')
             ->once()
             ->andReturn(true);
@@ -97,7 +101,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     public function test_pause_delivery_throws_exception_for_non_print_subscription(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
         $subscription->shouldReceive('canPauseDelivery')
             ->once()
             ->andReturn(false);
@@ -228,7 +232,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('find')
             ->with(1)
-            ->once()
+            ->twice()
             ->andReturn($subscription);
 
         $pauseStart = new \DateTime('+1 day');
@@ -248,6 +252,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->assertTrue($result['success']);
         $this->assertEquals('Delivery paused successfully', $result['message']);
         $this->assertEquals(13, $result['paused_days']);
+        $this->events->assertDispatched(SubscriptionPaused::class);
     }
 
     public function test_pause_delivery_adjusts_deliveries_within_pause_period(): void
@@ -271,7 +276,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
 
         $this->issueDeliveryRepository->shouldReceive('getUpcomingDeliveries')
@@ -290,6 +295,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $result = $this->service->pauseDelivery(1, $pauseStart, $pauseEnd);
         $this->assertTrue($result['success']);
+        $this->events->assertDispatched(SubscriptionPaused::class);
     }
 
     public function test_resume_delivery_throws_exception_when_subscription_not_found(): void
@@ -332,7 +338,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
 
         $this->issueDeliveryRepository->shouldReceive('getUpcomingDeliveries')
@@ -350,6 +356,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $result = $this->service->pauseDelivery(1, $pauseStart, $pauseEnd);
         $this->assertTrue($result['success']);
+        $this->events->assertDispatched(SubscriptionPaused::class);
     }
 
     public function test_resume_delivery_throws_exception_when_not_paused(): void
@@ -378,7 +385,8 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     public function test_resume_delivery_restores_paused_deliveries(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->member_id = 42;
         $subscription->shouldReceive('canResumeDelivery')->once()->andReturn(true);
 
         $delivery1 = m::mock(IssueDelivery::class)->makePartial();
@@ -396,7 +404,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
 
         $this->issueDeliveryRepository->shouldReceive('getUpcomingDeliveries')
@@ -414,11 +422,13 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $result = $this->service->resumeDelivery(1);
         $this->assertTrue($result['success']);
+        $this->events->assertDispatched(SubscriptionResumed::class);
     }
 
     public function test_resume_delivery_reverts_adjusted_deliveries(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->member_id = 42;
         $subscription->shouldReceive('canResumeDelivery')->once()->andReturn(true);
 
         $delivery1 = m::mock(IssueDelivery::class)->makePartial();
@@ -435,7 +445,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
 
         $this->issueDeliveryRepository->shouldReceive('getUpcomingDeliveries')
@@ -452,6 +462,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $result = $this->service->resumeDelivery(1);
         $this->assertTrue($result['success']);
+        $this->events->assertDispatched(SubscriptionResumed::class);
     }
 
     public function test_get_pause_status_returns_error_when_subscription_not_found(): void
@@ -483,7 +494,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
                 return $callback();
             });
 
-        $this->subscriptionRepository->shouldReceive('find')->with(1)->once()->andReturn($subscription);
+        $this->subscriptionRepository->shouldReceive('find')->with(1)->twice()->andReturn($subscription);
         $this->subscriptionRepository->shouldReceive('update')->once()->andReturn($subscription);
 
         // CRITICAL: Verify we're only fetching deliveries for subscription ID 1
@@ -498,7 +509,8 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
     public function test_resume_delivery_successfully(): void
     {
-        $subscription = m::mock(Subscription::class);
+        $subscription = m::mock(Subscription::class)->makePartial();
+        $subscription->member_id = 42;
         $subscription->shouldReceive('canResumeDelivery')
             ->once()
             ->andReturn(true);
@@ -511,7 +523,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $this->subscriptionRepository->shouldReceive('find')
             ->with(1)
-            ->once()
+            ->twice()
             ->andReturn($subscription);
 
         $this->issueDeliveryRepository->shouldReceive('getUpcomingDeliveries')
@@ -533,6 +545,7 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
 
         $this->assertTrue($result['success']);
         $this->assertEquals('Delivery resumed successfully', $result['message']);
+        $this->events->assertDispatched(SubscriptionResumed::class);
     }
 
     public function test_get_pause_status_returns_correct_data(): void
@@ -629,6 +642,9 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->databaseMock = m::mock(Database::class);
         $this->issueDeliveryRepository = m::mock(IssueDeliveryRepository::class);
+        $this->events = CapturingEventDispatcher::fake();
+
+        $_ENV['APP_ENV'] = 'production';
 
         $this->service = new SubscriptionDeliveryService(
             $this->subscriptionRepository,
@@ -641,5 +657,6 @@ class SubscriptionDeliveryServiceTest extends FunctionalTestCase
     {
         m::close();
         parent::tearDown();
+        $_ENV['APP_ENV'] = 'testing';
     }
 }

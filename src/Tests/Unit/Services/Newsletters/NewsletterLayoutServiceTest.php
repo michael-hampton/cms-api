@@ -3,12 +3,14 @@
 namespace App\Tests\Unit\Services\Newsletters;
 
 use App\Enums\Newsletters\LayoutVersionState;
+use App\Events\Newsletters\NewsletterLayoutPublished;
 use App\Framework\Support\Logger;
 use App\Models\NewsletterLayout;
 use App\Repositories\Newsletters\NewsletterLayoutRepository;
 use App\Services\Newsletter\Layout\LayoutRegionValidator;
 use App\Services\Newsletter\LayoutRendererService;
 use App\Services\Newsletter\NewsletterLayoutService;
+use App\Tests\Support\CapturingEventDispatcher;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
 class NewsletterLayoutServiceTest extends RepositoryTestCase
@@ -18,6 +20,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
     private LayoutRendererService $layoutRenderer;
     private Logger $logger;
     private LayoutRegionValidator $regionValidator;
+    private CapturingEventDispatcher $events;
 
     protected function setUp(): void
     {
@@ -27,6 +30,7 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
         $this->layoutRenderer = app(LayoutRendererService::class);
         $this->logger = app(Logger::class);
         $this->regionValidator = app(LayoutRegionValidator::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new NewsletterLayoutService(
             $this->layoutRepository,
@@ -90,6 +94,10 @@ class NewsletterLayoutServiceTest extends RepositoryTestCase
 
         $version->refresh();
         $this->assertEquals(LayoutVersionState::Published->value, $version->state);
+        $this->events->assertDispatched(
+            NewsletterLayoutPublished::class,
+            fn(NewsletterLayoutPublished $event): bool => $event->version->id === $version->id
+        );
     }
 
     public function test_rejects_invalid_state_transition(): void

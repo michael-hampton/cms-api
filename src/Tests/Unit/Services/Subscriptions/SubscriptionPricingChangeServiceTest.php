@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionPricingChangeStatus;
+use App\Events\Subscriptions\SubscriptionPricingChangeScheduled;
 use App\Framework\Database\Database;
 use App\Models\SubscriptionPlan;
 use App\Models\SubscriptionPricingChange;
 use App\Repositories\Subscriptions\SubscriptionPricingChangeRepository;
 use App\Services\Subscriptions\SubscriptionPricingChangeService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use Mockery;
 use Mockery\Adapter\Phpunit\MockeryPHPUnitIntegration;
@@ -22,6 +24,7 @@ class SubscriptionPricingChangeServiceTest extends FunctionalTestCase
 
     private SubscriptionPricingChangeRepository $repository;
     private Database $databaseMock;
+    private CapturingEventDispatcher $events;
     private SubscriptionPricingChangeService $service;
 
     protected function setUp(): void
@@ -30,6 +33,7 @@ class SubscriptionPricingChangeServiceTest extends FunctionalTestCase
 
         $this->repository = Mockery::mock(SubscriptionPricingChangeRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionPricingChangeService(
             $this->repository,
@@ -65,6 +69,10 @@ class SubscriptionPricingChangeServiceTest extends FunctionalTestCase
         $result = $this->service->schedule($plan, 14.99, $effectiveDate, createdBy: 42);
 
         $this->assertSame($expectedChange, $result);
+        $this->events->assertDispatched(
+            SubscriptionPricingChangeScheduled::class,
+            fn(SubscriptionPricingChangeScheduled $event): bool => $event->pricingChange === $expectedChange
+        );
     }
 
     public function test_it_wraps_schedule_in_a_transaction(): void

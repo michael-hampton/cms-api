@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Events\Subscriptions\SubscriptionEditionChanged;
 use App\Framework\Database\Database;
 use App\Models\IssueDelivery;
 use App\Models\Model;
@@ -16,6 +17,7 @@ use App\Repositories\Subscriptions\SubscriptionPlanRepository;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionEditionChangeService;
 use App\Services\Subscriptions\SubscriptionIssueDeliveryRebuildService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -39,6 +41,7 @@ class SubscriptionEditionChangeServiceTest extends TestCase
     private SubscriptionChangeRepository&MockInterface $changeRepository;
     private SubscriptionIssueDeliveryRebuildService&MockInterface $rebuildService;
     private Database&MockInterface $database;
+    private CapturingEventDispatcher $events;
 
     private SubscriptionEditionChangeService $service;
 
@@ -52,6 +55,7 @@ class SubscriptionEditionChangeServiceTest extends TestCase
         $this->changeRepository = Mockery::mock(SubscriptionChangeRepository::class);
         $this->rebuildService = Mockery::mock(SubscriptionIssueDeliveryRebuildService::class);
         $this->database = Mockery::mock(Database::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->database
             ->shouldReceive('transaction')
@@ -428,6 +432,13 @@ class SubscriptionEditionChangeServiceTest extends TestCase
         );
 
         $this->assertEquals(self::SUB_ID, $result->subscription_id);
+        $this->events->assertDispatched(
+            SubscriptionEditionChanged::class,
+            fn(SubscriptionEditionChanged $event): bool => $event->subscriptionId === self::SUB_ID
+                && $event->oldEditionId === self::OLD_EDITION_ID
+                && $event->newEditionId === self::NEW_EDITION_ID
+                && $event->agentId === self::AGENT_ID
+        );
     }
 
     public function test_calls_rebuild_service_with_correct_arguments(): void

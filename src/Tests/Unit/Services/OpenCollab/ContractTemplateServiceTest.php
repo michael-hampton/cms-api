@@ -4,12 +4,15 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ContractStatus;
 use App\Events\OpenCollab\ContractDraftCreatedEvent;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Contract;
 use App\Models\ContractTemplate;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContractTemplateRepository;
 use App\Services\OpenCollab\ContractTemplateService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +27,7 @@ class ContractTemplateServiceTest extends TestCase
     /** @var ContractRepository&MockInterface */
     private ContractRepository $contractRepository;
     private Database $databaseMock;
+    private CapturingEventDispatcher $eventDispatcher;
 
     // ── createTemplate ────────────────────────────────────────────────────────
 
@@ -119,13 +123,12 @@ class ContractTemplateServiceTest extends TestCase
             ]))
             ->andReturn($draft);
 
-        //$this->expectsEvents(ContractDraftCreatedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->createDraftFromTemplate($template, 10, 99)
         );
 
         $this->assertSame($draft, $result);
+        $this->assertContractEventDispatched(ContractDraftCreatedEvent::class, $draft);
     }
 
     public function test_draft_from_template_does_not_mutate_template(): void
@@ -153,12 +156,22 @@ class ContractTemplateServiceTest extends TestCase
         $this->templateRepository = Mockery::mock(ContractTemplateRepository::class);
         $this->contractRepository = Mockery::mock(ContractRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new ContractTemplateService(
             $this->templateRepository,
             $this->contractRepository,
             $this->databaseMock
         );
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -179,7 +192,7 @@ class ContractTemplateServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
 
-        return $this->databaseMock->transaction($callback);
+        return $callback();
     }
 
     /** @return Contract&MockInterface */
@@ -190,5 +203,16 @@ class ContractTemplateServiceTest extends TestCase
             $mock->{$key} = $value;
         }
         return $mock;
+    }
+
+    private function assertContractEventDispatched(string $eventClass, Contract $contract): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', $eventClass));
+        $this->assertSame($contract, $matches[0]->contract);
     }
 }

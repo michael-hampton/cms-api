@@ -7,6 +7,12 @@ use App\Contracts\ClockInterface;
 use App\Enums\Boost\BoostableType;
 use App\Enums\Boost\BoostContext;
 use App\Enums\Boost\BoostStatus;
+use App\Events\Boost\BoostActivatedEvent;
+use App\Events\Boost\BoostCancelledEvent;
+use App\Events\Boost\BoostCreatedEvent;
+use App\Events\Boost\BoostExpiredEvent;
+use App\Events\Boost\BoostPausedEvent;
+use App\Events\Boost\BoostResumedEvent;
 use App\Exceptions\Boost\BoostNotFoundException;
 use App\Exceptions\Boost\BoostTransitionException;
 use App\Framework\Database\Database;
@@ -17,6 +23,7 @@ use App\Services\Adverts\Boost\BoostPricingService;
 use App\Services\Adverts\Boost\BoostService;
 use App\Services\FrozenClock;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -28,6 +35,7 @@ class BoostServiceTest extends FunctionalTestCase
     private MockInterface $databaseMock;
     private BoostService $service;
     private ClockInterface $clock;
+    private CapturingEventDispatcher $events;
 
     public function test_creates_boost_with_pending_status(): void
     {
@@ -100,7 +108,10 @@ class BoostServiceTest extends FunctionalTestCase
             new \DateTimeImmutable('2026-01-08'),
             1.5
         );
-        $this->assertTrue(true);
+        $this->events->assertDispatched(
+            BoostCreatedEvent::class,
+            fn(BoostCreatedEvent $event): bool => $event->boost === $boost
+        );
     }
 
     // --- Creation ---
@@ -191,6 +202,10 @@ class BoostServiceTest extends FunctionalTestCase
         $result = $this->service->activateBoost(1); // no $now param
 
         $this->assertEquals(BoostStatus::Active->value, $result->status);
+        $this->events->assertDispatched(
+            BoostActivatedEvent::class,
+            fn(BoostActivatedEvent $event): bool => $event->boost === $result
+        );
     }
 
     public function test_throws_when_activating_before_start_time(): void
@@ -250,6 +265,10 @@ class BoostServiceTest extends FunctionalTestCase
 
         $result = $this->service->expireBoost(1, new \DateTimeImmutable('2026-01-09'));
         $this->assertEquals(BoostStatus::Expired->value, $result->status);
+        $this->events->assertDispatched(
+            BoostExpiredEvent::class,
+            fn(BoostExpiredEvent $event): bool => $event->boost === $result
+        );
     }
 
     public function test_expiration_is_idempotent(): void
@@ -294,6 +313,10 @@ class BoostServiceTest extends FunctionalTestCase
 
         $result = $this->service->cancelBoost(1);
         $this->assertEquals(BoostStatus::Cancelled->value, $result->status);
+        $this->events->assertDispatched(
+            BoostCancelledEvent::class,
+            fn(BoostCancelledEvent $event): bool => $event->boost === $result
+        );
     }
 
     public function test_throws_when_cancelling_expired_boost(): void
@@ -342,6 +365,10 @@ class BoostServiceTest extends FunctionalTestCase
         $result = $this->service->pauseBoost(1);
 
         $this->assertEquals(BoostStatus::Paused->value, $result->status);
+        $this->events->assertDispatched(
+            BoostPausedEvent::class,
+            fn(BoostPausedEvent $event): bool => $event->boost === $result
+        );
     }
 
     public function test_throws_when_pausing_non_active_boost(): void
@@ -367,6 +394,10 @@ class BoostServiceTest extends FunctionalTestCase
         $result = $this->service->resumeBoost(1);
 
         $this->assertEquals(BoostStatus::Active->value, $result->status);
+        $this->events->assertDispatched(
+            BoostResumedEvent::class,
+            fn(BoostResumedEvent $event): bool => $event->boost === $result
+        );
     }
 
     public function test_throws_when_resuming_non_paused_boost(): void
@@ -394,11 +425,14 @@ class BoostServiceTest extends FunctionalTestCase
 
     protected function setUp(): void
     {
+        parent::setUp();
+
         $this->boostRepository = Mockery::mock(BoostRepository::class);
         $this->eligibilityService = Mockery::mock(BoostEligibilityService::class);
         $this->pricingService = Mockery::mock(BoostPricingService::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->clock = new FrozenClock(new \DateTimeImmutable('2026-01-02 12:00:00', new \DateTimeZone('UTC')));
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new BoostService(
             $this->boostRepository,

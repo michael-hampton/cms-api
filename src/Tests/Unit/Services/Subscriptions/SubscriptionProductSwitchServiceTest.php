@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Services\Subscriptions;
 
 use App\Enums\Subscriptions\SubscriptionStatus;
+use App\Events\Subscriptions\SubscriptionProductChanged;
 use App\Framework\Authorization\MemberAuthWrapper;
 use App\Framework\Database\Database;
 use App\Models\Member;
@@ -17,6 +18,7 @@ use App\Services\Shopping\CartService;
 use App\Services\Shopping\OneTimeSubscriptionCheckoutService;
 use App\Services\Subscriptions\SubscriptionPaymentService;
 use App\Services\Subscriptions\SubscriptionProductSwitchService;
+use App\Tests\Support\CapturingEventDispatcher;
 use DateTimeImmutable;
 use InvalidArgumentException;
 use Mockery;
@@ -33,6 +35,7 @@ class SubscriptionProductSwitchServiceTest extends TestCase
     private $subscriptionPaymentService;
     private $memberAuth;
     private $database;
+    private CapturingEventDispatcher $events;
 
     public function test_invalid_switch_mode_throws_exception(): void
     {
@@ -769,6 +772,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
             'new_subscription',
             $result
         );
+
+        $this->events->assertDispatched(SubscriptionProductChanged::class);
     }
 
 
@@ -807,6 +812,8 @@ class SubscriptionProductSwitchServiceTest extends TestCase
         $this->database = Mockery::mock(
             Database::class
         );
+
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionProductSwitchService(
             $this->subscriptionRepository,

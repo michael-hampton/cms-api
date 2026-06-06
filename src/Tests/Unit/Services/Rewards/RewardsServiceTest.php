@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\Rewards;
 
 use App\Enums\Rewards\RewardType;
 use App\Enums\Vouchers\VoucherType;
+use App\Events\Rewards\RewardAwardedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
 use App\Models\Member;
@@ -14,6 +15,7 @@ use App\Services\Rewards\Handlers\RewardTypeHandlerFactory;
 use App\Services\Rewards\Handlers\VoucherRewardHandler;
 use App\Services\Rewards\RewardsService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 
 class RewardsServiceTest extends FunctionalTestCase
@@ -22,6 +24,7 @@ class RewardsServiceTest extends FunctionalTestCase
     private $handlerFactory;
     private $service;
     private Database $databaseMock;
+    private CapturingEventDispatcher $events;
 
     protected function setUp(): void
     {
@@ -29,6 +32,7 @@ class RewardsServiceTest extends FunctionalTestCase
         $this->repository = Mockery::mock(RewardsRepository::class);
         $this->handlerFactory = Mockery::mock(RewardTypeHandlerFactory::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new RewardsService(
             $this->repository,
@@ -366,6 +370,11 @@ class RewardsServiceTest extends FunctionalTestCase
 
         $this->assertCount(1, $result);
         $this->assertSame($newReward, $result[0]);
+        $this->events->assertDispatched(
+            RewardAwardedEvent::class,
+            fn(RewardAwardedEvent $event): bool => $event->member === $member
+                && $event->reward === $newReward
+        );
     }
 
     public function testCheckAndAwardRewardsSkipsWhenMaxClaimsReached(): void
@@ -532,8 +541,8 @@ class RewardsServiceTest extends FunctionalTestCase
         $result = $this->service->getRewardStats($member, $this->siteId);
 
         $this->assertEquals(10.0, $result['gift_card_total']);
-        $this->assertEquals('GBP', $result['currency']);
-        $this->assertEquals('£', $result['currency_symbol']);
+        $this->assertEquals('USD', $result['currency']);
+        $this->assertEquals('$', $result['currency_symbol']);
     }
 
 

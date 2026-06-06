@@ -3,13 +3,19 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ContractStatus;
+use App\Events\OpenCollab\ContractArchivedEvent;
+use App\Events\OpenCollab\ContractDraftCreatedEvent;
+use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Exceptions\OpenCollab\ContractNotArchivableException;
 use App\Exceptions\OpenCollab\ContractNotEditableException;
 use App\Exceptions\OpenCollab\ContractNotPublishableException;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Contract;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Services\OpenCollab\ContractService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -22,6 +28,7 @@ class ContractServiceTest extends TestCase
     /** @var ContractRepository&MockInterface */
     private ContractRepository $contractRepository;
     private Database $databaseMock;
+    private CapturingEventDispatcher $eventDispatcher;
 
     // ── createDraft ───────────────────────────────────────────────────────────
 
@@ -41,13 +48,12 @@ class ContractServiceTest extends TestCase
             ->with(Mockery::subset(['site_id' => 10, 'version' => 1, 'status' => ContractStatus::Draft->value]))
             ->andReturn($contract);
 
-        //$this->expectsEvents(ContractDraftCreatedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->createDraft(10, str_repeat('a', 60), 99)
         );
 
         $this->assertSame($contract, $result);
+        $this->assertContractEventDispatched(ContractDraftCreatedEvent::class, $contract);
     }
 
     // ── updateDraftContent ────────────────────────────────────────────────────
@@ -104,13 +110,12 @@ class ContractServiceTest extends TestCase
             ->with($draft, 99)
             ->andReturn($published);
 
-        //$this->expectsEvents(ContractPublishedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->publishVersion($draft, 99)
         );
 
         $this->assertSame($published, $result);
+        $this->assertContractEventDispatched(ContractPublishedEvent::class, $published);
     }
 
     public function test_publish_auto_archives_previous_published_version(): void
@@ -137,14 +142,12 @@ class ContractServiceTest extends TestCase
             ->with($draft, 99)
             ->andReturn($published);
 
-        // $this->expectsEvents(ContractArchivedEvent::class);
-        // $this->expectsEvents(ContractPublishedEvent::class);
-
         $this->runInFakeTransaction(
             fn() => $this->service->publishVersion($draft, 99)
         );
 
-        $this->assertTrue(true);
+        $this->assertContractEventDispatched(ContractArchivedEvent::class, $previous);
+        $this->assertContractEventDispatched(ContractPublishedEvent::class, $published);
     }
 
     public function test_publish_throws_for_already_published_contract(): void
@@ -178,13 +181,12 @@ class ContractServiceTest extends TestCase
             ->with($published, 99)
             ->andReturn($archived);
 
-//        $this->expectsEvents(ContractArchivedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->archiveVersion($published, 99)
         );
 
         $this->assertSame($archived, $result);
+        $this->assertContractEventDispatched(ContractArchivedEvent::class, $archived);
     }
 
     public function test_archive_throws_for_draft_contract(): void
@@ -242,13 +244,12 @@ class ContractServiceTest extends TestCase
             ]))
             ->andReturn($draft);
 
-//        $this->expectsEvents(ContractDraftCreatedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->cloneToDraft($source, 99)
         );
 
         $this->assertSame($draft, $result);
+        $this->assertContractEventDispatched(ContractDraftCreatedEvent::class, $draft);
     }
 
     public function test_clone_does_not_mutate_source(): void
@@ -334,8 +335,18 @@ class ContractServiceTest extends TestCase
 
         $this->contractRepository = Mockery::mock(ContractRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new ContractService($this->contractRepository, $this->databaseMock);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -361,6 +372,17 @@ class ContractServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
 
-        return $this->databaseMock->transaction($callback);
+        return $callback();
+    }
+
+    private function assertContractEventDispatched(string $eventClass, Contract $contract): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', $eventClass));
+        $this->assertSame($contract, $matches[0]->contract);
     }
 }

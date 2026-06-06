@@ -17,6 +17,7 @@ use App\Repositories\Subscriptions\IssueDeliveryRegionRepository;
 use App\Repositories\Subscriptions\PrintOrderRepository;
 use App\Services\Subscriptions\PrintOrder\PrintOrderCalculator;
 use App\Services\Subscriptions\PrintOrder\PrintOrderService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -28,9 +29,7 @@ final class PrintOrderServiceTest extends TestCase
     private MockInterface&PrintOrderCalculator           $calculator;
     private MockInterface&Logger                         $logger;
     private PrintOrderService                            $service;
-
-    /** Captured events fired via event() helper */
-    private array $firedEvents = [];
+    private CapturingEventDispatcher                     $events;
 
     protected function setUp(): void
     {
@@ -40,6 +39,7 @@ final class PrintOrderServiceTest extends TestCase
         $this->regionRepository = Mockery::mock(IssueDeliveryRegionRepository::class);
         $this->calculator       = Mockery::mock(PrintOrderCalculator::class);
         $this->logger           = Mockery::mock(Logger::class)->shouldIgnoreMissing();
+        $this->events           = CapturingEventDispatcher::fake();
 
         $this->service = new PrintOrderService(
             $this->repository,
@@ -47,9 +47,6 @@ final class PrintOrderServiceTest extends TestCase
             $this->calculator,
             $this->logger,
         );
-
-        // Capture events fired during tests without hitting the framework dispatcher
-        $this->firedEvents = [];
     }
 
     protected function tearDown(): void
@@ -120,6 +117,11 @@ final class PrintOrderServiceTest extends TestCase
         $returned = $this->service->generate($issue);
 
         $this->assertSame($result, $returned);
+        $this->events->assertDispatched(
+            PrintOrderGenerated::class,
+            fn(PrintOrderGenerated $event): bool => $event->issueDelivery === $issue
+                && $event->result === $result
+        );
     }
 
     public function test_non_regional_marks_print_order_done_with_correct_subscriber_total(): void

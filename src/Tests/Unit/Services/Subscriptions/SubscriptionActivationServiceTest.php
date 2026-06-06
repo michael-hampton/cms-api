@@ -2,11 +2,13 @@
 
 namespace App\Tests\Unit\Services\Subscriptions;
 
+use App\Events\Subscriptions\SubscriptionActivated;
 use App\Framework\Support\Collection;
 use App\Framework\Support\Logger;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\SubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionActivationService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -17,6 +19,7 @@ class SubscriptionActivationServiceTest extends TestCase
     private Logger&MockInterface $logger;
     private SubscriptionActivationService $service;
     private \DateTimeImmutable $now;
+    private CapturingEventDispatcher $events;
 
     public function test_it_activates_all_scheduled_subscriptions_that_are_due(): void
     {
@@ -37,6 +40,16 @@ class SubscriptionActivationServiceTest extends TestCase
 
         $this->assertSame(2, $result['activated']);
         $this->assertSame(0, $result['failed']);
+        $this->events->assertDispatched(
+            SubscriptionActivated::class,
+            fn(SubscriptionActivated $event): bool => $event->subscriptionId === 1
+                && $event->activatedAt === $this->now
+        );
+        $this->events->assertDispatched(
+            SubscriptionActivated::class,
+            fn(SubscriptionActivated $event): bool => $event->subscriptionId === 2
+                && $event->activatedAt === $this->now
+        );
     }
 
     /**
@@ -139,6 +152,7 @@ class SubscriptionActivationServiceTest extends TestCase
         $this->repository = Mockery::mock(SubscriptionRepository::class);
         $this->logger = Mockery::mock(Logger::class);
         $this->now = new \DateTimeImmutable('2025-06-01 12:00:00');
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new SubscriptionActivationService(
             $this->repository,

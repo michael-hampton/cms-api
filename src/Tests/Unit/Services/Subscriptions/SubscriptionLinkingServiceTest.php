@@ -6,12 +6,15 @@ use App\DTO\Subscriptions\SubscriptionWithAddress;
 use App\Events\Subscriptions\SubscriptionLinked;
 use App\Exceptions\Subscriptions\SubscriptionAlreadyLinkedException;
 use App\Exceptions\Subscriptions\SubscriptionNotFoundException;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Repositories\Subscriptions\PrintSubscriptionRepository;
 use App\Services\Subscriptions\SubscriptionLinkingService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
 use RuntimeException;
@@ -21,6 +24,7 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
     private PrintSubscriptionRepository $printRepo;
     private SubscriptionLinkingService $service;
     private Database $databaseMock;
+    private CapturingEventDispatcher $eventDispatcher;
 
     // ── memberHasLinkedSubscription ───────────────────────────────────
 
@@ -181,10 +185,6 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
 
     public function test_links_subscription_and_emits_event(): void
     {
-//        Event::fake([
-//            SubscriptionLinked::class
-//        ]);
-
         $unlinked = $this->makeSubscription([
             'id' => 42,
             'is_linked' => false,
@@ -249,17 +249,11 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
             $result
         );
 
-//        Event::assertDispatched(
-//            SubscriptionLinked::class
-//        );
+        $this->assertSubscriptionLinkedDispatched($linked, 1, 1);
     }
 
     public function test_event_is_not_emitted_on_idempotent_link(): void
     {
-//        Event::fake([
-//            SubscriptionLinked::class
-//        ]);
-
         $existing = $this->makeSubscription([
             'is_linked' => true,
             'member_id' => 1,
@@ -296,9 +290,7 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
             $result
         );
 
-//        Event::assertNotDispatched(
-//            SubscriptionLinked::class
-//        );
+        $this->assertEventNotDispatched(SubscriptionLinked::class);
     }
 
     // ── linkToMember — transaction ────────────────────────────────────
@@ -594,10 +586,6 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
 
     public function test_no_event_is_emitted_when_subscription_not_found(): void
     {
-//        Event::fake([
-//            SubscriptionLinked::class
-//        ]);
-
         $this->printRepo
             ->shouldReceive(
                 'findByAccountNumberAndPostcode'
@@ -617,19 +605,11 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
         ) {
         }
 
-//        Event::assertNotDispatched(
-//            SubscriptionLinked::class
-//        );
-
-        $this->assertTrue(true);
+        $this->assertEventNotDispatched(SubscriptionLinked::class);
     }
 
     public function test_no_event_is_emitted_when_subscription_already_linked_to_another(): void
     {
-//        Event::fake([
-//            SubscriptionLinked::class
-//        ]);
-
         $existing = $this->makeSubscription([
             'is_linked' => true,
             'member_id' => 99,
@@ -661,11 +641,7 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
         ) {
         }
 
-//        Event::assertNotDispatched(
-//            SubscriptionLinked::class
-//        );
-
-        $this->assertTrue(true);
+        $this->assertEventNotDispatched(SubscriptionLinked::class);
     }
 
     public function test_already_linked_subscription_never_writes(): void
@@ -787,10 +763,36 @@ class SubscriptionLinkingServiceTest extends FunctionalTestCase
         $this->databaseMock = Mockery::mock(
             Database::class
         );
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new SubscriptionLinkingService(
             $this->printRepo,
             $this->databaseMock,
         );
+    }
+
+    private function assertSubscriptionLinkedDispatched(Subscription $subscription, int $memberId, int $siteId): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof SubscriptionLinked
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', SubscriptionLinked::class));
+        $this->assertSame($subscription, $matches[0]->subscription);
+        $this->assertSame($memberId, $matches[0]->memberId);
+        $this->assertSame($siteId, $matches[0]->siteId);
+    }
+
+    private function assertEventNotDispatched(string $eventClass): void
+    {
+        $matches = array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        );
+
+        $this->assertEmpty($matches, sprintf('Expected event [%s] not to be dispatched.', $eventClass));
     }
 }

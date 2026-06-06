@@ -4,7 +4,12 @@ namespace App\Tests\Unit\Services\Billing\Orders;
 
 use App\Enums\Orders\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Events\Orders\OrderCancelledEvent;
+use App\Events\Orders\OrderRefundedEvent;
+use App\Events\Orders\OrderUpdatedEvent;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Member;
 use App\Models\Model;
 use App\Models\Order;
@@ -16,6 +21,7 @@ use App\Services\Billing\Order\OrderStatusTransitionHandler;
 use App\Services\Billing\Order\OrderUpdateService;
 use App\Services\Billing\OrderCalculationService;
 use App\Services\Billing\OrderHistoryService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -29,6 +35,7 @@ class OrderUpdateServiceTest extends TestCase
     private OrderHistoryService $historyService;
     private OrderStatusTransitionHandler $statusHandler;
     private Database $database;
+    private CapturingEventDispatcher $eventDispatcher;
     private OrderUpdateService $service;
 
     protected function setUp(): void
@@ -43,6 +50,9 @@ class OrderUpdateServiceTest extends TestCase
         $this->historyService = Mockery::mock(OrderHistoryService::class);
         $this->statusHandler = Mockery::mock(OrderStatusTransitionHandler::class);
         $this->database = Mockery::mock(Database::class);
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new OrderUpdateService(
             $this->orderRepository,
@@ -58,8 +68,6 @@ class OrderUpdateServiceTest extends TestCase
 
     public function test_it_updates_order_with_status_change()
     {
-        //Event::fake();
-
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 123;
         $order->status = OrderStatus::PENDING->value;
@@ -122,13 +130,11 @@ class OrderUpdateServiceTest extends TestCase
         $result = $this->service->update(123, $updateData, 1, 999);
 
         $this->assertEquals($updatedOrder, $result);
-        //Event::assertDispatched(OrderUpdatedEvent::class);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $updatedOrder);
     }
 
     public function test_it_updates_order_with_address_change()
     {
-        //Event::fake();
-
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 123;
         $order->status = OrderStatus::PENDING->value;
@@ -182,6 +188,7 @@ class OrderUpdateServiceTest extends TestCase
 
         $result = $this->service->update(123, $updateData, 1, 999);
         $this->assertInstanceOf(Order::class, $result);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $updatedOrder);
     }
 
     public function test_it_throws_exception_when_order_not_found()
@@ -313,7 +320,8 @@ class OrderUpdateServiceTest extends TestCase
         $result = $this->service->cancel(123, 'Customer request', 999);
 
         $this->assertEquals($cancelledOrder, $result);
-        //Event::assertDispatched(OrderCancelledEvent::class);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $cancelledOrder);
+        $this->assertEventDispatched(OrderCancelledEvent::class, $cancelledOrder);
     }
 
     public function test_it_throws_exception_when_order_cannot_be_cancelled()
@@ -340,8 +348,6 @@ class OrderUpdateServiceTest extends TestCase
 
     public function test_it_completes_order()
     {
-        // Event::fake();
-
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 123;
         $order->status = OrderStatus::PROCESSING->value;
@@ -386,12 +392,11 @@ class OrderUpdateServiceTest extends TestCase
         $result = $this->service->complete(123, 999);
 
         $this->assertEquals($completedOrder, $result);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $completedOrder);
     }
 
     public function test_it_refunds_order()
     {
-        //Event::fake();
-
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 123;
         $order->status = OrderStatus::COMPLETED->value;
@@ -441,13 +446,12 @@ class OrderUpdateServiceTest extends TestCase
         $result = $this->service->refund(123, 'Defective product', 999);
 
         $this->assertEquals($refundedOrder, $result);
-        //Event::assertDispatched(OrderRefundedEvent::class);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $refundedOrder);
+        $this->assertEventDispatched(OrderRefundedEvent::class, $refundedOrder);
     }
 
     public function test_it_wraps_updates_in_transaction()
     {
-        //Event::fake();
-
         $order = Mockery::mock(Order::class)->makePartial();
         $order->id = 123;
         $order->status = OrderStatus::PENDING->value;
@@ -471,6 +475,7 @@ class OrderUpdateServiceTest extends TestCase
 
         $result = $this->service->update(123, ['total' => 100.00], 1, 999);
         $this->assertInstanceOf(Order::class, $result);
+        $this->assertEventDispatched(OrderUpdatedEvent::class, $order);
     }
 
     protected function tearDown(): void
@@ -505,5 +510,16 @@ class OrderUpdateServiceTest extends TestCase
         $this->calculationService->shouldReceive('calculateOrderTotals')
             ->once()
             ->andReturn($orderTotals);
+    }
+
+    private function assertEventDispatched(string $eventClass, Order $order): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', $eventClass));
+        $this->assertSame($order, $matches[0]->order);
     }
 }

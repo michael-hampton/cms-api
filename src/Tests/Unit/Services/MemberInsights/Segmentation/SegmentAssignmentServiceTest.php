@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\MemberInsights\Segmentation;
 
+use App\Events\Subscriptions\SubscriptionSegmentAssigned;
 use App\Framework\Database\Database;
 use App\Models\PlanSegment;
 use App\Models\Segment;
@@ -11,6 +12,7 @@ use App\Repositories\MemberInsights\PlanSegmentRepository;
 use App\Repositories\MemberInsights\SubscriptionSegmentRepository;
 use App\Services\MemberInsights\Segmentation\SegmentAssignmentService;
 use App\Services\MemberInsights\Segmentation\SegmentRuleEngine;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +23,7 @@ class SegmentAssignmentServiceTest extends TestCase
     private PlanSegmentRepository|MockInterface $planSegmentRepository;
     private SubscriptionSegmentRepository|MockInterface $subscriptionSegmentRepository;
     private Database|MockInterface $database;
+    private CapturingEventDispatcher $events;
     private SegmentAssignmentService $service;
 
     // =========================================================================
@@ -46,6 +49,10 @@ class SegmentAssignmentServiceTest extends TestCase
         $result = $this->service->assignForSubscription($subscription);
 
         $this->assertSame($assignment, $result);
+        $this->events->assertDispatched(
+            SubscriptionSegmentAssigned::class,
+            fn(SubscriptionSegmentAssigned $event): bool => $event->subscriptionSegment === $assignment
+        );
     }
 
     public function test_it_respects_priority_and_skips_non_matching_segment(): void
@@ -204,6 +211,7 @@ class SegmentAssignmentServiceTest extends TestCase
         $this->planSegmentRepository         = Mockery::mock(PlanSegmentRepository::class);
         $this->subscriptionSegmentRepository = Mockery::mock(SubscriptionSegmentRepository::class);
         $this->database                      = Mockery::mock(Database::class);
+        $this->events                        = CapturingEventDispatcher::fake();
         $this->service                       = new SegmentAssignmentService(
             $this->ruleEngine,
             $this->planSegmentRepository,

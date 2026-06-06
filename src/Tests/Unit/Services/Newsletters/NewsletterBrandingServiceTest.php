@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\Newsletters;
 
+use App\Events\Newsletters\NewsletterBrandingUpdated;
 use App\Framework\Support\Logger;
 use App\Models\Model;
 use App\Models\Newsletter;
@@ -10,18 +11,21 @@ use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Repositories\Newsletters\NewsletterRepository;
 use App\Services\Newsletter\Branding\CssSanitizer;
 use App\Services\Newsletter\NewsletterBrandingService;
+use App\Tests\Support\CapturingEventDispatcher;
 use App\Tests\Unit\Repositories\RepositoryTestCase;
 
 class NewsletterBrandingServiceTest extends RepositoryTestCase
 {
     private NewsletterBrandingService $service;
     private NewsletterBrandingRepository $brandingRepository;
+    private CapturingEventDispatcher $events;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->brandingRepository = app(NewsletterBrandingRepository::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new NewsletterBrandingService(
             $this->brandingRepository,
@@ -59,6 +63,11 @@ class NewsletterBrandingServiceTest extends RepositoryTestCase
         $this->assertInstanceOf(NewsletterBrandingConfiguration::class, $branding);
         $this->assertEquals('https://example.com/logo.png', $branding->logo_url);
         $this->assertEquals('Weekly Digest', $branding->header_text);
+        $this->events->assertDispatched(
+            NewsletterBrandingUpdated::class,
+            fn(NewsletterBrandingUpdated $event): bool => $event->branding === $branding
+                && $event->newsletter->id === $newsletter->id
+        );
 
         // Version should have been created
         $versions = $this->brandingRepository->versionHistory($branding->id);

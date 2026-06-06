@@ -3,15 +3,22 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\GuidelineStatus;
+use App\Events\OpenCollab\GuidelineArchivedEvent;
+use App\Events\OpenCollab\GuidelineDraftCreatedEvent;
+use App\Events\OpenCollab\GuidelinePublishedEvent;
+use App\Events\OpenCollab\GuidelinesVersionBumpedEvent;
 use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\Guideline;
 use App\Models\Site;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Services\OpenCollab\GuidelineService;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 use PHPUnit\Framework\TestCase;
@@ -25,6 +32,7 @@ class GuidelineServiceTest extends TestCase
     private GuidelinesContentRepository $guidelinesRepository;
     private Database $databaseMock;
     private readonly SiteRepository $siteRepository;
+    private CapturingEventDispatcher $eventDispatcher;
 
     // ── createDraft ───────────────────────────────────────────────────────────
 
@@ -38,13 +46,12 @@ class GuidelineServiceTest extends TestCase
             ->with(10, Mockery::type('string'))
             ->andReturn($guideline);
 
-        //$this->expectsEvents(GuidelineDraftCreatedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->createDraft(10, str_repeat('a', 60), 99)
         );
 
         $this->assertSame($guideline, $result);
+        $this->assertGuidelineEventDispatched(GuidelineDraftCreatedEvent::class, $guideline);
     }
 
     // ── updateDraftContent ────────────────────────────────────────────────────
@@ -108,13 +115,13 @@ class GuidelineServiceTest extends TestCase
         // Stub Site::find — this is the one static call permitted through the model layer
         $this->siteRepository->shouldReceive('find')->with(10)->andReturn($site);
 
-        //$this->expectsEvents(GuidelinePublishedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->publishVersion($draft, 99)
         );
 
         $this->assertSame($published, $result);
+        $this->assertGuidelineEventDispatched(GuidelinePublishedEvent::class, $published);
+        $this->assertGuidelineEventDispatched(GuidelinesVersionBumpedEvent::class, $published);
     }
 
     public function test_publish_auto_archives_previous_published_guideline(): void
@@ -145,14 +152,13 @@ class GuidelineServiceTest extends TestCase
 
         $this->siteRepository->shouldReceive('find')->andReturn($site);
 
-        //$this->expectsEvents(GuidelineArchivedEvent::class);
-        //$this->expectsEvents(GuidelinePublishedEvent::class);
-
         $this->runInFakeTransaction(
             fn() => $this->service->publishVersion($draft, 99)
         );
 
-        $this->assertTrue(true);
+        $this->assertGuidelineEventDispatched(GuidelineArchivedEvent::class, $previous);
+        $this->assertGuidelineEventDispatched(GuidelinePublishedEvent::class, $published);
+        $this->assertGuidelineEventDispatched(GuidelinesVersionBumpedEvent::class, $published);
     }
 
     public function test_publish_throws_for_already_published_guideline(): void
@@ -186,13 +192,12 @@ class GuidelineServiceTest extends TestCase
             ->with($published, 99)
             ->andReturn($archived);
 
-        //$this->expectsEvents(GuidelineArchivedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->archiveVersion($published, 99)
         );
 
         $this->assertSame($archived, $result);
+        $this->assertGuidelineEventDispatched(GuidelineArchivedEvent::class, $archived);
     }
 
     public function test_archive_throws_for_draft_guideline(): void
@@ -250,13 +255,12 @@ class GuidelineServiceTest extends TestCase
             ]))
             ->andReturn($draft);
 
-        //$this->expectsEvents(GuidelineDraftCreatedEvent::class);
-
         $result = $this->runInFakeTransaction(
             fn() => $this->service->cloneToDraft($source, 99)
         );
 
         $this->assertSame($draft, $result);
+        $this->assertGuidelineEventDispatched(GuidelineDraftCreatedEvent::class, $draft);
     }
 
     public function test_clone_does_not_mutate_source(): void
@@ -309,8 +313,18 @@ class GuidelineServiceTest extends TestCase
         $this->guidelinesRepository = Mockery::mock(GuidelinesContentRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->siteRepository = Mockery::mock(SiteRepository::class);
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new GuidelineService($this->guidelinesRepository, $this->databaseMock, $this->siteRepository);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -335,6 +349,17 @@ class GuidelineServiceTest extends TestCase
             ->once()
             ->andReturnUsing(fn(callable $cb) => $cb());
 
-        return $this->databaseMock->transaction($callback);
+        return $callback();
+    }
+
+    private function assertGuidelineEventDispatched(string $eventClass, Guideline $guideline): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', $eventClass));
+        $this->assertSame($guideline, $matches[0]->guideline);
     }
 }

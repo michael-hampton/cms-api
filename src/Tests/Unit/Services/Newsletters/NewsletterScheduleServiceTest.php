@@ -7,13 +7,17 @@ use App\Enums\Newsletters\ScheduleFrequency;
 use App\Events\Newsletters\NewsletterCreationScheduleCreated;
 use App\Events\Newsletters\NewsletterCreationScheduleUpdated;
 use App\Events\Newsletters\NewsletterSendScheduleCreated;
+use App\Events\Newsletters\NewsletterSendScheduleUpdated;
+use App\Framework\Container;
 use App\Framework\Database\Database;
+use App\Framework\Events\EventDispatcher;
 use App\Models\NewsletterCreationSchedule;
 use App\Models\NewsletterSendSchedule;
 use App\Repositories\Newsletters\NewsletterCreationScheduleRepository;
 use App\Repositories\Newsletters\NewsletterSendScheduleRepository;
 use App\Services\Newsletter\NewsletterScheduleService;
 use App\Services\Newsletter\ScheduleNextRunCalculator;
+use App\Tests\Support\CapturingEventDispatcher;
 use DomainException;
 use Mockery;
 use Mockery\MockInterface;
@@ -25,6 +29,7 @@ class NewsletterScheduleServiceTest extends TestCase
     private MockInterface|NewsletterSendScheduleRepository $sendRepo;
     private MockInterface|ScheduleNextRunCalculator $calculator;
     private MockInterface|Database $database;
+    private CapturingEventDispatcher $eventDispatcher;
     private NewsletterScheduleService $service;
 
     public function test_create_creation_schedule_persists_and_emits_event(): void
@@ -62,11 +67,10 @@ class NewsletterScheduleServiceTest extends TestCase
             }))
             ->andReturn($schedule);
 
-        $this->expectsEvent(NewsletterCreationScheduleCreated::class);
-
         $result = $this->service->createCreationSchedule($newsletterId, $siteId, $data);
 
         $this->assertSame($schedule, $result);
+        $this->assertScheduleEventDispatched(NewsletterCreationScheduleCreated::class, $schedule);
     }
 
     private function makeCreationSchedule(array $attrs = []): NewsletterCreationSchedule
@@ -98,19 +102,6 @@ class NewsletterScheduleServiceTest extends TestCase
     // =========================================================================
     // createCreationSchedule
     // =========================================================================
-
-    /**
-     * Assert an event class would be dispatched.
-     * Swap this for your framework's event fake if available.
-     */
-    private function expectsEvent(string $eventClass): void
-    {
-        // If your framework provides Event::fake(), use that instead.
-        // This helper is a no-op marker — the real assertion is that
-        // no exception is thrown and the service completes successfully.
-        // Add Event::assertDispatched($eventClass) here if using Laravel's Event facade.
-        $this->addToAssertionCount(1);
-    }
 
     public function test_create_creation_schedule_throws_when_active_schedule_exists(): void
     {
@@ -176,11 +167,10 @@ class NewsletterScheduleServiceTest extends TestCase
             ->with(5, Mockery::on(fn($p) => isset($p['next_run_at']) && $p['time'] === '14:00'))
             ->andReturn($updated);
 
-        $this->expectsEvent(NewsletterCreationScheduleUpdated::class);
-
         $result = $this->service->updateCreationSchedule(5, ['time' => '14:00']);
 
         $this->assertSame($updated, $result);
+        $this->assertScheduleEventDispatched(NewsletterCreationScheduleUpdated::class, $updated);
     }
 
     public function test_update_creation_schedule_throws_when_not_found(): void
@@ -224,9 +214,9 @@ class NewsletterScheduleServiceTest extends TestCase
             ->with(5, ['status' => 'paused'])
             ->andReturn($paused);
 
-        $this->expectsEvent(NewsletterCreationScheduleUpdated::class);
+        $result = $this->service->updateCreationSchedule(5, ['status' => 'paused']);
 
-        $this->service->updateCreationSchedule(5, ['status' => 'paused']);
+        $this->assertScheduleEventDispatched(NewsletterCreationScheduleUpdated::class, $result);
     }
 
     public function test_update_creation_schedule_resume_recalculates_next_run(): void
@@ -254,9 +244,9 @@ class NewsletterScheduleServiceTest extends TestCase
             ->with(5, Mockery::on(fn($p) => $p['status'] === 'active' && isset($p['next_run_at'])))
             ->andReturn($resumed);
 
-        $this->expectsEvent(NewsletterCreationScheduleUpdated::class);
+        $result = $this->service->updateCreationSchedule(5, ['status' => 'active']);
 
-        $this->service->updateCreationSchedule(5, ['status' => 'active']);
+        $this->assertScheduleEventDispatched(NewsletterCreationScheduleUpdated::class, $result);
     }
 
     // =========================================================================
@@ -337,11 +327,10 @@ class NewsletterScheduleServiceTest extends TestCase
             ->with(Mockery::on(fn($p) => $p['newsletter_id'] === $newsletterId && $p['status'] === 'active'))
             ->andReturn($schedule);
 
-        $this->expectsEvent(NewsletterSendScheduleCreated::class);
-
         $result = $this->service->createSendSchedule($newsletterId, $siteId, $data);
 
         $this->assertSame($schedule, $result);
+        $this->assertScheduleEventDispatched(NewsletterSendScheduleCreated::class, $schedule);
     }
 
     private function makeSendSchedule(array $attrs = []): NewsletterSendSchedule
@@ -369,6 +358,42 @@ class NewsletterScheduleServiceTest extends TestCase
         $schedule->shouldReceive('toArray')->andReturn(array_merge($defaults, $attrs));
 
         return $schedule;
+    }
+
+    // =========================================================================
+    // updateSendSchedule
+    // =========================================================================
+
+    public function test_update_send_schedule_recalculates_next_run_and_emits_event(): void
+    {
+        $schedule = $this->makeSendSchedule([
+            'id' => 7,
+            'frequency' => 'weekly',
+            'day_of_week' => 1,
+            'time' => '14:30',
+            'status' => 'active',
+        ]);
+
+        $this->sendRepo->shouldReceive('find')->with(7)->andReturn($schedule);
+
+        $this->calculator->shouldReceive('calculate')
+            ->once()
+            ->andReturn(new \DateTimeImmutable('2026-03-04 15:30:00'));
+
+        $this->database->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn($cb) => $cb());
+
+        $updated = $this->makeSendSchedule(['id' => 7, 'time' => '15:30']);
+        $this->sendRepo->shouldReceive('update')
+            ->once()
+            ->with(7, Mockery::on(fn($p) => isset($p['next_run_at']) && $p['time'] === '15:30'))
+            ->andReturn($updated);
+
+        $result = $this->service->updateSendSchedule(7, ['time' => '15:30']);
+
+        $this->assertSame($updated, $result);
+        $this->assertScheduleEventDispatched(NewsletterSendScheduleUpdated::class, $updated);
     }
 
     // =========================================================================
@@ -427,6 +452,9 @@ class NewsletterScheduleServiceTest extends TestCase
         $this->sendRepo = Mockery::mock(NewsletterSendScheduleRepository::class);
         $this->calculator = Mockery::mock(ScheduleNextRunCalculator::class);
         $this->database = Mockery::mock(Database::class);
+        $this->eventDispatcher = new CapturingEventDispatcher();
+
+        Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
         $this->service = new NewsletterScheduleService(
             $this->creationRepo,
@@ -439,5 +467,18 @@ class NewsletterScheduleServiceTest extends TestCase
     protected function tearDown(): void
     {
         Mockery::close();
+
+        parent::tearDown();
+    }
+
+    private function assertScheduleEventDispatched(string $eventClass, NewsletterCreationSchedule|NewsletterSendSchedule $schedule): void
+    {
+        $matches = array_values(array_filter(
+            $this->eventDispatcher->dispatched,
+            fn(object $event): bool => $event instanceof $eventClass
+        ));
+
+        $this->assertNotEmpty($matches, sprintf('Expected event [%s] to be dispatched.', $eventClass));
+        $this->assertSame($schedule, $matches[0]->schedule);
     }
 }

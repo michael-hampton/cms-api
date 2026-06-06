@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Services\Newsletters;
 use App\DTO\Newsletters\IssueManualSendDTO;
 use App\DTO\Newsletters\NewsletterIssueDTO;
 use App\Enums\Newsletters\NewsletterIssueStatus;
+use App\Events\Newsletters\NewsletterIssueSent;
 use App\Framework\Database\Database;
 use App\Framework\Support\Logger;
 use App\Models\Newsletter;
@@ -15,6 +16,7 @@ use App\Services\Newsletter\NewsletterIssueService;
 use App\Services\Newsletter\NewsletterSendService;
 use App\Services\Newsletter\Validation\BlockPayloadValidator;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
+use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
 
@@ -35,6 +37,7 @@ class NewsletterIssueServiceTest extends FunctionalTestCase
     private BlockPayloadValidator|MockInterface $blockPayloadValidator;
     private Logger|MockInterface $logger;
     private Database|MockInterface $databaseMock;
+    private CapturingEventDispatcher $events;
 
     private NewsletterIssueService $service;
 
@@ -376,6 +379,11 @@ class NewsletterIssueServiceTest extends FunctionalTestCase
         $this->assertEquals(7, $result['issue_id']);
         $this->assertEquals(55, $result['send_id']);
         $this->assertTrue($txCalled());
+        $this->events->assertDispatched(
+            NewsletterIssueSent::class,
+            fn(NewsletterIssueSent $event): bool => $event->issue === $issue
+                && $event->sendResult === $sendResult
+        );
     }
 
     public function test_send_issue_throws_runtime_exception_when_issue_not_found(): void
@@ -771,6 +779,7 @@ class NewsletterIssueServiceTest extends FunctionalTestCase
         $this->blockPayloadValidator = Mockery::mock(BlockPayloadValidator::class);
         $this->logger = Mockery::mock(Logger::class);
         $this->databaseMock = Mockery::mock(Database::class);
+        $this->events = CapturingEventDispatcher::fake();
 
         $this->service = new NewsletterIssueService(
             $this->issueRepository,
