@@ -42,12 +42,11 @@ class AddressRepository extends Repository
 
     public function getAddressesForMember(int $memberId): Collection
     {
-        $query = Address::where('member_id', $memberId)
+        return Address::where('member_id', $memberId)
             ->orderBy('is_default', 'desc')
-            ->orderBy('created_at', 'desc');
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-
-        return $this->applySiteFilter($query)->get();
     }
 
     public function getShippingAddressesForMember(int $memberId): Collection

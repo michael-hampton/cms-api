@@ -466,6 +466,7 @@
     }
 
     async function loadSavedAddresses() {
+        alert('mike2')
         try {
             const res = await fetch(`/api/${SITE}/${window.currentMember.id}/addresses?type=shipping`);
             const data = await res.json();
@@ -477,6 +478,7 @@
     }
 
     function displaySavedAddresses(addresses) {
+        alert('mike')
         console.log('addresses', addresses)
         const container = document.getElementById('saved-addresses-list');
         const section = document.getElementById('saved-addresses-section');

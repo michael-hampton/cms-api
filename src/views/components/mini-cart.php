@@ -99,7 +99,7 @@
         </div>
 
         <div class="mc-actions">
-            <a href="/checkout" class="mc-checkout-btn">
+            <a href="/<?= \App\Framework\Support\SiteContext::slug()?>/checkout" class="mc-checkout-btn">
                 Proceed to Checkout
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M5 12h14M12 5l7 7-7 7"/>
