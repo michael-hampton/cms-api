@@ -25,6 +25,21 @@ class RbacRepository
             ->toArray();
     }
 
+    public function roleSlugsForUser(int $siteId, int $userId): array
+    {
+        $roleIds = $this->roleIdsForUser($siteId, $userId);
+
+        if ($roleIds === []) {
+            return [];
+        }
+
+        return OpenCollabRole::whereIn('id', $roleIds)
+            ->orderBy('slug')
+            ->get()
+            ->pluck('slug')
+            ->toArray();
+    }
+
     public function permissionIdsForRoles(array $roleIds): array
     {
         if ($roleIds === []) {
@@ -150,6 +165,28 @@ class RbacRepository
         return UserSite::where('site_id', $siteId)->get()->pluck('user_id')->map(fn($id) => (int) $id)->toArray();
     }
 
+    public function activeSiteAssignmentsForUser(int $userId): array
+    {
+        $activeSiteIds = Site::where('is_active', true)
+            ->get()
+            ->pluck('id')
+            ->map(fn($id) => (int) $id)
+            ->toArray();
+
+        if ($activeSiteIds === []) {
+            return [];
+        }
+
+        return UserSite::where('user_id', $userId)
+            ->whereIn('site_id', $activeSiteIds)
+            ->get()
+            ->map(fn($assignment) => [
+                'user_id' => (int) $assignment->user_id,
+                'site_id' => (int) $assignment->site_id,
+            ])
+            ->toArray();
+    }
+
     public function replaceUserRoles(int $siteId, int $userId, array $roleIds): void
     {
         OpenCollabSiteUserRole::where('site_id', $siteId)->where('user_id', $userId)->delete();
@@ -161,6 +198,19 @@ class RbacRepository
                 'role_id' => $roleId,
             ]);
         }
+    }
+
+    public function replaceUserRoleWithSlug(int $siteId, int $userId, string $roleSlug): bool
+    {
+        $siteRole = OpenCollabRole::where('slug', $roleSlug)->first();
+
+        if (!$siteRole) {
+            return false;
+        }
+
+        $this->replaceUserRoles($siteId, $userId, [(int) $siteRole->id]);
+
+        return true;
     }
 
     public function findPermissionBySlug(string $slug): ?OpenCollabPermission

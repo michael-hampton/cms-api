@@ -9,6 +9,14 @@ class CoreServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->container->singleton(\App\Framework\Support\Cache\CacheManager::class);
+        $this->container->singleton(
+            \App\Framework\Support\Cache\Contracts\CacheInterface::class,
+            fn() => $this->container
+                ->resolve(\App\Framework\Support\Cache\CacheManager::class)
+                ->driver()
+        );
+
         // Mail
         $this->container->singleton(\App\Framework\Mail\SMTPMailer::class);
         $this->container->afterResolving(\App\Framework\Mail\SMTPMailer::class, function ($mailer) {

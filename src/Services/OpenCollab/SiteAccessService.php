@@ -14,6 +14,7 @@ class SiteAccessService
 {
     public function __construct(
         private readonly UserSiteRepository $userSiteRepository,
+        private ?PermissionCacheInvalidator $permissionCacheInvalidator = null,
     )
     {
     }
@@ -26,11 +27,13 @@ class SiteAccessService
     public function grantAccess(int $userId, int $siteId): void
     {
         $this->userSiteRepository->grant($userId, $siteId);
+        $this->permissionCacheInvalidator()?->invalidateUser($userId);
     }
 
     public function revokeAccess(int $userId, int $siteId): void
     {
         $this->userSiteRepository->revoke($userId, $siteId);
+        $this->permissionCacheInvalidator()?->invalidateUser($userId);
     }
 
     /**
@@ -51,6 +54,21 @@ class SiteAccessService
     {
         foreach ($siteIds as $siteId) {
             $this->userSiteRepository->grant($userId, (int)$siteId);
+        }
+
+        $this->permissionCacheInvalidator()?->invalidateUser($userId);
+    }
+
+    private function permissionCacheInvalidator(): ?PermissionCacheInvalidator
+    {
+        if ($this->permissionCacheInvalidator) {
+            return $this->permissionCacheInvalidator;
+        }
+
+        try {
+            return $this->permissionCacheInvalidator = app(PermissionCacheInvalidator::class);
+        } catch (\Throwable) {
+            return null;
         }
     }
 }

@@ -46,7 +46,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
             ->with(7, ['is_active' => false])
             ->once();
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
 
@@ -64,7 +64,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->with(7, 1)->andReturn(true);
         $this->userRepository->shouldNotReceive('update')->with(7, ['is_active' => false]);
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
 
@@ -81,7 +81,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
         $this->userRepository->shouldReceive('update');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once();
 
@@ -118,7 +118,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
             ->with(6, PayoutAuditAction::Declined, 99, Mockery::type('string'))
             ->once();
 
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info');
         $this->eventDispatcher->shouldReceive('dispatch');
 
@@ -146,7 +146,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
             });
         $this->payoutAuditRepository->shouldReceive('log');
 
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info');
         $this->eventDispatcher->shouldReceive('dispatch');
 
@@ -166,14 +166,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->userRepository->shouldReceive('update');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
 
-        $queryMock = $this->makeQueryMockReturning([$draftPage, $onHoldPage]);
-        $this->pageRepository->shouldReceive('query')->andReturn($queryMock);
-        $this->pageRepository->shouldReceive('update')
-            ->with(10, ['status' => PageStatus::ARCHIVED->value])
-            ->once();
-        $this->pageRepository->shouldReceive('update')
-            ->with(11, ['status' => PageStatus::ARCHIVED->value])
-            ->once();
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(2);
 
         $this->logger->shouldReceive('info');
         $this->eventDispatcher->shouldReceive('dispatch');
@@ -193,10 +189,10 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->userRepository->shouldReceive('update');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
 
-        // Query only returns non-published pages per the archivable status filter
-        $queryMock = $this->makeQueryMockReturning([]);
-        $this->pageRepository->shouldReceive('query')->andReturn($queryMock);
-        $this->pageRepository->shouldNotReceive('update')->with(12, Mockery::any());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(0);
 
         $this->logger->shouldReceive('info');
         $this->eventDispatcher->shouldReceive('dispatch');
@@ -244,7 +240,7 @@ class ContributorTerminationServiceTest extends FunctionalTestCase
         $this->userSiteRepository->shouldReceive('hasAnyOtherAccess')->andReturn(false);
         $this->userRepository->shouldReceive('update');
         $this->payoutRepository->shouldReceive('inFlightForContributor')->andReturn(new Collection([]));
-        $this->pageRepository->shouldReceive('query')->andReturn($this->makeEmptyQueryMock());
+        $this->pageRepository->shouldReceive('archiveUnpublishedContributorPages')->with(7, 1)->once()->andReturn(0);
         $this->logger->shouldReceive('info');
 
         $this->eventDispatcher->shouldReceive('dispatch')

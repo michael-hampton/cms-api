@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Framework\Support\Cache\Cache;
+use App\Framework\Support\Cache\Contracts\CacheInterface;
 use App\Framework\Support\Config;
 use App\Models\OpenCollabPermission;
 use App\Models\OpenCollabRole;
@@ -13,7 +14,9 @@ use App\Models\User;
 use App\Repositories\OpenCollab\RbacRepository;
 use App\Repositories\OpenCollab\UserSiteRepository;
 use App\Services\OpenCollab\LegacyRoleToSiteRoleMapper;
+use App\Services\OpenCollab\PermissionCacheInvalidator;
 use App\Services\OpenCollab\RbacBootstrapper;
+use App\Services\OpenCollab\SitePermissionBundleBuilder;
 use App\Services\OpenCollab\SitePermissionResolver;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
@@ -27,6 +30,7 @@ class SitePermissionResolverTest extends FunctionalTestCase
     private UserSiteRepository $userSiteRepository;
     private RbacRepository $rbacRepository;
     private RbacBootstrapper $bootstrapper;
+    private CacheInterface $cache;
 
     protected function setUp(): void
     {
@@ -39,12 +43,57 @@ class SitePermissionResolverTest extends FunctionalTestCase
         $this->userSiteRepository = new UserSiteRepository();
         $this->rbacRepository = new RbacRepository();
         $this->bootstrapper = new RbacBootstrapper($this->rbacRepository);
+        $mapper = new LegacyRoleToSiteRoleMapper();
+        $this->cache = new class implements CacheInterface {
+            private array $items = [];
+
+            public function get(string $key): mixed
+            {
+                return $this->items[$key] ?? null;
+            }
+
+            public function put(string $key, mixed $value, int $ttlSeconds): void
+            {
+                $this->items[$key] = $value;
+            }
+
+            public function forget(string $key): void
+            {
+                unset($this->items[$key]);
+            }
+
+            public function forgetMany(array $keys): void
+            {
+                foreach ($keys as $key) {
+                    unset($this->items[$key]);
+                }
+            }
+
+            public function flush(): void
+            {
+                $this->items = [];
+            }
+
+            public function has(string $key): bool
+            {
+                return array_key_exists($key, $this->items);
+            }
+
+            public function remember(string $key, int $ttlSeconds, callable $callback): mixed
+            {
+                if ($this->has($key)) {
+                    return $this->items[$key];
+                }
+
+                return $this->items[$key] = $callback();
+            }
+        };
 
         $this->resolver = new SitePermissionResolver(
-            $this->userSiteRepository,
             $this->rbacRepository,
-            new LegacyRoleToSiteRoleMapper(),
-            $this->bootstrapper,
+            new SitePermissionBundleBuilder($this->rbacRepository, $mapper, $this->bootstrapper),
+            new PermissionCacheInvalidator($this->cache),
+            $this->cache,
         );
     }
 
@@ -137,5 +186,16 @@ class SitePermissionResolverTest extends FunctionalTestCase
         $this->resolver->invalidate($user->id, $this->siteId);
 
         $this->assertFalse($this->resolver->allows($user->id, $this->siteId, 'creator.invite'));
+    }
+
+    public function test_bundle_includes_global_admin_flag(): void
+    {
+        $admin = $this->createUser(['role' => 'admin', 'site_id' => $this->siteId]);
+
+        $bundle = $this->resolver->bundleForUser($admin->id);
+
+        $this->assertTrue($bundle['is_global_admin']);
+        $this->assertSame($admin->id, $bundle['user_id']);
+        $this->assertNotEmpty($bundle['assignments']);
     }
 }

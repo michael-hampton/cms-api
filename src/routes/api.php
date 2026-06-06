@@ -47,6 +47,7 @@ use App\Controllers\Front\CommentController;
 use App\Controllers\Front\EstateWebsiteController;
 use App\Controllers\Front\PageLikeController;
 use App\Controllers\Front\WishlistController;
+use App\Controllers\Internal\PermissionCacheController;
 use App\Controllers\MemberAuthController;
 use App\Controllers\MemberController;
 use App\Controllers\MemberInsights\CampaignAnalyticsApiController;
@@ -187,6 +188,7 @@ $router->post('/api/{site}/internal/workflow/run', [WorkflowController::class, '
 $router->get('/api/{site}/internal/workflow/logs', [WorkflowController::class, 'logs']);
 $router->get('/api/{site}/internal/workflow/classes', [WorkflowController::class, 'classes']);
 $router->get('/api/{site}/internal/workflow/listen', [WorkflowController::class, 'listen']);
+$router->post('/internal/permissions/cache/invalidate', [PermissionCacheController::class, 'invalidate']);
 
 $router->put('/api/sites/{id}/toggle-status', [SiteController::class, 'toggleStatus']);
 

@@ -2,8 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
-use App\Models\OpenCollabRole;
-use App\Models\OpenCollabSiteUserRole;
+use App\Repositories\OpenCollab\RbacRepository;
 
 class SiteRoleAssignmentService
 {
@@ -11,6 +10,7 @@ class SiteRoleAssignmentService
         private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,
         private readonly RbacBootstrapper $bootstrapper,
         private readonly SitePermissionResolver $resolver,
+        private ?RbacRepository $rbacRepository = null,
     ) {
     }
 
@@ -24,20 +24,11 @@ class SiteRoleAssignmentService
 
         $this->bootstrapper->ensureSeeded($siteId);
 
-        $siteRole = OpenCollabRole::where('slug', $siteRoleSlug)->first();
-        if (!$siteRole) {
+        $this->rbacRepository ??= new RbacRepository();
+
+        if (!$this->rbacRepository->replaceUserRoleWithSlug($siteId, $userId, $siteRoleSlug)) {
             return null;
         }
-
-        OpenCollabSiteUserRole::where('site_id', $siteId)
-            ->where('user_id', $userId)
-            ->delete();
-
-        OpenCollabSiteUserRole::firstOrCreate([
-            'site_id' => $siteId,
-            'user_id' => $userId,
-            'role_id' => $siteRole->id,
-        ]);
 
         $this->resolver->invalidate($userId, $siteId);
 

@@ -2,8 +2,9 @@
 
 namespace App\Services\Cms;
 
-use App\Models\Site;
 use App\Repositories\Cms\SiteRepository;
+use App\Repositories\OpenCollab\UserSiteRepository;
+use App\Services\OpenCollab\PermissionCacheInvalidator;
 
 class SiteService
 {
@@ -16,8 +17,7 @@ class SiteService
 
     public function getAllSites(): array
     {
-        $sites = Site::all();
-        return $sites->toArray();
+        return $this->repository->findAll();
     }
 
     public function getSiteById(int $id): ?array
@@ -85,7 +85,13 @@ class SiteService
 
     public function toggleStatus(int $id, bool $isActive): array
     {
+        $existing = $this->repository->find($id);
         $site = $this->repository->update($id, ['is_active' => $isActive]);
+
+        if ($existing && (bool) $existing->is_active && !$isActive) {
+            $this->invalidateArchivedSitePermissions($id);
+        }
+
         return $site->toArray();
     }
 
@@ -102,5 +108,19 @@ class SiteService
         }
 
         return $this->repository->delete($id);
+    }
+
+    private function invalidateArchivedSitePermissions(int $siteId): void
+    {
+        try {
+            $userIds = app(UserSiteRepository::class)->userIdsForSite($siteId);
+            app(PermissionCacheInvalidator::class)->invalidateUsers($userIds, $siteId);
+        } catch (\Throwable $exception) {
+            \App\Framework\Support\Logger::warning('Permission cache site archive fan-out failure', [
+                'operation' => 'site_archive_fanout',
+                'site_id' => $siteId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 }

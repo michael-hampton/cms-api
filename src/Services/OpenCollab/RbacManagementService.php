@@ -107,9 +107,7 @@ class RbacManagementService
 
         $this->rbacRepository->replaceRolePermissions($roleId, $permissionIds);
 
-        foreach ($this->rbacRepository->siteMembershipUserIds($siteId) as $userId) {
-            $this->permissionResolver->invalidate($userId, $siteId);
-        }
+        $this->permissionResolver->invalidateMany($this->rbacRepository->siteMembershipUserIds($siteId), $siteId);
 
         $this->auditLogger->log(
             action: 'role_permissions_synced',
@@ -252,9 +250,7 @@ class RbacManagementService
             $this->rbacRepository->deleteRole($roleId);
         }
 
-        foreach ($affectedUserIds as $userId) {
-            $this->permissionResolver->invalidate($userId, $siteId);
-        }
+        $this->permissionResolver->invalidateMany($affectedUserIds, $siteId);
 
         $this->auditLogger->log(
             action: 'role_deleted',

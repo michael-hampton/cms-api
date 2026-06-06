@@ -4,6 +4,7 @@ namespace App\Repositories\Cms\Pages;
 
 use App\DTO\Pages\PageFilterDto;
 use App\Enums\Pages\PageFilterType;
+use App\Enums\Pages\PageStatus;
 use App\Framework\Support\Collection;
 use App\Models\Author;
 use App\Models\Block;
@@ -1046,5 +1047,25 @@ class PageRepository extends Repository
         }
 
         return $query->get();
+    }
+
+    public function archiveUnpublishedContributorPages(int $contributorId, int $siteId): int
+    {
+        $pages = Page::where('contributor_id', $contributorId)
+            ->where('site_id', $siteId)
+            ->whereIn('status', [
+                PageStatus::DRAFT->value,
+                PageStatus::ON_HOLD->value,
+                PageStatus::WAITING_APPROVAL->value,
+            ])
+            ->get();
+
+        foreach ($pages as $page) {
+            $this->update($page->id, [
+                'status' => PageStatus::ARCHIVED->value,
+            ]);
+        }
+
+        return $pages->count();
     }
 }

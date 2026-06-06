@@ -71,6 +71,7 @@ use App\Framework\Console\Commands\MakeModelCommand;
 use App\Framework\Console\Commands\MakeRepositoryCommand;
 use App\Framework\Console\Commands\MigrateCommand;
 use App\Framework\Console\Commands\MigrateRollbackCommand;
+use App\Framework\Console\Commands\PruneCacheCommand;
 use App\Framework\Console\Commands\QueueWorkCommand;
 use App\Framework\Console\Commands\ScheduleRunCommand;
 use App\Framework\Console\Commands\SeedCommand;
@@ -709,6 +710,7 @@ class ApiApplication
         $commands = [
             'migrate' => MigrateCommand::class,
             'migrate:rollback' => MigrateRollbackCommand::class,
+            'cache:prune' => PruneCacheCommand::class,
             'make:migration' => MakeMigrationCommand::class,
             'make:controller' => MakeControllerCommand::class,
             'make:model' => MakeModelCommand::class,

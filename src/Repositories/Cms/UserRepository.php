@@ -9,6 +9,7 @@ use App\Search\PaginatedResult;
 use App\Search\SearchConfigurationFactory;
 use App\Search\SearchCriteria;
 use App\Search\SearchEngine;
+use App\Services\OpenCollab\PermissionCacheInvalidator;
 
 class UserRepository extends Repository implements UserRepositoryInterface
 {
@@ -54,6 +55,23 @@ class UserRepository extends Repository implements UserRepositoryInterface
     protected function getModelClass(): string
     {
         return User::class;
+    }
+
+    public function update(int $id, array $data): ?Model
+    {
+        $existing = $this->find($id);
+        $oldRole = $existing?->role;
+
+        $updated = parent::update($id, $data);
+
+        if ($updated && array_key_exists('role', $data) && $oldRole !== $updated->role) {
+            try {
+                app(PermissionCacheInvalidator::class)->invalidateUser($id);
+            } catch (\Throwable) {
+            }
+        }
+
+        return $updated;
     }
 
     public function updateUserWithPassword(int $id, array $data): Model

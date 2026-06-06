@@ -2,18 +2,19 @@
 
 namespace App\Services\OpenCollab;
 
-use App\Framework\Support\Cache\Cache;
-use App\Framework\Support\Config;
+use App\Framework\Support\Cache\Contracts\CacheInterface;
+use App\Framework\Support\Logger;
 use App\Repositories\OpenCollab\RbacRepository;
-use App\Repositories\OpenCollab\UserSiteRepository;
 
 class SitePermissionResolver
 {
+    private const TTL_SECONDS = 900;
+
     public function __construct(
-        private readonly UserSiteRepository $userSiteRepository,
         private readonly RbacRepository $rbacRepository,
-        private readonly LegacyRoleToSiteRoleMapper $legacyRoleMapper,
-        private readonly RbacBootstrapper $bootstrapper,
+        private readonly SitePermissionBundleBuilder $bundleBuilder,
+        private readonly PermissionCacheInvalidator $invalidator,
+        private readonly CacheInterface $cache,
     ) {
     }
 
@@ -23,24 +24,15 @@ class SitePermissionResolver
             return [];
         }
 
-        $this->bootstrapper->ensureSeeded($siteId);
+        $bundle = $this->bundleForUser($userId);
 
-        return Cache::remember($this->cacheKey($userId, $siteId), 3600, function () use ($userId, $siteId) {
-            if (!$this->userSiteRepository->hasAccess($userId, $siteId)) {
-                return [];
+        foreach ($bundle['assignments'] ?? [] as $assignment) {
+            if ((int) ($assignment['site_id'] ?? 0) === $siteId) {
+                return $assignment['permissions'] ?? [];
             }
+        }
 
-            $sitePermissions = $this->sitePermissions($userId, $siteId);
-
-            if (!Config::get('rbac.site_enabled', config('rbac.site_enabled', false))) {
-                return $this->normalizePermissions($this->legacyPermissions($userId));
-            }
-
-            return $this->normalizePermissions(array_merge(
-                $sitePermissions,
-                $this->legacyPermissions($userId)
-            ));
-        });
+        return [];
     }
 
     public function allows(int $userId, int $siteId, string $permission): bool
@@ -52,47 +44,46 @@ class SitePermissionResolver
 
     public function invalidate(int $userId, int $siteId): void
     {
-        Cache::forget($this->cacheKey($userId, $siteId));
+        $this->invalidator->invalidateUser($userId);
     }
 
-    private function sitePermissions(int $userId, int $siteId): array
+    public function invalidateMany(array $userIds, ?int $siteId = null): int
     {
-        $roleIds = $this->rbacRepository->roleIdsForUser($siteId, $userId);
-        $permissionIds = $this->rbacRepository->permissionIdsForRoles($roleIds);
-        $permissions = $this->rbacRepository->permissionSlugsForIds($permissionIds);
+        return $this->invalidator->invalidateUsers($userIds, $siteId);
+    }
 
-        foreach ($this->rbacRepository->overridesForUser($siteId, $userId) as $override) {
-            $slug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
-            if (!$slug) {
-                continue;
+    public function bundleForUser(int $userId): array
+    {
+        $key = $this->invalidator->keyForUser($userId);
+
+        try {
+            $bundle = $this->cache->get($key);
+
+            if (is_array($bundle)) {
+                return $bundle;
             }
-
-            if ((bool) $override['granted']) {
-                $permissions[] = $slug;
-                continue;
-            }
-
-            $permissions = array_values(array_filter($permissions, fn(string $value) => $value !== $slug));
+        } catch (\Throwable $exception) {
+            Logger::warning('Permission cache read failure', [
+                'operation' => 'get',
+                'user_id' => $userId,
+                'cache_key' => $key,
+                'error' => $exception->getMessage(),
+            ]);
         }
 
-        return $permissions;
-    }
+        $bundle = $this->bundleBuilder->build($userId);
 
-    private function legacyPermissions(int $userId): array
-    {
-        return $this->legacyRoleMapper->permissionsForRole($this->rbacRepository->legacyRoleForUser($userId));
-    }
+        try {
+            $this->cache->put($key, $bundle, self::TTL_SECONDS);
+        } catch (\Throwable $exception) {
+            Logger::warning('Permission cache write failure', [
+                'operation' => 'put',
+                'user_id' => $userId,
+                'cache_key' => $key,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
-    private function normalizePermissions(array $permissions): array
-    {
-        $permissions = array_values(array_unique($permissions));
-        sort($permissions);
-
-        return $permissions;
-    }
-
-    private function cacheKey(int $userId, int $siteId): string
-    {
-        return "permissions:{$siteId}:{$userId}";
+        return $bundle;
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutStatus;
-use App\Enums\Pages\PageStatus;
 use App\Events\OpenCollab\ContributorAccountClosedEvent;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
@@ -46,6 +45,7 @@ class ContributorTerminationService
         private readonly EventDispatcher         $eventDispatcher,
         private readonly Database                $database,
         private readonly Logger                  $logger,
+        private ?PermissionCacheInvalidator $permissionCacheInvalidator = null,
     )
     {
     }
@@ -85,6 +85,8 @@ class ContributorTerminationService
             $this->archiveUnpublishedPages($userId, $siteId);
         });
 
+        $this->permissionCacheInvalidator()?->invalidateUser($userId);
+
         $this->logger->info('Contributor account closed.', [
             'user_id' => $userId,
             'site_id' => $siteId,
@@ -98,6 +100,19 @@ class ContributorTerminationService
         $this->eventDispatcher->dispatch(
             new ContributorAccountClosedEvent($freshUser, $adminId, $reason)
         );
+    }
+
+    private function permissionCacheInvalidator(): ?PermissionCacheInvalidator
+    {
+        if ($this->permissionCacheInvalidator) {
+            return $this->permissionCacheInvalidator;
+        }
+
+        try {
+            return $this->permissionCacheInvalidator = app(PermissionCacheInvalidator::class);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -127,23 +142,6 @@ class ContributorTerminationService
 
     private function archiveUnpublishedPages(int $userId, int $siteId): void
     {
-        $archivableStatuses = [
-            PageStatus::DRAFT->value,
-            PageStatus::ON_HOLD->value,
-            PageStatus::WAITING_APPROVAL->value,
-        ];
-
-        $pages = $this->pageRepository
-            ->query()
-            ->where('contributor_id', $userId)
-            ->where('site_id', $siteId)
-            ->whereIn('status', $archivableStatuses)
-            ->get();
-
-        foreach ($pages as $page) {
-            $this->pageRepository->update($page->id, [
-                'status' => PageStatus::ARCHIVED->value,
-            ]);
-        }
+        $this->pageRepository->archiveUnpublishedContributorPages($userId, $siteId);
     }
 }

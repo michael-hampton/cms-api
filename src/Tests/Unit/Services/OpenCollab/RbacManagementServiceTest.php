@@ -35,6 +35,7 @@ class RbacManagementServiceTest extends RepositoryTestCase
 
         $resolver = Mockery::mock(SitePermissionResolver::class);
         $resolver->shouldReceive('invalidate')->byDefault();
+        $resolver->shouldReceive('invalidateMany')->byDefault();
 
         $this->service = new RbacManagementService(
             $this->bootstrapper,
