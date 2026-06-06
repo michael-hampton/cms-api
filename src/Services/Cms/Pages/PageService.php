@@ -3,6 +3,10 @@
 namespace App\Services\Cms\Pages;
 
 use App\Enums\Pages\PageStatus;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentHeld;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\Framework\Database\Database;
 use App\Framework\Exceptions\BlockParserNotFoundException;
 use App\Framework\Exceptions\ValidationException;
@@ -244,6 +248,9 @@ class PageService
         // Log waiting approval if that's the status
         if ($page->status === PageStatus::WAITING_APPROVAL->value) {
             $this->historyService->logPageWaitingApproval($page);
+            if (empty($requestData['suppress_workflow_notifications'])) {
+                $this->dispatchSubmittedForApproval($page, (int) ($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
+            }
         }
 
         return $page;
@@ -274,7 +281,14 @@ class PageService
             }
         }
 
-        return $this->createOrUpdatePageWithAllData($requestData, $siteId);
+        $wasWaitingApproval = $page->status === PageStatus::WAITING_APPROVAL->value;
+        $updatedPage = $this->createOrUpdatePageWithAllData($requestData, $siteId);
+
+        if (!$wasWaitingApproval && $updatedPage->status === PageStatus::WAITING_APPROVAL->value && empty($requestData['suppress_workflow_notifications'])) {
+            $this->dispatchSubmittedForApproval($updatedPage, (int) ($requestData['user_id'] ?? $requestData['contributor_id'] ?? $requestData['owner_id'] ?? 0));
+        }
+
+        return $updatedPage;
     }
 
     /**
@@ -312,7 +326,7 @@ class PageService
             throw new \Exception("Page is not waiting for approval");
         }
 
-        return $this->database->transaction(function () use ($page, $userId) {
+        $approvedPage = $this->database->transaction(function () use ($page, $userId) {
             // Mark as approved
             $page->approve($userId);
 
@@ -328,6 +342,17 @@ class PageService
 
             return $this->getCompletePageData($updatedPage->id);
         });
+
+        event(new ContentApproved(
+            contentType: 'pages',
+            contentId: (int) $approvedPage->id,
+            siteId: (int) $approvedPage->site_id,
+            actorId: $userId,
+            title: (string) $approvedPage->title,
+            ownerId: $this->pageOwnerId($approvedPage),
+        ));
+
+        return $approvedPage;
     }
 
     /**
@@ -345,7 +370,7 @@ class PageService
             throw new \Exception("Page is not waiting for approval");
         }
 
-        return $this->database->transaction(function () use ($page, $userId, $reason) {
+        $rejectedPage = $this->database->transaction(function () use ($page, $userId, $reason) {
             // Remove approval if it was there
             $page->removeApproval();
 
@@ -359,6 +384,18 @@ class PageService
 
             return $this->getCompletePageData($updatedPage->id);
         });
+
+        event(new ContentRejected(
+            contentType: 'pages',
+            contentId: (int) $rejectedPage->id,
+            siteId: (int) $rejectedPage->site_id,
+            actorId: $userId,
+            title: (string) $rejectedPage->title,
+            ownerId: $this->pageOwnerId($rejectedPage),
+            reason: $reason,
+        ));
+
+        return $rejectedPage;
     }
 
     /**
@@ -376,7 +413,7 @@ class PageService
             throw new \Exception("Cannot put page on hold from current status");
         }
 
-        return $this->database->transaction(function () use ($page, $userId, $reason) {
+        $heldPage = $this->database->transaction(function () use ($page, $userId, $reason) {
             $updatedPage = $this->pageRepository->update($page->id, [
                 'status' => Pagestatus::ON_HOLD->value,
             ]);
@@ -385,6 +422,41 @@ class PageService
 
             return $this->getCompletePageData($updatedPage->id);
         });
+
+        event(new ContentHeld(
+            contentType: 'pages',
+            contentId: (int) $heldPage->id,
+            siteId: (int) $heldPage->site_id,
+            actorId: $userId,
+            title: (string) $heldPage->title,
+            ownerId: $this->pageOwnerId($heldPage),
+            reason: $reason,
+        ));
+
+        return $heldPage;
+    }
+
+    private function dispatchSubmittedForApproval(Page $page, int $actorId): void
+    {
+        event(new ContentSubmittedForApproval(
+            contentType: 'pages',
+            contentId: (int) $page->id,
+            siteId: (int) $page->site_id,
+            actorId: $actorId,
+            title: (string) $page->title,
+            ownerId: $this->pageOwnerId($page),
+        ));
+    }
+
+    private function pageOwnerId(Page $page): ?int
+    {
+        foreach (['contributor_id', 'owner_id', 'created_by', 'author_id'] as $field) {
+            if (!empty($page->$field)) {
+                return (int) $page->$field;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -541,7 +613,7 @@ class PageService
             'author' => 'author',
             'publish_date' => fn($value) => $this->formatDateTime($value),
             'expiry_date' => fn($value) => $this->formatDateTime($value),
-            'visibility' => fn($value) => strtolower($value),
+            'visibility' => fn($value) => $this->normaliseVisibility($value),
             'password' => 'password',
             'featured' => fn($value) => (bool)$value,
             'allow_comments' => fn($value) => (bool)$value,
@@ -574,6 +646,28 @@ class PageService
         if (!empty($territories)) {
             $this->pageTerritoryRepository->syncTerritories($pageId, $territories, $this->siteId);
         }
+    }
+
+    private function normaliseVisibility(mixed $value): string
+    {
+        $value = strtolower(trim((string) $value));
+
+        if ($value === '') {
+            return 'free';
+        }
+
+        $allowed = [
+            'free',
+            'private',
+            'members',
+            'paid',
+            'password',
+            'internal',
+        ];
+
+        return in_array($value, $allowed, true)
+            ? $value
+            : 'free';
     }
 
     private function processSeoForm(int $pageId, array $seoForm): void

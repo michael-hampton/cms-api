@@ -337,7 +337,25 @@ class BriefServiceTest extends TestCase
         $newStatus = 'in_review';
         $userId = 1;
 
-        $brief = Mockery::mock(Model::class);
+        $oldBrief = Mockery::mock(Brief::class)->makePartial();
+        $oldBrief->id = $briefId;
+        $oldBrief->site_id = 1;
+        $oldBrief->title = 'Test Brief';
+        $oldBrief->owner_id = 5;
+        $oldBrief->status = 'draft';
+
+        $updatedBrief = Mockery::mock(Brief::class)->makePartial();
+        $updatedBrief->id = $briefId;
+        $updatedBrief->site_id = 1;
+        $updatedBrief->title = 'Test Brief';
+        $updatedBrief->owner_id = 5;
+        $updatedBrief->status = $newStatus;
+
+        $this->briefRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with($briefId)
+            ->andReturn($oldBrief);
 
         $this->createBriefVersion
             ->shouldReceive('handle')
@@ -347,12 +365,12 @@ class BriefServiceTest extends TestCase
         $this->briefRepository
             ->shouldReceive('update')
             ->once()
-            ->with($briefId, Mockery::on(function ($data) use ($newStatus) {
+            ->with($briefId, Mockery::on(function ($data) use ($newStatus, $userId) {
                 return $data['status'] === $newStatus
                     && isset($data['last_activity_at'])
-                    && $data['last_activity_user_id'] === 1;
+                    && $data['last_activity_user_id'] === $userId;
             }))
-            ->andReturn($brief);
+            ->andReturn($updatedBrief);
 
         $this->logBriefActivity
             ->shouldReceive('handle')
@@ -361,7 +379,7 @@ class BriefServiceTest extends TestCase
 
         $result = $this->service->updateStatus($briefId, $newStatus, $userId);
 
-        $this->assertSame($brief, $result);
+        $this->assertSame($updatedBrief, $result);
     }
 
     public function test_it_can_bulk_update_status(): void

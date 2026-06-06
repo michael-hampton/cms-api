@@ -46,7 +46,7 @@ class ArticleApprovalController extends Controller
      */
     public function pending(): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['content.review', 'content.approve', 'content.reject'])) {
+        if ($response = $this->authorizeSitePermissions(['pages.review', 'pages.approve', 'pages.reject', 'content.review', 'content.approve', 'content.reject'])) {
             return $response;
         }
 
@@ -62,7 +62,7 @@ class ArticleApprovalController extends Controller
      */
     public function approve(int $id): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['content.approve'])) {
+        if ($response = $this->authorizeSitePermissions(['pages.approve', 'content.approve'])) {
             return $response;
         }
 
@@ -83,7 +83,7 @@ class ArticleApprovalController extends Controller
      */
     public function reject(RejectArticleRequest $request, int $id): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['content.reject'])) {
+        if ($response = $this->authorizeSitePermissions(['pages.reject', 'content.reject'])) {
             return $response;
         }
 
@@ -115,7 +115,7 @@ class ArticleApprovalController extends Controller
      */
     public function submit(int $id): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['content.submit'])) {
+        if ($response = $this->authorizeSitePermissions(['pages.submit_for_approval', 'content.submit'])) {
             return $response;
         }
 
@@ -144,7 +144,7 @@ class ArticleApprovalController extends Controller
      */
     public function resubmit(int $id): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['content.submit'])) {
+        if ($response = $this->authorizeSitePermissions(['pages.submit_for_approval', 'content.submit'])) {
             return $response;
         }
 

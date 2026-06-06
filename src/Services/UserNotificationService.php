@@ -57,6 +57,11 @@ class UserNotificationService
         return $this->repository->countUnread($userId);
     }
 
+    public function getUnreadNotifications(int $userId)
+    {
+        return $this->repository->getUnreadForUser($userId);
+    }
+
     public function markAsRead(User $user, int $notificationId): void
     {
         $this->repository->markAsRead($notificationId, $user->id);

@@ -20,6 +20,10 @@ use App\Events\Boost\BoostLimitBreachedEvent;
 use App\Events\Boost\BoostPausedEvent;
 use App\Events\Boost\BoostResumedEvent;
 use App\Events\DatabaseEventSubscriber;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentHeld;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\Members\CommentPostedByMember;
 use App\Events\Members\MemberAddressImported;
 use App\Events\Members\MemberDetailsChanged;
@@ -106,6 +110,7 @@ use App\Listeners\Boost\SendBoostExpiredNotification;
 use App\Listeners\Boost\SendBoostLimitBreachedNotification;
 use App\Listeners\Boost\SendBoostPausedNotification;
 use App\Listeners\Boost\SendBoostResumedNotification;
+use App\Listeners\Cms\SendContentWorkflowNotification;
 use App\Listeners\GiftClaimedListener;
 use App\Listeners\GiftCreatedListener;
 use App\Listeners\Members\MemberPostcodeUpdatedListener;
@@ -804,6 +809,11 @@ class ApiApplication
         $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
         $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
         $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
+
+        $eventDispatcher->listen(ContentSubmittedForApproval::class, [SendContentWorkflowNotification::class, 'handle']);
+        $eventDispatcher->listen(ContentApproved::class, [SendContentWorkflowNotification::class, 'handle']);
+        $eventDispatcher->listen(ContentRejected::class, [SendContentWorkflowNotification::class, 'handle']);
+        $eventDispatcher->listen(ContentHeld::class, [SendContentWorkflowNotification::class, 'handle']);
 
         $eventDispatcher->listen(MemberAddressImported::class, [MemberPostcodeUpdated::class, 'handle']);
         $eventDispatcher->listen(MemberPostcodeUpdatedListener::class, [MemberPostcodeUpdated::class, 'handle']);

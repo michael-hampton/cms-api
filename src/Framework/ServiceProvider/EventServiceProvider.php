@@ -2,32 +2,26 @@
 
 namespace App\Framework\ServiceProvider;
 
-use App\Events\ArticleGifting\GiftClaimedEvent;
-use App\Events\ArticleGifting\GiftCreatedEvent;
-use App\Events\Badges\PointsAwardedEvent;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentHeld;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\Framework\Container;
 use App\Framework\Events\EventDispatcher;
+use App\Listeners\Cms\SendContentWorkflowNotification;
 
 class EventServiceProvider extends ServiceProvider
 {
 
     public function register(): void
     {
-        // echo 'here';
+        $dispatcher = Container::getInstance()->resolve(EventDispatcher::class);
 
-//        $dispatcher = Container::getInstance()->resolve(EventDispatcher::class);
-//
-//        $dispatcher->listen(PointsAwardedEvent::class, function (PointsAwardedEvent $event) {
-//           die('points awarded');
-//        });
-//
-//        $dispatcher->listen(GiftCreatedEvent::class, function (GiftCreatedEvent $event) {
-//            die('gift created');
-//        });
-//
-//        $dispatcher->listen(GiftClaimedEvent::class, function (GiftClaimedEvent $event) {
-//            die('gift claimed');
-//        });
+        $listener = [SendContentWorkflowNotification::class, 'handle'];
 
+        $dispatcher->listen(ContentSubmittedForApproval::class, $listener);
+        $dispatcher->listen(ContentApproved::class, $listener);
+        $dispatcher->listen(ContentRejected::class, $listener);
+        $dispatcher->listen(ContentHeld::class, $listener);
     }
 }

@@ -305,7 +305,7 @@ class BriefController extends Controller
                 return $this->errorResponse('No briefs selected', 400);
             }
 
-            if (!in_array($status, ['draft', 'in_review', 'ready', 'converted', 'archived'])) {
+            if (!in_array($status, ['draft', 'in_review', 'ready', 'on_hold', 'converted', 'archived'])) {
                 return $this->errorResponse('Invalid status', 400);
             }
 
@@ -337,17 +337,22 @@ class BriefController extends Controller
         }
 
         if ($newStatus === 'in_review') {
-            $this->workflowAuthorization->assertCanRequestApproval($userId, SiteContext::getId());
+            $this->workflowAuthorization->assertCanRequestApproval($userId, SiteContext::getId(), 'briefs');
             return;
         }
 
         if ($newStatus === 'ready') {
-            $this->workflowAuthorization->assertCanApprove($userId, SiteContext::getId());
+            $this->workflowAuthorization->assertCanApprove($userId, SiteContext::getId(), 'briefs');
+            return;
+        }
+
+        if ($newStatus === 'on_hold') {
+            $this->workflowAuthorization->assertCanHold($userId, SiteContext::getId(), 'briefs');
             return;
         }
 
         if ($brief->status === 'in_review' && $newStatus === 'draft') {
-            $this->workflowAuthorization->assertCanReject($userId, SiteContext::getId());
+            $this->workflowAuthorization->assertCanReject($userId, SiteContext::getId(), 'briefs');
         }
     }
 

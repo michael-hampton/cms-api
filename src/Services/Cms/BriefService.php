@@ -7,6 +7,10 @@ use App\Actions\Brief\ConvertBriefToPage;
 use App\Actions\Brief\CreateBriefVersion;
 use App\Actions\Brief\DuplicateBrief;
 use App\Actions\Brief\LogBriefActivity;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentHeld;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\DTO\Briefs\DuplicateBriefOptions;
 use App\Framework\Database\Database;
 use App\Framework\Support\Collection;
@@ -206,6 +210,12 @@ class BriefService
 
     public function updateStatus(int $briefId, string $newStatus, int $userId): Model
     {
+        $oldBrief = $this->briefRepository->find($briefId);
+
+        if (!$oldBrief) {
+            throw new Exception("Brief not found: {$briefId}");
+        }
+
         // Create version before status change
         $this->createBriefVersion->handle($briefId, $userId, "Status changed to {$newStatus}");
 
@@ -217,7 +227,40 @@ class BriefService
 
         $this->logBriefActivity->handle($briefId, $userId, 'status_changed', "Status changed to {$newStatus}");
 
+        $this->dispatchWorkflowEvent($oldBrief, $brief, $newStatus, $userId);
+
         return $brief;
+    }
+
+    private function dispatchWorkflowEvent(Model $oldBrief, Model $brief, string $newStatus, int $userId): void
+    {
+        $payload = [
+            'contentType' => 'briefs',
+            'contentId' => (int) $brief->id,
+            'siteId' => (int) $brief->site_id,
+            'actorId' => $userId,
+            'title' => (string) $brief->title,
+            'ownerId' => !empty($brief->owner_id) ? (int) $brief->owner_id : null,
+        ];
+
+        if ($newStatus === 'in_review') {
+            event(new ContentSubmittedForApproval(...$payload));
+            return;
+        }
+
+        if ($newStatus === 'ready') {
+            event(new ContentApproved(...$payload));
+            return;
+        }
+
+        if ($newStatus === 'on_hold') {
+            event(new ContentHeld(...$payload));
+            return;
+        }
+
+        if ($oldBrief->status === 'in_review' && $newStatus === 'draft') {
+            event(new ContentRejected(...$payload));
+        }
     }
 
     public function bulkUpdateStatus(array $briefIds, string $status): int

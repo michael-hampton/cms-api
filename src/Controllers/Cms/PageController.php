@@ -461,7 +461,7 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
-            $this->workflowAuthorization->assertCanApprove((int) $userId, SiteContext::getId());
+            $this->workflowAuthorization->assertCanApprove((int) $userId, SiteContext::getId(), 'pages');
 
             $page = $this->pageService->approvePage($id, $userId);
 
@@ -483,7 +483,7 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
-            $this->workflowAuthorization->assertCanReject((int) $userId, SiteContext::getId());
+            $this->workflowAuthorization->assertCanReject((int) $userId, SiteContext::getId(), 'pages');
 
             $page = $this->pageService->rejectPage($id, $userId, $reason);
 
@@ -505,9 +505,13 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
+            $this->workflowAuthorization->assertCanHold((int) $userId, SiteContext::getId(), 'pages');
+
             $page = $this->pageService->putPageOnHold($id, $userId, $reason);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
         }

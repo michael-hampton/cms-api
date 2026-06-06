@@ -21,6 +21,10 @@ class NotificationFormatter
 {
     public function format(UserNotification $notification): array
     {
+        if (str_starts_with($notification->type, 'page_') || str_starts_with($notification->type, 'brief_')) {
+            return $this->formatWorkflowNotification($notification);
+        }
+
         $type = NotificationType::tryFrom($notification->type);
 
         if ($type === null) {
@@ -134,6 +138,59 @@ class NotificationFormatter
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
+
+    private function formatWorkflowNotification(UserNotification $notification): array
+    {
+        $title = $notification->data['page_title']
+            ?? $notification->data['brief_title']
+            ?? $notification->data['content_title']
+            ?? 'Content';
+        $url = $notification->data['url'] ?? null;
+
+        return match ($notification->type) {
+            'page_submitted_for_approval' => [
+                'title' => 'Page submitted for approval',
+                'message' => "{$title} is ready for review.",
+                'action_url' => $url,
+            ],
+            'page_approved' => [
+                'title' => 'Page approved',
+                'message' => "{$title} has been approved.",
+                'action_url' => $url,
+            ],
+            'page_rejected' => [
+                'title' => 'Page rejected',
+                'message' => "{$title} was rejected" . (!empty($notification->data['reason']) ? ': ' . $notification->data['reason'] : '.'),
+                'action_url' => $url,
+            ],
+            'page_held' => [
+                'title' => 'Page put on hold',
+                'message' => "{$title} was put on hold" . (!empty($notification->data['reason']) ? ': ' . $notification->data['reason'] : '.'),
+                'action_url' => $url,
+            ],
+            'brief_submitted_for_approval' => [
+                'title' => 'Brief submitted for approval',
+                'message' => "{$title} is ready for review.",
+                'action_url' => $url,
+            ],
+            'brief_approved' => [
+                'title' => 'Brief approved',
+                'message' => "{$title} has been approved.",
+                'action_url' => $url,
+            ],
+            'brief_rejected' => [
+                'title' => 'Brief rejected',
+                'message' => "{$title} was rejected" . (!empty($notification->data['reason']) ? ': ' . $notification->data['reason'] : '.'),
+                'action_url' => $url,
+            ],
+            'brief_held' => [
+                'title' => 'Brief put on hold',
+                'message' => "{$title} was put on hold" . (!empty($notification->data['reason']) ? ': ' . $notification->data['reason'] : '.'),
+                'action_url' => $url,
+            ],
+            default => $this->fallback(),
+        };
+    }
 
     private function fallback(): array
     {

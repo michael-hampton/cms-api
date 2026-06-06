@@ -13,8 +13,11 @@ use App\Repositories\Cms\Pages\PageAuthorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Repositories\OpenCollab\RbacRepository;
+use App\Repositories\UserNotificationRepository;
 use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ContributorPageService;
+use App\Services\OpenCollab\SitePermissionResolver;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -29,6 +32,9 @@ class ContributorPageServiceTest extends FunctionalTestCase
     private MockInterface $authorRepository;
     private MockInterface $pageAuthorRepository;
     private MockInterface $userRepository;
+    private MockInterface $notificationRepository;
+    private MockInterface $rbacRepository;
+    private $permissionResolver;
 
     public function test_create_injects_contributor_id_and_delegates_to_page_service(): void
     {
@@ -41,6 +47,8 @@ class ContributorPageServiceTest extends FunctionalTestCase
             ->withArgs(function (array $data, int $siteId): bool {
                 return $data['contributor_id'] === 7
                     && $data['is_public_contribution'] === true
+                    && $data['suppress_workflow_notifications'] === true
+                    && $data['status'] === 'draft'
                     && $siteId === 1;
             })
             ->andReturn($createdPage);
@@ -48,6 +56,32 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $page = $this->service->createPage($requestData, 7, 1);
 
         $this->assertSame($createdPage, $page);
+    }
+
+    public function test_create_requesting_publish_submits_for_approval_not_published(): void
+    {
+        $createdPage = $this->makePage(['contributor_id' => 7, 'status' => 'waiting_approval']);
+
+        $this->pageService
+            ->shouldReceive('createPageWithAllData')
+            ->once()
+            ->withArgs(function (array $data): bool {
+                return $data['status'] === 'waiting_approval'
+                    && $data['forms']['meta']['status'] === 'waiting_approval'
+                    && $data['suppress_workflow_notifications'] === true;
+            })
+            ->andReturn($createdPage);
+        $this->expectReviewerNotification(pageId: 1, title: 'Test Article');
+
+        $page = $this->service->createPage([
+            'site_id' => 1,
+            'forms' => [
+                'main' => ['title' => 'My Article'],
+                'meta' => ['status' => 'published'],
+            ],
+        ], 7, 1);
+
+        $this->assertSame('waiting_approval', $page->status);
     }
 
     public function test_create_resolves_contributor_via_user_repository_not_static_call(): void
@@ -214,24 +248,23 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->service->updatePage(999, ['site_id' => 1], 7, 1);
     }
 
-    public function test_emits_published_event_when_page_transitions_from_draft_to_published(): void
+    public function test_update_never_publishes_contributor_page_directly(): void
     {
         $existing = $this->makePage(['id' => 10, 'contributor_id' => 7, 'status' => 'draft']);
-        $updatedPage = $this->makePage(['id' => 10, 'contributor_id' => 7, 'status' => 'published']);
+        $updatedPage = $this->makePage(['id' => 10, 'contributor_id' => 7, 'status' => 'waiting_approval']);
 
         $this->pageRepository->shouldReceive('find')->andReturn($existing);
-        $this->pageService->shouldReceive('updatePageWithAllData')->andReturn($updatedPage);
-
-        $this->eventDispatcher
-            ->shouldReceive('dispatch')
+        $this->pageService
+            ->shouldReceive('updatePageWithAllData')
             ->once()
-            ->withArgs(function ($event): bool {
-                return $event instanceof PagePublishedByContributorEvent
-                    && $event->contributorId === 7;
-            });
+            ->withArgs(fn($id, array $data) => $data['status'] === 'waiting_approval' && $data['suppress_workflow_notifications'] === true)
+            ->andReturn($updatedPage);
 
-        $this->service->updatePage(10, ['site_id' => 1], 7, 1);
-        $this->assertTrue(true);
+        $this->eventDispatcher->shouldNotReceive('dispatch');
+        $this->expectReviewerNotification(pageId: 10, title: 'Test Article');
+
+        $page = $this->service->updatePage(10, ['site_id' => 1, 'forms' => ['meta' => ['status' => 'published']]], 7, 1);
+        $this->assertSame('waiting_approval', $page->status);
     }
 
     public function test_does_not_emit_event_when_already_published_page_is_updated(): void
@@ -306,6 +339,36 @@ class ContributorPageServiceTest extends FunctionalTestCase
         return $user;
     }
 
+    private function expectReviewerNotification(int $pageId, string $title): void
+    {
+        $this->rbacRepository
+            ->shouldReceive('usersForSite')
+            ->with(1)
+            ->once()
+            ->andReturn([
+                ['id' => 22, 'is_active' => true],
+            ]);
+
+        $this->permissionResolver
+            ->shouldReceive('allows')
+            ->with(22, 1, 'pages.review')
+            ->once()
+            ->andReturn(true);
+
+        $this->notificationRepository
+            ->shouldReceive('create')
+            ->once()
+            ->withArgs(function (int $userId, string $type, array $payload) use ($pageId, $title): bool {
+                return $userId === 22
+                    && $type === 'page_submitted_for_approval'
+                    && $payload['page_id'] === $pageId
+                    && $payload['page_title'] === $title
+                    && $payload['notification_type'] === 'page_submitted_for_approval'
+                    && $payload['action_user_id'] === 7
+                    && $payload['url'] === "/admin/pages/{$pageId}/edit";
+            });
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -317,6 +380,9 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
+        $this->notificationRepository = Mockery::mock(UserNotificationRepository::class);
+        $this->rbacRepository = Mockery::mock(RbacRepository::class);
+        $this->permissionResolver = Mockery::mock(SitePermissionResolver::class);
 
 
         $this->service = new ContributorPageService(
@@ -327,6 +393,9 @@ class ContributorPageServiceTest extends FunctionalTestCase
             $this->authorRepository,
             $this->pageAuthorRepository,
             $this->userRepository,
+            $this->notificationRepository,
+            $this->rbacRepository,
+            $this->permissionResolver,
         );
     }
 

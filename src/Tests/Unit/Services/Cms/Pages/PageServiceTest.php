@@ -169,42 +169,120 @@ class PageServiceTest extends FunctionalTestCase
         $requestData = [
             'id' => 1,
             'forms' => [
-                'main' => ['title' => 'Test Page'],
-                'meta' => ['slug' => 'test-page', 'status' => 'draft', 'author' => 1],
-                'seo' => ['meta_title' => 'SEO Title', 'meta_description' => 'SEO Desc'],
-                'settings' => ['template' => 'default'],
-                'social' => ['enable_sharing' => true],
-                'tags' => ['categories' => [1], 'tags' => [2]]
+                'main' => [
+                    'title' => 'Test Page',
+                ],
+                'meta' => [
+                    'slug' => 'test-page',
+                    'status' => 'draft',
+                    'author' => 1,
+                    'visibility' => '',
+                ],
+                'seo' => [
+                    'meta_title' => 'SEO Title',
+                    'meta_description' => 'SEO Desc',
+                ],
+                'settings' => [
+                    'template' => 'default',
+                ],
+                'social' => [
+                    'enable_sharing' => true,
+                ],
+                'tags' => [
+                    'categories' => [1],
+                    'tags' => [2],
+                ],
             ],
             'blocks' => [
-                ['type' => 'text', 'data' => ['content' => 'Hello'], 'order' => 1]
-            ]
+                [
+                    'type' => 'text',
+                    'data' => [
+                        'content' => 'Hello',
+                    ],
+                    'order' => 1,
+                ],
+            ],
         ];
 
         $newPage = $this->createMockPage(1, 'Test Page');
 
         $this->setupTransaction();
-        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn(null);
-        $this->pageHistory->shouldReceive('logPageCreated')->once()->with($newPage);
 
-        $this->pageRepository->shouldReceive('create')
-            ->with([
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn(null);
+
+        $this->pageRepository
+            ->shouldReceive('create')
+            ->with(Mockery::subset([
+                'status' => 'draft',
                 'title' => 'Test Page',
                 'slug' => 'test-page',
-                'status' => 'draft',
                 'meta_title' => 'SEO Title',
                 'meta_description' => 'SEO Desc',
-                'site_id' => $this->siteId
-            ])->once()->andReturn($newPage);
+                'page_type' => 'content',
+                'site_id' => $this->siteId,
+            ]))
+            ->once()
+            ->andReturn($newPage);
 
-        $this->metadataRepository->shouldReceive('createOrUpdate')->once()->with(1, Mockery::any());
-        $this->seoRepository->shouldReceive('createOrUpdate')->once()->with(1, Mockery::any());
-        $this->settingsRepository->shouldReceive('createOrUpdate')->once()->with(1, Mockery::any());
-        $this->socialRepository->shouldReceive('createOrUpdate')->once()->with(1, Mockery::any());
-        $this->categoryRepository->shouldReceive('syncCategories')->once()->with(1, [1], $this->siteId);
-        $this->tagRepository->shouldReceive('syncTags')->once()->with(1, [2], $this->siteId);
-        $this->blockParserService->shouldReceive('replacePageBlocks')->once()->with(1, Mockery::any());
-        $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->once()->andReturn($newPage);
+        $this->pageHistory
+            ->shouldReceive('logPageCreated')
+            ->once()
+            ->with($newPage);
+
+        $this->metadataRepository
+            ->shouldReceive('createOrUpdate')
+            ->once()
+            ->with(1, Mockery::subset([
+                'author' => 1,
+                'visibility' => 'free',
+            ]));
+
+        $this->seoRepository
+            ->shouldReceive('createOrUpdate')
+            ->once()
+            ->with(1, Mockery::subset([
+                'meta_title' => 'SEO Title',
+                'meta_description' => 'SEO Desc',
+            ]));
+
+        $this->settingsRepository
+            ->shouldReceive('createOrUpdate')
+            ->once()
+            ->with(1, Mockery::subset([
+                'template' => 'default',
+            ]));
+
+        $this->socialRepository
+            ->shouldReceive('createOrUpdate')
+            ->once()
+            ->with(1, Mockery::subset([
+                'enable_sharing' => true,
+            ]));
+
+        $this->categoryRepository
+            ->shouldReceive('syncCategories')
+            ->once()
+            ->with(1, [1], $this->siteId);
+
+        $this->tagRepository
+            ->shouldReceive('syncTags')
+            ->once()
+            ->with(1, [2], $this->siteId);
+
+        $this->blockParserService
+            ->shouldReceive('replacePageBlocks')
+            ->once()
+            ->with(1, Mockery::any());
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->once()
+            ->andReturn($newPage);
 
         $result = $this->service->createPageWithAllData($requestData, $this->siteId);
 

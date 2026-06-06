@@ -4,7 +4,6 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\Pages\PageStatus;
-use App\Events\OpenCollab\PagePublishedByContributorEvent;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
@@ -13,6 +12,8 @@ use App\Repositories\Cms\Pages\PageAuthorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Repositories\OpenCollab\RbacRepository;
+use App\Repositories\UserNotificationRepository;
 use App\Services\Cms\Pages\PageService;
 
 /**
@@ -31,6 +32,9 @@ class ContributorPageService
         private readonly AuthorRepository $authorRepository,
         private readonly PageAuthorRepository    $pageAuthorRepository,
         private readonly UserRepositoryInterface $userRepository,
+        private readonly UserNotificationRepository $notificationRepository,
+        private readonly RbacRepository $rbacRepository,
+        private readonly SitePermissionResolver $permissionResolver,
     )
     {
     }
@@ -54,13 +58,25 @@ class ContributorPageService
             payload: ['page_id' => $page->id, 'title' => $page->title],
         );
 
+        if ($page->status === PageStatus::WAITING_APPROVAL->value) {
+            $this->notifyReviewers($page, $contributorId, $siteId);
+        }
+
         return $page;
     }
 
     private function injectContributorDefaults(array $requestData, int $contributorId): array
     {
+        $requestedStatus = strtolower((string)($requestData['status'] ?? $requestData['forms']['meta']['status'] ?? 'draft'));
+        $requestApproval = (bool)($requestData['submit_for_approval'] ?? $requestData['request_approval'] ?? false)
+            || in_array($requestedStatus, [PageStatus::PUBLISHED->value, PageStatus::WAITING_APPROVAL->value, 'published', 'waiting approval'], true);
+        $safeStatus = $requestApproval ? PageStatus::WAITING_APPROVAL->value : PageStatus::DRAFT->value;
+
         $requestData['contributor_id'] = $contributorId;
         $requestData['is_public_contribution'] = true;
+        $requestData['suppress_workflow_notifications'] = true;
+        $requestData['status'] = $safeStatus;
+        $requestData['forms']['meta']['status'] = $safeStatus;
         return $requestData;
     }
 
@@ -77,35 +93,56 @@ class ContributorPageService
             throw new UnauthorisedPageAccessException();
         }
 
-        $wasPublished = $page->status === PageStatus::PUBLISHED->value;
         $requestData = $this->injectContributorDefaults($requestData, $contributorId);
         $requestData['id'] = $pageId;
 
+        $wasWaitingApproval = $page->status === PageStatus::WAITING_APPROVAL->value;
         $updated = $this->pageService->updatePageWithAllData($pageId, $requestData, $siteId, $page);
 
-        $isNowPublished = $updated->status === PageStatus::PUBLISHED->value;
+        $this->recordActivity(
+            siteId: $siteId,
+            userId: $contributorId,
+            type: ActivityEventType::ArticleUpdated,
+            payload: ['page_id' => $updated->id, 'title' => $updated->title],
+        );
 
-        if (!$wasPublished && $isNowPublished) {
-            $this->eventDispatcher->dispatch(
-                new PagePublishedByContributorEvent($updated, $contributorId)
-            );
-
-            $this->recordActivity(
-                siteId: $siteId,
-                userId: $contributorId,
-                type: ActivityEventType::ArticlePublished,
-                payload: ['page_id' => $updated->id, 'title' => $updated->title],
-            );
-        } else {
-            $this->recordActivity(
-                siteId: $siteId,
-                userId: $contributorId,
-                type: ActivityEventType::ArticleUpdated,
-                payload: ['page_id' => $updated->id, 'title' => $updated->title],
-            );
+        if (!$wasWaitingApproval && $updated->status === PageStatus::WAITING_APPROVAL->value) {
+            $this->notifyReviewers($updated, $contributorId, $siteId);
         }
 
         return $updated;
+    }
+
+    private function notifyReviewers(Page $page, int $contributorId, int $siteId): void
+    {
+        $type = 'page_submitted_for_approval';
+
+        foreach ($this->rbacRepository->usersForSite($siteId) as $user) {
+            $userId = (int)($user['id'] ?? 0);
+
+            if (!$userId || (isset($user['is_active']) && !(bool)$user['is_active'])) {
+                continue;
+            }
+
+            if (
+                !$this->permissionResolver->allows($userId, $siteId, 'pages.review')
+                && !$this->permissionResolver->allows($userId, $siteId, 'content.review')
+            ) {
+                continue;
+            }
+
+            $this->notificationRepository->create($userId, $type, [
+                'page_id' => (int)$page->id,
+                'page_title' => (string)$page->title,
+                'site_id' => $siteId,
+                'content_type' => 'page',
+                'content_id' => (int)$page->id,
+                'content_title' => (string)$page->title,
+                'notification_type' => $type,
+                'action_user_id' => $contributorId,
+                'url' => "/admin/pages/{$page->id}/edit",
+            ]);
+        }
     }
 
     /**

@@ -5,8 +5,9 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Enums\Pages\PageStatus;
-use App\Events\OpenCollab\ArticleApprovedEvent;
-use App\Events\OpenCollab\ArticleRejectedEvent;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
@@ -77,6 +78,9 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
             ->withArgs(fn($e) => $e instanceof ArticleSubmittedForReviewEvent && $e->contributorId === 7);
+        $this->eventDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn($e) => $e instanceof ContentSubmittedForApproval && $e->ownerId === 7);
 
         $result = $this->service->submitForReview(1, 7);
 
@@ -95,7 +99,7 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
         $this->siteRepository->shouldReceive('find')->andReturn($site);
         $this->pageRepository->shouldReceive('update')->once();
         $this->activityRepository->shouldReceive('record')->once();
-        $this->eventDispatcher->shouldReceive('dispatch')->once();
+        $this->eventDispatcher->shouldReceive('dispatch')->twice();
 
         $this->service->submitForReview(1, 7);
         $this->assertTrue(true);
@@ -163,6 +167,8 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
         $this->activityRepository->shouldReceive('record')->once();
         $this->eventDispatcher->shouldReceive('dispatch')->once()
             ->withArgs(fn($e) => $e instanceof ArticleSubmittedForReviewEvent);
+        $this->eventDispatcher->shouldReceive('dispatch')->once()
+            ->withArgs(fn($e) => $e instanceof ContentSubmittedForApproval);
 
         $this->service->resubmit(1, 7);
         $this->assertTrue(true);
@@ -210,13 +216,10 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
             ->withArgs(fn($siteId, $userId, $type) => $type === ActivityEventType::ArticlePublished);
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
-            ->withArgs(fn($e) => $e instanceof ArticleApprovedEvent && $e->adminId === 55);
+            ->withArgs(fn($e) => $e instanceof ContentApproved && $e->ownerId === 7 && $e->actorId === 55);
 
-        $user = Mockery::mock(User::class)->makePartial();
-        $user->id = 1;
-
-        $this->userRepository->shouldReceive('find')->once()->with(7)->andReturn($user);
-        $this->notificationDispatcher->shouldReceive('dispatch')->once();
+        $this->userRepository->shouldNotReceive('find');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $result = $this->service->approve(1, adminId: 55);
 
@@ -261,13 +264,10 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
         $this->activityRepository->shouldReceive('record')->once();
         $this->eventDispatcher->shouldReceive('dispatch')
             ->once()
-            ->withArgs(fn($e) => $e instanceof ArticleRejectedEvent && $e->reason === RejectionReason::Quality);
+            ->withArgs(fn($e) => $e instanceof ContentRejected && $e->ownerId === 7 && $e->reason === 'Needs more depth.');
 
-        $user = Mockery::mock(User::class)->makePartial();
-        $user->id = 1;
-
-        $this->userRepository->shouldReceive('find')->once()->with(7)->andReturn($user);
-        $this->notificationDispatcher->shouldReceive('dispatch')->once();
+        $this->userRepository->shouldNotReceive('find');
+        $this->notificationDispatcher->shouldNotReceive('dispatch');
 
         $this->service->reject(1, 55, RejectionReason::Quality, 'Needs more depth.');
         $this->assertTrue(true);

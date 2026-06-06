@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
 use App\Models\Model;
 use App\Models\User;
 use App\Services\NotificationFormatter;
@@ -45,26 +46,28 @@ class NotificationController extends Controller
         $perPage = min((int)$request->get('per_page', 15), 50);
         $userId = Auth::id();
 
+        $siteId = SiteContext::getId();
         $page = $this->service->getNotificationsCursor($userId, $cursor, $perPage, $unreadOnly);
 
         $items = array_map(
             fn($n) => $this->formatNotification($n),
-            $page['items'],
+            $this->filterNotificationsForSite($page['items'], $siteId),
         );
 
         return $this->resourceResponse([
             'notifications' => $items,
             'next_cursor' => $page['next_cursor'],
-            'unread_count' => $this->service->getUnreadCount($userId),
+            'unread_count' => $this->unreadCountForSite($userId, $siteId),
         ]);
     }
 
     public function unreadCount(): JsonResponse
     {
         $userId = Auth::id();
+        $siteId = SiteContext::getId();
 
         return $this->resourceResponse([
-            'count' => $this->service->getUnreadCount($userId),
+            'count' => $this->unreadCountForSite($userId, $siteId),
         ]);
     }
 
@@ -108,5 +111,23 @@ class NotificationController extends Controller
             'read_at' => $notification->read_at,
             'created_at' => $notification->created_at,
         ]);
+    }
+
+    private function filterNotificationsForSite(array $notifications, int $siteId): array
+    {
+        return array_values(array_filter($notifications, function ($notification) use ($siteId): bool {
+            $data = is_array($notification)
+                ? ($notification['data'] ?? [])
+                : (is_array($notification->data) ? $notification->data : []);
+
+            return isset($data['site_id']) && (int)$data['site_id'] === $siteId;
+        }));
+    }
+
+    private function unreadCountForSite(int $userId, int $siteId): int
+    {
+        $unread = $this->service->getUnreadNotifications($userId);
+
+        return count($this->filterNotificationsForSite($unread->toArray(), $siteId));
     }
 }

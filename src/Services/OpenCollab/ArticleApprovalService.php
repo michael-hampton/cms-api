@@ -5,8 +5,9 @@ namespace App\Services\OpenCollab;
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Enums\Pages\PageStatus;
-use App\Events\OpenCollab\ArticleApprovedEvent;
-use App\Events\OpenCollab\ArticleRejectedEvent;
+use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentRejected;
+use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
@@ -18,8 +19,6 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
-use App\Services\OpenCollab\Notifications\ArticleApprovedNotification;
-use App\Services\OpenCollab\Notifications\ArticleRejectedNotification;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
@@ -111,6 +110,16 @@ class ArticleApprovalService
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
         );
+        $this->eventDispatcher->dispatch(
+            new ContentSubmittedForApproval(
+                contentType: 'pages',
+                contentId: (int)$page->id,
+                siteId: (int)$page->site_id,
+                actorId: $contributorId,
+                title: (string)$page->title,
+                ownerId: (int)$page->contributor_id,
+            )
+        );
 
         return $page;
     }
@@ -147,14 +156,6 @@ class ArticleApprovalService
                 'published_at' => date('Y-m-d H:i:s'),
             ]);
 
-            $contributor = $this->userRepository->find($page->contributor_id);
-
-            if ($contributor) {
-                $this->notificationDispatcher->dispatch(
-                    new ArticleApprovedNotification($page, $contributor)
-                );
-            }
-
             $this->activityRepository->record(
                 siteId: $page->site_id,
                 userId: (int)$page->contributor_id,
@@ -165,7 +166,14 @@ class ArticleApprovalService
             return $this->pageRepository->find($page->id);
         });
 
-        $this->eventDispatcher->dispatch(new ArticleApprovedEvent($page, $adminId, $page->contributor_id));
+        $this->eventDispatcher->dispatch(new ContentApproved(
+            contentType: 'pages',
+            contentId: (int)$page->id,
+            siteId: (int)$page->site_id,
+            actorId: $adminId,
+            title: (string)$page->title,
+            ownerId: (int)$page->contributor_id,
+        ));
 
         return $page;
     }
@@ -214,18 +222,18 @@ class ArticleApprovalService
                 ],
             );
 
-            $contributor = $this->userRepository->find($page->contributor_id);
-
-            if ($contributor) {
-                $this->notificationDispatcher->dispatch(
-                    new ArticleRejectedNotification($page, $contributor, $reason->value)
-                );
-            }
-
             return $this->pageRepository->find($page->id);
         });
 
-        $this->eventDispatcher->dispatch(new ArticleRejectedEvent($page, $adminId, $reason, $page->contributor_id, $notes));
+        $this->eventDispatcher->dispatch(new ContentRejected(
+            contentType: 'pages',
+            contentId: (int)$page->id,
+            siteId: (int)$page->site_id,
+            actorId: $adminId,
+            title: (string)$page->title,
+            ownerId: (int)$page->contributor_id,
+            reason: $notes ?: $reason->value,
+        ));
 
         return $page;
     }
@@ -285,6 +293,16 @@ class ArticleApprovalService
 
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
+        );
+        $this->eventDispatcher->dispatch(
+            new ContentSubmittedForApproval(
+                contentType: 'pages',
+                contentId: (int)$page->id,
+                siteId: (int)$page->site_id,
+                actorId: $contributorId,
+                title: (string)$page->title,
+                ownerId: (int)$page->contributor_id,
+            )
         );
 
         return $page;
