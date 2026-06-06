@@ -1221,7 +1221,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/orders/{orderId}/refunds/remaining', RefundController::class, 'remainingAmount');
         $router->post('/orders/{id}/cancel', OrderController::class, 'cancel');
         $router->post('/orders/{id}/complete', OrderController::class, 'complete');
-        $router->post('/orders/{id}/refund', OrderController::class, 'refund');
+        $router->post('/orders/{id}/refund', [OrderController::class, 'refund']);
         $router->post('/orders/{id}/duplicate', OrderController::class, 'duplicate');
         $router->post('/orders/bulk-status', [OrderController::class, 'bulkUpdateStatus']);
 

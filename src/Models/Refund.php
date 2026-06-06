@@ -21,7 +21,11 @@ class Refund extends Model
         'processed_at',
         'created_at',
         'updated_at',
-        'site_id'
+        'site_id',
+        'stripe_refund_id',
+        'stripe_refund_status',
+        'stripe_refunded_at',
+        'stripe_failure_reason'
     ];
 
     protected $casts = [

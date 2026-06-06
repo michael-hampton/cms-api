@@ -68,8 +68,8 @@ class RefundRepository extends Repository
     public function updateRefundStatus(int $refundId, string $status, ?int $processedBy = null): bool
     {
         $data = [
-            'status' => $status,
-            'updated_at' => date('Y-m-d H:i:s')
+            'status'     => $status,
+            'updated_at' => date('Y-m-d H:i:s'),
         ];
 
         if ($status === 'processed' && $processedBy) {
@@ -78,6 +78,52 @@ class RefundRepository extends Repository
         }
 
         return Refund::where('id', $refundId)->update($data);
+    }
+
+    /**
+     * Persist the Stripe refund result fields after a successful refund API call.
+     *
+     * Called inside the same DB transaction as the refund record creation, so
+     * if anything else in that transaction fails, this update is rolled back too.
+     */
+    public function markStripeRefunded(
+        int    $refundId,
+        string $stripeRefundId,
+        string $stripeStatus,
+        string $stripeRefundedAt,
+    ): void {
+        Refund::where('id', $refundId)->update([
+            'stripe_refund_id'     => $stripeRefundId,
+            'stripe_refund_status' => $stripeStatus,
+            'stripe_refunded_at'   => $stripeRefundedAt,
+            'updated_at'           => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Persist a Stripe failure reason for audit purposes.
+     *
+     * In practice the wrapping transaction will roll back after a Stripe failure,
+     * so this is only meaningful if you add a separate failure-logging flow outside
+     * the main transaction (e.g. a catch block that logs before re-throwing).
+     */
+    public function markStripeRefundFailed(int $refundId, string $failureReason): void
+    {
+        Refund::where('id', $refundId)->update([
+            'stripe_failure_reason' => $failureReason,
+            'updated_at'            => date('Y-m-d H:i:s'),
+        ]);
+    }
+
+    /**
+     * Check whether a Stripe refund has already been issued for this refund record.
+     * Used as a duplicate-refund guard.
+     */
+    public function hasStripeRefund(int $refundId): bool
+    {
+        return Refund::where('id', $refundId)
+            ->whereNotNull('stripe_refund_id')
+            ->exists();
     }
 
     public function deleteRefundItems(int $refundId): bool

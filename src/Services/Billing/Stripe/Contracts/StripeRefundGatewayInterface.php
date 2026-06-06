@@ -2,6 +2,8 @@
 
 namespace App\Services\Billing\Stripe\Contracts;
 
+use App\DTO\Payments\StripeRefundResult;
+
 interface StripeRefundGatewayInterface
 {
     /**
@@ -14,4 +16,22 @@ interface StripeRefundGatewayInterface
     public function refund(string $transactionId, float $amount, array $options = []): array;
 
     public function findRefundableTransactionForInvoice(string $invoiceId): ?string;
+
+    /**
+     * Issue a refund against a Stripe PaymentIntent.
+     *
+     * @param string  $paymentIntentId  Stripe pi_… ID.
+     * @param int     $amountCents      Amount to refund in minor units (e.g. 999 for £9.99).
+     * @param string  $currency         ISO 4217 currency code (e.g. 'gbp').
+     * @param array   $metadata         Arbitrary key/value metadata forwarded to Stripe.
+     *
+     * @throws \App\Exceptions\Payments\RefundGatewayException on Stripe API failure.
+     */
+    public function refundPaymentIntent(
+        string $paymentIntentId,
+        int    $amountCents,
+        string $currency,
+        array  $metadata = [],
+        ?string $idempotencyKey = null,
+    ): StripeRefundResult;
 }

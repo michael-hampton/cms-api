@@ -2,6 +2,8 @@
 
 namespace App\Services\Billing\Stripe;
 
+use App\DTO\Payments\StripeRefundResult;
+use App\Exceptions\Payments\RefundGatewayException;
 use App\Services\Billing\Stripe\Contracts\StripeRefundGatewayInterface;
 use Stripe\Exception\ApiErrorException;
 use Stripe\StripeClient;
@@ -9,19 +11,61 @@ use Stripe\StripeClient;
 /**
  * Wraps Stripe refund creation.
  *
- * Single responsibility: call the Stripe refunds API and return a
- * normalised result. No business logic, no DB writes.
+ * Implements two surfaces:
+ *   - refundPaymentIntent()  — typed DTO result, throws on failure (used by RefundService).
+ *   - refund()               — legacy array result, used by older callers; kept for BC.
+ *
+ * No business logic, no DB writes.
  */
 class StripeRefundGateway implements StripeRefundGatewayInterface
 {
     public function __construct(
-        private readonly StripeClient                      $stripe
-    )
-    {
+        private readonly StripeClient $stripe,
+    ) {
+    }
+
+    /**
+     * Issue a refund against a PaymentIntent and return a typed DTO.
+     *
+     * Throws RefundGatewayException on any Stripe API error so the caller's
+     * transaction can roll back cleanly.
+     *
+     * @throws RefundGatewayException
+     */
+    public function refundPaymentIntent(
+        string $paymentIntentId,
+        int    $amountCents,
+        string $currency,
+        array  $metadata = [],
+        ?string $idempotencyKey = null,
+    ): StripeRefundResult {
+        try {
+            $refund = $this->stripe->refunds->create(
+                [
+                    'payment_intent' => $paymentIntentId,
+                    'amount'         => $amountCents,
+                    'metadata'       => $metadata,
+                ],
+                array_filter([
+                    'idempotency_key' => $idempotencyKey,
+                ])
+            );
+
+            return new StripeRefundResult(
+                refundId:     $refund->id,
+                status:       $refund->status,
+                amountCents:  $refund->amount,
+                currency:     $refund->currency,
+            );
+        } catch (ApiErrorException $e) {
+            throw RefundGatewayException::fromStripeError($e->getMessage(), $e);
+        }
     }
 
     /**
      * Issue a refund against a charge or payment intent.
+     *
+     * Legacy surface — returns a plain array for backwards compatibility.
      *
      * @param string $transactionId  Stripe charge ID (ch_…) or payment intent ID (pi_…).
      * @param float  $amount         Amount in decimal units (e.g. 9.99 for £9.99).
@@ -41,7 +85,7 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
             }
 
             if (!empty($options['reason'])) {
-                $params['reason'] = $this->normaliseRefundReason((string)$options['reason']);
+                $params['reason'] = $this->normaliseRefundReason((string) $options['reason']);
             }
 
             if (!empty($options['metadata'])) {
@@ -56,7 +100,6 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
                 'amount'    => $refund->amount / 100,
                 'status'    => $refund->status,
             ];
-
         } catch (ApiErrorException $e) {
             return [
                 'success'    => false,
@@ -95,8 +138,8 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
 
             $payments = $this->stripe->invoicePayments->all([
                 'invoice' => $invoiceId,
-                'limit' => 10,
-                'expand' => [
+                'limit'   => 10,
+                'expand'  => [
                     'data.payment.payment_intent',
                     'data.payment.charge',
                 ],
@@ -107,9 +150,9 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
                     continue;
                 }
 
-                $payment = $invoicePayment->payment ?? null;
+                $payment       = $invoicePayment->payment ?? null;
                 $paymentIntent = is_object($payment) ? ($payment->payment_intent ?? null) : null;
-                $charge = is_object($payment) ? ($payment->charge ?? null) : null;
+                $charge        = is_object($payment) ? ($payment->charge ?? null) : null;
 
                 if (is_string($paymentIntent)) {
                     return $paymentIntent;
@@ -134,10 +177,12 @@ class StripeRefundGateway implements StripeRefundGatewayInterface
         }
     }
 
+    // ── Private ───────────────────────────────────────────────────────────────
+
     private function normaliseRefundReason(string $reason): string
     {
         return match ($reason) {
-            'duplicate', 'fraudulent', 'requested_by_customer' => $reason,
+            'duplicate', 'fraudulent', 'requested_by_customer'                                              => $reason,
             'customer_request', 'early_cancellation', 'manual_override', 'partial_service_failure' => 'requested_by_customer',
             default => 'requested_by_customer',
         };
