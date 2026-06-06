@@ -166,7 +166,12 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         $this->ensureSiteExists();
         $site = Site::find($this->siteId);
 
-        $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
+        $site->update([
+            'require_payment_setup' => $requiresSiteOnboarding,
+            'require_contracts' => $requiresSiteOnboarding,
+            'require_guidelines_ack' => $requiresSiteOnboarding,
+            'require_age_verification' => $requiresSiteOnboarding,
+        ]);
     }
 
     private function completeProfileOnboarding(User $contributor): void
