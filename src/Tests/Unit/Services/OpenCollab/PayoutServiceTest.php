@@ -4,7 +4,6 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
-use App\Events\OpenCollab\PayoutFailedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Database\Database;
@@ -23,6 +22,12 @@ use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
+use App\Services\OpenCollab\CreatorBalanceService;
+use App\Events\OpenCollab\PayoutProcessedEvent;
+use App\DTO\OpenCollab\SetOffResult;
+use App\Repositories\OpenCollab\PayoutLiabilityRecoveryRepository;
+use App\Services\OpenCollab\PayoutLedgerService;
+use App\Services\OpenCollab\SetOffService;
 
 class PayoutServiceTest extends FunctionalTestCase
 {
@@ -37,28 +42,225 @@ class PayoutServiceTest extends FunctionalTestCase
     private MockInterface $notificationDispatcher;
     private MockInterface $policy;
     private MockInterface $siteRepository;
+    private MockInterface $creatorBalanceService;
+    private MockInterface $setOffService;
+    private MockInterface $payoutLedgerService;
+    private MockInterface $payoutLiabilityRecoveryRepository;
 
-    // ── availableBalance() ────────────────────────────────────────────────────
-
-    public function test_available_balance_is_ledger_minus_paid_minus_in_flight(): void
+    public function test_available_balance_delegates_to_creator_balance_service(): void
     {
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->with(7)->andReturn(10000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->with(7)->andReturn(3000);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->with(7)->andReturn(2000);
+        $this->creatorBalanceService
+            ->shouldReceive('availableToWithdraw')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(7500);
 
-        $this->assertEquals(5000, $this->service->availableBalance(7));
+        $this->assertSame(7500, $this->service->availableBalance(7, 1));
     }
 
-    public function test_available_balance_never_goes_negative(): void
+    public function test_request_payout_blocks_when_set_off_reduces_net_below_minimum(): void
     {
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(1000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(800);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(500);
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
 
-        $this->assertEquals(0, $this->service->availableBalance(7));
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(10000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 10000)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 10000,
+                deductedAmount: 6000,
+                netAmount: 4000,
+                deductions: [],
+            ));
+
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
+        $this->payoutLedgerService->shouldNotReceive('attachSettledEntriesToPayout');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Minimum payout/i');
+
+        $this->service->requestPayout(7, 1, 'bank_transfer');
     }
 
-    // ── requestPayout() — policy enforcement ─────────────────────────────────
+    public function test_request_payout_applies_set_off_and_creates_net_payout(): void
+    {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(10000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 10000)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 10000,
+                deductedAmount: 3000,
+                netAmount: 7000,
+                deductions: [
+                    [
+                        'liability_id' => 50,
+                        'amount' => 3000,
+                        'source_type' => 'earnings_reversal',
+                        'source_id' => 123,
+                        'reason' => 'Withdrawn earning reversed.',
+                    ],
+                ],
+            ));
+
+        $this->payoutRepository
+            ->shouldReceive('findByIdempotencyKey')
+            ->once()
+            ->withArgs(fn (string $key): bool => str_starts_with($key, 'payout:user:7:site:1:manual:'))
+            ->andReturn(null);
+
+        $this->payoutRepository
+            ->shouldReceive('createWithIdempotency')
+            ->once()
+            ->withArgs(fn (array $data): bool =>
+                $data['user_id'] === 7
+                && $data['site_id'] === 1
+                && $data['amount'] === 7000
+                && $data['currency'] === 'GBP'
+                && $data['status'] === PayoutStatus::Pending->value
+                && $data['method'] === 'bank_transfer'
+                && isset($data['idempotency_key'])
+                && $data['processing_attempts'] === 0
+            )
+            ->andReturn($this->makePayout([
+                'id' => 99,
+                'user_id' => 7,
+                'site_id' => 1,
+                'amount' => 7000,
+                'status' => PayoutStatus::Pending->value,
+                'method' => 'bank_transfer',
+            ]));
+
+        $this->payoutLiabilityRecoveryRepository
+            ->shouldReceive('record')
+            ->once()
+            ->with(
+                99,
+                50,
+                3000,
+                'earnings_reversal',
+                123,
+                'Withdrawn earning reversed.',
+            );
+
+        $this->payoutLedgerService
+            ->shouldReceive('attachSettledEntriesToPayout')
+            ->once()
+            ->with(99, 7, 7000)
+            ->andReturn(7000);
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($event): bool => $event instanceof PayoutRequestedEvent);
+
+        $payout = $this->service->requestPayout(7, 1, 'bank_transfer');
+
+        $this->assertSame(7000, (int) $payout->amount);
+    }
+
+    public function test_request_payout_throws_when_state_aware_balance_below_minimum(): void
+    {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(4999);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 4999)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 4999,
+                deductedAmount: 0,
+                netAmount: 4999,
+                deductions: [],
+            ));
+
+        $this->payoutRepository->shouldNotReceive('findByIdempotencyKey');
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
+        $this->payoutRepository->shouldNotReceive('create');
+        $this->payoutLedgerService->shouldNotReceive('attachSettledEntriesToPayout');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Minimum payout/i');
+
+        $this->service->requestPayout(7, 1, 'bank_transfer');
+    }
 
     public function test_request_payout_throws_onboarding_incomplete_when_policy_blocks(): void
     {
@@ -78,38 +280,138 @@ class PayoutServiceTest extends FunctionalTestCase
     {
         $site = new Site(['id' => 1]);
         $site->exists = true;
-        $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
 
-        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('create')
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
             ->once()
-            ->withArgs(fn($data) => $data['status'] === PayoutStatus::Pending->value && $data['method'] === 'bank_transfer')
-            ->andReturn($this->makePayout(['status' => PayoutStatus::Pending->value]));
-        $this->eventDispatcher->shouldReceive('dispatch')
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
             ->once()
-            ->withArgs(fn($e) => $e instanceof PayoutRequestedEvent);
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(10000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 10000)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 10000,
+                deductedAmount: 0,
+                netAmount: 10000,
+                deductions: [],
+            ));
+
+        $this->payoutRepository
+            ->shouldReceive('findByIdempotencyKey')
+            ->once()
+            ->withArgs(fn (string $key): bool => str_starts_with($key, 'payout:user:7:site:1:manual:'))
+            ->andReturn(null);
+
+        $this->payoutRepository
+            ->shouldReceive('createWithIdempotency')
+            ->once()
+            ->withArgs(fn (array $data): bool =>
+                $data['user_id'] === 7
+                && $data['site_id'] === 1
+                && $data['amount'] === 10000
+                && $data['currency'] === 'GBP'
+                && $data['status'] === PayoutStatus::Pending->value
+                && $data['method'] === 'bank_transfer'
+                && isset($data['idempotency_key'])
+                && $data['processing_attempts'] === 0
+            )
+            ->andReturn($this->makePayout([
+                'id' => 99,
+                'user_id' => 7,
+                'site_id' => 1,
+                'amount' => 10000,
+                'status' => PayoutStatus::Pending->value,
+                'method' => 'bank_transfer',
+            ]));
+
+        $this->payoutLiabilityRecoveryRepository
+            ->shouldNotReceive('record');
+
+        $this->payoutLedgerService
+            ->shouldReceive('attachSettledEntriesToPayout')
+            ->once()
+            ->with(99, 7, 10000)
+            ->andReturn(10000);
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($event): bool => $event instanceof PayoutRequestedEvent);
 
         $payout = $this->service->requestPayout(7, 1, 'bank_transfer');
 
         $this->assertEquals(PayoutStatus::Pending->value, $payout->status);
+        $this->assertEquals(10000, (int) $payout->amount);
     }
 
     public function test_request_payout_throws_when_balance_below_minimum(): void
     {
         $site = new Site(['id' => 1]);
         $site->exists = true;
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
 
-        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(4999);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(4000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 4000)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 4000,
+                deductedAmount: 0,
+                netAmount: 4000,
+                deductions: [],
+            ));
+
+        $this->payoutRepository->shouldNotReceive('findByIdempotencyKey');
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
+        $this->payoutRepository->shouldNotReceive('create');
+        $this->payoutLedgerService->shouldNotReceive('attachSettledEntriesToPayout');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/Minimum payout/i');
+
         $this->service->requestPayout(7, 1, 'bank_transfer');
     }
 
@@ -117,16 +419,103 @@ class PayoutServiceTest extends FunctionalTestCase
     {
         $site = new Site(['id' => 1]);
         $site->exists = true;
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
 
-        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(20000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(10000);
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(20000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(10000);
+
+        $this->setOffService->shouldNotReceive('apply');
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/already in progress/i');
+
         $this->service->requestPayout(7, 1, 'bank_transfer');
+    }
+
+    public function test_request_payout_returns_existing_payout_when_idempotency_key_already_exists(): void
+    {
+        $site = new Site(['id' => 1]);
+        $site->exists = true;
+
+        $existing = $this->makePayout([
+            'id' => 50,
+            'user_id' => 7,
+            'site_id' => 1,
+            'amount' => 7000,
+            'status' => PayoutStatus::Pending->value,
+        ]);
+
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(7000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 7000,
+                deductedAmount: 0,
+                netAmount: 7000,
+                deductions: [],
+            ));
+
+        $this->payoutRepository
+            ->shouldReceive('findByIdempotencyKey')
+            ->once()
+            ->andReturn($existing);
+
+        $this->payoutRepository->shouldNotReceive('createWithIdempotency');
+        $this->payoutLedgerService->shouldNotReceive('attachSettledEntriesToPayout');
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($event): bool => $event instanceof PayoutRequestedEvent);
+
+        $result = $this->service->requestPayout(7, 1, 'bank_transfer');
+
+        $this->assertSame(50, (int) $result->id);
     }
 
     public function test_request_payout_throws_for_invalid_method(): void
@@ -142,17 +531,98 @@ class PayoutServiceTest extends FunctionalTestCase
     {
         $site = new Site(['id' => 1]);
         $site->exists = true;
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
 
-        $this->policy->shouldReceive('canWithdraw')->andReturn(true);
-        $this->ledgerRepository->shouldReceive('balanceForContributor')->andReturn(10000);
-        $this->payoutRepository->shouldReceive('totalPaidForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('totalInFlightForContributor')->andReturn(0);
-        $this->payoutRepository->shouldReceive('create')->andReturn($this->makePayout());
-        $this->eventDispatcher->shouldReceive('dispatch');
+        $transactionCalled = false;
+
+        $this->databaseMock = Mockery::mock(Database::class);
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(function (callable $callback) use (&$transactionCalled) {
+                $transactionCalled = true;
+                return $callback();
+            });
+
+        $this->service = new PayoutService(
+            $this->payoutRepository,
+            $this->payoutAuditRepository,
+            $this->ledgerRepository,
+            $this->paymentRepository,
+            $this->userRepository,
+            $this->eventDispatcher,
+            $this->databaseMock,
+            $this->notificationDispatcher,
+            $this->policy,
+            $this->siteRepository,
+            $this->creatorBalanceService,
+            $this->setOffService,
+            $this->payoutLedgerService,
+            $this->payoutLiabilityRecoveryRepository,
+        );
+
+        $this->siteRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($site);
+
+        $this->policy
+            ->shouldReceive('canWithdraw')
+            ->with(7, $site)
+            ->once()
+            ->andReturn(true);
+
+        $this->creatorBalanceService
+            ->shouldReceive('settledBalance')
+            ->with(7, 1)
+            ->once()
+            ->andReturn(10000);
+
+        $this->payoutRepository
+            ->shouldReceive('totalInFlightForContributor')
+            ->with(7)
+            ->once()
+            ->andReturn(0);
+
+        $this->setOffService
+            ->shouldReceive('apply')
+            ->with(7, 1, 10000)
+            ->once()
+            ->andReturn(new SetOffResult(
+                grossAmount: 10000,
+                deductedAmount: 0,
+                netAmount: 10000,
+                deductions: [],
+            ));
+
+        $this->payoutRepository
+            ->shouldReceive('findByIdempotencyKey')
+            ->once()
+            ->andReturn(null);
+
+        $this->payoutRepository
+            ->shouldReceive('createWithIdempotency')
+            ->once()
+            ->andReturn($this->makePayout([
+                'id' => 99,
+                'status' => PayoutStatus::Pending->value,
+                'amount' => 10000,
+            ]));
+
+        $this->payoutLedgerService
+            ->shouldReceive('attachSettledEntriesToPayout')
+            ->once()
+            ->with(99, 7, 10000)
+            ->andReturn(10000);
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($event): bool => $event instanceof PayoutRequestedEvent);
 
         $this->service->requestPayout(7, 1, 'bank_transfer');
-        $this->assertTrue(true); // transaction mock was invoked
+
+        $this->assertTrue($transactionCalled);
     }
 
     // ── approve() ─────────────────────────────────────────────────────────────
@@ -198,19 +668,58 @@ class PayoutServiceTest extends FunctionalTestCase
 
     public function test_mark_paid_transitions_approved_to_paid_logs_audit_and_dispatches_event(): void
     {
-        $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Approved->value]);
-        $paid = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Paid->value]);
+        $payout = $this->makePayout([
+            'id' => 5,
+            'status' => PayoutStatus::Approved->value,
+        ]);
 
-        $this->payoutRepository->shouldReceive('find')->andReturn($payout, $paid);
-        $this->payoutRepository->shouldReceive('update')
+        $paid = $this->makePayout([
+            'id' => 5,
+            'status' => PayoutStatus::Paid->value,
+        ]);
+
+        $this->payoutRepository
+            ->shouldReceive('find')
+            ->with(5)
+            ->andReturn($payout, $paid);
+
+        $this->payoutRepository
+            ->shouldReceive('update')
             ->once()
-            ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Paid->value && $data['reference'] === 'REF-001');
-        $this->payoutAuditRepository->shouldReceive('log')
+            ->withArgs(fn ($id, array $data): bool =>
+                $id === 5
+                && $data['status'] === PayoutStatus::Paid->value
+                && $data['paid_by'] === 99
+                && $data['reference'] === 'REF-001'
+            );
+
+        $this->payoutAuditRepository
+            ->shouldReceive('log')
             ->once()
-            ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Paid);
-        $this->eventDispatcher->shouldReceive('dispatch')
+            ->withArgs(fn (
+                int $payoutId,
+                PayoutAuditAction $action,
+                int $performedBy,
+                ?string $reason = null,
+            ): bool =>
+                $payoutId === 5
+                && $action === PayoutAuditAction::Paid
+                && $performedBy === 99
+            );
+
+        $this->payoutLedgerService
+            ->shouldReceive('markPayoutLedgerEntriesWithdrawn')
+            ->with(5)
+            ->once();
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
             ->once()
-            ->withArgs(fn($e) => $e instanceof PayoutFailedEvent && $e->adminId === 99);
+            ->withArgs(fn ($event): bool =>
+                $event instanceof PayoutProcessedEvent
+                && $event->adminId === 99
+                && $event->userId === 7
+            );
 
         $result = $this->service->markPaid(5, 99, 'REF-001');
 
@@ -346,6 +855,10 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->userRepository->shouldReceive('find')->byDefault();
         $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
         $this->siteRepository = Mockery::mock(SiteRepository::class);
+        $this->creatorBalanceService = Mockery::mock(CreatorBalanceService::class);
+        $this->setOffService = Mockery::mock(SetOffService::class);
+        $this->payoutLedgerService = Mockery::mock(PayoutLedgerService::class);
+        $this->payoutLiabilityRecoveryRepository = Mockery::mock(PayoutLiabilityRecoveryRepository::class);
 
         $this->service = new PayoutService(
             $this->payoutRepository,
@@ -357,7 +870,11 @@ class PayoutServiceTest extends FunctionalTestCase
             $this->databaseMock,
             $this->notificationDispatcher,
             $this->policy,
-            $this->siteRepository
+            $this->siteRepository,
+            $this->creatorBalanceService,
+            $this->setOffService,
+            $this->payoutLedgerService,
+            $this->payoutLiabilityRecoveryRepository,
         );
     }
 

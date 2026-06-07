@@ -284,6 +284,109 @@ class EarningsLedgerRepository extends Repository
         return $entry;
     }
 
+    public function settledAvailableForPayout(int $userId): \App\Framework\Support\Collection
+    {
+        return EarningsLedger::where('user_id', $userId)
+            ->where('accrual_status', AccrualStatus::Settled->value)
+            ->whereNull('payout_id')
+            ->orderBy('earned_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function updateAccrualStatus(
+        int $ledgerEntryId,
+        AccrualStatus $status,
+        array $metadata = [],
+    ): EarningsLedger {
+        $this->update($ledgerEntryId, array_merge([
+            'accrual_status' => $status->value,
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ], $metadata));
+
+        $entry = $this->find($ledgerEntryId);
+
+        if (!$entry) {
+            throw new \InvalidArgumentException("Earnings ledger entry [{$ledgerEntryId}] not found.");
+        }
+
+        return $entry;
+    }
+
+    public function recordAdjustment(
+        int $userId,
+        ?int $articleId,
+        int $amount,
+        string $currency,
+        string $referenceId,
+        string $reason,
+        ?int $sourceLedgerEntryId = null,
+    ): Model {
+        return $this->create([
+            'user_id' => $userId,
+            'article_id' => $articleId,
+            'type' => LedgerEntryType::Adjustment->value,
+            'amount' => $amount,
+            'currency' => strtoupper($currency),
+            'reference_id' => $referenceId,
+            'accrual_status' => AccrualStatus::Settled->value,
+            'reversal_reason' => $reason,
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function recordReversal(
+        int $userId,
+        ?int $articleId,
+        int $amount,
+        string $currency,
+        string $referenceId,
+        string $reason,
+        ?int $sourceLedgerEntryId = null,
+    ): Model {
+        return $this->create([
+            'user_id' => $userId,
+            'article_id' => $articleId,
+            'type' => LedgerEntryType::Reversal->value,
+            'amount' => -abs($amount),
+            'currency' => strtoupper($currency),
+            'reference_id' => $referenceId,
+            'accrual_status' => AccrualStatus::Settled->value,
+            'reversal_reason' => $reason,
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+    }
+
+    public function settledBalancesBySite(int $siteId): array
+    {
+        $table = (new \App\Models\EarningsLedger())->getTable();
+
+        $rows = \App\Models\EarningsLedger::query()
+            ->join('pages', 'pages.id', '=', "{$table}.article_id")
+            ->where('pages.site_id', $siteId)
+            ->where("{$table}.accrual_status", \App\Enums\OpenCollab\AccrualStatus::Settled->value)
+            ->whereNull("{$table}.payout_id")
+            ->selectRaw("{$table}.user_id, {$table}.currency, COALESCE(SUM({$table}.amount), 0) as total")
+            ->groupBy("{$table}.user_id", "{$table}.currency")
+            ->get();
+
+        $balances = [];
+
+        foreach ($rows as $row) {
+            $balances[] = [
+                'user_id' => (int) $row->user_id,
+                'currency' => strtoupper($row->currency ?? 'GBP'),
+                'amount' => (int) $row->total,
+            ];
+        }
+
+        return $balances;
+    }
+
     protected function getModelClass(): string
     {
         return EarningsLedger::class;

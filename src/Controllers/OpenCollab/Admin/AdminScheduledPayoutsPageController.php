@@ -25,6 +25,7 @@ class AdminScheduledPayoutsPageController extends Controller
         private readonly PayoutRepository         $payoutRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly PaymentTermsService      $paymentTermsService,
+        private readonly CreatorBalanceService $creatorBalanceService,
     )
     {
         parent::__construct();
@@ -46,24 +47,23 @@ class AdminScheduledPayoutsPageController extends Controller
         $eligibleByUser = $this->ledgerRepository->eligibleGroupedBySiteAndUser($siteId, $cutoff);
 
         // Flatten into display rows: [ [user_id, currency, amount, entry_count] ]
+        $settledRows = $this->ledgerRepository->settledBalancesBySite($siteId);
+
         $upcomingRows = [];
-        foreach ($eligibleByUser as $userId => $entries) {
-            $byCurrency = [];
-            foreach ($entries as $entry) {
-                $currency = strtoupper($entry['currency'] ?? 'GBP');
-                $byCurrency[$currency] = ($byCurrency[$currency] ?? 0) + (int)$entry['amount'];
+
+        foreach ($settledRows as $row) {
+            $amount = (int) $row['amount'];
+
+            if ($amount < $terms->minimum_payout_amount) {
+                continue;
             }
-            foreach ($byCurrency as $currency => $total) {
-                if ($total < $terms->minimum_payout_amount) {
-                    continue; // below threshold — won't be scheduled
-                }
-                $upcomingRows[] = [
-                    'user_id' => $userId,
-                    'currency' => $currency,
-                    'amount' => $total,
-                    'below_min' => false,
-                ];
-            }
+
+            $upcomingRows[] = [
+                'user_id' => (int) $row['user_id'],
+                'currency' => strtoupper($row['currency'] ?? 'GBP'),
+                'amount' => $amount,
+                'below_min' => false,
+            ];
         }
 
         return $this->view('open-collab.admin.payouts.scheduled', [

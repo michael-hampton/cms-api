@@ -254,6 +254,38 @@ $pageClass = '';
                     </select>
                 </div>
 
+                <div class="oc-form-group">
+                    <label class="oc-label" for="tax-classification-settings">Tax classification</label>
+                    <select class="oc-select" id="tax-classification-settings" name="tax_classification">
+                        <?php $taxClassification = $profile?->tax_classification ?? ''; ?>
+                        <option value="">Select classification…</option>
+                        <option value="uk_vat_registered" <?= $taxClassification === 'uk_vat_registered' ? 'selected' : '' ?>>
+                            UK VAT registered
+                        </option>
+                        <option value="uk_non_registered" <?= $taxClassification === 'uk_non_registered' ? 'selected' : '' ?>>
+                            UK non-registered
+                        </option>
+                        <option value="us" <?= $taxClassification === 'us' ? 'selected' : '' ?>>
+                            US
+                        </option>
+                        <option value="other" <?= $taxClassification === 'other' ? 'selected' : '' ?>>
+                            Other
+                        </option>
+                    </select>
+                    <div class="oc-help">Used for finance reporting. This does not calculate VAT automatically.</div>
+                </div>
+
+                <div class="oc-form-group">
+                    <label class="oc-label oc-label--optional" for="vat-number-settings">VAT number</label>
+                    <input class="oc-input"
+                           type="text"
+                           id="vat-number-settings"
+                           name="vat_number"
+                           value="<?= htmlspecialchars($profile?->vat_number ?? '') ?>"
+                           placeholder="e.g. GB123456789">
+                    <div class="oc-help">Only required if you are VAT registered.</div>
+                </div>
+
                 <button type="button" class="oc-btn oc-btn--primary" id="save-payment-btn"
                         onclick="savePaymentDetails()">
                     Save payment details
@@ -1194,6 +1226,8 @@ $pageClass = '';
                     payment_method_type: 'stripe',
                     payment_method_id: paymentMethodId,
                     tax_country: document.getElementById('tax-country-settings')?.value || '',
+                    tax_classification: document.getElementById('tax-classification-settings')?.value || '',
+                    vat_number: document.getElementById('vat-number-settings')?.value || '',
                 }),
             });
 

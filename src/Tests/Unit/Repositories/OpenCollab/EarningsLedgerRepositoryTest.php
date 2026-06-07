@@ -843,6 +843,57 @@ class EarningsLedgerRepositoryTest extends RepositoryTestCase
 
         $this->assertEquals(750, $balances[AccrualStatus::Settled->value]);
     }
+
+    public function test_settled_available_for_payout_returns_only_settled_entries_without_payout(): void
+    {
+        $user = $this->createUser();
+
+        \App\Models\EarningsLedger::create([
+            'user_id' => $user->id,
+            'article_id' => 100,
+            'type' => 'sale',
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'reference_id' => 'settled-available',
+            'accrual_status' => \App\Enums\OpenCollab\AccrualStatus::Settled->value,
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        \App\Models\EarningsLedger::create([
+            'user_id' => $user->id,
+            'article_id' => 101,
+            'type' => 'sale',
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'reference_id' => 'settled-already-attached',
+            'accrual_status' => \App\Enums\OpenCollab\AccrualStatus::Settled->value,
+            'payout_id' => 99,
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        \App\Models\EarningsLedger::create([
+            'user_id' => $user->id,
+            'article_id' => 102,
+            'type' => 'sale',
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'reference_id' => 'confirmed-not-available',
+            'accrual_status' => \App\Enums\OpenCollab\AccrualStatus::Confirmed->value,
+            'earned_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $rows = $this->repository->settledAvailableForPayout($user->id);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('settled-available', $rows->first()->reference_id);
+    }
+
     private function createLedgerEntry(array $overrides = []): Model
     {
         $user = $this->createUser();

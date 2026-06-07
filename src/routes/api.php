@@ -402,6 +402,11 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->post(
+            '/open-collab/admin/contributors/{id}/tax',
+            [AdminContributorController::class, 'updateTax']
+        );
+
+        $router->post(
             '/open-collab/profile/sample-links',
             [ContributorProfileSampleLinksController::class, 'update']
         );

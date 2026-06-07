@@ -32,6 +32,9 @@ class Payout extends Model
         'rejection_reason',
         'created_at',
         'updated_at',
+        'batch_id',
+        'accrual_window_id',
+        'idempotency_key',
     ];
 
     protected $casts = [
@@ -43,6 +46,8 @@ class Payout extends Model
         'rejected_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'batch_id' => 'integer',
+        'accrual_window_id' => 'integer',
     ];
 
     public function isPending(): bool

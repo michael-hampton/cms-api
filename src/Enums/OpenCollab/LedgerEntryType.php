@@ -7,4 +7,5 @@ enum LedgerEntryType: string
     case Sale = 'sale';
     case Refund = 'refund';
     case Adjustment = 'adjustment';
+    case Reversal = 'reversal';
 }

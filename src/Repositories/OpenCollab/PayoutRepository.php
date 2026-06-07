@@ -98,6 +98,67 @@ class PayoutRepository extends Repository
             ->get();
     }
 
+    public function createWithIdempotency(array $data): Payout
+    {
+        if (empty($data['idempotency_key'])) {
+            throw new \InvalidArgumentException('Payout idempotency key is required.');
+        }
+
+        return $this->create($data);
+    }
+
+    public function findByIdempotencyKey(string $idempotencyKey): ?Payout
+    {
+        return Payout::where('idempotency_key', $idempotencyKey)->first();
+    }
+
+    public function existsForWindowAndBatch(
+        int $userId,
+        int $siteId,
+        ?int $accrualWindowId,
+        ?int $batchId,
+    ): bool {
+        if ($accrualWindowId === null || $batchId === null) {
+            return false;
+        }
+
+        return Payout::where('user_id', $userId)
+            ->where('site_id', $siteId)
+            ->where('accrual_window_id', $accrualWindowId)
+            ->where('batch_id', $batchId)
+            ->exists();
+    }
+
+    public function statusesForBatch(int $batchId): array
+    {
+        $rows = Payout::where('batch_id', $batchId)
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->get();
+
+        $statuses = [];
+
+        foreach ($rows as $row) {
+            $statuses[$row->status] = (int) $row->total;
+        }
+
+        return $statuses;
+    }
+
+    public function incrementProcessingAttempts(int $payoutId): void
+    {
+        $payout = $this->find($payoutId);
+
+        if (!$payout) {
+            throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
+        }
+
+        $this->update($payoutId, [
+            'processing_attempts' => ((int) ($payout->processing_attempts ?? 0)) + 1,
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+    }
+
     protected function getModelClass(): string
     {
         return Payout::class;

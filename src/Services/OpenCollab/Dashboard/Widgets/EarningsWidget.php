@@ -2,31 +2,19 @@
 
 namespace App\Services\OpenCollab\Dashboard\Widgets;
 
+use App\Framework\Support\SiteContext;
 use App\Models\User;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
+use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
 use App\Services\OpenCollab\EarningsService;
 
-/**
- * Earnings widget — lifetime total, pending payout, per-article breakdown,
- * and transaction history.
- *
- * Amounts are in pence/cents (integers). Formatting belongs to the JS renderer.
- *
- * Data shape:
- * {
- *   total:           int        — lifetime gross in pence
- *   pending:         int        — balance awaiting payout in pence
- *   breakdown:       [{page_id, title, total}]
- *   transactions:    [{page_title, amount, status, created_at}]
- *   payment_details: {email}|null  — connected Stripe account, or null
- * }
- */
 final class EarningsWidget implements DashboardWidgetInterface
 {
     public function __construct(
-        private readonly EarningsService           $earningsService,
-        private readonly ArticlePaymentRepository  $paymentRepository,
+        private readonly EarningsService          $earningsService,
+        private readonly CreatorBalanceService   $creatorBalanceService,
+        private readonly ArticlePaymentRepository $paymentRepository,
     ) {}
 
     public function key(): string
@@ -46,16 +34,32 @@ final class EarningsWidget implements DashboardWidgetInterface
 
     public function data(User $user): array
     {
-        $total = $this->earningsService->totalEarningsForContributor($user->id);
+        $siteId = SiteContext::getId();
+
+        $balances = $this->creatorBalanceService->balances(
+            userId: (int) $user->id,
+            siteId: $siteId,
+        );
 
         return [
-            'total'           => $total,
-            // TODO: replace with PayoutService::pendingBalance() when available.
-            // For now pending mirrors total — same as the old DashboardPageController TODO.
-            'pending'         => $total,
-            'breakdown'       => $this->earningsService->earningsBreakdownForContributor($user->id),
-            'transactions'    => $this->paymentRepository->transactionsForContributor($user->id),
-            // TODO: inject ContributorProfileRepository and resolve Stripe account details.
+            'total' => $this->earningsService->totalEarningsForContributor($user->id),
+
+            'estimated' => $balances['estimated_balance'] ?? 0,
+            'confirmed' => $balances['confirmed_balance'] ?? 0,
+            'settled' => $balances['settled_balance'] ?? 0,
+            'withdrawn' => $balances['withdrawn_balance'] ?? 0,
+            'reversed' => $balances['reversed_balance'] ?? 0,
+
+            'open_liabilities' => $balances['open_liabilities'] ?? 0,
+            'pending_payouts' => $balances['in_flight_payouts'] ?? 0,
+            'available_to_withdraw' => $balances['available_to_withdraw'] ?? 0,
+
+            // Backwards-compatible aliases for old dashboard renderers.
+            'pending' => $balances['available_to_withdraw'] ?? 0,
+            'available' => $balances['available_to_withdraw'] ?? 0,
+
+            'breakdown' => $this->earningsService->earningsBreakdownForContributor($user->id),
+            'transactions' => $this->paymentRepository->transactionsForContributor($user->id),
             'payment_details' => null,
         ];
     }

@@ -23,6 +23,8 @@ class ContributorProfile extends Model
         'age_verified_at',
         'age_verification_method',
         'minimum_age_confirmed',
+        'tax_classification',
+        'vat_number',
     ];
 
     protected $hidden = [

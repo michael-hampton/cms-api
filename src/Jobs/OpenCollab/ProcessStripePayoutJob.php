@@ -87,15 +87,19 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
             /** @var TransferService $transfers */
             $transfers = $this->stripe->transfers;
 
+            $idempotencyKey = $payout->idempotency_key ?: 'payout:' . $payout->id;
+
             $transfer = $transfers->create([
-                'amount' => (int)$payout->amount,
-                'currency' => strtolower((string)$payout->currency),
-                'destination' => (string)$account->stripe_account_id,
+                'amount' => (int) $payout->amount,
+                'currency' => strtolower((string) $payout->currency),
+                'destination' => (string) $account->stripe_account_id,
                 'metadata' => [
-                    'payout_id' => (string)$payout->id,
-                    'user_id' => (string)$payout->user_id,
-                    'site_id' => (string)$payout->site_id,
+                    'payout_id' => (string) $payout->id,
+                    'user_id' => (string) $payout->user_id,
+                    'site_id' => (string) $payout->site_id,
                 ],
+            ], [
+                'idempotency_key' => $idempotencyKey,
             ]);
 
             $attempts = !$payout->processing_attempts ? 1 : $payout->processing_attempts + 1;
@@ -109,8 +113,6 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
                 'processed_at' => date('Y-m-d H:i:s'),
             ]);
         } catch (ApiErrorException $e) {
-            echo $e->getMessage();
-            die;
             $this->updatePayout($payout->id, [
                 'status' => PayoutStatus::Failed->value,
                 'provider' => 'stripe_connect',
@@ -127,7 +129,7 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
     private function updatePayout(int $payoutId, array $data): void
     {
         // Store the Stripe payload for audit/debugging.
-        if ($data['provider_response_json'] && is_array($data['provider_response_json'])) {
+        if (isset($data['provider_response_json']) && is_array($data['provider_response_json'])) {
             $data['provider_response_json'] = json_encode($data['provider_response_json']);
         }
 

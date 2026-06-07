@@ -118,6 +118,123 @@ class PayoutRepositoryTest extends RepositoryTestCase
         $this->assertEquals(3000, $this->repository->totalInFlightForContributor($user->id));
     }
 
+    public function test_create_with_idempotency_requires_key(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Payout idempotency key is required.');
+
+        $this->repository->createWithIdempotency([
+            'user_id' => 7,
+            'site_id' => 1,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ]);
+    }
+
+    public function test_create_with_idempotency_persists_key(): void
+    {
+        $user = $this->createUser();
+
+        $payout = $this->repository->createWithIdempotency([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+            'idempotency_key' => 'payout:test:key',
+            'processing_attempts' => 0,
+        ]);
+
+        $this->assertSame('payout:test:key', $payout->idempotency_key);
+    }
+
+    public function test_find_by_idempotency_key_returns_matching_payout(): void
+    {
+        $user = $this->createUser();
+
+        Payout::create([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+            'idempotency_key' => 'payout:abc',
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $found = $this->repository->findByIdempotencyKey('payout:abc');
+
+        $this->assertNotNull($found);
+        $this->assertSame($user->id, (int) $found->user_id);
+    }
+
+    public function test_exists_for_window_and_batch_returns_true_when_duplicate_exists(): void
+    {
+        $user = $this->createUser();
+
+        Payout::create([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'batch_id' => 20,
+            'accrual_window_id' => 30,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+            'idempotency_key' => 'payout:window:batch',
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->assertTrue(
+            $this->repository->existsForWindowAndBatch(
+                userId: $user->id,
+                siteId: $this->siteId,
+                accrualWindowId: 30,
+                batchId: 20,
+            )
+        );
+
+        $this->assertFalse(
+            $this->repository->existsForWindowAndBatch(
+                userId: $user->id,
+                siteId: $this->siteId,
+                accrualWindowId: 999,
+                batchId: 20,
+            )
+        );
+    }
+
+    public function test_increment_processing_attempts_increments_current_value(): void
+    {
+        $user = $this->createUser();
+
+        $payout = Payout::create([
+            'user_id' => $user->id,
+            'site_id' => $this->siteId,
+            'amount' => 10000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+            'idempotency_key' => 'payout:attempts',
+            'processing_attempts' => 2,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->repository->incrementProcessingAttempts((int) $payout->id);
+
+        $fresh = $this->repository->find((int) $payout->id);
+
+        $this->assertSame(3, (int) $fresh->processing_attempts);
+    }
+
+
     protected function setUp(): void
     {
         parent::setUp();

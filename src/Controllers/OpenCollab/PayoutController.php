@@ -54,18 +54,38 @@ class PayoutController extends Controller
 
     private function formatPayout(\App\Models\Payout $payout): array
     {
+        $deductionsTotal = $this->deductionsTotalForPayout((int) $payout->id);
+        $ledgerEntryCount = $this->ledgerEntryCountForPayout((int) $payout->id);
+
         return [
             'id' => $payout->id,
             'user_id' => $payout->user_id,
+
+            'amount' => $payout->amount,
             'amount_pence' => $payout->amount,
             'amount_pounds' => number_format($payout->amount / 100, 2, '.', ''),
+
             'currency' => $payout->currency,
             'status' => $payout->status,
             'method' => $payout->method,
+
+            'batch_id' => $payout->batch_id,
+            'accrual_window_id' => $payout->accrual_window_id,
+            'idempotency_key' => $payout->idempotency_key,
+
+            'provider' => $payout->provider,
             'provider_status' => $payout->provider_status,
+            'provider_transfer_id' => $payout->provider_transfer_id,
+            'provider_payout_id' => $payout->provider_payout_id,
             'provider_response_json' => $payout->provider_response_json,
+
+            'deductions_total_pence' => $deductionsTotal,
+            'deductions_total_pounds' => number_format($deductionsTotal / 100, 2, '.', ''),
+            'ledger_entry_count' => $ledgerEntryCount,
+
             'reference' => $payout->reference,
             'notes' => $payout->notes,
+
             'approved_at' => $payout->approved_at,
             'processed_at' => $payout->processed_at,
             'rejected_at' => $payout->rejected_at,
@@ -74,13 +94,38 @@ class PayoutController extends Controller
         ];
     }
 
+    private function deductionsTotalForPayout(int $payoutId): int
+    {
+        if (!class_exists(\App\Models\PayoutLiabilityRecovery::class)) {
+            return 0;
+        }
+
+        return (int) \App\Models\PayoutLiabilityRecovery::where('payout_id', $payoutId)
+            ->sum('amount');
+    }
+
+    private function ledgerEntryCountForPayout(int $payoutId): int
+    {
+        if (!class_exists(\App\Models\PayoutLedgerEntry::class)) {
+            return 0;
+        }
+
+        return (int) \App\Models\PayoutLedgerEntry::where('payout_id', $payoutId)
+            ->count();
+    }
+
+    /**
+     * GET /api/{site}/open-collab/payouts/balance
+     */
     /**
      * GET /api/{site}/open-collab/payouts/balance
      */
     public function balance(): JsonResponse
     {
         $userId = Auth::id();
-        $balance = $this->payoutService->availableBalance($userId);
+        $siteId = SiteContext::getId();
+
+        $balance = $this->payoutService->availableBalance($userId, $siteId);
 
         return $this->jsonResponse([
             'balance_pence' => $balance,

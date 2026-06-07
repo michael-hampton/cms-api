@@ -2,8 +2,11 @@
 
 namespace App\Tests\Functional\Controllers\OpenCollab;
 
+use App\Enums\OpenCollab\AccrualStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
+use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Enums\OpenCollab\PayoutStatus;
+use App\Models\ContributorOnboardingStep;
 use App\Models\ContributorProfile;
 use App\Models\EarningsLedger;
 use App\Models\Payout;
@@ -80,6 +83,8 @@ class PayoutControllerTest extends FunctionalTestCase
             'amount' => 12345,
             'currency' => 'GBP',
             'reference_id' => 'sale-1',
+            'accrual_status' => AccrualStatus::Settled->value,
+            'settled_at' => now_datetime()->format('Y-m-d H:i:s'),
         ]);
 
         $response = $this->getForSite('/api/open-collab/payouts/balance');
@@ -102,6 +107,8 @@ class PayoutControllerTest extends FunctionalTestCase
             'amount' => 10000,
             'currency' => 'GBP',
             'reference_id' => 'sale-2',
+            'accrual_status' => AccrualStatus::Settled->value,
+            'settled_at' => now_datetime()->format('Y-m-d H:i:s'),
         ]);
 
         $this->setupSiteOnboarding();
@@ -118,6 +125,17 @@ class PayoutControllerTest extends FunctionalTestCase
             'status' => PayoutStatus::Pending->value,
             'method' => 'bank_transfer',
         ]);
+
+        $payout = Payout::where('user_id', $this->contributor->id)
+            ->where('site_id', $this->siteId)
+            ->first();
+
+        $this->assertNotNull($payout);
+
+        $this->assertDatabaseHas('oc_payout_ledger_entries', [
+            'payout_id' => $payout->id,
+            'amount' => 10000,
+        ]);
     }
 
     public function test_contributor_cannot_request_payout_when_onboarding_incomplete(): void
@@ -131,7 +149,9 @@ class PayoutControllerTest extends FunctionalTestCase
             'type' => LedgerEntryType::Sale->value,
             'amount' => 10000,
             'currency' => 'GBP',
-            'reference_id' => 'sale-2',
+            'reference_id' => 'sale-2-onboarding',
+            'accrual_status' => AccrualStatus::Settled->value,
+            'settled_at' => now_datetime()->format('Y-m-d H:i:s'),
         ]);
 
         $this->setupSiteOnboarding(true);
@@ -155,12 +175,14 @@ class PayoutControllerTest extends FunctionalTestCase
             'amount' => 4999,
             'currency' => 'GBP',
             'reference_id' => 'sale-3',
+            'accrual_status' => AccrualStatus::Settled->value,
+            'settled_at' => now_datetime()->format('Y-m-d H:i:s'),
         ]);
 
         $this->setupSiteOnboarding();
 
         $response = $this->postForSite('/api/open-collab/payouts', [
-            'method' => 'paypal',
+            'method' => 'bank_transfer',
         ]);
 
         $this->assertEquals(422, $response->getStatusCode());
@@ -287,7 +309,12 @@ class PayoutControllerTest extends FunctionalTestCase
 
         ContributorProfile::firstOrCreate(
             ['user_id' => $this->contributor->id],
-            ['bio' => 'test bio'],
+            [
+                'bio' => 'This is a valid contributor bio for payout tests.',
+                'minimum_age_confirmed' => true,
+                'age_verified_at' => now_datetime()->format('Y-m-d H:i:s'),
+                'age_verification_method' => 'test',
+            ],
         );
     }
 
@@ -355,9 +382,38 @@ class PayoutControllerTest extends FunctionalTestCase
     private function setupSiteOnboarding(bool $requiresSiteOnboarding = false): void
     {
         $this->ensureSiteExists();
+
         $site = Site::find($this->siteId);
 
-        $site->update(['require_payment_setup' => $requiresSiteOnboarding, 'require_contracts' => $requiresSiteOnboarding, 'require_guidelines_ack' => $requiresSiteOnboarding]);
+        $site->update([
+            'require_payment_setup' => $requiresSiteOnboarding,
+            'require_contracts' => $requiresSiteOnboarding,
+            'require_guidelines_ack' => $requiresSiteOnboarding,
+            'require_age_verification' => $requiresSiteOnboarding,
+        ]);
+
+        ContributorProfile::where('user_id', $this->contributor->id)->update([
+            'bio' => 'This is a valid contributor bio for payout tests.',
+            'minimum_age_confirmed' => true,
+            'age_verified_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'age_verification_method' => 'test',
+        ]);
+
+        if (!$requiresSiteOnboarding) {
+            ContributorOnboardingStep::updateOrCreate(
+                [
+                    'user_id' => $this->contributor->id,
+                    'site_id' => $this->siteId,
+                    'step' => 'profile',
+                ],
+                [
+                    'status' => OnboardingStepStatus::Completed->value,
+                    'completed_at' => now_datetime()->format('Y-m-d H:i:s'),
+                    'meta' => json_encode(['test' => true]),
+                    'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+                ]
+            );
+        }
     }
 
 }

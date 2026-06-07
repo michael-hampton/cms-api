@@ -180,10 +180,12 @@
             <thead>
             <tr>
                 <th>ID</th>
+                <th>ID</th>
                 <th>Contributor</th>
                 <th>Amount</th>
                 <th>Currency</th>
                 <th>Method</th>
+                <th>Finance</th>
                 <th>Requested</th>
                 <th>Actions</th>
             </tr>
@@ -229,6 +231,7 @@
                 <th>Amount</th>
                 <th>Currency</th>
                 <th>Status</th>
+                <th>Finance</th>
                 <th>Created</th>
                 <th>Actions</th>
             </tr>
@@ -421,6 +424,7 @@
                 <td style="font-weight:600;">${symbol}${amount}</td>
                 <td style="font-size:.82rem;color:var(--slate);">${this.#esc(currency)}</td>
                 <td><span class="oc-badge ${statusCls}" id="badge-${p.id}">${this.#cap(status)}</span></td>
+                <td>${this.#financeSummary(p)}</td>
                 <td style="font-size:.78rem;color:var(--slate);">${this.#fmtDate(p.created_at)}</td>
                 <td><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${retryBtn}${markPaidBtn}${pdfBtn}</div></td>
             </tr>${rejectionRow}${failureRow}`;
@@ -628,9 +632,56 @@
             document.getElementById('payouts-table-wrap').style.display = state === 'table' ? 'block' : 'none';
         }
 
+        #money(pence, currency = 'GBP') {
+            const amount = Number(pence || 0) / 100;
+            const symbol = currency === 'GBP' ? '£' : currency + ' ';
+            return `${symbol}${amount.toFixed(2)}`;
+        }
+
         #fmtDate(str) {
             if (!str) return '—';
             return new Date(str).toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+        }
+
+        #financeSummary(p) {
+            const batch = p.batch_id ? `Batch #${this.#esc(p.batch_id)}` : 'Manual / no batch';
+
+            const ledgerCount = Number(p.ledger_entry_count || 0);
+            const ledger = ledgerCount > 0
+                ? `${ledgerCount} ledger ${ledgerCount === 1 ? 'entry' : 'entries'}`
+                : 'No ledger link';
+
+            const deductions = Number(p.deductions_total_pence || 0);
+            const deductionsText = deductions > 0
+                ? `Deductions ${this.#money(deductions, p.currency)}`
+                : 'No deductions';
+
+            const providerRef =
+                p.provider_transfer_id ||
+                p.provider_payout_id ||
+                p.provider_status ||
+                p.provider ||
+                null;
+
+            const provider = providerRef
+                ? `Provider ${this.#esc(providerRef)}`
+                : 'No provider ref';
+
+            const key = p.idempotency_key
+                ? this.#esc(p.idempotency_key)
+                : 'No idempotency key';
+
+            return `
+        <div style="display:flex;flex-direction:column;gap:3px;font-size:.74rem;color:var(--slate);line-height:1.35;min-width:190px;">
+            <div><strong style="color:var(--navy);">${batch}</strong></div>
+            <div>${ledger}</div>
+            <div style="color:${deductions > 0 ? 'var(--red)' : 'var(--slate)'};">${deductionsText}</div>
+            <div>${provider}</div>
+            <div style="font-family:monospace;font-size:.68rem;max-width:220px;white-space:normal;word-break:break-all;">
+                ${key}
+            </div>
+        </div>
+    `;
         }
 
         #cap(str) {

@@ -33,19 +33,39 @@ $pageClass = 'oc-page--wide';
 <!-- Stats bar (populated from API) -->
 <div class="oc-stats" style="animation:fadeSlideIn .4s ease;margin-bottom:24px;">
     <div class="oc-stat oc-stat--accent">
-        <div class="oc-stat__label">Available Balance</div>
+        <div class="oc-stat__label">Available to Withdraw</div>
         <div class="oc-stat__value" id="stat-balance">—</div>
-        <div class="oc-stat__sub">Ready to withdraw</div>
+        <div class="oc-stat__sub">Settled minus deductions</div>
     </div>
+
     <div class="oc-stat">
-        <div class="oc-stat__label">Minimum Payout</div>
-        <div class="oc-stat__value">£50.00</div>
-        <div class="oc-stat__sub">Per request</div>
+        <div class="oc-stat__label">Estimated</div>
+        <div class="oc-stat__value" id="stat-estimated">—</div>
+        <div class="oc-stat__sub">Visible, not payable yet</div>
     </div>
+
+    <div class="oc-stat">
+        <div class="oc-stat__label">Confirmed</div>
+        <div class="oc-stat__value" id="stat-confirmed">—</div>
+        <div class="oc-stat__sub">Approved, not settled</div>
+    </div>
+
     <div class="oc-stat oc-stat--green">
-        <div class="oc-stat__label">Total Requests</div>
-        <div class="oc-stat__value" id="stat-total">—</div>
-        <div class="oc-stat__sub">All time</div>
+        <div class="oc-stat__label">Withdrawn</div>
+        <div class="oc-stat__value" id="stat-withdrawn">—</div>
+        <div class="oc-stat__sub">Paid out</div>
+    </div>
+
+    <div class="oc-stat">
+        <div class="oc-stat__label">Deductions</div>
+        <div class="oc-stat__value" id="stat-liabilities">—</div>
+        <div class="oc-stat__sub">Open liabilities</div>
+    </div>
+
+    <div class="oc-stat">
+        <div class="oc-stat__label">Pending Payouts</div>
+        <div class="oc-stat__value" id="stat-in-flight">—</div>
+        <div class="oc-stat__sub">Pending or approved</div>
     </div>
 </div>
 
@@ -231,14 +251,29 @@ $pageClass = 'oc-page--wide';
                     headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
                 });
                 const data = await res.json();
-                this.#state.balancePence = data?.data?.balance_pence ?? data?.balance_pence ?? 0;
-                const pounds = (this.#state.balancePence / 100).toFixed(2);
+                const payload = data?.data ?? data ?? {};
 
-                document.getElementById('stat-balance').textContent = `£${pounds}`;
-                document.getElementById('balance-display').textContent = `£${pounds}`;
+                const balancePence =
+                    payload.available_to_withdraw ??
+                    payload.available_balance ??
+                    payload.balance_pence ??
+                    0;
+
+                this.#state.balancePence = balancePence;
+
+                const fmt = (pence) => `£${((Number(pence || 0)) / 100).toFixed(2)}`;
+
+                document.getElementById('stat-balance').textContent = fmt(balancePence);
+                document.getElementById('balance-display').textContent = fmt(balancePence);
+
+                document.getElementById('stat-estimated').textContent = fmt(payload.estimated_balance);
+                document.getElementById('stat-confirmed').textContent = fmt(payload.confirmed_balance);
+                document.getElementById('stat-withdrawn').textContent = fmt(payload.withdrawn_balance);
+                document.getElementById('stat-liabilities').textContent = fmt(payload.open_liabilities);
+                document.getElementById('stat-in-flight').textContent = fmt(payload.in_flight_payouts);
 
                 const btn = document.getElementById('payout-btn');
-                btn.textContent = `Request £${pounds}`;
+                btn.textContent = `Request ${fmt(balancePence)}`;
 
                 if (this.#state.balancePence >= ContributorPayoutsManager.#MIN_PENCE) {
                     btn.disabled = false;

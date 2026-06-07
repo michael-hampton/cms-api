@@ -4,7 +4,6 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
-use App\Events\OpenCollab\PayoutFailedEvent;
 use App\Events\OpenCollab\PayoutProcessedEvent;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
@@ -25,6 +24,9 @@ use App\Services\OpenCollab\Notifications\PayoutCreatedNotification;
 use App\Services\OpenCollab\Notifications\PayoutDeclinedNotification;
 use App\Services\OpenCollab\Notifications\PayoutPaidNotification;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
+use App\Services\OpenCollab\SetOffService;
+use App\Services\OpenCollab\PayoutLedgerService;
+use App\Repositories\OpenCollab\PayoutLiabilityRecoveryRepository;
 
 /**
  * Manual/batch payout management.
@@ -38,18 +40,21 @@ class PayoutService
     private const VALID_METHODS = ['bank_transfer', 'paypal', 'other', 'stripe'];
 
     public function __construct(
-        private readonly PayoutRepository         $payoutRepository,
-        private readonly PayoutAuditRepository   $payoutAuditRepository,
+        private readonly PayoutRepository          $payoutRepository,
+        private readonly PayoutAuditRepository    $payoutAuditRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
-        private readonly UserRepositoryInterface $userRepository,
+        private readonly UserRepositoryInterface  $userRepository,
         private readonly EventDispatcher          $eventDispatcher,
         private readonly Database                 $database,
-        private readonly NotificationDispatcher  $notificationDispatcher,
-        private readonly ContributorPolicy       $policy,
-        private readonly SiteRepository          $siteRepository
-    )
-    {
+        private readonly NotificationDispatcher   $notificationDispatcher,
+        private readonly ContributorPolicy        $policy,
+        private readonly SiteRepository           $siteRepository,
+        private readonly CreatorBalanceService    $creatorBalanceService,
+        private readonly SetOffService            $setOffService,
+        private readonly PayoutLedgerService      $payoutLedgerService,
+        private readonly PayoutLiabilityRecoveryRepository $payoutLiabilityRecoveryRepository,
+    ) {
     }
 
     // ── Contributor ───────────────────────────────────────────────────────────
@@ -76,12 +81,24 @@ class PayoutService
         }
 
         if (!$this->policy->canWithdraw($userId, $site)) {
-            $pending = []; // pendingSteps will be evaluated by the policy internally
+            $pending = [];
             throw new OnboardingIncompleteException($pending);
         }
 
         $payout = $this->database->transaction(function () use ($userId, $siteId, $method): Model {
-            $available = $this->availableBalance($userId);
+            $settled = $this->creatorBalanceService->settledBalance($userId, $siteId);
+            $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
+
+            if ($inFlight > 0) {
+                throw new \RuntimeException(
+                    "A payout of £" . number_format($inFlight / 100, 2) . " is already in progress."
+                );
+            }
+
+            $grossAvailable = max(0, $settled - $inFlight);
+
+            $setOff = $this->setOffService->apply($userId, $siteId, $grossAvailable);
+            $available = $setOff->netAmount;
 
             if ($available < self::MINIMUM_PAYOUT_PENCE) {
                 throw new \InvalidArgumentException(
@@ -90,26 +107,54 @@ class PayoutService
                 );
             }
 
-            $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
-            if ($inFlight > 0) {
-                throw new \RuntimeException(
-                    "A payout of £" . number_format($inFlight / 100, 2) . " is already in progress."
-                );
+            $idempotencyKey = $this->makePayoutIdempotencyKey(
+                userId: $userId,
+                siteId: $siteId,
+                batchId: null,
+                accrualWindowId: null,
+            );
+
+            $existing = $this->payoutRepository->findByIdempotencyKey($idempotencyKey);
+
+            if ($existing) {
+                return $existing;
             }
 
-            return $this->payoutRepository->create([
+            $payout = $this->payoutRepository->createWithIdempotency([
                 'user_id' => $userId,
                 'site_id' => $siteId,
                 'amount' => $available,
                 'currency' => 'GBP',
                 'status' => PayoutStatus::Pending->value,
                 'method' => $method,
+                'idempotency_key' => $idempotencyKey,
+                'processing_attempts' => 0,
             ]);
+
+            foreach ($setOff->deductions as $deduction) {
+                $this->payoutLiabilityRecoveryRepository->record(
+                    payoutId: (int) $payout->id,
+                    creatorLiabilityId: (int) $deduction['liability_id'],
+                    amount: (int) $deduction['amount'],
+                    sourceType: $deduction['source_type'] ?? null,
+                    sourceId: $deduction['source_id'] ?? null,
+                    reason: $deduction['reason'] ?? null,
+                );
+            }
+
+            $this->payoutLedgerService->attachSettledEntriesToPayout(
+                payoutId: (int) $payout->id,
+                userId: $userId,
+                amountToAttach: $available,
+            );
+
+            return $payout;
         });
 
         $this->eventDispatcher->dispatch(new PayoutRequestedEvent($payout, $userId));
 
         $contributor = $this->userRepository->find($userId);
+
         if ($contributor) {
             $this->notificationDispatcher->dispatch(
                 new PayoutCreatedNotification($payout, $contributor)
@@ -123,13 +168,9 @@ class PayoutService
      * Available balance in pence for a contributor.
      * = ledger balance − already paid − in-flight
      */
-    public function availableBalance(int $userId): int
+    public function availableBalance(int $userId, int $siteId): int
     {
-        $ledgerBalance = $this->ledgerRepository->balanceForContributor($userId);
-        $paid = $this->payoutRepository->totalPaidForContributor($userId);
-        $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
-
-        return max(0, $ledgerBalance - $paid - $inFlight);
+        return $this->creatorBalanceService->availableToWithdraw($userId, $siteId);
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
@@ -228,10 +269,14 @@ class PayoutService
                 reason: $notes,
             );
 
+            $this->payoutLedgerService->markPayoutLedgerEntriesWithdrawn((int) $payout->id);
+
             return $this->payoutRepository->find($payout->id);
         });
 
-        $this->eventDispatcher->dispatch(new PayoutFailedEvent($payout, $adminId, $payout->user_id));
+        $this->eventDispatcher->dispatch(
+            new PayoutProcessedEvent($payout, $adminId, $payout->user_id)
+        );
 
         $contributor = $this->userRepository->find($payout->user_id);
         if ($contributor) {
@@ -331,5 +376,18 @@ class PayoutService
         }
 
         return $payout;
+    }
+
+    private function makePayoutIdempotencyKey(
+        int $userId,
+        int $siteId,
+        ?int $batchId = null,
+        ?int $accrualWindowId = null,
+    ): string {
+        if ($batchId !== null && $accrualWindowId !== null) {
+            return "payout:user:{$userId}:site:{$siteId}:batch:{$batchId}:window:{$accrualWindowId}";
+        }
+
+        return 'payout:user:' . $userId . ':site:' . $siteId . ':manual:' . date('YmdHis');
     }
 }

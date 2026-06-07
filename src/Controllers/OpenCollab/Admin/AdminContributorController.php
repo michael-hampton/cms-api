@@ -348,7 +348,12 @@ class AdminContributorController extends Controller
     private function formatProfile(int $userId): array
     {
         if ($userId <= 0) {
-            return ['sample_links' => []];
+            return [
+                'sample_links' => [],
+                'tax_classification' => null,
+                'vat_number' => null,
+                'tax_country' => null,
+            ];
         }
 
         $profile = ContributorProfile::where('user_id', $userId)
@@ -359,6 +364,11 @@ class AdminContributorController extends Controller
             'avatar' => $profile?->avatar,
             'expertise' => $profile?->expertise_array ?? [],
             'sample_links' => $profile?->sample_links ?? [],
+
+            // Ticket 11 — finance/tax visibility
+            'tax_classification' => $profile?->tax_classification,
+            'vat_number' => $profile?->vat_number,
+            'tax_country' => $profile?->tax_country,
         ];
     }
 
@@ -389,5 +399,70 @@ class AdminContributorController extends Controller
         }
 
         return $this->successResponse($granted ? 'Capability granted.' : 'Capability denied.');
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/tax
+     *
+     * Body:
+     * {
+     *   "tax_classification": "uk_vat_registered|uk_non_registered|us|other|null",
+     *   "vat_number": "GB123456789|null",
+     *   "tax_country": "GB|null"
+     * }
+     */
+    public function updateTax(Request $request, int $id): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        $classification = $request->get('tax_classification');
+        $vatNumber = trim((string) $request->get('vat_number', ''));
+        $taxCountry = strtoupper(trim((string) $request->get('tax_country', '')));
+
+        $allowed = [
+            null,
+            '',
+            'uk_vat_registered',
+            'uk_non_registered',
+            'us',
+            'other',
+        ];
+
+        if (!in_array($classification, $allowed, true)) {
+            return $this->errorResponse('Invalid tax classification.', 422, [
+                'tax_classification' => ['Invalid tax classification.'],
+            ]);
+        }
+
+        if ($classification === 'uk_vat_registered' && $vatNumber === '') {
+            return $this->errorResponse('VAT number is required for UK VAT registered contributors.', 422, [
+                'vat_number' => ['VAT number is required for UK VAT registered contributors.'],
+            ]);
+        }
+
+        $profile = ContributorProfile::where('user_id', $id)->first();
+
+        if (!$profile) {
+            $profile = ContributorProfile::create([
+                'user_id' => $id,
+                'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+                'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $profile->tax_classification = $classification ?: null;
+        $profile->vat_number = $vatNumber !== '' ? $vatNumber : null;
+        $profile->tax_country = $taxCountry !== '' ? $taxCountry : null;
+        $profile->updated_at = now_datetime()->format('Y-m-d H:i:s');
+        $profile->save();
+
+        return $this->jsonResponse([
+            'profile' => $this->formatProfile($id),
+            'message' => 'Tax details updated.',
+        ]);
     }
 }
