@@ -362,6 +362,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
 
     // Pages API
     $router->group(['prefix' => '{site}'], function ($router) {
+        $router->get('/auth/me', AuthController::class, 'me');
+
         $router->get('/contact-info', SiteController::class, 'getContactInfo');
 
         $router->post(

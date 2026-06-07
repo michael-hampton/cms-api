@@ -9,12 +9,17 @@ use App\Framework\Authorization\Exceptions\InvalidCredentialsException;
 use App\Framework\Authorization\LoginRequest;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\SiteContext;
+use App\Models\Site;
+use App\Models\UserSite;
 use App\Requests\MemberRegistrationRequest;
+use App\Services\OpenCollab\SitePermissionResolver;
 
 class AuthController extends Controller
 {
     public function __construct(
-        private AuthenticationService $authService
+        private AuthenticationService $authService,
+        private SitePermissionResolver $permissionResolver
     ) {
         parent::__construct();
     }
@@ -41,7 +46,14 @@ class AuthController extends Controller
                 'role' => $response->role,
             ]);
 
-            return $this->jsonResponse($response->toArray(), 200);
+            if (!$this->userCanAccessSite($response->userId, $response->siteId)) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'You do not have access to this site.',
+                ], 403);
+            }
+
+            return $this->jsonResponse($this->withAuthContext($response->toArray(), $response->userId, $response->siteId), 200);
 
         } catch (InvalidCredentialsException $e) {
             return $this->jsonResponse([
@@ -76,14 +88,26 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user;
+        $site = SiteContext::get();
+        $siteId = $site?->id ?? $this->getCurrentSiteId($request);
+
+        if (!$this->userCanAccessSite((int) $user->id, $siteId)) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'You do not have access to this site.',
+            ], 403);
+        }
 
         return $this->jsonResponse([
-            'success' => true,
-            'data' => [
+            'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
+                'site_id' => $siteId,
+                'role' => $user->role ?? null,
             ],
+            'site' => $site ? $this->serializeSite($site) : null,
+            'permissions' => $this->permissionsFor((int) $user->id, $siteId),
         ], 200);
     }
 
@@ -100,8 +124,39 @@ class AuthController extends Controller
 
     private function getCurrentSiteId(Request $request): int
     {
-        // Implement your logic to determine site_id
-        // This could be from subdomain, header, or request parameter
-        return (int) $request->header('X-Site-Id', 1);
+        return SiteContext::getId() ?? (int) $request->header('X-Site-Id', 1);
+    }
+
+    private function withAuthContext(array $payload, int $userId, int $siteId): array
+    {
+        $site = SiteContext::get();
+
+        $payload['permissions'] = $this->permissionsFor($userId, $siteId);
+        $payload['site'] = $site ? $this->serializeSite($site) : null;
+        $payload['user']['permissions'] = $payload['permissions'];
+
+        return $payload;
+    }
+
+    private function permissionsFor(int $userId, int $siteId): array
+    {
+        return $this->permissionResolver->forUser($userId, $siteId);
+    }
+
+    private function userCanAccessSite(int $userId, int $siteId): bool
+    {
+        return UserSite::where('user_id', $userId)
+            ->where('site_id', $siteId)
+            ->first() !== null;
+    }
+
+    private function serializeSite(Site $site): array
+    {
+        return [
+            'id' => (int) $site->id,
+            'name' => $site->name,
+            'slug' => $site->slug,
+            'display_name' => $site->display_name ?? $site->name,
+        ];
     }
 }

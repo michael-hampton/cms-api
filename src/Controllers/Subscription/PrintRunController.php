@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Enums\Subscriptions\PrintRunStatus;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -28,6 +29,8 @@ use App\Resources\PrintRunResource;
  */
 class PrintRunController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly PrintRunRepository      $printRunRepository,
         private readonly IssueDeliveryRepository $issueDeliveryRepository,
@@ -47,6 +50,10 @@ class PrintRunController extends Controller
      */
     public function listByIssue(Request $request, int $issueId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $issueDelivery = $this->issueDeliveryRepository->find($issueId);
 
         if (!$issueDelivery) {
@@ -72,6 +79,10 @@ class PrintRunController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $filters = array_filter([
             'status' => $request->query('status'),
             'issue_delivery_id' => $request->query('issue_id'),
@@ -96,6 +107,10 @@ class PrintRunController extends Controller
 
     public function show(int $printRunId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
@@ -121,6 +136,10 @@ class PrintRunController extends Controller
      */
     public function cancel(int $printRunId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.schedule')) {
+            return $response;
+        }
+
         $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
@@ -157,6 +176,10 @@ class PrintRunController extends Controller
      */
     public function retry(int $printRunId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.schedule')) {
+            return $response;
+        }
+
         $printRun = $this->printRunRepository->find($printRunId);
 
         if (!$printRun) {
@@ -198,6 +221,10 @@ class PrintRunController extends Controller
      */
     public function bulkCancel(Request $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.schedule')) {
+            return $response;
+        }
+
         $ids = $request->input('print_run_ids', []);
 
         if (!is_array($ids) || empty($ids)) {

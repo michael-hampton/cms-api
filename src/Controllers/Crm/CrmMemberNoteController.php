@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
@@ -26,6 +27,8 @@ use Exception;
  */
 class CrmMemberNoteController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly MemberNoteService $noteService,
     )
@@ -39,6 +42,9 @@ class CrmMemberNoteController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.notes.view')) {
+            return $response;
         }
 
         $page = max(1, (int)$request->get('page', 1));
@@ -66,6 +72,9 @@ class CrmMemberNoteController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.notes.create')) {
+            return $response;
         }
 
         try {
@@ -125,6 +134,9 @@ class CrmMemberNoteController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
         }
+        if ($response = $this->requireSitePermission('crm.notes.edit')) {
+            return $response;
+        }
 
         try {
             $data = $request->validated();
@@ -151,6 +163,9 @@ class CrmMemberNoteController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.notes.delete')) {
+            return $response;
         }
 
         try {

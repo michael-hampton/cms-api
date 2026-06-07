@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Actions\Subscriptions\SuspendSubscriptionAction;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
@@ -34,6 +35,8 @@ use App\Services\Subscriptions\SubscriptionStripePlanSyncService;
 
 class CrmSubscriptionController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly SubscriptionRepository          $subscriptionRepository,
         private readonly MemberRepository                $memberRepository,
@@ -72,6 +75,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -113,6 +119,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.edit')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -185,6 +194,10 @@ class CrmSubscriptionController extends Controller
      */
     public function cancelForMember(Request $request, int $memberId, int $subscriptionId): mixed
     {
+        if ($response = $this->requireSitePermission('crm.subscriptions.cancel')) {
+            return $response;
+        }
+
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription || $subscription->member_id !== $memberId) {
@@ -246,6 +259,10 @@ class CrmSubscriptionController extends Controller
 
     public function pauseDeliveryForMember(Request $request, int $memberId, int $subscriptionId): mixed
     {
+        if ($response = $this->requireSitePermission('crm.subscriptions.pause')) {
+            return $response;
+        }
+
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription || $subscription->member_id !== $memberId) {
@@ -263,6 +280,10 @@ class CrmSubscriptionController extends Controller
 
     public function resumeDeliveryForMember(Request $request, int $memberId, int $subscriptionId): mixed
     {
+        if ($response = $this->requireSitePermission('crm.subscriptions.resume')) {
+            return $response;
+        }
+
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription || $subscription->member_id !== $memberId) {
@@ -276,6 +297,10 @@ class CrmSubscriptionController extends Controller
 
     public function reactivateForMember(Request $request, int $memberId, int $subscriptionId): mixed
     {
+        if ($response = $this->requireSitePermission('crm.subscriptions.resume')) {
+            return $response;
+        }
+
         $subscription = $this->subscriptionRepository->find($subscriptionId);
 
         if (!$subscription || $subscription->member_id !== $memberId) {
@@ -313,6 +338,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -397,6 +425,9 @@ class CrmSubscriptionController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
         }
+        if ($response = $this->requireSitePermission('crm.subscriptions.change_plan')) {
+            return $response;
+        }
 
         $siteId  = SiteContext::getId();
         $agentId = (int) Auth::id();
@@ -459,6 +490,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.change_plan')) {
+            return $response;
         }
 
         $siteId  = SiteContext::getId();
@@ -526,6 +560,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -602,6 +639,9 @@ class CrmSubscriptionController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
         }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
 
         $siteId = SiteContext::getId();
         $subscription = $this->subscriptionRepository->find($subscriptionId);
@@ -657,6 +697,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -724,6 +767,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.change_plan')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -796,6 +842,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.resume')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -870,6 +919,9 @@ class CrmSubscriptionController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
         }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
 
         $siteId = SiteContext::getId();
 
@@ -918,6 +970,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.edit')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -1002,6 +1057,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthenticated.', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.pause')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -1116,6 +1174,9 @@ class CrmSubscriptionController extends Controller
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
 
         $siteId = SiteContext::getId();
         $context = $request->input('context', 'all');
@@ -1187,6 +1248,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->resourceResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.refund')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -1289,6 +1353,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->resourceResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.refund')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -1458,6 +1525,9 @@ class CrmSubscriptionController extends Controller
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
+        }
 
         $siteId = SiteContext::getId();
         $plan = $this->planRepository->findWithPricingTiers($planId);
@@ -1474,6 +1544,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.subscriptions.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -1515,6 +1588,9 @@ class CrmSubscriptionController extends Controller
     {
         if (!Auth::check()) {
             return $this->jsonResponse(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+        if ($response = $this->requireSitePermission('crm.members.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();

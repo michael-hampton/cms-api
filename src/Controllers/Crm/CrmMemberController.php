@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
@@ -20,6 +21,8 @@ use InvalidArgumentException;
 
 class CrmMemberController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly CrmMemberRepository              $crmMemberRepository,
         private readonly CrmMemberService                 $crmMemberService,
@@ -45,6 +48,9 @@ class CrmMemberController extends Controller
     {
         if (!Auth::check()) {
             return $this->redirect('/login');
+        }
+        if ($response = $this->requireSitePermission('crm.members.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -104,6 +110,9 @@ class CrmMemberController extends Controller
         if (!Auth::check()) {
             return $this->redirect('/login');
         }
+        if ($response = $this->requireSitePermission('crm.members.view')) {
+            return $response;
+        }
 
         $member = $this->crmMemberRepository->findForSite($id, SiteContext::getId());
 
@@ -158,6 +167,9 @@ class CrmMemberController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
         }
+        if ($response = $this->requireSitePermission('crm.members.create')) {
+            return $response;
+        }
 
         try {
             $data    = $request->validated();
@@ -191,6 +203,9 @@ class CrmMemberController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.members.edit')) {
+            return $response;
         }
 
         try {
@@ -226,6 +241,9 @@ class CrmMemberController extends Controller
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
         }
+        if ($response = $this->requireSitePermission('crm.members.archive')) {
+            return $response;
+        }
 
         try {
             $updated = $this->crmMemberService->updateMember($id, SiteContext::getId(), ['is_active' => false]);
@@ -243,6 +261,9 @@ class CrmMemberController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.members.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Exceptions\Members\MergeConflictException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
@@ -24,6 +25,8 @@ use App\Services\Members\MemberMergeService;
  */
 class CrmDuplicateController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly CrmMemberRepository           $crmMemberRepository,
         private readonly MemberDuplicateDetectionService $duplicateDetectionService,
@@ -42,6 +45,9 @@ class CrmDuplicateController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.duplicates.view')) {
+            return $response;
         }
 
         $member = $this->crmMemberRepository->findForSite($memberId, SiteContext::getId());
@@ -67,6 +73,9 @@ class CrmDuplicateController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.duplicates.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -97,6 +106,9 @@ class CrmDuplicateController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.duplicates.view')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();
@@ -130,6 +142,9 @@ class CrmDuplicateController extends Controller
     {
         if (!Auth::check()) {
             return $this->errorResponse('Unauthorized', 401);
+        }
+        if ($response = $this->requireSitePermission('crm.duplicates.merge')) {
+            return $response;
         }
 
         $siteId = SiteContext::getId();

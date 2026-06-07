@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
@@ -18,6 +19,8 @@ use App\Services\Subscriptions\SubscriptionPlanPricingService;
 
 class SubscriptionPlanPricingController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly SubscriptionPlanPricingService    $pricingService,
         private readonly SubscriptionPlanPricingRepository $pricingRepository
@@ -28,6 +31,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function index(Request $request, ?int $planId = null, string $site = '')
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.view')) {
+            return $response;
+        }
+
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
@@ -47,6 +54,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function store(CreatePricingTierRequest $request, int $planId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.create')) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
 
@@ -84,6 +95,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function update(UpdatePricingTierRequest $request, int $planId, int $pricingId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.edit')) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $data['site_id'] = SiteContext::getId();
@@ -112,6 +127,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function destroy(int $planId, int $pricingId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.delete')) {
+            return $response;
+        }
+
         try {
             $this->pricingService->deletePricingTier($pricingId);
 
@@ -135,6 +154,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function setDefault(int $planId, int $pricingId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.edit')) {
+            return $response;
+        }
+
         try {
             $this->pricingService->setAsDefault($pricingId);
 
@@ -158,6 +181,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function toggleActive(int $planId, int $pricingId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.edit')) {
+            return $response;
+        }
+
         try {
             $this->pricingService->toggleActive($pricingId);
 
@@ -181,6 +208,10 @@ class SubscriptionPlanPricingController extends Controller
 
     public function updateSortOrder(Request $request, int $planId)
     {
+        if ($response = $this->requireSitePermission('subscription_pricing.edit')) {
+            return $response;
+        }
+
         $data = $request->all();
 
         try {

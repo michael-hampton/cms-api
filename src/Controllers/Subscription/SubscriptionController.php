@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Actions\SubscriptionPlan\BulkTogglePlanActive;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Controllers\Controller;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\Request;
@@ -25,6 +26,8 @@ use Exception;
 
 class SubscriptionController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly SubscriptionRepository     $subscriptionRepository,
         private readonly PaymentRepository          $paymentRepository,
@@ -37,6 +40,10 @@ class SubscriptionController extends Controller
 
     public function index()
     {
+        if ($response = $this->requireSitePermission('subscriptions.view')) {
+            return $response;
+        }
+
         try {
             $subscriptions = Subscription::with(['member', 'plan'])->orderBy('created_at', 'desc')->paginate(10);
 
@@ -50,6 +57,10 @@ class SubscriptionController extends Controller
 
     public function payments(Request $request, string $site)
     {
+        if ($response = $this->requireSitePermission('subscriptions.view_history')) {
+            return $response;
+        }
+
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->paymentRepository->search($criteria);
@@ -64,6 +75,10 @@ class SubscriptionController extends Controller
 
     public function plans(Request $request, string $site)
     {
+        if ($response = $this->requireSitePermission('subscription_plans.view')) {
+            return $response;
+        }
+
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $site);
 
@@ -80,6 +95,10 @@ class SubscriptionController extends Controller
 
     public function createPlan(CreateSubscriptionPlanRequest $request)
     {
+        if ($response = $this->requireSitePermission('subscription_plans.create')) {
+            return $response;
+        }
+
         $siteId = SiteContext::getId();
 
         try {
@@ -127,6 +146,10 @@ class SubscriptionController extends Controller
 
     public function updatePlan(UpdateSubscriptionPlanRequest $request, int $id)
     {
+        if ($response = $this->requireSitePermission('subscription_plans.edit')) {
+            return $response;
+        }
+
         try {
             $siteId = SiteContext::getId();
             $data = $request->validated();
@@ -172,6 +195,10 @@ class SubscriptionController extends Controller
 
     public function deletePlan(Request $request, int $id)
     {
+        if ($response = $this->requireSitePermission('subscription_plans.archive')) {
+            return $response;
+        }
+
         try {
             $success = $this->planService->deletePlan($id);
 
@@ -198,6 +225,10 @@ class SubscriptionController extends Controller
 
     public function bulkToggleActive(BulkToggleActiveRequest $request)
     {
+        if ($response = $this->requireSitePermission('subscription_plans.edit')) {
+            return $response;
+        }
+
         try {
             $planIds = $request->get('plan_ids', []);
             $active = (bool)$request->get('active');

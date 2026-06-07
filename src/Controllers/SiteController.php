@@ -3,28 +3,50 @@
 namespace App\Controllers;
 
 use App\Framework\Exceptions\ValidationException;
+use App\Framework\Authorization\AuthenticationService;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Site;
+use App\Models\User;
 use App\Requests\CreateSiteRequest;
 use App\Requests\UpdateContactInfoRequest;
 use App\Requests\UpdateSiteRequest;
 use App\Requests\UpdateSocialMediaRequest;
+use App\Repositories\OpenCollab\RbacRepository;
 use App\Services\Cms\SiteService;
 
 class SiteController extends Controller
 {
     private SiteService $siteService;
 
-    public function __construct(SiteService $siteService)
-    {
+    public function __construct(
+        SiteService $siteService,
+        private AuthenticationService $authService,
+        private RbacRepository $rbacRepository
+    ) {
         $this->siteService = $siteService;
 
         parent::__construct();
     }
 
-    public function index()
+    public function index(Request $request)
     {
         try {
+            $userId = $this->authenticatedUserId($request);
+
+            if ($userId !== null) {
+                $siteIds = array_map(
+                    fn(array $assignment) => (int) $assignment['site_id'],
+                    $this->rbacRepository->activeSiteAssignmentsForUser($userId)
+                );
+
+                return $this->jsonResponse(
+                    $siteIds === []
+                        ? []
+                        : Site::whereIn('id', $siteIds)->where('is_active', 1)->orderBy('name')->get()->toArray()
+                );
+            }
+
             $sites = $this->siteService->getAllSites();
             return $this->jsonResponse($sites);
         } catch (\Exception $e) {
@@ -317,5 +339,22 @@ class SiteController extends Controller
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    private function authenticatedUserId(Request $request): ?int
+    {
+        $header = $request->header('Authorization', '');
+
+        if (!preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
+            return null;
+        }
+
+        $token = $this->authService->validateAccessToken($matches[1], SiteContext::getId() ?? 1);
+
+        if (!$token || $token->getTokenableType() !== User::class) {
+            return null;
+        }
+
+        return $token->getTokenableId();
     }
 }

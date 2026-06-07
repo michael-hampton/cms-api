@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -15,6 +16,8 @@ use Exception;
 
 class CrmManualPaymentController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly ManualPaymentService    $manualPaymentService,
         private readonly PaymentRepository $manualPaymentRepository,
@@ -27,6 +30,10 @@ class CrmManualPaymentController extends Controller
      */
     public function index(int $memberId, Request $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.payment_methods.view')) {
+            return $response;
+        }
+
         try {
             $siteId  = SiteContext::getId();
             $page    = (int) $request->query('page', 1);
@@ -58,6 +65,10 @@ class CrmManualPaymentController extends Controller
      */
     public function store(int $memberId, CreateManualPaymentRequest $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.payment_methods.manage')) {
+            return $response;
+        }
+
         try {
             $data      = $request->validated();
             $siteId    = SiteContext::getId();
@@ -81,6 +92,10 @@ class CrmManualPaymentController extends Controller
      */
     public function destroy(int $memberId, int $id): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.payment_methods.manage')) {
+            return $response;
+        }
+
         try {
             $this->manualPaymentService->delete($id, $memberId);
             return $this->successResponse('Manual payment deleted.');

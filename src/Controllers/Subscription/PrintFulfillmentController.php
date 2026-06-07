@@ -3,6 +3,7 @@
 namespace App\Controllers\Subscription;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Enums\Subscriptions\PrintFulfillmentStatus;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -28,6 +29,8 @@ use Exception;
  */
 class PrintFulfillmentController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly PrintFulfillmentRepository $fulfillmentRepository,
         private readonly PrintBatchRepository       $batchRepository,
@@ -52,6 +55,10 @@ class PrintFulfillmentController extends Controller
      */
     public function index(Request $request, string $site): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         try {
             $criteria = SearchCriteriaParser::fromRequest($request, $site);
             $result = $this->fulfillmentRepository->search($criteria);
@@ -73,6 +80,10 @@ class PrintFulfillmentController extends Controller
      */
     public function show(int $fulfillmentId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['batch', 'subscription', 'batch.issueDelivery', 'issuesDelivered']);
 
         if (!$fulfillment) {
@@ -96,6 +107,10 @@ class PrintFulfillmentController extends Controller
      */
     public function listByBatch(Request $request, int $batchId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $batch = $this->batchRepository->find($batchId);
 
         if (!$batch) {
@@ -139,6 +154,10 @@ class PrintFulfillmentController extends Controller
      */
     public function updateTracking(Request $request, int $fulfillmentId): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.mark_delivered')) {
+            return $response;
+        }
+
         $fulfillment = $this->fulfillmentRepository->find($fulfillmentId, ['subscription', 'batch', 'batch.issueDelivery', 'issuesDelivered']);
 
         if (!$fulfillment) {

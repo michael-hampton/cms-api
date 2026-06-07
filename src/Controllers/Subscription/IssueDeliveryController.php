@@ -4,6 +4,7 @@ namespace App\Controllers\Subscription;
 
 use App\Actions\Subscriptions\ExportIssueSchedulesAction;
 use App\Actions\Subscriptions\ImportIssueSchedulesAction;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Controllers\Controller;
 use App\Enums\Subscriptions\IssueScheduleStatus;
 use App\Framework\Exceptions\ValidationException;
@@ -21,6 +22,8 @@ use Exception;
 
 class IssueDeliveryController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly IssueDeliveryService       $issueDeliveryService,
         private readonly IssueDeliveryRepository    $issueDeliveryRepository,
@@ -32,6 +35,10 @@ class IssueDeliveryController extends Controller
 
     public function index(Request $request, string $site): JsonResponse
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         try {
             $criteria   = SearchCriteriaParser::fromRequest($request, $site);
             $result     = $this->issueDeliveryRepository->search($criteria);
@@ -45,6 +52,10 @@ class IssueDeliveryController extends Controller
 
     public function show(int $id)
     {
+        if ($response = $this->requireSitePermission('issues.view')) {
+            return $response;
+        }
+
         $schedule = $this->issueDeliveryRepository->find($id);
 
         if (!$schedule) {
@@ -59,6 +70,10 @@ class IssueDeliveryController extends Controller
 
     public function store(StoreIssueDeliveryRequest $request)
     {
+        if ($response = $this->requireSitePermission('issues.create')) {
+            return $response;
+        }
+
         try {
             $siteId = SiteContext::getId();
             $data   = $request->validated();
@@ -98,6 +113,10 @@ class IssueDeliveryController extends Controller
 
     public function update(UpdateIssueDeliveryRequest $request, int $id)
     {
+        if ($response = $this->requireSitePermission('issues.edit')) {
+            return $response;
+        }
+
         try {
             $data = $request->validated();
             $data['promotion_id'] = $data['promotion_id'] ?: null;
@@ -150,6 +169,10 @@ class IssueDeliveryController extends Controller
 
     public function destroy(int $id)
     {
+        if ($response = $this->requireSitePermission('issues.archive')) {
+            return $response;
+        }
+
         try {
             // Remove the cover image from disk before deleting the record
             $schedule = $this->issueDeliveryRepository->find($id);
@@ -173,6 +196,10 @@ class IssueDeliveryController extends Controller
 
     public function updateStatus(Request $request, int $id)
     {
+        if ($response = $this->requireSitePermission('issues.schedule')) {
+            return $response;
+        }
+
         $data = $request->all();
 
         try {
@@ -199,6 +226,10 @@ class IssueDeliveryController extends Controller
 
     public function importCsv(Request $request)
     {
+        if ($response = $this->requireSitePermission('issues.create')) {
+            return $response;
+        }
+
         $siteId = SiteContext::getId();
 
         if (!$request->hasFile('csv_file')) {
@@ -228,6 +259,10 @@ class IssueDeliveryController extends Controller
 
     public function exportCsv()
     {
+        if ($response = $this->requireSitePermission('issues.export')) {
+            return $response;
+        }
+
         $siteId = SiteContext::getId();
 
         try {

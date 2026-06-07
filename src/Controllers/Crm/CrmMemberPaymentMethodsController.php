@@ -3,11 +3,14 @@
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Repositories\Members\MemberRepository;
 use App\Services\Billing\Stripe\StripeCustomerPaymentMethodService;
 
 class CrmMemberPaymentMethodsController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly MemberRepository       $memberRepository,
         private readonly StripeCustomerPaymentMethodService $paymentMethodService,
@@ -18,6 +21,10 @@ class CrmMemberPaymentMethodsController extends Controller
 
     public function index(int $memberId): mixed
     {
+        if ($response = $this->requireSitePermission('crm.payment_methods.view')) {
+            return $response;
+        }
+
         $member = $this->memberRepository->find($memberId);
 
         if (!$member) {

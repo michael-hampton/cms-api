@@ -3,6 +3,7 @@
 namespace App\Controllers\Crm;
 
 use App\Controllers\Controller;
+use App\Controllers\Concerns\RequiresSitePermission;
 use App\Enums\AttachmentableType;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
@@ -14,6 +15,8 @@ use Exception;
 
 class CrmAttachmentController extends Controller
 {
+    use RequiresSitePermission;
+
     public function __construct(
         private readonly AttachmentService    $attachmentService,
         private readonly AttachmentRepository $attachmentRepository,
@@ -27,6 +30,10 @@ class CrmAttachmentController extends Controller
      */
     public function index(int $memberId, Request $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.attachments.view')) {
+            return $response;
+        }
+
         try {
             $siteId     = SiteContext::getId();
             $entityType = $request->query('entity_type');
@@ -57,6 +64,10 @@ class CrmAttachmentController extends Controller
      */
     public function store(int $memberId, Request $request): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.attachments.upload')) {
+            return $response;
+        }
+
         try {
             $siteId = SiteContext::getId();
 
@@ -97,6 +108,10 @@ class CrmAttachmentController extends Controller
      */
     public function destroy(int $memberId, int $id): JsonResponse
     {
+        if ($response = $this->requireSitePermission('crm.attachments.delete')) {
+            return $response;
+        }
+
         try {
             $this->attachmentService->delete($id, $memberId);
             return $this->successResponse('Attachment deleted.');
