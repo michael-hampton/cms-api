@@ -658,11 +658,8 @@ class PageService
 
         $allowed = [
             'free',
-            'private',
-            'members',
-            'paid',
-            'password',
-            'internal',
+            'member',
+            'premium'
         ];
 
         return in_array($value, $allowed, true)

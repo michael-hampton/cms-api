@@ -20,14 +20,14 @@ class ContributorPolicyService implements ContributorPolicy
 {
     /**
      * Steps that block publishing and submission.
-     * Payment is intentionally excluded — a contributor can publish without payout details.
+     * Payment/KYC are intentionally excluded — a contributor can publish without payout details.
      */
     private const PUBLISH_BLOCKING_STEPS = ['profile', 'contract', 'guidelines'];
 
     /**
-     * All steps block withdrawal — including payment setup.
+     * All financial/onboarding steps block withdrawal — including payment setup and KYC.
      */
-    private const WITHDRAW_BLOCKING_STEPS = ['profile', 'payment', 'contract', 'guidelines'];
+    private const WITHDRAW_BLOCKING_STEPS = ['profile', 'payment_setup', 'kyc_verification', 'contract', 'guidelines', 'age_verification'];
 
     public function __construct(
         private readonly ContributorOnboardingService $onboarding,

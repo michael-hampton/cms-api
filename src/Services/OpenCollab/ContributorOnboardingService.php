@@ -59,6 +59,7 @@ class ContributorOnboardingService
      */
     public function completeStep(int $userId, Site $site, string $step, ?array $meta = null): void
     {
+        $step = $this->normalizeStep($step);
         $this->assertStepKnown($step);
 
         $req        = $this->mapSiteToRequirements($site);
@@ -88,6 +89,7 @@ class ContributorOnboardingService
 
     public function markStepInProgress(int $userId, Site $site, string $step): void
     {
+        $step = $this->normalizeStep($step);
         $this->assertStepKnown($step);
 
         $req        = $this->mapSiteToRequirements($site);
@@ -104,12 +106,14 @@ class ContributorOnboardingService
 
     public function invalidateStep(int $userId, int $siteId, string $step): void
     {
+        $step = $this->normalizeStep($step);
         $this->assertStepKnown($step);
         $this->onboardingStepRepository->markInvalidated($userId, $siteId, $step);
     }
 
     public function invalidateStepForAllContributors(int $siteId, string $step): int
     {
+        $step = $this->normalizeStep($step);
         $this->assertStepKnown($step);
         return $this->onboardingStepRepository->bulkInvalidateCompletedStep($siteId, $step);
     }
@@ -235,6 +239,23 @@ class ContributorOnboardingService
         ];
     }
 
+    public function completeKycVerificationStep(int $userId, Site $site): array
+    {
+        try {
+            $this->completeStep($userId, $site, 'kyc_verification');
+        } catch (\InvalidArgumentException|\RuntimeException $e) {
+            return [
+                'ok'     => false,
+                'errors' => ['kyc_verification' => [$e->getMessage()]],
+            ];
+        }
+
+        return [
+            'ok'     => true,
+            'status' => $this->statusPayload($userId, $site),
+        ];
+    }
+
     public function statusPayload(int $userId, Site $site): array
     {
         $pending   = $this->pendingSteps($userId, $site);
@@ -275,7 +296,7 @@ class ContributorOnboardingService
         $steps = ['profile'];
 
         if ($req->requirePaymentSetup) {
-            $steps[] = 'payment';
+            $steps[] = 'payment_setup';
         }
 
         if ($req->requireKycVerification) {
@@ -371,7 +392,7 @@ class ContributorOnboardingService
     {
         return match ($step) {
             'profile'          => $this->checkProfileDomain($userId, $req),
-            'payment'    => $this->checkPaymentDomain($userId),
+            'payment_setup'    => $this->checkPaymentDomain($userId),
             'kyc_verification' => $this->checkKycDomain($userId, $req),
             'contract'         => $this->checkContractDomain($userId, $req),
             'guidelines'       => $this->checkGuidelinesDomain($userId, $req),
@@ -567,5 +588,13 @@ class ContributorOnboardingService
                 . implode(', ', OnboardingStepStatus::STEPS) . '.'
             );
         }
+    }
+
+    private function normalizeStep(string $step): string
+    {
+        return match ($step) {
+            'payment' => 'payment_setup',
+            default => $step,
+        };
     }
 }

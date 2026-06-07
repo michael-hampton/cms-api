@@ -78,6 +78,23 @@
 
             <div class="oc-toggle-row">
                 <div class="oc-toggle-row__body">
+                    <span class="oc-toggle-row__label">Require KYC verification</span>
+                    <span class="oc-toggle-row__description">
+                        Contributors must have a verified Stripe Connect account before requesting payouts.
+                    </span>
+                </div>
+                <label class="oc-toggle" aria-label="Require KYC verification">
+                    <input
+                            type="checkbox"
+                            name="require_kyc_verification"
+                            value="1"
+                            <?= ($currentSite->require_kyc_verification ?? false) ? 'checked' : '' ?>>
+                    <span class="oc-toggle__track"></span>
+                </label>
+            </div>
+
+            <div class="oc-toggle-row">
+                <div class="oc-toggle-row__body">
                     <span class="oc-toggle-row__label">Require signed contract</span>
                     <span class="oc-toggle-row__description">
                         Contributors must sign the active contract before submitting.
@@ -713,6 +730,7 @@
             return {
                 guidelines_version: fd.get('guidelines_version') || null,
                 require_payment_setup: fd.has('require_payment_setup'),
+                require_kyc_verification: fd.has('require_kyc_verification'),
                 require_contracts: fd.has('require_contracts'),
                 require_guidelines_ack: fd.has('require_guidelines_ack'),
                 require_age_verification: fd.has('require_age_verification'),

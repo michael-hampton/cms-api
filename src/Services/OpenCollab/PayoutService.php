@@ -87,7 +87,7 @@ class PayoutService
 
         $payout = $this->database->transaction(function () use ($userId, $siteId, $method): Model {
             $settled = $this->creatorBalanceService->settledBalance($userId, $siteId);
-            $inFlight = $this->payoutRepository->totalInFlightForContributor($userId);
+            $inFlight = $this->payoutRepository->totalInFlightForContributor($userId, $siteId);
 
             if ($inFlight > 0) {
                 throw new \RuntimeException(
@@ -96,6 +96,20 @@ class PayoutService
             }
 
             $grossAvailable = max(0, $settled - $inFlight);
+
+            if ($grossAvailable < self::MINIMUM_PAYOUT_PENCE) {
+                throw new \InvalidArgumentException(
+                    "Minimum payout is £" . number_format(self::MINIMUM_PAYOUT_PENCE / 100, 2) .
+                    ". Current available balance: £" . number_format($grossAvailable / 100, 2) . "."
+                );
+            }
+
+            $stateKey = $this->makeManualPayoutStateKey($userId, $siteId);
+            $existing = $this->payoutRepository->findByIdempotencyKey($stateKey);
+
+            if ($existing && $existing->status !== PayoutStatus::Rejected->value) {
+                return $existing;
+            }
 
             $setOff = $this->setOffService->apply($userId, $siteId, $grossAvailable);
             $available = $setOff->netAmount;
@@ -107,19 +121,6 @@ class PayoutService
                 );
             }
 
-            $idempotencyKey = $this->makePayoutIdempotencyKey(
-                userId: $userId,
-                siteId: $siteId,
-                batchId: null,
-                accrualWindowId: null,
-            );
-
-            $existing = $this->payoutRepository->findByIdempotencyKey($idempotencyKey);
-
-            if ($existing) {
-                return $existing;
-            }
-
             $payout = $this->payoutRepository->createWithIdempotency([
                 'user_id' => $userId,
                 'site_id' => $siteId,
@@ -127,7 +128,7 @@ class PayoutService
                 'currency' => 'GBP',
                 'status' => PayoutStatus::Pending->value,
                 'method' => $method,
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $stateKey,
                 'processing_attempts' => 0,
             ]);
 
@@ -145,7 +146,8 @@ class PayoutService
             $this->payoutLedgerService->attachSettledEntriesToPayout(
                 payoutId: (int) $payout->id,
                 userId: $userId,
-                amountToAttach: $available,
+                amountToAttach: $grossAvailable,
+                siteId: $siteId,
             );
 
             return $payout;
@@ -162,6 +164,21 @@ class PayoutService
         }
 
         return $payout;
+    }
+
+    private function makeManualPayoutStateKey(int $userId, int $siteId): string
+    {
+        $entryIds = $this->ledgerRepository
+            ->settledAvailableForPayout($userId, $siteId)
+            ->map(fn($entry) => (int)$entry->id)
+            ->toArray();
+
+        return sprintf(
+            'payout:user:%d:site:%d:manual:%s',
+            $userId,
+            $siteId,
+            sha1(implode(',', $entryIds)),
+        );
     }
 
     /**

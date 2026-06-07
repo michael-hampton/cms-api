@@ -10,6 +10,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Requests\OpenCollab\InitiatePaymentRequest;
+use App\Services\OpenCollab\ArticleAccessService;
 use App\Services\OpenCollab\ArticlePaymentService;
 
 class ArticlePaymentController extends Controller
@@ -17,6 +18,7 @@ class ArticlePaymentController extends Controller
     public function __construct(
         private readonly ArticlePaymentService $paymentService,
         private readonly PageRepository        $pageRepository,
+        private readonly ArticleAccessService $articleAccessService,
     )
     {
         parent::__construct();
@@ -42,6 +44,12 @@ class ArticlePaymentController extends Controller
                 userId: Auth::id(), // null for unauthenticated guests
                 email: $data['email'],
             );
+
+
+            // try with http://localhost:5001/guitar-world/test-55
+            if(!empty($result['payment']->stripe_payment_intent_id)) { //todo this will is tmporary and will be covered by webhook
+                $this->articleAccessService->grantAccessFromPayment($result['payment']->stripe_payment_intent_id);
+            }
 
             return $this->jsonResponse([
                 'client_secret' => $result['client_secret'],

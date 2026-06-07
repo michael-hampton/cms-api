@@ -22,7 +22,7 @@ class CreatorBalanceServiceTest extends TestCase
     {
         $this->ledgerRepository
             ->shouldReceive('balancesByStatusForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn([
                 AccrualStatus::Estimated->value => 1000,
@@ -40,7 +40,7 @@ class CreatorBalanceServiceTest extends TestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(1000);
 
@@ -75,7 +75,7 @@ class CreatorBalanceServiceTest extends TestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->andReturn(1500);
 
         $this->assertSame(6000, $this->service->availableToWithdraw(7, 1));

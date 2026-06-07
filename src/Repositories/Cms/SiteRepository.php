@@ -97,4 +97,22 @@ class SiteRepository
 
         return $query->exists();
     }
+
+    /**
+     * @return array<int, Site>
+     */
+    public function findSitesForContributor(int $userId): array
+    {
+        $siteIds = \App\Models\UserSite::where('user_id', $userId)
+            ->get()
+            ->pluck('site_id')
+            ->map(fn($id) => (int)$id)
+            ->toArray();
+
+        if (empty($siteIds)) {
+            return [];
+        }
+
+        return Site::whereIn('id', $siteIds)->get()->all();
+    }
 }

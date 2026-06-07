@@ -21,11 +21,11 @@ use App\Models\Site;
 final class OnboardingPageViewModel
 {
     /** Canonical display order — do not reorder. */
-    private const STEP_ORDER = ['profile', 'payment', 'contract', 'guidelines', 'age_verification'];
+    private const STEP_ORDER = ['profile', 'payment_setup', 'contract', 'guidelines', 'age_verification'];
 
     private const STEP_LABELS = [
         'profile' => 'Profile',
-        'payment' => 'Payment',
+        'payment_setup' => 'Payment',
         'contract' => 'Contract',
         'guidelines' => 'Guidelines',
         'age_verification' => 'Age Verification',
@@ -33,7 +33,7 @@ final class OnboardingPageViewModel
 
     private const STEP_TITLES = [
         'profile' => 'Set up your profile',
-        'payment' => 'Payment details',
+        'payment_setup' => 'Payment details',
         'contract' => 'Sign the contract',
         'guidelines' => 'Brand guidelines',
         'age_verification' => 'Verify your age',
@@ -41,7 +41,7 @@ final class OnboardingPageViewModel
 
     private const STEP_ICONS = [
         'profile' => '<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>',
-        'payment' => '<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>',
+        'payment_setup' => '<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>',
         'contract' => '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>',
         'guidelines' => '<path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>',
         'age_verification' => '<path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>',
@@ -83,7 +83,7 @@ final class OnboardingPageViewModel
         return array_values(array_filter(
             self::STEP_ORDER,
             fn(string $step) => match ($step) {
-                'payment' => (bool)($this->site->require_payment_setup ?? true),
+                'payment_setup' => (bool)($this->site->require_payment_setup ?? true),
                 'contract' => (bool)($this->site->require_contracts ?? true),
                 'guidelines' => (bool)($this->site->require_guidelines_ack ?? true),
                 'age_verification' => (bool)($this->site->require_age_verification ?? true),

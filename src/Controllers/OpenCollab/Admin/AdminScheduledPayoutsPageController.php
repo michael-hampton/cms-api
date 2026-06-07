@@ -7,6 +7,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\PaymentTermsService;
 
 /**

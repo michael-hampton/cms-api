@@ -291,19 +291,29 @@ $pageClass = 'oc-page--wide';
 
         async #loadPayouts() {
             this.#showState('loading');
+
             try {
                 const res = await fetch(`/api/${this.#site}/open-collab/payouts`, {
-                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
+                    headers: {
+                        Authorization: `Bearer ${this.#token()}`,
+                        Accept: 'application/json'
+                    },
                 });
+
                 if (!res.ok) {
                     this.#showState('error');
                     return;
                 }
+
                 const data = await res.json();
-                this.#state.all = Array.isArray(data) ? data : (data.data ?? []);
-                document.getElementById('stat-total').textContent = this.#state.all.length;
+
+                this.#state.all = Array.isArray(data)
+                    ? data
+                    : (data.data ?? []);
+
                 this.#render();
-            } catch {
+            } catch (e) {
+                console.log('e', e);
                 this.#showState('error');
             }
         }

@@ -35,6 +35,7 @@ use App\Events\Members\PageViewedByMember;
 use App\Events\Members\RewardClaimedByMember;
 use App\Events\OpenCollab\ArticleApprovedEvent;
 use App\Events\OpenCollab\ArticleNeedsChangesEvent;
+use App\Events\OpenCollab\ArticlePurchasedEvent;
 use App\Events\OpenCollab\ArticleRejectedEvent;
 use App\Events\OpenCollab\ContractPublishedEvent;
 use App\Events\OpenCollab\DisputeRaisedEvent;
@@ -119,6 +120,7 @@ use App\Listeners\Members\SendAccountActivationEmailListener;
 use App\Listeners\Members\SyncMemberToStripeJob;
 use App\Listeners\Members\SyncMemberToStripeListener;
 use App\Listeners\OpenCollab\InvalidateContributorOnboardingListener;
+use App\Listeners\OpenCollab\RecordSaleToEarningsLedger;
 use App\Listeners\OpenCollab\SendArticleApprovedNotification;
 use App\Listeners\OpenCollab\SendArticleNeedsChangesNotification;
 use App\Listeners\OpenCollab\SendArticleRejectedNotification;
@@ -866,6 +868,7 @@ class ApiApplication
         $eventDispatcher->listen(PaymentFailed::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentFailed']);
         $eventDispatcher->listen(PaymentRefunded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentRefunded']);
         $eventDispatcher->listen(MemberDetailsChanged::class, [SyncMemberToStripeListener::class, 'handle']);
+        $eventDispatcher->listen(ArticlePurchasedEvent::class, [RecordSaleToEarningsLedger::class, 'handle']);
 
     }
 }

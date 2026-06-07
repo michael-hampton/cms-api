@@ -85,7 +85,7 @@ class ContributorPolicyServiceTest extends FunctionalTestCase
         $site = $this->makeSite();
 
         $this->onboarding->shouldReceive('pendingSteps')->with(1, $site)->once()->andReturn([
-            ['step' => 'payment', 'reason' => 'Payment details missing.', 'meta' => []],
+            ['step' => 'payment_setup', 'reason' => 'Payment details missing.', 'meta' => []],
         ]);
 
         $this->assertTrue($this->service->canPublishArticle(1, $site));
@@ -120,7 +120,7 @@ class ContributorPolicyServiceTest extends FunctionalTestCase
         $site = $this->makeSite();
 
         $this->onboarding->shouldReceive('pendingSteps')->with(1, $site)->once()->andReturn([
-            ['step' => 'payment', 'reason' => 'Payment missing.', 'meta' => []],
+            ['step' => 'payment_setup', 'reason' => 'Payment missing.', 'meta' => []],
         ]);
 
         $this->assertTrue($this->service->canSubmitForReview(1, $site));
@@ -131,7 +131,7 @@ class ContributorPolicyServiceTest extends FunctionalTestCase
         $site = $this->makeSite();
 
         $this->onboarding->shouldReceive('pendingSteps')->with(1, $site)->once()->andReturn([
-            ['step' => 'payment', 'reason' => 'Payment details missing.', 'meta' => []],
+            ['step' => 'payment_setup', 'reason' => 'Payment details missing.', 'meta' => []],
         ]);
 
         $this->assertFalse($this->service->canWithdraw(1, $site));

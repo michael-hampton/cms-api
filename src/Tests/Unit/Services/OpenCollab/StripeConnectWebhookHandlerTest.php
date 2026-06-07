@@ -8,11 +8,16 @@ use App\Enums\OpenCollab\PayoutStatus;
 use App\Framework\Support\Logger;
 use App\Models\ContributorPayoutAccount;
 use App\Models\Payout;
+use App\Models\Site;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\PayoutLedgerService;
 use App\Services\OpenCollab\StripeConnectWebhookHandler;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
+use Mockery;
 
 class StripeConnectWebhookHandlerTest extends FunctionalTestCase
 {
@@ -115,6 +120,96 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
         $this->assertEquals(PayoutStatus::Paid->value, $fresh->status);
     }
 
+    public function test_account_updated_restricted_invalidates_kyc_and_syncs_onboarding(): void
+    {
+        $user = $this->createUser();
+        ContributorPayoutAccount::create([
+            'user_id' => $user->id,
+            'provider' => 'stripe',
+            'stripe_account_id' => 'acct_restricted',
+            'charges_enabled' => true,
+            'payouts_enabled' => true,
+            'details_submitted' => true,
+            'requirements_due_json' => [],
+        ]);
+
+        $site = new Site([
+            'id' => $this->siteId,
+            'require_kyc_verification' => true,
+        ]);
+        $site->exists = true;
+
+        $onboarding = Mockery::mock(ContributorOnboardingService::class);
+        $onboarding->shouldReceive('invalidateStep')->once()->with($user->id, $this->siteId, 'kyc_verification');
+        $onboarding->shouldReceive('syncStatus')->once()->with($user->id, $site);
+
+        $siteRepository = Mockery::mock(SiteRepository::class);
+        $siteRepository->shouldReceive('findSitesForContributor')->once()->with($user->id)->andReturn([$site]);
+
+        $handler = new StripeConnectWebhookHandler(
+            new ContributorPayoutAccountRepository(),
+            new PayoutRepository(),
+            new Logger(),
+            $onboarding,
+            $siteRepository,
+        );
+
+        $handler->handle((object)[
+            'id' => 'evt_acc_restricted',
+            'type' => 'account.updated',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'acct_restricted',
+                    'charges_enabled' => true,
+                    'payouts_enabled' => false,
+                    'details_submitted' => true,
+                    'requirements' => (object)['currently_due' => ['individual.verification.document']],
+                ],
+            ],
+        ], 'corr_restricted');
+
+        $fresh = ContributorPayoutAccount::where('stripe_account_id', 'acct_restricted')->first();
+        $this->assertFalse((bool)$fresh->payouts_enabled);
+    }
+
+    public function test_payout_paid_marks_linked_ledger_entries_withdrawn(): void
+    {
+        $payout = Payout::create([
+            'user_id' => $this->createUser()->id,
+            'site_id' => $this->siteId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'stripe',
+            'provider_transfer_id' => 'tr_test_withdraw',
+        ]);
+
+        $ledger = Mockery::mock(PayoutLedgerService::class);
+        $ledger->shouldReceive('markPayoutLedgerEntriesWithdrawn')->once()->with((int)$payout->id);
+
+        $handler = new StripeConnectWebhookHandler(
+            new ContributorPayoutAccountRepository(),
+            new PayoutRepository(),
+            new Logger(),
+            null,
+            null,
+            $ledger,
+        );
+
+        $handler->handle((object)[
+            'id' => 'evt_payout_paid_withdraw',
+            'type' => 'payout.paid',
+            'data' => (object)[
+                'object' => (object)[
+                    'id' => 'po_withdraw',
+                    'source_transfer' => 'tr_test_withdraw',
+                ],
+            ],
+        ], 'corr_paid_withdraw');
+
+        $this->assertSame(PayoutStatus::Paid->value, Payout::find($payout->id)->status);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -125,4 +220,3 @@ class StripeConnectWebhookHandlerTest extends FunctionalTestCase
         );
     }
 }
-

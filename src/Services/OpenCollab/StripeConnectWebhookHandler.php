@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutStatus;
+use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Framework\Support\Logger;
+use App\Repositories\Cms\SiteRepository;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 
@@ -15,6 +17,9 @@ class StripeConnectWebhookHandler
         private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
         private readonly PayoutRepository                   $payoutRepository,
         private readonly Logger                             $logger,
+        private readonly ?ContributorOnboardingService      $onboardingService = null,
+        private readonly ?SiteRepository                    $siteRepository = null,
+        private readonly ?PayoutLedgerService               $payoutLedgerService = null,
     )
     {
     }
@@ -63,19 +68,37 @@ class StripeConnectWebhookHandler
             'user_id' => $existing->user_id,
             'payouts_enabled' => $payoutsEnabled,
         ]);
+
+        $status = StripeConnectAccountStatus::fromAccountFields(
+            connected: true,
+            detailsSubmitted: $detailsSubmitted,
+            payoutsEnabled: $payoutsEnabled,
+            requirementsDue: $requirements,
+        );
+
+        $this->syncKycOnboardingAfterAccountUpdate(
+            userId: (int)$existing->user_id,
+            status: $status,
+            correlationId: $correlationId,
+        );
     }
 
     private function handlePayoutPaid(object $event, string $correlationId): void
     {
-        $this->syncPayoutState($event, PayoutStatus::Paid, 'paid', $correlationId);
+        $payout = $this->syncPayoutState($event, PayoutStatus::Paid, 'paid', $correlationId);
+
+        if ($payout) {
+            ($this->payoutLedgerService ?? app(PayoutLedgerService::class))
+                ->markPayoutLedgerEntriesWithdrawn((int)$payout->id);
+        }
     }
 
-    private function syncPayoutState(object $event, PayoutStatus $status, string $providerStatus, string $correlationId): void
+    private function syncPayoutState(object $event, PayoutStatus $status, string $providerStatus, string $correlationId): ?\App\Models\Payout
     {
         $payload = $event->data->object ?? null;
         $transferId = (string)($payload?->source_transfer ?? $payload?->id ?? '');
         if ($transferId === '') {
-            return;
+            return null;
         }
 
         $payout = $this->payoutRepository
@@ -83,7 +106,7 @@ class StripeConnectWebhookHandler
             ->first();
 
         if (!$payout) {
-            return;
+            return null;
         }
 
         $this->payoutRepository->update((int)$payout->id, [
@@ -96,6 +119,38 @@ class StripeConnectWebhookHandler
                 'payout' => (array)$payload,
             ],
         ]);
+
+        return $this->payoutRepository->find((int)$payout->id);
+    }
+
+    private function syncKycOnboardingAfterAccountUpdate(
+        int $userId,
+        StripeConnectAccountStatus $status,
+        string $correlationId,
+    ): void {
+        $onboarding = $this->onboardingService ?? app(ContributorOnboardingService::class);
+        $siteRepository = $this->siteRepository ?? app(SiteRepository::class);
+
+        $sites = $siteRepository->findSitesForContributor($userId);
+
+        foreach ($sites as $site) {
+            if (!(bool)($site->require_kyc_verification ?? false)) {
+                continue;
+            }
+
+            if ($status->blocksKyc()) {
+                $onboarding->invalidateStep($userId, (int)$site->id, 'kyc_verification');
+            }
+
+            $onboarding->syncStatus($userId, $site);
+
+            $this->logger->info('Stripe Connect KYC onboarding status synced.', [
+                'correlation_id' => $correlationId,
+                'user_id' => $userId,
+                'site_id' => (int)$site->id,
+                'stripe_status' => $status->value,
+            ]);
+        }
     }
 
     private function handlePayoutFailed(object $event, string $correlationId): void
@@ -124,4 +179,3 @@ class StripeConnectWebhookHandler
         ]);
     }
 }
-

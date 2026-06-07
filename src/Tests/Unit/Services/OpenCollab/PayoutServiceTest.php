@@ -83,9 +83,15 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
+
+        $this->payoutRepository
+            ->shouldReceive('findByIdempotencyKey')
+            ->once()
+            ->withArgs(fn (string $key): bool => str_starts_with($key, 'payout:user:7:site:1:manual:'))
+            ->andReturn(null);
 
         $this->setOffService
             ->shouldReceive('apply')
@@ -132,7 +138,7 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
@@ -198,8 +204,8 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutLedgerService
             ->shouldReceive('attachSettledEntriesToPayout')
             ->once()
-            ->with(99, 7, 7000)
-            ->andReturn(7000);
+            ->with(99, 7, 10000, 1)
+            ->andReturn(10000);
 
         $this->eventDispatcher
             ->shouldReceive('dispatch')
@@ -236,20 +242,11 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
-        $this->setOffService
-            ->shouldReceive('apply')
-            ->with(7, 1, 4999)
-            ->once()
-            ->andReturn(new SetOffResult(
-                grossAmount: 4999,
-                deductedAmount: 0,
-                netAmount: 4999,
-                deductions: [],
-            ));
+        $this->setOffService->shouldNotReceive('apply');
 
         $this->payoutRepository->shouldNotReceive('findByIdempotencyKey');
         $this->payoutRepository->shouldNotReceive('createWithIdempotency');
@@ -301,7 +298,7 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
@@ -350,7 +347,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutLedgerService
             ->shouldReceive('attachSettledEntriesToPayout')
             ->once()
-            ->with(99, 7, 10000)
+            ->with(99, 7, 10000, 1)
             ->andReturn(10000);
 
         $this->eventDispatcher
@@ -389,20 +386,11 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
-        $this->setOffService
-            ->shouldReceive('apply')
-            ->with(7, 1, 4000)
-            ->once()
-            ->andReturn(new SetOffResult(
-                grossAmount: 4000,
-                deductedAmount: 0,
-                netAmount: 4000,
-                deductions: [],
-            ));
+        $this->setOffService->shouldNotReceive('apply');
 
         $this->payoutRepository->shouldNotReceive('findByIdempotencyKey');
         $this->payoutRepository->shouldNotReceive('createWithIdempotency');
@@ -440,7 +428,7 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(10000);
 
@@ -486,19 +474,11 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
-        $this->setOffService
-            ->shouldReceive('apply')
-            ->once()
-            ->andReturn(new SetOffResult(
-                grossAmount: 7000,
-                deductedAmount: 0,
-                netAmount: 7000,
-                deductions: [],
-            ));
+        $this->setOffService->shouldNotReceive('apply');
 
         $this->payoutRepository
             ->shouldReceive('findByIdempotencyKey')
@@ -580,7 +560,7 @@ class PayoutServiceTest extends FunctionalTestCase
 
         $this->payoutRepository
             ->shouldReceive('totalInFlightForContributor')
-            ->with(7)
+            ->with(7, 1)
             ->once()
             ->andReturn(0);
 
@@ -612,7 +592,7 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->payoutLedgerService
             ->shouldReceive('attachSettledEntriesToPayout')
             ->once()
-            ->with(99, 7, 10000)
+            ->with(99, 7, 10000, 1)
             ->andReturn(10000);
 
         $this->eventDispatcher
@@ -859,6 +839,11 @@ class PayoutServiceTest extends FunctionalTestCase
         $this->setOffService = Mockery::mock(SetOffService::class);
         $this->payoutLedgerService = Mockery::mock(PayoutLedgerService::class);
         $this->payoutLiabilityRecoveryRepository = Mockery::mock(PayoutLiabilityRecoveryRepository::class);
+
+        $this->ledgerRepository
+            ->shouldReceive('settledAvailableForPayout')
+            ->byDefault()
+            ->andReturn(collect([(object)['id' => 1], (object)['id' => 2]]));
 
         $this->service = new PayoutService(
             $this->payoutRepository,

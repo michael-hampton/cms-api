@@ -123,7 +123,6 @@ use App\Middleware\OpenCollab\OnboardingRouteGuard;
 
 // Pages API
 
-
 // Web routes (return Response objects -> HTML)
 $router->get('/', WebPageController::class, 'index');
 $router->get('/pages', WebPageController::class, 'index');

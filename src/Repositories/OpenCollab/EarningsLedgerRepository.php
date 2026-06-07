@@ -249,11 +249,22 @@ class EarningsLedgerRepository extends Repository
      *
      * @return array<string, int>
      */
-    public function balancesByStatusForContributor(int $userId): array
+    public function balancesByStatusForContributor(int $userId, ?int $siteId = null): array
     {
-        $rows = EarningsLedger::where('user_id', $userId)
-            ->selectRaw('accrual_status, COALESCE(SUM(amount), 0) as total')
-            ->groupBy('accrual_status')
+        $table = (new EarningsLedger())->getTable();
+
+        $query = EarningsLedger::query()
+            ->where("{$table}.user_id", $userId);
+
+        if ($siteId !== null) {
+            $query
+                ->join('pages', 'pages.id', '=', "{$table}.article_id")
+                ->where('pages.site_id', $siteId);
+        }
+
+        $rows = $query
+            ->selectRaw("{$table}.accrual_status, COALESCE(SUM({$table}.amount), 0) as total")
+            ->groupBy("{$table}.accrual_status")
             ->get();
 
         $balances = [];
@@ -284,13 +295,25 @@ class EarningsLedgerRepository extends Repository
         return $entry;
     }
 
-    public function settledAvailableForPayout(int $userId): \App\Framework\Support\Collection
+    public function settledAvailableForPayout(int $userId, ?int $siteId = null): \App\Framework\Support\Collection
     {
-        return EarningsLedger::where('user_id', $userId)
-            ->where('accrual_status', AccrualStatus::Settled->value)
-            ->whereNull('payout_id')
-            ->orderBy('earned_at')
-            ->orderBy('id')
+        $table = (new EarningsLedger())->getTable();
+
+        $query = EarningsLedger::query()
+            ->where("{$table}.user_id", $userId)
+            ->where("{$table}.accrual_status", AccrualStatus::Settled->value)
+            ->whereNull("{$table}.payout_id");
+
+        if ($siteId !== null) {
+            $query
+                ->join('pages', 'pages.id', '=', "{$table}.article_id")
+                ->where('pages.site_id', $siteId)
+                ->select("{$table}.*");
+        }
+
+        return $query
+            ->orderBy("{$table}.earned_at")
+            ->orderBy("{$table}.id")
             ->get();
     }
 

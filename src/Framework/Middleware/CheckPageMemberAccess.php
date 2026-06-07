@@ -19,7 +19,7 @@ class CheckPageMemberAccess
     public function handle(Request $request, callable $next): Response
     {
         $response = $next($request);
-        
+
         $page = $request->getAttribute('page');
 
         if (!$page instanceof Page) {

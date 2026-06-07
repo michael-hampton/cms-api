@@ -2,13 +2,14 @@
 
 namespace App\Services\OpenCollab;
 
+use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\Enums\OpenCollab\PaymentStatus;
 use App\Exceptions\OpenCollab\DuplicatePurchaseException;
 use App\Framework\Database\Database;
 use App\Models\Page;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
-use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
+use App\Services\Billing\Stripe\StripePaymentIntentGateway;
 
 /**
  * Handles the payment initiation half of the purchase flow.
@@ -27,10 +28,10 @@ use App\Services\Billing\PaymentProviders\PaymentIntentGateway;
 class ArticlePaymentService
 {
     public function __construct(
-        private readonly ArticlePaymentRepository $paymentRepository,
-        private readonly ArticleAccessRepository  $accessRepository,
-        private readonly Database                 $database,
-        private readonly PaymentIntentGateway     $paymentIntentGateway
+        private readonly ArticlePaymentRepository   $paymentRepository,
+        private readonly ArticleAccessRepository    $accessRepository,
+        private readonly Database                   $database,
+        private readonly StripePaymentIntentGateway $paymentIntentGateway
     )
     {
     }
@@ -53,23 +54,24 @@ class ArticlePaymentService
         $this->guardAgainstDuplicatePurchase($page->id, $userId, $email);
 
         return $this->database->transaction(function () use ($page, $userId, $email): array {
-            $intent = $this->paymentIntentGateway->create([
-                'amount' => $page->price,
-                'currency' => 'gbp',
-                'automatic_payment_methods' => ['enabled' => true],
-                'metadata' => [
-                    'page_id' => $page->id,
-                    'email' => $email,
-                    'user_id' => $userId ?? 'guest',
-                ],
-            ]);
+            $intent = $this->paymentIntentGateway->create( //todo fix test
+                new CreatePaymentIntentDto(
+                    $page->price * 100,
+                    'gbp',
+                    [
+                        'page_id' => $page->id,
+                        'email' => $email,
+                        'user_id' => $userId ?? 'guest',
+                    ]
+                )
+            );
 
             $payment = $this->paymentRepository->create([
                 'site_id' => $page->site_id,
                 'page_id' => $page->id,
                 'user_id' => $userId,
                 'email' => $email,
-                'stripe_payment_intent_id' => $intent->id,
+                'stripe_payment_intent_id' => $intent->paymentIntentId,
                 'status' => PaymentStatus::Pending->value,
                 'amount' => $page->price,
                 'currency' => 'gbp',
@@ -77,7 +79,7 @@ class ArticlePaymentService
 
             return [
                 'payment' => $payment,
-                'client_secret' => $intent->client_secret,
+                'client_secret' => $intent->clientSecret,
             ];
         });
     }

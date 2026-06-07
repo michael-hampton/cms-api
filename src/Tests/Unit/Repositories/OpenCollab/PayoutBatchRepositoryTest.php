@@ -3,6 +3,8 @@
 namespace App\Tests\Unit\Repositories\OpenCollab;
 
 use App\Enums\OpenCollab\PayoutBatchStatus;
+use App\Enums\OpenCollab\PayoutStatus;
+use App\Models\Payout;
 use App\Models\PayoutBatch;
 use App\Repositories\OpenCollab\PayoutBatchRepository;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -78,10 +80,72 @@ class PayoutBatchRepositoryTest extends FunctionalTestCase
         $this->repository->findOrFail(999999);
     }
 
+    public function test_refresh_status_marks_partially_failed_when_children_are_mixed(): void
+    {
+        $batch = PayoutBatch::create([
+            'site_id' => 1,
+            'status' => PayoutBatchStatus::Processing->value,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->createBatchPayout((int)$batch->id, PayoutStatus::Paid);
+        $this->createBatchPayout((int)$batch->id, PayoutStatus::Failed);
+
+        $updated = $this->repository->refreshStatusFromPayouts((int)$batch->id);
+
+        $this->assertSame(PayoutBatchStatus::PartiallyFailed->value, $updated->status);
+    }
+
+    public function test_refresh_status_marks_completed_when_all_children_are_paid(): void
+    {
+        $batch = PayoutBatch::create([
+            'site_id' => 1,
+            'status' => PayoutBatchStatus::Processing->value,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $this->createBatchPayout((int)$batch->id, PayoutStatus::Paid);
+        $this->createBatchPayout((int)$batch->id, PayoutStatus::Paid);
+
+        $updated = $this->repository->refreshStatusFromPayouts((int)$batch->id);
+
+        $this->assertSame(PayoutBatchStatus::Completed->value, $updated->status);
+        $this->assertNotEmpty($updated->completed_at);
+    }
+
+    public function test_mark_cancelled_updates_status(): void
+    {
+        $batch = PayoutBatch::create([
+            'site_id' => 1,
+            'status' => PayoutBatchStatus::Draft->value,
+            'created_at' => now_datetime()->format('Y-m-d H:i:s'),
+            'updated_at' => now_datetime()->format('Y-m-d H:i:s'),
+        ]);
+
+        $updated = $this->repository->markCancelled((int)$batch->id);
+
+        $this->assertSame(PayoutBatchStatus::Cancelled->value, $updated->status);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->repository = new PayoutBatchRepository();
+    }
+
+    private function createBatchPayout(int $batchId, PayoutStatus $status): void
+    {
+        Payout::create([
+            'user_id' => $this->createUser()->id,
+            'site_id' => 1,
+            'batch_id' => $batchId,
+            'amount' => 5000,
+            'currency' => 'GBP',
+            'status' => $status->value,
+            'method' => 'bank_transfer',
+        ]);
     }
 }

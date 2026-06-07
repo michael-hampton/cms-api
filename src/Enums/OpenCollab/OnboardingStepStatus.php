@@ -5,9 +5,9 @@ namespace App\Enums\OpenCollab;
 /**
  * Canonical registry for onboarding step keys and their workflow statuses.
  *
- * STEP KEYS — the only place step names are defined.
- *   Use OnboardingStepStatus::STEPS to get the ordered list.
- *   Never hard-code the strings 'profile', 'contract', etc. elsewhere.
+     * STEP KEYS — the only place step names are defined.
+     *   Use OnboardingStepStatus::STEPS to get the ordered list.
+     *   Never hard-code the strings 'profile', 'contract', etc. elsewhere.
  *
  * STATUSES — stored as plain strings in contributor_onboarding_steps.status.
  *   pending     — not yet started, or reset after invalidation
@@ -37,7 +37,8 @@ enum OnboardingStepStatus: string
     /** All valid step keys, in canonical display order. */
     public const STEPS = [
         'profile',
-        'payment',
+        'payment_setup',
+        'kyc_verification',
         'contract',
         'guidelines',
         'age_verification',
@@ -70,7 +71,7 @@ enum OnboardingStepStatus: string
      */
     public static function stepsInvalidatedByPaymentRevoked(): array
     {
-        return ['payment'];
+        return ['payment_setup', 'kyc_verification'];
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

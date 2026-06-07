@@ -55,14 +55,19 @@ class PayoutRepository extends Repository
      * Total amount in-flight (pending + approved) for a contributor.
      * Used to prevent double-requesting.
      */
-    public function totalInFlightForContributor(int $userId): int
+    public function totalInFlightForContributor(int $userId, ?int $siteId = null): int
     {
-        return (int)Payout::where('user_id', $userId)
+        $query = Payout::where('user_id', $userId)
             ->whereIn('status', [
                 PayoutStatus::Pending->value,
                 PayoutStatus::Approved->value,
-            ])
-            ->sum('amount');
+            ]);
+
+        if ($siteId !== null) {
+            $query->where('site_id', $siteId);
+        }
+
+        return (int)$query->sum('amount');
     }
 
     /**

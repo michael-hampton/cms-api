@@ -34,7 +34,7 @@ use App\Models\Country;
 $member           = $member ?? null;
 $requiresShipping = $requiresShipping ?? false;
 $required         = $requiresShipping;
-$address = $member->addresses->whereIn('type', ['shipping', 'both'])->first();
+$address = $member?->addresses->whereIn('type', ['shipping', 'both'])->first() ?? null;
 
 $prefill = [
         'address'     => $address->address_line_1     ?? '',

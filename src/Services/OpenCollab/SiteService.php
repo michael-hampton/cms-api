@@ -14,9 +14,12 @@ class SiteService
 
     public function updateSiteSettings(int $siteId, array $data): Site
     {
+        $data['require_kyc_verification'] = (bool)($data['require_kyc_verification'] ?? false);
+
         $allowed = [
             'guidelines_version',
             'require_payment_setup',
+            'require_kyc_verification',
             'require_contracts',
             'require_guidelines_ack',
             'require_age_verification',

@@ -18,7 +18,7 @@ class CreatorBalanceService
 
     public function balances(int $userId, int $siteId): array
     {
-        $ledgerBalances = $this->ledgerRepository->balancesByStatusForContributor($userId);
+        $ledgerBalances = $this->ledgerRepository->balancesByStatusForContributor($userId, $siteId);
 
         $estimated = $this->statusAmount($ledgerBalances, AccrualStatus::Estimated);
         $confirmed = $this->statusAmount($ledgerBalances, AccrualStatus::Confirmed);
@@ -27,7 +27,7 @@ class CreatorBalanceService
         $reversed = $this->statusAmount($ledgerBalances, AccrualStatus::Reversed);
 
         $openLiabilities = $this->liabilityRepository->openAmountForContributor($userId, $siteId);
-        $inFlightPayouts = $this->payoutRepository->totalInFlightForContributor($userId);
+        $inFlightPayouts = $this->payoutRepository->totalInFlightForContributor($userId, $siteId);
 
         return [
             'estimated_balance' => $estimated,

@@ -95,7 +95,7 @@ class ContributorProfileRepository extends Repository
             return false;
         }
 
-        return (bool)($account->payouts_enabled || $account->details_submitted);
+        return !empty($account->stripe_account_id);
     }
 
     // ── Age verification ──────────────────────────────────────────────────────

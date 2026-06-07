@@ -1830,6 +1830,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->post('/payment-methods/{paymentMethodId}/default', [OnboardingController::class, 'setDefaultPaymentMethod']);
         $router->delete('/payment-methods/{paymentMethodId}', [OnboardingController::class, 'removePaymentMethod']);
         $router->post('/steps/payment/complete', [OnboardingController::class, 'completePaymentStep']);
+        $router->post('/steps/kyc-verification/complete', [OnboardingController::class, 'completeKycVerificationStep']);
         $router->get('/contract', [OnboardingController::class, 'getContract']);
         $router->post('/contract', [OnboardingController::class, 'signContract']);
         $router->post('/guidelines', [OnboardingController::class, 'acknowledgeGuidelines']);

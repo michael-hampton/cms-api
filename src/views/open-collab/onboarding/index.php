@@ -79,7 +79,7 @@ if ($profile && !empty($profile->expertise)) {
                     <div class="oc-alert oc-alert--info" style="margin-bottom:16px;">
                         <?= htmlspecialchars($vm->currentStepReason()) ?>
                     </div>
-                <?php endif; ?>
+                <?php endif;?>
 
                 <!-- ── PROFILE STEP ─────────────────────────── -->
                 <?php if ($vm->currentStepName() === 'profile'): ?>
@@ -231,7 +231,7 @@ if ($profile && !empty($profile->expertise)) {
                     </form>
 
                     <!-- ── PAYMENT STEP ─────────────────────────── -->
-                <?php elseif ($vm->currentStepName() === 'payment'): ?>
+                <?php elseif ($vm->currentStepName() === 'payment_setup'): ?>
                     <form id="onboarding-form" novalidate>
                         <div class="oc-alert oc-alert--info" style="margin-bottom:20px;">
                             <svg viewBox="0 0 20 20" fill="currentColor" width="16">
@@ -1379,7 +1379,7 @@ if ($profile && !empty($profile->expertise)) {
             switch (name) {
                 case 'profile':
                     return new ProfileStep(site, token);
-                case 'payment':
+                case 'payment_setup':
                     return new PaymentStep(site, token, stripeKey);
                 case 'contract':
                     return new ContractStep(site, token);

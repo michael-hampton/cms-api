@@ -40,8 +40,9 @@ use RuntimeException;
  *   GET  /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/guidelines
- *   POST /api/{site}/open-collab/onboarding/age-verification
- */
+     *   POST /api/{site}/open-collab/onboarding/age-verification
+     *   POST /api/{site}/open-collab/onboarding/steps/kyc-verification/complete
+     */
 class OnboardingController extends Controller
 {
     use AuthorizesSitePermissions;
@@ -258,6 +259,29 @@ class OnboardingController extends Controller
             'onboarding' => $result['status'],
         ]);
     }
+
+    /**
+     * POST /api/{site}/open-collab/onboarding/steps/kyc-verification/complete
+     */
+    public function completeKycVerificationStep(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+            return $response;
+        }
+
+        $site   = $this->currentSite();
+        $result = $this->onboardingService->completeKycVerificationStep(Auth::id(), $site);
+
+        if (!$result['ok']) {
+            return $this->errorResponse('Validation failed', 422, $result['errors']);
+        }
+
+        return $this->jsonResponse([
+            'message'    => 'KYC verification step completed.',
+            'onboarding' => $result['status'],
+        ]);
+    }
+
 
     /**
      * GET /api/{site}/open-collab/onboarding/contract

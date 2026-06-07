@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Enums\OpenCollab\OnboardingStepStatus;
+use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Models\Contract;
 use App\Models\ContributorProfile;
@@ -15,6 +16,7 @@ use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorAgeValidationService;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\StripeConnectAccountService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -123,7 +125,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/not applicable/');
 
-        $this->service->completeStep(1, $site, 'payment');
+        $this->service->completeStep(1, $site, 'payment_setup');
     }
 
     // ── domain validation before marking ─────────────────────────────────────
@@ -150,7 +152,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/domain validation failed/');
 
-        $this->service->completeStep(1, $site, 'payment');
+        $this->service->completeStep(1, $site, 'payment_setup');
     }
 
     public function test_complete_step_throws_when_contract_not_signed(): void
@@ -323,20 +325,20 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->mockStepStatuses(1, $site, [
             'profile' => OnboardingStepStatus::Completed->value,
-            'payment' => OnboardingStepStatus::Completed->value,
+            'payment_setup' => OnboardingStepStatus::Completed->value,
         ]);
 
         $this->stepRepo
             ->shouldReceive('markCompleted')
             ->once()
-            ->with(1, $site->id, 'payment', null);
+            ->with(1, $site->id, 'payment_setup', null);
 
         $this->contributorOnboardingRepository
             ->shouldReceive('syncStatus')
             ->once()
             ->with(1, $site, true);
 
-        $this->service->completeStep(1, $site, 'payment');
+        $this->service->completeStep(1, $site, 'payment_setup');
 
         $this->assertTrue(true);
     }
@@ -605,7 +607,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $profile  = $this->makeProfile();
         $contract = $this->makeContract(['id' => 3, 'version' => 1]);
 
-        foreach (['profile', 'payment', 'contract', 'guidelines', 'age_verification'] as $step) {
+        foreach (['profile', 'payment_setup', 'contract', 'guidelines', 'age_verification'] as $step) {
             $this->stepRepo->shouldReceive('getStatus')
                 ->with(1, $site->id, $step)
                 ->andReturn(OnboardingStepStatus::Completed->value);
@@ -695,7 +697,7 @@ class ContributorOnboardingServiceTest extends TestCase
             ->andReturn(OnboardingStepStatus::Completed->value);
 
         $this->stepRepo->shouldReceive('getStatus')
-            ->with(1, $site->id, 'payment')
+            ->with(1, $site->id, 'payment_setup')
             ->andReturn(OnboardingStepStatus::Completed->value);
 
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
@@ -704,11 +706,11 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->stepRepo->shouldReceive('markInvalidated')
             ->once()
-            ->with(1, $site->id, 'payment');
+            ->with(1, $site->id, 'payment_setup');
 
         $pending = $this->service->pendingSteps(1, $site);
 
-        $paymentStep = collect($pending)->firstWhere('step', 'payment');
+        $paymentStep = collect($pending)->firstWhere('step', 'payment_setup');
         $this->assertNotNull($paymentStep);
         $this->assertSame(OnboardingStepStatus::Invalidated->value, $paymentStep['status']);
     }
@@ -738,6 +740,130 @@ class ContributorOnboardingServiceTest extends TestCase
         $ageStep = collect($pending)->firstWhere('step', 'age_verification');
         $this->assertNotNull($ageStep);
         $this->assertSame(OnboardingStepStatus::Invalidated->value, $ageStep['status']);
+    }
+
+    public function test_kyc_step_is_pending_when_stripe_account_is_missing(): void
+    {
+        $service = $this->makeServiceWithStripeStatus(StripeConnectAccountStatus::Disconnected);
+        $site = $this->makeSite([
+            'require_payment_setup' => false,
+            'require_kyc_verification' => true,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+            'require_age_verification' => false,
+        ]);
+
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'kyc_verification')->andReturn(null);
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+
+        $pending = $service->pendingSteps(1, $site);
+
+        $kyc = collect($pending)->firstWhere('step', 'kyc_verification');
+        $this->assertNotNull($kyc);
+        $this->assertSame(OnboardingStepStatus::Pending->value, $kyc['status']);
+    }
+
+    public function test_kyc_step_is_pending_when_stripe_onboarding_is_incomplete_or_restricted(): void
+    {
+        foreach ([StripeConnectAccountStatus::Incomplete, StripeConnectAccountStatus::Restricted] as $status) {
+            $this->tearDown();
+            $this->setUp();
+
+            $service = $this->makeServiceWithStripeStatus($status);
+            $site = $this->makeSite([
+                'require_payment_setup' => false,
+                'require_kyc_verification' => true,
+                'require_contracts' => false,
+                'require_guidelines_ack' => false,
+                'require_age_verification' => false,
+            ]);
+
+            $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+            $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'kyc_verification')->andReturn(null);
+            $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+
+            $pending = $service->pendingSteps(1, $site);
+            $this->assertNotNull(collect($pending)->firstWhere('step', 'kyc_verification'));
+        }
+    }
+
+    public function test_kyc_step_requires_enabled_stripe_status_and_completed_row(): void
+    {
+        $service = $this->makeServiceWithStripeStatus(StripeConnectAccountStatus::Enabled);
+        $site = $this->makeSite([
+            'require_payment_setup' => false,
+            'require_kyc_verification' => true,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+            'require_age_verification' => false,
+        ]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->once()->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'kyc_verification')->once()->andReturn(null);
+        $this->stepRepo->shouldReceive('getStatus')->with(2, $site->id, 'profile')->once()->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(2, $site->id, 'kyc_verification')->once()->andReturn(OnboardingStepStatus::Completed->value);
+
+        $this->assertNotEmpty($service->pendingSteps(1, $site));
+        $this->assertEmpty($service->pendingSteps(2, $site));
+    }
+
+    public function test_site_without_kyc_requirement_excludes_kyc_step(): void
+    {
+        $site = $this->makeSite([
+            'require_payment_setup' => false,
+            'require_kyc_verification' => false,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+            'require_age_verification' => false,
+        ]);
+
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'kyc_verification')->never();
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+
+        $this->assertNotContains('kyc_verification', array_column($this->service->pendingSteps(1, $site), 'step'));
+    }
+
+    public function test_complete_kyc_step_validates_stripe_before_marking_completed(): void
+    {
+        $service = $this->makeServiceWithStripeStatus(StripeConnectAccountStatus::Restricted);
+        $site = $this->makeSite([
+            'require_payment_setup' => false,
+            'require_kyc_verification' => true,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+            'require_age_verification' => false,
+        ]);
+
+        $this->stepRepo->shouldNotReceive('markCompleted');
+
+        $result = $service->completeKycVerificationStep(1, $site);
+
+        $this->assertFalse($result['ok']);
+    }
+
+    public function test_complete_kyc_step_marks_completed_when_stripe_is_enabled(): void
+    {
+        $service = $this->makeServiceWithStripeStatus(StripeConnectAccountStatus::Enabled);
+        $site = $this->makeSite([
+            'require_payment_setup' => false,
+            'require_kyc_verification' => true,
+            'require_contracts' => false,
+            'require_guidelines_ack' => false,
+            'require_age_verification' => false,
+        ]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($this->makeProfile());
+        $this->stepRepo->shouldReceive('markCompleted')->once()->with(1, $site->id, 'kyc_verification', null);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'kyc_verification')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->contributorOnboardingRepository->shouldReceive('syncStatus')->once()->with(1, $site, true);
+
+        $result = $service->completeKycVerificationStep(1, $site);
+
+        $this->assertTrue($result['ok']);
     }
 
     public function test_pending_steps_does_not_call_mark_invalidated_when_domain_still_valid(): void
@@ -774,7 +900,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $pending = $this->service->pendingSteps(1, $site);
 
         $stepNames = array_column($pending, 'step');
-        $this->assertNotContains('payment', $stepNames);
+        $this->assertNotContains('payment_setup', $stepNames);
         $this->assertNotContains('contract', $stepNames);
         $this->assertNotContains('guidelines', $stepNames);
         $this->assertNotContains('age_verification', $stepNames);
@@ -835,7 +961,7 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->assertContains('profile', $completed);
         $this->assertContains('guidelines', $completed);
-        $this->assertNotContains('payment', $completed);
+        $this->assertNotContains('payment_setup', $completed);
         $this->assertNotContains('contract', $completed);
         $this->assertNotContains('age_verification', $completed);
     }
@@ -861,7 +987,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $profile = $this->makeProfile();
 
         $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'profile')->andReturn(OnboardingStepStatus::Completed->value);
-        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'payment')->andReturn(OnboardingStepStatus::Completed->value);
+        $this->stepRepo->shouldReceive('getStatus')->with(1, $site->id, 'payment_setup')->andReturn(OnboardingStepStatus::Completed->value);
 
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
         $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
@@ -870,7 +996,7 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $completed = $this->service->completedSteps(1, $site);
 
-        $this->assertNotContains('payment', $completed);
+        $this->assertNotContains('payment_setup', $completed);
     }
 
     // =========================================================================
@@ -1102,6 +1228,22 @@ class ContributorOnboardingServiceTest extends TestCase
             ?? (new DateTimeImmutable('-20 years', new DateTimeZone('UTC')))->format('Y-m-d');
 
         return $profile;
+    }
+
+    private function makeServiceWithStripeStatus(StripeConnectAccountStatus $status): ContributorOnboardingService
+    {
+        $stripe = Mockery::mock(StripeConnectAccountService::class);
+        $stripe->shouldReceive('getAccountStatus')->andReturn($status);
+
+        return new ContributorOnboardingService(
+            profileRepository:         $this->profileRepo,
+            onboardingStepRepository:  $this->stepRepo,
+            contractRepository:        $this->contractRepo,
+            guidelinesRepository:      $this->guidelinesRepo,
+            ageValidationService:      $this->ageService,
+            contributorOnboardingRepository:  $this->contributorOnboardingRepository,
+            stripeConnectAccountService: $stripe,
+        );
     }
 
     private function makeContract(array $attributes = []): Contract

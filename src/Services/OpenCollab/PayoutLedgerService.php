@@ -18,6 +18,7 @@ class PayoutLedgerService
         int $payoutId,
         int $userId,
         int $amountToAttach,
+        ?int $siteId = null,
     ): int {
         if ($amountToAttach <= 0) {
             return 0;
@@ -26,7 +27,7 @@ class PayoutLedgerService
         $remaining = $amountToAttach;
         $attached = 0;
 
-        $entries = $this->ledgerRepository->settledAvailableForPayout($userId);
+        $entries = $this->ledgerRepository->settledAvailableForPayout($userId, $siteId);
 
         foreach ($entries as $entry) {
             if ($remaining <= 0) {
