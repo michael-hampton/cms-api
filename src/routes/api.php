@@ -1648,6 +1648,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/issue-deliveries/search', [IssueDeliveryController::class, 'index']);
         $router->get('/issue-deliveries/{id}', [IssueDeliveryController::class, 'show']);
         $router->post('/issue-deliveries/{id}', [IssueDeliveryController::class, 'update']);
+        $router->put('/issue-deliveries/{id}', [IssueDeliveryController::class, 'update']);
         $router->delete('/issue-deliveries/{id}', [IssueDeliveryController::class, 'destroy']);
         $router->put('/issue-deliveries/{id}/status', [IssueDeliveryController::class, 'updateStatus']);
 

@@ -16,7 +16,7 @@ class SubscriptionCommunicationHistoryController extends Controller
 
     public function index(int $subscriptionId): JsonResponse
     {
-        return $this->resourceResponse(['history' => $this->service->historyForSubscription($subscriptionId)]);
+        return $this->jsonResponse(['history' => $this->service->historyForSubscription($subscriptionId)]);
     }
 
     public function communication(int $communicationId): JsonResponse

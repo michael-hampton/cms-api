@@ -2,7 +2,9 @@
 
 namespace App\Repositories\OpenCollab;
 
+use App\Enums\OpenCollab\AccrualStatus;
 use App\Enums\OpenCollab\LedgerEntryType;
+use App\Exceptions\OpenCollab\InvalidAccrualTransitionException;
 use App\Framework\Support\Collection;
 use App\Models\EarningsLedger;
 use App\Models\Model;
@@ -109,6 +111,177 @@ class EarningsLedgerRepository extends Repository
             ->where('earned_at', '<=', $cutoff->format('Y-m-d H:i:s'))
             ->whereNull('paid_at')
             ->sum('amount');
+    }
+
+    /**
+     * Validate and apply an accrual status transition.
+     *
+     * @throws InvalidAccrualTransitionException if the transition is not permitted
+     */
+    public function transition(
+        int           $ledgerEntryId,
+        AccrualStatus $to,
+        ?string       $timestampColumn = null,
+        array         $extra           = [],
+    ): EarningsLedger {
+        $entry = $this->findOrFail($ledgerEntryId);
+
+        $from = AccrualStatus::from($entry->accrual_status);
+
+        if (!$from->canTransitionTo($to)) {
+            throw new InvalidAccrualTransitionException($ledgerEntryId, $from, $to);
+        }
+
+        $updates = array_merge(['accrual_status' => $to->value], $extra);
+
+        if ($timestampColumn !== null) {
+            $updates[$timestampColumn] = now_datetime()->format('Y-m-d H:i:s');
+        }
+
+        $this->update($ledgerEntryId, $updates);
+
+        return $this->find($ledgerEntryId);
+    }
+
+    /**
+     * Confirm an estimated or confirmed entry.
+     *
+     * @throws InvalidAccrualTransitionException
+     */
+    public function confirm(int $ledgerEntryId, ?int $actorId = null): EarningsLedger
+    {
+        return $this->transition(
+            $ledgerEntryId,
+            AccrualStatus::Confirmed,
+            'confirmed_at',
+            $actorId ? ['confirmed_by' => $actorId] : [],
+        );
+    }
+
+    /**
+     * Settle a confirmed entry (make it withdrawable).
+     *
+     * @throws InvalidAccrualTransitionException
+     */
+    public function settle(int $ledgerEntryId, ?int $actorId = null): EarningsLedger
+    {
+        return $this->transition(
+            $ledgerEntryId,
+            AccrualStatus::Settled,
+            'settled_at',
+            $actorId ? ['settled_by' => $actorId] : [],
+        );
+    }
+
+    /**
+     * Withdraw a settled entry (include it in a payout).
+     *
+     * @throws InvalidAccrualTransitionException
+     */
+    public function withdraw(int $ledgerEntryId, int $payoutId): EarningsLedger
+    {
+        return $this->transition(
+            $ledgerEntryId,
+            AccrualStatus::Withdrawn,
+            'withdrawn_at',
+            ['payout_id' => $payoutId],
+        );
+    }
+
+    /**
+     * Reverse an entry (estimated, confirmed, or settled only).
+     *
+     * Withdrawn entries CANNOT be reversed directly — use the liability engine.
+     *
+     * @throws InvalidAccrualTransitionException
+     */
+    public function reverse(int $ledgerEntryId, string $reason, ?int $actorId = null): EarningsLedger
+    {
+        return $this->transition(
+            $ledgerEntryId,
+            AccrualStatus::Reversed,
+            'reversed_at',
+            array_filter([
+                'reversal_reason' => $reason,
+                'reversed_by'     => $actorId,
+            ]),
+        );
+    }
+
+    /**
+     * Returns the current AccrualStatus for a ledger entry.
+     *
+     * @throws \InvalidArgumentException if the entry is not found
+     */
+    public function currentStatus(int $ledgerEntryId): AccrualStatus
+    {
+        $entry = $this->findOrFail($ledgerEntryId);
+
+        return AccrualStatus::from($entry->accrual_status);
+    }
+
+    /**
+     * Returns all settled entries for a contributor that are not yet withdrawn.
+     * These are the entries that contribute to the withdrawable balance.
+     */
+    public function settledForContributor(int $userId): \App\Framework\Support\Collection
+    {
+        return EarningsLedger::where('user_id', $userId)
+            ->where('accrual_status', AccrualStatus::Settled->value)
+            ->orderBy('earned_at')
+            ->get();
+    }
+
+    /**
+     * Sum of settled (withdrawable) earnings for a contributor in pence.
+     */
+    public function settledBalanceForContributor(int $userId): int
+    {
+        return (int) EarningsLedger::where('user_id', $userId)
+            ->where('accrual_status', AccrualStatus::Settled->value)
+            ->sum('amount');
+    }
+
+    /**
+     * Aggregate balances grouped by accrual_status for a contributor.
+     *
+     * Returns a map: ['estimated' => int, 'confirmed' => int, 'settled' => int, ...]
+     *
+     * @return array<string, int>
+     */
+    public function balancesByStatusForContributor(int $userId): array
+    {
+        $rows = EarningsLedger::where('user_id', $userId)
+            ->selectRaw('accrual_status, COALESCE(SUM(amount), 0) as total')
+            ->groupBy('accrual_status')
+            ->get();
+
+        $balances = [];
+        foreach (AccrualStatus::cases() as $status) {
+            $balances[$status->value] = 0;
+        }
+
+        foreach ($rows as $row) {
+            $balances[$row->accrual_status] = (int) $row->total;
+        }
+
+        return $balances;
+    }
+
+    /**
+     * @throws \InvalidArgumentException
+     */
+    private function findOrFail(int $ledgerEntryId): EarningsLedger
+    {
+        $entry = $this->find($ledgerEntryId);
+
+        if (!$entry) {
+            throw new \InvalidArgumentException(
+                "Earnings ledger entry [{$ledgerEntryId}] not found."
+            );
+        }
+
+        return $entry;
     }
 
     protected function getModelClass(): string

@@ -32,7 +32,7 @@ class SubscriptionResource extends JsonResource
             'updated_at' => $this->getAttribute('updated_at')?->format('Y-m-d'),
             'stripe_sync_status' => $this->getAttribute('stripe_sync_status'),
             'stripe_synced_at' => $this->getAttribute('stripe_synced_at')?->format('Y-m-d'),
-            'stripe_sync_error' => $this->getAttribute('stripe_sync_error')?->format('Y-m-d'),
+            'stripe_sync_error' => $this->getAttribute('stripe_sync_error'),
         ];
     }
 }

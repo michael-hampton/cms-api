@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use Stripe\Exception\ApiErrorException;
@@ -36,12 +37,11 @@ class StripeConnectAccountService
                 $user = User::find($userId);
 
                 $account = $this->stripe->accounts->create([
-                    'type' => 'express',
-                    // country can be updated by Stripe during onboarding; default to GB for now
+                    'type'    => 'express',
                     'country' => 'GB',
-                    'email' => $user?->email,
+                    'email'   => $user?->email,
                     'metadata' => [
-                        'user_id' => (string)$userId,
+                        'user_id'  => (string)$userId,
                         'provider' => 'stripe_connect',
                     ],
                 ]);
@@ -55,27 +55,27 @@ class StripeConnectAccountService
                     $existing = $this->payoutAccountRepository->find($existing->id);
                 } else {
                     $existing = $this->payoutAccountRepository->create([
-                        'user_id' => $userId,
-                        'provider' => 'stripe',
-                        'stripe_account_id' => $stripeAccountId,
-                        'charges_enabled' => (bool)$account->charges_enabled,
-                        'payouts_enabled' => (bool)$account->payouts_enabled,
-                        'details_submitted' => (bool)$account->details_submitted,
+                        'user_id'              => $userId,
+                        'provider'             => 'stripe',
+                        'stripe_account_id'    => $stripeAccountId,
+                        'charges_enabled'      => (bool)$account->charges_enabled,
+                        'payouts_enabled'      => (bool)$account->payouts_enabled,
+                        'details_submitted'    => (bool)$account->details_submitted,
                         'requirements_due_json' => (array)($account->requirements?->currently_due ?? []),
                     ]);
                 }
             }
 
             $link = $this->stripe->accountLinks->create([
-                'account' => $stripeAccountId,
-                'type' => 'account_onboarding',
-                'return_url' => $returnUrl,
+                'account'     => $stripeAccountId,
+                'type'        => 'account_onboarding',
+                'return_url'  => $returnUrl,
                 'refresh_url' => $refreshUrl,
             ]);
 
             return [
-                'success' => true,
-                'onboarding_url' => $link->url,
+                'success'           => true,
+                'onboarding_url'    => $link->url,
                 'stripe_account_id' => $stripeAccountId,
             ];
 
@@ -92,39 +92,61 @@ class StripeConnectAccountService
         }
     }
 
+    /**
+     * Returns the current onboarding status for a contributor's Stripe Connect account.
+     *
+     * The `status` field is now driven by StripeConnectAccountStatus, keeping all
+     * status derivation logic in one place and eliminating magic strings.
+     *
+     * @return array{
+     *   connected: bool,
+     *   status: string,
+     *   stripe_account_id?: string,
+     *   payouts_enabled: bool,
+     *   verification_required: array,
+     * }
+     */
     public function getOnboardingStatus(int $userId): array
     {
         $account = $this->payoutAccountRepository->findByUserId($userId, 'stripe');
 
         if (!$account || empty($account->stripe_account_id)) {
             return [
-                'connected' => false,
-                'status' => 'disconnected',
-                'payouts_enabled' => false,
+                'connected'            => false,
+                'status'               => StripeConnectAccountStatus::Disconnected->value,
+                'payouts_enabled'      => false,
                 'verification_required' => [],
             ];
         }
 
-        $requirements = (array)($account->requirements_due_json ?? []);
-        $payoutsEnabled = (bool)$account->payouts_enabled;
+        $requirements    = (array)($account->requirements_due_json ?? []);
+        $payoutsEnabled  = (bool)$account->payouts_enabled;
         $detailsSubmitted = (bool)$account->details_submitted;
 
-        $status = 'verification_pending';
-        if ($payoutsEnabled && $detailsSubmitted && count($requirements) === 0) {
-            $status = 'enabled';
-        } elseif (!$detailsSubmitted) {
-            $status = 'incomplete';
-        } elseif (!$payoutsEnabled) {
-            $status = 'restricted';
-        }
+        $status = StripeConnectAccountStatus::fromAccountFields(
+            connected:        true,
+            detailsSubmitted: $detailsSubmitted,
+            payoutsEnabled:   $payoutsEnabled,
+            requirementsDue:  $requirements,
+        );
 
         return [
-            'connected' => true,
-            'status' => $status,
-            'stripe_account_id' => $account->stripe_account_id,
-            'payouts_enabled' => $payoutsEnabled,
+            'connected'            => true,
+            'status'               => $status->value,
+            'stripe_account_id'    => $account->stripe_account_id,
+            'payouts_enabled'      => $payoutsEnabled,
             'verification_required' => $requirements,
         ];
     }
-}
 
+    /**
+     * Resolve the typed status enum for a user's Stripe Connect account.
+     * Useful internally and for other services that need to branch on status.
+     */
+    public function getAccountStatus(int $userId): StripeConnectAccountStatus
+    {
+        $raw = $this->getOnboardingStatus($userId);
+
+        return StripeConnectAccountStatus::from($raw['status']);
+    }
+}
