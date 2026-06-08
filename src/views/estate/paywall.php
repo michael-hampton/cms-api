@@ -1,3 +1,27 @@
+<?php
+$metadataVisibility = $page->metadata->visibility ?? null;
+
+$isPurchasablePremium =
+        (bool) $page->is_paid
+        && (int) $page->price > 0
+        && !empty($page->premium_approved_at)
+        && empty($page->monetisation_disabled_at)
+        && !empty($page->contributor_id)
+        && $metadataVisibility === 'premium';
+?>
+
+<?php if ($isPurchasablePremium): ?>
+    <script src="https://js.stripe.com/v3/" defer></script>
+<?php endif; ?>
+
+<?php if ($isPurchasablePremium):
+    $authedEmail = \App\Framework\Authorization\Auth::user()?->email ?? '';
+    $isAuthed = !empty($authedEmail);
+    $siteSlug = \App\Framework\Support\SiteContext::slug();
+    $pageId = (int)$page->id;
+    $priceFormatted = '£' . number_format(((int) $page->price) / 100, 2);
+endif; ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,20 +32,9 @@
 </head>
 <body>
 
-<?php
-if ($page->is_paid): ?>
-    <script src="https://js.stripe.com/v3/" defer></script>
+<?php if ($isPurchasablePremium): ?>
+<script src="https://js.stripe.com/v3/" defer></script>
 <?php endif; ?>
-
-<?php if ($page->is_paid):
-// Pre-fill email for authenticated users — avoids JS manipulation of who
-// the purchase email is attributed to. Auth::user() may be null for guests.
-    $authedEmail = \App\Framework\Authorization\Auth::user()?->email ?? '';
-    $isAuthed = !empty($authedEmail);
-    $siteSlug = \App\Framework\Support\SiteContext::slug();
-    $pageId = (int)$page->id;
-    $priceFormatted = '£' . number_format($page->price / 100, 2);
-endif; ?>
 
 @include('header', ['menu' => $menu, 'title' => 'Subscribe to Read'])
 
@@ -37,7 +50,7 @@ endif; ?>
         <h1>Premium Content</h1>
         <h2><?= htmlspecialchars($page->title) ?></h2>
 
-        <?php if ($page->is_paid): ?>
+        <?php if ($isPurchasablePremium): ?>
             <p class="paywall-message">
                 Purchase instant, permanent access to this article. No subscription required.
             </p>
@@ -63,8 +76,8 @@ endif; ?>
             </p>
         <?php endif; ?>
 
-        <?php if (!$page->is_paid): ?>
-        <div class="paywall-benefits">
+        <?php if ($isPurchasablePremium): ?>
+            <div class="paywall-benefits">
             <h3>Subscription Benefits</h3>
             <ul>
                 <li>
@@ -96,7 +109,7 @@ endif; ?>
         <?php endif; ?>
 
         <div class="paywall-actions">
-            <?php if ($page->is_paid): ?>
+            <?php if ($isPurchasablePremium): ?>
                 <div class="button-group">
                     <button class="btn btn-primary" onclick="openPaymentModal()">
                         Buy Article &mdash; £<?= number_format($page->price / 100, 2) ?>

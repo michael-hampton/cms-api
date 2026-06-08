@@ -10,6 +10,7 @@ use App\Models\Page;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\Billing\Stripe\StripePaymentIntentGateway;
+use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
 
 /**
  * Handles the payment initiation half of the purchase flow.
@@ -31,7 +32,8 @@ class ArticlePaymentService
         private readonly ArticlePaymentRepository   $paymentRepository,
         private readonly ArticleAccessRepository    $accessRepository,
         private readonly Database                   $database,
-        private readonly StripePaymentIntentGateway $paymentIntentGateway
+        private readonly StripePaymentIntentGateway $paymentIntentGateway,
+        private readonly PremiumPagePurchaseEligibilityService $purchaseEligibilityService,
     )
     {
     }
@@ -47,14 +49,12 @@ class ArticlePaymentService
      */
     public function initiatePayment(Page $page, ?int $userId, string $email): array
     {
-        if (!$page->is_paid) {
-            throw new \InvalidArgumentException("Page [{$page->id}] is not a paid page.");
-        }
+        $this->purchaseEligibilityService->assertPurchasable($page);
 
         $this->guardAgainstDuplicatePurchase($page->id, $userId, $email);
 
         return $this->database->transaction(function () use ($page, $userId, $email): array {
-            $intent = $this->paymentIntentGateway->create( //todo fix test
+            $intent = $this->paymentIntentGateway->create(
                 new CreatePaymentIntentDto(
                     $page->price * 100,
                     'gbp',

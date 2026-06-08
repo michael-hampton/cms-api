@@ -410,6 +410,25 @@ class EarningsLedgerRepository extends Repository
         return $balances;
     }
 
+    public function forArticle(int $articleId): Collection
+    {
+        return EarningsLedger::query()
+            ->where('article_id', $articleId)
+            ->orderBy('earned_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    public function activeForArticle(int $articleId): Collection
+    {
+        return EarningsLedger::query()
+            ->where('article_id', $articleId)
+            ->whereIn('accrual_status', AccrualStatus::activeValues())
+            ->orderBy('earned_at')
+            ->orderBy('id')
+            ->get();
+    }
+
     protected function getModelClass(): string
     {
         return EarningsLedger::class;

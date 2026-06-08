@@ -62,6 +62,14 @@ enum AccrualStatus: string
         return [self::Estimated, self::Confirmed, self::Settled];
     }
 
+    public static function activeValues(): array
+    {
+        return array_map(
+            static fn (self $status): string => $status->value,
+            self::active()
+        );
+    }
+
     /**
      * Returns true when the earning is in a terminal state
      * (no further transitions are possible through normal flow).

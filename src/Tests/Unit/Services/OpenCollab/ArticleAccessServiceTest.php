@@ -114,6 +114,17 @@ class ArticleAccessServiceTest extends FunctionalTestCase
     {
         $payment = $this->makePendingPayment();
 
+        $page = $this->makeSellablePage();
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->with($payment->page_id)
+            ->once()
+            ->andReturn($page);
+
+        $this->logger
+            ->shouldNotReceive('warning');
+
         $this->paymentRepository
             ->shouldReceive('findByPaymentIntentId')
             ->with('pi_test')
@@ -139,7 +150,10 @@ class ArticleAccessServiceTest extends FunctionalTestCase
         $this->eventDispatcher
             ->shouldReceive('dispatch')
             ->once()
-            ->withArgs(fn($event) => $event instanceof ArticlePurchasedEvent);
+            ->withArgs(function ($event): bool {
+                return $event instanceof ArticlePurchasedEvent
+                    && $event->eligibleForEarnings === true;
+            });
 
         $this->service->grantAccessFromPayment('pi_test');
         $this->assertTrue(true);
@@ -210,17 +224,48 @@ class ArticleAccessServiceTest extends FunctionalTestCase
 
     public function test_wraps_access_grant_in_transaction(): void
     {
-        $this->databaseMock->shouldNotReceive('transaction')->byDefault();
-
         $payment = $this->makePendingPayment();
+        $page = $this->makeSellablePage();
+
         $payment->shouldReceive('refresh')->andReturnSelf();
 
-        $this->paymentRepository->shouldReceive('findByPaymentIntentId')->andReturn($payment);
-        $this->paymentRepository->shouldReceive('updateStatus');
-        $this->accessRepository->shouldReceive('create');
-        $this->eventDispatcher->shouldReceive('dispatch');
+        $this->paymentRepository
+            ->shouldReceive('findByPaymentIntentId')
+            ->with('pi_test')
+            ->once()
+            ->andReturn($payment);
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->with($payment->page_id)
+            ->once()
+            ->andReturn($page);
+
+        $this->logger->shouldNotReceive('warning');
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $this->paymentRepository
+            ->shouldReceive('updateStatus')
+            ->with($payment->id, 'succeeded')
+            ->once();
+
+        $this->accessRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::type('array'));
+
+        $this->eventDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn ($event) => $event instanceof ArticlePurchasedEvent);
 
         $this->service->grantAccessFromPayment('pi_test');
+
         $this->assertTrue(true);
     }
 
@@ -278,7 +323,8 @@ class ArticleAccessServiceTest extends FunctionalTestCase
 
         $this->databaseMock
             ->shouldReceive('transaction')
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->byDefault()
+            ->andReturnUsing(fn (callable $cb) => $cb());
 
         $this->notificationDispatcher->shouldReceive('dispatch')->byDefault();
         $this->pageRepository->shouldReceive('find')->byDefault();
@@ -293,6 +339,20 @@ class ArticleAccessServiceTest extends FunctionalTestCase
             $this->notificationDispatcher,
             $this->pageRepository
         );
+    }
+
+    private function makeSellablePage(): Page
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = 1;
+        $page->contributor_id = 7;
+        $page->price = 500;
+
+        $page->shouldReceive('isSellable')
+            ->andReturn(true);
+
+        return $page;
     }
 
     protected function tearDown(): void

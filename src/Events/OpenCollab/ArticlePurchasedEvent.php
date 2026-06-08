@@ -19,6 +19,7 @@ class ArticlePurchasedEvent
         public readonly ArticlePayment $payment,
         public readonly int            $pageId,
         public readonly int            $contributorId,
+        public bool $eligibleForEarnings = true
     )
     {
     }

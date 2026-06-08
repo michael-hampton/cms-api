@@ -3,6 +3,7 @@
 namespace App\Listeners\Cms;
 
 use App\Events\Cms\ContentApproved;
+use App\Events\Cms\ContentEditoriallyModified;
 use App\Events\Cms\ContentHeld;
 use App\Events\Cms\ContentRejected;
 use App\Events\Cms\ContentSubmittedForApproval;
@@ -40,6 +41,11 @@ class SendContentWorkflowNotification
         if ($event instanceof ContentHeld) {
             $this->notifyOwner($event, $this->notificationType($event->contentType, 'held'), $event->reason);
         }
+
+        if ($event instanceof ContentEditoriallyModified) {
+            $this->notifyOwner($event, $this->notificationType($event->contentType, 'editorially_modified'));
+            return;
+        }
     }
 
     private function notifyReviewers(ContentSubmittedForApproval $event): void
@@ -70,9 +76,9 @@ class SendContentWorkflowNotification
 
     private function notifyOwner(object $event, string $type, ?string $reason = null): void
     {
-//        if (!$event->ownerId || $event->ownerId === $event->actorId) {
-//            return;
-//        }
+        if (!$event->ownerId || $event->ownerId === $event->actorId) {
+            return;
+        }
 
         $user = User::find($event->ownerId);
         if ($user && isset($user->is_active) && !(bool) $user->is_active) {
@@ -91,7 +97,7 @@ class SendContentWorkflowNotification
     {
         $singular = rtrim($event->contentType, 's');
 
-        return [
+        $payload = [
             "{$singular}_id" => $event->contentId,
             "{$singular}_title" => $event->title,
             'site_id' => (int) $event->siteId,
@@ -102,6 +108,12 @@ class SendContentWorkflowNotification
             'action_user_id' => $actionUserId,
             'url' => $this->urlFor($event->contentType, $event->contentId),
         ];
+
+        if (isset($event->historyId)) {
+            $payload['history_id'] = (int) $event->historyId;
+        }
+
+        return $payload;
     }
 
     private function urlFor(string $contentType, int $contentId): string

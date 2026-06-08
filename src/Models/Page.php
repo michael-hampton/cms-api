@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OpenCollab\PageVisibility;
 use App\Enums\Pages\PageStatus;
 use App\Framework\Authorization\AuthenticatedMember;
 use App\Framework\Database\QueryBuilder;
@@ -65,7 +66,27 @@ class Page extends Model
         'is_paid',
         'price',
         'contributor_id',
-        'is_public_contribution'
+        'is_public_contribution',
+        'premium_requested_at',
+        'premium_requested_by',
+        'premium_suggested_price',
+        'premium_request_note',
+
+        'premium_approved_at',
+        'premium_approved_by',
+        'premium_approval_note',
+
+        'premium_rejected_at',
+        'premium_rejected_by',
+        'premium_rejection_reason',
+
+        'monetisation_disabled_at',
+        'monetisation_disabled_by',
+        'monetisation_disabled_reason',
+
+        'first_editorial_change_reported_at',
+        'first_editorial_change_reported_by',
+        'first_editorial_change_history_id',
     ];
 
     protected $alwaysInclude = [
@@ -104,7 +125,23 @@ class Page extends Model
         'submitted_at' => 'datetime',
         'zones' => 'json',
         'is_paid' => 'boolean',
-        'is_public_contribution' => 'boolean'
+        'is_public_contribution' => 'boolean',
+        'premium_requested_at' => 'datetime',
+        'premium_requested_by' => 'integer',
+        'premium_suggested_price' => 'integer',
+
+        'premium_approved_at' => 'datetime',
+        'premium_approved_by' => 'integer',
+
+        'premium_rejected_at' => 'datetime',
+        'premium_rejected_by' => 'integer',
+
+        'monetisation_disabled_at' => 'datetime',
+        'monetisation_disabled_by' => 'integer',
+
+        'first_editorial_change_reported_at' => 'datetime',
+        'first_editorial_change_reported_by' => 'integer',
+        'first_editorial_change_history_id' => 'integer',
     ];
 
     /**
@@ -711,5 +748,28 @@ class Page extends Model
 
         $collaborator = $this->collaborators->firstWhere('user_id', $userId);
         return $collaborator ? $collaborator->role : null;
+    }
+
+    public function isPremiumApproved(): bool
+    {
+        return !empty($this->premium_approved_at);
+    }
+
+    public function isMonetisationDisabled(): bool
+    {
+        return !empty($this->monetisation_disabled_at);
+    }
+
+    public function isContributorOwned(): bool
+    {
+        return !empty($this->contributor_id) || (bool) $this->is_public_contribution;
+    }
+
+    public function isSellable(): bool
+    {
+        return $this->metadata?->visibility === PageVisibility::Premium->value
+            && (int) $this->price > 0
+            && $this->premium_approved_at !== null
+            && $this->monetisation_disabled_at === null;
     }
 }

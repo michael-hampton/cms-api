@@ -1039,4 +1039,67 @@ class PageController extends Controller
         }
     }
 
+    public function approveWithDecision(Request $request, string $site, int $id): JsonResponse
+    {
+        try {
+            $userId = Auth::id();
+
+            if (!$userId) {
+                throw new UnauthorizedException('Unauthenticated.');
+            }
+
+            $decision = [
+                'monetisation_decision' => $request->get('monetisation_decision', 'free'),
+                'approved_price' => $request->get('approved_price'),
+                'premium_note' => $request->get('premium_note'),
+                'premium_rejection_reason' => $request->get('premium_rejection_reason'),
+            ];
+
+            if (!in_array($decision['monetisation_decision'], ['free', 'premium', 'reject_premium'], true)) {
+                return $this->errorResponse('Invalid monetisation decision.', 422);
+            }
+
+            if ($decision['monetisation_decision'] === 'premium' && (int) $decision['approved_price'] <= 0) {
+                return $this->errorResponse('Approved price is required for premium approval.', 422);
+            }
+
+            if ($decision['monetisation_decision'] === 'reject_premium' && empty(trim((string) $decision['premium_rejection_reason']))) {
+                return $this->errorResponse('Premium rejection reason is required.', 422);
+            }
+
+            $page = $this->pageService->approvePageWithMonetisationDecision($id, $userId, $decision);
+
+            return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 401);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function premiumPriceRecommendation(string $site, int $id): JsonResponse
+    {
+        try {
+            $page = $this->pageRepository->getCompletePageData($id);
+
+            if (!$page) {
+                return $this->errorResponse('Page not found.', 404);
+            }
+
+            $service = Container::getInstance()->make(
+                \App\Services\Cms\Pages\PremiumPagePricingRecommendationService::class
+            );
+
+            $recommendation = $service->recommend($page);
+
+            return $this->jsonResponse([
+                'recommendation' => $recommendation->toArray(),
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
 }

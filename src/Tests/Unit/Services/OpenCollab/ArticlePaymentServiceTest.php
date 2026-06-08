@@ -5,10 +5,12 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\DTO\Stripe\CreatePaymentIntentDto;
 use App\DTO\Stripe\PaymentIntentResultDto;
 use App\Enums\OpenCollab\PaymentStatus;
+use App\Enums\Pages\PageStatus;
 use App\Exceptions\OpenCollab\DuplicatePurchaseException;
 use App\Framework\Database\Database;
 use App\Models\ArticlePayment;
 use App\Models\Page;
+use App\Models\PageMetadata;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Services\Billing\Stripe\StripePaymentIntentGateway;
@@ -16,6 +18,8 @@ use App\Services\OpenCollab\ArticlePaymentService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
+use App\Services\Cms\Pages\PremiumPagePurchaseEligibilityService;
+use Stripe\PaymentIntent;
 
 class ArticlePaymentServiceTest extends FunctionalTestCase
 {
@@ -24,6 +28,7 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
     private MockInterface $accessRepository;
     private MockInterface $databaseMock;
     private MockInterface $gateway;
+    private PremiumPagePurchaseEligibilityService $purchaseEligibilityService;
 
     // -------------------------------------------------------------------------
     // initiatePayment()
@@ -151,6 +156,12 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
         $this->gateway->shouldNotReceive('create');
         $this->paymentRepository->shouldNotReceive('create');
 
+        $this->purchaseEligibilityService
+            ->shouldReceive('assertPurchasable')
+            ->once()
+            ->with($page)
+            ->andThrow(new \InvalidArgumentException('Page is not a paid page.'));
+
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/not a paid page/i');
 
@@ -200,6 +211,171 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
         $this->service->initiatePayment($page, 42, 'buyer@example.com');
 
         $this->assertTrue(true);
+    }
+
+    public function test_initiatePayment_checks_premium_purchase_eligibility_before_creating_payment_intent(): void
+    {
+        $page = $this->mockPage([
+            'id' => 123,
+            'site_id' => 1,
+            'status' => PageStatus::PUBLISHED->value,
+            'price' => 5.99,
+            'is_paid' => true,
+            'premium_approved_at' => '2026-06-07 12:00:00',
+            'monetisation_disabled_at' => null,
+            'contributor_id' => 7,
+            'metadata' => $this->mockPageMetadata([
+                'page_id' => 123,
+                'visibility' => 'premium',
+            ]),
+        ]);
+
+        $capturedDto = null;
+
+        $this->purchaseEligibilityService
+            ->shouldReceive('assertPurchasable')
+            ->once()
+            ->with($page)
+            ->andReturnNull();
+
+        $this->accessRepository
+            ->shouldReceive('hasAccessByUserId')
+            ->once()
+            ->with(123, 55)
+            ->andReturn(false);
+
+        $this->accessRepository
+            ->shouldNotReceive('hasAccessByEmail');
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->with(Mockery::type('callable'))
+            ->andReturnUsing(function (callable $callback): array {
+                return $callback();
+            });
+
+        $this->gateway
+            ->shouldReceive('create')
+            ->once()
+            ->withArgs(function (CreatePaymentIntentDto $dto) use (&$capturedDto): bool {
+                $capturedDto = $dto;
+
+                return true;
+            })
+            ->andReturn(new PaymentIntentResultDto(
+                true,
+                'pi_test',
+                'secret_test'
+            ));
+
+        $payment = $this->mockArticlePayment([
+            'id' => 1,
+            'stripe_payment_intent_id' => 'pi_test',
+        ]);
+
+        $this->paymentRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::on(function (array $data): bool {
+                return $data['site_id'] === 1
+                    && $data['page_id'] === 123
+                    && $data['user_id'] === 55
+                    && $data['email'] === 'reader@example.com'
+                    && $data['stripe_payment_intent_id'] === 'pi_test'
+                    && $data['status'] === PaymentStatus::Pending->value
+                    && $data['amount'] === 5.99
+                    && $data['currency'] === 'gbp';
+            }))
+            ->andReturn($payment);
+
+        $result = $this->service->initiatePayment($page, 55, 'reader@example.com');
+
+        $this->assertSame($payment, $result['payment']);
+        $this->assertSame('secret_test', $result['client_secret']);
+
+        $this->assertInstanceOf(CreatePaymentIntentDto::class, $capturedDto);
+    }
+
+    public function test_initiatePayment_stops_when_page_is_not_purchasable(): void
+    {
+        $page = $this->mockPage([
+            'id' => 123,
+            'site_id' => 1,
+            'price' => 5.99,
+            'is_paid' => true,
+        ]);
+
+        $this->purchaseEligibilityService
+            ->shouldReceive('assertPurchasable')
+            ->once()
+            ->with($page)
+            ->andThrow(new \InvalidArgumentException('Page is not purchasable.'));
+
+        $this->accessRepository
+            ->shouldNotReceive('hasAccessByUserId');
+
+        $this->accessRepository
+            ->shouldNotReceive('hasAccessByEmail');
+
+        $this->databaseMock
+            ->shouldNotReceive('transaction');
+
+        $this->gateway
+            ->shouldNotReceive('create');
+
+        $this->paymentRepository
+            ->shouldNotReceive('create');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Page is not purchasable.');
+
+        $this->service->initiatePayment($page, 55, 'reader@example.com');
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    private function mockPageMetadata(array $attributes): PageMetadata&MockInterface
+    {
+        /** @var PageMetadata&MockInterface $metadata */
+        $metadata = Mockery::mock(PageMetadata::class)->makePartial();
+
+        foreach ($attributes as $key => $value) {
+            $metadata->{$key} = $value;
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    private function mockArticlePayment(array $attributes): ArticlePayment&MockInterface
+    {
+        /** @var ArticlePayment&MockInterface $payment */
+        $payment = Mockery::mock(ArticlePayment::class)->makePartial();
+
+        foreach ($attributes as $key => $value) {
+            $payment->{$key} = $value;
+        }
+
+        return $payment;
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    private function mockPage(array $attributes): Page&MockInterface
+    {
+        /** @var Page&MockInterface $page */
+        $page = Mockery::mock(Page::class)->makePartial();
+
+        foreach ($attributes as $key => $value) {
+            $page->{$key} = $value;
+        }
+
+        return $page;
     }
 
     // -------------------------------------------------------------------------
@@ -275,13 +451,22 @@ class ArticlePaymentServiceTest extends FunctionalTestCase
 
         $this->databaseMock
             ->shouldReceive('transaction')
-            ->andReturnUsing(fn(callable $cb) => $cb());
+            ->byDefault()
+            ->andReturnUsing(fn (callable $cb) => $cb());
+
+        $this->purchaseEligibilityService = Mockery::mock(PremiumPagePurchaseEligibilityService::class);
+
+        $this->purchaseEligibilityService
+            ->shouldReceive('assertPurchasable')
+            ->byDefault()
+            ->andReturnNull();
 
         $this->service = new ArticlePaymentService(
             $this->paymentRepository,
             $this->accessRepository,
             $this->databaseMock,
             $this->gateway,
+            $this->purchaseEligibilityService,
         );
     }
 

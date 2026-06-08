@@ -29,6 +29,8 @@ use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 use App\Tests\Unit\Services\Concerns\HasSiteHistory;
 use Exception;
 use Mockery;
+use App\Services\Cms\Pages\PremiumPageApprovalService;
+use App\Services\Cms\Pages\FirstEditorialChangeReporter;
 
 class PageServiceTest extends FunctionalTestCase
 {
@@ -52,6 +54,8 @@ class PageServiceTest extends FunctionalTestCase
     private $pageRegionSetRepository;
     private $pageTerritoryRepository;
     private $pageProductRepository;
+    private $premiumApprovalService;
+    private $firstEditorialChangeReporter;
 
     protected function setUp(): void
     {
@@ -76,6 +80,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
         $this->pageRegionSetRepository = Mockery::mock(PageRegionSetRepository::class);
         $this->pageTerritoryRepository = Mockery::mock(PageTerritoryRepository::class);
+        $this->premiumApprovalService = Mockery::mock(PremiumPageApprovalService::class);
+        $this->firstEditorialChangeReporter = Mockery::mock(FirstEditorialChangeReporter::class);
 
         $this->service = new PageService(
             $this->pageRepository,
@@ -95,6 +101,8 @@ class PageServiceTest extends FunctionalTestCase
             $this->pageRegionSetRepository,
             $this->pageTerritoryRepository,
             $this->pageProductRepository,
+            $this->premiumApprovalService,
+            $this->firstEditorialChangeReporter,
             $this->siteId
         );
     }
@@ -308,7 +316,9 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturn($existingPage);
 
         $this->setupTransaction();
-        $this->pageHistory->shouldReceive('logPageUpdated')->once()->with(1, Mockery::type('array'), Mockery::type('array'));
+
+        $this->setPageHistoryUpdate();
+
         $this->pageRepository->shouldReceive('update')->once()->with(1, Mockery::subset(['title' => 'Updated Page']))->andReturn($existingPage);
         $this->metadataRepository->shouldReceive('createOrUpdate')->once()->with(1, Mockery::any());
         $this->pageRepository->shouldReceive('getCompletePageData')->with(1)->twice()->andReturn($existingPage);
@@ -316,6 +326,24 @@ class PageServiceTest extends FunctionalTestCase
         $result = $this->service->updatePageWithAllData(1, $requestData, $this->siteId);
 
         $this->assertSame($existingPage, $result);
+    }
+
+    private function setPageHistoryUpdate()
+    {
+        $pageHistory = new PageHistory([
+            'id' => 55,
+            'page_id' => 1,
+            'user_id' => 1,
+        ]);
+
+        $this->pageHistory
+            ->shouldReceive('logPageUpdated')
+            ->once()
+            ->with(1, Mockery::type('array'), Mockery::type('array'))
+            ->andReturn($pageHistory);
+
+        $this->firstEditorialChangeReporter
+            ->shouldReceive('reportIfNeeded');
     }
 
     public function testSearchPagesCallsRepository()
@@ -745,7 +773,7 @@ class PageServiceTest extends FunctionalTestCase
             ->andReturn($existingPage);
 
         $this->setupTransaction();
-        $this->pageHistory->shouldReceive('logPageUpdated')->once()->with(1, Mockery::type('array'), Mockery::type('array'));
+        $this->setPageHistoryUpdate();
 
         $this->pageRepository->shouldReceive('update')
             ->once()
@@ -823,7 +851,8 @@ class PageServiceTest extends FunctionalTestCase
         $this->setupTransaction();
         $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
         $this->pageHistory->shouldReceive('logPageWaitingApproval')->once();
-        $this->pageHistory->shouldReceive('logPageUpdated')->once();
+
+        $this->setPageHistoryUpdate();
 
         $requestData = [
             'id' => $page->id,
@@ -1202,5 +1231,344 @@ class PageServiceTest extends FunctionalTestCase
         $result = $this->service->createPageWithAllData($requestData, $this->siteId);
 
         $this->assertEquals(5, $result->owner_id);
+    }
+
+    public function testApprovePageWithMonetisationDecisionApprovesPublicationAndMarksFree(): void
+    {
+        $user = $this->createUser();
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = $this->siteId;
+        $page->title = 'Test Page';
+        $page->status = PageStatus::WAITING_APPROVAL->value;
+        $page->contributor_id = $user->id;
+
+        $page->shouldReceive('isWaitingApproval')
+            ->once()
+            ->andReturn(true);
+
+        $page->shouldReceive('approve')
+            ->once()
+            ->with(99);
+
+        $publishedPage = Mockery::mock(Page::class)->makePartial();
+        $publishedPage->id = 1;
+        $publishedPage->site_id = $this->siteId;
+        $publishedPage->title = 'Test Page';
+        $publishedPage->status = PageStatus::PUBLISHED->value;
+        $publishedPage->contributor_id = $user->id;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn (callable $callback) => $callback());
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($page);
+
+        $this->pageRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function (array $data): bool {
+                return $data['status'] === PageStatus::PUBLISHED->value
+                    && !empty($data['published_at']);
+            }))
+            ->andReturn($publishedPage);
+
+        $this->pageHistory
+            ->shouldReceive('logPageApproved')
+            ->once()
+            ->with($page, 99);
+
+        $this->pageHistory
+            ->shouldReceive('logPagePublished')
+            ->once()
+            ->with(1);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $this->premiumApprovalService
+            ->shouldReceive('approveFree')
+            ->once()
+            ->with($publishedPage, 99, null)
+            ->andReturn($publishedPage);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $result = $this->service->approvePageWithMonetisationDecision(1, 99, [
+            'monetisation_decision' => 'free',
+        ]);
+
+        $this->assertSame($publishedPage, $result);
+    }
+
+    public function testApprovePageWithMonetisationDecisionApprovesPremium(): void
+    {
+        $user = $this->createUser();
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = $this->siteId;
+        $page->title = 'Premium Page';
+        $page->status = PageStatus::WAITING_APPROVAL->value;
+        $page->contributor_id = $user->id;
+
+        $page->shouldReceive('isWaitingApproval')
+            ->once()
+            ->andReturn(true);
+
+        $page->shouldReceive('approve')
+            ->once()
+            ->with(99);
+
+
+        $publishedPage = Mockery::mock(Page::class)->makePartial();
+        $publishedPage->id = 1;
+        $publishedPage->site_id = $this->siteId;
+        $publishedPage->title = 'Premium Page';
+        $publishedPage->status = PageStatus::PUBLISHED->value;
+        $publishedPage->contributor_id = $user->id;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn (callable $callback) => $callback());
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($page);
+
+        $this->pageRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function (array $data): bool {
+                return $data['status'] === PageStatus::PUBLISHED->value
+                    && !empty($data['published_at']);
+            }))
+            ->andReturn($publishedPage);
+
+        $this->pageHistory
+            ->shouldReceive('logPageApproved')
+            ->once()
+            ->with($page, 99);
+
+        $this->pageHistory
+            ->shouldReceive('logPagePublished')
+            ->once()
+            ->with(1);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $this->premiumApprovalService
+            ->shouldReceive('approvePremium')
+            ->once()
+            ->with($publishedPage, 99, 599, 'Approved as premium')
+            ->andReturn($publishedPage);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $result = $this->service->approvePageWithMonetisationDecision(1, 99, [
+            'monetisation_decision' => 'premium',
+            'approved_price' => 599,
+            'premium_note' => 'Approved as premium',
+        ]);
+
+        $this->assertSame($publishedPage, $result);
+    }
+
+    public function testApprovePageWithMonetisationDecisionRejectsPremiumRequest(): void
+    {
+        $user = $this->createUser();
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = $this->siteId;
+        $page->title = 'Free Page';
+        $page->status = PageStatus::WAITING_APPROVAL->value;
+        $page->contributor_id = $user->id;
+
+        $page->shouldReceive('isWaitingApproval')
+            ->once()
+            ->andReturn(true);
+
+        $page->shouldReceive('approve')
+            ->once()
+            ->with(99);
+
+        $publishedPage = Mockery::mock(Page::class)->makePartial();
+        $publishedPage->id = 1;
+        $publishedPage->site_id = $this->siteId;
+        $publishedPage->title = 'Free Page';
+        $publishedPage->status = PageStatus::PUBLISHED->value;
+        $publishedPage->contributor_id = $user->id;
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn (callable $callback) => $callback());
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($page);
+
+        $this->pageRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::on(function (array $data): bool {
+                return $data['status'] === PageStatus::PUBLISHED->value
+                    && !empty($data['published_at']);
+            }))
+            ->andReturn($publishedPage);
+
+        $this->pageHistory
+            ->shouldReceive('logPageApproved')
+            ->once()
+            ->with($page, 99);
+
+        $this->pageHistory
+            ->shouldReceive('logPagePublished')
+            ->once()
+            ->with(1);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $this->premiumApprovalService
+            ->shouldReceive('rejectPremium')
+            ->once()
+            ->with($publishedPage, 99, 'Not suitable for premium')
+            ->andReturn($publishedPage);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($publishedPage);
+
+        $result = $this->service->approvePageWithMonetisationDecision(1, 99, [
+            'monetisation_decision' => 'reject_premium',
+            'premium_rejection_reason' => 'Not suitable for premium',
+        ]);
+
+        $this->assertSame($publishedPage, $result);
+    }
+
+    public function testApprovePageWithMonetisationDecisionThrowsWhenPageIsNotWaitingApproval(): void
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->status = PageStatus::DRAFT->value;
+
+        $page->shouldReceive('isWaitingApproval')
+            ->once()
+            ->andReturn(false);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->once()
+            ->andReturnUsing(fn (callable $callback) => $callback());
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($page);
+
+        $this->pageRepository
+            ->shouldNotReceive('update');
+
+        $this->premiumApprovalService
+            ->shouldNotReceive('approvePremium');
+
+        $this->premiumApprovalService
+            ->shouldNotReceive('approveFree');
+
+        $this->premiumApprovalService
+            ->shouldNotReceive('rejectPremium');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Page is not waiting for approval');
+
+        $this->service->approvePageWithMonetisationDecision(1, 99, [
+            'monetisation_decision' => 'premium',
+            'approved_price' => 599,
+        ]);
+    }
+
+    public function testUpdatePageWithAllDataReportsFirstEditorialChangeWhenActorProvided(): void
+    {
+        $requestData = [
+            'id' => 1,
+            'status' => 'published',
+            'forms' => [
+                'main' => ['title' => 'Updated Page'],
+                'meta' => ['slug' => 'updated-page', 'status' => 'published']
+            ]
+        ];
+
+        $existingPage = $this->createMockPage(1, 'Original Page');
+        $existingPage->contributor_id = 7;
+        $existingPage->is_public_contribution = true;
+        $existingPage->first_editorial_change_reported_at = null;
+
+        $updatedPage = $this->createMockPage(1, 'Updated Page');
+        $updatedPage->contributor_id = 7;
+        $updatedPage->is_public_contribution = true;
+
+        $this->pageRepository
+            ->shouldReceive('find')
+            ->with(1)
+            ->once()
+            ->andReturn($existingPage);
+
+        $this->setupTransaction();
+
+        $this->setPageHistoryUpdate(true, $existingPage, 99);
+
+        $this->pageRepository
+            ->shouldReceive('update')
+            ->once()
+            ->with(1, Mockery::subset(['title' => 'Updated Page']))
+            ->andReturn($updatedPage);
+
+        $this->pageRepository
+            ->shouldReceive('getCompletePageData')
+            ->with(1)
+            ->twice()
+            ->andReturn($updatedPage);
+
+        $result = $this->service->updatePageWithAllData(
+            1,
+            $requestData,
+            $this->siteId,
+            null,
+            99
+        );
+
+        $this->assertSame($updatedPage, $result);
     }
 }

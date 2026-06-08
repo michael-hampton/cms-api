@@ -56,7 +56,9 @@ class PageService
         private readonly PageRegionSetRepository   $pageRegionSetRepository,
         private readonly PageTerritoryRepository   $pageTerritoryRepository,
         private readonly PageProductRepository     $pageProductRepository,
-        ?int                                       $siteId = null
+        private readonly PremiumPageApprovalService $premiumApprovalService,
+        private readonly FirstEditorialChangeReporter $firstEditorialChangeReporter,
+        ?int                                       $siteId = null,
     )
     {
         $this->siteId = $siteId ?? SiteContext::getId();
@@ -129,7 +131,15 @@ class PageService
                     if (!empty($requestData['blocks'])) {
                         $newPageData['blocks'] = $requestData['blocks'];
                     }
-                    $this->historyService->logPageUpdated($page->id, $oldPageData, $newPageData);
+                    $pageHistory = $this->historyService->logPageUpdated($page->id, $oldPageData, $newPageData);
+
+                    if ($pageHistory) {
+                        $this->firstEditorialChangeReporter->reportIfNeeded(
+                            page: $existingPage,
+                            actorId: $pageHistory->user_id,
+                            pageHistoryId: (int) $pageHistory->id,
+                        );
+                    }
                 }
             } else {
                 $page = $this->pageRepository->create($mainData);
@@ -1147,5 +1157,66 @@ class PageService
 
             return $this->getCompletePageData($updatedPage->id);
         });
+    }
+
+    public function approvePageWithMonetisationDecision(int $pageId, int $userId, array $decision): Page
+    {
+        $approvedPage = $this->database->transaction(function () use ($pageId, $userId, $decision) {
+            $page = $this->pageRepository->find($pageId);
+
+            if (!$page) {
+                throw new \Exception("Page not found");
+            }
+
+            if (!$page->isWaitingApproval()) {
+                throw new \Exception("Page is not waiting for approval");
+            }
+
+            $page->approve($userId);
+
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::PUBLISHED->value,
+                'published_at' => date('Y-m-d H:i:s')
+            ]);
+
+            $this->historyService->logPageApproved($page, $userId);
+            $this->historyService->logPagePublished($page->id);
+
+            $freshPage = $this->getCompletePageData($updatedPage->id);
+
+            $monetisationDecision = $decision['monetisation_decision'] ?? 'free';
+
+            match ($monetisationDecision) {
+                'premium' => $this->premiumApprovalService->approvePremium(
+                    page: $freshPage,
+                    editorId: $userId,
+                    approvedPrice: (int) $decision['approved_price'],
+                    note: $decision['premium_note'] ?? null,
+                ),
+                'reject_premium' => $this->premiumApprovalService->rejectPremium(
+                    page: $freshPage,
+                    editorId: $userId,
+                    reason: (string) ($decision['premium_rejection_reason'] ?? 'Premium request rejected by editor.'),
+                ),
+                default => $this->premiumApprovalService->approveFree(
+                    page: $freshPage,
+                    editorId: $userId,
+                    note: $decision['premium_note'] ?? null,
+                ),
+            };
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+
+        event(new ContentApproved(
+            contentType: 'pages',
+            contentId: (int) $approvedPage->id,
+            siteId: (int) $approvedPage->site_id,
+            actorId: $userId,
+            title: (string) $approvedPage->title,
+            ownerId: $this->pageOwnerId($approvedPage),
+        ));
+
+        return $approvedPage;
     }
 }

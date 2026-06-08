@@ -911,6 +911,89 @@ class EarningsLedgerRepositoryTest extends RepositoryTestCase
         ], $overrides));
     }
 
+    public function test_forArticle_returns_entries_for_article_ordered_by_earned_at_and_id(): void
+    {
+        EarningsLedger::create([
+            'user_id' => 1,
+            'article_id' => 123,
+            'type' => 'sale',
+            'amount' => 100,
+            'currency' => 'gbp',
+            'reference_id' => 'ref_2',
+            'earned_at' => '2026-06-07 12:00:00',
+            'accrual_status' => AccrualStatus::Estimated->value,
+        ]);
+
+        EarningsLedger::create([
+            'user_id' => 1,
+            'article_id' => 123,
+            'type' => 'sale',
+            'amount' => 100,
+            'currency' => 'gbp',
+            'reference_id' => 'ref_1',
+            'earned_at' => '2026-06-07 11:00:00',
+            'accrual_status' => AccrualStatus::Estimated->value,
+        ]);
+
+        EarningsLedger::create([
+            'user_id' => 1,
+            'article_id' => 999,
+            'type' => 'sale',
+            'amount' => 100,
+            'currency' => 'gbp',
+            'reference_id' => 'other',
+            'earned_at' => '2026-06-07 10:00:00',
+            'accrual_status' => AccrualStatus::Estimated->value,
+        ]);
+
+        $entries = $this->repository->forArticle(123);
+
+        $this->assertCount(2, $entries);
+        $this->assertSame('ref_1', $entries->first()->reference_id);
+        $this->assertSame('ref_2', $entries->last()->reference_id);
+    }
+
+    public function test_activeForArticle_returns_only_estimated_confirmed_and_settled(): void
+    {
+        EarningsLedger::query()->where('article_id', 123)->delete();
+
+        foreach (AccrualStatus::cases() as $status) {
+            EarningsLedger::create([
+                'user_id' => 1,
+                'article_id' => 123,
+                'type' => 'sale',
+                'amount' => 100,
+                'currency' => 'gbp',
+                'reference_id' => 'ref_' . $status->value,
+                'earned_at' => '2026-06-07 12:00:00',
+                'accrual_status' => $status->value,
+            ]);
+        }
+
+        $entries = $this->repository->activeForArticle(123);
+
+        $statuses = [];
+
+        foreach ($entries as $entry) {
+            $statuses[] = $entry->accrual_status;
+        }
+
+        sort($statuses);
+
+        $expected = [
+            AccrualStatus::Confirmed->value,
+            AccrualStatus::Estimated->value,
+            AccrualStatus::Settled->value,
+        ];
+
+        sort($expected);
+
+        $this->assertSame($expected, $statuses);
+
+        $this->assertNotContains(AccrualStatus::Withdrawn->value, $statuses);
+        $this->assertNotContains(AccrualStatus::Reversed->value, $statuses);
+    }
+
 
     protected function setUp(): void
     {

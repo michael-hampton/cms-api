@@ -3,8 +3,8 @@
 namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
-use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
+use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\Pages\PageRepository;
@@ -15,35 +15,34 @@ use App\Services\OpenCollab\ReadabilityService;
 /**
  * Renders the public and contributor-facing article pages.
  *
- * All `$userId = 1; //todo` stubs have been replaced with Auth::id().
- * Auth is resolved via the token (API calls) or session (web); both
- * paths are handled by Auth::user() already.
- *
- * Draft-first rule: ContributorPageService sets status = draft at creation.
- * This controller does not override that; it just reads what's stored.
+ * Payment modal visibility rule:
+ *   The modal is shown ONLY when the page is sellable (isSellable() === true).
+ *   This requires: visibility = premium, price > 0, premium_approved_at set,
+ *   and monetisation_disabled_at = null.
+ *   The backend never relies on frontend modal state for eligibility.
  */
 class ArticlePageController extends Controller
 {
     use ResolvesUiComponents;
-
     use AuthorizesSitePagePermissions;
 
     public function __construct(
-        private readonly PageRepository       $pageRepository,
-        private readonly ArticleAccessService $accessService,
-        private readonly ReadabilityService   $readabilityService,
+        private readonly PageRepository                $pageRepository,
+        private readonly ArticleAccessService          $accessService,
+        private readonly ReadabilityService            $readabilityService,
         private readonly OpenCollabAuthorizationService $authorization,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
     /**
      * GET /articles/{slug}
-     * Public article page. Three rendering states:
-     *   Free article           → full content
-     *   Paid + no access       → preview + paywall
-     *   Paid + access granted  → full content
+     *
+     * Three rendering states:
+     *   Free article                → full content, no paywall
+     *   Approved premium + no access → preview + payment button
+     *   Premium but NOT approved    → locked-content message, NO payment button
+     *   Approved premium + access   → full content
      */
     public function show(string $slug)
     {
@@ -53,14 +52,13 @@ class ArticlePageController extends Controller
             return $this->notFound();
         }
 
-        // Only published articles are publicly accessible
         if ($page->status !== 'published') {
             return $this->notFound();
         }
 
-        $user = Auth::user();
+        $user   = Auth::user();
         $userId = $user?->id;
-        $email = $user?->email;
+        $email  = $user?->email;
 
         $accessGranted = $this->accessService->canView($page, $userId, $email);
 
@@ -72,25 +70,21 @@ class ArticlePageController extends Controller
             ? $page->content
             : $this->previewContent($page->content);
 
-        return $this->view('open-collab.articles.show', [
-            'page' => $page,
-            'accessGranted' => $accessGranted,
-            'content' => $content,
-            'authorName' => $authorName,
-            'readerEmail' => $email ?? '',
-            'site' => SiteContext::slug(),
-            'stripePublicKey' => config('stripe.public_key', ''),
-        ]);
-    }
+        // Payment button is shown only for pages that are fully sellable.
+        // An unapproved or disabled premium page shows the locked message
+        // but not the payment button — users cannot purchase it.
+        $showPaymentButton = !$accessGranted && $page->isSellable();
 
-    /**
-     * Returns the first ~300 characters of the content stripped of HTML.
-     * The controller — not the view — is responsible for this truncation.
-     */
-    private function previewContent(string $content): string
-    {
-        $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        return mb_substr($plain, 0, 300) . '…';
+        return $this->view('open-collab.articles.show', [
+            'page'               => $page,
+            'accessGranted'      => $accessGranted,
+            'showPaymentButton'  => $showPaymentButton,
+            'content'            => $content,
+            'authorName'         => $authorName,
+            'readerEmail'        => $email ?? '',
+            'site'               => SiteContext::slug(),
+            'stripePublicKey'    => config('stripe.public_key', ''),
+        ]);
     }
 
     /**
@@ -103,15 +97,13 @@ class ArticlePageController extends Controller
         }
 
         return $this->view('open-collab.articles.editor', [
-            'page' => null,
-            'site' => SiteContext::slug(),
-            'siteId' => SiteContext::getId(),
+            'page'            => null,
+            'site'            => SiteContext::slug(),
+            'siteId'          => SiteContext::getId(),
             'readabilityScore' => null,
-            'currentUser' => Auth::user(),
+            'currentUser'     => Auth::user(),
         ]);
     }
-
-    // ── Helpers ──────────────────────────────────────────────
 
     /**
      * GET /articles/{id}/edit
@@ -123,29 +115,25 @@ class ArticlePageController extends Controller
         }
 
         $userId = Auth::id();
-        $page = $this->pageRepository->find($id);
+        $page   = $this->pageRepository->find($id);
 
-        //dd($page);
-
-        // Ownership check
-        if (!$page || (int)$page->contributor_id !== (int)$userId) {
+        if (!$page || (int) $page->contributor_id !== (int) $userId) {
             return $this->redirect('/articles');
         }
 
         $score = $this->readabilityService->getScore($id);
 
         return $this->view('open-collab.articles.editor', [
-            'page' => $page,
-            'site' => SiteContext::slug(),
-            'siteId' => SiteContext::getId(),
+            'page'             => $page,
+            'site'             => SiteContext::slug(),
+            'siteId'           => SiteContext::getId(),
             'readabilityScore' => $score?->readability_score,
-            'currentUser' => Auth::user(),
+            'currentUser'      => Auth::user(),
         ]);
     }
 
     /**
      * GET /articles
-     * Contributor's article management list.
      */
     public function index()
     {
@@ -155,10 +143,18 @@ class ArticlePageController extends Controller
         );
 
         return $this->view('open-collab.articles.index', [
-            'articles' => $articles,
+            'articles'            => $articles,
             'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('articles.index'),
-            'site' => SiteContext::slug(),
-            'currentUser' => Auth::user(),
+            'site'                => SiteContext::slug(),
+            'currentUser'         => Auth::user(),
         ]);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function previewContent(string $content): string
+    {
+        $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        return mb_substr($plain, 0, 300) . '…';
     }
 }

@@ -19,6 +19,7 @@ use App\Events\Boost\BoostExpiredEvent;
 use App\Events\Boost\BoostLimitBreachedEvent;
 use App\Events\Boost\BoostPausedEvent;
 use App\Events\Boost\BoostResumedEvent;
+use App\Events\Cms\ContentEditoriallyModified;
 use App\Events\DatabaseEventSubscriber;
 use App\Events\Cms\ContentApproved;
 use App\Events\Cms\ContentHeld;
@@ -67,6 +68,7 @@ use App\Events\Subscriptions\SubscriptionCancelled;
 use App\Events\Subscriptions\SubscriptionCancelledByStripe;
 use App\Events\Subscriptions\SubscriptionCreated;
 use App\Events\Subscriptions\SubscriptionPaused;
+use App\Events\Subscriptions\SubscriptionPricingChangeScheduled;
 use App\Events\Subscriptions\SubscriptionReactivated;
 use App\Events\Subscriptions\SubscriptionResumed;
 use App\Framework\Console\Artisan;
@@ -148,6 +150,7 @@ use App\Listeners\Subscriptions\AllFulfilmentsCreatedListener;
 use App\Listeners\Subscriptions\IssueDeliveryDispatchedListener;
 use App\Listeners\Subscriptions\LabelRunFailedListener;
 use App\Listeners\Subscriptions\LabelRunGeneratedListener;
+use App\Listeners\Subscriptions\NotifyAffectedSubscribersListener;
 use App\Listeners\Subscriptions\OnInvoicePaymentFailed;
 use App\Listeners\Subscriptions\OnInvoicePaymentSucceeded;
 use App\Listeners\Subscriptions\OnSubscriptionCancelledByStripe;
@@ -816,6 +819,10 @@ class ApiApplication
         $eventDispatcher->listen(ContentApproved::class, [SendContentWorkflowNotification::class, 'handle']);
         $eventDispatcher->listen(ContentRejected::class, [SendContentWorkflowNotification::class, 'handle']);
         $eventDispatcher->listen(ContentHeld::class, [SendContentWorkflowNotification::class, 'handle']);
+        $eventDispatcher->listen(
+            ContentEditoriallyModified::class,
+            [SendContentWorkflowNotification::class, 'handle']
+        );
 
         $eventDispatcher->listen(MemberAddressImported::class, [MemberPostcodeUpdated::class, 'handle']);
         $eventDispatcher->listen(MemberPostcodeUpdatedListener::class, [MemberPostcodeUpdated::class, 'handle']);
@@ -828,6 +835,7 @@ class ApiApplication
         $eventDispatcher->listen(ProductFulfilmentCreated::class, [ProductFulfilmentCreatedListener::class, 'handle']);
         $eventDispatcher->listen(ProductFulfilmentStalled::class, [NotifyOpsOfStalledProductFulfilmentListener::class, 'handle']);
 
+        $eventDispatcher->listen(SubscriptionPricingChangeScheduled::class, [NotifyAffectedSubscribersListener::class, 'handle']);
 
         $eventDispatcher->listen(IssueDeliveryDispatched::class, [IssueDeliveryDispatchedListener::class, 'handle']);
         $eventDispatcher->listen(AllFulfilmentsCreated::class, [AllFulfilmentsCreatedListener::class, 'handle']);

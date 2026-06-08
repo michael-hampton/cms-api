@@ -1021,6 +1021,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/pages/calendar', [PageController::class, 'getCalendarPages']);
         $router->get('/featured-pages', PageController::class, 'getFeaturedPages');
         $router->put('/pages/{id}/schedule', [PageController::class, 'updateSchedule']);
+        $router->post('/pages/{id}/approve-with-decision', [PageController::class, 'approveWithDecision']);
+        $router->get('/pages/{id}/premium-price-recommendation', [PageController::class, 'premiumPriceRecommendation']);
 
         $router->get('/rewards', [RewardsAdminController::class, 'index']);
         $router->get('/rewards/search', [RewardsAdminController::class, 'search']);
