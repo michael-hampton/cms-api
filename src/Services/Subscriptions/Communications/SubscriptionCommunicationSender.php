@@ -41,14 +41,23 @@ class SubscriptionCommunicationSender
     }
 
     public function send(
-        Subscription                          $subscription,
-        SubscriptionCommunication             $communication,
-        ?SubscriptionCommunicationSchedule    $schedule = null,
+        Subscription                       $subscription,
+        SubscriptionCommunication          $communication,
+        ?SubscriptionCommunicationSchedule $schedule = null,
+        array                              $metadata = [],
+        ?string                            $dedupeKey = null,
     ): void {
         $channels = $communication->channels ?? [];
 
         foreach ($channels as $channel) {
-            $this->sendViaChannel($subscription, $communication, $schedule, $channel);
+            $this->sendViaChannel(
+                subscription: $subscription,
+                communication: $communication,
+                schedule: $schedule,
+                channel: $channel,
+                metadata: $metadata,
+                dedupeKey: $dedupeKey,
+            );
         }
     }
 
@@ -57,24 +66,28 @@ class SubscriptionCommunicationSender
         SubscriptionCommunication          $communication,
         ?SubscriptionCommunicationSchedule $schedule,
         string                             $channel,
+        array                              $metadata = [],
+        ?string                            $dedupeKey = null,
     ): void {
         if ($this->deliveryRepository->hasAlreadySent(
             $subscription->id,
             $communication->id,
             $schedule?->id,
+            $dedupeKey,
         )) {
             $this->logger->info('SubscriptionCommunicationSender: skipping duplicate', [
                 'subscription_id' => $subscription->id,
                 'communication_id' => $communication->id,
                 'schedule_id' => $schedule?->id,
                 'channel' => $channel,
+                'dedupe_key' => $dedupeKey,
             ]);
             return;
         }
 
         match ($channel) {
-            'email'  => $this->sendEmail($subscription, $communication, $schedule),
-            'in_app' => $this->sendInApp($subscription, $communication, $schedule),
+            'email'  => $this->sendEmail($subscription, $communication, $schedule, $metadata, $dedupeKey),
+            'in_app' => $this->sendInApp($subscription, $communication, $schedule, $metadata, $dedupeKey),
             default  => $this->logger->warning('SubscriptionCommunicationSender: unknown channel', [
                 'channel' => $channel,
             ]),
@@ -85,6 +98,8 @@ class SubscriptionCommunicationSender
         Subscription                       $subscription,
         SubscriptionCommunication          $communication,
         ?SubscriptionCommunicationSchedule $schedule,
+        array                              $metadata = [],
+        ?string                            $dedupeKey = null,
     ): void {
         $member = $subscription->member;
 
@@ -102,6 +117,8 @@ class SubscriptionCommunicationSender
             scheduleId:      $schedule?->id,
             channel:         'email',
             recipientEmail:  $member->email,
+            metadata:        $metadata,
+            dedupeKey:       $dedupeKey,
         );
 
         $template = $communication->template;
@@ -116,7 +133,15 @@ class SubscriptionCommunicationSender
         }
 
         try {
-            $mailable = new $template($member, $subscription, $communication, $schedule);
+            $mailable = $this->makeMailable(
+                template: $template,
+                member: $member,
+                subscription: $subscription,
+                communication: $communication,
+                schedule: $schedule,
+                metadata: $metadata,
+            );
+
             $mailable->deliveryToken = $delivery->token;
 
             $notification = new SubscriptionCommunicationNotification(
@@ -148,6 +173,8 @@ class SubscriptionCommunicationSender
         Subscription                       $subscription,
         SubscriptionCommunication          $communication,
         ?SubscriptionCommunicationSchedule $schedule,
+        array                              $metadata = [],
+        ?string                            $dedupeKey = null,
     ): void {
         $member = $subscription->member;
 
@@ -161,11 +188,14 @@ class SubscriptionCommunicationSender
             communicationId: $communication->id,
             scheduleId:      $schedule?->id,
             channel:         'in_app',
+            metadata:        $metadata,
+            dedupeKey:       $dedupeKey,
         );
 
         try {
             $dispatched = $this->inAppDispatcher->dispatchForSubscriptionCommunication(
-                $member, $communication
+                $member,
+                $communication
             );
 
             if ($dispatched) {
@@ -180,5 +210,34 @@ class SubscriptionCommunicationSender
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    private function makeMailable(
+        string                             $template,
+        mixed                              $member,
+        Subscription                       $subscription,
+        SubscriptionCommunication          $communication,
+        ?SubscriptionCommunicationSchedule $schedule,
+        array                              $metadata = [],
+    ): object {
+        $reflection = new \ReflectionClass($template);
+        $constructor = $reflection->getConstructor();
+
+        if ($constructor !== null && $constructor->getNumberOfParameters() >= 5) {
+            return new $template(
+                $member,
+                $subscription,
+                $communication,
+                $schedule,
+                $metadata,
+            );
+        }
+
+        return new $template(
+            $member,
+            $subscription,
+            $communication,
+            $schedule,
+        );
     }
 }

@@ -38,6 +38,9 @@ class SubscriptionPricingChange extends Model
         'status',
         'reason',
         'created_by',
+        'requires_subscription_replacement',
+        'itd_required',
+        'itd_letter_code',
     ];
 
     protected $casts = [
@@ -47,6 +50,8 @@ class SubscriptionPricingChange extends Model
         'notice_sent_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'requires_subscription_replacement' => 'boolean',
+        'itd_required' => 'boolean',
     ];
 
     // ── Relationships ─────────────────────────────────────────────────────
@@ -112,5 +117,25 @@ class SubscriptionPricingChange extends Model
         }
 
         return round((($this->new_price - $this->old_price) / $this->old_price) * 100, 1);
+    }
+
+    public function requiresSubscriptionReplacement(): bool
+    {
+        return (bool) $this->requires_subscription_replacement;
+    }
+
+    public function requiresItdNotification(): bool
+    {
+        return (bool) $this->itd_required;
+    }
+
+    public function itdLetterCode(): ?string
+    {
+        return $this->itd_letter_code;
+    }
+
+    public function isPriceIncrease(): bool
+    {
+        return $this->new_price > $this->old_price;
     }
 }

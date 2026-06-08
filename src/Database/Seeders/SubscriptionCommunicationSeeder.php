@@ -77,7 +77,16 @@ class SubscriptionCommunicationSeeder extends Seeder
             'sort_order' => 20,
             'schedules'  => [],
         ],
-
+        [
+            'key'        => 'itd_price_rise_default',
+            'name'       => 'ITD Price Rise Notice',
+            'type'       => CommunicationTypeEnum::ITD,
+            'template'   => \App\Mail\Subscriptions\ItdPriceRiseNoticeMail::class,
+            'channels'   => ['email'],
+            'is_active'  => true,
+            'sort_order' => 50,
+            'schedules'  => [],
+        ],
         [
             'key'        => 'customer_care_default',
             'name'       => 'Customer Care',

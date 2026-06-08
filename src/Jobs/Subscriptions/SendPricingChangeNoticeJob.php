@@ -11,9 +11,8 @@ use App\Framework\Queue\Queueable;
 use App\Framework\Queue\SerializesModels;
 use App\Framework\Queue\ShouldQueue;
 use App\Framework\Support\Logger;
-use App\Framework\Support\Mail;
+use App\Jobs\BaseJob;
 use App\Mail\Subscriptions\PricingChangeNoticeMail;
-use App\Mail\Subscriptions\SubscriptionLinkedMail;
 use App\Models\Member;
 use App\Models\Subscription;
 use App\Models\SubscriptionPricingChange;
@@ -28,17 +27,17 @@ use App\Models\SubscriptionPricingChange;
  * logged rather than bubbled, so a single failed delivery does not block the
  * rest of the batch.
  */
-class SendPricingChangeNoticeJob implements ShouldQueue
+class SendPricingChangeNoticeJob extends BaseJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $backoff = 60; // seconds
 
-    public function __construct(
-        private readonly Member                    $member,
-        private readonly Subscription              $subscription,
-        private readonly SubscriptionPricingChange $pricingChange,
-    )
+    private Member $member;
+    private Subscription $subscription;
+    private SubscriptionPricingChange $pricingChange;
+
+    public function __construct()
     {
     }
 

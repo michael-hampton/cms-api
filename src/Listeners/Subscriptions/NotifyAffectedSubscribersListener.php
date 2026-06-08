@@ -4,6 +4,7 @@ namespace App\Listeners\Subscriptions;
 
 use App\Events\Subscriptions\SubscriptionPricingChangeScheduled;
 use App\Jobs\Subscriptions\SendPricingChangeNoticeJob;
+use App\Jobs\SyncMemberToStripeJob;
 use App\Repositories\Subscriptions\SubscriptionPricingChangeRepository;
 
 /**
@@ -39,11 +40,11 @@ class NotifyAffectedSubscribersListener
                 continue;
             }
 
-//            SendPricingChangeNoticeJob::dispatch(
-//                $member,
-//                $subscription,
-//                $pricingChange,
-//            );
+            dispatch(SendPricingChangeNoticeJob::for(
+                $member,
+                $subscription,
+                $pricingChange,
+            ))->dispatchNow();
         }
 
         $this->repository->markNotified($pricingChange);

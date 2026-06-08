@@ -81,4 +81,11 @@ class SubscriptionCommunicationRepository
 
         return $communication;
     }
+
+    public function findActiveByKey(string $key): ?SubscriptionCommunication
+    {
+        return SubscriptionCommunication::where('key', $key)
+            ->where('is_active', true)
+            ->first();
+    }
 }

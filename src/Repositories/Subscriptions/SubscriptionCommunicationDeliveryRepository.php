@@ -11,18 +11,29 @@ use App\Models\SubscriptionCommunicationDelivery;
 class SubscriptionCommunicationDeliveryRepository
 {
     public function hasAlreadySent(
-        int  $subscriptionId,
-        int  $communicationId,
-        ?int $scheduleId
+        int     $subscriptionId,
+        int     $communicationId,
+        ?int    $scheduleId,
+        ?string $dedupeKey = null,
     ): bool {
-        return SubscriptionCommunicationDelivery::where('subscription_id', $subscriptionId)
+        $query = SubscriptionCommunicationDelivery::where('subscription_id', $subscriptionId)
             ->where('subscription_communication_id', $communicationId)
-            ->where('subscription_communication_schedule_id', $scheduleId)
             ->whereIn('status', [
                 CommunicationDeliveryStatus::SENT->value,
                 CommunicationDeliveryStatus::PENDING->value,
-            ])
-            ->exists();
+            ]);
+
+        if ($scheduleId === null) {
+            $query->whereNull('subscription_communication_schedule_id');
+        } else {
+            $query->where('subscription_communication_schedule_id', $scheduleId);
+        }
+
+        if ($dedupeKey !== null) {
+            $query->where('dedupe_key', $dedupeKey);
+        }
+
+        return $query->exists();
     }
 
     public function recordPending(
@@ -35,6 +46,8 @@ class SubscriptionCommunicationDeliveryRepository
         ?int    $subscriptionSegmentId = null,
         ?string $recipientEmail = null,
         ?string $subject = null,
+        ?array  $metadata = null,
+        ?string $dedupeKey = null,
     ): Model {
         return SubscriptionCommunicationDelivery::create([
             'subscription_id'                          => $subscriptionId,
@@ -44,10 +57,12 @@ class SubscriptionCommunicationDeliveryRepository
             'channel'                                  => $channel,
             'status'                                   => CommunicationDeliveryStatus::PENDING->value,
             'token'                                    => Str::uuid(),
+            'dedupe_key'                               => $dedupeKey,
             'segment_id'                               => $segmentId,
             'subscription_segment_id'                  => $subscriptionSegmentId,
             'recipient_email'                          => $recipientEmail,
             'subject'                                  => $subject,
+            'metadata'                                 => $metadata,
         ]);
     }
 

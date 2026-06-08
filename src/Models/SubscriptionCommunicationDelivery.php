@@ -15,6 +15,7 @@ class SubscriptionCommunicationDelivery extends Model
         'recipient_email', 'subject',
         'sent_at', 'failed_at', 'opened_at', 'clicked_at',
         'failure_reason', 'metadata',
+        'dedupe_key',
     ];
 
     protected $casts = [
