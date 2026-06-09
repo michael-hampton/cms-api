@@ -16,6 +16,7 @@ use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorAgeValidationService;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\ContributorProfileCompletionService;
 use App\Services\OpenCollab\StripeConnectAccountService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use DateTimeImmutable;
@@ -53,6 +54,7 @@ class ContributorOnboardingServiceTest extends TestCase
 
     private ContributorAgeValidationService $ageService;
     private ContributorOnboardingRepository $contributorOnboardingRepository;
+    private ContributorProfileCompletionService $contributorProfileCompletionService;
 
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -65,6 +67,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->contractRepo   = Mockery::mock(ContractRepository::class);
         $this->guidelinesRepo = Mockery::mock(GuidelinesRepository::class);
         $this->contributorOnboardingRepository = Mockery::mock(ContributorOnboardingRepository::class);
+        $this->contributorProfileCompletionService = Mockery::mock(ContributorProfileCompletionService::class);
         $this->ageService     = new ContributorAgeValidationService();
 
         // Default: step repo reports no rows exist for any step.
@@ -77,8 +80,11 @@ class ContributorOnboardingServiceTest extends TestCase
             contractRepository:        $this->contractRepo,
             guidelinesRepository:      $this->guidelinesRepo,
             ageValidationService:      $this->ageService,
-            contributorOnboardingRepository:  $this->contributorOnboardingRepository
+            contributorOnboardingRepository:  $this->contributorOnboardingRepository,
+            profileCompletionService: $this->contributorProfileCompletionService,
         );
+
+        $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(true)->byDefault();
     }
 
     protected function tearDown(): void
@@ -134,6 +140,8 @@ class ContributorOnboardingServiceTest extends TestCase
     {
         $site    = $this->makeSite(['require_payment_setup' => false, 'require_contracts' => false, 'require_guidelines_ack' => false, 'require_age_verification' => false]);
         $profile = $this->makeProfile(['bio' => '']);
+
+        $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(false);
 
         $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
 
@@ -260,12 +268,6 @@ class ContributorOnboardingServiceTest extends TestCase
             ->with(1, 7)
             ->andReturn(true);
 
-        $this->profileRepo
-            ->shouldReceive('findByUserId')
-            ->once()
-            ->with(1)
-            ->andReturn($profile);
-
         $this->stepRepo
             ->shouldReceive('markCompleted')
             ->once()
@@ -317,12 +319,6 @@ class ContributorOnboardingServiceTest extends TestCase
             ->with(1)
             ->andReturn(true);
 
-        $this->profileRepo
-            ->shouldReceive('findByUserId')
-            ->once()
-            ->with(1)
-            ->andReturn($profile);
-
         $this->mockStepStatuses(1, $site, [
             'profile' => OnboardingStepStatus::Completed->value,
             'payment_setup' => OnboardingStepStatus::Completed->value,
@@ -362,12 +358,6 @@ class ContributorOnboardingServiceTest extends TestCase
             ->with(1, $site->id)
             ->andReturn(2);
 
-        $this->profileRepo
-            ->shouldReceive('findByUserId')
-            ->once()
-            ->with(1)
-            ->andReturn($profile);
-
         $this->mockStepStatuses(1, $site, [
             'profile'    => OnboardingStepStatus::Completed->value,
             'guidelines' => OnboardingStepStatus::Completed->value,
@@ -406,7 +396,7 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->profileRepo
             ->shouldReceive('findByUserId')
-            ->times(3)
+            ->twice()
             ->with(1)
             ->andReturn($profile);
 
@@ -442,12 +432,6 @@ class ContributorOnboardingServiceTest extends TestCase
         $profile = $this->makeProfile([
             'bio' => 'A valid bio with enough length.',
         ]);
-
-        $this->profileRepo
-            ->shouldReceive('findByUserId')
-            ->twice()
-            ->with(1)
-            ->andReturn($profile);
 
         $this->stepRepo
             ->shouldReceive('markCompleted')
@@ -930,11 +914,35 @@ class ContributorOnboardingServiceTest extends TestCase
     {
         $site = $this->makeSite();
 
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn(null);
-        $this->profileRepo->shouldReceive('isPaymentSetup')->andReturn(false);
-        $this->contractRepo->shouldReceive('latestPublishedForSite')->andReturn($this->makeContract());
-        $this->contractRepo->shouldReceive('hasSigned')->andReturn(false);
-        $this->guidelinesRepo->shouldReceive('latestAcknowledgedVersion')->andReturn(0);
+        $profile = $this->makeProfile([
+            'date_of_birth' => null,
+        ]);
+        $profile->date_of_birth = null;
+
+        $this->contributorProfileCompletionService
+            ->shouldReceive('isComplete')
+            ->with(1, $site)
+            ->andReturn(false);
+
+        $this->profileRepo
+            ->shouldReceive('findByUserId')
+            ->andReturn($profile);
+
+        $this->profileRepo
+            ->shouldReceive('isPaymentSetup')
+            ->andReturn(false);
+
+        $this->contractRepo
+            ->shouldReceive('latestPublishedForSite')
+            ->andReturn($this->makeContract());
+
+        $this->contractRepo
+            ->shouldReceive('hasSigned')
+            ->andReturn(false);
+
+        $this->guidelinesRepo
+            ->shouldReceive('latestAcknowledgedVersion')
+            ->andReturn(0);
 
         foreach ($this->service->pendingSteps(1, $site) as $step) {
             $this->assertNotEmpty($step['reason'], "Step [{$step['step']}] has an empty reason.");
@@ -1041,10 +1049,24 @@ class ContributorOnboardingServiceTest extends TestCase
 
     public function test_complete_profile_step_returns_error_when_bio_missing(): void
     {
-        $site    = $this->makeSite();
-        $profile = $this->makeProfile(['bio' => '']);
+        $site = $this->makeSite();
 
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->contributorProfileCompletionService
+            ->shouldReceive('isComplete')
+            ->once()
+            ->with(1, $site)
+            ->andReturn(false);
+
+        $this->contributorProfileCompletionService
+            ->shouldReceive('missingFields')
+            ->once()
+            ->with(1, $site)
+            ->andReturn([
+                [
+                    'key'  => 'bio',
+                    'name' => 'Bio',
+                ],
+            ]);
 
         $result = $this->service->completeProfileStep(1, $site);
 
@@ -1054,10 +1076,24 @@ class ContributorOnboardingServiceTest extends TestCase
 
     public function test_complete_profile_step_returns_error_when_bio_too_short(): void
     {
-        $site    = $this->makeSite();
-        $profile = $this->makeProfile(['bio' => 'Short.']);
+        $site = $this->makeSite();
 
-        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $this->contributorProfileCompletionService
+            ->shouldReceive('isComplete')
+            ->once()
+            ->with(1, $site)
+            ->andReturn(false);
+
+        $this->contributorProfileCompletionService
+            ->shouldReceive('missingFields')
+            ->once()
+            ->with(1, $site)
+            ->andReturn([
+                [
+                    'key'  => 'bio',
+                    'name' => 'Bio',
+                ],
+            ]);
 
         $result = $this->service->completeProfileStep(1, $site);
 
@@ -1074,14 +1110,10 @@ class ContributorOnboardingServiceTest extends TestCase
             'require_age_verification' => false,
         ]);
 
-        $profile = $this->makeProfile([
-            'bio' => 'A valid bio that is long enough.',
-        ]);
-
-        $this->profileRepo
-            ->shouldReceive('findByUserId')
-            ->atLeast()->once()->with(1)
-            ->andReturn($profile);
+        $this->contributorProfileCompletionService
+            ->shouldReceive('isComplete')
+            ->with(1, $site)
+            ->andReturn(true);
 
         $this->stepRepo
             ->shouldReceive('markCompleted')
@@ -1090,7 +1122,8 @@ class ContributorOnboardingServiceTest extends TestCase
 
         $this->stepRepo
             ->shouldReceive('getStatus')
-            ->atLeast()->once()
+            ->atLeast()
+            ->once()
             ->with(1, $site->id, 'profile')
             ->andReturn(OnboardingStepStatus::Completed->value);
 
@@ -1236,12 +1269,13 @@ class ContributorOnboardingServiceTest extends TestCase
         $stripe->shouldReceive('getAccountStatus')->andReturn($status);
 
         return new ContributorOnboardingService(
-            profileRepository:         $this->profileRepo,
-            onboardingStepRepository:  $this->stepRepo,
-            contractRepository:        $this->contractRepo,
-            guidelinesRepository:      $this->guidelinesRepo,
-            ageValidationService:      $this->ageService,
-            contributorOnboardingRepository:  $this->contributorOnboardingRepository,
+            profileRepository: $this->profileRepo,
+            onboardingStepRepository: $this->stepRepo,
+            contractRepository: $this->contractRepo,
+            guidelinesRepository: $this->guidelinesRepo,
+            ageValidationService: $this->ageService,
+            contributorOnboardingRepository: $this->contributorOnboardingRepository,
+            profileCompletionService: $this->contributorProfileCompletionService,
             stripeConnectAccountService: $stripe,
         );
     }

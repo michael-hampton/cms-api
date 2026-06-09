@@ -152,6 +152,7 @@ use App\Controllers\Subscription\SubscriptionCommunicationTrackingController;
 use App\Controllers\Subscription\SubscriptionController;
 use App\Controllers\Subscription\SubscriptionModalController;
 use App\Controllers\Vouchers\SubscriptionVoucherController;
+use App\Framework\Middleware\EnsureOnboardingNotExpired;
 use App\Middleware\OpenCollab\OnboardingRouteGuard;
 use App\Controllers\Subscription\SubscriptionPlanPricingController;
 use App\Controllers\Subscription\SubscriptionPlanSubscriberController;
@@ -1823,7 +1824,7 @@ $router->get('/api/{site}/address-lookup', [AddressController::class, 'lookup'])
 $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router) {
 
     // Epic 2: Onboarding API (Targets OnboardingController)
-    $router->group(['prefix' => 'onboarding'], function () use ($router) {
+    $router->group(['prefix' => 'onboarding', 'middleware' => [EnsureOnboardingNotExpired::class]], function () use ($router) {
         $router->get('/status', [OnboardingController::class, 'status']);
         $router->post('/profile', [OnboardingController::class, 'storeProfile']);
         $router->post('/steps/profile/complete', [OnboardingController::class, 'completeProfileStep']);

@@ -3,6 +3,7 @@
 namespace App\Services\OpenCollab;
 
 use App\DTO\OpenCollab\OnboardingRequirements;
+use App\Enums\OpenCollab\ContributorOnboardingStatus;
 use App\Enums\OpenCollab\OnboardingStepStatus;
 use App\Enums\OpenCollab\StripeConnectAccountStatus;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
@@ -22,11 +23,16 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
  *     2. contributor_onboarding_steps row status === 'completed'
  *     3. domain validation still passes at runtime
  *
+ * Profile step:
+ *   Delegates completion determination to ContributorProfileCompletionService,
+ *   which checks per-site active required CustomFieldDefinition rows.
+ *   This service does NOT inspect individual profile fields directly.
+ *
  * KYC verification step:
  *   Enabled via the site flag `require_kyc_verification`.
  *   Completion requires BOTH:
  *     - explicit completeStep() call (contributor returns from Stripe onboarding)
- *     - Stripe account status === Enabled (payouts_enabled, details_submitted, no requirements)
+ *     - Stripe account status === Enabled
  *
  *   The step may be invalidated by the webhook handler when Stripe becomes restricted.
  */
@@ -39,6 +45,7 @@ class ContributorOnboardingService
         private readonly GuidelinesRepository                $guidelinesRepository,
         private readonly ContributorAgeValidationService     $ageValidationService,
         private readonly ContributorOnboardingRepository     $contributorOnboardingRepository,
+        private readonly ContributorProfileCompletionService $profileCompletionService,
         private readonly ?StripeConnectAccountService        $stripeConnectAccountService = null,
     ) {}
 
@@ -46,7 +53,25 @@ class ContributorOnboardingService
 
     public function start(int $userId, int $siteId): void
     {
+        $expiresAt = $this->calculateExpiresAt();
+
         $this->contributorOnboardingRepository->start($userId, $siteId);
+    }
+
+    private function calculateExpiresAt(): string
+    {
+        $days = (int) (config('open_collab.onboarding.expires_after_days') ?? 60);
+
+        return date('Y-m-d H:i:s', strtotime("+{$days} days"));
+    }
+
+    public function touchActivity(int $userId, Site $site): void
+    {
+        $this->contributorOnboardingRepository->touchActivity(
+            $userId,
+            (int) $site->id,
+            $this->calculateExpiresAt(),
+        );
     }
 
     /**
@@ -184,20 +209,15 @@ class ContributorOnboardingService
 
     public function completeProfileStep(int $userId, Site $site): array
     {
-        $profile = $this->profileRepository->findByUserId($userId);
+        if (!$this->profileCompletionService->isComplete($userId, $site)) {
+            $missing = $this->profileCompletionService->missingFields($userId, $site);
 
-        if (!$profile || !trim((string) $profile->bio)) {
-            return [
-                'ok'     => false,
-                'errors' => ['bio' => ['A short bio is required before you can complete your profile.']],
-            ];
-        }
+            $errors = [];
+            foreach ($missing as $field) {
+                $errors[$field['key']] = ["Please complete your {$field['name']} before continuing."];
+            }
 
-        if (mb_strlen(trim((string) $profile->bio)) < 20) {
-            return [
-                'ok'     => false,
-                'errors' => ['bio' => ['Your bio must be at least 20 characters.']],
-            ];
+            return ['ok' => false, 'errors' => $errors];
         }
 
         try {
@@ -287,8 +307,6 @@ class ContributorOnboardingService
     }
 
     /**
-     * Returns only the step names applicable to this site configuration.
-     *
      * @return array<int, string>
      */
     private function applicableStepsFromRequirements(OnboardingRequirements $req): array
@@ -331,7 +349,7 @@ class ContributorOnboardingService
         $pending = [];
 
         foreach ($this->applicableStepsFromRequirements($req) as $step) {
-            $result = $this->evaluateStep($userId, $req, $step);
+            $result = $this->evaluateStep($userId, $req, $step, $site);
 
             if ($result !== null) {
                 if ($result['stale'] && $site !== null) {
@@ -353,14 +371,14 @@ class ContributorOnboardingService
     /**
      * @return array{step: string, status: string, reason: string, meta: array, stale: bool}|null
      */
-    private function evaluateStep(int $userId, OnboardingRequirements $req, string $step): ?array
+    private function evaluateStep(int $userId, OnboardingRequirements $req, string $step, ?Site $site = null): ?array
     {
         $rowStatus = $this->onboardingStepRepository->getStatus($userId, $req->siteId, $step)
             ?? OnboardingStepStatus::Pending->value;
 
         $rowIsCompleted = $rowStatus === OnboardingStepStatus::Completed->value;
 
-        [$domainPasses, $reason, $meta] = $this->checkDomainForStep($userId, $req, $step);
+        [$domainPasses, $reason, $meta] = $this->checkDomainForStep($userId, $req, $step, $site);
 
         if ($rowIsCompleted && $domainPasses) {
             return null;
@@ -388,10 +406,10 @@ class ContributorOnboardingService
     /**
      * @return array{0: bool, 1: string, 2: array<string, mixed>}
      */
-    private function checkDomainForStep(int $userId, OnboardingRequirements $req, string $step): array
+    private function checkDomainForStep(int $userId, OnboardingRequirements $req, string $step, ?Site $site = null): array
     {
         return match ($step) {
-            'profile'          => $this->checkProfileDomain($userId, $req),
+            'profile'          => $this->checkProfileDomain($userId, $req, $site),
             'payment_setup'    => $this->checkPaymentDomain($userId),
             'kyc_verification' => $this->checkKycDomain($userId, $req),
             'contract'         => $this->checkContractDomain($userId, $req),
@@ -403,9 +421,34 @@ class ContributorOnboardingService
 
     // ── Domain checks ─────────────────────────────────────────────────────────
 
-    /** @return array{0: bool, 1: string, 2: array} */
-    private function checkProfileDomain(int $userId, OnboardingRequirements $req): array
+    /**
+     * Profile domain check.
+     *
+     * When a Site is available, delegates to ContributorProfileCompletionService
+     * so per-site field configuration is respected.
+     *
+     * Falls back to the legacy bio-only check when no Site context is present
+     * (e.g. completeStep() assertion path before Site is threaded through).
+     *
+     * @return array{0: bool, 1: string, 2: array}
+     */
+    private function checkProfileDomain(int $userId, OnboardingRequirements $req, ?Site $site): array
     {
+        if ($site !== null) {
+            $isComplete = $this->profileCompletionService->isComplete($userId, $site);
+
+            if (!$isComplete) {
+                return [
+                    false,
+                    'Complete your contributor profile before contributing.',
+                    [],
+                ];
+            }
+
+            return [true, '', []];
+        }
+
+        // Legacy fallback (no Site context): check bio directly.
         $profile = $this->profileRepository->findByUserId($userId);
         $hasBio  = (bool) trim((string) ($profile?->bio ?? ''));
 
@@ -434,18 +477,7 @@ class ContributorOnboardingService
         return [true, '', []];
     }
 
-    /**
-     * KYC domain check.
-     *
-     * Passes only when the contributor's Stripe Connect account is in the
-     * Enabled state (payouts_enabled = true, details_submitted = true, no
-     * requirements due). A missing Stripe account always fails.
-     *
-     * If no StripeConnectAccountService is injected (e.g. in tests that do
-     * not care about KYC), the check defaults to pending.
-     *
-     * @return array{0: bool, 1: string, 2: array}
-     */
+    /** @return array{0: bool, 1: string, 2: array} */
     private function checkKycDomain(int $userId, OnboardingRequirements $req): array
     {
         if ($this->stripeConnectAccountService === null) {
@@ -455,11 +487,7 @@ class ContributorOnboardingService
         $status = $this->stripeConnectAccountService->getAccountStatus($userId);
 
         return match ($status) {
-            StripeConnectAccountStatus::Enabled => [
-                true,
-                '',
-                ['stripe_status' => $status->value],
-            ],
+            StripeConnectAccountStatus::Enabled => [true, '', ['stripe_status' => $status->value]],
             StripeConnectAccountStatus::Disconnected => [
                 false,
                 'A Stripe Connect account is required for KYC verification.',
@@ -503,14 +531,7 @@ class ContributorOnboardingService
             ];
         }
 
-        return [
-            true,
-            '',
-            [
-                'contract_id'      => $contract->id,
-                'contract_version' => $contract->version,
-            ],
-        ];
+        return [true, '', ['contract_id' => $contract->id, 'contract_version' => $contract->version]];
     }
 
     /** @return array{0: bool, 1: string, 2: array} */
@@ -529,14 +550,7 @@ class ContributorOnboardingService
             ];
         }
 
-        return [
-            true,
-            '',
-            [
-                'required_version'     => $req->guidelinesVersion,
-                'acknowledged_version' => $ack,
-            ],
-        ];
+        return [true, '', ['required_version' => $req->guidelinesVersion, 'acknowledged_version' => $ack]];
     }
 
     /** @return array{0: bool, 1: string, 2: array} */
@@ -569,7 +583,7 @@ class ContributorOnboardingService
 
     private function assertDomainValidForStep(int $userId, Site $site, string $step, OnboardingRequirements $req): void
     {
-        [$passes, $reason] = $this->checkDomainForStep($userId, $req, $step);
+        [$passes, $reason] = $this->checkDomainForStep($userId, $req, $step, $site);
 
         if (!$passes) {
             throw new \RuntimeException(
@@ -594,7 +608,15 @@ class ContributorOnboardingService
     {
         return match ($step) {
             'payment' => 'payment_setup',
-            default => $step,
+            default   => $step,
         };
+    }
+
+    public function isExpired(int $userId, Site $site): bool
+    {
+        $record = $this->contributorOnboardingRepository->findForUser($userId, (int) $site->id);
+
+        return $record !== null
+            && $record->status === ContributorOnboardingStatus::Expired->value;
     }
 }

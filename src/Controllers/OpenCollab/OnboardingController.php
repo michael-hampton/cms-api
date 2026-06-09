@@ -24,6 +24,8 @@ use App\Services\OpenCollab\ContributorPaymentMethodService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Models\User;
 use RuntimeException;
+use App\Services\OpenCollab\ContributorProfileFieldConfigService;
+use App\Enums\Cms\CustomFieldStorageType;
 
 /**
  * Handles contributor onboarding steps.
@@ -54,6 +56,7 @@ class OnboardingController extends Controller
         private readonly GuidelinesRepository           $guidelinesRepository,
         private readonly OpenCollabAuthorizationService $authorization,
         private readonly ContributorPaymentMethodService $paymentMethodService,
+        private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
     ) {
         parent::__construct();
     }
@@ -90,13 +93,66 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data   = $request->validated();
+            $site   = $this->currentSite();
             $userId = Auth::id();
 
-            $this->profileRepository->createOrUpdate($userId, [
-                'bio'    => $data['bio'],
-                'avatar' => $data['avatar'] ?? null,
-            ]);
+            $this->ensureContributorProfileStarted($userId, $site);
+
+            $data = $request->validated();
+
+            $fields = $this->profileFieldConfigService->activeFieldsForSite($site);
+
+            $profileData = [];
+
+            foreach ($fields as $field) {
+                $key = (string) $field->key;
+
+                if (!array_key_exists($key, $data)) {
+                    continue;
+                }
+
+                $value = $data[$key];
+
+                if ($key === 'writing_samples') {
+                    $urls = $value['url'] ?? [];
+                    $titles = $value['title'] ?? [];
+
+                    $samples = [];
+
+                    foreach ((array) $urls as $index => $url) {
+                        $url = trim((string) $url);
+
+                        if ($url === '') {
+                            continue;
+                        }
+
+                        $samples[] = [
+                            'url'   => $url,
+                            'title' => trim((string) ($titles[$index] ?? '')),
+                        ];
+                    }
+
+                    $column = $field->profile_column ?: $key;
+                    $profileData[$column] = json_encode($samples);
+
+                    continue;
+                }
+
+                if (($field->storage_type ?? null) === CustomFieldStorageType::ProfileColumn->value) {
+                    $column = $field->profile_column ?: $key;
+                    $profileData[$column] = $value;
+                    continue;
+                }
+            }
+
+            // Avatar can still be passed separately by existing frontend code.
+            if (array_key_exists('avatar', $data)) {
+                $profileData['avatar'] = $data['avatar'];
+            }
+
+            $this->profileRepository->createOrUpdate($userId, $profileData);
+
+            $this->onboardingService->touchActivity($userId, $site);
 
             return $this->successResponse('Profile saved.');
         } catch (ValidationException $e) {
@@ -173,6 +229,8 @@ class OnboardingController extends Controller
                 paymentMethodType: 'bank_transfer',
                 taxCountry: $data['tax_country'] ?? null,
             );
+
+            $this->onboardingService->touchActivity($userId, $this->currentSite());
 
             return $this->successResponse('Payment details saved.');
         } catch (ValidationException $e) {
@@ -345,6 +403,8 @@ class OnboardingController extends Controller
 
             $this->onboardingService->completeStep($userId, $site, 'contract');
 
+            $this->onboardingService->touchActivity($userId, $this->currentSite());
+
             return $this->successResponse('Contract signed.');
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
@@ -369,6 +429,8 @@ class OnboardingController extends Controller
             $this->profileRepository->markAgeVerified($userId, AgeVerificationMethod::SelfDeclared);
 
             $this->onboardingService->completeStep($userId, $site, 'age_verification');
+
+            $this->onboardingService->touchActivity($userId, $this->currentSite());
 
             return $this->successResponse('Age verification saved.');
         } catch (ValidationException $e) {
@@ -406,6 +468,8 @@ class OnboardingController extends Controller
             $this->guidelinesRepository->record($userId, $site->id, $currentVersion);
 
             $this->onboardingService->completeStep($userId, $site, 'guidelines');
+
+            $this->onboardingService->touchActivity($userId, $this->currentSite());
 
             return $this->successResponse('Guidelines acknowledged.');
         } catch (ValidationException $e) {
@@ -445,5 +509,10 @@ class OnboardingController extends Controller
     private function clientIp(Request $request): string
     {
         return $request->ip() ?? '0.0.0.0';
+    }
+
+    private function ensureContributorProfileStarted(int $userId, Site $site): void
+    {
+        $this->onboardingService->start($userId, $site->id);
     }
 }

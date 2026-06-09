@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Cms;
 
+use App\Enums\Cms\CustomFieldContext;
 use App\Framework\Support\Collection;
 use App\Models\CustomFieldDefinition;
 use App\Models\Model;
@@ -16,6 +17,68 @@ class CustomFieldDefinitionRepository extends Repository
         return CustomFieldDefinition::class;
     }
 
+    // ── Context-aware reads (Ticket 2) ────────────────────────────────────────
+
+    /**
+     * All definitions (active or not) for a site/context, ordered canonically.
+     */
+    public function forSiteAndContext(int $siteId, string $context): Collection
+    {
+        return CustomFieldDefinition::query()
+            ->where('site_id', $siteId)
+            ->where('context', $context)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Only active definitions for a site/context.
+     */
+    public function activeForSiteAndContext(int $siteId, string $context): Collection
+    {
+        return CustomFieldDefinition::query()
+            ->where('site_id', $siteId)
+            ->where('context', $context)
+            ->where('is_active', true)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Active AND required definitions for a site/context.
+     * This is the authoritative list used by profile completion checks.
+     */
+    public function activeRequiredForSiteAndContext(int $siteId, string $context): Collection
+    {
+        return CustomFieldDefinition::query()
+            ->where('site_id', $siteId)
+            ->where('context', $context)
+            ->where('is_active', true)
+            ->where('is_required', true)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('name', 'asc')
+            ->get();
+    }
+
+    /**
+     * Find a single definition by site, context, and key.
+     */
+    public function findForSiteContextAndKey(
+        int    $siteId,
+        string $context,
+        string $key,
+    ): ?CustomFieldDefinition {
+        return CustomFieldDefinition::query()
+            ->where('site_id', $siteId)
+            ->where('context', $context)
+            ->where('key', $key)
+            ->first();
+    }
+
+    // ── Legacy reads ──────────────────────────────────────────────────────────
+
     public function findByKey(string $key): ?CustomFieldDefinition
     {
         return CustomFieldDefinition::byKey($key)->first();
@@ -28,12 +91,15 @@ class CustomFieldDefinitionRepository extends Repository
 
     public function getRequired(): Collection
     {
-        return CustomFieldDefinition::ordered()->where('is_required', true)->actve()->get();
+        return CustomFieldDefinition::ordered()->where('is_required', true)->active()->get();
     }
 
     public function getSearchableFields(): Collection
     {
-        return CustomFieldDefinition::ordered()->where('is_searchable', true)->where('is_active', true)->get();
+        return CustomFieldDefinition::ordered()
+            ->where('is_searchable', true)
+            ->where('is_active', true)
+            ->get();
     }
 
     public function getGroupedFields(string $siteName): array
@@ -44,9 +110,6 @@ class CustomFieldDefinitionRepository extends Repository
 
         foreach ($fields as $field) {
             $group = $field->group_name ?: 'default';
-            if (!isset($grouped[$group])) {
-                $grouped[$group] = [];
-            }
             $grouped[$group][] = $field;
         }
 
@@ -110,8 +173,8 @@ class CustomFieldDefinitionRepository extends Repository
         $results = $this->database->select(
             "SELECT COUNT(*) as usage_count,
                 COUNT(CASE WHEN pcf.field_value IS NOT NULL AND pcf.field_value != '' THEN 1 END) as filled_count
-         FROM page_custom_fields pcf
-         WHERE pcf.custom_field_definition_id = ?",
+             FROM page_custom_fields pcf
+             WHERE pcf.custom_field_definition_id = ?",
             [$fieldId]
         );
 
@@ -129,23 +192,12 @@ class CustomFieldDefinitionRepository extends Repository
         return $this->database->delete('custom_field_definitions', ['id' => $unusedFieldIds]);
     }
 
+    // ── Private helpers ───────────────────────────────────────────────────────
+
     private function generateKey(string $name): string
     {
-        $key = strtolower(trim($name));
-        $key = preg_replace('/[^a-z0-9_]/', '_', $key);
-        $key = preg_replace('/_+/', '_', $key);
-        $key = trim($key, '_');
-
-        // Ensure uniqueness
-        $originalKey = $key;
-        $counter = 1;
-
-        while ($this->findByKey($key)) {
-            $key = $originalKey . '_' . $counter;
-            $counter++;
-        }
-
-        return $key;
+        $key = $this->createKeyFromName($name);
+        return $this->ensureUniqueKey($key);
     }
 
     private function getNextSortOrder(): int
@@ -159,12 +211,10 @@ class CustomFieldDefinitionRepository extends Repository
 
     private function prepareFieldData(array $data): array
     {
-        // Auto-generate key if not provided
         if (empty($data['key'])) {
             $data['key'] = $this->generateUniqueKey($data['name']);
         }
 
-        // Ensure JSON fields are properly encoded
         $jsonFields = ['options', 'validation_rules'];
         foreach ($jsonFields as $field) {
             if (isset($data[$field]) && is_array($data[$field])) {
@@ -172,12 +222,11 @@ class CustomFieldDefinitionRepository extends Repository
             }
         }
 
-        // Set defaults
         $defaults = [
-            'is_active' => true,
-            'is_required' => false,
+            'is_active'     => true,
+            'is_required'   => false,
             'is_searchable' => false,
-            'sort_order' => $this->getNextSortOrder()
+            'sort_order'    => $this->getNextSortOrder(),
         ];
 
         foreach ($defaults as $key => $defaultValue) {
@@ -185,21 +234,6 @@ class CustomFieldDefinitionRepository extends Repository
         }
 
         return $data;
-    }
-
-    private function groupFieldsByGroup(array $fields): array
-    {
-        $grouped = [];
-
-        foreach ($fields as $field) {
-            $group = $field->group_name ?: 'default';
-            if (!isset($grouped[$group])) {
-                $grouped[$group] = [];
-            }
-            $grouped[$group][] = $field;
-        }
-
-        return $grouped;
     }
 
     private function generateUniqueKey(string $name): string
@@ -218,7 +252,7 @@ class CustomFieldDefinitionRepository extends Repository
 
     private function ensureUniqueKey(string $baseKey): string
     {
-        $key = $baseKey;
+        $key     = $baseKey;
         $counter = 1;
 
         while ($this->findByKey($key)) {

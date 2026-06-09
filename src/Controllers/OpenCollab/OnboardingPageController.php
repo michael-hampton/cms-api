@@ -14,6 +14,8 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\ViewModels\OpenCollab\OnboardingPageViewModel;
+use App\Services\OpenCollab\ContributorProfileFieldConfigService;
+use App\ViewModels\OpenCollab\ProfileStepViewModel;
 
 class OnboardingPageController extends Controller
 {
@@ -26,6 +28,7 @@ class OnboardingPageController extends Controller
         private readonly GuidelinesContentRepository $guidelinesContentRepository,
         private readonly OpenCollabAuthorizationService $authorization,
         private readonly ContributorProfileRepository $contributorProfileRepository,
+        private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
     )
     {
         parent::__construct();
@@ -54,25 +57,44 @@ class OnboardingPageController extends Controller
             exit;
         }
 
-        $viewModel = new OnboardingPageViewModel($pending, $site);
+        $profile = $this->contributorProfileRepository->findByUserId(Auth::id());
+
+        $profileFields = $this->profileFieldConfigService->activeFieldsForSite($site);
+
+        $profileStep = ProfileStepViewModel::fromFields($profileFields, $profile);
+
+        $viewModel = new OnboardingPageViewModel(
+            pendingSteps: $this->onboardingService->pendingSteps(Auth::id(), $site),
+            site: $site,
+            profileStep: $profileStep,
+        );
         $publishedGuidelines = $viewModel->currentStepName() === 'guidelines'
             ? $this->guidelinesContentRepository->latestPublishedForSite($site->id)
             : null;
 
         return $this->view('open-collab.onboarding.index', [
             'vm' => $viewModel,
-            // Passed separately because the view needs them for JS/Stripe init,
-            // not for step logic.
+
             'contract' => $viewModel->currentStepName() === 'contract'
                 ? $this->contractRepository->latestForSite($site->id)
                 : null,
+
             'siteGuidelines' => $publishedGuidelines,
+
             'siteGuidelinesVersion' => $publishedGuidelines?->version
                 ?? $this->guidelinesRepository->latestVersion($site->id),
+
             'site' => SiteContext::slug(),
+
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
+
             'currentUser' => Auth::user(),
+
             'profile' => $this->contributorProfileRepository->findByUserId(Auth::id()),
+
+            'profileFields' => $viewModel->currentStepName() === 'profile'
+                ? $this->profileFieldConfigService->activeFieldsForSite($site)
+                : collect([]),
         ]);
     }
 

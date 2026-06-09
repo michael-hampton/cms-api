@@ -3,9 +3,9 @@
 $initialExpertise = [];
 if ($profile && !empty($profile->expertise)) {
     $initialExpertise = array_values(
-        array_filter(
-            array_map('trim', explode(',', $profile->expertise))
-        )
+            array_filter(
+                    array_map('trim', explode(',', $profile->expertise))
+            )
     );
 }
 ?>
@@ -82,287 +82,144 @@ if ($profile && !empty($profile->expertise)) {
                 <?php endif;?>
 
                 <!-- ── PROFILE STEP ─────────────────────────── -->
-                <!-- ── PROFILE STEP ─────────────────────────── -->
-                <?php $profileStep = $vm->profileStep(); ?>
+                <?php if ($vm->currentStepName() === 'profile'): ?>
+                    <form id="onboarding-form" novalidate>
 
-                <?php if ($vm->currentStepName() === 'profile' && $profileStep): ?>
-                    <form id="onboarding-form" class="oc-step-form" method="POST" enctype="multipart/form-data" novalidate>
-                        <input type="hidden" name="_token" value="<?= csrf_token() ?>">
+                        <div id="section-bio" style="margin-bottom:24px;">
+                            <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
+                                Tell readers a little about you. This appears on your articles and public profile.
+                            </p>
 
-                        <p class="oc-muted">
-                            Tell readers a little about you. This appears on your articles and public profile.
-                        </p>
-
-                        <?php if ($photoField = $profileStep->photoField()): ?>
-                            <?php
-                            $field    = $photoField;
-                            $photoUrl = $field->stringValue;
-                            $initial  = strtoupper(substr($currentUser->name ?? 'M', 0, 1));
-                            ?>
-
-                            <div class="oc-form-group">
+                            <div class="oc-form-group" style="margin-bottom:20px;">
                                 <label class="oc-label">Profile photo</label>
-
-                                <div style="display:flex;align-items:center;gap:14px;">
-                                    <div
-                                        id="avatar-preview"
-                                        style="width:64px;height:64px;border-radius:999px;overflow:hidden;background:#f1f5f9;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative;">
-
-                                        <?php if ($photoUrl): ?>
-                                            <img
-                                                id="avatar-img"
-                                                src="<?= htmlspecialchars($photoUrl) ?>"
-                                                alt="Your avatar"
-                                                style="width:100%;height:100%;object-fit:cover;">
-                                        <?php else: ?>
-                                            <span
-                                                id="avatar-initials"
-                                                style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">
-                                <?= htmlspecialchars($initial) ?>
-                            </span>
-                                        <?php endif; ?>
-
-                                        <span
-                                            style="position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:999px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:.65rem;">
-                            ✎
-                        </span>
+                                <div style="display:flex;align-items:center;gap:16px;">
+                                    <div id="avatar-preview-wrap" style="position:relative;flex-shrink:0;">
+                                        <div id="avatar-preview"
+                                             style="width:72px;height:72px;border-radius:50%;background:var(--slate-pale, #f1f5f9);border:1.5px solid var(--border);overflow:hidden;display:grid;place-items:center;cursor:pointer;"
+                                             onclick="document.getElementById('avatar-file-input').click()"
+                                             title="Click to change photo">
+                                            <?php if (!empty($profile?->avatar)): ?>
+                                                <img id="avatar-img" src="<?= htmlspecialchars($profile->avatar) ?>" alt="Your avatar" style="width:100%;height:100%;object-fit:cover;">
+                                            <?php else: ?>
+                                                <span id="avatar-initials" style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">
+                                                    <?= strtoupper(substr($currentUser->name ?? 'U', 0, 1)) ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div onclick="document.getElementById('avatar-file-input').click()"
+                                             style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--navy);border-radius:50%;display:grid;place-items:center;cursor:pointer;border:2px solid #fff;"
+                                             title="Change photo" aria-hidden="true">
+                                            <svg viewBox="0 0 20 20" fill="#fff" width="10"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/></svg>
+                                        </div>
                                     </div>
 
-                                    <div>
-                                        <label class="oc-btn oc-btn--ghost oc-btn--sm" for="avatar-file-input">
+                                    <div style="flex:1;">
+                                        <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" onclick="document.getElementById('avatar-file-input').click()">
                                             Choose photo
-                                        </label>
-
-                                        <input
-                                            type="file"
-                                            id="avatar-file-input"
-                                            name="<?= htmlspecialchars($field->key) ?>"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            style="display:none;">
-
-                                        <button
-                                            type="button"
-                                            id="avatar-remove-btn"
-                                            class="oc-btn oc-btn--ghost oc-btn--sm"
-                                            style="<?= $photoUrl ? '' : 'display:none;' ?>">
+                                        </button>
+                                        <button type="button" id="avatar-remove-btn" class="oc-btn oc-btn--ghost oc-btn--sm" style="margin-left:6px;color:var(--red, #ef4444); display: <?= !empty($profile?->avatar) ? 'inline-block' : 'none' ?>;">
                                             Remove
                                         </button>
+                                        <div class="oc-help" style="margin-top:4px; font-size: 0.75rem;">JPG, PNG or WebP · Max 2 MB</div>
+                                        <div id="avatar-error" class="oc-error-msg" style="margin-top:4px;display:none;"></div>
 
-                                        <input
-                                            type="hidden"
-                                            name="<?= htmlspecialchars($field->existingInputName()) ?>"
-                                            value="<?= htmlspecialchars($photoUrl) ?>">
-
-                                        <div class="oc-help">JPG, PNG or WebP · Max 2 MB</div>
-
-                                        <div id="avatar-progress-wrap" style="display:none;margin-top:8px;width:180px;">
-                                            <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
-                                                <div id="avatar-progress-bar" style="height:100%;width:0%;background:var(--navy);"></div>
+                                        <div id="avatar-progress-wrap" style="display:none;margin-top:6px;">
+                                            <div style="height:4px;background:var(--border);border-radius:99px;overflow:hidden;width:140px;">
+                                                <div id="avatar-progress-bar" style="height:100%;width:0%;background:var(--navy);border-radius:99px;transition:width .2s ease;"></div>
                                             </div>
-                                            <div id="avatar-progress-label" class="oc-help" style="margin-top:4px;">Uploading…</div>
+                                            <div id="avatar-progress-label" style="font-size:.72rem;color:var(--slate);margin-top:2px;">Uploading…</div>
                                         </div>
-
-                                        <div class="oc-error-msg" id="avatar-error"></div>
                                     </div>
                                 </div>
                             </div>
-                        <?php endif; ?>
 
-                        <?php if ($bioField = $profileStep->bioField()): ?>
                             <div class="oc-form-group">
                                 <label class="oc-label" for="bio">Your bio</label>
-
-                                <textarea
-                                    class="oc-textarea"
-                                    id="bio"
-                                    name="<?= htmlspecialchars($bioField->key) ?>"
-                                    rows="5"
-                                    placeholder="<?= htmlspecialchars($bioField->placeholder ?: "I'm a writer specialising in...") ?>"
-                    <?= $bioField->required ? 'required' : '' ?>
-                    style="min-height:120px;"><?= htmlspecialchars($bioField->stringValue) ?></textarea>
-
+                                <textarea class="oc-textarea" id="bio" name="bio" rows="5"
+                                          placeholder="I'm a writer specialising in…" required
+                                          style="min-height:120px;"><?= htmlspecialchars($profile?->bio ?? '') ?></textarea>
                                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
                                     <div class="oc-help">Between 20 and 1000 characters.</div>
                                     <div id="bio-char-count" style="font-size:.72rem;color:var(--slate);">
-                                        <?= mb_strlen($bioField->stringValue) ?> / 1000
+                                        <?= mb_strlen($profile?->bio ?? '') ?> / 1000
                                     </div>
                                 </div>
-
                                 <div class="oc-error-msg" id="bio-error"></div>
                             </div>
-                        <?php endif; ?>
+                        </div>
 
-                        <?php if ($expertiseField = $profileStep->expertiseField()): ?>
-                            <hr class="oc-section-divider">
+                        <hr style="border:0;border-top:1px solid var(--border);margin:24px 0;">
 
-                            <div class="oc-form-group">
-                                <label class="oc-label" for="expertise-input">Areas of expertise</label>
+                        <div id="section-expertise" style="margin-bottom:24px;">
+                            <label class="oc-label">Areas of expertise</label>
+                            <div class="oc-help" style="margin-bottom:12px;">
+                                Add up to 8 topics that describe your writing focus to help editors match you with briefs.
+                            </div>
 
-                                <div class="oc-help">
-                                    Add up to 8 topics that describe your writing focus to help editors match you with briefs.
+                            <div id="expertise-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:38px;margin-bottom:12px;padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:#fff;cursor:text;">
+                            </div>
+
+                            <div style="display:flex;gap:8px;align-items:flex-start;">
+                                <div style="flex:1;position:relative;">
+                                    <input class="oc-input" type="text" id="expertise-input"
+                                           placeholder="e.g. Technology, Climate, Finance…"
+                                           maxlength="40" autocomplete="off">
+                                    <div id="expertise-suggestions" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);z-index:50;overflow:hidden;">
+                                    </div>
                                 </div>
+                                <button type="button" id="add-expertise-btn" class="oc-btn oc-btn--ghost oc-btn--sm" style="height:38px;">
+                                    Add
+                                </button>
+                            </div>
+                            <div class="oc-help" style="margin-top:4px; font-size: 0.75rem;">
+                                Press <kbd style="font-size:.7rem;padding:1px 4px;border:1px solid var(--border);border-radius:4px;background:#f8fafc;">Enter</kbd> or comma to add. Click tags to remove.
+                            </div>
+                            <div class="oc-error-msg" id="expertise-error" style="margin-top:4px;"></div>
+                        </div>
 
-                                <div id="expertise-tags" class="oc-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+                        <hr style="border:0;border-top:1px solid var(--border);margin:24px 0;">
 
-                                <div style="position:relative;margin-top:10px;">
-                                    <div style="display:flex;gap:8px;">
-                                        <input
-                                            class="oc-input"
-                                            id="expertise-input"
-                                            type="text"
-                                            placeholder="e.g. Technology, Climate, Finance..."
-                                            style="flex:1;">
+                        <div id="section-samples" style="margin-bottom:32px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                                <label class="oc-label" style="margin-bottom:0;">Writing samples</label>
+                                <span style="font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
+                            </div>
+                            <div class="oc-help" style="margin-bottom:14px;">
+                                Link to up to 3 pieces of your published work to give editors a sense of your style.
+                            </div>
 
-                                        <button type="button" class="oc-btn oc-btn--ghost" id="add-expertise-btn">
-                                            Add
+                            <div id="samples-list" style="display:flex;flex-direction:column;gap:12px;">
+                                <?php
+                                $samples = $profile?->sample_links ?? [];
+
+                                while (count($samples) < 3) { $samples[] = null; }
+                                foreach ($samples as $i => $sample):
+                                    $n = $i + 1;
+                                    ?>
+                                    <div style="display:flex;gap:8px;align-items:stretch;" data-sample-row="<?= $n ?>">
+                                        <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+                                            <input class="oc-input" type="url" id="sample-url-<?= $n ?>"
+                                                   placeholder="https://example.com/my-article"
+                                                   value="<?= htmlspecialchars($sample['url'] ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                            <input class="oc-input" type="text" id="sample-title-<?= $n ?>"
+                                                   placeholder="Article title (optional)"
+                                                   value="<?= htmlspecialchars($sample['title'] ?? '') ?>" style="font-size:0.82rem; padding:6px 10px;">
+                                        </div>
+                                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm clear-sample-btn" data-row="<?= $n ?>" style="color:var(--slate);padding:0 10px;display:flex;align-items:center;justify-content:center;" aria-label="Clear row">
+                                            <svg viewBox="0 0 20 20" fill="currentColor" width="14" aria-hidden="true"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
                                         </button>
                                     </div>
-
-                                    <div
-                                        id="expertise-suggestions"
-                                        style="display:none;position:absolute;left:0;right:72px;top:44px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);z-index:20;overflow:hidden;">
-                                    </div>
-                                </div>
-
-                                <input
-                                    type="hidden"
-                                    id="expertise"
-                                    name="<?= htmlspecialchars($expertiseField->key) ?>"
-                                    value="<?= htmlspecialchars(json_encode($expertiseField->selectedValues)) ?>">
-
-                                <div class="oc-help" style="margin-top:4px;">
-                                    Press <kbd>Enter</kbd> or comma to add. Click tags to remove.
-                                </div>
-
-                                <div class="oc-error-msg" id="expertise-error"></div>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($writingField = $profileStep->writingSamplesField()): ?>
-                            <hr class="oc-section-divider">
-
-                            <div class="oc-form-group">
-                                <label class="oc-label">
-                                    Writing samples
-                                    <?php if (!$writingField->required): ?>
-                                        <span style="float:right;font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
-                                    <?php endif; ?>
-                                </label>
-
-                                <div class="oc-help">
-                                    Link to up to 3 pieces of your published work to give editors a sense of your style.
-                                </div>
-
-                                <div id="samples-list" style="margin-top:10px;">
-                                    <?php
-                                    $samples = $writingField->sampleLinks();
-
-                                    while (count($samples) < 3) {
-                                        $samples[] = ['url' => '', 'title' => ''];
-                                    }
-
-                                    $samples = array_slice($samples, 0, 3);
-                                    ?>
-
-                                    <?php foreach ($samples as $index => $sample): ?>
-                                        <?php $row = $index + 1; ?>
-
-                                        <div class="sample-row" style="margin-bottom:10px;">
-                                            <div style="display:flex;gap:8px;">
-                                                <input
-                                                    class="oc-input"
-                                                    type="url"
-                                                    id="sample-url-<?= $row ?>"
-                                                    name="<?= htmlspecialchars($writingField->key) ?>[url][]"
-                                                    value="<?= htmlspecialchars((string) ($sample['url'] ?? '')) ?>"
-                                                    placeholder="https://example.com/my-article"
-                                                    style="flex:1;">
-
-                                                <button
-                                                    type="button"
-                                                    class="oc-btn oc-btn--ghost oc-btn--sm clear-sample-btn"
-                                                    data-row="<?= $row ?>">
-                                                    ×
-                                                </button>
-                                            </div>
-
-                                            <input
-                                                class="oc-input"
-                                                type="text"
-                                                id="sample-title-<?= $row ?>"
-                                                name="<?= htmlspecialchars($writingField->key) ?>[title][]"
-                                                value="<?= htmlspecialchars((string) ($sample['title'] ?? '')) ?>"
-                                                placeholder="Article title (optional)"
-                                                style="margin-top:8px;">
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-
-                                <div class="oc-error-msg" id="samples-error"></div>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php if ($portfolioField = $profileStep->portfolioField()): ?>
-                            <hr class="oc-section-divider">
-
-                            <div class="oc-form-group">
-                                <label class="oc-label" for="portfolio_url">
-                                    Portfolio URL
-                                    <?php if (!$portfolioField->required): ?>
-                                        <span style="float:right;font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
-                                    <?php endif; ?>
-                                </label>
-
-                                <input
-                                    class="oc-input"
-                                    type="url"
-                                    id="portfolio_url"
-                                    name="<?= htmlspecialchars($portfolioField->key) ?>"
-                                    value="<?= htmlspecialchars($portfolioField->stringValue) ?>"
-                                    placeholder="<?= htmlspecialchars($portfolioField->placeholder ?: 'https://example.com') ?>">
-
-                                <div class="oc-error-msg" id="portfolio_url-error"></div>
-                            </div>
-                        <?php endif; ?>
-
-                        <?php foreach ($profileStep->locationFields() as $field): ?>
-                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
-                        <?php endforeach; ?>
-
-                        <?php foreach ($profileStep->socialFields() as $field): ?>
-                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
-                        <?php endforeach; ?>
-
-                        <?php
-                        foreach ($profileStep->additionalSections as $section): ?>
-                            <hr class="oc-section-divider">
-
-                            <div class="oc-card-section">
-                                <h3><?= htmlspecialchars($section->title) ?></h3>
-                                <p class="oc-muted"><?= htmlspecialchars($section->description) ?></p>
-
-                                <?php foreach ($section->fields as $field): ?>
-                                    @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
                                 <?php endforeach; ?>
                             </div>
-                        <?php endforeach; ?>
+                            <div class="oc-error-msg" id="samples-error" style="margin-top:4px;"></div>
+                        </div>
 
-                        <div id="autosave-status" class="oc-help" style="display:none;margin-bottom:12px;"></div>
-
-                        <div style="display:flex;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:20px;">
-                            <button
-                                type="button"
-                                class="oc-btn oc-btn--ghost"
-                                id="save-progress-btn"
-                                style="flex:1;">
+                        <div style="display:flex; gap:12px; align-items:center; border-top:1px solid var(--border); padding-top:20px;">
+                            <button type="button" class="oc-btn oc-btn--ghost" id="save-progress-btn" style="flex:1; white-space:nowrap;">
                                 Save progress
                             </button>
-
-                            <button
-                                type="submit"
-                                class="oc-btn oc-btn--amber"
-                                id="submit-btn"
-                                style="flex:2;display:flex;align-items:center;justify-content:center;gap:8px;">
+                            <button type="submit" class="oc-btn oc-btn--amber" id="submit-btn" style="flex:2; display:flex; align-items:center; justify-content:center; gap:8px;">
                                 Save &amp; continue
                                 <svg viewBox="0 0 20 20" fill="currentColor" width="16">
                                     <path fill-rule="evenodd"
@@ -372,10 +229,6 @@ if ($profile && !empty($profile->expertise)) {
                             </button>
                         </div>
                     </form>
-
-                    <script>
-                        window.OPEN_COLLAB_PROFILE_FIELDS = <?= json_encode($profileStep->frontendFields) ?>;
-                    </script>
 
                     <!-- ── PAYMENT STEP ─────────────────────────── -->
                 <?php elseif ($vm->currentStepName() === 'payment_setup'): ?>
@@ -711,181 +564,96 @@ if ($profile && !empty($profile->expertise)) {
 
         constructor(site, token) {
             super(site, token);
-
-            this._tags = this._normaliseInitialExpertise();
+            this._tags = [...INITIAL_EXPERTISE];
             this._initFeatures();
-        }
-
-        _normaliseInitialExpertise() {
-            const hidden = document.getElementById('expertise');
-
-            if (hidden && hidden.value) {
-                try {
-                    const parsed = JSON.parse(hidden.value);
-
-                    if (Array.isArray(parsed)) {
-                        return parsed.filter(Boolean);
-                    }
-                } catch {
-                    return hidden.value.split(',').map(v => v.trim()).filter(Boolean);
-                }
-            }
-
-            return Array.isArray(INITIAL_EXPERTISE) ? [...INITIAL_EXPERTISE] : [];
         }
 
         _initFeatures() {
             this._renderTags();
 
+            // Character tracking counter metrics loop
             const bioEl = document.getElementById('bio');
             const counter = document.getElementById('bio-char-count');
-
             if (bioEl && counter) {
                 bioEl.addEventListener('input', () => {
                     counter.textContent = `${bioEl.value.length} / 1000`;
                     counter.style.color = bioEl.value.length > 1000 ? 'var(--red)' : 'var(--slate)';
                 });
-
-                bioEl.addEventListener('blur', () => this._saveBioSegment());
             }
+
+            // ── TRIGGER BACKGROUND AUTO-SAVES ON LOOSE BLUR ──
+            bioEl?.addEventListener('blur', () => this._saveBioSegment());
 
             document.querySelectorAll('#samples-list input').forEach(input => {
                 input.addEventListener('blur', () => this._saveSamplesSegment());
             });
 
-            document.querySelectorAll('.clear-sample-btn').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const rowNum = btn.dataset.row;
-
-                    const urlInput = document.getElementById(`sample-url-${rowNum}`);
-                    const titleInput = document.getElementById(`sample-title-${rowNum}`);
-
-                    if (urlInput) {
-                        urlInput.value = '';
-                    }
-
-                    if (titleInput) {
-                        titleInput.value = '';
-                    }
-
-                    await this._saveSamplesSegment();
-                });
-            });
-
+            // Avatar interactions
             const avatarInput = document.getElementById('avatar-file-input');
             avatarInput?.addEventListener('change', (e) => this._onAvatarSelected(e.target));
 
             const removeAvatarBtn = document.getElementById('avatar-remove-btn');
             removeAvatarBtn?.addEventListener('click', () => this._removeAvatarFile());
 
+            // Expertise key tracking hooks
             const expInput = document.getElementById('expertise-input');
-
             expInput?.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ',') {
                     e.preventDefault();
                     this._addExpertiseFromInput();
                 }
             });
-
             expInput?.addEventListener('input', (e) => this._onExpertiseInput(e.target.value));
+            document.getElementById('add-expertise-btn')?.addEventListener('click', () => this._addExpertiseFromInput());
 
-            document.getElementById('add-expertise-btn')
-                ?.addEventListener('click', () => this._addExpertiseFromInput());
+            // Clear sample row triggers
+            document.querySelectorAll('.clear-sample-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const rowNum = btn.dataset.row;
+                    const urlInput = document.getElementById(`sample-url-${rowNum}`);
+                    const titleInput = document.getElementById(`sample-title-${rowNum}`);
+                    if (urlInput) urlInput.value = '';
+                    if (titleInput) titleInput.value = '';
+                    this._saveSamplesSegment();
+                });
+            });
 
-            document.getElementById('save-progress-btn')
-                ?.addEventListener('click', () => this._manualProgressSaveOnly());
+            // ── EXPLICIT DISCRETE "SAVE PROGRESS" BUTTON TRIGGER ──
+            document.getElementById('save-progress-btn')?.addEventListener('click', () => this._manualProgressSaveOnly());
         }
 
         _updateStatusIndicator(message) {
             const el = document.getElementById('autosave-status');
-
             if (el) {
                 el.textContent = message;
                 el.style.display = 'block';
             }
         }
 
-        _profilePayload(extra = {}) {
-            const payload = {
-                ...extra,
-            };
-
-            const bio = document.getElementById('bio')?.value.trim();
-
-            if (bio !== undefined) {
-                payload.bio = bio;
-            }
-
-            const portfolio = document.getElementById('portfolio_url')?.value.trim();
-            if (portfolio !== undefined) {
-                payload.portfolio_url = portfolio;
-            }
-
-            ['tax_country', 'timezone', 'linkedin_url', 'instagram_url', 'tiktok_url'].forEach(key => {
-                const value = document.getElementById(key)?.value?.trim();
-
-                if (value !== undefined) {
-                    payload[key] = value;
-                }
-            });
-
-            payload.expertise = this._tags;
-
-            const sampleUrls = [];
-            const sampleTitles = [];
-
-            for (let n = 1; n <= 3; n++) {
-                const url = document.getElementById(`sample-url-${n}`)?.value.trim() ?? '';
-                const title = document.getElementById(`sample-title-${n}`)?.value.trim() ?? '';
-
-                if (url) {
-                    sampleUrls.push(url);
-                    sampleTitles.push(title);
-                }
-            }
-
-            payload.writing_samples = {
-                url: sampleUrls,
-                title: sampleTitles,
-            };
-
-            return payload;
-        }
-
-        async _saveProfilePayload(payload, messageOnSuccess = 'Profile progress saved.') {
-            try {
-                const res = await this._post('profile', payload);
-
-                if (res.ok) {
-                    this._updateStatusIndicator(messageOnSuccess);
-                    this._clearError();
-                    return true;
-                }
-
-                const data = await res.json();
-                let msg = data.message || 'Could not save profile progress.';
-
-                if (data.errors) {
-                    msg = Object.values(data.errors).flat().join(' ');
-                }
-
-                this._showError(msg);
-                return false;
-            } catch {
-                this._updateStatusIndicator('Changes kept locally. Could not save right now.');
-                return false;
-            }
-        }
+        // ── RESTFUL BACKGROUND SECTOR SAVES ──
 
         async _saveBioSegment() {
-            const bioText = document.getElementById('bio')?.value.trim() ?? '';
-
             this._updateStatusIndicator('Saving bio description progress...');
-
-            await this._saveProfilePayload(
-                { bio: bioText },
-                'Bio draft updated successfully.'
-            );
+            const bioText = document.getElementById('bio')?.value.trim() ?? '';
+            try {
+                const res = await fetch(`/api/${this._site}/open-collab/contributor`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ bio: bioText })
+                });
+                if (res.ok) {
+                    this._updateStatusIndicator('Bio draft updated successfully.');
+                    this._clearError();
+                } else {
+                    this._updateStatusIndicator('Bio structural update saved locally.');
+                }
+            } catch {
+                this._updateStatusIndicator('Bio changes kept local (network offline).');
+            }
         }
 
         async _saveExpertiseSegment() {
@@ -939,88 +707,63 @@ if ($profile && !empty($profile->expertise)) {
             }
         }
 
+        // ── MANUAL PROGRESS ACTION FOR MULTI-SESSION LEAVE ──
         async _manualProgressSaveOnly() {
             this._clearError();
-
             const btn = document.getElementById('save-progress-btn');
             const successEl = document.getElementById('form-success');
-
-            if (!btn) {
-                return;
-            }
-
-            if (successEl) {
-                successEl.style.display = 'none';
-            }
+            if (successEl) successEl.style.display = 'none';
 
             const originalContent = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = 'Saving progress...';
 
-            const saved = await this._saveProfilePayload(
-                this._profilePayload(),
-                'All profile step fields saved successfully.'
-            );
+            try {
+                // Concurrently run discrete API pipeline saves to ensure complete state execution synchronization
+                await Promise.all([
+                    this._saveBioSegment(),
+                    this._saveExpertiseSegment(),
+                    this._saveSamplesSegment()
+                ]);
 
-            if (saved && successEl) {
-                successEl.textContent = 'Onboarding progress saved safely. You can close your browser and return later.';
-                successEl.style.display = 'block';
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                if (successEl) {
+                    successEl.textContent = 'Onboarding progress saved safely! You can close your browser session and return to pick up right where you left off.';
+                    successEl.style.display = 'block';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                this._updateStatusIndicator('All step attributes written successfully.');
+            } catch {
+                this._showError('A synchronization latency timeout fault occurred during state persistence routing loops.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
             }
-
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
         }
 
         _setAvatarPreview(src) {
             const wrap = document.getElementById('avatar-preview');
-
-            if (!wrap) {
-                return;
-            }
-
-            wrap.innerHTML = `
-            <img id="avatar-img" src="${this._escapeHtml(src)}" alt="Your avatar" style="width:100%;height:100%;object-fit:cover;">
-            <span style="position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:999px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:.65rem;">✎</span>
-        `;
-
-            const removeBtn = document.getElementById('avatar-remove-btn');
-
-            if (removeBtn) {
-                removeBtn.style.display = 'inline-block';
-            }
+            if (!wrap) return;
+            wrap.innerHTML = `<img id="avatar-img" src="${this._escapeHtml(src)}" alt="Your avatar" style="width:100%;height:100%;object-fit:cover;">`;
+            document.getElementById('avatar-remove-btn').style.display = 'inline-block';
         }
 
         _onAvatarSelected(input) {
             const file = input.files?.[0];
-
-            if (!file) {
-                return;
-            }
+            if (!file) return;
 
             const errEl = document.getElementById('avatar-error');
-
-            if (errEl) {
-                errEl.style.display = 'none';
-                errEl.textContent = '';
-            }
+            errEl.style.display = 'none';
 
             if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-                if (errEl) {
-                    errEl.textContent = 'Only JPG, PNG, and WebP images are accepted.';
-                    errEl.style.display = 'block';
-                }
-
+                errEl.textContent = 'Only JPG, PNG, and WebP images are accepted.';
+                errEl.style.display = 'block';
                 input.value = '';
                 return;
             }
 
             if (file.size > 2 * 1024 * 1024) {
-                if (errEl) {
-                    errEl.textContent = 'Image must be under 2 MB.';
-                    errEl.style.display = 'block';
-                }
-
+                errEl.textContent = 'Image must be under 2 MB.';
+                errEl.style.display = 'block';
                 input.value = '';
                 return;
             }
@@ -1038,51 +781,27 @@ if ($profile && !empty($profile->expertise)) {
             const progressLabel = document.getElementById('avatar-progress-label');
             const errEl = document.getElementById('avatar-error');
 
-            if (progressWrap) {
-                progressWrap.style.display = 'block';
-            }
-
-            if (progressBar) {
-                progressBar.style.width = '0%';
-            }
-
-            if (progressLabel) {
-                progressLabel.textContent = 'Uploading…';
-            }
+            progressWrap.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressLabel.textContent = 'Uploading…';
 
             const formData = new FormData();
             formData.append('avatar', file);
 
             const xhr = new XMLHttpRequest();
-
             xhr.upload.onprogress = (e) => {
-                if (!e.lengthComputable) {
-                    return;
-                }
-
+                if (!e.lengthComputable) return;
                 const pct = Math.round((e.loaded / e.total) * 100);
-
-                if (progressBar) {
-                    progressBar.style.width = `${pct}%`;
-                }
-
-                if (progressLabel) {
-                    progressLabel.textContent = `${pct}%`;
-                }
+                progressBar.style.width = `${pct}%`;
+                progressLabel.textContent = `${pct}%`;
             };
 
             xhr.onload = () => {
-                if (progressWrap) {
-                    progressWrap.style.display = 'none';
-                }
-
+                progressWrap.style.display = 'none';
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    this._updateStatusIndicator('Avatar upload completed.');
+                    this._updateStatusIndicator('Avatar headshot upload completed.');
                     this._clearError();
-                    return;
-                }
-
-                if (errEl) {
+                } else {
                     errEl.textContent = 'Upload failed. Please try again.';
                     errEl.style.display = 'block';
                 }
@@ -1096,55 +815,32 @@ if ($profile && !empty($profile->expertise)) {
 
         async _removeAvatarFile() {
             this._updateStatusIndicator('Removing avatar file asset...');
-
             const errEl = document.getElementById('avatar-error');
-
-            if (errEl) {
-                errEl.style.display = 'none';
-                errEl.textContent = '';
-            }
+            if (errEl) errEl.style.display = 'none';
 
             try {
                 const res = await fetch(`/api/${this._site}/open-collab/contributor/avatar`, {
                     method: 'DELETE',
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': `Bearer ${this._token}`,
-                    },
+                        'Authorization': `Bearer ${this._token}`
+                    }
                 });
 
-                if (!res.ok) {
+                if (res.ok) {
+                    const wrap = document.getElementById('avatar-preview');
+                    const initial = DEFAULT_NAME.trim().charAt(0).toUpperCase();
+                    wrap.innerHTML = `<span id="avatar-initials" style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">${initial}</span>`;
+                    document.getElementById('avatar-remove-btn').style.display = 'none';
+                    document.getElementById('avatar-file-input').value = '';
+                    this._updateStatusIndicator('Profile avatar resource removed.');
+                    this._clearError();
+                } else {
                     if (errEl) {
                         errEl.textContent = 'Failed to remove photo. Please try again.';
                         errEl.style.display = 'block';
                     }
-
-                    return;
                 }
-
-                const wrap = document.getElementById('avatar-preview');
-                const initial = DEFAULT_NAME.trim().charAt(0).toUpperCase();
-
-                if (wrap) {
-                    wrap.innerHTML = `
-                    <span id="avatar-initials" style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">${this._escapeHtml(initial)}</span>
-                    <span style="position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:999px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:.65rem;">✎</span>
-                `;
-                }
-
-                const removeBtn = document.getElementById('avatar-remove-btn');
-                const fileInput = document.getElementById('avatar-file-input');
-
-                if (removeBtn) {
-                    removeBtn.style.display = 'none';
-                }
-
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-
-                this._updateStatusIndicator('Profile avatar removed.');
-                this._clearError();
             } catch {
                 if (errEl) {
                     errEl.textContent = 'Could not remove photo. Please check your connection.';
@@ -1155,52 +851,33 @@ if ($profile && !empty($profile->expertise)) {
 
         _renderTags() {
             const container = document.getElementById('expertise-tags');
-            const hidden = document.getElementById('expertise');
-
-            if (hidden) {
-                hidden.value = JSON.stringify(this._tags);
-            }
-
-            if (!container) {
-                return;
-            }
-
+            if (!container) return;
             container.innerHTML = '';
-
             this._tags.forEach((tag, i) => {
                 const pill = document.createElement('span');
-
                 pill.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:var(--slate-pale, #f1f5f9);border:1px solid var(--border);border-radius:99px;font-size:.76rem;color:var(--navy);cursor:pointer;font-weight:500;';
                 pill.title = 'Click to remove';
                 pill.innerHTML = `${this._escapeHtml(tag)} <svg viewBox="0 0 12 12" fill="currentColor" width="9" aria-hidden="true"><path d="M6 4.586L9.293 1.293a1 1 0 111.414 1.414L7.414 6l3.293 3.293a1 1 0 01-1.414 1.414L6 7.414 2.707 10.707a1 1 0 01-1.414-1.414L4.586 6 1.293 2.707A1 1 0 012.707 1.293L6 4.586z"/></svg>`;
-
                 pill.onclick = () => {
                     this._tags.splice(i, 1);
                     this._renderTags();
                     this._saveExpertiseSegment();
                 };
-
                 container.appendChild(pill);
             });
         }
 
         _onExpertiseInput(value) {
-            const suggestions = document.getElementById('expertise-suggestions');
-
-            if (!suggestions) {
-                return;
-            }
-
             const lower = value.toLowerCase().trim();
-
+            const suggestions = document.getElementById('expertise-suggestions');
             if (!lower) {
                 suggestions.style.display = 'none';
                 return;
             }
 
-            const matches = this._suggestedTopics
-                .filter(s => s.toLowerCase().includes(lower) && !this._tags.includes(s))
-                .slice(0, 5);
+            const matches = this._suggestedTopics.filter(s =>
+                s.toLowerCase().includes(lower) && !this._tags.includes(s)
+            ).slice(0, 5);
 
             if (!matches.length) {
                 suggestions.style.display = 'none';
@@ -1210,22 +887,15 @@ if ($profile && !empty($profile->expertise)) {
             suggestions.innerHTML = matches.map(m =>
                 `<div style="padding:8px 12px;cursor:pointer;font-size:.82rem;color:var(--navy);" class="suggestion-item">${this._escapeHtml(m)}</div>`
             ).join('');
-
             suggestions.style.display = 'block';
 
             suggestions.querySelectorAll('.suggestion-item').forEach((el, index) => {
                 el.addEventListener('mousedown', () => {
                     this._addTag(matches[index]);
-
                     const input = document.getElementById('expertise-input');
-
-                    if (input) {
-                        input.value = '';
-                    }
-
+                    input.value = '';
                     suggestions.style.display = 'none';
                 });
-
                 el.addEventListener('mouseover', () => el.style.background = 'var(--cream)');
                 el.addEventListener('mouseout', () => el.style.background = '');
             });
@@ -1233,54 +903,26 @@ if ($profile && !empty($profile->expertise)) {
 
         _addExpertiseFromInput() {
             const input = document.getElementById('expertise-input');
-
-            if (!input) {
-                return;
-            }
-
             const val = input.value.replace(/,$/, '').trim();
-
-            if (val) {
-                this._addTag(val);
-            }
-
+            if (val) this._addTag(val);
             input.value = '';
-
-            const suggestions = document.getElementById('expertise-suggestions');
-
-            if (suggestions) {
-                suggestions.style.display = 'none';
-            }
+            document.getElementById('expertise-suggestions').style.display = 'none';
         }
 
         _addTag(raw) {
             const tag = raw.trim();
             const errEl = document.getElementById('expertise-error');
+            if (errEl) errEl.textContent = '';
 
-            if (errEl) {
-                errEl.textContent = '';
-            }
-
-            if (!tag || this._tags.includes(tag)) {
-                return;
-            }
-
+            if (!tag || this._tags.includes(tag)) return;
             if (this._tags.length >= 8) {
-                if (errEl) {
-                    errEl.textContent = 'Maximum of 8 expertise tags allowed.';
-                }
-
+                if (errEl) errEl.textContent = 'Maximum of 8 expertise tags allowed.';
                 return;
             }
-
             if (tag.length > 40) {
-                if (errEl) {
-                    errEl.textContent = 'Tags must be under 40 characters.';
-                }
-
+                if (errEl) errEl.textContent = 'Tags must be under 40 characters.';
                 return;
             }
-
             this._tags.push(tag);
             this._renderTags();
             this._saveExpertiseSegment();
@@ -1288,65 +930,62 @@ if ($profile && !empty($profile->expertise)) {
 
         _escapeHtml(str) {
             const d = document.createElement('div');
-            d.textContent = str ?? '';
+            d.textContent = str;
             return d.innerHTML;
         }
 
+        // ── SUBMIT SYSTEM RUNS ONLY WHEN TRANSITIONING TO THE NEXT FULL STEP ──
         async _submit() {
             this._clearError();
 
-            const bio = document.getElementById('bio')?.value.trim() ?? '';
+            const bio = document.getElementById('bio')?.value.trim();
             const bioErr = document.getElementById('bio-error');
             const samplesErr = document.getElementById('samples-error');
 
-            if (bioErr) {
-                bioErr.textContent = '';
-            }
-
-            if (samplesErr) {
-                samplesErr.textContent = '';
-            }
+            if (bioErr) bioErr.textContent = '';
+            if (samplesErr) samplesErr.textContent = '';
 
             if (!bio || bio.length < 20) {
-                if (bioErr) {
-                    bioErr.textContent = 'Bio must be at least 20 characters.';
-                }
-
+                if (bioErr) bioErr.textContent = 'Bio must be at least 20 characters.';
                 return;
             }
 
+            const samples = [];
             for (let n = 1; n <= 3; n++) {
                 const url = document.getElementById(`sample-url-${n}`)?.value.trim() ?? '';
-
-                if (!url) {
-                    continue;
-                }
-
-                try {
-                    new URL(url);
-                } catch {
-                    if (samplesErr) {
-                        samplesErr.textContent = `Sample ${n} is not a valid URL. Please include https://.`;
+                const title = document.getElementById(`sample-title-${n}`)?.value.trim() ?? '';
+                if (url) {
+                    try {
+                        new URL(url);
+                    } catch {
+                        if (samplesErr) samplesErr.textContent = `Sample ${n} is not a valid URL. Please include https://.`;
+                        return;
                     }
-
-                    return;
+                    samples.push({ url, title });
                 }
             }
 
             const btn = this._setButtonLoading('Saving and moving to next step…');
 
-            const saved = await this._saveProfilePayload(
-                this._profilePayload(),
-                'Profile saved.'
-            );
+            try {
+                // Ensure bio database block matches context state precisely before wizard update
+                await fetch(`/api/${this._site}/open-collab/contributor`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': `Bearer ${this._token}`
+                    },
+                    body: JSON.stringify({ bio: bio })
+                });
 
-            if (!saved) {
+                // Explicitly complete the profile step after the draft has been saved.
+                const res = await this._post('steps/profile/complete', {});
+                await this._handleResponse(res, btn, 'Save & continue');
+            } catch (err) {
+                this._showError('Something went wrong. Please check your connection and try again.');
                 this._resetButton(btn, 'Save & continue');
-                return;
             }
-
-            const res = await this._post('steps/profile/complete', {});
-            await this._handleResponse(res, btn, 'Save & continue');
         }
     }
 
