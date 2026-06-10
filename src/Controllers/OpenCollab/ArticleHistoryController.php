@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
+use App\Models\PageHistory;
 use App\Repositories\Cms\Pages\PageHistoryRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 
@@ -52,7 +53,7 @@ class ArticleHistoryController extends Controller
         return $this->jsonResponse(['history' => $history]);
     }
 
-    private function formatEntry(\App\Models\PageHistory $entry): array
+    private function formatEntry(PageHistory $entry): array
     {
         return [
             'id' => $entry->id,

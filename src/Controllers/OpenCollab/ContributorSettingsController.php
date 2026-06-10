@@ -36,7 +36,8 @@ class ContributorSettingsController extends Controller
         private readonly ContributorOnboardingService         $onboardingService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
         private readonly DynamicFieldValidator                $dynamicFieldValidator,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -127,7 +128,7 @@ class ContributorSettingsController extends Controller
 
             return $this->jsonResponse([
                 'expertise' => $profile->expertise_array,
-                'message'   => 'Expertise saved.',
+                'message' => 'Expertise saved.',
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -158,7 +159,7 @@ class ContributorSettingsController extends Controller
         }
 
         $siteId = SiteContext::getId();
-        $site   = Site::find($siteId);
+        $site = Site::find($siteId);
 
         if (!$site) {
             return $this->errorResponse('Site not found.', 404);

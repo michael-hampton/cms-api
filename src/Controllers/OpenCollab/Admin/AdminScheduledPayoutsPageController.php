@@ -9,6 +9,7 @@ use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\PaymentTermsService;
+use DateTime;
 
 /**
  * Renders the admin scheduled payouts visibility page.
@@ -26,7 +27,7 @@ class AdminScheduledPayoutsPageController extends Controller
         private readonly PayoutRepository         $payoutRepository,
         private readonly EarningsLedgerRepository $ledgerRepository,
         private readonly PaymentTermsService      $paymentTermsService,
-        private readonly CreatorBalanceService $creatorBalanceService,
+        private readonly CreatorBalanceService    $creatorBalanceService,
     )
     {
         parent::__construct();
@@ -44,7 +45,7 @@ class AdminScheduledPayoutsPageController extends Controller
         $pendingPayouts = $this->payoutRepository->pendingForSite($siteId);
 
         // Section 2: preview — eligible ledger entries not yet in a payout
-        $cutoff = (new \DateTime())->modify("-{$terms->payout_delay_days} days");
+        $cutoff = (new DateTime())->modify("-{$terms->payout_delay_days} days");
         $eligibleByUser = $this->ledgerRepository->eligibleGroupedBySiteAndUser($siteId, $cutoff);
 
         // Flatten into display rows: [ [user_id, currency, amount, entry_count] ]
@@ -53,14 +54,14 @@ class AdminScheduledPayoutsPageController extends Controller
         $upcomingRows = [];
 
         foreach ($settledRows as $row) {
-            $amount = (int) $row['amount'];
+            $amount = (int)$row['amount'];
 
             if ($amount < $terms->minimum_payout_amount) {
                 continue;
             }
 
             $upcomingRows[] = [
-                'user_id' => (int) $row['user_id'],
+                'user_id' => (int)$row['user_id'],
                 'currency' => strtoupper($row['currency'] ?? 'GBP'),
                 'amount' => $amount,
                 'below_min' => false,

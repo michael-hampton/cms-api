@@ -25,7 +25,7 @@ class AdminContributorPageController extends Controller
 
     public function __construct(
         private readonly AdminContributorRepository $contributorRepository,
-        private readonly InvitationRepository $invitationRepository,
+        private readonly InvitationRepository       $invitationRepository,
     )
     {
         parent::__construct();

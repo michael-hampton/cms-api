@@ -61,46 +61,6 @@ class NotificationController extends Controller
         ]);
     }
 
-    public function unreadCount(): JsonResponse
-    {
-        $userId = Auth::id();
-        $siteId = SiteContext::getId();
-
-        return $this->resourceResponse([
-            'count' => $this->unreadCountForSite($userId, $siteId),
-        ]);
-    }
-
-    public function markAsRead(Request $request): JsonResponse
-    {
-        $user = $this->resolveUser();
-        $notificationId = (int)($request->get('notification_id') ?? 0);
-
-        if ($notificationId <= 0) {
-            return $this->errorResponse('Invalid notification_id');
-        }
-
-        $this->service->markAsRead($user, $notificationId);
-
-        return $this->resourceResponse(['success' => true]);
-    }
-
-    public function markAllAsRead(): JsonResponse
-    {
-        $user = $this->resolveUser();
-
-        $this->service->markAllAsRead($user);
-
-        return $this->resourceResponse(['success' => true]);
-    }
-
-    // ── Private ───────────────────────────────────────────────────────────────
-
-    private function resolveUser(): Model
-    {
-        return User::find(Auth::id());
-    }
-
     private function formatNotification($notification): array
     {
         return array_merge($this->formatter->format($notification), [
@@ -129,5 +89,45 @@ class NotificationController extends Controller
         $unread = $this->service->getUnreadNotifications($userId);
 
         return count($this->filterNotificationsForSite($unread->toArray(), $siteId));
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    public function unreadCount(): JsonResponse
+    {
+        $userId = Auth::id();
+        $siteId = SiteContext::getId();
+
+        return $this->resourceResponse([
+            'count' => $this->unreadCountForSite($userId, $siteId),
+        ]);
+    }
+
+    public function markAsRead(Request $request): JsonResponse
+    {
+        $user = $this->resolveUser();
+        $notificationId = (int)($request->get('notification_id') ?? 0);
+
+        if ($notificationId <= 0) {
+            return $this->errorResponse('Invalid notification_id');
+        }
+
+        $this->service->markAsRead($user, $notificationId);
+
+        return $this->resourceResponse(['success' => true]);
+    }
+
+    private function resolveUser(): Model
+    {
+        return User::find(Auth::id());
+    }
+
+    public function markAllAsRead(): JsonResponse
+    {
+        $user = $this->resolveUser();
+
+        $this->service->markAllAsRead($user);
+
+        return $this->resourceResponse(['success' => true]);
     }
 }

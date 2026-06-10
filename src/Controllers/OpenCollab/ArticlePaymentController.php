@@ -12,13 +12,14 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Requests\OpenCollab\InitiatePaymentRequest;
 use App\Services\OpenCollab\ArticleAccessService;
 use App\Services\OpenCollab\ArticlePaymentService;
+use InvalidArgumentException;
 
 class ArticlePaymentController extends Controller
 {
     public function __construct(
         private readonly ArticlePaymentService $paymentService,
         private readonly PageRepository        $pageRepository,
-        private readonly ArticleAccessService $articleAccessService,
+        private readonly ArticleAccessService  $articleAccessService,
     )
     {
         parent::__construct();
@@ -47,7 +48,7 @@ class ArticlePaymentController extends Controller
 
 
             // try with http://localhost:5001/guitar-world/test-55
-            if(!empty($result['payment']->stripe_payment_intent_id)) { //todo this will is tmporary and will be covered by webhook
+            if (!empty($result['payment']->stripe_payment_intent_id)) { //todo this will is tmporary and will be covered by webhook
                 $this->articleAccessService->grantAccessFromPayment($result['payment']->stripe_payment_intent_id);
             }
 
@@ -59,7 +60,7 @@ class ArticlePaymentController extends Controller
             return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
         } catch (DuplicatePurchaseException $e) {
             return $this->errorResponse($e->getMessage(), 409);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

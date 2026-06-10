@@ -4,6 +4,7 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
+use App\Enums\Cms\CustomFieldStorageType;
 use App\Enums\OpenCollab\AgeVerificationMethod;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -11,6 +12,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
+use App\Models\User;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
@@ -21,11 +23,9 @@ use App\Requests\OpenCollab\StorePaymentDetailsRequest;
 use App\Resources\OpenCollab\OnboardingStatusResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorPaymentMethodService;
-use App\Services\OpenCollab\OpenCollabAuthorizationService;
-use App\Models\User;
-use RuntimeException;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
-use App\Enums\Cms\CustomFieldStorageType;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use RuntimeException;
 
 /**
  * Handles contributor onboarding steps.
@@ -42,22 +42,23 @@ use App\Enums\Cms\CustomFieldStorageType;
  *   GET  /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/contract
  *   POST /api/{site}/open-collab/onboarding/guidelines
-     *   POST /api/{site}/open-collab/onboarding/age-verification
-     *   POST /api/{site}/open-collab/onboarding/steps/kyc-verification/complete
-     */
+ *   POST /api/{site}/open-collab/onboarding/age-verification
+ *   POST /api/{site}/open-collab/onboarding/steps/kyc-verification/complete
+ */
 class OnboardingController extends Controller
 {
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly ContributorOnboardingService    $onboardingService,
-        private readonly ContributorProfileRepository   $profileRepository,
-        private readonly ContractRepository             $contractRepository,
-        private readonly GuidelinesRepository           $guidelinesRepository,
-        private readonly OpenCollabAuthorizationService $authorization,
-        private readonly ContributorPaymentMethodService $paymentMethodService,
+        private readonly ContributorOnboardingService         $onboardingService,
+        private readonly ContributorProfileRepository         $profileRepository,
+        private readonly ContractRepository                   $contractRepository,
+        private readonly GuidelinesRepository                 $guidelinesRepository,
+        private readonly OpenCollabAuthorizationService       $authorization,
+        private readonly ContributorPaymentMethodService      $paymentMethodService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -70,13 +71,24 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site    = $this->currentSite();
-        $userId  = Auth::id();
+        $site = $this->currentSite();
+        $userId = Auth::id();
         $pending = $this->onboardingService->pendingSteps($userId, $site);
 
         return $this->jsonResponse(
             (new OnboardingStatusResource(['pending_steps' => $pending]))->toArray()
         );
+    }
+
+    private function currentSite(): Site
+    {
+        $site = Site::find(SiteContext::getId());
+
+        if (!$site) {
+            throw new RuntimeException('Site not found in context.');
+        }
+
+        return $site;
     }
 
     /**
@@ -93,7 +105,7 @@ class OnboardingController extends Controller
         }
 
         try {
-            $site   = $this->currentSite();
+            $site = $this->currentSite();
             $userId = Auth::id();
 
             $this->ensureContributorProfileStarted($userId, $site);
@@ -105,7 +117,7 @@ class OnboardingController extends Controller
             $profileData = [];
 
             foreach ($fields as $field) {
-                $key = (string) $field->key;
+                $key = (string)$field->key;
 
                 if (!array_key_exists($key, $data)) {
                     continue;
@@ -119,16 +131,16 @@ class OnboardingController extends Controller
 
                     $samples = [];
 
-                    foreach ((array) $urls as $index => $url) {
-                        $url = trim((string) $url);
+                    foreach ((array)$urls as $index => $url) {
+                        $url = trim((string)$url);
 
                         if ($url === '') {
                             continue;
                         }
 
                         $samples[] = [
-                            'url'   => $url,
-                            'title' => trim((string) ($titles[$index] ?? '')),
+                            'url' => $url,
+                            'title' => trim((string)($titles[$index] ?? '')),
                         ];
                     }
 
@@ -160,6 +172,11 @@ class OnboardingController extends Controller
         }
     }
 
+    private function ensureContributorProfileStarted(int $userId, Site $site): void
+    {
+        $this->onboardingService->start($userId, $site->id);
+    }
+
     /**
      * POST /api/{site}/open-collab/onboarding/steps/profile/complete
      *
@@ -172,7 +189,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site   = $this->currentSite();
+        $site = $this->currentSite();
         $result = $this->onboardingService->completeProfileStep(Auth::id(), $site);
 
         if (!$result['ok']) {
@@ -180,7 +197,7 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'message'    => 'Profile step completed.',
+            'message' => 'Profile step completed.',
             'onboarding' => $result['status'],
         ]);
     }
@@ -198,7 +215,7 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data   = $request->validated();
+            $data = $request->validated();
             $userId = Auth::id();
 
             if (($data['payment_method_type'] ?? null) === 'stripe') {
@@ -236,6 +253,17 @@ class OnboardingController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
+    }
+
+    private function currentUser(): User
+    {
+        $user = User::find(Auth::id());
+
+        if (!$user) {
+            throw new RuntimeException('Authenticated user could not be loaded.');
+        }
+
+        return $user;
     }
 
     public function paymentMethods(): JsonResponse
@@ -305,7 +333,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site   = $this->currentSite();
+        $site = $this->currentSite();
         $result = $this->onboardingService->completePaymentStep(Auth::id(), $site);
 
         if (!$result['ok']) {
@@ -313,7 +341,7 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'message'    => 'Payment step completed.',
+            'message' => 'Payment step completed.',
             'onboarding' => $result['status'],
         ]);
     }
@@ -327,7 +355,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site   = $this->currentSite();
+        $site = $this->currentSite();
         $result = $this->onboardingService->completeKycVerificationStep(Auth::id(), $site);
 
         if (!$result['ok']) {
@@ -335,11 +363,10 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'message'    => 'KYC verification step completed.',
+            'message' => 'KYC verification step completed.',
             'onboarding' => $result['status'],
         ]);
     }
-
 
     /**
      * GET /api/{site}/open-collab/onboarding/contract
@@ -350,7 +377,7 @@ class OnboardingController extends Controller
             return $response;
         }
 
-        $site     = $this->currentSite();
+        $site = $this->currentSite();
         $contract = $this->contractRepository->latestForSite($site->id);
 
         if (!$contract) {
@@ -358,11 +385,13 @@ class OnboardingController extends Controller
         }
 
         return $this->jsonResponse([
-            'id'      => $contract->id,
+            'id' => $contract->id,
             'version' => $contract->version,
             'content' => $contract->content,
         ]);
     }
+
+    // -------------------------------------------------------------------------
 
     /**
      * POST /api/{site}/open-collab/onboarding/contract
@@ -374,16 +403,16 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data     = $request->validated();
-            $userId   = Auth::id();
-            $site     = $this->currentSite();
+            $data = $request->validated();
+            $userId = Auth::id();
+            $site = $this->currentSite();
             $contract = $this->contractRepository->latestForSite($site->id);
 
             if (!$contract) {
                 return $this->errorResponse('No contract found for this site.', 404);
             }
 
-            if ((int) $data['contract_id'] !== $contract->id) {
+            if ((int)$data['contract_id'] !== $contract->id) {
                 return $this->errorResponse(
                     'Contract version mismatch. Please reload and try again.',
                     409
@@ -412,6 +441,16 @@ class OnboardingController extends Controller
     }
 
     /**
+     * Reads the client IP from the request object rather than from the $_SERVER
+     * superglobal, keeping infrastructure details out of the controller body.
+     * Falls back to '0.0.0.0' if the header is absent.
+     */
+    private function clientIp(Request $request): string
+    {
+        return $request->ip() ?? '0.0.0.0';
+    }
+
+    /**
      * POST /api/{site}/open-collab/onboarding/age-verification
      */
     public function updateAgeVerification(Request $request): JsonResponse
@@ -421,9 +460,9 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data   = $request->all();
+            $data = $request->all();
             $userId = Auth::id();
-            $site   = $this->currentSite();
+            $site = $this->currentSite();
 
             $this->profileRepository->updateDob($userId, $data['date_of_birth']);
             $this->profileRepository->markAgeVerified($userId, AgeVerificationMethod::SelfDeclared);
@@ -448,12 +487,12 @@ class OnboardingController extends Controller
         }
 
         try {
-            $data           = $request->validated();
-            $userId         = Auth::id();
-            $site           = $this->currentSite();
-            $currentVersion = (int) ($site->guidelines_version ?? 1);
+            $data = $request->validated();
+            $userId = Auth::id();
+            $site = $this->currentSite();
+            $currentVersion = (int)($site->guidelines_version ?? 1);
 
-            if ((int) $data['version'] < $currentVersion) {
+            if ((int)$data['version'] < $currentVersion) {
                 return $this->errorResponse(
                     'Guidelines have been updated. Please review the latest version.',
                     409
@@ -475,44 +514,5 @@ class OnboardingController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
         }
-    }
-
-    // -------------------------------------------------------------------------
-
-    private function currentSite(): Site
-    {
-        $site = Site::find(SiteContext::getId());
-
-        if (!$site) {
-            throw new RuntimeException('Site not found in context.');
-        }
-
-        return $site;
-    }
-
-    private function currentUser(): User
-    {
-        $user = User::find(Auth::id());
-
-        if (!$user) {
-            throw new RuntimeException('Authenticated user could not be loaded.');
-        }
-
-        return $user;
-    }
-
-    /**
-     * Reads the client IP from the request object rather than from the $_SERVER
-     * superglobal, keeping infrastructure details out of the controller body.
-     * Falls back to '0.0.0.0' if the header is absent.
-     */
-    private function clientIp(Request $request): string
-    {
-        return $request->ip() ?? '0.0.0.0';
-    }
-
-    private function ensureContributorProfileStarted(int $userId, Site $site): void
-    {
-        $this->onboardingService->start($userId, $site->id);
     }
 }

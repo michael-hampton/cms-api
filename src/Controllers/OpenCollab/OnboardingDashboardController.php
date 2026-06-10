@@ -8,6 +8,7 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use RuntimeException;
 
 /**
  * Serves the onboarding dashboard view and its status API endpoint.
@@ -44,6 +45,19 @@ class OnboardingDashboardController extends Controller
         ]);
     }
 
+    private function currentSite(): Site
+    {
+        $site = Site::find(SiteContext::getId());
+
+        if (!$site) {
+            throw new RuntimeException('Site not found in context.');
+        }
+
+        return $site;
+    }
+
+    // ── Private ───────────────────────────────────────────────────────────────
+
     /**
      * GET /api/{site}/open-collab/onboarding/status
      *
@@ -76,18 +90,5 @@ class OnboardingDashboardController extends Controller
             'completedSteps' => $completedSteps,
             'pendingSteps' => $pendingSteps,
         ]);
-    }
-
-    // ── Private ───────────────────────────────────────────────────────────────
-
-    private function currentSite(): Site
-    {
-        $site = Site::find(SiteContext::getId());
-
-        if (!$site) {
-            throw new \RuntimeException('Site not found in context.');
-        }
-
-        return $site;
     }
 }

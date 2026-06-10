@@ -6,6 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Services\OpenCollab\PaymentRetryService;
+use DomainException;
+use InvalidArgumentException;
 
 /**
  * Routes:
@@ -43,9 +45,9 @@ class PaymentRetryController extends Controller
                 'client_secret' => $result['client_secret'],
                 'payment_id' => $result['payment_id'],
             ]);
-        } catch (\DomainException $e) {
+        } catch (DomainException $e) {
             return $this->errorResponse($e->getMessage(), 422);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 404);
         }
     }

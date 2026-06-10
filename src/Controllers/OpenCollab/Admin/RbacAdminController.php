@@ -11,16 +11,18 @@ use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\RbacRepository;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\RbacManagementService;
+use InvalidArgumentException;
 
 class RbacAdminController extends Controller
 {
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly RbacManagementService $rbacManagementService,
+        private readonly RbacManagementService          $rbacManagementService,
         private readonly OpenCollabAuthorizationService $authorization,
-        private readonly RbacRepository $rbacRepository,
-    ) {
+        private readonly RbacRepository                 $rbacRepository,
+    )
+    {
         parent::__construct();
     }
 
@@ -124,7 +126,7 @@ class RbacAdminController extends Controller
             return $this->errorResponse('User not found.', 404);
         }
 
-        $permissionSlug = (string) $request->get('permission_slug', '');
+        $permissionSlug = (string)$request->get('permission_slug', '');
         $granted = filter_var($request->get('granted', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
 
         if ($permissionSlug === '' || $granted === null) {
@@ -133,7 +135,7 @@ class RbacAdminController extends Controller
 
         try {
             $this->rbacManagementService->setUserOverride(SiteContext::getId(), $userId, $permissionSlug, $granted, Auth::id());
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->errorResponse($exception->getMessage(), 422);
         }
 
@@ -152,7 +154,7 @@ class RbacAdminController extends Controller
 
         try {
             $this->rbacManagementService->deleteUserOverride(SiteContext::getId(), $userId, $permissionSlug, Auth::id());
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->errorResponse($exception->getMessage(), 422);
         }
 
@@ -168,12 +170,12 @@ class RbacAdminController extends Controller
         try {
             $role = $this->rbacManagementService->createRole(
                 SiteContext::getId(),
-                (string) $request->get('name', ''),
-                ($request->get('slug') !== null ? (string) $request->get('slug') : null),
+                (string)$request->get('name', ''),
+                ($request->get('slug') !== null ? (string)$request->get('slug') : null),
                 is_array($request->get('permission_slugs', [])) ? array_values(array_map('strval', $request->get('permission_slugs', []))) : [],
                 Auth::id(),
             );
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->errorResponse($exception->getMessage(), 422);
         }
 
@@ -191,7 +193,7 @@ class RbacAdminController extends Controller
 
         try {
             $this->rbacManagementService->deleteRole(SiteContext::getId(), $roleId, Auth::id());
-        } catch (\InvalidArgumentException $exception) {
+        } catch (InvalidArgumentException $exception) {
             return $this->errorResponse($exception->getMessage(), 422);
         }
 

@@ -9,14 +9,13 @@ use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Services\OpenCollab\InvitationResendService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
-use App\Framework\Authorization\Auth;
 
 class ResendInvitationController extends Controller
 {
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly InvitationResendService $resendService,
+        private readonly InvitationResendService        $resendService,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {

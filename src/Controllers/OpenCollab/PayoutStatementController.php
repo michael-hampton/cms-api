@@ -7,10 +7,15 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\StreamedResponse;
 use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
+use App\Models\Payout;
+use App\Models\Site;
+use App\Models\User;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use DateTimeInterface;
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Throwable;
 
 /**
  * Generates and streams a payout statement PDF using dompdf.
@@ -57,33 +62,7 @@ class PayoutStatementController extends Controller
         return $this->streamStatement($payout);
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/payouts/{id}/statement
-     * Admin can download any payout statement.
-     */
-    public function adminDownload(int $id): void
-    {
-        $user = Auth::user();
-        if (!$user || !in_array($user->role ?? '', ['admin', 'agent'], true)) {
-            http_response_code(403);
-            echo json_encode(['error' => 'Admin access required.']);
-            return;
-        }
-
-        $payout = $this->payoutRepository->find($id);
-
-        if (!$payout || (int)$payout->site_id !== SiteContext::getId()) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Payout not found.']);
-            return;
-        }
-
-        $this->streamStatement($payout);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private function streamStatement(\App\Models\Payout $payout): ?StreamedResponse
+    private function streamStatement(Payout $payout): ?StreamedResponse
     {
         try {
             return new StreamedResponse(function () use ($payout) {
@@ -115,7 +94,7 @@ class PayoutStatementController extends Controller
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'attachment; filename="invoice-' . $payout->id . '.pdf"'
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             echo $e->getMessage();
             die;
             $this->logger->error('Exception generating payout PDF.', [
@@ -131,10 +110,10 @@ class PayoutStatementController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    private function buildHtml(\App\Models\Payout $payout): string
+    private function buildHtml(Payout $payout): string
     {
-        $contributor = \App\Models\User::find($payout->user_id);
-        $site = \App\Models\Site::find($payout->site_id);
+        $contributor = User::find($payout->user_id);
+        $site = Site::find($payout->site_id);
         $transactions = $this->buildTransactions($payout);
 
         $totalEarnings = array_sum(
@@ -440,7 +419,9 @@ class PayoutStatementController extends Controller
 HTML;
     }
 
-    private function buildTransactions(\App\Models\Payout $payout): array
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private function buildTransactions(Payout $payout): array
     {
         $raw = $this->paymentRepository->transactionHistoryForContributor(
             (int)$payout->user_id,
@@ -459,7 +440,7 @@ HTML;
 
             // created_at is a DateTime object per the project note
             $createdAt = $txArr['created_at'] ?? null;
-            $date = $createdAt instanceof \DateTimeInterface
+            $date = $createdAt instanceof DateTimeInterface
                 ? $createdAt->format('d M Y')
                 : (is_string($createdAt) ? date('d M Y', strtotime($createdAt)) : '—');
 
@@ -477,10 +458,10 @@ HTML;
         return $transactions;
     }
 
-    private function payoutDateRange(\App\Models\Payout $payout): string
+    private function payoutDateRange(Payout $payout): string
     {
         $created = $payout->created_at;
-        if (!$created instanceof \DateTimeInterface) {
+        if (!$created instanceof DateTimeInterface) {
             return '';
         }
 
@@ -488,5 +469,29 @@ HTML;
         $end = (clone $created)->modify('last day of this month')->format('d M Y');
 
         return "{$start} – {$end}";
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/payouts/{id}/statement
+     * Admin can download any payout statement.
+     */
+    public function adminDownload(int $id): void
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->role ?? '', ['admin', 'agent'], true)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Admin access required.']);
+            return;
+        }
+
+        $payout = $this->payoutRepository->find($id);
+
+        if (!$payout || (int)$payout->site_id !== SiteContext::getId()) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Payout not found.']);
+            return;
+        }
+
+        $this->streamStatement($payout);
     }
 }

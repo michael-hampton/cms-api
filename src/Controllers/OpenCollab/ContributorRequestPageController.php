@@ -7,7 +7,6 @@ use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\ViewModels\OpenCollab\ContributorRequestFormViewModel;
-use App\ViewModels\OpenCollab\ProfileStepViewModel;
 
 /**
  * GET /{site}/open-collab/request-access
@@ -26,13 +25,14 @@ class ContributorRequestPageController extends Controller
 {
     public function __construct(
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
     public function show()
     {
-        $site     = Site::find(SiteContext::getId());
+        $site = Site::find(SiteContext::getId());
         $siteSlug = SiteContext::slug();
 
         $requestForm = $site
@@ -43,7 +43,7 @@ class ContributorRequestPageController extends Controller
 
         return $this->view('open-collab.contributor-request', [
             'site' => $siteSlug,
-            'requiresApproval' => (bool) ($site?->require_invite_approval ?? true),
+            'requiresApproval' => (bool)($site?->require_invite_approval ?? true),
             'submitted' => false,
             'requestForm' => $requestForm,
         ]);

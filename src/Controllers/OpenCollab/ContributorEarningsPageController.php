@@ -15,11 +15,12 @@ class ContributorEarningsPageController extends Controller
 {
     public function __construct(
         private readonly EarningsService          $earningsService,
-        private readonly CreatorBalanceService   $creatorBalanceService,
+        private readonly CreatorBalanceService    $creatorBalanceService,
         private readonly PayoutService            $payoutService,
         private readonly PayoutRepository         $payoutRepository,
         private readonly ArticlePaymentRepository $paymentRepository,
-    ) {
+    )
+    {
         parent::__construct();
     }
 

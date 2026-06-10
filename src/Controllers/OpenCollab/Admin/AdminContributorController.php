@@ -12,6 +12,8 @@ use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\ContributorProfile;
+use App\Models\Invitation;
+use App\Models\User;
 use App\Repositories\OpenCollab\AdminContributorRepository;
 use App\Repositories\OpenCollab\InvitationRepository;
 use App\Repositories\OpenCollab\RbacRepository;
@@ -19,8 +21,9 @@ use App\Requests\OpenCollab\CloseContributorAccountRequest;
 use App\Services\OpenCollab\ContributorTerminationService;
 use App\Services\OpenCollab\InvitationService;
 use App\Services\OpenCollab\RbacManagementService;
-use App\Services\OpenCollab\SitePermissionResolver;
 use App\Services\OpenCollab\SiteAccessService;
+use App\Services\OpenCollab\SitePermissionResolver;
+use InvalidArgumentException;
 
 /**
  * Admin contributor management area.
@@ -50,9 +53,9 @@ class AdminContributorController extends Controller
         private readonly RbacRepository                $rbacRepository,
         private readonly SitePermissionResolver        $permissionResolver,
         private readonly RbacManagementService         $rbacManagementService,
-        private readonly DeactivateContributorAction $deactivateAction,
-        private readonly ReactivateContributorAction $reactivateAction,
-        private readonly ChangeContributorRoleAction $changeRoleAction,
+        private readonly DeactivateContributorAction   $deactivateAction,
+        private readonly ReactivateContributorAction   $reactivateAction,
+        private readonly ChangeContributorRoleAction   $changeRoleAction,
     )
     {
         parent::__construct();
@@ -73,253 +76,6 @@ class AdminContributorController extends Controller
         return $this->jsonResponse($this->formatPaginatedUsers($results));
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/contributors/{id}
-     */
-    public function show(int $id): JsonResponse
-    {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
-
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
-        }
-
-        return $this->jsonResponse(['contributor' => $this->formatUser($contributor)]);
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/deactivate
-     *
-     * Body: { "reason": "..." }
-     */
-    public function deactivate(Request $request, int $id): JsonResponse
-    {
-        try {
-            $this->deactivateAction->execute(
-                userId: $id,
-                siteId: SiteContext::getId(),
-                adminId: Auth::id(),
-                reason: (string)$request->get('reason', ''),
-            );
-
-            return $this->successResponse('Contributor deactivated.');
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/reactivate
-     *
-     * Body: { "reason": "..." }
-     */
-    public function reactivate(Request $request, int $id): JsonResponse
-    {
-        try {
-            $this->reactivateAction->execute(
-                userId: $id,
-                siteId: SiteContext::getId(),
-                adminId: Auth::id(),
-                reason: (string)$request->get('reason', ''),
-            );
-
-            return $this->successResponse('Contributor reactivated.');
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/close
-     */
-    public function close(CloseContributorAccountRequest $request, int $id): JsonResponse
-    {
-        try {
-            $data = $request->validated();
-
-            $this->terminationService->close(
-                userId: $id,
-                siteId: SiteContext::getId(),
-                adminId: Auth::id(),
-                reason: $data['reason'],
-            );
-
-            return $this->successResponse('Contributor account closed.');
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    // ── Site access ───────────────────────────────────────────────────────────
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/grant-access
-     */
-    public function grantAccess(int $id): JsonResponse
-    {
-        $this->siteAccessService->grantAccess($id, SiteContext::getId());
-
-        return $this->successResponse('Site access granted.');
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/revoke-access
-     */
-    public function revokeAccess(int $id): JsonResponse
-    {
-        $this->siteAccessService->revokeAccess($id, SiteContext::getId());
-
-        return $this->successResponse('Site access revoked.');
-    }
-
-    // ── Role ──────────────────────────────────────────────────────────────────
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributors/{id}/role
-     *
-     * Body: { "role": "editor", "reason": "..." }
-     */
-    public function updateRole(Request $request, int $id): JsonResponse
-    {
-        try {
-            $this->changeRoleAction->execute(
-                userId: $id,
-                siteId: SiteContext::getId(),
-                adminId: Auth::id(),
-                newRole: (string)$request->get('role', ''),
-                reason: (string)$request->get('reason', ''),
-            );
-
-            return $this->successResponse('Role updated.');
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    public function capabilities(int $id): JsonResponse
-    {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
-        }
-
-        $siteId = SiteContext::getId();
-        $effectivePermissions = $this->permissionResolver->forUser($id, $siteId);
-        $rolePermissionIds = $this->rbacRepository->permissionIdsForRoles($this->rbacRepository->roleIdsForUser($siteId, $id));
-        $rolePermissionSlugs = array_values(array_unique($this->rbacRepository->permissionSlugsForIds($rolePermissionIds)));
-
-        $overrides = [];
-        foreach ($this->rbacRepository->overridesForUser($siteId, $id) as $override) {
-            $slug = $this->rbacRepository->permissionSlugForId((int) $override['permission_id']);
-            if ($slug) {
-                $overrides[$slug] = (bool) $override['granted'];
-            }
-        }
-
-        $capabilities = array_map(function (array $permission) use ($effectivePermissions, $rolePermissionSlugs, $overrides) {
-            $slug = $permission['slug'];
-            $directGrant = array_key_exists($slug, $overrides) && $overrides[$slug] === true;
-            $directDeny = array_key_exists($slug, $overrides) && $overrides[$slug] === false;
-
-            return [
-                'key' => $slug,
-                'label' => $permission['name'],
-                'description' => null,
-                'effective' => in_array($slug, $effectivePermissions, true),
-                'source' => $directGrant || $directDeny ? 'override' : (in_array($slug, $rolePermissionSlugs, true) ? 'role' : 'none'),
-                'directGrant' => $directGrant,
-                'directDeny' => $directDeny,
-            ];
-        }, $this->rbacManagementService->permissionsForSite($siteId));
-
-        return $this->resourceResponse(['capabilities' => $capabilities]);
-    }
-
-    public function grantCapability(int $id, string $capabilityKey): JsonResponse
-    {
-        return $this->setCapabilityOverride($id, $capabilityKey, true);
-    }
-
-    public function revokeCapability(int $id, string $capabilityKey): JsonResponse
-    {
-        return $this->setCapabilityOverride($id, $capabilityKey, false);
-    }
-
-    public function resetCapability(int $id, string $capabilityKey): JsonResponse
-    {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
-        }
-
-        try {
-            $this->rbacManagementService->deleteUserOverride(SiteContext::getId(), $id, $capabilityKey, Auth::id());
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-
-        return $this->successResponse('Capability override removed.');
-    }
-
-    // ── Invitations ───────────────────────────────────────────────────────────
-
-    /**
-     * GET /api/{site}/open-collab/admin/invitations
-     */
-    public function invitations(): JsonResponse
-    {
-        $invitations = $this->invitationRepository->getAllForSite(SiteContext::getId());
-
-        return $this->resourceResponse(
-            $invitations->map(fn($inv) => $this->formatInvitation($inv))->toArray()
-        );
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/invitations/{id}/resend
-     */
-    public function resendInvitation(int $id): JsonResponse
-    {
-        $existing = $this->invitationRepository->find($id);
-
-        if (!$existing || $existing->site_id !== SiteContext::getId()) {
-            return $this->errorResponse('Invitation not found.', 404);
-        }
-
-        try {
-            $newInvitation = $this->invitationService->create(
-                email: $existing->email,
-                invitedBy: Auth::id(),
-                siteId: SiteContext::getId(),
-            );
-
-            return $this->jsonResponse([
-                'invitation' => $this->formatInvitation($newInvitation),
-                'message' => 'New invitation created for ' . $existing->email,
-            ], 201);
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    /**
-     * DELETE /api/{site}/open-collab/admin/invitations/{id}
-     */
-    public function revokeInvitation(int $id): JsonResponse
-    {
-        try {
-            $this->invitationService->revoke($id, Auth::id());
-
-            return $this->successResponse('Invitation revoked.');
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    // ── Formatting ────────────────────────────────────────────────────────────
-
     private function formatPaginatedUsers(array $result): array
     {
         $items = $result['data'] ?? $result;
@@ -330,7 +86,7 @@ class AdminContributorController extends Controller
         return array_map(fn($u) => $this->formatUser($u), (array)$items);
     }
 
-    private function formatUser(\App\Models\User|array $user): array
+    private function formatUser(User|array $user): array
     {
         $values = is_array($user) ? $user : $user->toArray();
 
@@ -372,7 +128,229 @@ class AdminContributorController extends Controller
         ];
     }
 
-    private function formatInvitation(\App\Models\Invitation $inv): array
+    /**
+     * GET /api/{site}/open-collab/admin/contributors/{id}
+     */
+    public function show(int $id): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        return $this->jsonResponse(['contributor' => $this->formatUser($contributor)]);
+    }
+
+    // ── Site access ───────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/deactivate
+     *
+     * Body: { "reason": "..." }
+     */
+    public function deactivate(Request $request, int $id): JsonResponse
+    {
+        try {
+            $this->deactivateAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                reason: (string)$request->get('reason', ''),
+            );
+
+            return $this->successResponse('Contributor deactivated.');
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/reactivate
+     *
+     * Body: { "reason": "..." }
+     */
+    public function reactivate(Request $request, int $id): JsonResponse
+    {
+        try {
+            $this->reactivateAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                reason: (string)$request->get('reason', ''),
+            );
+
+            return $this->successResponse('Contributor reactivated.');
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    // ── Role ──────────────────────────────────────────────────────────────────
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/close
+     */
+    public function close(CloseContributorAccountRequest $request, int $id): JsonResponse
+    {
+        try {
+            $data = $request->validated();
+
+            $this->terminationService->close(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                reason: $data['reason'],
+            );
+
+            return $this->successResponse('Contributor account closed.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/grant-access
+     */
+    public function grantAccess(int $id): JsonResponse
+    {
+        $this->siteAccessService->grantAccess($id, SiteContext::getId());
+
+        return $this->successResponse('Site access granted.');
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/revoke-access
+     */
+    public function revokeAccess(int $id): JsonResponse
+    {
+        $this->siteAccessService->revokeAccess($id, SiteContext::getId());
+
+        return $this->successResponse('Site access revoked.');
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributors/{id}/role
+     *
+     * Body: { "role": "editor", "reason": "..." }
+     */
+    public function updateRole(Request $request, int $id): JsonResponse
+    {
+        try {
+            $this->changeRoleAction->execute(
+                userId: $id,
+                siteId: SiteContext::getId(),
+                adminId: Auth::id(),
+                newRole: (string)$request->get('role', ''),
+                reason: (string)$request->get('reason', ''),
+            );
+
+            return $this->successResponse('Role updated.');
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function capabilities(int $id): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        $siteId = SiteContext::getId();
+        $effectivePermissions = $this->permissionResolver->forUser($id, $siteId);
+        $rolePermissionIds = $this->rbacRepository->permissionIdsForRoles($this->rbacRepository->roleIdsForUser($siteId, $id));
+        $rolePermissionSlugs = array_values(array_unique($this->rbacRepository->permissionSlugsForIds($rolePermissionIds)));
+
+        $overrides = [];
+        foreach ($this->rbacRepository->overridesForUser($siteId, $id) as $override) {
+            $slug = $this->rbacRepository->permissionSlugForId((int)$override['permission_id']);
+            if ($slug) {
+                $overrides[$slug] = (bool)$override['granted'];
+            }
+        }
+
+        $capabilities = array_map(function (array $permission) use ($effectivePermissions, $rolePermissionSlugs, $overrides) {
+            $slug = $permission['slug'];
+            $directGrant = array_key_exists($slug, $overrides) && $overrides[$slug] === true;
+            $directDeny = array_key_exists($slug, $overrides) && $overrides[$slug] === false;
+
+            return [
+                'key' => $slug,
+                'label' => $permission['name'],
+                'description' => null,
+                'effective' => in_array($slug, $effectivePermissions, true),
+                'source' => $directGrant || $directDeny ? 'override' : (in_array($slug, $rolePermissionSlugs, true) ? 'role' : 'none'),
+                'directGrant' => $directGrant,
+                'directDeny' => $directDeny,
+            ];
+        }, $this->rbacManagementService->permissionsForSite($siteId));
+
+        return $this->resourceResponse(['capabilities' => $capabilities]);
+    }
+
+    // ── Invitations ───────────────────────────────────────────────────────────
+
+    public function grantCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        return $this->setCapabilityOverride($id, $capabilityKey, true);
+    }
+
+    private function setCapabilityOverride(int $id, string $capabilityKey, bool $granted): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        try {
+            $this->rbacManagementService->setUserOverride(SiteContext::getId(), $id, $capabilityKey, $granted, Auth::id());
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+
+        return $this->successResponse($granted ? 'Capability granted.' : 'Capability denied.');
+    }
+
+    public function revokeCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        return $this->setCapabilityOverride($id, $capabilityKey, false);
+    }
+
+    // ── Formatting ────────────────────────────────────────────────────────────
+
+    public function resetCapability(int $id, string $capabilityKey): JsonResponse
+    {
+        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
+        if (!$contributor) {
+            return $this->errorResponse('Contributor not found.', 404);
+        }
+
+        try {
+            $this->rbacManagementService->deleteUserOverride(SiteContext::getId(), $id, $capabilityKey, Auth::id());
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+
+        return $this->successResponse('Capability override removed.');
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/invitations
+     */
+    public function invitations(): JsonResponse
+    {
+        $invitations = $this->invitationRepository->getAllForSite(SiteContext::getId());
+
+        return $this->resourceResponse(
+            $invitations->map(fn($inv) => $this->formatInvitation($inv))->toArray()
+        );
+    }
+
+    private function formatInvitation(Invitation $inv): array
     {
         return [
             'id' => $inv->id,
@@ -385,20 +363,45 @@ class AdminContributorController extends Controller
         ];
     }
 
-    private function setCapabilityOverride(int $id, string $capabilityKey, bool $granted): JsonResponse
+    /**
+     * POST /api/{site}/open-collab/admin/invitations/{id}/resend
+     */
+    public function resendInvitation(int $id): JsonResponse
     {
-        $contributor = $this->contributorRepository->findContributorForSite($id, SiteContext::getId());
-        if (!$contributor) {
-            return $this->errorResponse('Contributor not found.', 404);
+        $existing = $this->invitationRepository->find($id);
+
+        if (!$existing || $existing->site_id !== SiteContext::getId()) {
+            return $this->errorResponse('Invitation not found.', 404);
         }
 
         try {
-            $this->rbacManagementService->setUserOverride(SiteContext::getId(), $id, $capabilityKey, $granted, Auth::id());
-        } catch (\InvalidArgumentException $e) {
+            $newInvitation = $this->invitationService->create(
+                email: $existing->email,
+                invitedBy: Auth::id(),
+                siteId: SiteContext::getId(),
+            );
+
+            return $this->jsonResponse([
+                'invitation' => $this->formatInvitation($newInvitation),
+                'message' => 'New invitation created for ' . $existing->email,
+            ], 201);
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
+    }
 
-        return $this->successResponse($granted ? 'Capability granted.' : 'Capability denied.');
+    /**
+     * DELETE /api/{site}/open-collab/admin/invitations/{id}
+     */
+    public function revokeInvitation(int $id): JsonResponse
+    {
+        try {
+            $this->invitationService->revoke($id, Auth::id());
+
+            return $this->successResponse('Invitation revoked.');
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 
     /**
@@ -420,8 +423,8 @@ class AdminContributorController extends Controller
         }
 
         $classification = $request->get('tax_classification');
-        $vatNumber = trim((string) $request->get('vat_number', ''));
-        $taxCountry = strtoupper(trim((string) $request->get('tax_country', '')));
+        $vatNumber = trim((string)$request->get('vat_number', ''));
+        $taxCountry = strtoupper(trim((string)$request->get('tax_country', '')));
 
         $allowed = [
             null,

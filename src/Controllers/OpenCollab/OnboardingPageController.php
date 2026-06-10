@@ -12,9 +12,9 @@ use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\ViewModels\OpenCollab\OnboardingPageViewModel;
-use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\ViewModels\OpenCollab\ProfileStepViewModel;
 
 class OnboardingPageController extends Controller
@@ -22,12 +22,12 @@ class OnboardingPageController extends Controller
     use AuthorizesSitePagePermissions;
 
     public function __construct(
-        private readonly ContributorOnboardingService $onboardingService,
-        private readonly ContractRepository $contractRepository,
-        private readonly GuidelinesRepository $guidelinesRepository,
-        private readonly GuidelinesContentRepository $guidelinesContentRepository,
-        private readonly OpenCollabAuthorizationService $authorization,
-        private readonly ContributorProfileRepository $contributorProfileRepository,
+        private readonly ContributorOnboardingService         $onboardingService,
+        private readonly ContractRepository                   $contractRepository,
+        private readonly GuidelinesRepository                 $guidelinesRepository,
+        private readonly GuidelinesContentRepository          $guidelinesContentRepository,
+        private readonly OpenCollabAuthorizationService       $authorization,
+        private readonly ContributorProfileRepository         $contributorProfileRepository,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
     )
     {

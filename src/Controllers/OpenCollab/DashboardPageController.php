@@ -4,20 +4,16 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
-use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
-use App\Repositories\Cms\Pages\PageRepository;
-use App\Repositories\OpenCollab\ActivityRepository;
-use App\Services\OpenCollab\Dashboard\WidgetRegistry;
 use App\Services\OpenCollab\Dashboard\WidgetResolver;
 use App\Services\OpenCollab\EarningsService;
 
 class DashboardPageController extends Controller
 {
     public function __construct(
-        private readonly EarningsService    $earningsService,
-        private readonly WidgetResolver $widgetResolver,
+        private readonly EarningsService $earningsService,
+        private readonly WidgetResolver  $widgetResolver,
     )
     {
         parent::__construct();

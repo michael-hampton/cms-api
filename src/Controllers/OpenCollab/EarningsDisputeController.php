@@ -7,8 +7,11 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\EarningsDispute;
 use App\Repositories\OpenCollab\EarningsDisputeRepository;
 use App\Services\OpenCollab\EarningsDisputeService;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Routes:
@@ -62,14 +65,14 @@ class EarningsDisputeController extends Controller
                 'dispute' => $this->formatDispute($dispute),
                 'message' => 'Dispute raised. Our team will review it shortly.',
             ], 201);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 409);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
 
-    private function formatDispute(\App\Models\EarningsDispute $dispute): array
+    private function formatDispute(EarningsDispute $dispute): array
     {
         return [
             'id' => $dispute->id,
@@ -136,7 +139,7 @@ class EarningsDisputeController extends Controller
                 'dispute' => $this->formatDispute($dispute),
                 'message' => 'Dispute resolved.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -166,7 +169,7 @@ class EarningsDisputeController extends Controller
                 'dispute' => $this->formatDispute($dispute),
                 'message' => 'Dispute rejected.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

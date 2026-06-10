@@ -5,7 +5,9 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Models\PaymentTerms;
 use App\Services\OpenCollab\PaymentTermsService;
+use InvalidArgumentException;
 
 /**
  * Admin CRUD for per-site payment terms.
@@ -35,7 +37,7 @@ class AdminPaymentTermsController extends Controller
         ]);
     }
 
-    private function formatTerms(\App\Models\PaymentTerms $terms): array
+    private function formatTerms(PaymentTerms $terms): array
     {
         return [
             'id' => $terms->id,
@@ -77,7 +79,7 @@ class AdminPaymentTermsController extends Controller
                 'payment_terms' => $this->formatTerms($terms),
                 'message' => 'Payment terms saved.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

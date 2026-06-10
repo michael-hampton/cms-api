@@ -10,13 +10,24 @@ use App\Services\UI\Components\UiPanelComponent;
 trait ResolvesUiComponents
 {
     /**
+     * @return array<int, string>
+     */
+    protected function allowedUiComponentKeysForSurface(string $surface): array
+    {
+        return array_map(
+            static fn(array $component): string => (string)$component['key'],
+            $this->allowedUiComponentDefinitionsForSurface($surface)
+        );
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     protected function allowedUiComponentDefinitionsForSurface(string $surface, ?string $type = null): array
     {
         $components = app(WidgetResolver::class)->allowedForSurface(
-            (int) Auth::id(),
-            (int) SiteContext::getId(),
+            (int)Auth::id(),
+            (int)SiteContext::getId(),
             $surface,
         );
 
@@ -31,13 +42,13 @@ trait ResolvesUiComponents
     }
 
     /**
-     * @return array<int, string>
+     * @return array<int, array<string, mixed>>
      */
-    protected function allowedUiComponentKeysForSurface(string $surface): array
+    protected function allowedUiPanelDescriptorsForSurface(string $surface, array $context = []): array
     {
         return array_map(
-            static fn(array $component): string => (string) $component['key'],
-            $this->allowedUiComponentDefinitionsForSurface($surface)
+            static fn(UiPanelComponent $panel): array => $panel->descriptor($context),
+            $this->allowedUiPanelsForSurface($surface)
         );
     }
 
@@ -50,7 +61,7 @@ trait ResolvesUiComponents
         $panels = [];
 
         foreach ($definitions as $definition) {
-            $class = (string) ($definition['component'] ?? '');
+            $class = (string)($definition['component'] ?? '');
             if ($class === '' || !class_exists($class)) {
                 continue;
             }
@@ -64,16 +75,5 @@ trait ResolvesUiComponents
         }
 
         return $panels;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    protected function allowedUiPanelDescriptorsForSurface(string $surface, array $context = []): array
-    {
-        return array_map(
-            static fn(UiPanelComponent $panel): array => $panel->descriptor($context),
-            $this->allowedUiPanelsForSurface($surface)
-        );
     }
 }

@@ -7,6 +7,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Services\OpenCollab\Dashboard\WidgetSettingsService;
+use InvalidArgumentException;
 
 /**
  * Manages per-user widget configuration overrides.
@@ -29,7 +30,8 @@ class WidgetSettingsController extends Controller
 {
     public function __construct(
         private readonly WidgetSettingsService $widgetSettingsService,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -52,7 +54,7 @@ class WidgetSettingsController extends Controller
     public function saveWidgetConfig(Request $request, string $key): JsonResponse
     {
         $userId = Auth::id();
-        $body   = $request->all();
+        $body = $request->all();
 
         if (!isset($body['enabled'], $body['position'])) {
             return $this->jsonResponse(['error' => 'enabled and position are required.'], 422);
@@ -60,13 +62,13 @@ class WidgetSettingsController extends Controller
 
         try {
             $this->widgetSettingsService->saveWidgetConfig(
-                userId:    $userId,
+                userId: $userId,
                 widgetKey: $key,
-                enabled:   (bool)$body['enabled'],
-                position:  (int)$body['position'],
-                settings:  is_array($body['settings'] ?? null) ? $body['settings'] : [],
+                enabled: (bool)$body['enabled'],
+                position: (int)$body['position'],
+                settings: is_array($body['settings'] ?? null) ? $body['settings'] : [],
             );
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->jsonResponse(['error' => $e->getMessage()], 422);
         }
 
@@ -93,7 +95,7 @@ class WidgetSettingsController extends Controller
      */
     public function updatePositions(Request $request): JsonResponse
     {
-        $userId    = Auth::id();
+        $userId = Auth::id();
         $positions = $request->get('positions') ?? null;
 
         if (!is_array($positions) || empty($positions)) {
@@ -102,7 +104,7 @@ class WidgetSettingsController extends Controller
 
         try {
             $this->widgetSettingsService->updatePositions($userId, $positions);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->jsonResponse(['error' => $e->getMessage()], 422);
         }
 

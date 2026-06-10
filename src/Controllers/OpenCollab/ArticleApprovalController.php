@@ -15,6 +15,7 @@ use App\Requests\OpenCollab\RejectArticleRequest;
 use App\Resources\OpenCollab\ContributorPageResource;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use InvalidArgumentException;
 
 /**
  * Admin-side article moderation.
@@ -33,7 +34,7 @@ class ArticleApprovalController extends Controller
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly ArticleApprovalService $approvalService,
+        private readonly ArticleApprovalService         $approvalService,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {
@@ -73,7 +74,7 @@ class ArticleApprovalController extends Controller
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article approved and published.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -104,7 +105,7 @@ class ArticleApprovalController extends Controller
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -133,7 +134,7 @@ class ArticleApprovalController extends Controller
             ]);
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -162,7 +163,7 @@ class ArticleApprovalController extends Controller
             ]);
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

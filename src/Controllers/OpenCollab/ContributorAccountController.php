@@ -10,6 +10,8 @@ use App\Framework\Support\Logger;
 use App\Framework\Support\SiteContext;
 use App\Requests\OpenCollab\CloseContributorAccountRequest;
 use App\Services\OpenCollab\ContributorTerminationService;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Handles contributor self-service account closure.
@@ -66,9 +68,9 @@ class ContributorAccountController extends Controller
             );
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             $this->logger->error('Contributor self-service account closure failed.', [
                 'user_id' => $userId,
                 'site_id' => SiteContext::getId(),

@@ -29,8 +29,8 @@ class PayoutPageController extends Controller
     use AuthorizesSitePagePermissions;
 
     public function __construct(
-        private readonly PayoutService    $payoutService,
-        private readonly PayoutRepository $payoutRepository,
+        private readonly PayoutService                  $payoutService,
+        private readonly PayoutRepository               $payoutRepository,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {

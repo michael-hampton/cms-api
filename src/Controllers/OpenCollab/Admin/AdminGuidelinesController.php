@@ -39,10 +39,10 @@ class AdminGuidelinesController extends Controller
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly GuidelinesContentRepository $guidelinesContentRepository,
-        private readonly GuidelineTemplateRepository $templateRepository,
-        private readonly GuidelineService            $guidelineService,
-        private readonly GuidelineTemplateService    $guidelineTemplateService,
+        private readonly GuidelinesContentRepository    $guidelinesContentRepository,
+        private readonly GuidelineTemplateRepository    $templateRepository,
+        private readonly GuidelineService               $guidelineService,
+        private readonly GuidelineTemplateService       $guidelineTemplateService,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {
@@ -60,6 +60,25 @@ class AdminGuidelinesController extends Controller
         return $this->jsonResponse(
             $guidelines->map(fn($g) => $this->formatGuideline($g))->toArray()
         );
+    }
+
+    private function formatGuideline(Guideline $guideline): array
+    {
+        return [
+            'id' => $guideline->id,
+            'site_id' => $guideline->site_id,
+            'version' => $guideline->version,
+            'content' => $guideline->content,
+            'status' => $guideline->status,
+            'status_label' => $guideline->status,
+            'published_at' => $guideline->published_at,
+            'published_by' => $guideline->published_by,
+            'archived_at' => $guideline->archived_at,
+            'archived_by' => $guideline->archived_by,
+            'source_template_id' => $guideline->source_template_id,
+            'cloned_from_version_id' => $guideline->cloned_from_version_id,
+            'created_at' => $guideline->created_at,
+        ];
     }
 
     public function latest(): JsonResponse
@@ -257,6 +276,8 @@ class AdminGuidelinesController extends Controller
         ], 201);
     }
 
+    // ── Formatting ────────────────────────────────────────────────────────────
+
     public function storeFromTemplate(Request $request): JsonResponse
     {
         if ($response = $this->authorizeSitePermissions(['guideline.create'])) {
@@ -280,26 +301,5 @@ class AdminGuidelinesController extends Controller
             'guideline' => $this->formatGuideline($guideline),
             'message' => "Draft version {$guideline->version} created from template.",
         ], 201);
-    }
-
-    // ── Formatting ────────────────────────────────────────────────────────────
-
-    private function formatGuideline(Guideline $guideline): array
-    {
-        return [
-            'id' => $guideline->id,
-            'site_id' => $guideline->site_id,
-            'version' => $guideline->version,
-            'content' => $guideline->content,
-            'status' => $guideline->status,
-            'status_label' => $guideline->status,
-            'published_at' => $guideline->published_at,
-            'published_by' => $guideline->published_by,
-            'archived_at' => $guideline->archived_at,
-            'archived_by' => $guideline->archived_by,
-            'source_template_id' => $guideline->source_template_id,
-            'cloned_from_version_id' => $guideline->cloned_from_version_id,
-            'created_at' => $guideline->created_at,
-        ];
     }
 }

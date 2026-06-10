@@ -17,12 +17,13 @@ use App\ViewModels\OpenCollab\ProfileStepViewModel;
 class ContributorAccountPageController extends Controller
 {
     public function __construct(
-        private readonly ContributorProfileRepository      $contributorProfileRepository,
-        private readonly ContractRepository                $contractRepository,
-        private readonly GuidelinesRepository              $guidelinesRepository,
-        private readonly UserConsentService                $userConsentService,
+        private readonly ContributorProfileRepository         $contributorProfileRepository,
+        private readonly ContractRepository                   $contractRepository,
+        private readonly GuidelinesRepository                 $guidelinesRepository,
+        private readonly UserConsentService                   $userConsentService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -30,10 +31,10 @@ class ContributorAccountPageController extends Controller
     {
         $userId = Auth::id();
         $siteId = SiteContext::getId();
-        $site   = Site::find($siteId);
+        $site = Site::find($siteId);
 
         $contract = $this->contractRepository->latestForSite($siteId);
-        $profile  = $this->contributorProfileRepository->findByUserId($userId);
+        $profile = $this->contributorProfileRepository->findByUserId($userId);
 
         // Ticket 1: build the same ProfileStepViewModel used by onboarding so the
         // settings view can render dynamic fields through the shared partial.
@@ -44,15 +45,15 @@ class ContributorAccountPageController extends Controller
         $profileStep = ProfileStepViewModel::fromFields($profileFields, $profile);
 
         return $this->view('open-collab.settings.index', [
-            'profile'            => $profile,
-            'profileStep'        => $profileStep,
-            'stripePublicKey'    => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
+            'profile' => $profile,
+            'profileStep' => $profileStep,
+            'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
             'contractSignatures' => !empty($contract)
                 ? $this->contractRepository->getForUser($userId, $contract->id)?->toArray() ?? []
                 : [],
-            'guidelinesAck'      => $this->guidelinesRepository->getForUser($userId, $siteId),
-            'site'               => SiteContext::slug(),
-            'currentUser'        => User::find($userId),
+            'guidelinesAck' => $this->guidelinesRepository->getForUser($userId, $siteId),
+            'site' => SiteContext::slug(),
+            'currentUser' => User::find($userId),
         ]);
     }
 }

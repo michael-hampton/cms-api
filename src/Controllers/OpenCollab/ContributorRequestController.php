@@ -7,11 +7,13 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Models\ContributorRequest;
 use App\Models\Site;
 use App\Requests\OpenCollab\SubmitContributorRequestRequest;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\ContributorRequestService;
 use App\Services\OpenCollab\DynamicFieldValidator;
+use InvalidArgumentException;
 
 /**
  * Self-service contributor registration and admin review queue.
@@ -31,7 +33,8 @@ class ContributorRequestController extends Controller
         private readonly ContributorRequestService            $requestService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
         private readonly DynamicFieldValidator                $dynamicFieldValidator,
-    ) {
+    )
+    {
         parent::__construct();
     }
 
@@ -43,10 +46,10 @@ class ContributorRequestController extends Controller
     {
         try {
 
-            $data   = $request->validated();
+            $data = $request->validated();
 
             $siteId = SiteContext::getId();
-            $site   = Site::find($siteId);
+            $site = Site::find($siteId);
 
             if (!$site) {
                 return $this->errorResponse('Site not found.', 404);
@@ -62,7 +65,7 @@ class ContributorRequestController extends Controller
                 return $this->errorResponse('Validation failed.', 422, $validationErrors);
             }
 
-            $requiresApproval = (bool) ($site->require_invite_approval ?? true);
+            $requiresApproval = (bool)($site->require_invite_approval ?? true);
 
             $result = $this->requestService->submit(
                 email: $fieldValues['email'] ?? '',
@@ -81,87 +84,9 @@ class ContributorRequestController extends Controller
             ], 201);
         } catch (ValidationException $exception) {
             return $this->errorResponse($exception->getMessage(), 422, $exception->getErrors());
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
-    }
-
-    /**
-     * GET /api/{site}/open-collab/admin/contributor-requests
-     */
-    public function index(): JsonResponse
-    {
-        $requests = $this->requestService->pendingForSite(SiteContext::getId());
-
-        return $this->jsonResponse(
-            $requests->map(fn($r) => $this->formatRequest($r))->toArray()
-        );
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributor-requests/{id}/approve
-     */
-    public function approve(int $id): JsonResponse
-    {
-        try {
-            $invitation = $this->requestService->approve(
-                requestId: $id,
-                adminId:   Auth::id(),
-                siteId:    SiteContext::getId(),
-            );
-
-            return $this->jsonResponse([
-                'message'    => 'Request approved — invitation dispatched.',
-                'invitation' => [
-                    'id'         => $invitation->id,
-                    'email'      => $invitation->email,
-                    'expires_at' => $invitation->expires_at,
-                ],
-            ]);
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    /**
-     * POST /api/{site}/open-collab/admin/contributor-requests/{id}/reject
-     */
-    public function reject(int $id): JsonResponse
-    {
-        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
-        $reason = trim($body['reason'] ?? '');
-
-        try {
-            $this->requestService->reject(
-                requestId: $id,
-                adminId:   Auth::id(),
-                siteId:    SiteContext::getId(),
-                reason:    $reason ?: null,
-            );
-
-            return $this->successResponse('Request rejected.');
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
-        }
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Ticket 5: custom_fields included in admin review payload so admins can see
-     * submitted dynamic values when deciding whether to approve a request.
-     */
-    private function formatRequest(\App\Models\ContributorRequest $r): array
-    {
-        return [
-            'id'            => $r->id,
-            'email'         => $r->email,
-            'name'          => $r->name,
-            'bio'           => $r->bio,
-            'status'        => $r->status,
-            'custom_fields' => $r->custom_fields ?? [],
-            'created_at'    => $r->created_at,
-        ];
     }
 
     private function extractDefinedFieldValues(array $data, $fieldDefinitions): array
@@ -169,7 +94,7 @@ class ContributorRequestController extends Controller
         $result = [];
 
         foreach ($fieldDefinitions->all() as $definition) {
-            $key = (string) $definition->key;
+            $key = (string)$definition->key;
 
             if (array_key_exists($key, $data)) {
                 $result[$key] = $data[$key];
@@ -186,5 +111,83 @@ class ContributorRequestController extends Controller
         }
 
         return $fieldValues;
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/contributor-requests
+     */
+    public function index(): JsonResponse
+    {
+        $requests = $this->requestService->pendingForSite(SiteContext::getId());
+
+        return $this->jsonResponse(
+            $requests->map(fn($r) => $this->formatRequest($r))->toArray()
+        );
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * Ticket 5: custom_fields included in admin review payload so admins can see
+     * submitted dynamic values when deciding whether to approve a request.
+     */
+    private function formatRequest(ContributorRequest $r): array
+    {
+        return [
+            'id' => $r->id,
+            'email' => $r->email,
+            'name' => $r->name,
+            'bio' => $r->bio,
+            'status' => $r->status,
+            'custom_fields' => $r->custom_fields ?? [],
+            'created_at' => $r->created_at,
+        ];
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributor-requests/{id}/approve
+     */
+    public function approve(int $id): JsonResponse
+    {
+        try {
+            $invitation = $this->requestService->approve(
+                requestId: $id,
+                adminId: Auth::id(),
+                siteId: SiteContext::getId(),
+            );
+
+            return $this->jsonResponse([
+                'message' => 'Request approved — invitation dispatched.',
+                'invitation' => [
+                    'id' => $invitation->id,
+                    'email' => $invitation->email,
+                    'expires_at' => $invitation->expires_at,
+                ],
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * POST /api/{site}/open-collab/admin/contributor-requests/{id}/reject
+     */
+    public function reject(int $id): JsonResponse
+    {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $reason = trim($body['reason'] ?? '');
+
+        try {
+            $this->requestService->reject(
+                requestId: $id,
+                adminId: Auth::id(),
+                siteId: SiteContext::getId(),
+                reason: $reason ?: null,
+            );
+
+            return $this->successResponse('Request rejected.');
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
     }
 }

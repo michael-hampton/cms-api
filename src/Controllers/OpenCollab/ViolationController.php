@@ -11,9 +11,12 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
+use App\Models\ContributorViolation;
+use App\Repositories\OpenCollab\ViolationRepository;
 use App\Requests\OpenCollab\RecordViolationRequest;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ViolationService;
+use InvalidArgumentException;
 
 /**
  * Routes:
@@ -27,9 +30,9 @@ class ViolationController extends Controller
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly ViolationService $violationService,
-        private readonly \App\Repositories\OpenCollab\ViolationRepository $violationRepository,
-        private readonly OpenCollabAuthorizationService $authorization,
+        private readonly ViolationService                                 $violationService,
+        private readonly ViolationRepository $violationRepository,
+        private readonly OpenCollabAuthorizationService                   $authorization,
     )
     {
         parent::__construct();
@@ -53,23 +56,7 @@ class ViolationController extends Controller
         );
     }
 
-    /**
-     * GET /api/{site}/open-collab/admin/contributors/{userId}/violations
-     */
-    public function index(int $userId): JsonResponse
-    {
-        if ($response = $this->authorizeSitePermissions(['violation.view'])) {
-            return $response;
-        }
-
-        $violations = $this->violationRepository->forContributor($userId, SiteContext::getId());
-
-        return $this->resourceResponse([
-            'data' => $violations->map(fn($v) => $this->formatViolation($v))->values()
-        ]);
-    }
-
-    private function formatViolation(\App\Models\ContributorViolation $v): array
+    private function formatViolation(ContributorViolation $v): array
     {
         return [
             'id' => $v->id,
@@ -86,6 +73,22 @@ class ViolationController extends Controller
             'resolution_notes' => $v->resolution_notes,
             'created_at' => $v->created_at,
         ];
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/contributors/{userId}/violations
+     */
+    public function index(int $userId): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['violation.view'])) {
+            return $response;
+        }
+
+        $violations = $this->violationRepository->forContributor($userId, SiteContext::getId());
+
+        return $this->resourceResponse([
+            'data' => $violations->map(fn($v) => $this->formatViolation($v))->values()
+        ]);
     }
 
     /**
@@ -121,7 +124,7 @@ class ViolationController extends Controller
             ], 201);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -144,7 +147,7 @@ class ViolationController extends Controller
                 'violation' => $this->formatViolation($violation),
                 'message' => 'Violation resolved.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Models\ArticleComment;
 use App\Repositories\OpenCollab\ArticleCommentRepository;
 
 /**
@@ -40,7 +41,7 @@ class ArticleCommentController extends Controller
         return $this->jsonResponse($comments);
     }
 
-    private function formatComment(\App\Models\ArticleComment $comment): array
+    private function formatComment(ArticleComment $comment): array
     {
         return [
             'id' => $comment->id,

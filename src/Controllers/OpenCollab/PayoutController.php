@@ -5,15 +5,21 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Payout;
+use App\Models\PayoutLedgerEntry;
+use App\Models\PayoutLiabilityRecovery;
 use App\Repositories\OpenCollab\PayoutRepository;
 use App\Requests\OpenCollab\MarkPayoutPaidRequest;
 use App\Requests\OpenCollab\RequestPayoutRequest;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\PayoutService;
+use InvalidArgumentException;
+use RuntimeException;
 
 /**
  * Routes:
@@ -28,8 +34,8 @@ use App\Services\OpenCollab\PayoutService;
 class PayoutController extends Controller
 {
     public function __construct(
-        private readonly PayoutService    $payoutService,
-        private readonly PayoutRepository $payoutRepository,
+        private readonly PayoutService                  $payoutService,
+        private readonly PayoutRepository               $payoutRepository,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {
@@ -52,10 +58,10 @@ class PayoutController extends Controller
         );
     }
 
-    private function formatPayout(\App\Models\Payout $payout): array
+    private function formatPayout(Payout $payout): array
     {
-        $deductionsTotal = $this->deductionsTotalForPayout((int) $payout->id);
-        $ledgerEntryCount = $this->ledgerEntryCountForPayout((int) $payout->id);
+        $deductionsTotal = $this->deductionsTotalForPayout((int)$payout->id);
+        $ledgerEntryCount = $this->ledgerEntryCountForPayout((int)$payout->id);
 
         return [
             'id' => $payout->id,
@@ -96,21 +102,21 @@ class PayoutController extends Controller
 
     private function deductionsTotalForPayout(int $payoutId): int
     {
-        if (!class_exists(\App\Models\PayoutLiabilityRecovery::class)) {
+        if (!class_exists(PayoutLiabilityRecovery::class)) {
             return 0;
         }
 
-        return (int) \App\Models\PayoutLiabilityRecovery::where('payout_id', $payoutId)
+        return (int)PayoutLiabilityRecovery::where('payout_id', $payoutId)
             ->sum('amount');
     }
 
     private function ledgerEntryCountForPayout(int $payoutId): int
     {
-        if (!class_exists(\App\Models\PayoutLedgerEntry::class)) {
+        if (!class_exists(PayoutLedgerEntry::class)) {
             return 0;
         }
 
-        return (int) \App\Models\PayoutLedgerEntry::where('payout_id', $payoutId)
+        return (int)PayoutLedgerEntry::where('payout_id', $payoutId)
             ->count();
     }
 
@@ -160,9 +166,9 @@ class PayoutController extends Controller
                 'pending_steps' => $e->getPendingSteps(),
                 'redirect' => '/contributor/onboarding',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
-        } catch (\RuntimeException $e) {
+        } catch (RuntimeException $e) {
             return $this->errorResponse($e->getMessage(), 409);
         }
     }
@@ -178,7 +184,7 @@ class PayoutController extends Controller
                 'payout.view',
                 'payout.approve',
             ]);
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+        } catch (UnauthorizedException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
 
@@ -204,7 +210,7 @@ class PayoutController extends Controller
 
         try {
             $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.approve']);
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+        } catch (UnauthorizedException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
 
@@ -215,7 +221,7 @@ class PayoutController extends Controller
                 'payout' => $this->formatPayout($payout),
                 'message' => 'Payout approved.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -231,7 +237,7 @@ class PayoutController extends Controller
 
         try {
             $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.mark_paid']);
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+        } catch (UnauthorizedException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
 
@@ -250,7 +256,7 @@ class PayoutController extends Controller
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed', 422, $e->getErrors());
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -268,7 +274,7 @@ class PayoutController extends Controller
 
         try {
             $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.reject']);
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+        } catch (UnauthorizedException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
 
@@ -285,7 +291,7 @@ class PayoutController extends Controller
                 'payout' => $this->formatPayout($payout),
                 'message' => 'Payout rejected.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }
@@ -301,7 +307,7 @@ class PayoutController extends Controller
 
         try {
             $this->authorization->assertAny(Auth::id(), SiteContext::getId(), ['payout.approve']);
-        } catch (\App\Framework\Exceptions\UnauthorizedException $e) {
+        } catch (UnauthorizedException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         }
 
@@ -312,7 +318,7 @@ class PayoutController extends Controller
                 'payout' => $this->formatPayout($payout),
                 'message' => 'Stripe payout retry queued.',
             ]);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
     }

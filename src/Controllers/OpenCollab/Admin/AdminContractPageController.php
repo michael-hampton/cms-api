@@ -19,7 +19,8 @@ class AdminContractPageController extends Controller
 
     public function __construct(
         private readonly OpenCollabAuthorizationService $authorization,
-    ) {
+    )
+    {
         parent::__construct();
     }
 

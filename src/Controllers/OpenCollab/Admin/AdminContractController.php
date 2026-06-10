@@ -38,10 +38,10 @@ class AdminContractController extends Controller
     use AuthorizesSitePermissions;
 
     public function __construct(
-        private readonly ContractRepository         $contractRepository,
-        private readonly ContractTemplateRepository $templateRepository,
-        private readonly ContractService            $contractService,
-        private readonly ContractTemplateService    $contractTemplateService,
+        private readonly ContractRepository             $contractRepository,
+        private readonly ContractTemplateRepository     $templateRepository,
+        private readonly ContractService                $contractService,
+        private readonly ContractTemplateService        $contractTemplateService,
         private readonly OpenCollabAuthorizationService $authorization,
     )
     {
@@ -59,6 +59,25 @@ class AdminContractController extends Controller
         return $this->jsonResponse(
             $contracts->map(fn($c) => $this->formatContract($c))->toArray()
         );
+    }
+
+    private function formatContract(Contract $contract): array
+    {
+        return [
+            'id' => $contract->id,
+            'site_id' => $contract->site_id,
+            'version' => $contract->version,
+            'content' => $contract->content,
+            'status' => $contract->status,
+            'status_label' => $contract->status,
+            'published_at' => $contract->published_at,
+            'published_by' => $contract->published_by,
+            'archived_at' => $contract->archived_at,
+            'archived_by' => $contract->archived_by,
+            'source_template_id' => $contract->source_template_id,
+            'cloned_from_version_id' => $contract->cloned_from_version_id,
+            'created_at' => $contract->created_at,
+        ];
     }
 
     public function latest(): JsonResponse
@@ -281,6 +300,8 @@ class AdminContractController extends Controller
         ], 201);
     }
 
+    // ── Formatting ────────────────────────────────────────────────────────────
+
     public function fromTemplate(Request $request): JsonResponse
     {
         if ($response = $this->authorize(['contract.create'])) {
@@ -296,26 +317,5 @@ class AdminContractController extends Controller
             Auth::id()
         );
         return $this->jsonResponse(['contract' => $this->formatContract($contract)], 201);
-    }
-
-    // ── Formatting ────────────────────────────────────────────────────────────
-
-    private function formatContract(Contract $contract): array
-    {
-        return [
-            'id' => $contract->id,
-            'site_id' => $contract->site_id,
-            'version' => $contract->version,
-            'content' => $contract->content,
-            'status' => $contract->status,
-            'status_label' => $contract->status,
-            'published_at' => $contract->published_at,
-            'published_by' => $contract->published_by,
-            'archived_at' => $contract->archived_at,
-            'archived_by' => $contract->archived_by,
-            'source_template_id' => $contract->source_template_id,
-            'cloned_from_version_id' => $contract->cloned_from_version_id,
-            'created_at' => $contract->created_at,
-        ];
     }
 }

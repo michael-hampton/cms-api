@@ -13,6 +13,8 @@ use App\Jobs\OpenCollab\ProcessStripeWebhookJob;
 use App\Models\StripeWebhookEvent;
 use App\Services\OpenCollab\StripeWebhookVerifier;
 use Stripe\Exception\SignatureVerificationException;
+use Throwable;
+use UnexpectedValueException;
 
 /**
  * Receives and dispatches Stripe webhook events.
@@ -49,7 +51,7 @@ class StripeWebhookController extends Controller
                 'error' => $e->getMessage(),
             ]);
             return $this->errorResponse('Invalid signature.', 400);
-        } catch (\UnexpectedValueException $e) {
+        } catch (UnexpectedValueException $e) {
             $this->logger->warning('Stripe webhook payload could not be parsed.', [
                 'error' => $e->getMessage(),
             ]);
@@ -74,7 +76,7 @@ class StripeWebhookController extends Controller
                         'type' => (string)$event->type,
                         'payload_json' => json_decode($request->getContent(), true) ?? [],
                     ]);
-                } catch (\Throwable) {
+                } catch (Throwable) {
                     $existing = StripeWebhookEvent::where('stripe_event_id', $event->id)->first();
                 }
             }
@@ -90,7 +92,7 @@ class StripeWebhookController extends Controller
                 'event_type' => $event->type ?? null,
             ]);
 
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->logger->error('Stripe webhook enqueue failed.', [
                 'event_id' => $event->id ?? null,
                 'event_type' => $event->type ?? null,
