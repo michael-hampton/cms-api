@@ -8,30 +8,35 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
+use App\Models\Site;
 use App\Resources\OpenCollab\ContributorProfileResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
+use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\ContributorProfileService;
+use App\Services\OpenCollab\DynamicFieldValidator;
 use Exception;
 
 /**
  * Self-service settings endpoints consumed by the settings/index view.
  *
  * Routes (all under /api/{site}/open-collab/contributor/):
- *   POST  avatar            — upload / replace profile photo
- *   DELETE avatar           — remove profile photo
- *   POST  expertise         — save expertise tag list
- *   POST  profile           — update bio (+ apply avatar URL from a prior upload)
+ *   POST   avatar            — upload / replace profile photo
+ *   DELETE avatar            — remove profile photo
+ *   POST   expertise         — save expertise tag list
+ *   POST   profile           — update profile fields (core + dynamic)
  *
- * The onboarding/profile route is also kept here as an alias because the
- * settings view posts to /api/{site}/open-collab/onboarding/profile.
+ * Ticket 4: updateProfile now validates and persists dynamic database-backed
+ * field values using the same field definitions as the onboarding profile step.
+ * The split-card UX is unchanged — each section still saves independently.
  */
 class ContributorSettingsController extends Controller
 {
     public function __construct(
-        private readonly ContributorProfileService $profileService,
-        private readonly ContributorOnboardingService $onboardingService,
-    )
-    {
+        private readonly ContributorProfileService            $profileService,
+        private readonly ContributorOnboardingService         $onboardingService,
+        private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
+        private readonly DynamicFieldValidator                $dynamicFieldValidator,
+    ) {
         parent::__construct();
     }
 
@@ -73,8 +78,6 @@ class ContributorSettingsController extends Controller
 
     /**
      * DELETE /api/{site}/open-collab/contributor/avatar
-     *
-     * Removes the current avatar, deletes the file from disk.
      */
     public function removeAvatar(): JsonResponse
     {
@@ -101,7 +104,6 @@ class ContributorSettingsController extends Controller
      * POST /api/{site}/open-collab/contributor/expertise
      *
      * Body: { expertise: string[] }
-     * Returns: { expertise: string[], message: string }
      */
     public function saveExpertise(Request $request): JsonResponse
     {
@@ -125,28 +127,28 @@ class ContributorSettingsController extends Controller
 
             return $this->jsonResponse([
                 'expertise' => $profile->expertise_array,
-                'message' => 'Expertise saved.',
+                'message'   => 'Expertise saved.',
             ]);
         } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die;
             return $this->errorResponse('Could not save expertise. Please try again.', 500);
         }
     }
 
-    // ── Profile (bio + avatar URL) ────────────────────────────────────────────
+    // ── Profile (core fields + dynamic fields) ────────────────────────────────
 
     /**
      * POST /api/{site}/open-collab/onboarding/profile
      * POST /api/{site}/open-collab/contributor/profile   (alias)
      *
-     * Body (JSON):
-     *   bio    string|null
-     *   avatar string|null|''   — URL from a prior uploadAvatar() call,
-     *                             '' / null means remove existing avatar
-     * Returns: { profile: object, message: string }
+     * Ticket 4: validates and persists dynamic database-backed field values
+     * alongside core profile fields. Both paths use the same field definitions
+     * as the onboarding profile step.
+     *
+     * Body (JSON): any mix of core field keys + dynamic field keys.
+     * The full submitted payload is passed to ContributorProfileService, which
+     * resolves which keys map to profile columns and persists them.
      */
     public function updateProfile(Request $request): JsonResponse
     {
@@ -155,22 +157,31 @@ class ContributorSettingsController extends Controller
             return $this->errorResponse('Unauthenticated.', 401);
         }
 
-        // Fallback for frameworks where only() keeps keys regardless of presence
+        $siteId = SiteContext::getId();
+        $site   = Site::find($siteId);
+
+        if (!$site) {
+            return $this->errorResponse('Site not found.', 404);
+        }
+
         $rawInput = $request->all();
-        $filtered = [];
-        foreach (['bio', 'avatar'] as $key) {
-            if (array_key_exists($key, $rawInput)) {
-                $filtered[$key] = $rawInput[$key];
-            }
+
+        // Ticket 4: validate dynamic fields before persisting anything.
+        $fieldDefinitions = $this->profileFieldConfigService->activeFieldsForSite($site);
+        $validationErrors = $this->dynamicFieldValidator->validate($fieldDefinitions, $rawInput);
+
+        if (!empty($validationErrors)) {
+            return $this->errorResponse('Validation failed.', 422, $validationErrors);
         }
 
         try {
             $profile = $this->profileService->updateProfile(
                 userId: $userId,
-                siteId: SiteContext::getId(),
-                data: $filtered,
+                siteId: $siteId,
+                data: $rawInput,
             );
-            $this->onboardingService->markProfileInProgress($userId, SiteContext::getId());
+
+            $this->onboardingService->markProfileInProgress($userId, $siteId);
 
             return $this->jsonResponse([
                 'profile' => (new ContributorProfileResource($profile))->toArray(),

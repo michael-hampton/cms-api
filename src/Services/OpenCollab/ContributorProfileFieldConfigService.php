@@ -65,6 +65,42 @@ final class ContributorProfileFieldConfigService
         );
     }
 
+    /**
+     * All active field definitions for the contributor request context.
+     * Used by the public request form view and request save.
+     */
+    public function activeRequestFieldsForSite(Site $site): Collection
+    {
+        return $this->definitionRepository->activeForSiteAndContext(
+            siteId: $site->id,
+            context: CustomFieldContext::ContributorRequest->value,
+        );
+    }
+
+    /**
+     * Active AND required request field definitions.
+     * Used to validate contributor request submissions server-side.
+     */
+    public function requiredRequestFieldsForSite(Site $site): Collection
+    {
+        return $this->definitionRepository->activeRequiredForSiteAndContext(
+            siteId: $site->id,
+            context: CustomFieldContext::ContributorRequest->value,
+        );
+    }
+
+    /**
+     * Active AND required profile field definitions.
+     * Used by profile completion checks during onboarding step resolution.
+     */
+    public function requiredProfileFieldsForSite(Site $site): Collection
+    {
+        return $this->definitionRepository->activeRequiredForSiteAndContext(
+            siteId: $site->id,
+            context: CustomFieldContext::ContributorProfile->value,
+        );
+    }
+
     // ── Writes ────────────────────────────────────────────────────────────────
 
     /**

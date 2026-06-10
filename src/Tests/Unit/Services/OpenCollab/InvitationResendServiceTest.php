@@ -20,27 +20,45 @@ class InvitationResendServiceTest extends TestCase
         $invitation->id = 123;
 
         $repo = Mockery::mock(InvitationRepository::class);
+
         $repo->shouldReceive('findLatestForEmail')
+            ->with('test@test.com', 1)
             ->once()
             ->andReturn($invitation);
 
         $repo->shouldReceive('expireAllForEmail')->never();
 
         $state = Mockery::mock(InvitationStateMachine::class);
-        $state->shouldReceive('isUsed')->andReturn(false);
-        $state->shouldReceive('isPending')->andReturn(true);
+
+        $state->shouldReceive('isUsed')
+            ->once()
+            ->andReturn(false);
+
+        $state->shouldReceive('status')
+            ->once()
+            ->andReturn(\App\Enums\OpenCollab\InvitationStatus::Pending);
+
+        $state->shouldReceive('isPending')
+            ->once()
+            ->andReturn(true);
 
         $factory = Mockery::mock(InvitationStateMachineFactory::class);
+
         $factory->shouldReceive('make')
+            ->with($invitation)
             ->once()
             ->andReturn($state);
 
         $invitationService = Mockery::mock(InvitationService::class);
+
         $invitationService->shouldReceive('send')
             ->once()
             ->with($invitation);
 
         $logger = Mockery::mock(Logger::class);
+
+        $logger->shouldReceive('info')
+            ->once();
 
         $service = new InvitationResendService(
             $repo,
@@ -89,24 +107,47 @@ class InvitationResendServiceTest extends TestCase
         $invitation = Mockery::mock(Invitation::class);
 
         $repo = Mockery::mock(InvitationRepository::class);
-        $repo->shouldReceive('findLatestForEmail')->andReturn($invitation);
+
+        $repo->shouldReceive('findLatestForEmail')
+            ->with('expired@test.com', 1)
+            ->once()
+            ->andReturn($invitation);
 
         $repo->shouldReceive('expireAllForEmail')
+            ->with('expired@test.com', 1)
             ->once();
 
         $state = Mockery::mock(InvitationStateMachine::class);
-        $state->shouldReceive('isUsed')->andReturn(false);
-        $state->shouldReceive('isPending')->andReturn(false);
-        $state->shouldReceive('shouldCreateNewInvite')->andReturn(true);
+
+        $state->shouldReceive('isUsed')
+            ->once()
+            ->andReturn(false);
+
+        $state->shouldReceive('status')
+            ->twice()
+            ->andReturn(\App\Enums\OpenCollab\InvitationStatus::Expired);
+
+        $state->shouldReceive('isPending')
+            ->once()
+            ->andReturn(false);
 
         $factory = Mockery::mock(InvitationStateMachineFactory::class);
-        $factory->shouldReceive('make')->andReturn($state);
+
+        $factory->shouldReceive('make')
+            ->with($invitation)
+            ->once()
+            ->andReturn($state);
 
         $invitationService = Mockery::mock(InvitationService::class);
+
         $invitationService->shouldReceive('create')
+            ->with('expired@test.com', 0, 1)
             ->once();
 
         $logger = Mockery::mock(Logger::class);
+
+        $logger->shouldReceive('info')
+            ->once();
 
         $service = new InvitationResendService(
             $repo,
@@ -115,7 +156,7 @@ class InvitationResendServiceTest extends TestCase
             $logger
         );
 
-        $service->handle('test@test.com', 1);
+        $service->handle('expired@test.com', 1);
 
         $this->assertTrue(true);
     }
@@ -139,6 +180,149 @@ class InvitationResendServiceTest extends TestCase
         );
 
         $service->handle('not-an-email', 1);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_handle_drops_request_when_rate_limit_exceeded(): void
+    {
+        $email = 'limited@test.com';
+        $siteId = 1;
+        $key = 'oc:resend:' . hash('sha256', $email) . ':' . $siteId;
+
+        \App\Framework\Support\Cache\Cache::put($key, 3, 3600);
+
+        $repo = Mockery::mock(InvitationRepository::class);
+        $repo->shouldReceive('findLatestForEmail')->never();
+
+        $factory = Mockery::mock(InvitationStateMachineFactory::class);
+
+        $invitationService = Mockery::mock(InvitationService::class);
+        $invitationService->shouldReceive('send')->never();
+        $invitationService->shouldReceive('create')->never();
+
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldReceive('warning')->once();
+
+        $service = new InvitationResendService(
+            $repo,
+            $factory,
+            $invitationService,
+            $logger
+        );
+
+        $service->handle($email, $siteId);
+
+        \App\Framework\Support\Cache\Cache::forget($key);
+
+        $this->assertTrue(true);
+    }
+
+    public function test_handle_increments_throttle_counter_on_each_call(): void
+    {
+        $email = 'counter@test.com';
+        $siteId = 1;
+        $key = 'oc:resend:' . hash('sha256', $email) . ':' . $siteId;
+
+        \App\Framework\Support\Cache\Cache::forget($key);
+
+        $repo = Mockery::mock(InvitationRepository::class);
+        $repo->shouldReceive('findLatestForEmail')
+            ->twice()
+            ->with($email, $siteId)
+            ->andReturn(null);
+
+        $factory = Mockery::mock(InvitationStateMachineFactory::class);
+        $invitationService = Mockery::mock(InvitationService::class);
+        $logger = Mockery::mock(Logger::class);
+
+        $service = new InvitationResendService(
+            $repo,
+            $factory,
+            $invitationService,
+            $logger
+        );
+
+        $service->handle($email, $siteId);
+        $service->handle($email, $siteId);
+
+        $this->assertEquals(2, \App\Framework\Support\Cache\Cache::get($key));
+
+        \App\Framework\Support\Cache\Cache::forget($key);
+    }
+
+    public function test_handle_normalises_email_before_throttle_check(): void
+    {
+        $rawEmail = '  USER@TEST.COM  ';
+        $normalisedEmail = 'user@test.com';
+        $siteId = 1;
+        $key = 'oc:resend:' . hash('sha256', $normalisedEmail) . ':' . $siteId;
+
+        \App\Framework\Support\Cache\Cache::forget($key);
+
+        $repo = Mockery::mock(InvitationRepository::class);
+        $repo->shouldReceive('findLatestForEmail')
+            ->once()
+            ->with($normalisedEmail, $siteId)
+            ->andReturn(null);
+
+        $factory = Mockery::mock(InvitationStateMachineFactory::class);
+        $invitationService = Mockery::mock(InvitationService::class);
+        $logger = Mockery::mock(Logger::class);
+
+        $service = new InvitationResendService(
+            $repo,
+            $factory,
+            $invitationService,
+            $logger
+        );
+
+        $service->handle($rawEmail, $siteId);
+
+        $this->assertEquals(1, \App\Framework\Support\Cache\Cache::get($key));
+
+        \App\Framework\Support\Cache\Cache::forget($key);
+    }
+
+    public function test_handle_does_not_create_new_invitation_for_revoked_invitation(): void
+    {
+        $invitation = Mockery::mock(Invitation::class)->makePartial();
+        $invitation->id = 456;
+
+        $repo = Mockery::mock(InvitationRepository::class);
+
+        $repo->shouldReceive('findLatestForEmail')
+            ->with('revoked@test.com', 1)
+            ->once()
+            ->andReturn($invitation);
+
+        $repo->shouldReceive('expireAllForEmail')->never();
+
+        $state = Mockery::mock(InvitationStateMachine::class);
+        $state->shouldReceive('isUsed')->once()->andReturn(false);
+        $state->shouldReceive('status')->once()->andReturn(\App\Enums\OpenCollab\InvitationStatus::Revoked);
+
+        $factory = Mockery::mock(InvitationStateMachineFactory::class);
+        $factory->shouldReceive('make')
+            ->with($invitation)
+            ->once()
+            ->andReturn($state);
+
+        $invitationService = Mockery::mock(InvitationService::class);
+        $invitationService->shouldReceive('send')->never();
+        $invitationService->shouldReceive('create')->never();
+
+        $logger = Mockery::mock(Logger::class);
+        $logger->shouldReceive('info')->once();
+
+        $service = new InvitationResendService(
+            $repo,
+            $factory,
+            $invitationService,
+            $logger
+        );
+
+        $service->handle('revoked@test.com', 1);
 
         $this->assertTrue(true);
     }

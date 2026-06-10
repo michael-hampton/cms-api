@@ -6,4 +6,5 @@ enum CustomFieldContext: string
 {
     case Page               = 'page';
     case ContributorProfile = 'contributor_profile';
+    case ContributorRequest  = 'contributor_request';
 }

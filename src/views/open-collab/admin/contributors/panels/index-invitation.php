@@ -9,7 +9,7 @@
                 <label class="oc-label" for="invite-email">Email address</label>
                 <input class="oc-input" type="email" id="invite-email" placeholder="contributor@example.com">
             </div>
-            <button onclick="sendInvite()" class="oc-btn oc-btn--amber" id="invite-btn">
+            <button onclick="manager.sendInvite()" class="oc-btn oc-btn--amber" id="invite-btn">
                 Send invitation
             </button>
         </div>

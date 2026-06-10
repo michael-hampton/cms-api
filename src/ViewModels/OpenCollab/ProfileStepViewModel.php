@@ -13,8 +13,8 @@ final readonly class ProfileStepViewModel
      */
     public function __construct(
         private array $fieldsByKey,
-        public array $additionalSections,
-        public array $frontendFields,
+        public array  $additionalSections,
+        public array  $frontendFields,
     ) {}
 
     public static function fromFields(Collection|array $fields, mixed $profile): self
@@ -49,6 +49,7 @@ final readonly class ProfileStepViewModel
             static fn(ProfileFieldViewModel $field) => !in_array($field->key, $knownKeys, true),
         );
 
+        // Ticket 2 fix: $additionalSections was hardcoded to [] — now populated correctly.
         $additionalSections = [];
 
         if (!empty($customFields)) {
@@ -61,12 +62,12 @@ final readonly class ProfileStepViewModel
 
         return new self(
             fieldsByKey: $mapped,
-            additionalSections: [],
+            additionalSections: $additionalSections,
             frontendFields: array_values(array_map(
                 static fn(ProfileFieldViewModel $field) => [
-                    'key' => $field->key,
-                    'required' => $field->required,
-                    'type' => $field->type,
+                    'key'        => $field->key,
+                    'required'   => $field->required,
+                    'type'       => $field->type,
                     'renderType' => $field->renderType,
                 ],
                 $mapped,

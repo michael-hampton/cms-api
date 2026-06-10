@@ -619,4 +619,9 @@ class ContributorOnboardingService
         return $record !== null
             && $record->status === ContributorOnboardingStatus::Expired->value;
     }
+
+    public function hasStarted(int $userId, int $siteId)
+    {
+        return $this->contributorOnboardingRepository->hasStarted($userId, $siteId);
+    }
 }

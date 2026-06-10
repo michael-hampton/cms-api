@@ -191,9 +191,8 @@ class InvitationControllerTest extends FunctionalTestCase
         $this->assertNotNull($refreshed->used_at);
     }
 
-    public function test_accept_reactivates_existing_user_account(): void
+    public function test_accept_reactivates_existing_user_account_without_overwriting_credentials(): void
     {
-        // User already exists (e.g. previously closed), should be re-activated
         $existingUser = User::create([
             'name' => 'Old Name',
             'email' => 'returning@example.com',
@@ -201,10 +200,11 @@ class InvitationControllerTest extends FunctionalTestCase
             'role' => 'contributor',
             'is_contributor' => true,
             'is_active' => false,
-            'site_id' => $this->siteId
+            'site_id' => $this->siteId,
         ]);
 
         $token = bin2hex(random_bytes(32));
+
         Invitation::create([
             'site_id' => $this->siteId,
             'email' => 'returning@example.com',
@@ -220,11 +220,21 @@ class InvitationControllerTest extends FunctionalTestCase
 
         $this->assertEquals(201, $response->getStatusCode());
 
-        // Original user should be reactivated, not a duplicate created
-        $this->assertDatabaseHas('users', ['id' => $existingUser->id, 'is_active' => 1, 'name' => 'New Name']);
+        $this->assertDatabaseHas('users', [
+            'id' => $existingUser->id,
+            'is_active' => 1,
+            'name' => 'Old Name',
+        ]);
 
-        // Should NOT have created a second user with the same email
-        $this->assertEquals(1, User::where('email', 'returning@example.com')->count());
+        $this->assertEquals(
+            1,
+            User::where('email', 'returning@example.com')->count()
+        );
+
+        $existingUser = User::find($existingUser->id);
+
+        $this->assertTrue(password_verify('oldpass', $existingUser->password));
+        $this->assertFalse(password_verify('newpassword123', $existingUser->password));
     }
 
     public function test_accept_returns_404_for_invalid_token(): void

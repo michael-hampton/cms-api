@@ -10,6 +10,13 @@ class ContributorRequestControllerTest extends FunctionalTestCase
 {
     use CreatesTestData;
 
+    public function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seedContributorRequestFieldsForTest();
+    }
+
     // ── Public submission ──────────────────────────────────────────────────────
 
     public function test_anyone_can_submit_a_contributor_request(): void
@@ -209,5 +216,26 @@ class ContributorRequestControllerTest extends FunctionalTestCase
         $response = $this->getForSiteUnauthenticated('/api/open-collab/admin/contributor-requests');
 
         $this->assertEquals(401, $response->getStatusCode());
+    }
+
+    private function seedContributorRequestFieldsForTest(): void
+    {
+        foreach ([
+                     ['key' => 'name', 'name' => 'Full name', 'type' => 'text', 'render_type' => 'input', 'sort_order' => 10],
+                     ['key' => 'email', 'name' => 'Email address', 'type' => 'email', 'render_type' => 'input', 'sort_order' => 20],
+                     ['key' => 'bio', 'name' => 'Tell us about yourself', 'type' => 'textarea', 'render_type' => 'textarea', 'sort_order' => 30],
+                 ] as $field) {
+            \App\Models\CustomFieldDefinition::create([
+                'site_id' => $this->siteId,
+                'context' => 'contributor_request',
+                'description' => '',
+                'placeholder' => '',
+                'is_required' => true,
+                'validation_rules' => json_encode(['required']),
+                'options' => json_encode([]),
+                'is_active' => true,
+                ...$field,
+            ]);
+        }
     }
 }

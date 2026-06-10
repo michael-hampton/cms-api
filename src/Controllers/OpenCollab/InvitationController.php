@@ -74,34 +74,54 @@ class InvitationController extends Controller
     {
         try {
             $data = $request->validated();
+
             $user = $this->invitationService->accept(
-                token: $token,
-                name: $data['name'],
+                token:    $token,
+                name:     $data['name'],
                 password: $data['password']
             );
 
-            $authRequest = new AuthLoginRequest(
-                email: $user->email,
-                password: $data['password'],
-                siteId: SiteContext::getId(),
-            );
+            try {
+                $authRequest = new AuthLoginRequest(
+                    email:  $user->email,
+                    password: $data['password'],
+                    siteId: SiteContext::getId(),
+                );
 
-            $authResponse = $this->authenticationService->login($authRequest);
+                $authResponse = $this->authenticationService->login($authRequest);
 
-            return $this->jsonResponse([
-                'token' => $authResponse->accessToken,
-                'token_type' => $authResponse->tokenType,
-                'user' => [
-                    'id' => $authResponse->userId,
-                    'name' => $authResponse->userName,
-                    'email' => $authResponse->userEmail,
-                    'role' => $authResponse->role,
-                ],
-            ], 201);
+                return $this->jsonResponse([
+                    'token'      => $authResponse->accessToken,
+                    'token_type' => $authResponse->tokenType,
+                    'user'       => [
+                        'id'    => $authResponse->userId,
+                        'name'  => $authResponse->userName,
+                        'email' => $authResponse->userEmail,
+                        'role'  => $authResponse->role,
+                    ],
+                ], 201);
+            } catch (\Throwable) {
+                return $this->jsonResponse([
+                    'message'        => 'Invitation accepted. Please log in with your existing password.',
+                    'requires_login' => true,
+                    'user'           => [
+                        'id'    => $user->id,
+                        'name'  => $user->name,
+                        'email' => $user->email,
+                        'role'  => $user->role,
+                    ],
+                ], 201);
+            }
         } catch (ValidationException $validationException) {
-            return $this->errorResponse('Validation failed', 422, $validationException->getErrors());
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                $validationException->getErrors()
+            );
         } catch (InvalidInvitationException $e) {
             return $this->errorResponse($e->getMessage(), 404);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 }

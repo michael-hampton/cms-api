@@ -79,26 +79,9 @@
             <div id="form-errors" class="oc-form-errors" style="display:none;" role="alert"></div>
 
             <form id="request-form" novalidate>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="req-name">Full name</label>
-                    <input class="oc-input" type="text" id="req-name" name="name"
-                           placeholder="Your full name" required autocomplete="name">
-                    <div class="oc-error-msg" id="name-error"></div>
-                </div>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="req-email">Email address</label>
-                    <input class="oc-input" type="email" id="req-email" name="email"
-                           placeholder="you@example.com" required autocomplete="email">
-                    <div class="oc-error-msg" id="email-error"></div>
-                </div>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="req-bio">Tell us about yourself</label>
-                    <textarea class="oc-textarea" id="req-bio" name="bio" rows="4"
-                              placeholder="What topics do you write about? What's your background?"
-                              style="min-height:100px;" required></textarea>
-                    <div class="oc-help">Minimum 20 characters. This helps us review your request.</div>
-                    <div class="oc-error-msg" id="bio-error"></div>
-                </div>
+                <?php foreach (($requestForm?->fields ?? []) as $field): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
+                <?php endforeach; ?>
 
                 <button type="submit" class="oc-btn oc-btn--amber oc-btn--block" id="submit-btn">
                     Request access
@@ -121,38 +104,52 @@
 
     document.getElementById('request-form')?.addEventListener('submit', async function (e) {
         e.preventDefault();
+
+        const form = e.currentTarget;
         const errBox = document.getElementById('form-errors');
         const btn = document.getElementById('submit-btn');
+
         errBox.style.display = 'none';
-        ['name', 'email', 'bio'].forEach(f => {
-            const el = document.getElementById(f + '-error');
-            if (el) {
-                el.textContent = '';
-                el.classList.remove('visible');
+        errBox.textContent = '';
+
+        form.querySelectorAll('.oc-error-msg').forEach(el => {
+            el.textContent = '';
+            el.classList.remove('visible');
+        });
+
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+
+        Object.keys(payload).forEach(key => {
+            if (typeof payload[key] === 'string') {
+                payload[key] = payload[key].trim();
             }
         });
 
-        const name = document.getElementById('req-name').value.trim();
-        const email = document.getElementById('req-email').value.trim();
-        const bio = document.getElementById('req-bio').value.trim();
+        if (payload.email) {
+            payload.email = payload.email.toLowerCase();
+        }
 
         let valid = true;
-        if (!name) {
-            document.getElementById('name-error').textContent = 'Name is required.';
-            document.getElementById('name-error').classList.add('visible');
+
+        if (!payload.name) {
+            setFieldError('name', 'Name is required.');
             valid = false;
         }
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            document.getElementById('email-error').textContent = 'A valid email is required.';
-            document.getElementById('email-error').classList.add('visible');
+
+        if (!payload.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) {
+            setFieldError('email', 'A valid email is required.');
             valid = false;
         }
-        if (bio.length < 20) {
-            document.getElementById('bio-error').textContent = 'Please write at least 20 characters.';
-            document.getElementById('bio-error').classList.add('visible');
+
+        if (!payload.bio || payload.bio.length < 20) {
+            setFieldError('bio', 'Please write at least 20 characters.');
             valid = false;
         }
-        if (!valid) return;
+
+        if (!valid) {
+            return;
+        }
 
         btn.disabled = true;
         btn.innerHTML = '<div class="oc-spinner"></div> Submitting…';
@@ -160,20 +157,34 @@
         try {
             const res = await fetch(`/api/${SITE}/open-collab/contributor-requests`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-                body: JSON.stringify({name, email, bio}),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
             });
+
             const data = await res.json();
+
             if (res.ok) {
                 window.location.reload();
-            } else {
-                let msg = data.error || data.message || 'Submission failed.';
-                if (data.errors) msg = Object.values(data.errors).flat().join(' ');
-                errBox.textContent = msg;
-                errBox.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = 'Request access';
+                return;
             }
+
+            let msg = data.error || data.message || 'Submission failed.';
+
+            if (data.errors) {
+                msg = Object.values(data.errors).flat().join(' ');
+
+                Object.entries(data.errors).forEach(([field, messages]) => {
+                    setFieldError(field, Array.isArray(messages) ? messages[0] : messages);
+                });
+            }
+
+            errBox.textContent = msg;
+            errBox.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Request access';
         } catch {
             errBox.textContent = 'Network error. Please try again.';
             errBox.style.display = 'block';
@@ -181,6 +192,17 @@
             btn.textContent = 'Request access';
         }
     });
+
+    function setFieldError(field, message) {
+        const el = document.getElementById(`${field}-error`);
+
+        if (!el) {
+            return;
+        }
+
+        el.textContent = message;
+        el.classList.add('visible');
+    }
 </script>
 
 </body>
