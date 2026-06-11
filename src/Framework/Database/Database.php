@@ -560,12 +560,8 @@ class Database
             Logger::debug('Records updated', ['table' => $table, 'affected_rows' => $affectedRows]);
             return $affectedRows;
         } catch (PDOException $PDOException) {
-            die('no');
-            dd($PDOException->getMessage());
 
         } catch (Exception $e) {
-            echo $e->getMessage();
-            die('hete6');
             Logger::error('Update operation failed', ['table' => $table, 'error' => $e->getMessage()]);
             throw $e;
         }

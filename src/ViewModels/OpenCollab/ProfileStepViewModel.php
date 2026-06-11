@@ -40,6 +40,7 @@ final readonly class ProfileStepViewModel
             'portfolio_url',
             'writing_samples',
             'linkedin_url',
+            'twitter_url',
             'instagram_url',
             'tiktok_url',
         ];
@@ -95,6 +96,11 @@ final readonly class ProfileStepViewModel
         return $this->field('bio');
     }
 
+    public function displayNameField(): ?ProfileFieldViewModel
+    {
+        return $this->field('display_name');
+    }
+
     public function expertiseField(): ?ProfileFieldViewModel
     {
         return $this->field('expertise');
@@ -117,6 +123,7 @@ final readonly class ProfileStepViewModel
     {
         return array_values(array_filter([
             $this->field('linkedin_url'),
+            $this->field('twitter_url'),
             $this->field('instagram_url'),
             $this->field('tiktok_url'),
         ]));

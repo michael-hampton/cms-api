@@ -199,6 +199,17 @@ class ContributorProfileCustomFieldDefinitionSeeder
                 'sort_order'     => 120,
             ],
             [
+                'name'           => 'Twitter URL',
+                'key'            => 'twitter_url',
+                'type'           => 'url',
+                'description'    => 'Contributor Twitter/X profile URL.',
+                'placeholder'    => 'https://x.com/example',
+                'profile_column' => 'twitter_url',
+                'is_required'    => false,
+                'is_locked'      => false,
+                'sort_order'     => 125,
+            ],
+            [
                 'name'           => 'TikTok URL',
                 'key'            => 'tiktok_url',
                 'type'           => 'url',

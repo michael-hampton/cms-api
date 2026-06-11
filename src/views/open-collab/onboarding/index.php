@@ -94,243 +94,38 @@ if ($profile && !empty($profile->expertise)) {
                         </p>
 
                         <?php if ($photoField = $profileStep->photoField()): ?>
-                            <?php
-                            $field    = $photoField;
-                            $photoUrl = $field->stringValue;
-                            $initial  = strtoupper(substr($currentUser->name ?? 'M', 0, 1));
-                            ?>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $photoField, 'mode' => 'onboarding', 'currentUser' => $currentUser])
+                        <?php endif; ?>
 
-                            <div class="oc-form-group">
-                                <label class="oc-label">Profile photo</label>
-
-                                <div style="display:flex;align-items:center;gap:14px;">
-                                    <div
-                                        id="avatar-preview"
-                                        style="width:64px;height:64px;border-radius:999px;overflow:hidden;background:#f1f5f9;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;position:relative;">
-
-                                        <?php if ($photoUrl): ?>
-                                            <img
-                                                id="avatar-img"
-                                                src="<?= htmlspecialchars($photoUrl) ?>"
-                                                alt="Your avatar"
-                                                style="width:100%;height:100%;object-fit:cover;">
-                                        <?php else: ?>
-                                            <span
-                                                id="avatar-initials"
-                                                style="font-family:var(--font-display);font-size:1.3rem;color:var(--slate);user-select:none;">
-                                <?= htmlspecialchars($initial) ?>
-                            </span>
-                                        <?php endif; ?>
-
-                                        <span
-                                            style="position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:999px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:.65rem;">
-                            ✎
-                        </span>
-                                    </div>
-
-                                    <div>
-                                        <label class="oc-btn oc-btn--ghost oc-btn--sm" for="avatar-file-input">
-                                            Choose photo
-                                        </label>
-
-                                        <input
-                                            type="file"
-                                            id="avatar-file-input"
-                                            name="<?= htmlspecialchars($field->key) ?>"
-                                            accept="image/jpeg,image/png,image/webp"
-                                            style="display:none;">
-
-                                        <button
-                                            type="button"
-                                            id="avatar-remove-btn"
-                                            class="oc-btn oc-btn--ghost oc-btn--sm"
-                                            style="<?= $photoUrl ? '' : 'display:none;' ?>">
-                                            Remove
-                                        </button>
-
-                                        <input
-                                            type="hidden"
-                                            name="<?= htmlspecialchars($field->existingInputName()) ?>"
-                                            value="<?= htmlspecialchars($photoUrl) ?>">
-
-                                        <div class="oc-help">JPG, PNG or WebP · Max 2 MB</div>
-
-                                        <div id="avatar-progress-wrap" style="display:none;margin-top:8px;width:180px;">
-                                            <div style="height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;">
-                                                <div id="avatar-progress-bar" style="height:100%;width:0%;background:var(--navy);"></div>
-                                            </div>
-                                            <div id="avatar-progress-label" class="oc-help" style="margin-top:4px;">Uploading…</div>
-                                        </div>
-
-                                        <div class="oc-error-msg" id="avatar-error"></div>
-                                    </div>
-                                </div>
-                            </div>
+                        <?php if ($displayNameField = $profileStep->displayNameField()): ?>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $displayNameField, 'mode' => 'onboarding', 'currentUser' => $currentUser])
                         <?php endif; ?>
 
                         <?php if ($bioField = $profileStep->bioField()): ?>
-                            <div class="oc-form-group">
-                                <label class="oc-label" for="bio">Your bio</label>
-
-                                <textarea
-                                    class="oc-textarea"
-                                    id="bio"
-                                    name="<?= htmlspecialchars($bioField->key) ?>"
-                                    rows="5"
-                                    placeholder="<?= htmlspecialchars($bioField->placeholder ?: "I'm a writer specialising in...") ?>"
-                    <?= $bioField->required ? 'required' : '' ?>
-                    style="min-height:120px;"><?= htmlspecialchars($bioField->stringValue) ?></textarea>
-
-                                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
-                                    <div class="oc-help">Between 20 and 1000 characters.</div>
-                                    <div id="bio-char-count" style="font-size:.72rem;color:var(--slate);">
-                                        <?= mb_strlen($bioField->stringValue) ?> / 1000
-                                    </div>
-                                </div>
-
-                                <div class="oc-error-msg" id="bio-error"></div>
-                            </div>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $bioField, 'mode' => 'onboarding'])
                         <?php endif; ?>
 
                         <?php if ($expertiseField = $profileStep->expertiseField()): ?>
                             <hr class="oc-section-divider">
-
-                            <div class="oc-form-group">
-                                <label class="oc-label" for="expertise-input">Areas of expertise</label>
-
-                                <div class="oc-help">
-                                    Add up to 8 topics that describe your writing focus to help editors match you with briefs.
-                                </div>
-
-                                <div id="expertise-tags" class="oc-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
-
-                                <div style="position:relative;margin-top:10px;">
-                                    <div style="display:flex;gap:8px;">
-                                        <input
-                                            class="oc-input"
-                                            id="expertise-input"
-                                            type="text"
-                                            placeholder="e.g. Technology, Climate, Finance..."
-                                            style="flex:1;">
-
-                                        <button type="button" class="oc-btn oc-btn--ghost" id="add-expertise-btn">
-                                            Add
-                                        </button>
-                                    </div>
-
-                                    <div
-                                        id="expertise-suggestions"
-                                        style="display:none;position:absolute;left:0;right:72px;top:44px;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);z-index:20;overflow:hidden;">
-                                    </div>
-                                </div>
-
-                                <input
-                                    type="hidden"
-                                    id="expertise"
-                                    name="<?= htmlspecialchars($expertiseField->key) ?>"
-                                    value="<?= htmlspecialchars(json_encode($expertiseField->selectedValues)) ?>">
-
-                                <div class="oc-help" style="margin-top:4px;">
-                                    Press <kbd>Enter</kbd> or comma to add. Click tags to remove.
-                                </div>
-
-                                <div class="oc-error-msg" id="expertise-error"></div>
-                            </div>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $expertiseField, 'mode' => 'onboarding'])
                         <?php endif; ?>
 
                         <?php if ($writingField = $profileStep->writingSamplesField()): ?>
                             <hr class="oc-section-divider">
-
-                            <div class="oc-form-group">
-                                <label class="oc-label">
-                                    Writing samples
-                                    <?php if (!$writingField->required): ?>
-                                        <span style="float:right;font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
-                                    <?php endif; ?>
-                                </label>
-
-                                <div class="oc-help">
-                                    Link to up to 3 pieces of your published work to give editors a sense of your style.
-                                </div>
-
-                                <div id="samples-list" style="margin-top:10px;">
-                                    <?php
-                                    $samples = $writingField->sampleLinks();
-
-                                    while (count($samples) < 3) {
-                                        $samples[] = ['url' => '', 'title' => ''];
-                                    }
-
-                                    $samples = array_slice($samples, 0, 3);
-                                    ?>
-
-                                    <?php foreach ($samples as $index => $sample): ?>
-                                        <?php $row = $index + 1; ?>
-
-                                        <div class="sample-row" style="margin-bottom:10px;">
-                                            <div style="display:flex;gap:8px;">
-                                                <input
-                                                    class="oc-input"
-                                                    type="url"
-                                                    id="sample-url-<?= $row ?>"
-                                                    name="<?= htmlspecialchars($writingField->key) ?>[url][]"
-                                                    value="<?= htmlspecialchars((string) ($sample['url'] ?? '')) ?>"
-                                                    placeholder="https://example.com/my-article"
-                                                    style="flex:1;">
-
-                                                <button
-                                                    type="button"
-                                                    class="oc-btn oc-btn--ghost oc-btn--sm clear-sample-btn"
-                                                    data-row="<?= $row ?>">
-                                                    ×
-                                                </button>
-                                            </div>
-
-                                            <input
-                                                class="oc-input"
-                                                type="text"
-                                                id="sample-title-<?= $row ?>"
-                                                name="<?= htmlspecialchars($writingField->key) ?>[title][]"
-                                                value="<?= htmlspecialchars((string) ($sample['title'] ?? '')) ?>"
-                                                placeholder="Article title (optional)"
-                                                style="margin-top:8px;">
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-
-                                <div class="oc-error-msg" id="samples-error"></div>
-                            </div>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $writingField, 'mode' => 'onboarding'])
                         <?php endif; ?>
 
                         <?php if ($portfolioField = $profileStep->portfolioField()): ?>
                             <hr class="oc-section-divider">
-
-                            <div class="oc-form-group">
-                                <label class="oc-label" for="portfolio_url">
-                                    Portfolio URL
-                                    <?php if (!$portfolioField->required): ?>
-                                        <span style="float:right;font-size:.75rem;color:var(--slate);font-weight:500;">Optional</span>
-                                    <?php endif; ?>
-                                </label>
-
-                                <input
-                                    class="oc-input"
-                                    type="url"
-                                    id="portfolio_url"
-                                    name="<?= htmlspecialchars($portfolioField->key) ?>"
-                                    value="<?= htmlspecialchars($portfolioField->stringValue) ?>"
-                                    placeholder="<?= htmlspecialchars($portfolioField->placeholder ?: 'https://example.com') ?>">
-
-                                <div class="oc-error-msg" id="portfolio_url-error"></div>
-                            </div>
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $portfolioField, 'mode' => 'onboarding'])
                         <?php endif; ?>
 
                         <?php foreach ($profileStep->locationFields() as $field): ?>
-                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'onboarding'])
                         <?php endforeach; ?>
 
                         <?php foreach ($profileStep->socialFields() as $field): ?>
-                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
+                            @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'onboarding'])
                         <?php endforeach; ?>
 
                         <?php
@@ -342,7 +137,7 @@ if ($profile && !empty($profile->expertise)) {
                                 <p class="oc-muted"><?= htmlspecialchars($section->description) ?></p>
 
                                 <?php foreach ($section->fields as $field): ?>
-                                    @include('open-collab/onboarding/partials/profile-field', ['field' => $field])
+                                    @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'onboarding'])
                                 <?php endforeach; ?>
                             </div>
                         <?php endforeach; ?>
@@ -810,10 +605,47 @@ if ($profile && !empty($profile->expertise)) {
                 ...extra,
             };
 
+            const form = document.getElementById('onboarding-form');
+            if (form) {
+                const formData = new FormData(form);
+
+                formData.forEach((value, key) => {
+                    if (
+                        key === '_token' ||
+                        key === 'avatar' ||
+                        key === 'expertise' ||
+                        key === 'writing_samples' ||
+                        key.startsWith('writing_samples[')
+                    ) {
+                        return;
+                    }
+
+                    if (value instanceof File) {
+                        return;
+                    }
+
+                    if (key.endsWith('[]')) {
+                        const normalizedKey = key.slice(0, -2);
+                        if (!Array.isArray(payload[normalizedKey])) {
+                            payload[normalizedKey] = [];
+                        }
+                        payload[normalizedKey].push(String(value));
+                        return;
+                    }
+
+                    payload[key] = String(value);
+                });
+            }
+
             const bio = document.getElementById('bio')?.value.trim();
 
             if (bio !== undefined) {
                 payload.bio = bio;
+            }
+
+            const displayName = document.getElementById('display-name')?.value.trim();
+            if (displayName !== undefined) {
+                payload.display_name = displayName;
             }
 
             const portfolio = document.getElementById('portfolio_url')?.value.trim();
@@ -821,7 +653,7 @@ if ($profile && !empty($profile->expertise)) {
                 payload.portfolio_url = portfolio;
             }
 
-            ['tax_country', 'timezone', 'linkedin_url', 'instagram_url', 'tiktok_url'].forEach(key => {
+            ['tax_country', 'timezone', 'linkedin_url', 'twitter_url', 'instagram_url', 'tiktok_url'].forEach(key => {
                 const value = document.getElementById(key)?.value?.trim();
 
                 if (value !== undefined) {

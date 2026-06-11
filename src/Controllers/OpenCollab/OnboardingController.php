@@ -4,7 +4,6 @@ namespace App\Controllers\OpenCollab;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
-use App\Enums\Cms\CustomFieldStorageType;
 use App\Enums\OpenCollab\AgeVerificationMethod;
 use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
@@ -24,6 +23,7 @@ use App\Resources\OpenCollab\OnboardingStatusResource;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorPaymentMethodService;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
+use App\Services\OpenCollab\ContributorProfileService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use RuntimeException;
 
@@ -57,6 +57,7 @@ class OnboardingController extends Controller
         private readonly OpenCollabAuthorizationService       $authorization,
         private readonly ContributorPaymentMethodService      $paymentMethodService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
+        private readonly ContributorProfileService            $profileService,
     )
     {
         parent::__construct();
@@ -114,55 +115,12 @@ class OnboardingController extends Controller
 
             $fields = $this->profileFieldConfigService->activeFieldsForSite($site);
 
-            $profileData = [];
-
-            foreach ($fields as $field) {
-                $key = (string)$field->key;
-
-                if (!array_key_exists($key, $data)) {
-                    continue;
-                }
-
-                $value = $data[$key];
-
-                if ($key === 'writing_samples') {
-                    $urls = $value['url'] ?? [];
-                    $titles = $value['title'] ?? [];
-
-                    $samples = [];
-
-                    foreach ((array)$urls as $index => $url) {
-                        $url = trim((string)$url);
-
-                        if ($url === '') {
-                            continue;
-                        }
-
-                        $samples[] = [
-                            'url' => $url,
-                            'title' => trim((string)($titles[$index] ?? '')),
-                        ];
-                    }
-
-                    $column = $field->profile_column ?: $key;
-                    $profileData[$column] = json_encode($samples);
-
-                    continue;
-                }
-
-                if (($field->storage_type ?? null) === CustomFieldStorageType::ProfileColumn->value) {
-                    $column = $field->profile_column ?: $key;
-                    $profileData[$column] = $value;
-                    continue;
-                }
-            }
-
-            // Avatar can still be passed separately by existing frontend code.
-            if (array_key_exists('avatar', $data)) {
-                $profileData['avatar'] = $data['avatar'];
-            }
-
-            $this->profileRepository->createOrUpdate($userId, $profileData);
+            $this->profileService->updateProfile(
+                userId: $userId,
+                siteId: (int) $site->id,
+                data: $data,
+                fieldDefinitions: $fields,
+            );
 
             $this->onboardingService->touchActivity($userId, $site);
 

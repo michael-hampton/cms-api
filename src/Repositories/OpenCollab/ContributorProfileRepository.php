@@ -68,6 +68,12 @@ class ContributorProfileRepository extends Repository
         return ContributorProfile::where('user_id', $userId)->first();
     }
 
+    public function findByAuthorId(int $authorId): ?ContributorProfile
+    {
+        /** @var ContributorProfile|null */
+        return ContributorProfile::where('author_id', $authorId)->first();
+    }
+
     public function findOrCreateForUserAndSite(int $userId, int $siteId): ContributorProfile
     {
         $profile = $this->findByUserId($userId);
@@ -136,9 +142,15 @@ class ContributorProfileRepository extends Repository
      */
     public function createForUser(int $userId, array $extra = [], ?int $siteId = null): Model
     {
-        return ContributorProfile::create(array_merge([
+        $defaults = [
             'user_id' => $userId,
-        ], $extra));
+        ];
+
+        if ($siteId !== null) {
+            $defaults['site_id'] = $siteId;
+        }
+
+        return ContributorProfile::create(array_merge($defaults, $extra));
     }
 
     protected function getModelClass(): string

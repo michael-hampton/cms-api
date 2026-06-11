@@ -21,6 +21,8 @@ class Author extends Model
         'website',
         'twitter',
         'linkedin',
+        'instagram',
+        'tiktok',
         'facebook',
         'status',
         'site_id',
@@ -31,7 +33,10 @@ class Author extends Model
         'awards',
         'seniority_date',
         'is_active',
-        'is_guest'
+        'is_guest',
+        'overridden_fields',
+        'last_updated_by_type',
+        'last_updated_by_id',
     ];
 
     protected $casts = [
@@ -42,7 +47,8 @@ class Author extends Model
         'education' => 'array',
         'awards' => 'array',
         'seniority_date' => 'date',
-        'is_active' => 'boolean'
+        'is_active' => 'boolean',
+        'overridden_fields' => 'array',
     ];
 
     protected $appends = [

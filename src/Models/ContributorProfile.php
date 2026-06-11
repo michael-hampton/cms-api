@@ -8,10 +8,19 @@ class ContributorProfile extends Model
 
     protected $fillable = [
         'user_id',
+        'site_id',
+        'author_id',
+        'display_name',
         'bio',
         'avatar',
         'expertise',
         'sample_links',
+        'timezone',
+        'portfolio_url',
+        'linkedin_url',
+        'twitter_url',
+        'instagram_url',
+        'tiktok_url',
         'payment_method_type',
         'payment_details',
         'stripe_customer_id',
@@ -25,6 +34,9 @@ class ContributorProfile extends Model
         'minimum_age_confirmed',
         'tax_classification',
         'vat_number',
+        'author_sync_status',
+        'author_last_synced_at',
+        'author_last_synced_by',
     ];
 
     protected $hidden = [
@@ -33,6 +45,7 @@ class ContributorProfile extends Model
 
     protected $casts = [
         'sample_links' => 'array',
+        'author_last_synced_at' => 'datetime',
     ];
 
     /**

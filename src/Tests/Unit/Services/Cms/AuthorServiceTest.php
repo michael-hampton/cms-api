@@ -35,6 +35,7 @@ class AuthorServiceTest extends FunctionalTestCase
         $this->service = new AuthorService(
             $this->authorRepository,
             $this->imageUploadService,
+            null,
             $this->databaseMock
         );
     }

@@ -9,6 +9,7 @@ use App\Framework\Support\Collection;
 use App\Framework\Support\Str;
 use App\Models\Author;
 use App\Repositories\Cms\AuthorRepository;
+use App\Services\OpenCollab\ContributorAuthorSyncService;
 use Exception;
 
 class AuthorService
@@ -18,7 +19,8 @@ class AuthorService
     public function __construct(
         private readonly AuthorRepository   $authorRepository,
         private readonly ImageUploadService $imageUploadService,
-        ?Database                           $database = null
+        private readonly ?ContributorAuthorSyncService $contributorAuthorSyncService,
+        ?Database                           $database = null,
     )
     {
         $this->database = $database ?? Database::getInstance();
@@ -73,9 +75,14 @@ class AuthorService
         });
     }
 
-    public function updateAuthor(int $id, array $data, ?UploadedFile $avatarFile = null): Author
+    public function updateAuthor(
+        int $id,
+        array $data,
+        ?UploadedFile $avatarFile = null,
+        ?int $adminId = null,
+    ): Author
     {
-        return $this->database->transaction(function () use ($id, $data, $avatarFile) {
+        return $this->database->transaction(function () use ($id, $data, $avatarFile, $adminId) {
             $author = $this->authorRepository->find($id);
 
             if (!$author) {
@@ -99,8 +106,40 @@ class AuthorService
                 throw new Exception("Failed to update author");
             }
 
+            if ($this->contributorAuthorSyncService) {
+                $updatedAuthor = $this->contributorAuthorSyncService->recordAdminAuthorUpdate(
+                    $updatedAuthor,
+                    $data,
+                    $adminId,
+                );
+            }
+
             return $updatedAuthor;
         });
+    }
+
+    public function getOverriddenFields(int $authorId): array
+    {
+        if (!$this->contributorAuthorSyncService) {
+            $author = $this->authorRepository->find($authorId);
+
+            if (!$author) {
+                throw new Exception('Author not found');
+            }
+
+            return is_array($author->overridden_fields) ? $author->overridden_fields : [];
+        }
+
+        return $this->contributorAuthorSyncService->overriddenFields($authorId);
+    }
+
+    public function removeOverride(int $authorId, string $field, ?int $adminId = null): Author
+    {
+        if (!$this->contributorAuthorSyncService) {
+            throw new Exception('Author synchronisation is not available');
+        }
+
+        return $this->contributorAuthorSyncService->removeOverride($authorId, $field, $adminId);
     }
 
     public function delete(int $authorId, ?int $reassignToAuthorId = null): bool

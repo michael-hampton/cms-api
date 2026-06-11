@@ -1313,6 +1313,8 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/authors/active', AuthorController::class, 'getActive');
         $router->post('/authors', AuthorController::class, 'store');
         $router->post('/authors/merge', AuthorController::class, 'merge');
+        $router->get('/authors/{id}/overrides', AuthorController::class, 'overrides');
+        $router->delete('/authors/{id}/overrides/{field}', AuthorController::class, 'removeOverride');
         $router->get('/authors/{id}', AuthorController::class, 'show');
         $router->put('/authors/{id}', AuthorController::class, 'update');
         $router->delete('/authors/{id}', AuthorController::class, 'destroy');

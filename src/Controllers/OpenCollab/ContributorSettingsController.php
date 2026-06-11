@@ -7,6 +7,7 @@ use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Support\Collection;
 use App\Framework\Support\SiteContext;
 use App\Models\Site;
 use App\Resources\OpenCollab\ContributorProfileResource;
@@ -140,8 +141,7 @@ class ContributorSettingsController extends Controller
     // ── Profile (core fields + dynamic fields) ────────────────────────────────
 
     /**
-     * POST /api/{site}/open-collab/onboarding/profile
-     * POST /api/{site}/open-collab/contributor/profile   (alias)
+     * PUT /api/{site}/open-collab/contributor
      *
      * Ticket 4: validates and persists dynamic database-backed field values
      * alongside core profile fields. Both paths use the same field definitions
@@ -167,9 +167,9 @@ class ContributorSettingsController extends Controller
 
         $rawInput = $request->all();
 
-        // Ticket 4: validate dynamic fields before persisting anything.
         $fieldDefinitions = $this->profileFieldConfigService->activeFieldsForSite($site);
-        $validationErrors = $this->dynamicFieldValidator->validate($fieldDefinitions, $rawInput);
+        $submittedDefinitions = $this->submittedProfileDefinitions($fieldDefinitions, $rawInput);
+        $validationErrors = $this->dynamicFieldValidator->validate($submittedDefinitions, $rawInput);
 
         if (!empty($validationErrors)) {
             return $this->errorResponse('Validation failed.', 422, $validationErrors);
@@ -180,6 +180,7 @@ class ContributorSettingsController extends Controller
                 userId: $userId,
                 siteId: $siteId,
                 data: $rawInput,
+                fieldDefinitions: $submittedDefinitions,
             );
 
             $this->onboardingService->markProfileInProgress($userId, $siteId);
@@ -193,5 +194,19 @@ class ContributorSettingsController extends Controller
         } catch (Exception $e) {
             return $this->errorResponse('Could not update profile. Please try again.', 500);
         }
+    }
+
+    /**
+     * Settings cards save independently, so validate only the dynamic fields
+     * submitted by the current card instead of every active profile field.
+     *
+     * @param Collection<int, \App\Models\CustomFieldDefinition> $fieldDefinitions
+     * @param array<string, mixed> $input
+     */
+    private function submittedProfileDefinitions(Collection $fieldDefinitions, array $input): Collection
+    {
+        return $fieldDefinitions
+            ->filter(static fn($definition) => array_key_exists((string) $definition->key, $input))
+            ->values();
     }
 }

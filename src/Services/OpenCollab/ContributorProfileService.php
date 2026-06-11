@@ -4,6 +4,7 @@ namespace App\Services\OpenCollab;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
+use App\Framework\Support\Collection;
 use App\Models\ContributorProfile;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Services\Cms\ImageUploadService;
@@ -30,6 +31,7 @@ class ContributorProfileService
     public function __construct(
         private readonly ContributorProfileRepository $profileRepository,
         private readonly ImageUploadService           $imageUploadService,
+        private readonly ?ContributorAuthorSyncService $authorSyncService,
     )
     {
     }
@@ -66,8 +68,10 @@ class ContributorProfileService
         if ($profile) {
             $this->profileRepository->update($profile->id, ['avatar' => $url]);
         } else {
-            $this->profileRepository->createForUser($userId, ['avatar' => $url]);
+            $profile = $this->profileRepository->createForUser($userId, ['avatar' => $url]);
         }
+
+        $this->syncPublicProfileFields($profile, $siteId, $userId, ['avatar']);
 
         return $url;
     }
@@ -105,6 +109,7 @@ class ContributorProfileService
 
         $this->imageUploadService->delete(ltrim($profile->avatar, '/'));
         $this->profileRepository->update($profile->id, ['avatar' => null]);
+        $this->syncPublicProfileFields($profile, $siteId, $userId, ['avatar']);
     }
 
     // ── Profile (bio / avatar URL) ────────────────────────────────────────────
@@ -124,12 +129,18 @@ class ContributorProfileService
         if ($profile) {
             $this->profileRepository->update($profile->id, ['expertise' => implode(',', $tags)]);
 
-            return $profile->fresh();
+            $fresh = $profile->fresh();
+            $this->syncPublicProfileFields($fresh ?? $profile, $siteId, $userId, ['expertise']);
+
+            return $fresh ?? $profile;
         }
 
-        return $this->profileRepository->createForUser($userId, [
+        $created = $this->profileRepository->createForUser($userId, [
             'expertise' => implode(',', $tags),
         ]);
+        $this->syncPublicProfileFields($created, $siteId, $userId, ['expertise']);
+
+        return $created;
     }
 
     // ── Validation helpers ────────────────────────────────────────────────────
@@ -259,7 +270,7 @@ class ContributorProfileService
      *
      * @throws ValidationException
      */
-    public function updateProfile(int $userId, int $siteId, array $data): ContributorProfile
+    public function updateProfile(int $userId, int $siteId, array $data, ?Collection $fieldDefinitions = null): ContributorProfile
     {
         $fields = [];
 
@@ -287,6 +298,23 @@ class ContributorProfileService
             }
         }
 
+        if ($fieldDefinitions) {
+            foreach ($fieldDefinitions->all() as $definition) {
+                $key = (string) $definition->key;
+
+                if (!array_key_exists($key, $data) || in_array($key, ['avatar'], true)) {
+                    continue;
+                }
+
+                if (method_exists($definition, 'isProfileColumnField') && !$definition->isProfileColumnField()) {
+                    continue;
+                }
+
+                $column = $definition->profile_column ?: $key;
+                $fields[$column] = $this->normaliseDynamicProfileValue($key, $data[$key]);
+            }
+        }
+
         if (empty($fields)) {
             // Nothing to update; return or create the profile as-is
             return $this->profileRepository->findByUserId($userId)
@@ -298,9 +326,76 @@ class ContributorProfileService
         if ($profile) {
             $this->profileRepository->update($profile->id, $fields);
 
-            return $profile->fresh();
+            $fresh = $profile->fresh();
+            $this->syncPublicProfileFields($fresh ?? $profile, $siteId, $userId, array_keys($fields));
+
+            return $fresh ?? $profile;
         }
 
-        return $this->profileRepository->createForUser($userId, $fields);
+        $created = $this->profileRepository->createForUser($userId, $fields);
+        $this->syncPublicProfileFields($created, $siteId, $userId, array_keys($fields));
+
+        return $created;
+    }
+
+    private function syncPublicProfileFields(
+        ?ContributorProfile $profile,
+        int $siteId,
+        int $userId,
+        array $changedFields,
+    ): void {
+        if (!$profile || !$this->authorSyncService) {
+            return;
+        }
+
+        $profile = $profile->fresh() ?? $profile;
+
+        $publicFields = $this->authorSyncService->syncableProfileFieldsFrom($changedFields);
+
+        if (empty($publicFields)) {
+            return;
+        }
+
+        $this->authorSyncService->syncProfileToAuthor(
+            profile: $profile,
+            siteId: $siteId,
+            actorType: 'contributor',
+            actorId: $userId,
+            changedProfileFields: $publicFields,
+        );
+    }
+
+    private function normaliseDynamicProfileValue(string $key, mixed $value): mixed
+    {
+        if ($key === 'expertise' && is_array($value)) {
+            return implode(',', $this->validateAndNormaliseTags($value));
+        }
+
+        if ($key === 'writing_samples' && is_array($value)) {
+            $urls = $value['url'] ?? [];
+            $titles = $value['title'] ?? [];
+            $samples = [];
+
+            foreach ((array) $urls as $index => $url) {
+                $url = trim((string) $url);
+
+                if ($url === '') {
+                    continue;
+                }
+
+                $samples[] = [
+                    'url' => $url,
+                    'title' => trim((string) ($titles[$index] ?? '')),
+                ];
+            }
+
+            return $samples;
+        }
+
+        if (is_array($value)) {
+            return json_encode($value);
+        }
+
+        return $value;
     }
 }

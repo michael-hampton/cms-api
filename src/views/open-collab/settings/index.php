@@ -28,88 +28,38 @@ $pageClass = '';
 
             <form id="profile-form" novalidate>
 
-                <!-- Avatar upload -->
-                <div class="oc-form-group" style="margin-bottom:24px;">
-                    <label class="oc-label">Profile picture</label>
-                    <div style="display:flex;align-items:center;gap:20px;">
-                        <!-- Avatar preview -->
-                        <div id="avatar-preview-wrap" style="position:relative;flex-shrink:0;">
-                            <div id="avatar-preview"
-                                 style="width:80px;height:80px;border-radius:50%;background:var(--slate-pale);border:2px solid var(--border);overflow:hidden;display:grid;place-items:center;cursor:pointer;"
-                                 onclick="document.getElementById('avatar-file-input').click()"
-                                 title="Click to change photo">
-                                <?php if (!empty($profile?->avatar)): ?>
-                                    <img id="avatar-img"
-                                         src="<?= htmlspecialchars($profile->avatar) ?>"
-                                         alt="Your avatar"
-                                         style="width:100%;height:100%;object-fit:cover;">
-                                <?php else: ?>
-                                    <span id="avatar-initials"
-                                          style="font-family:var(--font-display);font-size:1.5rem;color:var(--slate);user-select:none;">
-                                        <?= strtoupper(substr($currentUser->name ?? 'U', 0, 1)) ?>
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                            <!-- Edit badge -->
-                            <div onclick="document.getElementById('avatar-file-input').click()"
-                                 style="position:absolute;bottom:0;right:0;width:24px;height:24px;background:var(--navy);border-radius:50%;display:grid;place-items:center;cursor:pointer;border:2px solid #fff;"
-                                 title="Change photo">
-                                <svg viewBox="0 0 20 20" fill="#fff" width="11">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                                </svg>
-                            </div>
-                        </div>
+                <?php if ($photoField = $profileStep?->photoField()): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $photoField, 'mode' => 'settings', 'currentUser' => $currentUser])
+                <?php endif; ?>
 
-                        <!-- Upload controls -->
-                        <div style="flex:1;">
-                            <input type="file" id="avatar-file-input" accept="image/jpeg,image/png,image/webp"
-                                   style="display:none;" onchange="avatarManager.onFileSelected(this)">
-                            <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
-                                    onclick="document.getElementById('avatar-file-input').click()">
-                                Choose photo
-                            </button>
-                            <?php if (!empty($profile?->avatar)): ?>
-                                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
-                                        style="margin-left:8px;color:var(--red);"
-                                        onclick="avatarManager.remove()">
-                                    Remove
-                                </button>
-                            <?php endif; ?>
-                            <div class="oc-help" style="margin-top:6px;">
-                                JPG, PNG or WebP · Max 2 MB · Square images work best
-                            </div>
-                            <div id="avatar-error"
-                                 style="font-size:.75rem;color:var(--red);margin-top:4px;display:none;"></div>
-                            <!-- Upload progress -->
-                            <div id="avatar-progress-wrap" style="display:none;margin-top:8px;">
-                                <div style="height:4px;background:var(--slate-pale);border-radius:99px;overflow:hidden;width:180px;">
-                                    <div id="avatar-progress-bar"
-                                         style="height:100%;width:0%;background:var(--navy);border-radius:99px;transition:width .2s ease;"></div>
-                                </div>
-                                <div style="font-size:.72rem;color:var(--slate);margin-top:3px;"
-                                     id="avatar-progress-label">Uploading…
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <?php if ($displayNameField = $profileStep?->field('display_name')): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $displayNameField, 'mode' => 'settings', 'currentUser' => $currentUser])
+                <?php endif; ?>
 
-                <div class="oc-form-group">
-                    <label class="oc-label" for="display-name">Display name</label>
-                    <input class="oc-input" type="text" id="display-name" name="name"
-                           value="<?= htmlspecialchars($currentUser->name ?? '') ?>">
-                </div>
-                <div class="oc-form-group">
-                    <label class="oc-label" for="bio">Bio</label>
-                    <textarea class="oc-textarea" id="bio" name="bio"
-                              rows="4"><?= htmlspecialchars($profile?->bio ?? '') ?></textarea>
-                    <div class="oc-help">Visible to readers on your published articles.</div>
-                </div>
+                <?php if ($bioField = $profileStep?->bioField()): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $bioField, 'mode' => 'settings'])
+                <?php endif; ?>
+
+                <?php if ($portfolioField = $profileStep?->portfolioField()): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $portfolioField, 'mode' => 'settings'])
+                <?php endif; ?>
+
+                <?php foreach ($profileStep?->socialFields() ?? [] as $field): ?>
+                    @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'settings'])
+                <?php endforeach; ?>
+
+                <?php foreach ($profileStep?->locationFields() ?? [] as $field): ?>
+                    <?php if ($field->key !== 'tax_country'): ?>
+                        @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'settings'])
+                    <?php endif; ?>
+                <?php endforeach; ?>
+
                 <button type="submit" class="oc-btn oc-btn--primary" id="profile-save-btn">Save profile</button>
             </form>
         </div>
     </div>
 
+    <?php if ($profileStep?->expertiseField()): ?>
     <!-- Expertise section -->
     <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .41s ease;" id="expertise">
         <div class="oc-card__header">
@@ -119,42 +69,9 @@ $pageClass = '';
             <div id="expertise-success" class="oc-alert oc-alert--success" style="display:none;"></div>
             <div id="expertise-errors" class="oc-form-errors" style="display:none;"></div>
 
-            <div class="oc-help" style="margin-bottom:16px;">
-                Add up to 8 topics that describe your writing focus. These help editors match you with relevant briefs.
-            </div>
-
-            <!-- Tag list -->
-            <div id="expertise-tags"
-                 style="display:flex;flex-wrap:wrap;gap:8px;min-height:40px;margin-bottom:16px;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:#fff;cursor:text;"
-                 onclick="document.getElementById('expertise-input').focus()">
-                <!-- Tags injected by JS -->
-            </div>
-
-            <!-- Input row -->
-            <div style="display:flex;gap:10px;align-items:flex-start;">
-                <div style="flex:1;position:relative;">
-                    <input class="oc-input" type="text" id="expertise-input"
-                           placeholder="e.g. Technology, Climate, Finance…"
-                           maxlength="40"
-                           autocomplete="off"
-                           onkeydown="expertiseManager.onKeyDown(event)"
-                           oninput="expertiseManager.onInput(this.value)">
-                    <!-- Suggestions dropdown -->
-                    <div id="expertise-suggestions"
-                         style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);z-index:50;overflow:hidden;">
-                    </div>
-                </div>
-                <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm"
-                        onclick="expertiseManager.addFromInput()"
-                        style="flex-shrink:0;margin-top:1px;">
-                    Add
-                </button>
-            </div>
-            <div class="oc-help" style="margin-top:6px;" id="expertise-hint">
-                Press <kbd
-                        style="font-size:.7rem;padding:1px 5px;border:1px solid var(--border);border-radius:4px;background:var(--slate-pale);">Enter</kbd>
-                or comma to add · Click a tag to remove it
-            </div>
+            <?php if ($expertiseField = $profileStep?->expertiseField()): ?>
+                @include('open-collab/onboarding/partials/profile-field', ['field' => $expertiseField, 'mode' => 'settings'])
+            <?php endif; ?>
 
             <div style="margin-top:16px;">
                 <button type="button" class="oc-btn oc-btn--primary" id="expertise-save-btn"
@@ -164,7 +81,9 @@ $pageClass = '';
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
+    <?php if ($profileStep?->writingSamplesField()): ?>
     <!-- Writing samples section -->
     <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .415s ease;" id="writing-samples">
         <div class="oc-card__header">
@@ -174,7 +93,9 @@ $pageClass = '';
             <div id="sample-links-success" class="oc-alert oc-alert--success" style="display:none;"></div>
             <div id="sample-links-errors" class="oc-form-errors" style="display:none;"></div>
 
-            <div id="sample-links-list" style="display:flex;flex-direction:column;gap:14px;margin-bottom:16px;"></div>
+            <?php if ($writingField = $profileStep?->writingSamplesField()): ?>
+                @include('open-collab/onboarding/partials/profile-field', ['field' => $writingField, 'mode' => 'settings'])
+            <?php endif; ?>
 
             <div style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
                 <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" id="sample-link-add-btn"
@@ -188,6 +109,35 @@ $pageClass = '';
             </div>
         </div>
     </div>
+    <?php endif; ?>
+
+    <?php foreach ($profileStep?->additionalSections ?? [] as $index => $section): ?>
+        <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .418s ease;" id="profile-additional-<?= (int) $index ?>">
+            <div class="oc-card__header">
+                <span class="oc-card__title"><?= htmlspecialchars($section->title) ?></span>
+            </div>
+            <div class="oc-card__body">
+                <div id="profile-additional-success-<?= (int) $index ?>" class="oc-alert oc-alert--success" style="display:none;"></div>
+                <div id="profile-additional-errors-<?= (int) $index ?>" class="oc-form-errors" style="display:none;"></div>
+
+                <?php if ($section->description): ?>
+                    <div class="oc-help" style="margin-bottom:16px;">
+                        <?= htmlspecialchars($section->description) ?>
+                    </div>
+                <?php endif; ?>
+
+                <form class="profile-additional-form" data-section="<?= (int) $index ?>" novalidate>
+                    <?php foreach ($section->fields as $field): ?>
+                        @include('open-collab/onboarding/partials/profile-field', ['field' => $field, 'mode' => 'settings'])
+                    <?php endforeach; ?>
+
+                    <button type="submit" class="oc-btn oc-btn--primary profile-additional-save-btn">
+                        Save information
+                    </button>
+                </form>
+            </div>
+        </div>
+    <?php endforeach; ?>
 
     <!-- Payment details section -->
     <div class="oc-card" style="margin-bottom:24px;animation:fadeSlideIn .42s ease;" id="stripe-connect">
@@ -729,7 +679,17 @@ $pageClass = '';
             this.#site = site;
             this.#token = token;
             this.#tags = [...initialTags];
+            this.#bindField();
             this.#render();
+        }
+
+        #bindField() {
+            const input = document.getElementById('expertise-input');
+            const addButton = document.getElementById('add-expertise-btn');
+
+            input?.addEventListener('keydown', (event) => this.onKeyDown(event));
+            input?.addEventListener('input', (event) => this.onInput(event.target.value));
+            addButton?.addEventListener('click', () => this.addFromInput());
         }
 
         onKeyDown(event) {
@@ -828,6 +788,11 @@ $pageClass = '';
         #render() {
             const container = document.getElementById('expertise-tags');
             container.innerHTML = '';
+
+            const hidden = document.getElementById('expertise');
+            if (hidden) {
+                hidden.value = JSON.stringify(this.#tags);
+            }
 
             for (let i = 0; i < this.#tags.length; i++) {
                 const tag = document.createElement('span');
@@ -1118,38 +1083,76 @@ $pageClass = '';
             this.#site = site;
             this.#token = token;
             this.#bindForm();
+            this.#bindAdditionalForms();
+            this.#bindBioCounter();
         }
 
         #bindForm() {
             document.getElementById('profile-form')?.addEventListener('submit', (e) => {
                 e.preventDefault();
-                this.#save();
+                this.#saveForm(e.currentTarget, {
+                    button: document.getElementById('profile-save-btn'),
+                    success: document.getElementById('profile-success'),
+                    errors: document.getElementById('profile-errors'),
+                    resetLabel: 'Save profile',
+                    successMessage: '✓ Profile updated',
+                });
             });
         }
 
-        async #save() {
-            const btn = document.getElementById('profile-save-btn');
+        #bindAdditionalForms() {
+            document.querySelectorAll('.profile-additional-form').forEach((form) => {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const section = form.dataset.section;
+                    this.#saveForm(form, {
+                        button: form.querySelector('.profile-additional-save-btn'),
+                        success: document.getElementById(`profile-additional-success-${section}`),
+                        errors: document.getElementById(`profile-additional-errors-${section}`),
+                        resetLabel: 'Save information',
+                        successMessage: '✓ Information updated',
+                    });
+                });
+            });
+        }
+
+        #bindBioCounter() {
+            const bio = document.getElementById('bio');
+            const counter = document.getElementById('bio-char-count');
+
+            if (!bio || !counter) return;
+
+            bio.addEventListener('input', () => {
+                counter.textContent = `${bio.value.length} / 1000`;
+                counter.style.color = bio.value.length > 1000 ? 'var(--red)' : 'var(--slate)';
+            });
+        }
+
+        async #saveForm(form, options) {
+            const btn = options.button;
             btn.disabled = true;
             btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Saving…';
 
-            const payload = {bio: document.getElementById('bio').value};
+            const payload = this.#payloadFromForm(form);
 
             // Include avatar URL if the AvatarManager has a pending change
-            const pendingAvatar = window.avatarManager?.getPendingUrl();
+            const pendingAvatar = form.id === 'profile-form'
+                ? window.avatarManager?.getPendingUrl()
+                : null;
             if (pendingAvatar !== null && pendingAvatar !== undefined) {
                 payload.avatar = pendingAvatar; // '' = remove, string = new URL
             }
 
-            const res = await fetch(`/api/${this.#site}/open-collab/onboarding/profile`, {
-                method: 'POST',
+            const res = await fetch(`/api/${this.#site}/open-collab/contributor`, {
+                method: 'PUT',
                 headers: {'Content-Type': 'application/json', Authorization: `Bearer ${this.#token}`},
                 body: JSON.stringify(payload),
             });
 
             const data = await res.json();
             if (res.ok) {
-                const ok = document.getElementById('profile-success');
-                ok.textContent = '✓ Profile updated';
+                const ok = options.success;
+                ok.textContent = options.successMessage;
                 ok.style.display = 'flex';
                 // Reset avatar progress indicator after successful save
                 const progressWrap = document.getElementById('avatar-progress-wrap');
@@ -1158,13 +1161,36 @@ $pageClass = '';
                     ok.style.display = 'none';
                 }, 3000);
             } else {
-                const err = document.getElementById('profile-errors');
-                err.textContent = data.message || 'Save failed.';
+                const err = options.errors;
+                const messages = data.errors
+                    ? Object.values(data.errors).flat().join(' ')
+                    : data.message || 'Save failed.';
+                err.textContent = messages;
                 err.style.display = 'block';
             }
 
             btn.disabled = false;
-            btn.textContent = 'Save profile';
+            btn.textContent = options.resetLabel;
+        }
+
+        #payloadFromForm(form) {
+            const payload = {};
+            const formData = new FormData(form);
+
+            formData.forEach((value, key) => {
+                if (key.endsWith('[]')) {
+                    const normalizedKey = key.slice(0, -2);
+                    if (!Array.isArray(payload[normalizedKey])) {
+                        payload[normalizedKey] = [];
+                    }
+                    payload[normalizedKey].push(String(value));
+                    return;
+                }
+
+                payload[key] = value;
+            });
+
+            return payload;
         }
     }
 
@@ -1333,8 +1359,12 @@ $pageClass = '';
             this.#payment = new PaymentDetailsManager(site, token, stripeKey);
             this.#closure = new AccountClosureManager(site, token, expectedEmail);
             this.#avatar = new AvatarManager(site, token);
-            this.#expertise = new ExpertiseManager(site, token, initialExpertise);
-            this.#sampleLinks = new SampleLinksManager(site, token, initialSampleLinks);
+            this.#expertise = document.getElementById('expertise-tags')
+                ? new ExpertiseManager(site, token, initialExpertise)
+                : null;
+            this.#sampleLinks = document.getElementById('sample-links-list')
+                ? new SampleLinksManager(site, token, initialSampleLinks)
+                : null;
 
             // Expose avatarManager globally for inline HTML handlers
             window.avatarManager = this.#avatar;

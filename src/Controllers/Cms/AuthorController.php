@@ -7,6 +7,7 @@ use App\Actions\Author\CloneAuthor;
 use App\Actions\Author\MergeAuthor;
 use App\Controllers\Controller;
 use App\Framework\Container;
+use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
@@ -105,7 +106,7 @@ class AuthorController extends Controller
             $data = $request->validated();
             $avatarFile = $request->hasFile('avatar') ? $request->file('avatar') : null;
 
-            $author = $this->authorService->updateAuthor($id, $data, $avatarFile);
+            $author = $this->authorService->updateAuthor($id, $data, $avatarFile, Auth::id());
 
             return $this->jsonResponse(['author' => $author->toArray()]);
 
@@ -117,6 +118,33 @@ class AuthorController extends Controller
             );
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
+        }
+    }
+
+    public function overrides(int $id): JsonResponse
+    {
+        try {
+            return $this->jsonResponse([
+                'overridden_fields' => $this->authorService->getOverriddenFields($id),
+            ]);
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 404);
+        }
+    }
+
+    public function removeOverride(int $id, string $field): JsonResponse
+    {
+        try {
+            $author = $this->authorService->removeOverride($id, $field, Auth::id());
+
+            return $this->jsonResponse([
+                'author' => $author->toArray(),
+                'overridden_fields' => $author->overridden_fields ?? [],
+            ]);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        } catch (Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
         }
     }
 

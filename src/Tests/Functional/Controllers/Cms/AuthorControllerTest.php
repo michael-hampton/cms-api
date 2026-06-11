@@ -401,7 +401,7 @@ class AuthorControllerTest extends FunctionalTestCase
         $response = $this->putForSite("/api/authors/{$author->id}", [
             'name' => 'John Updated',
             'expertise' => 'Updated expertise',
-            'location' => json_encode(['Boston']),
+            'location' => ['Boston'],
             'seniority_date' => '2019-06-01',
             'is_active' => false
         ]);

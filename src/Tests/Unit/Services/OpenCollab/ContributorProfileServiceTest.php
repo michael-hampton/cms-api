@@ -4,6 +4,8 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\UploadedFile;
+use App\Framework\Support\Collection;
+use App\Models\CustomFieldDefinition;
 use App\Models\ContributorProfile;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
 use App\Services\Cms\ImageUploadService;
@@ -369,6 +371,49 @@ class ContributorProfileServiceTest extends TestCase
         $this->assertSame('/keep.jpg', $result->avatar);
     }
 
+    public function test_updateProfile_maps_dynamic_profile_fields_to_configured_columns(): void
+    {
+        $profile = $this->makeProfile(['id' => 2]);
+        $fresh = $this->makeProfile([
+            'id' => 2,
+            'display_name' => 'Jane Contributor',
+            'portfolio_url' => 'https://example.com',
+            'linkedin_url' => 'https://linkedin.com/in/example',
+            'twitter_url' => 'https://x.com/example',
+        ]);
+
+        $definitions = new Collection([
+            $this->makeDefinition('display_name', 'display_name'),
+            $this->makeDefinition('portfolio_url', 'portfolio_url'),
+            $this->makeDefinition('linkedin_url', 'linkedin_url'),
+            $this->makeDefinition('twitter_url', 'twitter_url'),
+        ]);
+
+        $this->profileRepo->shouldReceive('findByUserId')->andReturn($profile);
+        $profile->shouldReceive('fresh')->andReturn($fresh);
+
+        $this->profileRepo
+            ->shouldReceive('update')
+            ->once()
+            ->with(2, [
+                'display_name' => 'Jane Contributor',
+                'portfolio_url' => 'https://example.com',
+                'linkedin_url' => 'https://linkedin.com/in/example',
+                'twitter_url' => 'https://x.com/example',
+            ])
+            ->andReturn($profile);
+
+        $result = $this->service->updateProfile(1, 10, [
+            'display_name' => 'Jane Contributor',
+            'portfolio_url' => 'https://example.com',
+            'linkedin_url' => 'https://linkedin.com/in/example',
+            'twitter_url' => 'https://x.com/example',
+        ], $definitions);
+
+        $this->assertSame('Jane Contributor', $result->display_name);
+        $this->assertSame('https://example.com', $result->portfolio_url);
+    }
+
     public function test_updateSampleLinks_normalises_and_persists_links(): void
     {
         $profile = $this->makeProfile(['id' => 12, 'bio' => 'Keep me']);
@@ -460,6 +505,20 @@ class ContributorProfileServiceTest extends TestCase
         ]);
     }
 
+    private function makeDefinition(string $key, string $profileColumn): CustomFieldDefinition
+    {
+        /** @var CustomFieldDefinition&MockInterface $definition */
+        $definition = Mockery::mock(CustomFieldDefinition::class)->makePartial();
+        $definition->key = $key;
+        $definition->profile_column = $profileColumn;
+        $definition->storage_type = 'profile_column';
+        $definition->shouldReceive('getAttribute')->with('key')->andReturn($key);
+        $definition->shouldReceive('getAttribute')->with('profile_column')->andReturn($profileColumn);
+        $definition->shouldReceive('getAttribute')->with('storage_type')->andReturn('profile_column');
+
+        return $definition;
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -470,6 +529,7 @@ class ContributorProfileServiceTest extends TestCase
         $this->service = new ContributorProfileService(
             $this->profileRepo,
             $this->uploadService,
+            null,
         );
     }
 
