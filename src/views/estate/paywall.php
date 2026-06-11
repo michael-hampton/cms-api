@@ -15,7 +15,7 @@ $isPurchasablePremium =
 <?php endif; ?>
 
 <?php if ($isPurchasablePremium):
-    $authedEmail = \App\Framework\Authorization\Auth::user()?->email ?? '';
+    $authedEmail = \App\Framework\Authorization\MemberAuth::member()?->email ?? '';
     $isAuthed = !empty($authedEmail);
     $siteSlug = \App\Framework\Support\SiteContext::slug();
     $pageId = (int)$page->id;

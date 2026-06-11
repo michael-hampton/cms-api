@@ -10,6 +10,7 @@ use App\Jobs\BaseJob;
 use App\Models\Payout;
 use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\PayoutLedgerService;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Service\TransferService;
 use Stripe\StripeClient;
@@ -17,16 +18,16 @@ use Stripe\StripeClient;
 class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
 {
     public int $tries = 5;
-    public ?PayoutRepository $payoutRepository = null;
 
-    // Dependencies (lazy for worker + testability)
+    // Dependencies are public nullable so tests can inject mocks directly.
+    public ?PayoutRepository $payoutRepository = null;
     public ?ContributorPayoutAccountRepository $payoutAccountRepository = null;
+    public ?PayoutLedgerService $payoutLedgerService = null;
     public ?StripeClient $stripe = null;
 
     public function __construct(
         public readonly int $payoutId,
-    )
-    {
+    ) {
     }
 
     public function uniqueId(): string
@@ -36,7 +37,7 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
 
     public function uniqueFor(): int
     {
-        // prevent duplicate execution for 30 minutes
+        // Prevent duplicate execution for 30 minutes.
         return 30 * 60;
     }
 
@@ -45,6 +46,7 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
         $this->payoutRepository ??= new PayoutRepository();
         $this->payoutAccountRepository ??= new ContributorPayoutAccountRepository();
         $this->stripe ??= new StripeClient((string)($_ENV['STRIPE_SECRET_KEY'] ?? ''));
+        $this->payoutLedgerService ??= app(PayoutLedgerService::class);
 
         /** @var Payout|null $payout */
         $payout = $this->payoutRepository->find($this->payoutId);
@@ -53,41 +55,43 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
             return;
         }
 
-        // Only process approved Stripe payouts
+        // Only process approved payouts.
         if ($payout->status !== PayoutStatus::Approved->value) {
             return;
         }
 
-        if ($payout->method !== 'stripe') {
+        // In this app, bank_account is still Stripe Express-backed.
+        if (!$this->isStripeBackedMethod((string) $payout->method)) {
             return;
         }
 
-        // Idempotency: if we already created a transfer, do nothing
+        // Idempotency guard: if a Stripe transfer already exists, do not create another.
         if (!empty($payout->provider_transfer_id)) {
             return;
         }
 
-        $account = $this->payoutAccountRepository->findByUserId((int)$payout->user_id, 'stripe');
+        $attempt = ((int) ($payout->processing_attempts ?? 0)) + 1;
+
+        $account = $this->payoutAccountRepository->findByUserId((int) $payout->user_id, 'stripe');
 
         if (!$account || !$account->stripe_account_id || !$account->payouts_enabled) {
-            $this->updatePayout($payout->id, [
+            $this->updatePayout($this->payoutRepository, (int) $payout->id, [
                 'status' => PayoutStatus::Failed->value,
                 'provider' => 'stripe_connect',
                 'provider_status' => 'account_not_payable',
-                'processing_attempts' => ((int)($payout->processing_attempts ?? 0)) + 1,
+                'processing_attempts' => $attempt,
                 'processed_at' => date('Y-m-d H:i:s'),
                 'provider_response_json' => [
                     'reason' => 'Connected account missing or payouts disabled.',
                 ],
             ]);
+
             return;
         }
 
         try {
             /** @var TransferService $transfers */
             $transfers = $this->stripe->transfers;
-
-            $idempotencyKey = $payout->idempotency_key ?: 'payout:' . $payout->id;
 
             $transfer = $transfers->create([
                 'amount' => (int) $payout->amount,
@@ -99,25 +103,29 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
                     'site_id' => (string) $payout->site_id,
                 ],
             ], [
-                'idempotency_key' => $idempotencyKey,
+                'idempotency_key' => $this->stripeTransferIdempotencyKey($payout, $attempt),
             ]);
 
-            $attempts = !$payout->processing_attempts ? 1 : $payout->processing_attempts + 1;
-
-            $this->updatePayout($payout->id, [
+            $this->updatePayout($this->payoutRepository, (int) $payout->id, [
+                'status' => PayoutStatus::Paid->value,
                 'provider' => 'stripe_connect',
                 'provider_transfer_id' => $transfer->id,
                 'provider_status' => !$transfer->status ? 'created' : $transfer->status,
                 'provider_response_json' => $transfer->toArray(),
-                'processing_attempts' => $attempts,
+                'processing_attempts' => $attempt,
                 'processed_at' => date('Y-m-d H:i:s'),
             ]);
+
+            // This is the important missing step.
+            // Once Stripe has accepted the transfer, the attached settled earnings
+            // should no longer remain withdrawable.
+            $this->payoutLedgerService->markPayoutLedgerEntriesWithdrawn((int) $payout->id);
         } catch (ApiErrorException $e) {
-            $this->updatePayout($payout->id, [
+            $this->updatePayout($this->payoutRepository, (int) $payout->id, [
                 'status' => PayoutStatus::Failed->value,
                 'provider' => 'stripe_connect',
                 'provider_status' => 'transfer_failed',
-                'processing_attempts' => ((int)($payout->processing_attempts ?? 0)) + 1,
+                'processing_attempts' => $attempt,
                 'processed_at' => date('Y-m-d H:i:s'),
                 'provider_response_json' => [
                     'error' => $e->getMessage(),
@@ -126,8 +134,25 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
         }
     }
 
-    private function updatePayout(int $payoutId, array $data): void
+    private function isStripeBackedMethod(string $method): bool
     {
+        return in_array($method, ['stripe', 'bank_transfer'], true);
+    }
+
+    private function stripeTransferIdempotencyKey(Payout $payout, int $attempt): string
+    {
+        return sprintf(
+            'stripe-transfer:payout:%d:attempt:%d',
+            (int) $payout->id,
+            $attempt
+        );
+    }
+
+    private function updatePayout(
+        PayoutRepository $payoutRepository,
+        int $payoutId,
+        array $data,
+    ): void {
         // Store the Stripe payload for audit/debugging.
         if (isset($data['provider_response_json']) && is_array($data['provider_response_json'])) {
             $data['provider_response_json'] = json_encode($data['provider_response_json']);
@@ -135,7 +160,6 @@ class ProcessStripePayoutJob extends BaseJob implements ShouldBeUnique
 
         $data['updated_at'] = date('Y-m-d H:i:s');
 
-        $this->payoutRepository->update($payoutId, $data);
+        $payoutRepository->update($payoutId, $data);
     }
 }
-

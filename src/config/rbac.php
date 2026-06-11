@@ -4,13 +4,21 @@ return [
     'site_enabled' => env('RBAC_SITE_ENABLED', true),
 
     'permissions' => [
+        // Generic content grants
         ['name' => 'Create Content', 'slug' => 'content.create', 'group' => 'content'],
         ['name' => 'Submit Content', 'slug' => 'content.submit', 'group' => 'content'],
         ['name' => 'Edit Own Content', 'slug' => 'content.edit_own', 'group' => 'content'],
         ['name' => 'Review Content', 'slug' => 'content.review', 'group' => 'content'],
         ['name' => 'Approve Content', 'slug' => 'content.approve', 'group' => 'content'],
         ['name' => 'Reject Content', 'slug' => 'content.reject', 'group' => 'content'],
+        ['name' => 'Hold Content', 'slug' => 'content.hold', 'group' => 'content'],
+        ['name' => 'Edit Content', 'slug' => 'content.edit', 'group' => 'content'],
+        ['name' => 'Delete Content', 'slug' => 'content.delete', 'group' => 'content'],
+        ['name' => 'Make Content Private', 'slug' => 'content.make_private', 'group' => 'content'],
+        ['name' => 'Delete Content Comments', 'slug' => 'content.comment.delete', 'group' => 'content'],
         ['name' => 'Publish Content', 'slug' => 'content.publish', 'group' => 'content'],
+
+        // Page-scoped grants
         ['name' => 'View Pages', 'slug' => 'pages.view', 'group' => 'pages'],
         ['name' => 'Create Pages', 'slug' => 'pages.create', 'group' => 'pages'],
         ['name' => 'Edit Pages', 'slug' => 'pages.edit', 'group' => 'pages'],
@@ -19,7 +27,12 @@ return [
         ['name' => 'Approve Pages', 'slug' => 'pages.approve', 'group' => 'pages'],
         ['name' => 'Reject Pages', 'slug' => 'pages.reject', 'group' => 'pages'],
         ['name' => 'Hold Pages', 'slug' => 'pages.hold', 'group' => 'pages'],
+        ['name' => 'Delete Pages', 'slug' => 'pages.delete', 'group' => 'pages'],
+        ['name' => 'Make Pages Private', 'slug' => 'pages.make_private', 'group' => 'pages'],
+        ['name' => 'Delete Page Comments', 'slug' => 'pages.comment.delete', 'group' => 'pages'],
         ['name' => 'Publish Pages', 'slug' => 'pages.publish', 'group' => 'pages'],
+
+        // Brief-scoped grants
         ['name' => 'View Briefs', 'slug' => 'briefs.view', 'group' => 'briefs'],
         ['name' => 'Create Briefs', 'slug' => 'briefs.create', 'group' => 'briefs'],
         ['name' => 'Edit Briefs', 'slug' => 'briefs.edit', 'group' => 'briefs'],
@@ -28,34 +41,51 @@ return [
         ['name' => 'Approve Briefs', 'slug' => 'briefs.approve', 'group' => 'briefs'],
         ['name' => 'Reject Briefs', 'slug' => 'briefs.reject', 'group' => 'briefs'],
         ['name' => 'Hold Briefs', 'slug' => 'briefs.hold', 'group' => 'briefs'],
+        ['name' => 'Delete Briefs', 'slug' => 'briefs.delete', 'group' => 'briefs'],
+        ['name' => 'Make Briefs Private', 'slug' => 'briefs.make_private', 'group' => 'briefs'],
+        ['name' => 'Delete Brief Comments', 'slug' => 'briefs.comment.delete', 'group' => 'briefs'],
+
+        // Onboarding
         ['name' => 'View Onboarding', 'slug' => 'onboarding.view', 'group' => 'onboarding'],
         ['name' => 'Override Onboarding', 'slug' => 'onboarding.override', 'group' => 'onboarding'],
         ['name' => 'Force Complete Onboarding', 'slug' => 'onboarding.force_complete', 'group' => 'onboarding'],
+
+        // Dashboard
         ['name' => 'View Dashboard Widgets', 'slug' => 'dashboard.widgets.view', 'group' => 'dashboard'],
         ['name' => 'View Dashboard Payouts Widget', 'slug' => 'dashboard.payouts.view', 'group' => 'dashboard'],
         ['name' => 'View Dashboard Onboarding Widget', 'slug' => 'dashboard.onboarding.view', 'group' => 'dashboard'],
         ['name' => 'View Dashboard Content Queue Widget', 'slug' => 'dashboard.content_queue.view', 'group' => 'dashboard'],
+
+        // Contracts
         ['name' => 'Create Contract', 'slug' => 'contract.create', 'group' => 'contracts'],
         ['name' => 'Edit Contract', 'slug' => 'contract.edit', 'group' => 'contracts'],
         ['name' => 'Publish Contract', 'slug' => 'contract.publish', 'group' => 'contracts'],
         ['name' => 'Archive Contract', 'slug' => 'contract.archive', 'group' => 'contracts'],
         ['name' => 'View Contract', 'slug' => 'contract.view', 'group' => 'contracts'],
         ['name' => 'Sign Contract', 'slug' => 'contract.sign', 'group' => 'contracts'],
+
+        // Guidelines
         ['name' => 'Create Guideline', 'slug' => 'guideline.create', 'group' => 'guidelines'],
         ['name' => 'Edit Guideline', 'slug' => 'guideline.edit', 'group' => 'guidelines'],
         ['name' => 'Publish Guideline', 'slug' => 'guideline.publish', 'group' => 'guidelines'],
         ['name' => 'Archive Guideline', 'slug' => 'guideline.archive', 'group' => 'guidelines'],
         ['name' => 'Acknowledge Guideline', 'slug' => 'guideline.acknowledge', 'group' => 'guidelines'],
+
+        // Finance
         ['name' => 'Request Payout', 'slug' => 'payout.request', 'group' => 'finance'],
         ['name' => 'View Payout', 'slug' => 'payout.view', 'group' => 'finance'],
         ['name' => 'Approve Payout', 'slug' => 'payout.approve', 'group' => 'finance'],
         ['name' => 'Reject Payout', 'slug' => 'payout.reject', 'group' => 'finance'],
         ['name' => 'Mark Payout Paid', 'slug' => 'payout.mark_paid', 'group' => 'finance'],
         ['name' => 'View Ledger', 'slug' => 'ledger.view', 'group' => 'finance'],
+
+        // Creator management
         ['name' => 'Invite Creator', 'slug' => 'creator.invite', 'group' => 'creator_management'],
         ['name' => 'Remove Creator', 'slug' => 'creator.remove', 'group' => 'creator_management'],
         ['name' => 'Suspend Creator', 'slug' => 'creator.suspend', 'group' => 'creator_management'],
         ['name' => 'Manage Creator Roles', 'slug' => 'creator.manage_roles', 'group' => 'creator_management'],
+
+        // Contributors
         ['name' => 'View Contributor Details', 'slug' => 'contributor.details.view', 'group' => 'contributors'],
         ['name' => 'View Contributor Invitations', 'slug' => 'contributor.invitation.view', 'group' => 'contributors'],
         ['name' => 'Resend Contributor Invitations', 'slug' => 'contributor.invitation.resend', 'group' => 'contributors'],
@@ -64,13 +94,19 @@ return [
         ['name' => 'Manage Contributor Capabilities', 'slug' => 'contributor.capabilities.manage', 'group' => 'contributors'],
         ['name' => 'View Contributor Onboarding', 'slug' => 'contributor.onboarding.view', 'group' => 'contributors'],
         ['name' => 'View Contributor Activity', 'slug' => 'contributor.activity.view', 'group' => 'contributors'],
+
+        // Site administration
         ['name' => 'Manage Site', 'slug' => 'site.manage', 'group' => 'site_administration'],
         ['name' => 'Manage Site Members', 'slug' => 'site.members', 'group' => 'site_administration'],
         ['name' => 'Manage Site Roles', 'slug' => 'site.roles.manage', 'group' => 'site_administration'],
         ['name' => 'Manage Site Permissions', 'slug' => 'site.permissions.manage', 'group' => 'site_administration'],
+
+        // Moderation
         ['name' => 'View Violations', 'slug' => 'violation.view', 'group' => 'moderation'],
         ['name' => 'Record Violations', 'slug' => 'violation.record', 'group' => 'moderation'],
         ['name' => 'Resolve Violations', 'slug' => 'violation.resolve', 'group' => 'moderation'],
+
+        // Subscriptions
         ['name' => 'View Subscriptions', 'slug' => 'subscriptions.view', 'group' => 'subscriptions'],
         ['name' => 'Create Subscriptions', 'slug' => 'subscriptions.create', 'group' => 'subscriptions'],
         ['name' => 'Edit Subscriptions', 'slug' => 'subscriptions.edit', 'group' => 'subscriptions'],
@@ -82,14 +118,20 @@ return [
         ['name' => 'Change Subscription Edition', 'slug' => 'subscriptions.change_edition', 'group' => 'subscriptions'],
         ['name' => 'Manage Subscription Payment Method', 'slug' => 'subscriptions.manage_payment_method', 'group' => 'subscriptions'],
         ['name' => 'View Subscription History', 'slug' => 'subscriptions.view_history', 'group' => 'subscriptions'],
+
+        // Subscription plans
         ['name' => 'View Subscription Plans', 'slug' => 'subscription_plans.view', 'group' => 'subscription_plans'],
         ['name' => 'Create Subscription Plans', 'slug' => 'subscription_plans.create', 'group' => 'subscription_plans'],
         ['name' => 'Edit Subscription Plans', 'slug' => 'subscription_plans.edit', 'group' => 'subscription_plans'],
         ['name' => 'Archive Subscription Plans', 'slug' => 'subscription_plans.archive', 'group' => 'subscription_plans'],
+
+        // Subscription pricing
         ['name' => 'View Subscription Pricing', 'slug' => 'subscription_pricing.view', 'group' => 'subscription_pricing'],
         ['name' => 'Create Subscription Pricing', 'slug' => 'subscription_pricing.create', 'group' => 'subscription_pricing'],
         ['name' => 'Edit Subscription Pricing', 'slug' => 'subscription_pricing.edit', 'group' => 'subscription_pricing'],
         ['name' => 'Delete Subscription Pricing', 'slug' => 'subscription_pricing.delete', 'group' => 'subscription_pricing'],
+
+        // Issues
         ['name' => 'View Issues', 'slug' => 'issues.view', 'group' => 'issues'],
         ['name' => 'Create Issues', 'slug' => 'issues.create', 'group' => 'issues'],
         ['name' => 'Edit Issues', 'slug' => 'issues.edit', 'group' => 'issues'],
@@ -97,12 +139,16 @@ return [
         ['name' => 'Schedule Issues', 'slug' => 'issues.schedule', 'group' => 'issues'],
         ['name' => 'Export Issues', 'slug' => 'issues.export', 'group' => 'issues'],
         ['name' => 'Mark Issues Delivered', 'slug' => 'issues.mark_delivered', 'group' => 'issues'],
+
+        // Vouchers
         ['name' => 'View Vouchers', 'slug' => 'vouchers.view', 'group' => 'vouchers'],
         ['name' => 'Create Vouchers', 'slug' => 'vouchers.create', 'group' => 'vouchers'],
         ['name' => 'Edit Vouchers', 'slug' => 'vouchers.edit', 'group' => 'vouchers'],
         ['name' => 'Archive Vouchers', 'slug' => 'vouchers.archive', 'group' => 'vouchers'],
         ['name' => 'Assign Vouchers', 'slug' => 'vouchers.assign', 'group' => 'vouchers'],
         ['name' => 'Redeem Vouchers', 'slug' => 'vouchers.redeem', 'group' => 'vouchers'],
+
+        // CRM
         ['name' => 'View CRM', 'slug' => 'crm.view', 'group' => 'crm'],
         ['name' => 'View CRM Members', 'slug' => 'crm.members.view', 'group' => 'crm'],
         ['name' => 'Create CRM Members', 'slug' => 'crm.members.create', 'group' => 'crm'],
@@ -147,9 +193,15 @@ return [
                 'content.create',
                 'content.submit',
                 'content.edit_own',
+
                 'pages.create',
                 'pages.submit_for_approval',
                 'pages.edit',
+
+                'briefs.create',
+                'briefs.submit_for_approval',
+                'briefs.edit',
+
                 'payout.request',
                 'contract.sign',
                 'guideline.acknowledge',
@@ -163,16 +215,23 @@ return [
                 'content.review',
                 'content.reject',
                 'content.approve',
+                'content.hold',
+                'content.comment.delete',
+
                 'pages.view',
                 'pages.review',
                 'pages.approve',
                 'pages.reject',
                 'pages.hold',
+                'pages.comment.delete',
+
                 'briefs.view',
                 'briefs.review',
                 'briefs.approve',
                 'briefs.reject',
                 'briefs.hold',
+                'briefs.comment.delete',
+
                 'violation.view',
                 'violation.record',
             ],
@@ -301,7 +360,56 @@ return [
         'legal' => ['site_role' => 'legal', 'permissions' => ['contract.create', 'contract.edit', 'contract.publish', 'contract.archive', 'contract.view', 'guideline.create', 'guideline.edit', 'guideline.publish', 'guideline.archive']],
         'creator' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'onboarding.view']],
         'contributor' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'payout.request', 'contract.sign', 'guideline.acknowledge', 'onboarding.view']],
-        'reviewer' => ['site_role' => 'reviewer', 'permissions' => ['content.review', 'content.reject', 'content.approve', 'pages.view', 'pages.review', 'pages.reject', 'pages.approve', 'pages.hold', 'briefs.view', 'briefs.review', 'briefs.reject', 'briefs.approve', 'briefs.hold']],
-        'editor' => ['site_role' => 'reviewer', 'permissions' => ['content.review', 'content.reject', 'content.approve', 'pages.view', 'pages.review', 'pages.reject', 'pages.approve', 'pages.hold', 'briefs.view', 'briefs.review', 'briefs.reject', 'briefs.approve', 'briefs.hold', 'violation.view', 'violation.record']],
+        'reviewer' => [
+            'site_role' => 'reviewer',
+            'permissions' => [
+                'content.review',
+                'content.reject',
+                'content.approve',
+                'content.hold',
+                'content.comment.delete',
+
+                'pages.view',
+                'pages.review',
+                'pages.reject',
+                'pages.approve',
+                'pages.hold',
+                'pages.comment.delete',
+
+                'briefs.view',
+                'briefs.review',
+                'briefs.reject',
+                'briefs.approve',
+                'briefs.hold',
+                'briefs.comment.delete',
+            ],
+        ],
+        'editor' => [
+            'site_role' => 'reviewer',
+            'permissions' => [
+                'content.review',
+                'content.reject',
+                'content.approve',
+                'content.hold',
+                'content.comment.delete',
+
+                'pages.view',
+                'pages.review',
+                'pages.reject',
+                'pages.approve',
+                'pages.hold',
+                'pages.comment.delete',
+
+                'briefs.view',
+                'briefs.review',
+                'briefs.reject',
+                'briefs.approve',
+                'briefs.hold',
+                'briefs.comment.delete',
+
+                'violation.view',
+                'violation.record',
+            ],
+        ],
     ],
 ];

@@ -145,12 +145,31 @@ $pageClass = '';
             <span class="oc-card__title">Stripe Connect Payouts</span>
         </div>
         <div class="oc-card__body">
-            <div id="stripe-connect-status" class="oc-alert oc-alert--info">Checking Stripe onboarding status…</div>
-            <div id="stripe-connect-requirements" style="margin:10px 0;color:var(--slate);font-size:.85rem;"></div>
-            <button type="button" class="oc-btn oc-btn--primary" id="stripe-connect-btn"
-                    onclick="startStripeOnboarding()">
-                Connect Stripe account
-            </button>
+            <div id="stripe-connect-status"
+                 class="oc-alert oc-alert--info"
+                 style="margin-bottom:12px;">
+                Checking Stripe payout status…
+            </div>
+
+            <div id="stripe-connect-requirements"
+                 style="display:none;margin:10px 0 14px;color:var(--slate);font-size:.85rem;line-height:1.6;">
+            </div>
+
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <button type="button"
+                        class="oc-btn oc-btn--primary"
+                        id="stripe-connect-btn"
+                        onclick="startStripeOnboarding()">
+                    Connect Stripe account
+                </button>
+
+                <button type="button"
+                        class="oc-btn oc-btn--ghost"
+                        id="stripe-connect-refresh-btn"
+                        onclick="refreshStripeConnectStatus()">
+                    Refresh status
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1374,6 +1393,7 @@ $pageClass = '';
 
         init() {
             this.#notif.load();
+            this.#handleStripeConnectReturn();
             this.#loadStripeConnectStatus();
         }
 
@@ -1404,63 +1424,219 @@ $pageClass = '';
 
         async #loadStripeConnectStatus() {
             const token = localStorage.getItem('oc_token') || '';
-            const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/status`, {
-                headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
-            });
-
-            if (!res.ok) {
-                document.getElementById('stripe-connect-status').textContent = 'Unable to load Stripe onboarding status.';
-                return;
-            }
-
-            const status = await res.json();
             const box = document.getElementById('stripe-connect-status');
             const req = document.getElementById('stripe-connect-requirements');
             const btn = document.getElementById('stripe-connect-btn');
 
-            if (!status.connected) {
-                box.textContent = 'Stripe is not connected. Connect your account to receive payouts.';
-                btn.textContent = 'Connect Stripe account';
+            if (!box || !btn) {
                 return;
             }
 
-            if (status.status === 'enabled') {
-                box.textContent = 'Payouts enabled. Your Stripe account is ready.';
-                btn.textContent = 'Refresh onboarding link';
-            } else if (status.status === 'incomplete') {
-                box.textContent = 'Onboarding incomplete. Resume onboarding to finish setup.';
-                btn.textContent = 'Resume onboarding';
-            } else if (status.status === 'restricted') {
-                box.textContent = 'Payouts disabled or restricted. Review required verification steps.';
-                btn.textContent = 'Fix verification';
-            } else {
-                box.textContent = 'Verification is pending. Stripe may require more details.';
-                btn.textContent = 'Refresh onboarding link';
+            box.className = 'oc-alert oc-alert--info';
+            box.textContent = 'Checking Stripe payout status…';
+            btn.disabled = true;
+            btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Checking…';
+
+            try {
+                const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/status`, {
+                    headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
+                });
+
+                const payload = await res.json();
+                const status = payload.data || payload;
+
+                if (!res.ok || payload.success === false) {
+                    box.className = 'oc-alert oc-alert--error';
+                    box.textContent = payload.message || 'Unable to load Stripe onboarding status.';
+                    btn.disabled = false;
+                    btn.textContent = 'Connect Stripe account';
+                    if (req) req.textContent = '';
+                    return;
+                }
+
+                this.#renderStripeConnectStatus(status);
+            } catch {
+                box.className = 'oc-alert oc-alert--error';
+                box.textContent = 'Unable to load Stripe onboarding status.';
+                btn.disabled = false;
+                btn.textContent = 'Connect Stripe account';
+                if (req) req.textContent = '';
+            }
+        }
+
+        #handleStripeConnectReturn() {
+            const params = new URLSearchParams(window.location.search);
+            const stripeConnectState = params.get('stripe_connect');
+
+            if (!stripeConnectState) {
+                return;
             }
 
-            if (Array.isArray(status.verification_required) && status.verification_required.length > 0) {
-                req.textContent = 'Verification required: ' + status.verification_required.join(', ');
-            } else {
-                req.textContent = '';
+            const box = document.getElementById('stripe-connect-status');
+
+            if (stripeConnectState === 'return' && box) {
+                box.className = 'oc-alert oc-alert--info';
+                box.textContent = 'Returned from Stripe. Checking payout status…';
             }
+
+            if (stripeConnectState === 'refresh' && box) {
+                box.className = 'oc-alert oc-alert--warning';
+                box.textContent = 'Stripe onboarding link expired. Please continue setup.';
+            }
+
+            params.delete('stripe_connect');
+
+            const query = params.toString();
+            const cleanUrl = window.location.pathname
+                + (query ? `?${query}` : '')
+                + window.location.hash;
+
+            window.history.replaceState({}, '', cleanUrl);
+        }
+
+        #renderStripeConnectStatus(status) {
+            const box = document.getElementById('stripe-connect-status');
+            const req = document.getElementById('stripe-connect-requirements');
+            const btn = document.getElementById('stripe-connect-btn');
+
+            const requirements = Array.isArray(status.verification_required)
+                ? status.verification_required
+                : [];
+
+            if (!status.connected) {
+                box.className = 'oc-alert oc-alert--info';
+                box.textContent = 'Stripe is not connected. Connect your account to receive payouts.';
+                btn.disabled = false;
+                btn.textContent = 'Connect Stripe account';
+                this.#renderStripeRequirements([]);
+                return;
+            }
+
+            if (status.payouts_enabled || status.status === 'enabled') {
+                box.className = 'oc-alert oc-alert--success';
+                box.textContent = 'Payouts enabled. Your Stripe account is ready.';
+                btn.disabled = false;
+                btn.textContent = 'Update Stripe setup';
+                this.#renderStripeRequirements([]);
+                return;
+            }
+
+            if (status.status === 'incomplete' || requirements.length > 0) {
+                box.className = 'oc-alert oc-alert--warning';
+                box.textContent = 'Stripe account created, but payout setup is incomplete. Continue setup to finish onboarding.';
+                btn.disabled = false;
+                btn.textContent = 'Continue Stripe setup';
+                this.#renderStripeRequirements(requirements);
+                return;
+            }
+
+            if (status.status === 'restricted') {
+                box.className = 'oc-alert oc-alert--warning';
+                box.textContent = 'Payouts are restricted. Review the required Stripe verification steps.';
+                btn.disabled = false;
+                btn.textContent = 'Fix Stripe verification';
+                this.#renderStripeRequirements(requirements);
+                return;
+            }
+
+            box.className = 'oc-alert oc-alert--info';
+            box.textContent = 'Verification is pending. Stripe may require more details.';
+            btn.disabled = false;
+            btn.textContent = 'Refresh onboarding link';
+            this.#renderStripeRequirements(requirements);
+        }
+
+        #renderStripeRequirements(requirements) {
+            const req = document.getElementById('stripe-connect-requirements');
+
+            if (!req) {
+                return;
+            }
+
+            if (!Array.isArray(requirements) || requirements.length === 0) {
+                req.innerHTML = '';
+                req.style.display = 'none';
+                return;
+            }
+
+            const labels = {
+                external_account: 'Add a bank account or payout destination',
+                'tos_acceptance.date': 'Accept Stripe’s terms of service',
+                'tos_acceptance.ip': 'Confirm Stripe terms acceptance',
+            };
+
+            const items = requirements
+                .map((requirement) => labels[requirement] || requirement)
+                .map((label) => `<li>${this.#escapeHtml(label)}</li>`)
+                .join('');
+
+            req.innerHTML = `
+        <div style="font-weight:600;color:var(--navy);margin-bottom:4px;">
+            Stripe still needs:
+        </div>
+        <ul style="margin:0;padding-left:18px;">
+            ${items}
+        </ul>
+    `;
+            req.style.display = 'block';
+        }
+
+        #escapeHtml(value) {
+            const div = document.createElement('div');
+            div.textContent = String(value ?? '');
+            return div.innerHTML;
         }
 
         async startStripeOnboarding() {
             const token = localStorage.getItem('oc_token') || '';
-            const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/onboard`, {
-                method: 'POST',
-                headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
-            });
+            const box = document.getElementById('stripe-connect-status');
+            const btn = document.getElementById('stripe-connect-btn');
 
-            if (!res.ok) {
-                alert('Unable to create Stripe onboarding link right now.');
-                return;
+            if (box) {
+                box.className = 'oc-alert oc-alert--info';
+                box.textContent = 'Preparing Stripe onboarding…';
             }
 
-            const data = await res.json();
-            const url = data.data?.onboarding_url || data.onboarding_url;
-            if (url) {
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<div class="oc-spinner oc-spinner--dark"></div> Preparing…';
+            }
+
+            try {
+                const res = await fetch(`/api/${SITE}/open-collab/stripe-connect/onboard`, {
+                    method: 'POST',
+                    headers: {Authorization: `Bearer ${token}`, Accept: 'application/json'},
+                });
+
+                const payload = await res.json();
+                const data = payload.data || payload;
+                const url = data.onboarding_url;
+
+                if (!res.ok || payload.success === false || !url) {
+                    if (box) {
+                        box.className = 'oc-alert oc-alert--error';
+                        box.textContent = payload.message || 'Unable to create Stripe onboarding link right now.';
+                    }
+
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Continue Stripe setup';
+                    }
+
+                    return;
+                }
+
                 window.location.href = url;
+            } catch {
+                if (box) {
+                    box.className = 'oc-alert oc-alert--error';
+                    box.textContent = 'Unable to create Stripe onboarding link right now.';
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Continue Stripe setup';
+                }
             }
         }
     }

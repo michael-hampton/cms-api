@@ -96,7 +96,7 @@ class PayoutController extends Controller
             'processed_at' => $payout->processed_at,
             'rejected_at' => $payout->rejected_at,
             'rejection_reason' => $payout->rejection_reason,
-            'created_at' => $payout->created_at,
+            'created_at' => $payout->created_at->format('Y-m-d H:i:s'),
         ];
     }
 

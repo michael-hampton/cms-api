@@ -148,8 +148,6 @@ $headerActions = '
     <?php endif; ?>
 </div>
 
-@endsection
-
 <script>
     let DashboardWidgetManager = (() => {
 
@@ -914,3 +912,5 @@ $headerActions = '
         await DashboardWidgetManager.load();
     });
 </script>
+
+@endsection

@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Exceptions\OpenCollab\DuplicatePurchaseException;
 use App\Framework\Authorization\Auth;
+use App\Framework\Authorization\MemberAuth;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
@@ -42,7 +43,7 @@ class ArticlePaymentController extends Controller
             $data = $request->validated();
             $result = $this->paymentService->initiatePayment(
                 page: $page,
-                userId: Auth::id(), // null for unauthenticated guests
+                userId: MemberAuth::id(), // null for unauthenticated guests
                 email: $data['email'],
             );
 

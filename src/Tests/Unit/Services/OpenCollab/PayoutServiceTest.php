@@ -6,9 +6,12 @@ use App\Enums\OpenCollab\PayoutAuditAction;
 use App\Enums\OpenCollab\PayoutStatus;
 use App\Events\OpenCollab\PayoutRequestedEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
+use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
+use App\Framework\Queue\Dispatcher;
+use App\Framework\Queue\PendingDispatch;
 use App\Models\Payout;
 use App\Models\Site;
 use App\Repositories\Cms\SiteRepository;
@@ -17,6 +20,7 @@ use App\Repositories\OpenCollab\ArticlePaymentRepository;
 use App\Repositories\OpenCollab\EarningsLedgerRepository;
 use App\Repositories\OpenCollab\PayoutAuditRepository;
 use App\Repositories\OpenCollab\PayoutRepository;
+use App\Services\OpenCollab\Notifications\PayoutPaidNotification;
 use App\Services\OpenCollab\PayoutService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
@@ -609,16 +613,39 @@ class PayoutServiceTest extends FunctionalTestCase
 
     public function test_approve_transitions_pending_to_approved_and_logs_audit(): void
     {
-        $payout = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Pending->value]);
-        $approved = $this->makePayout(['id' => 5, 'status' => PayoutStatus::Approved->value]);
+        $payout = $this->makePayout([
+            'id' => 5,
+            'status' => PayoutStatus::Pending->value,
+            'method' => 'bank_transfer',
+        ]);
 
-        $this->payoutRepository->shouldReceive('find')->with(5)->andReturn($payout, $approved);
-        $this->payoutRepository->shouldReceive('update')
+        $approved = $this->makePayout([
+            'id' => 5,
+            'status' => PayoutStatus::Approved->value,
+            'method' => 'bank_transfer',
+        ]);
+
+        $this->payoutRepository
+            ->shouldReceive('find')
+            ->with(5)
+            ->andReturn($payout, $approved);
+
+        $this->payoutRepository
+            ->shouldReceive('update')
             ->once()
-            ->withArgs(fn($id, $data) => $data['status'] === PayoutStatus::Approved->value && $data['approved_by'] === 99);
-        $this->payoutAuditRepository->shouldReceive('log')
+            ->withArgs(fn($id, $data) =>
+                $id === 5
+                && $data['status'] === PayoutStatus::Approved->value
+                && $data['approved_by'] === 99
+            );
+
+        $this->payoutAuditRepository
+            ->shouldReceive('log')
             ->once()
-            ->withArgs(fn($pid, $action) => $pid === 5 && $action === PayoutAuditAction::Approved);
+            ->withArgs(fn($pid, $action) =>
+                $pid === 5
+                && $action === PayoutAuditAction::Approved
+            );
 
         $result = $this->service->approve(5, adminId: 99);
 
@@ -650,13 +677,21 @@ class PayoutServiceTest extends FunctionalTestCase
     {
         $payout = $this->makePayout([
             'id' => 5,
+            'user_id' => 7,
             'status' => PayoutStatus::Approved->value,
+            'method' => 'paypal',
         ]);
 
         $paid = $this->makePayout([
             'id' => 5,
+            'user_id' => 7,
             'status' => PayoutStatus::Paid->value,
+            'method' => 'paypal',
         ]);
+
+        $contributor = Mockery::mock(\App\Models\User::class)->makePartial();
+        $contributor->id = 7;
+        $contributor->exists = true;
 
         $this->payoutRepository
             ->shouldReceive('find')
@@ -671,6 +706,8 @@ class PayoutServiceTest extends FunctionalTestCase
                 && $data['status'] === PayoutStatus::Paid->value
                 && $data['paid_by'] === 99
                 && $data['reference'] === 'REF-001'
+                && $data['notes'] === null
+                && isset($data['processed_at'])
             );
 
         $this->payoutAuditRepository
@@ -685,12 +722,13 @@ class PayoutServiceTest extends FunctionalTestCase
                 $payoutId === 5
                 && $action === PayoutAuditAction::Paid
                 && $performedBy === 99
+                && $reason === null
             );
 
         $this->payoutLedgerService
             ->shouldReceive('markPayoutLedgerEntriesWithdrawn')
-            ->with(5)
-            ->once();
+            ->once()
+            ->with(5);
 
         $this->eventDispatcher
             ->shouldReceive('dispatch')
@@ -700,6 +738,17 @@ class PayoutServiceTest extends FunctionalTestCase
                 && $event->adminId === 99
                 && $event->userId === 7
             );
+
+        $this->userRepository
+            ->shouldReceive('find')
+            ->once()
+            ->with(7)
+            ->andReturn($contributor);
+
+        $this->notificationDispatcher
+            ->shouldReceive('dispatch')
+            ->once()
+            ->with(Mockery::type(\App\Services\OpenCollab\Notifications\PayoutPaidNotification::class));
 
         $result = $this->service->markPaid(5, 99, 'REF-001');
 
@@ -861,6 +910,27 @@ class PayoutServiceTest extends FunctionalTestCase
             $this->payoutLedgerService,
             $this->payoutLiabilityRecoveryRepository,
         );
+
+        $pendingDispatch = Mockery::mock(PendingDispatch::class);
+
+        $pendingDispatch
+            ->shouldReceive('onQueue')
+            ->byDefault()
+            ->andReturnSelf();
+
+        $pendingDispatch
+            ->shouldReceive('dispatchNow')
+            ->byDefault()
+            ->andReturnNull();
+
+        $dispatcher = Mockery::mock(Dispatcher::class);
+
+        $dispatcher
+            ->shouldReceive('dispatch')
+            ->byDefault()
+            ->andReturn($pendingDispatch);
+
+        Container::getInstance()->bind(Dispatcher::class, fn () => $dispatcher);
     }
 
     protected function tearDown(): void

@@ -26,7 +26,7 @@ class PayoutLedgerServiceTest extends TestCase
 
         $this->ledgerRepository
             ->shouldReceive('settledAvailableForPayout')
-            ->with(7)
+            ->with(7, null)
             ->once()
             ->andReturn(collect([$first, $second]));
 
@@ -57,7 +57,7 @@ class PayoutLedgerServiceTest extends TestCase
 
         $this->ledgerRepository
             ->shouldReceive('settledAvailableForPayout')
-            ->with(7)
+            ->with(7, null)
             ->once()
             ->andReturn(collect([$entry]));
 
@@ -80,7 +80,7 @@ class PayoutLedgerServiceTest extends TestCase
 
         $this->ledgerRepository
             ->shouldReceive('settledAvailableForPayout')
-            ->with(7)
+            ->with(7, null)
             ->once()
             ->andReturn(collect([$entry]));
 

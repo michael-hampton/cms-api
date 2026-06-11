@@ -195,21 +195,23 @@ class PayoutService
     /**
      * @throws \InvalidArgumentException if payout is not found or not pending
      */
-    public function approve(int $payoutId, int $adminId): \App\Models\Payout
+    public function approve(int $payoutId, int $adminId): Payout
     {
         $payout = $this->payoutRepository->find($payoutId);
 
         if (!$payout) {
+            echo 'not found';
             throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
         }
 
         if (!$payout->isPending()) {
+            echo 'not pending';
             throw new \InvalidArgumentException(
                 "Payout [{$payoutId}] cannot be approved from status [{$payout->status}]."
             );
         }
 
-        $payout = $this->database->transaction(function () use ($payout, $adminId): \App\Models\Payout {
+        $payout = $this->database->transaction(function () use ($payout, $adminId): Payout {
             $this->payoutRepository->update($payout->id, [
                 'status' => PayoutStatus::Approved->value,
                 'approved_by' => $adminId,
@@ -235,8 +237,8 @@ class PayoutService
         }
 
         // Stripe payouts are executed asynchronously after approval.
-        if ($payout->method === 'stripe') {
-            dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts');
+        if (in_array($payout->method, ['stripe', 'bank_transfer'])) {
+            dispatch(ProcessStripePayoutJob::for($payout->id))->onQueue('payouts')->dispatchNow();
         }
 
         return $payout;
@@ -250,7 +252,7 @@ class PayoutService
         int     $adminId,
         ?string $reference = null,
         ?string $notes = null,
-    ): \App\Models\Payout
+    ): Payout
     {
         $payout = $this->payoutRepository->find($payoutId);
 
@@ -264,13 +266,13 @@ class PayoutService
             );
         }
 
-        if ($payout->method === 'stripe') {
+        if (in_array($payout->method, ['stripe', 'bank_transfer'])) {
             throw new \InvalidArgumentException(
                 "Payout [{$payoutId}] is Stripe-backed and must be finalised by Stripe webhooks."
             );
         }
 
-        $payout = $this->database->transaction(function () use ($payout, $adminId, $reference, $notes): \App\Models\Payout {
+        $payout = $this->database->transaction(function () use ($payout, $adminId, $reference, $notes): Payout {
             $this->payoutRepository->update($payout->id, [
                 'status' => PayoutStatus::Paid->value,
                 'paid_by' => $adminId,
@@ -317,7 +319,7 @@ class PayoutService
             throw new \InvalidArgumentException("Payout [{$payoutId}] is already paid and cannot be retried.");
         }
 
-        if ($payout->method !== 'stripe') {
+        if (!in_array($payout->method, ['stripe', 'bank_transfer'])) {
             throw new \InvalidArgumentException("Only Stripe payouts can be retried.");
         }
 
@@ -351,7 +353,7 @@ class PayoutService
     /**
      * @throws \InvalidArgumentException if payout is not found or not pending
      */
-    public function reject(int $payoutId, int $adminId, string $reason): \App\Models\Payout
+    public function reject(int $payoutId, int $adminId, string $reason): Payout
     {
         $payout = $this->payoutRepository->find($payoutId);
 
@@ -365,7 +367,7 @@ class PayoutService
             );
         }
 
-        $payout = $this->database->transaction(function () use ($payout, $adminId, $reason): \App\Models\Payout {
+        $payout = $this->database->transaction(function () use ($payout, $adminId, $reason): Payout {
             $this->payoutRepository->update($payout->id, [
                 'status' => PayoutStatus::Rejected->value,
                 'rejected_by' => $adminId,

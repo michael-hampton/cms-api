@@ -80,11 +80,15 @@ class StripeConnectAccountService
             ];
 
         } catch (ApiErrorException $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
             ];
         } catch (\Exception $e) {
+            echo $e->getMessage();
+            die;
             return [
                 'success' => false,
                 'message' => 'Unable to start Stripe onboarding right now.',
@@ -119,8 +123,26 @@ class StripeConnectAccountService
             ];
         }
 
-        $requirements    = (array)($account->requirements_due_json ?? []);
-        $payoutsEnabled  = (bool)$account->payouts_enabled;
+        try {
+            $stripeAccount = $this->stripe->accounts->retrieve($account->stripe_account_id);
+
+            $requirements = (array)($stripeAccount->requirements?->currently_due ?? []);
+
+            $this->payoutAccountRepository->update($account->id, [
+                'charges_enabled'       => (bool) $stripeAccount->charges_enabled,
+                'payouts_enabled'       => (bool) $stripeAccount->payouts_enabled,
+                'details_submitted'     => (bool) $stripeAccount->details_submitted,
+                'requirements_due_json' => $requirements,
+            ]);
+
+            $account = $this->payoutAccountRepository->find($account->id);
+        } catch (ApiErrorException $e) {
+            // Keep local values if Stripe is temporarily unavailable.
+            // You may want to log this.
+        }
+
+        $requirements     = (array)($account->requirements_due_json ?? []);
+        $payoutsEnabled   = (bool)$account->payouts_enabled;
         $detailsSubmitted = (bool)$account->details_submitted;
 
         $status = StripeConnectAccountStatus::fromAccountFields(
@@ -131,10 +153,10 @@ class StripeConnectAccountService
         );
 
         return [
-            'connected'            => true,
-            'status'               => $status->value,
-            'stripe_account_id'    => $account->stripe_account_id,
-            'payouts_enabled'      => $payoutsEnabled,
+            'connected'             => true,
+            'status'                => $status->value,
+            'stripe_account_id'     => $account->stripe_account_id,
+            'payouts_enabled'       => $payoutsEnabled,
             'verification_required' => $requirements,
         ];
     }

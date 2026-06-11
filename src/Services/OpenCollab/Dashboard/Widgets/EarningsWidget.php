@@ -5,6 +5,7 @@ namespace App\Services\OpenCollab\Dashboard\Widgets;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
+use App\Repositories\OpenCollab\ContributorPayoutAccountRepository;
 use App\Services\OpenCollab\CreatorBalanceService;
 use App\Services\OpenCollab\Dashboard\Contracts\DashboardWidgetInterface;
 use App\Services\OpenCollab\EarningsService;
@@ -12,10 +13,13 @@ use App\Services\OpenCollab\EarningsService;
 final class EarningsWidget implements DashboardWidgetInterface
 {
     public function __construct(
-        private readonly EarningsService          $earningsService,
-        private readonly CreatorBalanceService   $creatorBalanceService,
-        private readonly ArticlePaymentRepository $paymentRepository,
-    ) {}
+        private readonly EarningsService                    $earningsService,
+        private readonly CreatorBalanceService              $creatorBalanceService,
+        private readonly ArticlePaymentRepository           $paymentRepository,
+        private readonly ContributorPayoutAccountRepository $payoutAccountRepository,
+    )
+    {
+    }
 
     public function key(): string
     {
@@ -37,9 +41,26 @@ final class EarningsWidget implements DashboardWidgetInterface
         $siteId = SiteContext::getId();
 
         $balances = $this->creatorBalanceService->balances(
-            userId: (int) $user->id,
+            userId: (int)$user->id,
             siteId: $siteId,
         );
+
+        $payoutAccount = $this->payoutAccountRepository->findByUserId((int)$user->id, 'stripe');
+
+        $paymentDetails = null;
+
+        if ($payoutAccount) {
+            $paymentDetails = [
+                'provider' => 'stripe',
+                'method' => 'bank_account',
+                'connected' => !empty($payoutAccount->stripe_account_id),
+                'status' => $payoutAccount->payouts_enabled ? 'enabled' : 'incomplete',
+                'payouts_enabled' => (bool)$payoutAccount->payouts_enabled,
+                'verification_required' => (array)($payoutAccount->requirements_due_json ?? []),
+            ];
+        }
+
+        dd($this->earningsService->earningsBreakdownForContributor($user->id));
 
         return [
             'total' => $this->earningsService->totalEarningsForContributor($user->id),
@@ -60,7 +81,7 @@ final class EarningsWidget implements DashboardWidgetInterface
 
             'breakdown' => $this->earningsService->earningsBreakdownForContributor($user->id),
             'transactions' => $this->paymentRepository->transactionsForContributor($user->id),
-            'payment_details' => null,
+            'payment_details' => $paymentDetails,
         ];
     }
 }

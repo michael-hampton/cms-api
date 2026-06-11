@@ -27,8 +27,8 @@ class StripeConnectController extends Controller
         $userId = Auth::id();
         $siteSlug = SiteContext::slug();
 
-        $returnUrl = url("/{$siteSlug}/contributor/settings?stripe_connect=return");
-        $refreshUrl = url("/{$siteSlug}/contributor/settings?stripe_connect=refresh");
+        $returnUrl = url("/{$siteSlug}/open-collab/settings?stripe_connect=return");
+        $refreshUrl = url("/{$siteSlug}/open-collab/settings?stripe_connect=refresh");
 
         $result = $this->stripeConnectAccountService->createOrRefreshOnboarding(
             userId: $userId,

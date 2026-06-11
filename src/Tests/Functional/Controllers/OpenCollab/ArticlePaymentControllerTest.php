@@ -118,6 +118,38 @@ class ArticlePaymentControllerTest extends FunctionalTestCase
         ]);
     }
 
+    public function test_initiate_payment_does_not_pass_internal_user_id_for_public_purchase(): void
+    {
+        $page = $this->createPage([
+            'is_paid' => true,
+            'price' => 500,
+            'contributor_id' => $this->contributor->id,
+            'status' => 'published',
+        ]);
+
+        $mock = Mockery::mock(ArticlePaymentService::class)->makePartial();
+
+        $mock->shouldReceive('initiatePayment')
+            ->once()
+            ->withArgs(function ($pageArg, $userIdArg, $emailArg) use ($page) {
+                return (int) $pageArg->id === (int) $page->id
+                    && $userIdArg === null
+                    && $emailArg === 'buyer@example.com';
+            })
+            ->andReturn([
+                'client_secret' => 'test_secret_xyz',
+                'payment' => (object)['id' => 1],
+            ]);
+
+        Container::getInstance()->bind(ArticlePaymentService::class, fn () => $mock);
+
+        $response = $this->postForSite("/api/open-collab/pages/{$page->id}/purchase", [
+            'email' => 'buyer@example.com',
+        ]);
+
+        $this->assertEquals(201, $response->getStatusCode());
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

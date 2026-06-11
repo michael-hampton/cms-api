@@ -281,6 +281,7 @@ use App\Services\Vouchers\Providers\VoucherDiscountProvider;
 use DateTimeInterface;
 use Error;
 use Exception;
+use RuntimeException;
 use Stripe\StripeClient;
 use Throwable;
 
@@ -570,6 +571,16 @@ class ApiApplication
                 )
             )
         );
+
+        $this->container->singleton(StripeClient::class, function () {
+            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? null;
+
+            if (!$secretKey) {
+                throw new RuntimeException('STRIPE_SECRET_KEY is not configured.');
+            }
+
+            return new StripeClient($secretKey);
+        });
 
         // Bind the channel map for DeliverIssueDeliveryJob.
         // Keys are SubscriptionType enum values.

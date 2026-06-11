@@ -119,7 +119,10 @@ class ProcessStripePayoutJobTest extends FunctionalTestCase
                         && $payload['metadata']['site_id'] === (string) $payout->site_id;
                 }),
                 m::on(function (array $options) use ($payout): bool {
-                    return $options['idempotency_key'] === 'payout:' . $payout->id;
+                    return $options['idempotency_key'] === sprintf(
+                            'stripe-transfer:payout:%d:attempt:1',
+                            (int) $payout->id
+                        );
                 }),
             )
             ->andReturn($transferObj);
@@ -142,7 +145,7 @@ class ProcessStripePayoutJobTest extends FunctionalTestCase
         $this->assertIsArray($fresh->provider_response_json);
     }
 
-    public function test_job_uses_existing_payout_idempotency_key_when_present(): void
+    public function test_job_uses_transfer_attempt_idempotency_key_even_when_payout_key_exists(): void
     {
         $user = $this->createUser();
         $userId = $user->id;
@@ -186,8 +189,11 @@ class ProcessStripePayoutJobTest extends FunctionalTestCase
                         && $payload['currency'] === 'gbp'
                         && $payload['metadata']['payout_id'] === (string) $payout->id;
                 }),
-                m::on(function (array $options): bool {
-                    return $options['idempotency_key'] === 'custom-payout-key-123';
+                m::on(function (array $options) use ($payout): bool {
+                    return $options['idempotency_key'] === sprintf(
+                            'stripe-transfer:payout:%d:attempt:1',
+                            (int) $payout->id
+                        );
                 }),
             )
             ->andReturn($transferObj);

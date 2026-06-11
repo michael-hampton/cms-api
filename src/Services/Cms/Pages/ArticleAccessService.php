@@ -3,10 +3,12 @@
 namespace App\Services\Cms\Pages;
 
 use App\Framework\Support\SiteContext;
+use App\Models\ArticleAccess;
 use App\Models\EditorialOverride;
 use App\Models\Member;
 use App\Models\Page;
 use App\Models\SubscriptionWindow;
+use App\Repositories\OpenCollab\ArticleAccessRepository;
 use DateTimeImmutable;
 use DateTimeZone;
 
@@ -14,8 +16,9 @@ class ArticleAccessService
 {
     private DateTimeZone $utcTimezone;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly ArticleAccessRepository $articleAccessRepository,
+    ) {
         $this->utcTimezone = new DateTimeZone('UTC');
     }
 
@@ -190,6 +193,13 @@ class ArticleAccessService
     {
         $siteId = $siteId ?? SiteContext::getId();
 
+        if ($member && $this->hasOneOffPurchaseAccess($page, $member)) {
+            return [
+                'can_view' => true,
+                'reason' => 'one_off_page_purchase',
+            ];
+        }
+
         if (!$member) {
             return ['can_view' => false, 'reason' => 'subscription_required'];
         }
@@ -211,7 +221,6 @@ class ArticleAccessService
             return ['can_view' => true, 'reason' => $accessResult['reason']];
         }
 
-        // Determine specific denial reason
         return [
             'can_view' => false,
             'reason' => $accessResult['denial_reason']
@@ -390,5 +399,28 @@ class ArticleAccessService
             'denial_reason' => 'published_after_subscription',
             'access_reason' => null
         ];
+    }
+
+    private function hasOneOffPurchaseAccess(Page $page, Member $member): bool
+    {
+        $userId = $member->user_id ?? null;
+
+        if ($userId !== null && $this->articleAccessRepository->hasAccessByUserId(
+                (int) $page->id,
+                (int) $userId
+            )) {
+            return true;
+        }
+
+        $email = trim((string) ($member->email ?? ''));
+
+        if ($email !== '' && $this->articleAccessRepository->hasAccessByEmail(
+                (int) $page->id,
+                $email
+            )) {
+            return true;
+        }
+
+        return false;
     }
 }
