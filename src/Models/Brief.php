@@ -83,6 +83,31 @@ class Brief extends Model
         return $this->status === 'archived';
     }
 
+    /**
+     * Validate that a status transition is permitted.
+     *
+     * Allowed graph:
+     *   draft        → in_review, ready, on_hold, archived
+     *   in_review    → draft (rejection), ready (approval), on_hold, archived
+     *   ready        → draft, in_review, on_hold, archived, converted
+     *   on_hold      → draft, in_review, ready, archived
+     *   converted    → (terminal — no transitions allowed once converted)
+     *   archived     → draft (un-archive only)
+     */
+    public function canTransitionTo(string $targetStatus): bool
+    {
+        $allowedTransitions = [
+            'draft'     => ['in_review', 'ready', 'on_hold', 'archived'],
+            'in_review' => ['draft', 'ready', 'on_hold', 'archived'],
+            'ready'     => ['draft', 'in_review', 'on_hold', 'archived', 'converted'],
+            'on_hold'   => ['draft', 'in_review', 'ready', 'archived'],
+            'converted' => [],
+            'archived'  => ['draft'],
+        ];
+
+        return in_array($targetStatus, $allowedTransitions[$this->status] ?? [], true);
+    }
+
     public function template()
     {
         return $this->belongsTo(BriefTemplate::class, 'template_id');

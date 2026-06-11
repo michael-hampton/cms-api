@@ -94,9 +94,22 @@ class PageController extends Controller
     {
         try {
             $requestData = $request->all();
+            $userId = Auth::id();
 
             // Determine if this is an update or create based on presence of ID
             if (!empty($requestData['id'])) {
+                $existingPage = $this->pageRepository->find((int) $requestData['id']);
+
+                if ($existingPage) {
+                    $ownerId = $existingPage->owner_id ?? $existingPage->created_by ?? null;
+                    $this->workflowAuthorization->assertCanEdit(
+                        (int) $userId,
+                        SiteContext::getId(),
+                        $ownerId !== null ? (int) $ownerId : null,
+                        'pages',
+                    );
+                }
+
                 $page = $this->pageService->updatePageWithAllData($requestData['id'], $requestData, $request->get('site_id'));
                 $statusCode = 200;
             } else {
@@ -106,6 +119,8 @@ class PageController extends Controller
 
             return $this->jsonResponse(['page' => $page->toArray()], $statusCode);
 
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (ValidationException $e) {
             return $this->errorResponse(
                 'Validation failed',
@@ -142,6 +157,7 @@ class PageController extends Controller
         try {
             $requestData = $request->all();
             $siteId = SiteContext::getId();
+            $userId = Auth::id();
 
             //check if page exists before trying to update it
             $page = $this->pageRepository->find($id);
@@ -151,10 +167,20 @@ class PageController extends Controller
                 return $this->jsonResponse(['page' => $page->toArray()]);
             }
 
+            $ownerId = $page->owner_id ?? $page->created_by ?? null;
+            $this->workflowAuthorization->assertCanEdit(
+                (int) $userId,
+                $siteId,
+                $ownerId !== null ? (int) $ownerId : null,
+                'pages',
+            );
+
             $page = $this->pageService->updatePageWithAllData($id, $requestData, $request->get('site_id'), $page);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
 
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (ValidationException $e) {
             return $this->errorResponse(
                 'Validation failed',
@@ -169,6 +195,26 @@ class PageController extends Controller
     public function destroy(int $id, string $site): JsonResponse
     {
         try {
+            $userId = Auth::id();
+
+            if (!$userId) {
+                return $this->errorResponse('Unauthenticated.', 401);
+            }
+
+            $page = $this->pageRepository->find($id);
+
+            if (!$page) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            $ownerId = $page->owner_id ?? $page->created_by ?? null;
+            $this->workflowAuthorization->assertCanDelete(
+                (int) $userId,
+                SiteContext::getId(),
+                $ownerId !== null ? (int) $ownerId : null,
+                'pages',
+            );
+
             $result = $this->pageService->deletePage($id);
 
             if (!$result) {
@@ -176,6 +222,8 @@ class PageController extends Controller
             }
 
             return $this->successResponse('Page deleted successfully');
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -439,6 +487,14 @@ class PageController extends Controller
                 return $this->errorResponse('Status is required', 422);
             }
 
+            $userId = (int) ($request->get('user_id') ?? Auth::id());
+
+            if (!$userId) {
+                return $this->errorResponse('User ID required', 422);
+            }
+
+            $this->authorizePageStatusChange($status, $userId);
+
             $handler = Container::getInstance()->make(BulkUpdatePageStatus::class);
 
             $results = $handler->handle($ids, $status);
@@ -447,6 +503,8 @@ class PageController extends Controller
                 'message' => 'Pages updated successfully',
                 'updated' => $results
             ]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -526,9 +584,25 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
+            $page = $this->pageRepository->find($id);
+
+            if (!$page) {
+                return $this->errorResponse('Page not found', 404);
+            }
+
+            $ownerId = $page->owner_id ?? $page->created_by ?? null;
+            $this->workflowAuthorization->assertCanMakePrivate(
+                (int) $userId,
+                SiteContext::getId(),
+                $ownerId !== null ? (int) $ownerId : null,
+                'pages',
+            );
+
             $page = $this->pageService->makePagePrivate($id, $userId);
 
             return $this->jsonResponse(['page' => $page->toArray()]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 400);
         }
@@ -548,6 +622,8 @@ class PageController extends Controller
                 return $this->errorResponse('User ID required', 422);
             }
 
+            $this->workflowAuthorization->assertCanApprove((int) $userId, SiteContext::getId(), 'pages');
+
             $handler = Container::getInstance()->make(BulkApprovePages::class);
 
             $results = $handler->handle($ids, $userId);
@@ -556,6 +632,8 @@ class PageController extends Controller
                 'message' => 'Pages processed for approval',
                 'results' => $results
             ]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -1100,6 +1178,23 @@ class PageController extends Controller
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Enforce permission rules for page status changes driven by bulk or individual update endpoints.
+     * Mirrors the brief-side authorizeBriefStatusChange pattern.
+     */
+    private function authorizePageStatusChange(string $newStatus, int $userId): void
+    {
+        $siteId = SiteContext::getId();
+
+        match ($newStatus) {
+            'waiting_approval' => $this->workflowAuthorization->assertCanRequestApproval($userId, $siteId, 'pages'),
+            'published'        => $this->workflowAuthorization->assertCanApprove($userId, $siteId, 'pages'),
+            'on_hold'          => $this->workflowAuthorization->assertCanHold($userId, $siteId, 'pages'),
+            'draft'            => null, // no permission required beyond owning the content
+            default            => null,
+        };
     }
 
 }

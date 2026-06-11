@@ -573,7 +573,7 @@ class PageGridBlockParser extends BaseBlockParser
         // Check if page is private
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
 
-        $accessService = new ArticleAccessService();
+        $accessService = app(ArticleAccessService::class);
 
         // Get actual Page model
         $pageModel = $this->pageRepository->findBySlug($page['slug'], $siteId);

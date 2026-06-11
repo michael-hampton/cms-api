@@ -60,8 +60,6 @@ final class EarningsWidget implements DashboardWidgetInterface
             ];
         }
 
-        dd($this->earningsService->earningsBreakdownForContributor($user->id));
-
         return [
             'total' => $this->earningsService->totalEarningsForContributor($user->id),
 

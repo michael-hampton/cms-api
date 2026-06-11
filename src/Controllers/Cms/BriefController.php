@@ -4,12 +4,14 @@ namespace App\Controllers\Cms;
 
 use App\Controllers\Controller;
 use App\DTO\Briefs\DuplicateBriefOptions;
+use App\Framework\Authorization\Auth;
 use App\Framework\Exceptions\UnauthorizedException;
 use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
+use App\Models\BriefComment;
 use App\Repositories\Cms\Briefs\BriefTaskRepository;
 use App\Requests\Briefs\AddBriefAttachmentRequest;
 use App\Requests\Briefs\AddBriefCollaboratorRequest;
@@ -90,13 +92,28 @@ class BriefController extends Controller
     {
         try {
             $data = $request->all();
-            $userId = $request->get('user_id', $data['owner_id'] ?? null);
+            $userId = (int) ($request->get('user_id', $data['owner_id'] ?? null) ?: Auth::id());
+
+            $brief = $this->briefService->getCompleteBrief($id);
+
+            if (!$brief) {
+                return $this->errorResponse('Brief not found', 404);
+            }
+
+            $this->workflowAuthorization->assertCanEdit(
+                $userId,
+                SiteContext::getId(),
+                $brief->owner_id !== null ? (int) $brief->owner_id : null,
+                'briefs',
+            );
 
             $brief = $this->briefService->updateBrief($id, $data, $userId);
 
             return $this->resourceResponse([
                 'data' => BriefResource::make($brief)->toArray(),
             ]);
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -105,6 +122,25 @@ class BriefController extends Controller
     public function destroy(int $id, string $site): JsonResponse
     {
         try {
+            $userId = Auth::id();
+
+            if (!$userId) {
+                return $this->errorResponse('Unauthenticated.', 401);
+            }
+
+            $brief = $this->briefService->getCompleteBrief($id);
+
+            if (!$brief) {
+                return $this->errorResponse('Brief not found', 404);
+            }
+
+            $this->workflowAuthorization->assertCanDelete(
+                (int) $userId,
+                SiteContext::getId(),
+                $brief->owner_id !== null ? (int) $brief->owner_id : null,
+                'briefs',
+            );
+
             $result = $this->briefService->deleteBrief($id);
 
             if (!$result) {
@@ -112,6 +148,8 @@ class BriefController extends Controller
             }
 
             return $this->successResponse('Brief deleted successfully');
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -192,6 +230,26 @@ class BriefController extends Controller
     public function deleteComment(int $id, int $commentId, string $site): JsonResponse
     {
         try {
+            $userId = Auth::id();
+
+            if (!$userId) {
+                return $this->errorResponse('Unauthenticated.', 401);
+            }
+
+            // BriefService::findComment(briefId, commentId) must return the comment model or null.
+            $comment = BriefComment::find($commentId);
+
+            if (!$comment) {
+                return $this->errorResponse('Comment not found', 404);
+            }
+
+            $this->workflowAuthorization->assertCanDeleteComment(
+                (int) $userId,
+                SiteContext::getId(),
+                $comment->user_id !== null ? (int) $comment->user_id : null,
+                'briefs',
+            );
+
             $result = $this->briefService->deleteComment($id, $commentId);
 
             if (!$result) {
@@ -199,6 +257,8 @@ class BriefController extends Controller
             }
 
             return $this->successResponse('Comment deleted successfully');
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }
@@ -283,6 +343,19 @@ class BriefController extends Controller
 
             $this->authorizeBriefStatusChange($id, $status, $userId);
 
+            $brief = $this->briefService->getCompleteBrief($id);
+
+            if (!$brief) {
+                return $this->errorResponse('Brief not found', 404);
+            }
+
+            if (!$brief->canTransitionTo($status)) {
+                return $this->errorResponse(
+                    "Cannot change brief status from {$brief->status} to {$status}",
+                    422,
+                );
+            }
+
             $brief = $this->briefService->updateStatus($id, $request->get('status'), $request->get('user_id'));
 
             return $this->resourceResponse([
@@ -316,6 +389,19 @@ class BriefController extends Controller
 
             foreach ($briefIds as $briefId) {
                 $this->authorizeBriefStatusChange((int) $briefId, $status, $userId);
+
+                $brief = $this->briefService->getCompleteBrief((int) $briefId);
+
+                if (!$brief) {
+                    throw new Exception("Brief not found: {$briefId}");
+                }
+
+                if (!$brief->canTransitionTo($status)) {
+                    return $this->errorResponse(
+                        "Cannot change brief {$briefId} status from {$brief->status} to {$status}",
+                        422,
+                    );
+                }
             }
 
             $count = $this->briefService->bulkUpdateStatus($briefIds, $status);
@@ -393,9 +479,33 @@ class BriefController extends Controller
                 return $this->errorResponse('No briefs selected', 400);
             }
 
+            $userId = (int) ($request->get('user_id') ?? Auth::id());
+
+            if (!$userId) {
+                return $this->errorResponse('User ID is required', 400);
+            }
+
+            // Each brief is checked individually: the acting user must be owner OR have delete permission.
+            foreach ($briefIds as $briefId) {
+                $brief = $this->briefService->getCompleteBrief((int) $briefId);
+
+                if (!$brief) {
+                    throw new Exception("Brief not found: {$briefId}");
+                }
+
+                $this->workflowAuthorization->assertCanDelete(
+                    $userId,
+                    SiteContext::getId(),
+                    $brief->owner_id !== null ? (int) $brief->owner_id : null,
+                    'briefs',
+                );
+            }
+
             $this->briefService->bulkDelete($briefIds);
 
             return $this->successResponse('Deleted ' . count($briefIds) . ' briefs');
+        } catch (UnauthorizedException $e) {
+            return $this->errorResponse($e->getMessage(), 403);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

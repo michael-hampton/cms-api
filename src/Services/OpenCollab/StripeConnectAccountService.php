@@ -80,15 +80,11 @@ class StripeConnectAccountService
             ];
 
         } catch (ApiErrorException $e) {
-            echo $e->getMessage();
-            die;
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
             ];
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            die;
             return [
                 'success' => false,
                 'message' => 'Unable to start Stripe onboarding right now.',

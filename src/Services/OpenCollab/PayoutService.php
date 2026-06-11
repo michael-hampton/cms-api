@@ -200,12 +200,10 @@ class PayoutService
         $payout = $this->payoutRepository->find($payoutId);
 
         if (!$payout) {
-            echo 'not found';
             throw new \InvalidArgumentException("Payout [{$payoutId}] not found.");
         }
 
         if (!$payout->isPending()) {
-            echo 'not pending';
             throw new \InvalidArgumentException(
                 "Payout [{$payoutId}] cannot be approved from status [{$payout->status}]."
             );
