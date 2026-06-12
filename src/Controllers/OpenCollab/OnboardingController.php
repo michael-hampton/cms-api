@@ -14,6 +14,7 @@ use App\Models\Site;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContributorProfileRepository;
+use App\Repositories\OpenCollab\GuidelinesContentRepository;
 use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Requests\OpenCollab\AcknowledgeGuidelinesRequest;
 use App\Requests\OpenCollab\SignContractRequest;
@@ -25,6 +26,7 @@ use App\Services\OpenCollab\ContributorPaymentMethodService;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\ContributorProfileService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\ViewModels\OpenCollab\OnboardingLegalDocumentViewModelFactory;
 use RuntimeException;
 
 /**
@@ -54,10 +56,12 @@ class OnboardingController extends Controller
         private readonly ContributorProfileRepository         $profileRepository,
         private readonly ContractRepository                   $contractRepository,
         private readonly GuidelinesRepository                 $guidelinesRepository,
+        private readonly GuidelinesContentRepository          $guidelinesContentRepository,
         private readonly OpenCollabAuthorizationService       $authorization,
         private readonly ContributorPaymentMethodService      $paymentMethodService,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
         private readonly ContributorProfileService            $profileService,
+        private readonly OnboardingLegalDocumentViewModelFactory $legalDocumentFactory,
     )
     {
         parent::__construct();
@@ -346,6 +350,7 @@ class OnboardingController extends Controller
             'id' => $contract->id,
             'version' => $contract->version,
             'content' => $contract->content,
+            'display' => $this->legalDocumentFactory->forContract($contract),
         ]);
     }
 
@@ -386,6 +391,8 @@ class OnboardingController extends Controller
                 $userId,
                 $contract->id,
                 $this->clientIp($request),
+                (int)$contract->version,
+                $request->userAgent(),
             );
 
             $this->onboardingService->completeStep($userId, $site, 'contract');
@@ -448,7 +455,16 @@ class OnboardingController extends Controller
             $data = $request->validated();
             $userId = Auth::id();
             $site = $this->currentSite();
-            $currentVersion = (int)($site->guidelines_version ?? 1);
+            $currentGuideline = $this->guidelinesContentRepository->latestPublishedForSite($site->id);
+            $currentVersion = (int)($currentGuideline?->version ?? $site->guidelines_version ?? 1);
+            $submittedGuidelineId = (int)($data['guideline_id'] ?? 0);
+
+            if ($currentGuideline && $submittedGuidelineId > 0 && $submittedGuidelineId !== (int)$currentGuideline->id) {
+                return $this->errorResponse(
+                    'Guidelines version mismatch. Please reload and try again.',
+                    409
+                );
+            }
 
             if ((int)$data['version'] < $currentVersion) {
                 return $this->errorResponse(
@@ -457,12 +473,22 @@ class OnboardingController extends Controller
                 );
             }
 
-            if ($this->guidelinesRepository->hasAcknowledged($userId, $site->id, $currentVersion)) {
+            if (
+                ($currentGuideline && $this->guidelinesRepository->hasAcknowledgedGuideline($userId, (int)$currentGuideline->id))
+                || $this->guidelinesRepository->hasAcknowledged($userId, $site->id, $currentVersion)
+            ) {
                 $this->onboardingService->completeStep($userId, $site, 'guidelines');
                 return $this->successResponse('Guidelines already acknowledged.');
             }
 
-            $this->guidelinesRepository->record($userId, $site->id, $currentVersion);
+            $this->guidelinesRepository->record(
+                $userId,
+                $site->id,
+                $currentVersion,
+                $currentGuideline?->id,
+                $this->clientIp($request),
+                $request->userAgent(),
+            );
 
             $this->onboardingService->completeStep($userId, $site, 'guidelines');
 

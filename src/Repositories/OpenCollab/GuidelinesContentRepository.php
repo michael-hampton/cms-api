@@ -48,15 +48,23 @@ class GuidelinesContentRepository extends Repository
 
     // ── Lifecycle Writes ──────────────────────────────────────────────────────
 
-    public function createVersion(int $siteId, string $content): Model
+    public function createVersion(int $siteId, string $content, array $metadata = []): Model
     {
         $latest = $this->latestForSite($siteId);
         $nextVersion = $latest ? $latest->version + 1 : 1;
 
         return $this->create([
             'site_id' => $siteId,
+            'title' => $metadata['title'] ?? null,
             'version' => $nextVersion,
             'content' => $content,
+            'source_type' => $metadata['source_type'] ?? 'manual',
+            'content_format' => $metadata['content_format'] ?? 'html',
+            'template_id' => $metadata['template_id'] ?? null,
+            'document_id' => $metadata['document_id'] ?? null,
+            'source_document_id' => $metadata['source_document_id'] ?? null,
+            'extraction_status' => $metadata['extraction_status'] ?? 'not_required',
+            'extraction_error' => $metadata['extraction_error'] ?? null,
             'status' => GuidelineStatus::Draft->value,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -68,6 +76,7 @@ class GuidelinesContentRepository extends Repository
             'status' => GuidelineStatus::Published->value,
             'published_at' => date('Y-m-d H:i:s'),
             'published_by' => $publishedByUserId,
+            'published_by_user_id' => $publishedByUserId,
         ]);
 
         return $guideline->fresh();

@@ -9,6 +9,7 @@ class AcknowledgeGuidelinesRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'guideline_id' => ['nullable', 'integer', 'min:1'],
             'version' => ['required', 'integer', 'min:1'],
             'agreed' => ['required', 'boolean', 'accepted'],
         ];

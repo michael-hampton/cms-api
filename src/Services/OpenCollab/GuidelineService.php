@@ -11,6 +11,7 @@ use App\Exceptions\OpenCollab\GuidelineNotArchivableException;
 use App\Exceptions\OpenCollab\GuidelineNotEditableException;
 use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
 use App\Framework\Database\Database;
+use App\Framework\Http\UploadedFile;
 use App\Models\Guideline;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\OpenCollab\GuidelinesContentRepository;
@@ -41,10 +42,21 @@ class GuidelineService
 
     // ── Draft Creation ────────────────────────────────────────────────────────
 
-    public function createDraft(int $siteId, string $content, int $createdByUserId): Guideline
+    public function createDraft(
+        int $siteId,
+        string $content,
+        int $createdByUserId,
+        array $metadata = [],
+    ): Guideline
     {
-        return $this->database->transaction(function () use ($siteId, $content, $createdByUserId): Guideline {
-            $guideline = $this->guidelinesRepository->createVersion($siteId, $content);
+        return $this->database->transaction(function () use ($siteId, $content, $createdByUserId, $metadata): Guideline {
+            $guideline = empty($metadata)
+                ? $this->guidelinesRepository->createVersion($siteId, $content)
+                : $this->guidelinesRepository->createVersion($siteId, $content, $metadata + [
+                    'source_type' => 'manual',
+                    'content_format' => 'html',
+                    'extraction_status' => 'not_required',
+                ]);
 
             event(new GuidelineDraftCreatedEvent(
                 guideline: $guideline,
@@ -146,8 +158,16 @@ class GuidelineService
 
             $draft = $this->guidelinesRepository->create([
                 'site_id' => $source->site_id,
+                'title' => $source->title,
                 'version' => $version,
                 'content' => $source->content,
+                'source_type' => $source->source_type,
+                'content_format' => $source->content_format ?: 'html',
+                'template_id' => $source->template_id,
+                'document_id' => $source->document_id,
+                'source_document_id' => $source->source_document_id,
+                'extraction_status' => $source->extraction_status,
+                'extraction_error' => $source->extraction_error,
                 'status' => GuidelineStatus::Draft->value,
                 'cloned_from_version_id' => $source->id,
                 'created_at' => date('Y-m-d H:i:s'),
@@ -161,6 +181,44 @@ class GuidelineService
             ));
 
             return $draft;
+        });
+    }
+
+    public function createDraftFromDocument(
+        UploadedFile $file,
+        int $siteId,
+        int $createdByUserId,
+        ?string $title = null,
+    ): Guideline {
+        return $this->database->transaction(function () use ($file, $siteId, $createdByUserId, $title): Guideline {
+            $documentService = app(OpenCollabDocumentService::class);
+            $document = $documentService->store(
+                file: $file,
+                siteId: $siteId,
+                category: 'published_guideline_document',
+                uploadedByUserId: $createdByUserId,
+                documentableType: 'guideline',
+            );
+            $extraction = $document->metadata_json['extraction'] ?? [];
+
+            $guideline = $this->createDraft(
+                siteId: $siteId,
+                content: $extraction['content'] ?? '',
+                createdByUserId: $createdByUserId,
+                metadata: [
+                    'title' => $title,
+                    'source_type' => 'document_upload',
+                    'content_format' => $extraction['format'] ?? 'document',
+                    'document_id' => $document->id,
+                    'source_document_id' => $document->id,
+                    'extraction_status' => $extraction['status'] ?? 'failed',
+                    'extraction_error' => $extraction['error'] ?? null,
+                ],
+            );
+
+            $documentService->attach($document, 'guideline', $guideline->id);
+
+            return $guideline->fresh() ?? $guideline;
         });
     }
 

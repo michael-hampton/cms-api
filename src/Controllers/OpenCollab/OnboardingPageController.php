@@ -14,6 +14,7 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\ViewModels\OpenCollab\OnboardingLegalDocumentViewModelFactory;
 use App\ViewModels\OpenCollab\OnboardingPageViewModel;
 use App\ViewModels\OpenCollab\ProfileStepViewModel;
 
@@ -29,6 +30,7 @@ class OnboardingPageController extends Controller
         private readonly OpenCollabAuthorizationService       $authorization,
         private readonly ContributorProfileRepository         $contributorProfileRepository,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
+        private readonly OnboardingLegalDocumentViewModelFactory $legalDocumentFactory,
     )
     {
         parent::__construct();
@@ -68,6 +70,10 @@ class OnboardingPageController extends Controller
             site: $site,
             profileStep: $profileStep,
         );
+        $contract = $viewModel->currentStepName() === 'contract'
+            ? $this->contractRepository->latestForSite($site->id)
+            : null;
+
         $publishedGuidelines = $viewModel->currentStepName() === 'guidelines'
             ? $this->guidelinesContentRepository->latestPublishedForSite($site->id)
             : null;
@@ -75,11 +81,11 @@ class OnboardingPageController extends Controller
         return $this->view('open-collab.onboarding.index', [
             'vm' => $viewModel,
 
-            'contract' => $viewModel->currentStepName() === 'contract'
-                ? $this->contractRepository->latestForSite($site->id)
-                : null,
+            'contract' => $contract,
+            'contractDisplay' => $this->legalDocumentFactory->forContract($contract),
 
             'siteGuidelines' => $publishedGuidelines,
+            'guidelinesDisplay' => $this->legalDocumentFactory->forGuideline($publishedGuidelines),
 
             'siteGuidelinesVersion' => $publishedGuidelines?->version
                 ?? $this->guidelinesRepository->latestVersion($site->id),

@@ -10,6 +10,7 @@ use App\Exceptions\OpenCollab\GuidelineNotPublishableException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Http\UploadedFile;
 use App\Framework\Support\SiteContext;
 use App\Jobs\OpenCollab\GuidelineUpdatedFanoutJob;
 use App\Models\Guideline;
@@ -67,8 +68,16 @@ class AdminGuidelinesController extends Controller
         return [
             'id' => $guideline->id,
             'site_id' => $guideline->site_id,
+            'title' => $guideline->title,
             'version' => $guideline->version,
             'content' => $guideline->content,
+            'content_format' => $guideline->content_format,
+            'source_type' => $guideline->source_type,
+            'template_id' => $guideline->template_id,
+            'document_id' => $guideline->document_id,
+            'source_document_id' => $guideline->source_document_id,
+            'extraction_status' => $guideline->extraction_status,
+            'extraction_error' => $guideline->extraction_error,
             'status' => $guideline->status,
             'status_label' => $guideline->status,
             'published_at' => $guideline->published_at,
@@ -128,6 +137,12 @@ class AdminGuidelinesController extends Controller
             siteId: SiteContext::getId(),
             content: $content,
             createdByUserId: Auth::id(),
+            metadata: [
+                'title' => $request->input('title'),
+                'source_type' => 'manual',
+                'content_format' => 'html',
+                'extraction_status' => 'not_required',
+            ],
         );
 
         return $this->jsonResponse([
@@ -301,5 +316,35 @@ class AdminGuidelinesController extends Controller
             'guideline' => $this->formatGuideline($guideline),
             'message' => "Draft version {$guideline->version} created from template.",
         ], 201);
+    }
+
+    public function storeFromDocument(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['guideline.create'])) {
+            return $response;
+        }
+
+        $file = $this->uploadedDocument($request);
+
+        if (!$file) {
+            return $this->errorResponse('Document is required.', 422);
+        }
+
+        $guideline = $this->guidelineService->createDraftFromDocument(
+            file: $file,
+            siteId: SiteContext::getId(),
+            createdByUserId: Auth::id(),
+            title: $request->input('title'),
+        );
+
+        return $this->jsonResponse([
+            'guideline' => $this->formatGuideline($guideline),
+            'message' => "Draft version {$guideline->version} created from document.",
+        ], 201);
+    }
+
+    private function uploadedDocument(Request $request): ?UploadedFile
+    {
+        return $request->files()['document'] ?? $request->file('document');
     }
 }

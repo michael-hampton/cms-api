@@ -3,6 +3,7 @@
 namespace App\Tests\Functional\Controllers\Cms;
 
 use App\Models\User;
+use App\Models\UserSite;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -238,6 +239,22 @@ class UserControllerTest extends FunctionalTestCase
 
         $response->assertStatus(404)
             ->assertJson(['message' => 'User not found']);
+    }
+
+    protected function createUser(array $overrides = []): User
+    {
+        $user = $this->factory(User::class)
+            ->forSite($this->siteId)
+            ->create($overrides);
+
+        if (!empty($this->siteId) && \App\Models\Site::find($this->siteId)) {
+            UserSite::firstOrCreate([
+                'user_id' => $user->id,
+                'site_id' => $this->siteId,
+            ]);
+        }
+
+        return $user;
     }
 
 }

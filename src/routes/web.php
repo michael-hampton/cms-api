@@ -88,6 +88,7 @@ use App\Controllers\OpenCollab\DashboardPageController;
 use App\Controllers\OpenCollab\InvitationPageController;
 use App\Controllers\OpenCollab\OnboardingDashboardController;
 use App\Controllers\OpenCollab\OnboardingPageController;
+use App\Controllers\OpenCollab\OpenCollabDocumentController;
 use App\Controllers\OpenCollab\PayoutPageController;
 use App\Controllers\OpenCollab\ResendInvitationPageController;
 use App\Controllers\Product\ProductComparisonController;
@@ -653,3 +654,6 @@ $router->get('/{site}/open-collab/request-access',
 $router->get('/{site}/open-collab/resend-invitation',
     [ResendInvitationPageController::class, 'show'])
     ->name('contributor.resend-invitation');
+
+$router->get('/api/{site}/open-collab/documents/{id}/preview', [OpenCollabDocumentController::class, 'preview']);
+$router->get('/api/{site}/open-collab/documents/{id}/download', [OpenCollabDocumentController::class, 'download']);

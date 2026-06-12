@@ -75,17 +75,20 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function show(int|string $id, string $site): JsonResponse
+    public function show(string $site, string $id): JsonResponse
     {
         try {
-            if (is_numeric($id)) {
-                $theme = $this->emailThemeService->getThemeById((int)$id);
-            } else {
-                $siteId = Site::resolveSite($site);
-                $theme = $this->emailThemeService->getThemeBySlug($id, $siteId);
-            }
+            $siteId = Site::resolveSite($site);
+
+            $theme = is_numeric($id)
+                ? $this->emailThemeService->getThemeById((int) $id)
+                : $this->emailThemeService->getThemeBySlug($id, $siteId);
 
             if (!$theme) {
+                return $this->errorResponse('Email theme not found', 404);
+            }
+
+            if ((int) $theme->site_id !== (int) $siteId) {
                 return $this->errorResponse('Email theme not found', 404);
             }
 
@@ -97,9 +100,17 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function update(int $id, UpdateEmailThemeRequest $request, string $site): JsonResponse
+    public function update(UpdateEmailThemeRequest $request, string $site, int $id): JsonResponse
     {
         try {
+            $siteId = Site::resolveSite($site);
+
+            $existingTheme = $this->emailThemeService->getThemeById($id);
+
+            if (!$existingTheme || (int) $existingTheme->site_id !== (int) $siteId) {
+                return $this->errorResponse('Email theme not found', 404);
+            }
+
             $data = $request->validated();
             $logoFile = $request->hasFile('logo') ? $request->file('logo') : null;
 
@@ -115,16 +126,30 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function destroy(int $id, Request $request, string $site): JsonResponse
+    public function destroy(Request $request, string $site, int $id): JsonResponse
     {
         try {
+            $siteId = Site::resolveSite($site);
+
+            $theme = $this->emailThemeService->getThemeById($id);
+
+            if (!$theme || (int) $theme->site_id !== (int) $siteId) {
+                return $this->errorResponse('Email theme not found', 404);
+            }
+
             $this->emailThemeService->deleteTheme($id);
 
             return $this->successResponse('Email theme deleted successfully');
         } catch (Exception $e) {
-            // deleteTheme throws RuntimeException for not-found and for default-theme guard
-            $status = str_contains($e->getMessage(), 'not found') ? 404 : 500;
-            return $this->errorResponse($e->getMessage(), $status);
+            if (str_contains($e->getMessage(), 'default theme')) {
+                return $this->errorResponse($e->getMessage(), 409);
+            }
+
+            if (str_contains($e->getMessage(), 'not found')) {
+                return $this->errorResponse($e->getMessage(), 404);
+            }
+
+            return $this->errorResponse($e->getMessage(), 500);
         }
     }
 
@@ -146,10 +171,17 @@ class EmailThemeController extends Controller
         }
     }
 
-    public function setDefault(int $id, Request $request, string $site): JsonResponse
+    public function setDefault(Request $request, string $site, int $id): JsonResponse
     {
         try {
             $siteId = Site::resolveSite($site);
+
+            $theme = $this->emailThemeService->getThemeById($id);
+
+            if (!$theme || (int) $theme->site_id !== (int) $siteId) {
+                return $this->errorResponse('Email theme not found', 404);
+            }
+
             $result = $this->emailThemeService->setDefaultTheme($id, $siteId);
 
             if (!$result) {

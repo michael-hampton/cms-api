@@ -10,6 +10,7 @@ use App\Models\ContractTemplate;
 use App\Models\Model;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Repositories\OpenCollab\ContractTemplateRepository;
+use App\Framework\Http\UploadedFile;
 
 /**
  * Manages contract template CRUD and draft creation from templates.
@@ -44,6 +45,9 @@ class ContractTemplateService
                 'slug' => $slug,
                 'description' => $description,
                 'content' => $content,
+                'source_type' => 'manual',
+                'content_format' => 'html',
+                'extraction_status' => 'not_required',
                 'is_active' => true,
                 'created_by' => $createdByUserId,
                 'updated_by' => $createdByUserId,
@@ -64,6 +68,8 @@ class ContractTemplateService
                 'name' => $name,
                 'description' => $description,
                 'content' => $content,
+                'source_type' => $template->source_type ?: 'manual',
+                'content_format' => $template->content_format ?: 'html',
                 'updated_by' => $updatedByUserId,
             ]);
 
@@ -99,6 +105,11 @@ class ContractTemplateService
                 'site_id' => $siteId,
                 'version' => $version,
                 'content' => $template->content, // snapshot
+                'template_id' => $template->id,
+                'source_type' => 'template',
+                'content_format' => $template->content_format ?: 'html',
+                'extraction_status' => $template->extraction_status,
+                'extraction_error' => $template->extraction_error,
                 'status' => ContractStatus::Draft->value,
                 'source_template_id' => $template->id,
                 'created_at' => date('Y-m-d H:i:s'),
@@ -112,6 +123,46 @@ class ContractTemplateService
             ));
 
             return $contract;
+        });
+    }
+
+    public function importFromDocument(
+        UploadedFile $file,
+        int $siteId,
+        string $name,
+        string $slug,
+        int $createdByUserId,
+        ?string $description = null,
+    ): ContractTemplate {
+        return $this->database->transaction(function () use ($file, $siteId, $name, $slug, $createdByUserId, $description): Model {
+            $documentService = app(OpenCollabDocumentService::class);
+            $document = $documentService->store(
+                file: $file,
+                siteId: $siteId,
+                category: 'contract_template_source',
+                uploadedByUserId: $createdByUserId,
+                documentableType: 'contract_template',
+            );
+            $extraction = $document->metadata_json['extraction'] ?? [];
+
+            $template = $this->templateRepository->create([
+                'name' => $name,
+                'slug' => $slug,
+                'description' => $description,
+                'content' => $extraction['content'] ?? '',
+                'source_document_id' => $document->id,
+                'source_type' => 'document_import',
+                'content_format' => $extraction['format'] ?? 'document',
+                'extraction_status' => $extraction['status'] ?? 'failed',
+                'extraction_error' => $extraction['error'] ?? null,
+                'is_active' => true,
+                'created_by' => $createdByUserId,
+                'updated_by' => $createdByUserId,
+            ]);
+
+            $documentService->attach($document, 'contract_template', $template->id);
+
+            return $template->fresh() ?? $template;
         });
     }
 }

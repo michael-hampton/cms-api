@@ -9,11 +9,14 @@ class UserContractSignature extends Model
     protected $fillable = [
         'user_id',
         'contract_id',
+        'contract_version',
         'signed_at',
         'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
+        'contract_version' => 'integer',
         'signed_at' => 'datetime',
     ];
 

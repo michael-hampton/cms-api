@@ -20,6 +20,11 @@ class ContractTemplate extends Model
         'slug',
         'description',
         'content',
+        'source_document_id',
+        'source_type',
+        'content_format',
+        'extraction_status',
+        'extraction_error',
         'is_active',
         'created_by',
         'updated_by',
@@ -27,6 +32,7 @@ class ContractTemplate extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'source_document_id' => 'integer',
     ];
 
     // ── Relations ────────────────────────────────────────────────────────────

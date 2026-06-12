@@ -120,6 +120,7 @@ use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
 use App\Controllers\OpenCollab\OnboardingDashboardController;
+use App\Controllers\OpenCollab\OpenCollabDocumentController;
 use App\Controllers\OpenCollab\PaymentRetryController;
 use App\Controllers\OpenCollab\PayoutController;
 use App\Controllers\OpenCollab\PayoutStatementController;
@@ -484,15 +485,18 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/open-collab/admin/contracts', [AdminContractController::class, 'index']);
         $router->get('/open-collab/admin/contracts/latest', [AdminContractController::class, 'latest']);
         $router->post('/open-collab/admin/contracts', [AdminContractController::class, 'store']);
+        $router->post('/open-collab/admin/contracts/manual', [AdminContractController::class, 'store']);
         $router->get('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'show']);
         $router->put('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'update']);
         $router->delete('/open-collab/admin/contracts/{id}', [AdminContractController::class, 'destroy']);
         $router->post('/open-collab/admin/contracts/{id}/publish', [AdminContractController::class, 'publish']);
         $router->post('/open-collab/admin/contracts/{id}/clone', [AdminContractController::class, 'clone']);
         $router->post('/open-collab/admin/contracts/from-template', [AdminContractController::class, 'storeFromTemplate']);
+        $router->post('/open-collab/admin/contracts/from-document', [AdminContractController::class, 'storeFromDocument']);
 
         $router->get('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'index']);
         $router->post('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'store']);
+        $router->post('/open-collab/admin/contract-templates/import-document', [AdminContractTemplateController::class, 'importDocument']);
         $router->put('/open-collab/admin/contract-templates/{id}', [AdminContractTemplateController::class, 'update']);
         $router->delete('/open-collab/admin/contract-templates/{id}', [AdminContractTemplateController::class, 'destroy']);
 
@@ -500,16 +504,19 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->get('/open-collab/admin/guidelines', [AdminGuidelinesController::class, 'index']);
         $router->get('/open-collab/admin/guidelines/latest', [AdminGuidelinesController::class, 'latest']);
         $router->post('/open-collab/admin/guidelines', [AdminGuidelinesController::class, 'store']);
+        $router->post('/open-collab/admin/guidelines/manual', [AdminGuidelinesController::class, 'store']);
         $router->get('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'show']);
         $router->put('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'update']);
         $router->delete('/open-collab/admin/guidelines/{id}', [AdminGuidelinesController::class, 'destroy']);
         $router->post('/open-collab/admin/guidelines/{id}/publish', [AdminGuidelinesController::class, 'publish']);
         $router->post('/open-collab/admin/guidelines/{id}/clone', [AdminGuidelinesController::class, 'clone']);
         $router->post('/open-collab/admin/guidelines/from-template', [AdminGuidelinesController::class, 'storeFromTemplate']);
+        $router->post('/open-collab/admin/guidelines/from-document', [AdminGuidelinesController::class, 'storeFromDocument']);
 
         // ─── Guideline Templates ──────────────────────────────────────────────
         $router->get('/open-collab/admin/guideline-templates', [AdminGuidelineTemplateController::class, 'index']);
         $router->post('/open-collab/admin/guideline-templates', [AdminGuidelineTemplateController::class, 'store']);
+        $router->post('/open-collab/admin/guideline-templates/import-document', [AdminGuidelineTemplateController::class, 'importDocument']);
         $router->put('/open-collab/admin/guideline-templates/{id}', [AdminGuidelineTemplateController::class, 'update']);
         $router->delete('/open-collab/admin/guideline-templates/{id}', [AdminGuidelineTemplateController::class, 'destroy']);
 

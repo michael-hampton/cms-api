@@ -1369,7 +1369,7 @@ class PageControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
 
-        $this->assertEquals('draft', $data['data']['page']['status']);
+        $this->assertEquals('rejected', $data['data']['page']['status']);
         $this->assertNull($data['data']['page']['approved_by']);
         $this->assertNull($data['data']['page']['approved_at']);
     }
@@ -1688,7 +1688,7 @@ class PageControllerTest extends FunctionalTestCase
 
         $this->assertEquals(400, $response->getStatusCode());
         $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('not waiting for approval', $data['error']);
+        $this->assertStringContainsString('not awaiting approval', $data['error']);
     }
 
     public function testCannotRejectDraftPage()

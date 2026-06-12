@@ -95,6 +95,8 @@ $pageGridAdded = false;
                 @js('deals-carousel.js')
             <?php endif; ?>
 
+            @include('components/guest-contributors')
+
             @if($page->page_type !== 'landing-page')
             @include('authors')
             @endif

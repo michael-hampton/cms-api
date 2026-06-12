@@ -27,11 +27,21 @@ class Contract extends Model
 
     protected $fillable = [
         'site_id',
+        'title',
+        'template_id',
+        'document_id',
+        'source_document_id',
+        'source_type',
         'version',
         'content',
+        'content_format',
+        'extraction_status',
+        'extraction_error',
         'status',
         'published_at',
         'published_by',
+        'issued_by_user_id',
+        'issued_at',
         'archived_at',
         'archived_by',
         'source_template_id',
@@ -40,8 +50,12 @@ class Contract extends Model
 
     protected $casts = [
         'version' => 'integer',
+        'template_id' => 'integer',
+        'document_id' => 'integer',
+        'source_document_id' => 'integer',
         'status' => ContractStatus::class,
         'published_at' => 'datetime',
+        'issued_at' => 'datetime',
         'archived_at' => 'datetime',
     ];
 

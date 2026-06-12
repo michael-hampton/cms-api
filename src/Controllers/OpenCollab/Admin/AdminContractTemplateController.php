@@ -6,6 +6,8 @@ use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Http\UploadedFile;
+use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\ContractTemplateRepository;
 use App\Services\OpenCollab\ContractTemplateService;
 
@@ -60,5 +62,41 @@ class AdminContractTemplateController extends Controller
 
         $this->templateService->deactivate($template, Auth::id());
         return $this->successResponse('Template deactivated.');
+    }
+
+    public function importDocument(Request $request): JsonResponse
+    {
+        $file = $this->uploadedDocument($request);
+
+        if (!$file) {
+            return $this->errorResponse('Document is required.', 422);
+        }
+
+        $name = trim((string)$request->input('name', ''));
+
+        if ($name === '') {
+            return $this->errorResponse('Template name is required.', 422);
+        }
+
+        $template = $this->templateService->importFromDocument(
+            file: $file,
+            siteId: SiteContext::getId(),
+            name: $name,
+            slug: $request->input('slug') ?: $this->slugFromName($name),
+            createdByUserId: Auth::id(),
+            description: $request->input('description')
+        );
+
+        return $this->resourceResponse($template->toArray(), 201);
+    }
+
+    private function uploadedDocument(Request $request): ?UploadedFile
+    {
+        return $request->files()['document'] ?? $request->file('document');
+    }
+
+    private function slugFromName(string $name): string
+    {
+        return trim(strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $name) ?? ''), '-');
     }
 }

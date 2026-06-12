@@ -105,13 +105,21 @@ class ContractRepository extends Repository
             ->first();
     }
 
-    public function recordSignature(int $userId, int $contractId, string $ipAddress): UserContractSignature
+    public function recordSignature(
+        int $userId,
+        int $contractId,
+        string $ipAddress,
+        ?int $contractVersion = null,
+        ?string $userAgent = null,
+    ): UserContractSignature
     {
         $signature = new UserContractSignature();
         $signature->user_id = $userId;
         $signature->contract_id = $contractId;
+        $signature->contract_version = $contractVersion;
         $signature->signed_at = date('Y-m-d H:i:s');
         $signature->ip_address = $ipAddress;
+        $signature->user_agent = $userAgent;
         $signature->save();
 
         return $signature;

@@ -40,6 +40,7 @@ use App\Models\MerchantProductFeed;
 use App\Models\MerchantUrl;
 use App\Models\Model;
 use App\Models\Newsletter;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Page;
@@ -623,14 +624,15 @@ trait CreatesTestData
         ], $attributes));
     }
 
-    protected function createEmailTheme(array $attributes = []): EmailTheme
+    protected function createEmailTheme(array $attributes = []): NewsletterBrandingConfiguration
     {
-        return EmailTheme::create(array_merge([
+        return NewsletterBrandingConfiguration::create(array_merge([
             'name' => 'Test Theme ' . uniqid(),
             'slug' => 'test-theme-' . uniqid(),
             'description' => 'Test theme description',
             'is_active' => true,
             'is_default' => false,
+            'type' => 'email_template',
             'site_id' => $this->siteId ?? 1
         ], $attributes));
     }

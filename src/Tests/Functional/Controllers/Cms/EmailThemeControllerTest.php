@@ -1,9 +1,8 @@
 <?php
-// tests/Functional/Controllers/EmailThemeControllerTest.php
 
 namespace App\Tests\Functional\Controllers\Cms;
 
-use App\Models\EmailTheme;
+use App\Models\NewsletterBrandingConfiguration;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use App\Tests\Unit\Repositories\Concerns\CreatesTestData;
 
@@ -65,12 +64,15 @@ class EmailThemeControllerTest extends FunctionalTestCase
         ];
 
         $response = $this->postForSite('/api/email-themes', [
-            'name' => 'Theme With Logo'
+            'name' => 'Theme With Logo',
         ], $files);
 
         $this->assertEquals(201, $response->getStatusCode());
+
         $data = json_decode($response->getContent(), true);
-        $this->assertNotNull($data['data']['theme']['assets']['logo']['asset_url'] ?? null);
+
+        $this->assertNotNull($data['data']['theme']['logo_url'] ?? null);
+        $this->assertNotNull($data['data']['theme']['assets']['logo']['url'] ?? null);
     }
 
     public function testStoreValidatesRequiredFields()
@@ -133,7 +135,7 @@ class EmailThemeControllerTest extends FunctionalTestCase
         $response = $this->deleteForSite("/api/email-themes/{$theme->id}");
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertNull(EmailTheme::find($theme->id));
+        $this->assertNull(NewsletterBrandingConfiguration::find($theme->id));
     }
 
     public function testCannotDeleteDefaultTheme()
@@ -142,7 +144,8 @@ class EmailThemeControllerTest extends FunctionalTestCase
 
         $response = $this->deleteForSite("/api/email-themes/{$theme->id}");
 
-        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertEquals(409, $response->getStatusCode());
+
         $data = json_decode($response->getContent(), true);
 
         $this->assertStringContainsString('default', $data['error']);
@@ -224,8 +227,8 @@ class EmailThemeControllerTest extends FunctionalTestCase
         $this->assertCount(2, $data['result']['deleted']);
         $this->assertCount(0, $data['result']['failed']);
 
-        $this->assertNull(EmailTheme::find($theme1->id));
-        $this->assertNull(EmailTheme::find($theme2->id));
+        $this->assertNull(NewsletterBrandingConfiguration::find($theme1->id));
+        $this->assertNull(NewsletterBrandingConfiguration::find($theme2->id));
     }
 
     public function testBulkDeleteFailsForDefaultTheme()

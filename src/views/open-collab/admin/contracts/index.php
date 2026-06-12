@@ -81,6 +81,10 @@ $breadcrumbs = [['label' => 'Contracts']];
             <div class="oc-form-group" style="margin-bottom:12px;"><label class="oc-label">Content</label><textarea
                         class="oc-textarea" id="template-content" rows="6" style="font-family:monospace;"></textarea>
             </div>
+            <div class="oc-form-group" style="margin-bottom:12px;">
+                <label class="oc-label" for="template-document">Import from document</label>
+                <input class="oc-input" id="template-document" type="file" accept=".pdf,.docx,.txt,.md">
+            </div>
             <div style="display:flex;gap:10px;justify-content:flex-end;">
                 <button onclick="templateManager.hideForm()" class="oc-btn oc-btn--ghost oc-btn--sm">Cancel</button>
                 <button onclick="templateManager.save()" class="oc-btn oc-btn--amber oc-btn--sm" id="template-save-btn">
@@ -148,9 +152,17 @@ $breadcrumbs = [['label' => 'Contracts']];
                 <textarea class="oc-textarea" id="quick-contract-content" rows="12"
                           placeholder="Paste contract text here..."
                           style="font-family:monospace;font-size:.82rem;margin-bottom:12px;"></textarea>
+                <div class="oc-form-group" style="margin-bottom:12px;">
+                    <label class="oc-label" for="quick-contract-document">Or upload a contract document</label>
+                    <input class="oc-input" id="quick-contract-document" type="file" accept=".pdf,.docx,.txt,.md">
+                </div>
                 <div style="display:flex;gap:8px;">
                     <button onclick="manager.createDraft()" class="oc-btn oc-btn--amber" style="flex:1;"
                             id="create-btn">Save as draft
+                    </button>
+                    <button onclick="manager.createDraftFromDocument()" class="oc-btn oc-btn--ghost" id="create-document-btn"
+                            title="Upload Document">
+                        Upload
                     </button>
                     <button onclick="templateManager.open()" class="oc-btn oc-btn--ghost" id="template-btn"
                             title="Use Template">
@@ -257,6 +269,7 @@ $breadcrumbs = [['label' => 'Contracts']];
             document.getElementById('template-slug').value = t?.slug || '';
             document.getElementById('template-description').value = t?.description || '';
             document.getElementById('template-content').value = t?.content || '';
+            document.getElementById('template-document').value = '';
 
             // 2. Toggle Visibility
             document.getElementById('template-form-wrap').style.display = 'block';
@@ -285,6 +298,22 @@ $breadcrumbs = [['label' => 'Contracts']];
             const btn = document.getElementById('template-save-btn');
             this.#setLoading(btn, 'Saving...');
             const id = document.getElementById('template-id').value;
+            const file = document.getElementById('template-document').files[0];
+            if (!id && file) {
+                const form = new FormData();
+                form.append('name', document.getElementById('template-name').value);
+                form.append('slug', document.getElementById('template-slug').value);
+                form.append('description', document.getElementById('template-description').value);
+                form.append('document', file);
+                await this.#fetch(`/api/${this.#site}/open-collab/admin/contract-templates/import-document`, {
+                    method: 'POST',
+                    body: form
+                });
+                this.#clearLoading(btn, 'Save Template');
+                this.hideForm();
+                this.load();
+                return;
+            }
             const payload = {
                 name: document.getElementById('template-name').value,
                 slug: document.getElementById('template-slug').value,
@@ -322,13 +351,15 @@ $breadcrumbs = [['label' => 'Contracts']];
         }
 
         #fetch(url, opts = {}) {
+            const isForm = opts.body instanceof FormData;
+            const headers = {
+                Authorization: `Bearer ${this.#token()}`,
+                Accept: 'application/json', ...(opts.headers ?? {})
+            };
+            if (!isForm) headers['Content-Type'] = 'application/json';
             return fetch(url, {
                 ...opts,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json', ...(opts.headers ?? {})
-                }
+                headers
             });
         }
 
@@ -422,6 +453,30 @@ $breadcrumbs = [['label' => 'Contracts']];
             document.getElementById('quick-contract-content').value = '';
             this.reload();
             this.#toast('✓ Draft saved');
+        }
+
+        async createDraftFromDocument() {
+            const btn = document.getElementById('create-document-btn');
+            const err = document.getElementById('create-errors');
+            const file = document.getElementById('quick-contract-document').files[0];
+            if (!file) {
+                err.textContent = 'Choose a PDF, DOCX, TXT, or Markdown document.';
+                err.style.display = 'block';
+                return;
+            }
+            err.style.display = 'none';
+            const form = new FormData();
+            form.append('document', file);
+            form.append('title', file.name.replace(/\.[^.]+$/, ''));
+            this.#setLoading(btn, 'Uploading...');
+            await this.#fetch(`/api/${this.#site}/open-collab/admin/contracts/from-document`, {
+                method: 'POST',
+                body: form
+            });
+            this.#clearLoading(btn, 'Upload');
+            document.getElementById('quick-contract-document').value = '';
+            this.reload();
+            this.#toast('✓ Document draft saved');
         }
 
         async viewContract(id, version) {
@@ -526,13 +581,15 @@ $breadcrumbs = [['label' => 'Contracts']];
         }
 
         #fetch(url, opts = {}) {
+            const isForm = opts.body instanceof FormData;
+            const headers = {
+                Authorization: `Bearer ${this.#token()}`,
+                Accept: 'application/json', ...(opts.headers ?? {})
+            };
+            if (!isForm) headers['Content-Type'] = 'application/json';
             return fetch(url, {
                 ...opts,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${this.#token()}`,
-                    Accept: 'application/json', ...(opts.headers ?? {})
-                }
+                headers
             });
         }
 

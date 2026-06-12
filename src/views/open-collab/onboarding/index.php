@@ -284,14 +284,13 @@ if ($profile && !empty($profile->expertise)) {
                     <?php $meta = $vm->currentStepMeta(); ?>
                     <form id="onboarding-form" novalidate>
                         <?php if ($contract): ?>
-                            <input type="hidden" name="contract_id" value="<?= (int)$contract->id ?>">
+                            <input type="hidden" name="contract_id" value="<?= (int)($contractDisplay['id'] ?? $contract->id) ?>">
                             <p style="font-size:.875rem;color:var(--slate);margin-bottom:16px;">
                                 Please read the full contributor agreement before signing.
                             </p>
-                            <div style="height:260px;overflow-y:scroll;border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;font-size:.875rem;line-height:1.75;color:var(--navy);background:#fff;margin-bottom:20px;"
-                                 id="contract-scroll">
-                                <?= $contract->content ?>
-                            </div>
+                            <?php if($contractDisplay): ?>
+                            @include('/open-collab/onboarding/partials/legal-document', ['document' => $contractDisplay])
+                            <?php endif; ?>
                             <div class="oc-toggle-row" style="margin-bottom:20px;">
                                 <label class="oc-toggle">
                                     <input type="checkbox" id="agreed" name="agreed" required>
@@ -299,7 +298,7 @@ if ($profile && !empty($profile->expertise)) {
                                 </label>
                                 <div class="oc-toggle-label">
                                     <strong>I have read and agree to this contributor agreement</strong>
-                                    <span>Version <?= (int)$contract->version ?>, signed electronically</span>
+                                    <span>Version <?= (int)($contractDisplay['version'] ?? $contract->version) ?>, signed electronically</span>
                                 </div>
                             </div>
                             <div class="oc-error-msg" id="agree-error"></div>
@@ -318,7 +317,8 @@ if ($profile && !empty($profile->expertise)) {
                 <?php elseif ($vm->currentStepName() === 'guidelines'): ?>
                     <?php $meta = $vm->currentStepMeta(); ?>
                     <form id="onboarding-form" novalidate>
-                        <input type="hidden" name="version" value="<?= (int)($siteGuidelinesVersion ?? 1) ?>">
+                        <input type="hidden" name="guideline_id" value="<?= (int)($guidelinesDisplay['id'] ?? 0) ?>">
+                        <input type="hidden" name="version" value="<?= (int)($guidelinesDisplay['version'] ?? $siteGuidelinesVersion ?? 1) ?>">
                         <p style="font-size:.875rem;color:var(--slate);margin-bottom:20px;">
                             Before you start publishing, please review our editorial standards and brand guidelines.
                         </p>
@@ -329,16 +329,16 @@ if ($profile && !empty($profile->expertise)) {
                                         & Editorial Guidelines
                                     </div>
                                     <div style="font-size:.78rem;color:var(--slate);">
-                                        Version <?= (int)($siteGuidelinesVersion ?? 1) ?></div>
+                                        Version <?= (int)($guidelinesDisplay['version'] ?? $siteGuidelinesVersion ?? 1) ?></div>
                                 </div>
                             </div>
-                            <div style="max-height:360px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:.875rem;line-height:1.7;color:var(--navy);white-space:pre-wrap;">
-                                <?php if (!empty($siteGuidelines?->content)): ?>
-                                    <?= $siteGuidelines->content ?>
-                                <?php else: ?>
+                            <?php if (!empty($guidelinesDisplay)): ?>
+                                @include('/open-collab/onboarding/partials/legal-document', ['document' => $guidelinesDisplay])
+                            <?php else: ?>
+                                <div style="max-height:360px;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px;font-size:.875rem;line-height:1.7;color:var(--navy);">
                                     <p style="margin:0;color:var(--slate);">No published guidelines are currently available for this site.</p>
-                                <?php endif; ?>
-                            </div>
+                                </div>
+                            <?php endif; ?>
                         </div>
                         <div class="oc-toggle-row" style="margin-bottom:20px;">
                             <label class="oc-toggle">
@@ -1502,6 +1502,7 @@ if ($profile && !empty($profile->expertise)) {
         async _submit() {
             this._clearError();
             const agreed = document.getElementById('guidelines-agreed')?.checked;
+            const guidelineId = document.querySelector('[name="guideline_id"]')?.value;
             const version = document.querySelector('[name="version"]')?.value;
 
             if (!agreed) {
@@ -1511,6 +1512,7 @@ if ($profile && !empty($profile->expertise)) {
 
             const btn = this._setButtonLoading('Completing…');
             const res = await this._post('guidelines', {
+                guideline_id: parseInt(guidelineId || '0'),
                 version: parseInt(version),
                 agreed: true,
             });

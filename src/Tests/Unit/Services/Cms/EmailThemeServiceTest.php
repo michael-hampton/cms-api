@@ -4,9 +4,7 @@ namespace App\Tests\Unit\Services\Cms;
 
 use App\Framework\Database\Database;
 use App\Framework\Http\UploadedFile;
-use App\Models\EmailTheme;
 use App\Models\NewsletterBrandingConfiguration;
-use App\Repositories\Cms\EmailThemeAssetRepository;
 use App\Repositories\Newsletters\EmailThemeRepository;
 use App\Repositories\Newsletters\NewsletterBrandingRepository;
 use App\Services\Cms\ImageUploadService;
@@ -136,7 +134,8 @@ class EmailThemeServiceTest extends FunctionalTestCase
         $this->expectException(\Exception::class);
         $this->expectExceptionMessage('Cannot delete the default theme. Please set another theme as default first.');
 
-        $theme = Mockery::mock(EmailTheme::class)->makePartial();
+        $theme = Mockery::mock(NewsletterBrandingConfiguration::class)->makePartial();
+        $theme->id = 1;
         $theme->is_default = true;
 
         $this->repository->shouldReceive('find')
@@ -162,15 +161,30 @@ class EmailThemeServiceTest extends FunctionalTestCase
 
     public function testDeleteThemeRemovesLogoAndCallsDelete(): void
     {
-        $theme = Mockery::mock(EmailTheme::class)->makePartial();
+        $theme = Mockery::mock(NewsletterBrandingConfiguration::class)->makePartial();
+        $theme->id = 3;
         $theme->is_default = false;
+
         $theme->shouldReceive('getAssets')
             ->once()
-            ->andReturn(['logo' => ['url' => '/uploads/old-logo.png']]);
-        $theme->shouldReceive('delete')->once()->andReturn(true);
+            ->andReturn([
+                'logo' => [
+                    'url' => '/uploads/old-logo.png',
+                ],
+            ]);
 
-        $this->repository->shouldReceive('find')->with(3)->once()->andReturn($theme);
-        $this->imageUploadService->shouldReceive('delete')->once()->with('/uploads/old-logo.png');
+        $theme->shouldReceive('delete')
+            ->once()
+            ->andReturn(true);
+
+        $this->repository->shouldReceive('find')
+            ->with(3)
+            ->once()
+            ->andReturn($theme);
+
+        $this->imageUploadService->shouldReceive('delete')
+            ->once()
+            ->with('/uploads/old-logo.png');
 
         $result = $this->service->deleteTheme(3);
 

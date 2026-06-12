@@ -91,7 +91,7 @@ $defaultIcon = ['color' => '#64748b', 'path' => 'M3 3a1 1 0 000 2v8a2 2 0 002 2h
                                 <?= htmlspecialchars($label) ?>
                             </div>
                             <div style="font-size:.72rem;color:var(--slate-light);white-space:nowrap;flex-shrink:0;">
-                                <?= $event->created_at ? date('d M Y, H:i', strtotime($event->created_at)) : '' ?>
+                                <?= $event->created_at ? $event->created_at->format('d M Y, H:i') : '' ?>
                             </div>
                         </div>
                         <div style="font-size:.78rem;color:var(--slate);display:flex;gap:12px;flex-wrap:wrap;">

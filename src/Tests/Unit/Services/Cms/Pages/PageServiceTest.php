@@ -1040,6 +1040,36 @@ class PageServiceTest extends FunctionalTestCase
         $this->assertSame($updated, $result);
     }
 
+    public function testSubmitPageForApprovalThrowsForInvalidStatus(): void
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->contributor_id = 5;
+        $page->status = PageStatus::PUBLISHED->value;
+
+        $this->pageRepository->shouldReceive('find')->with(1)->once()->andReturn($page);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('cannot be submitted from status');
+
+        $this->service->submitPageForReview(1, 5);
+    }
+
+    public function testSubmitPageForApprovalThrowsForInvalidContributor(): void
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->contributor_id = 7;
+        $page->status = PageStatus::PUBLISHED->value;
+
+        $this->pageRepository->shouldReceive('find')->with(1)->once()->andReturn($page);
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Page [1] does not belong to contributor [5].');
+
+        $this->service->submitPageForReview(1, 5);
+    }
+
     public function testResubmitPageForReviewTransitionsRejectedToWaitingApproval()
     {
         $page = Mockery::mock(Page::class)->makePartial();

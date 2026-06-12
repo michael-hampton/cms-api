@@ -10,6 +10,7 @@ use App\Exceptions\OpenCollab\ContractNotArchivableException;
 use App\Exceptions\OpenCollab\ContractNotEditableException;
 use App\Exceptions\OpenCollab\ContractNotPublishableException;
 use App\Framework\Database\Database;
+use App\Framework\Http\UploadedFile;
 use App\Models\Contract;
 use App\Repositories\OpenCollab\ContractRepository;
 
@@ -40,16 +41,31 @@ class ContractService
     /**
      * Create a blank draft contract for a site.
      */
-    public function createDraft(int $siteId, string $content, int $createdByUserId): Contract
+    public function createDraft(
+        int $siteId,
+        string $content,
+        int $createdByUserId,
+        array $metadata = [],
+    ): Contract
     {
-        return $this->database->transaction(function () use ($siteId, $content, $createdByUserId): Contract {
+        return $this->database->transaction(function () use ($siteId, $content, $createdByUserId, $metadata): Contract {
             $version = $this->contractRepository->nextVersionNumber($siteId);
 
             $contract = $this->contractRepository->create([
                 'site_id' => $siteId,
+                'title' => $metadata['title'] ?? null,
                 'version' => $version,
                 'content' => $content,
+                'source_type' => $metadata['source_type'] ?? 'manual',
+                'content_format' => $metadata['content_format'] ?? 'html',
+                'template_id' => $metadata['template_id'] ?? null,
+                'document_id' => $metadata['document_id'] ?? null,
+                'source_document_id' => $metadata['source_document_id'] ?? null,
+                'extraction_status' => $metadata['extraction_status'] ?? 'not_required',
+                'extraction_error' => $metadata['extraction_error'] ?? null,
                 'status' => ContractStatus::Draft->value,
+                'issued_by_user_id' => $createdByUserId,
+                'issued_at' => date('Y-m-d H:i:s'),
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
 
@@ -150,8 +166,16 @@ class ContractService
 
             $draft = $this->contractRepository->create([
                 'site_id' => $source->site_id,
+                'title' => $source->title,
                 'version' => $version,
                 'content' => $source->content,
+                'source_type' => $source->source_type,
+                'content_format' => $source->content_format ?: 'html',
+                'template_id' => $source->template_id,
+                'document_id' => $source->document_id,
+                'source_document_id' => $source->source_document_id,
+                'extraction_status' => $source->extraction_status,
+                'extraction_error' => $source->extraction_error,
                 'status' => ContractStatus::Draft->value,
                 'cloned_from_version_id' => $source->id,
                 'created_at' => date('Y-m-d H:i:s'),
@@ -165,6 +189,44 @@ class ContractService
             ));
 
             return $draft;
+        });
+    }
+
+    public function createDraftFromDocument(
+        UploadedFile $file,
+        int $siteId,
+        int $createdByUserId,
+        ?string $title = null,
+    ): Contract {
+        return $this->database->transaction(function () use ($file, $siteId, $createdByUserId, $title): Contract {
+            $documentService = app(OpenCollabDocumentService::class);
+            $document = $documentService->store(
+                file: $file,
+                siteId: $siteId,
+                category: 'issued_contract_document',
+                uploadedByUserId: $createdByUserId,
+                documentableType: 'contract',
+            );
+            $extraction = $document->metadata_json['extraction'] ?? [];
+
+            $contract = $this->createDraft(
+                siteId: $siteId,
+                content: $extraction['content'] ?? '',
+                createdByUserId: $createdByUserId,
+                metadata: [
+                    'title' => $title,
+                    'source_type' => 'document_upload',
+                    'content_format' => $extraction['format'] ?? 'document',
+                    'document_id' => $document->id,
+                    'source_document_id' => $document->id,
+                    'extraction_status' => $extraction['status'] ?? 'failed',
+                    'extraction_error' => $extraction['error'] ?? null,
+                ],
+            );
+
+            $documentService->attach($document, 'contract', $contract->id);
+
+            return $contract->fresh() ?? $contract;
         });
     }
 

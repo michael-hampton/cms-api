@@ -10,6 +10,7 @@ use App\Exceptions\OpenCollab\ContractNotPublishableException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
+use App\Framework\Http\UploadedFile;
 use App\Framework\Support\SiteContext;
 use App\Models\Contract;
 use App\Repositories\OpenCollab\ContractRepository;
@@ -66,8 +67,16 @@ class AdminContractController extends Controller
         return [
             'id' => $contract->id,
             'site_id' => $contract->site_id,
+            'title' => $contract->title,
             'version' => $contract->version,
             'content' => $contract->content,
+            'content_format' => $contract->content_format,
+            'source_type' => $contract->source_type,
+            'template_id' => $contract->template_id,
+            'document_id' => $contract->document_id,
+            'source_document_id' => $contract->source_document_id,
+            'extraction_status' => $contract->extraction_status,
+            'extraction_error' => $contract->extraction_error,
             'status' => $contract->status,
             'status_label' => $contract->status,
             'published_at' => $contract->published_at,
@@ -127,6 +136,12 @@ class AdminContractController extends Controller
             siteId: SiteContext::getId(),
             content: $content,
             createdByUserId: Auth::id(),
+            metadata: [
+                'title' => $request->input('title'),
+                'source_type' => 'manual',
+                'content_format' => 'html',
+                'extraction_status' => 'not_required',
+            ],
         );
 
         return $this->jsonResponse([
@@ -298,6 +313,36 @@ class AdminContractController extends Controller
             'contract' => $this->formatContract($contract),
             'message' => "Draft version {$contract->version} created from template.",
         ], 201);
+    }
+
+    public function storeFromDocument(Request $request): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['contract.create'])) {
+            return $response;
+        }
+
+        $file = $this->uploadedDocument($request);
+
+        if (!$file) {
+            return $this->errorResponse('Document is required.', 422);
+        }
+
+        $contract = $this->contractService->createDraftFromDocument(
+            file: $file,
+            siteId: SiteContext::getId(),
+            createdByUserId: Auth::id(),
+            title: $request->input('title'),
+        );
+
+        return $this->jsonResponse([
+            'contract' => $this->formatContract($contract),
+            'message' => "Draft version {$contract->version} created from document.",
+        ], 201);
+    }
+
+    private function uploadedDocument(Request $request): ?UploadedFile
+    {
+        return $request->files()['document'] ?? $request->file('document');
     }
 
     // ── Formatting ────────────────────────────────────────────────────────────
