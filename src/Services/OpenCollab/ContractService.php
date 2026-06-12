@@ -32,6 +32,7 @@ class ContractService
     public function __construct(
         private readonly ContractRepository $contractRepository,
         private readonly Database           $database,
+        private readonly OpenCollabDocumentService  $documentService
     )
     {
     }
@@ -199,8 +200,7 @@ class ContractService
         ?string $title = null,
     ): Contract {
         return $this->database->transaction(function () use ($file, $siteId, $createdByUserId, $title): Contract {
-            $documentService = app(OpenCollabDocumentService::class);
-            $document = $documentService->store(
+            $document = $this->documentService->store(
                 file: $file,
                 siteId: $siteId,
                 category: 'issued_contract_document',
@@ -224,7 +224,7 @@ class ContractService
                 ],
             );
 
-            $documentService->attach($document, 'contract', $contract->id);
+            $this->documentService->attach($document, 'contract', $contract->id);
 
             return $contract->fresh() ?? $contract;
         });

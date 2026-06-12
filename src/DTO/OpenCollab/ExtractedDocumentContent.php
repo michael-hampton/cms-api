@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\OpenCollab;
+namespace App\DTO\OpenCollab;
 
 class ExtractedDocumentContent
 {

@@ -24,7 +24,8 @@ class ContractTemplateService
     public function __construct(
         private readonly ContractTemplateRepository $templateRepository,
         private readonly ContractRepository         $contractRepository,
-        private readonly Database                   $database
+        private readonly Database                   $database,
+        private readonly OpenCollabDocumentService $documentService
     )
     {
     }
@@ -135,8 +136,7 @@ class ContractTemplateService
         ?string $description = null,
     ): ContractTemplate {
         return $this->database->transaction(function () use ($file, $siteId, $name, $slug, $createdByUserId, $description): Model {
-            $documentService = app(OpenCollabDocumentService::class);
-            $document = $documentService->store(
+            $document = $this->documentService->store(
                 file: $file,
                 siteId: $siteId,
                 category: 'contract_template_source',
@@ -160,7 +160,7 @@ class ContractTemplateService
                 'updated_by' => $createdByUserId,
             ]);
 
-            $documentService->attach($document, 'contract_template', $template->id);
+            $this->documentService->attach($document, 'contract_template', $template->id);
 
             return $template->fresh() ?? $template;
         });

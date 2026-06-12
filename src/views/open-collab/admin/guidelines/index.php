@@ -485,7 +485,7 @@ $breadcrumbs = [['label' => 'Guidelines']];
             const g = data.data?.guideline ?? data.guideline;
             const status = (g.status?.value ?? g.status ?? 'draft').toLowerCase();
             document.getElementById('view-modal-title').textContent = `Guidelines v${version}`;
-            document.getElementById('view-modal-content').innerHTML = g.content || 'No content';
+            document.getElementById('view-modal-content').innerHTML = this.#renderLegalDocument(g, 'Guidelines');
             const meta = [`Created ${new Date(g.created_at).toLocaleDateString()}`];
             if (g.published_at) meta.push(`Published ${new Date(g.published_at).toLocaleDateString()}`);
             if (g.source_template_id) meta.push(`From template #${g.source_template_id}`);
@@ -591,6 +591,64 @@ $breadcrumbs = [['label' => 'Guidelines']];
                 ...opts,
                 headers
             });
+        }
+
+        #renderLegalDocument(record, label = 'Document') {
+            const contentFormat = (record.content_format || 'html').toLowerCase();
+            const hasInlineContent = (record.content || '').trim() !== '' && ['html', 'text'].includes(contentFormat);
+
+            if (hasInlineContent) {
+                return `
+            <div class="legal-scroll"
+                 style="height:420px;overflow-y:auto;border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;background:#fff;">
+                ${record.content}
+            </div>
+        `;
+            }
+
+            const documentId = record.document_id || record.source_document_id;
+
+            if (!documentId) {
+                return `
+            <div style="padding:24px;text-align:center;color:var(--slate);">
+                No content or document is available for these ${this.#esc(label.toLowerCase())}.
+            </div>
+        `;
+            }
+
+            const previewUrl = `/api/${this.#site}/open-collab/documents/${documentId}/preview`;
+            const downloadUrl = `/api/${this.#site}/open-collab/documents/${documentId}/download`;
+            const title = record.title || `${label} document`;
+
+            const isPdf = contentFormat === 'pdf';
+
+            return `
+        <div style="border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 20px;background:#fff;">
+            <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px;">
+                <div>
+                    <div style="font-weight:700;color:var(--navy);">${this.#esc(title)}</div>
+                    <div style="font-size:.78rem;color:var(--slate);">
+                        Version ${this.#esc(String(record.version || '—'))}
+                        · ${this.#esc(contentFormat.toUpperCase())}
+                    </div>
+                </div>
+            </div>
+
+            ${
+                isPdf
+                    ? `<iframe src="${previewUrl}"
+                               style="width:100%;height:520px;border:1px solid var(--border);border-radius:var(--radius);background:#f8fafc;margin-bottom:14px;"></iframe>`
+                    : `<p style="margin:0 0 14px;color:var(--slate);line-height:1.6;">
+                           These ${this.#esc(label.toLowerCase())} were uploaded as a document. Open or download it to review the original file.
+                       </p>`
+            }
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a class="oc-btn oc-btn--ghost" href="${previewUrl}" target="_blank" rel="noopener">Open document</a>
+                <a class="oc-btn oc-btn--ghost" href="${downloadUrl}">Download document</a>
+            </div>
+        </div>
+    `;
         }
 
         #esc(s) {

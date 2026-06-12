@@ -1894,6 +1894,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
 
     $router->get('/admin/users/search', [SiteSettingsController::class, 'searchUsers']);
     $router->post('/admin/sites/users', [SiteSettingsController::class, 'assignUser']);
+    $router->get('/admin/sites/users', [SiteSettingsController::class, 'assignedUsers']);
     $router->post('/admin/sites/settings', [SiteSettingsController::class, 'update']);
     $router->delete('/admin/sites/users/{userId}', [SiteSettingsController::class, 'removeUser']);
     $router->get('/admin/contracts', [AdminContractController::class, 'index']);

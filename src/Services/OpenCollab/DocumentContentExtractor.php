@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\DTO\OpenCollab\ExtractedDocumentContent;
 use Throwable;
 use ZipArchive;
 

@@ -12,9 +12,12 @@ use App\Exceptions\OpenCollab\ContractNotPublishableException;
 use App\Framework\Container;
 use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
+use App\Framework\Http\UploadedFile;
 use App\Models\Contract;
+use App\Models\OpenCollabDocument;
 use App\Repositories\OpenCollab\ContractRepository;
 use App\Services\OpenCollab\ContractService;
+use App\Services\OpenCollab\OpenCollabDocumentService;
 use App\Tests\Support\CapturingEventDispatcher;
 use Mockery;
 use Mockery\MockInterface;
@@ -29,6 +32,7 @@ class ContractServiceTest extends TestCase
     private ContractRepository $contractRepository;
     private Database $databaseMock;
     private CapturingEventDispatcher $eventDispatcher;
+    private OpenCollabDocumentService $documentService;
 
     // ── createDraft ───────────────────────────────────────────────────────────
 
@@ -327,6 +331,387 @@ class ContractServiceTest extends TestCase
         );
     }
 
+    public function test_create_draft_persists_document_metadata(): void
+    {
+        $contract = $this->makeContract([
+            'id' => 1,
+            'site_id' => 10,
+            'version' => 1,
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(1);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'site_id' => 10,
+                'title' => 'Uploaded Contract',
+                'version' => 1,
+                'content' => '<p>Extracted terms</p>',
+                'source_type' => 'document_upload',
+                'content_format' => 'html',
+                'template_id' => null,
+                'document_id' => 55,
+                'source_document_id' => 55,
+                'extraction_status' => 'completed',
+                'extraction_error' => null,
+                'status' => ContractStatus::Draft->value,
+                'issued_by_user_id' => 99,
+            ]))
+            ->andReturn($contract);
+
+        $result = $this->runInFakeTransaction(
+            fn () => $this->service->createDraft(
+                siteId: 10,
+                content: '<p>Extracted terms</p>',
+                createdByUserId: 99,
+                metadata: [
+                    'title' => 'Uploaded Contract',
+                    'source_type' => 'document_upload',
+                    'content_format' => 'html',
+                    'document_id' => 55,
+                    'source_document_id' => 55,
+                    'extraction_status' => 'completed',
+                    'extraction_error' => null,
+                ],
+            )
+        );
+
+        $this->assertSame($contract, $result);
+    }
+
+    public function test_clone_to_draft_copies_document_metadata(): void
+    {
+        $source = $this->makeContract([
+            'id' => 3,
+            'site_id' => 10,
+            'title' => 'Uploaded Contract',
+            'version' => 3,
+            'content' => '',
+            'source_type' => 'document_upload',
+            'content_format' => 'pdf',
+            'template_id' => null,
+            'document_id' => 55,
+            'source_document_id' => 55,
+            'extraction_status' => 'needs_review',
+            'extraction_error' => null,
+            'status' => ContractStatus::Published->value,
+        ]);
+
+        $draft = $this->makeContract([
+            'id' => 4,
+            'site_id' => 10,
+            'version' => 4,
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(4);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'site_id' => 10,
+                'title' => 'Uploaded Contract',
+                'version' => 4,
+                'content' => '',
+                'source_type' => 'document_upload',
+                'content_format' => 'pdf',
+                'template_id' => null,
+                'document_id' => 55,
+                'source_document_id' => 55,
+                'extraction_status' => 'needs_review',
+                'extraction_error' => null,
+                'status' => ContractStatus::Draft->value,
+                'cloned_from_version_id' => 3,
+            ]))
+            ->andReturn($draft);
+
+        $result = $this->runInFakeTransaction(
+            fn () => $this->service->cloneToDraft($source, 99)
+        );
+
+        $this->assertSame($draft, $result);
+    }
+
+    public function test_create_draft_from_document_creates_document_upload_contract(): void
+    {
+        $file = Mockery::mock(\App\Framework\Http\UploadedFile::class);
+
+        $document = Mockery::mock(\App\Models\OpenCollabDocument::class)->makePartial();
+        $document->id = 55;
+        $document->metadata_json = [
+            'extraction' => [
+                'content' => '<p>Extracted contract</p>',
+                'format' => 'html',
+                'status' => 'completed',
+                'error' => null,
+            ],
+        ];
+
+        $contract = $this->makeContract([
+            'id' => 77,
+            'site_id' => 10,
+            'version' => 1,
+            'content' => '<p>Extracted contract</p>',
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $contract->shouldReceive('fresh')->once()->andReturn($contract);
+
+        $this->documentService
+            ->shouldReceive('store')
+            ->once()
+            ->with(
+                $file,
+                10,
+                'issued_contract_document',
+                99,
+                'contract'
+            )
+            ->andReturn($document);
+
+        $this->documentService
+            ->shouldReceive('attach')
+            ->once()
+            ->with($document, 'contract', 77)
+            ->andReturn($document);
+
+        // One transaction for createDraftFromDocument()
+        // One nested transaction for createDraft()
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn (callable $callback) => $callback());
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(1);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'site_id' => 10,
+                'title' => 'Uploaded Contract',
+                'version' => 1,
+                'content' => '<p>Extracted contract</p>',
+                'source_type' => 'document_upload',
+                'content_format' => 'html',
+                'document_id' => 55,
+                'source_document_id' => 55,
+                'extraction_status' => 'completed',
+                'extraction_error' => null,
+                'status' => ContractStatus::Draft->value,
+                'issued_by_user_id' => 99,
+            ]))
+            ->andReturn($contract);
+
+        $result = $this->service->createDraftFromDocument(
+            file: $file,
+            siteId: 10,
+            createdByUserId: 99,
+            title: 'Uploaded Contract',
+        );
+
+        $this->assertSame($contract, $result);
+        $this->assertContractEventDispatched(ContractDraftCreatedEvent::class, $contract);
+    }
+
+    // ── Document/source metadata ─────────────────────────────────────────────────
+
+    public function test_create_draft_sets_manual_source_metadata_defaults(): void
+    {
+        $contract = $this->makeContract([
+            'id' => 1,
+            'site_id' => 10,
+            'version' => 1,
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(1);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'site_id' => 10,
+                'version' => 1,
+                'content' => 'manual contract body',
+                'source_type' => 'manual',
+                'content_format' => 'html',
+                'template_id' => null,
+                'document_id' => null,
+                'source_document_id' => null,
+                'extraction_status' => 'not_required',
+                'extraction_error' => null,
+                'status' => ContractStatus::Draft->value,
+                'issued_by_user_id' => 99,
+            ]))
+            ->andReturn($contract);
+
+        $result = $this->runInFakeTransaction(
+            fn() => $this->service->createDraft(10, 'manual contract body', 99)
+        );
+
+        $this->assertSame($contract, $result);
+    }
+
+    public function test_create_draft_from_pdf_document_creates_empty_content_pdf_contract(): void
+    {
+        $file = Mockery::mock(UploadedFile::class);
+
+        $document = Mockery::mock(OpenCollabDocument::class)->makePartial();
+        $document->id = 56;
+        $document->metadata_json = [
+            'extraction' => [
+                'content' => null,
+                'format' => 'pdf',
+                'status' => 'needs_review',
+                'error' => null,
+            ],
+        ];
+
+        $contract = $this->makeContract([
+            'id' => 78,
+            'site_id' => 10,
+            'version' => 1,
+            'content' => '',
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $contract->shouldReceive('fresh')->once()->andReturn($contract);
+
+        $this->documentService
+            ->shouldReceive('store')
+            ->once()
+            ->with($file, 10, 'issued_contract_document', 99, 'contract')
+            ->andReturn($document);
+
+        $this->documentService
+            ->shouldReceive('attach')
+            ->once()
+            ->with($document, 'contract', 78)
+            ->andReturn($document);
+
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn(callable $callback) => $callback());
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(1);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'site_id' => 10,
+                'content' => '',
+                'source_type' => 'document_upload',
+                'content_format' => 'pdf',
+                'document_id' => 56,
+                'source_document_id' => 56,
+                'extraction_status' => 'needs_review',
+                'extraction_error' => null,
+                'status' => ContractStatus::Draft->value,
+            ]))
+            ->andReturn($contract);
+
+        $result = $this->service->createDraftFromDocument($file, 10, 99, 'PDF Contract');
+
+        $this->assertSame($contract, $result);
+    }
+
+    public function test_create_draft_from_failed_extraction_preserves_error_metadata(): void
+    {
+        $file = Mockery::mock(UploadedFile::class);
+
+        $document = Mockery::mock(OpenCollabDocument::class)->makePartial();
+        $document->id = 57;
+        $document->metadata_json = [
+            'extraction' => [
+                'content' => null,
+                'format' => 'document',
+                'status' => 'failed',
+                'error' => 'Unable to read document.',
+            ],
+        ];
+
+        $contract = $this->makeContract([
+            'id' => 79,
+            'site_id' => 10,
+            'version' => 1,
+            'content' => '',
+            'status' => ContractStatus::Draft->value,
+        ]);
+
+        $contract->shouldReceive('fresh')->once()->andReturn($contract);
+
+        $this->documentService
+            ->shouldReceive('store')
+            ->once()
+            ->with($file, 10, 'issued_contract_document', 99, 'contract')
+            ->andReturn($document);
+
+        $this->documentService
+            ->shouldReceive('attach')
+            ->once()
+            ->with($document, 'contract', 79)
+            ->andReturn($document);
+
+        Container::getInstance()->instance(OpenCollabDocumentService::class, $documentService);
+
+        $this->databaseMock
+            ->shouldReceive('transaction')
+            ->twice()
+            ->andReturnUsing(fn(callable $callback) => $callback());
+
+        $this->contractRepository
+            ->shouldReceive('nextVersionNumber')
+            ->once()
+            ->with(10)
+            ->andReturn(1);
+
+        $this->contractRepository
+            ->shouldReceive('create')
+            ->once()
+            ->with(Mockery::subset([
+                'content' => '',
+                'source_type' => 'document_upload',
+                'content_format' => 'document',
+                'document_id' => 57,
+                'source_document_id' => 57,
+                'extraction_status' => 'failed',
+                'extraction_error' => 'Unable to read document.',
+            ]))
+            ->andReturn($contract);
+
+        $result = $this->service->createDraftFromDocument($file, 10, 99, 'Broken Contract');
+
+        $this->assertSame($contract, $result);
+    }
+
     // ── Setup ─────────────────────────────────────────────────────────────────
 
     protected function setUp(): void
@@ -336,10 +721,11 @@ class ContractServiceTest extends TestCase
         $this->contractRepository = Mockery::mock(ContractRepository::class);
         $this->databaseMock = Mockery::mock(Database::class);
         $this->eventDispatcher = new CapturingEventDispatcher();
+        $this->documentService = Mockery::mock(OpenCollabDocumentService::class);
 
         Container::getInstance()->instance(EventDispatcher::class, $this->eventDispatcher);
 
-        $this->service = new ContractService($this->contractRepository, $this->databaseMock);
+        $this->service = new ContractService($this->contractRepository, $this->databaseMock, $this->documentService);
     }
 
     protected function tearDown(): void

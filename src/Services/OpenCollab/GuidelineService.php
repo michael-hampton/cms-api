@@ -36,6 +36,7 @@ class GuidelineService
         private readonly GuidelinesContentRepository $guidelinesRepository,
         private readonly Database                    $database,
         private readonly SiteRepository              $siteRepository,
+        private readonly OpenCollabDocumentService $documentService,
     )
     {
     }
@@ -191,8 +192,7 @@ class GuidelineService
         ?string $title = null,
     ): Guideline {
         return $this->database->transaction(function () use ($file, $siteId, $createdByUserId, $title): Guideline {
-            $documentService = app(OpenCollabDocumentService::class);
-            $document = $documentService->store(
+            $document = $this->documentService->store(
                 file: $file,
                 siteId: $siteId,
                 category: 'published_guideline_document',
@@ -216,7 +216,7 @@ class GuidelineService
                 ],
             );
 
-            $documentService->attach($document, 'guideline', $guideline->id);
+            $this->documentService->attach($document, 'guideline', $guideline->id);
 
             return $guideline->fresh() ?? $guideline;
         });

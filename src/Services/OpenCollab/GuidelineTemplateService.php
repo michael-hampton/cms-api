@@ -23,7 +23,8 @@ class GuidelineTemplateService
     public function __construct(
         private readonly GuidelineTemplateRepository $templateRepository,
         private readonly GuidelinesContentRepository $guidelinesRepository,
-        private readonly Database                    $database
+        private readonly Database                    $database,
+        public readonly OpenCollabDocumentService $documentService
     )
     {
     }
@@ -130,8 +131,7 @@ class GuidelineTemplateService
         ?string $description = null,
     ): GuidelineTemplate {
         return $this->database->transaction(function () use ($file, $siteId, $name, $slug, $createdByUserId, $description): Model {
-            $documentService = app(OpenCollabDocumentService::class);
-            $document = $documentService->store(
+            $document = $this->documentService->store(
                 file: $file,
                 siteId: $siteId,
                 category: 'guideline_template_source',
@@ -155,7 +155,7 @@ class GuidelineTemplateService
                 'updated_by' => $createdByUserId,
             ]);
 
-            $documentService->attach($document, 'guideline_template', $template->id);
+            $this->documentService->attach($document, 'guideline_template', $template->id);
 
             return $template->fresh() ?? $template;
         });

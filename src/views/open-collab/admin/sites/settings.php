@@ -227,31 +227,9 @@
 
         <!-- Assigned users list -->
         <div id="assigned-users-list">
-            <?php if (empty($assignedUsers) || count($assignedUsers) === 0): ?>
-                <div id="no-users-msg"
-                     style="font-size:.85rem;color:var(--slate);padding:12px 0;">
-                    No users have been assigned to this site yet.
-                </div>
-            <?php else: ?>
-                <?php foreach ($assignedUsers as $u): ?>
-                    <div class="oc-user-row" data-user-id="<?= $u['id'] ?>">
-                        <div class="oc-user-row__avatar">
-                            <?= strtoupper(substr($u['name'], 0, 1)) ?>
-                        </div>
-                        <div class="oc-user-row__body">
-                            <span class="oc-user-row__name"><?= htmlspecialchars($u['name']) ?></span>
-                            <span class="oc-user-row__email"><?= htmlspecialchars($u['email']) ?></span>
-                        </div>
-                        <button
-                                type="button"
-                                class="oc-btn oc-btn--ghost oc-btn--sm oc-btn--danger"
-                                onclick="siteUsersManager.removeUser(<?= $u['id'] ?>, this)"
-                                aria-label="Remove <?= htmlspecialchars($u['name']) ?>">
-                            Remove
-                        </button>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
+            <div class="oc-rbac-loading">
+                Loading assigned users…
+            </div>
         </div>
 
     </div>
@@ -809,6 +787,72 @@
             });
         }
 
+        async init() {
+            await this.loadAssignedUsers();
+        }
+
+        async loadAssignedUsers() {
+            const list = document.getElementById('assigned-users-list');
+
+            if (!list) return;
+
+            list.innerHTML = `
+        <div class="oc-rbac-loading">
+            Loading assigned users…
+        </div>
+    `;
+
+            try {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/sites/users`, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        ...(this.#token ? {Authorization: `Bearer ${this.#token}`} : {}),
+                    },
+                });
+
+                const data = await res.json().catch(() => ({}));
+
+                if (!res.ok) {
+                    throw new Error(data.message || `Error ${res.status}`);
+                }
+
+                this.#renderAssignedUsers(data.users || data.data?.users || []);
+
+            } catch (err) {
+                list.innerHTML = `
+            <div class="oc-alert oc-alert--danger">
+                ${this.#esc(err.message || 'Could not load assigned users.')}
+            </div>
+        `;
+            }
+        }
+
+        #renderAssignedUsers(users) {
+            const list = document.getElementById('assigned-users-list');
+
+            if (!list) return;
+
+            list.innerHTML = '';
+
+            if (!users.length) {
+                list.innerHTML = this.#emptyStateHtml();
+                return;
+            }
+
+            for (const user of users) {
+                this.#appendUserRow(user);
+            }
+        }
+
+        #emptyStateHtml() {
+            return `
+        <div id="no-users-msg" style="font-size:.85rem;color:var(--slate);padding:12px 0;">
+            No users have been assigned to this site yet.
+        </div>
+    `;
+        }
+
         onSearchInput(value) {
             // Reset selection whenever the input changes
             this.#selectedUser = null;
@@ -885,9 +929,7 @@
                 // Show empty state if no rows remain
                 if (document.querySelectorAll('.oc-user-row').length === 0) {
                     const list = document.getElementById('assigned-users-list');
-                    list.innerHTML = `<div id="no-users-msg" style="font-size:.85rem;color:var(--slate);padding:12px 0;">
-                        No users have been assigned to this site yet.
-                    </div>`;
+                    list.innerHTML = this.#emptyStateHtml();
                 }
 
                 this.#showBanner('success', data.message || 'User removed.');
@@ -1030,6 +1072,8 @@
             <?= json_encode($site) ?>,
         localStorage.getItem('oc_token') || '',
     );
+
+    siteUsersManager.init();
 
     const rbacManager = {
         state: {

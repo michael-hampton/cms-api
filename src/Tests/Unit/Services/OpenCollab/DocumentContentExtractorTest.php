@@ -67,6 +67,18 @@ class DocumentContentExtractorTest extends TestCase
         $this->assertSame('needs_review', $result->status);
     }
 
+    public function test_txt_extraction_escapes_html(): void
+    {
+        $path = $this->tempFile('txt', '<script>alert("xss")</script>Hello');
+
+        $result = $this->extractor->extract($path, 'txt');
+
+        $this->assertSame('html', $result->format);
+        $this->assertSame('completed', $result->status);
+        $this->assertStringContainsString('&lt;script&gt;', $result->content);
+        $this->assertStringNotContainsString('<script>', $result->content);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

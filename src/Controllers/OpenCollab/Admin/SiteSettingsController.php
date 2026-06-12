@@ -34,11 +34,6 @@ class SiteSettingsController extends Controller
             return $this->errorResponse('Site not found', 404);
         }
 
-        $assignedUserIds = $this->siteAccessService->getUserIdsForSite($site->id);
-        $assignedUsers = User::whereIn('id', $assignedUserIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
         return $this->view('open-collab.admin.sites.settings', [
             'pageTitle' => 'Site Settings',
             'activeNav' => 'site_settings',
@@ -48,7 +43,46 @@ class SiteSettingsController extends Controller
             ],
             'site' => $site->slug,
             'currentSite' => $site,
-            'assignedUsers' => $assignedUsers,
+        ]);
+    }
+
+    /**
+     * GET /api/{site}/open-collab/admin/sites/users
+     *
+     * Returns users assigned to the current site.
+     *
+     * Response: { "users": [{ "id", "name", "email" }] }
+     */
+    public function assignedUsers(): JsonResponse
+    {
+        $site = SiteContext::get();
+
+        if (!$site) {
+            return $this->errorResponse('Site not found', 404);
+        }
+
+        $assignedUserIds = $this->siteAccessService->getUserIdsForSite($site->id);
+
+        if (empty($assignedUserIds)) {
+            return $this->resourceResponse([
+                'users' => [],
+            ]);
+        }
+
+        $users = User::whereIn('id', $assignedUserIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->all();
+
+        return $this->resourceResponse([
+            'users' => array_map(
+                fn($u) => [
+                    'id' => $u['id'] ?? $u->id,
+                    'name' => $u['name'] ?? $u->name,
+                    'email' => $u['email'] ?? $u->email,
+                ],
+                $users,
+            ),
         ]);
     }
 
