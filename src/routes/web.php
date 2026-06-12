@@ -77,7 +77,9 @@ use App\Controllers\OpenCollab\Admin\AdminViolationPageController;
 use App\Controllers\OpenCollab\Admin\SiteIndexController;
 use App\Controllers\OpenCollab\Admin\SiteSettingsController;
 use App\Controllers\OpenCollab\ArticlePageController;
+use App\Controllers\OpenCollab\ContributorBriefController;
 use App\Controllers\OpenCollab\ContributorAccountPageController;
+use App\Controllers\OpenCollab\ContributorBriefInboxController;
 use App\Controllers\OpenCollab\ContributorDisputePageController;
 use App\Controllers\OpenCollab\ContributorEarningsPageController;
 use App\Controllers\OpenCollab\ContributorLoginPageController;
@@ -626,6 +628,8 @@ $router->group(['middleware' => [RequireContributorAuth::class, CheckContributor
     $router->get('/{site}/open-collab/dashboard', [DashboardPageController::class, 'index']);
     $router->get('/{site}/open-collab/contributor/dashboard', [\App\Controllers\OpenCollab\DashboardPageNewController::class, 'show']);
     $router->get('/{site}/open-collab/dashboard/earnings', [DashboardPageController::class, 'earnings']);
+    $router->get('/{site}/open-collab/briefs', [ContributorBriefInboxController::class, 'index']);
+    $router->get('/{site}/open-collab/briefs/{brief}', [ContributorBriefController::class, 'show']);
     $router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
     $router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
     $router->get('/{site}/open-collab/earnings', [ContributorEarningsPageController::class, 'index']);

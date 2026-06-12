@@ -4,21 +4,16 @@ namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\RejectionReason;
-use App\Enums\Pages\PageStatus;
-use App\Events\Cms\ContentApproved;
-use App\Events\Cms\ContentRejected;
-use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
-use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Page;
-use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
@@ -29,18 +24,15 @@ use App\Services\OpenCollab\Policies\ContributorPolicy;
  * when the policy blocks an action — callers translate this to the appropriate
  * HTTP response.
  *
- * Allowed transitions:
- *   draft / on_hold  → waiting_approval  (contributor submits — policy checked)
- *   waiting_approval → published          (admin approves — no policy check needed)
- *   waiting_approval → on_hold            (admin rejects)
+ * Page state transitions are delegated to PageService. This service only checks
+ * Open Collab policy and records Open Collab activity.
  */
 class ArticleApprovalService
 {
     public function __construct(
-        private readonly PageRepository          $pageRepository,
+        private readonly PageService            $pageService,
         private readonly ActivityRepository      $activityRepository,
         private readonly EventDispatcher         $eventDispatcher,
-        private readonly Database                $database,
         private readonly ContributorPolicy       $policy,
         private readonly SiteRepository          $siteRepository,
         private readonly NotificationDispatcher  $notificationDispatcher,
@@ -60,7 +52,7 @@ class ArticleApprovalService
      */
     public function submitForReview(int $pageId, int $contributorId): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $this->pageService->findPage($pageId);
 
         if (!$page || (int)$page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
@@ -80,45 +72,17 @@ class ArticleApprovalService
             throw new OnboardingIncompleteException($pending);
         }
 
-        $submittableStatuses = [
-            PageStatus::DRAFT->value,
-            PageStatus::ON_HOLD->value,
-        ];
+        $page = $this->pageService->submitPageForReview($pageId, $contributorId);
 
-        if (!in_array($page->status, $submittableStatuses, true)) {
-            throw new \InvalidArgumentException(
-                "Article [{$pageId}] cannot be submitted from status [{$page->status}]."
-            );
-        }
-
-        $page = $this->database->transaction(function () use ($page, $contributorId): Page {
-            $this->pageRepository->update($page->id, [
-                'status' => PageStatus::WAITING_APPROVAL->value,
-                'submitted_at' => date('Y-m-d H:i:s'),
-            ]);
-
-            $this->activityRepository->record(
-                siteId: $page->site_id,
-                userId: $contributorId,
-                type: ActivityEventType::ArticleUpdated,
-                payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
-            );
-
-            return $this->pageRepository->find($page->id);
-        });
+        $this->activityRepository->record(
+            siteId: $page->site_id,
+            userId: $contributorId,
+            type: ActivityEventType::ArticleUpdated,
+            payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
+        );
 
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
-        );
-        $this->eventDispatcher->dispatch(
-            new ContentSubmittedForApproval(
-                contentType: 'pages',
-                contentId: (int)$page->id,
-                siteId: (int)$page->site_id,
-                actorId: $contributorId,
-                title: (string)$page->title,
-                ownerId: (int)$page->contributor_id,
-            )
         );
 
         return $page;
@@ -132,48 +96,14 @@ class ArticleApprovalService
      */
     public function approve(int $pageId, int $adminId): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $this->pageService->approvePage($pageId, $adminId);
 
-        if (!$page) {
-            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
-        }
-
-        if ($page->status !== PageStatus::WAITING_APPROVAL->value) {
-            throw new \InvalidArgumentException(
-                "Article [{$pageId}] is not awaiting approval (status: {$page->status})."
-            );
-        }
-
-        $page = $this->database->transaction(function () use ($page, $adminId): Page {
-            $this->pageRepository->update($page->id, [
-                'status' => PageStatus::PUBLISHED->value,
-                'approved_by' => $adminId,
-                'approved_at' => date('Y-m-d H:i:s'),
-                'rejected_by' => null,
-                'rejected_at' => null,
-                'rejection_reason' => null,
-                'rejection_notes' => null,
-                'published_at' => date('Y-m-d H:i:s'),
-            ]);
-
-            $this->activityRepository->record(
-                siteId: $page->site_id,
-                userId: (int)$page->contributor_id,
-                type: ActivityEventType::ArticlePublished,
-                payload: ['page_id' => $page->id, 'approved_by' => $adminId],
-            );
-
-            return $this->pageRepository->find($page->id);
-        });
-
-        $this->eventDispatcher->dispatch(new ContentApproved(
-            contentType: 'pages',
-            contentId: (int)$page->id,
-            siteId: (int)$page->site_id,
-            actorId: $adminId,
-            title: (string)$page->title,
-            ownerId: (int)$page->contributor_id,
-        ));
+        $this->activityRepository->record(
+            siteId: $page->site_id,
+            userId: (int)$page->contributor_id,
+            type: ActivityEventType::ArticlePublished,
+            payload: ['page_id' => $page->id, 'approved_by' => $adminId],
+        );
 
         return $page;
     }
@@ -186,54 +116,19 @@ class ArticleApprovalService
      */
     public function reject(int $pageId, int $adminId, RejectionReason $reason, ?string $notes = null): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $this->pageService->rejectPage($pageId, $adminId, $reason->value, $notes);
 
-        if (!$page) {
-            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
-        }
-
-        if ($page->status !== PageStatus::WAITING_APPROVAL->value) {
-            throw new \InvalidArgumentException(
-                "Article [{$pageId}] is not awaiting approval (status: {$page->status})."
-            );
-        }
-
-        $page = $this->database->transaction(function () use ($page, $adminId, $reason, $notes): Page {
-            $this->pageRepository->update($page->id, [
-                'status' => PageStatus::ON_HOLD->value,
+        $this->activityRepository->record(
+            siteId: $page->site_id,
+            userId: (int)$page->contributor_id,
+            type: ActivityEventType::ArticleUpdated,
+            payload: [
+                'page_id' => $page->id,
+                'action' => 'rejected',
+                'reason' => $reason->value,
                 'rejected_by' => $adminId,
-                'rejected_at' => date('Y-m-d H:i:s'),
-                'rejection_reason' => $reason->value,
-                'rejection_notes' => $notes,
-                'approved_by' => null,
-                'approved_at' => null,
-                'resubmission_count' => (int)$page->resubmission_count,
-            ]);
-
-            $this->activityRepository->record(
-                siteId: $page->site_id,
-                userId: (int)$page->contributor_id,
-                type: ActivityEventType::ArticleUpdated,
-                payload: [
-                    'page_id' => $page->id,
-                    'action' => 'rejected',
-                    'reason' => $reason->value,
-                    'rejected_by' => $adminId,
-                ],
-            );
-
-            return $this->pageRepository->find($page->id);
-        });
-
-        $this->eventDispatcher->dispatch(new ContentRejected(
-            contentType: 'pages',
-            contentId: (int)$page->id,
-            siteId: (int)$page->site_id,
-            actorId: $adminId,
-            title: (string)$page->title,
-            ownerId: (int)$page->contributor_id,
-            reason: $notes ?: $reason->value,
-        ));
+            ],
+        );
 
         return $page;
     }
@@ -248,7 +143,7 @@ class ArticleApprovalService
      */
     public function resubmit(int $pageId, int $contributorId): Page
     {
-        $page = $this->pageRepository->find($pageId);
+        $page = $this->pageService->findPage($pageId);
 
         if (!$page || (int)$page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
@@ -264,45 +159,22 @@ class ArticleApprovalService
             throw new OnboardingIncompleteException([]);
         }
 
-        if ($page->status !== PageStatus::ON_HOLD->value) {
-            throw new \InvalidArgumentException(
-                "Article [{$pageId}] cannot be resubmitted from status [{$page->status}]."
-            );
-        }
+        $nextCount = ((int)$page->resubmission_count) + 1;
+        $page = $this->pageService->resubmitPageForReview($pageId, $contributorId);
 
-        $page = $this->database->transaction(function () use ($page, $contributorId): Page {
-            $this->pageRepository->update($page->id, [
-                'status' => PageStatus::WAITING_APPROVAL->value,
-                'submitted_at' => date('Y-m-d H:i:s'),
-                'resubmission_count' => ((int)$page->resubmission_count) + 1,
-            ]);
-
-            $this->activityRepository->record(
-                siteId: $page->site_id,
-                userId: $contributorId,
-                type: ActivityEventType::ArticleUpdated,
-                payload: [
-                    'page_id' => $page->id,
-                    'action' => 'resubmitted',
-                    'resubmission_count' => ((int)$page->resubmission_count) + 1,
-                ],
-            );
-
-            return $this->pageRepository->find($page->id);
-        });
+        $this->activityRepository->record(
+            siteId: $page->site_id,
+            userId: $contributorId,
+            type: ActivityEventType::ArticleUpdated,
+            payload: [
+                'page_id' => $page->id,
+                'action' => 'resubmitted',
+                'resubmission_count' => $nextCount,
+            ],
+        );
 
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
-        );
-        $this->eventDispatcher->dispatch(
-            new ContentSubmittedForApproval(
-                contentType: 'pages',
-                contentId: (int)$page->id,
-                siteId: (int)$page->site_id,
-                actorId: $contributorId,
-                title: (string)$page->title,
-                ownerId: (int)$page->contributor_id,
-            )
         );
 
         return $page;
@@ -313,12 +185,6 @@ class ArticleApprovalService
      */
     public function pendingReviewForSite(int $siteId): \App\Framework\Support\Collection
     {
-        return $this->pageRepository
-            ->query()
-            ->where('site_id', $siteId)
-            ->where('status', PageStatus::WAITING_APPROVAL->value)
-            ->whereNotNull('contributor_id')
-            ->orderBy('submitted_at')
-            ->get();
+        return $this->pageService->pendingReviewForSite($siteId);
     }
 }

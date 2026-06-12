@@ -11,6 +11,7 @@ enum PageStatus: string
     case WAITING_APPROVAL = 'waiting_approval';
     case PRIVATE = 'private';
     case ON_HOLD = 'on_hold';
+    case REJECTED = 'rejected';
 
     case INTERNAL = 'internal';
 
@@ -24,6 +25,7 @@ enum PageStatus: string
             self::WAITING_APPROVAL => 'Waiting Approval',
             self::PRIVATE => 'Private',
             self::ON_HOLD => 'On Hold',
+            self::REJECTED => 'Rejected',
             self::INTERNAL => 'Internal',
         };
     }

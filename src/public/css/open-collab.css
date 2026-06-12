@@ -95,6 +95,18 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* ── Layout Shell ─────────────────────────────────────────── */
 .oc-shell {
     display: flex;
@@ -2532,4 +2544,486 @@ body {
 .badge-archived {
     background: #f3f4f6;
     color: #6b7280;
+}
+
+.oc-brief-inbox {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.oc-brief-inbox__titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.oc-brief-inbox__titlebar h1 {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 2rem;
+    line-height: 1.15;
+}
+
+.oc-brief-summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.oc-brief-summary__card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    min-height: 86px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: var(--shadow-sm);
+}
+
+.oc-brief-summary__card span {
+    color: var(--slate);
+    font-size: .76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.oc-brief-summary__card strong {
+    color: var(--navy);
+    font-size: 1.65rem;
+    line-height: 1;
+}
+
+.oc-brief-summary__card--danger strong {
+    color: var(--red);
+}
+
+.oc-brief-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.oc-brief-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.oc-brief-filter {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--slate);
+    border-radius: var(--radius-sm);
+    min-height: 34px;
+    padding: 0 11px;
+    font: inherit;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.oc-brief-filter:hover,
+.oc-brief-filter.is-active {
+    background: var(--navy);
+    border-color: var(--navy);
+    color: #fff;
+}
+
+.oc-brief-search {
+    min-width: 260px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 11px;
+}
+
+.oc-brief-search svg {
+    width: 16px;
+    height: 16px;
+    color: var(--slate);
+    flex-shrink: 0;
+}
+
+.oc-brief-search input {
+    border: 0;
+    outline: 0;
+    width: 100%;
+    font: inherit;
+    font-size: .86rem;
+    color: var(--navy);
+}
+
+.oc-brief-state {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    min-height: 190px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 8px;
+    color: var(--slate);
+    text-align: center;
+    padding: 28px;
+}
+
+.oc-brief-state[hidden] {
+    display: none;
+}
+
+.oc-brief-state strong {
+    color: var(--navy);
+    font-size: 1rem;
+}
+
+.oc-brief-state--error strong {
+    color: var(--red);
+}
+
+.oc-brief-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.oc-brief-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) auto minmax(132px, auto) auto;
+    align-items: center;
+    gap: 18px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-left: 4px solid transparent;
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.oc-brief-row--overdue {
+    border-left-color: var(--red);
+    background: #fffafa;
+}
+
+.oc-brief-row__main,
+.oc-brief-row__deadline {
+    min-width: 0;
+}
+
+.oc-brief-row__titleline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.oc-brief-row__titleline h2 {
+    color: var(--navy);
+    font-size: .98rem;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc-brief-row__meta,
+.oc-brief-row__deadline span {
+    color: var(--slate);
+    font-size: .78rem;
+}
+
+.oc-brief-row__meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.oc-brief-row__statuses {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+.oc-brief-row__deadline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.oc-brief-row__deadline strong {
+    color: var(--navy);
+    font-size: .86rem;
+}
+
+.oc-brief-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    border-radius: 999px;
+    background: var(--amber-pale);
+    color: var(--amber-dark);
+    padding: 0 9px;
+    font-size: .7rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.oc-brief-badge--muted {
+    background: var(--slate-pale);
+    color: var(--slate);
+}
+
+.oc-brief-badge--danger {
+    background: var(--red-pale);
+    color: var(--red);
+}
+
+@media (max-width: 1100px) {
+    .oc-brief-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .oc-brief-row {
+        grid-template-columns: 1fr;
+        align-items: stretch;
+    }
+
+    .oc-brief-row .oc-btn {
+        justify-self: start;
+    }
+}
+
+@media (max-width: 640px) {
+    .oc-brief-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .oc-brief-toolbar,
+    .oc-brief-search {
+        width: 100%;
+    }
+
+    .oc-brief-row__titleline h2 {
+        white-space: normal;
+    }
+}
+
+.oc-brief-workspace,
+.oc-brief-workspace__content,
+.oc-brief-workspace__main,
+.oc-brief-workspace__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.oc-brief-workspace__loading {
+    min-height: 260px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 10px;
+    color: var(--slate);
+}
+
+.oc-brief-workspace__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 18px;
+    align-items: start;
+}
+
+.oc-brief-workspace__header,
+.oc-brief-panel {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+}
+
+.oc-brief-workspace__header {
+    padding: 20px;
+}
+
+.oc-brief-workspace__header h1 {
+    font-family: var(--font-display);
+    color: var(--navy);
+    font-size: 2rem;
+    line-height: 1.12;
+    margin-bottom: 10px;
+}
+
+.oc-brief-panel {
+    padding: 18px;
+}
+
+.oc-brief-panel h2 {
+    color: var(--navy);
+    font-size: .98rem;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.oc-brief-panel__empty {
+    color: var(--slate);
+    font-size: .86rem;
+}
+
+.oc-brief-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.oc-brief-detail {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+}
+
+.oc-brief-detail span {
+    color: var(--slate);
+    display: block;
+    font-size: .72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.oc-brief-detail strong,
+.oc-brief-detail p {
+    color: var(--navy);
+    font-size: .9rem;
+}
+
+.oc-brief-item {
+    border-top: 1px solid var(--border);
+    padding: 12px 0;
+}
+
+.oc-brief-item:first-of-type {
+    border-top: 0;
+    padding-top: 0;
+}
+
+.oc-brief-item__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+}
+
+.oc-brief-item__head strong {
+    color: var(--navy);
+}
+
+.oc-brief-item p,
+.oc-brief-item span {
+    color: var(--slate);
+    font-size: .84rem;
+}
+
+.oc-brief-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.oc-brief-actions .oc-btn {
+    justify-content: center;
+}
+
+.oc-brief-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 25, 41, .44);
+    z-index: 500;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+}
+
+.oc-brief-modal[hidden] {
+    display: none;
+}
+
+.oc-brief-modal__dialog {
+    background: #fff;
+    border-radius: var(--radius);
+    width: min(520px, 100%);
+    padding: 20px;
+    position: relative;
+    box-shadow: var(--shadow-lg);
+}
+
+.oc-brief-modal__dialog h2 {
+    color: var(--navy);
+    margin-bottom: 14px;
+    font-size: 1.1rem;
+}
+
+.oc-brief-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.oc-brief-field label {
+    color: var(--slate);
+    font-size: .78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.oc-brief-field input,
+.oc-brief-field textarea {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font: inherit;
+    padding: 9px 10px;
+}
+
+.oc-brief-field textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.oc-brief-modal__errors {
+    color: var(--red);
+    background: var(--red-pale);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    font-size: .84rem;
+    margin-bottom: 12px;
+}
+
+.oc-brief-modal__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+@media (max-width: 980px) {
+    .oc-brief-workspace__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .oc-brief-detail-grid {
+        grid-template-columns: 1fr;
+    }
 }

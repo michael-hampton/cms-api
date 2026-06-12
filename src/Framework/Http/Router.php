@@ -118,6 +118,13 @@ class Router
         return $this;
     }
 
+    public function patch(string $path, $handler, ?string $method = null, array $middleware = []): self
+    {
+        $this->addRoute('PATCH', $path, $handler, $method, $middleware);
+
+        return $this;
+    }
+
     /**
      * Enhanced DELETE method - supports both old and new syntax
      */
@@ -269,6 +276,7 @@ class Router
                 $handler = $routeData['handler'] ?? $routeData;
 
                 $middlewareStack = array_merge($this->globalMiddleware, $routeData['middleware']);
+                $request->setRouteParams($params);
 
                 Session::setPreviousUrl($redirectPath);
 

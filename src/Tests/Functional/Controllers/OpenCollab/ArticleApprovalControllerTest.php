@@ -73,7 +73,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         $this->assertEquals(200, $response->getStatusCode());
         $this->assertDatabaseHas('pages', [
             'id' => $page->id,
-            'status' => PageStatus::ON_HOLD->value,
+            'status' => PageStatus::REJECTED->value,
             'rejection_reason' => 'quality',
         ]);
     }
@@ -147,7 +147,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
 
         $page = $this->createPage([
             'contributor_id' => $this->contributor->id,
-            'status' => PageStatus::ON_HOLD->value,
+            'status' => PageStatus::REJECTED->value,
             'resubmission_count' => 1,
         ]);
 

@@ -43,6 +43,32 @@ class BriefResource extends JsonResource
             'attachments' => $this->getAttribute('attachments') ?? [],
             'comments' => $this->getAttribute('comments') ?? [],
             'collaborators' => $this->getAttribute('collaborators') ?? [],
+            'pending_contributor_requests' => $this->pendingContributorRequests(),
         ];
+    }
+
+    private function pendingContributorRequests(): array
+    {
+        $activity = $this->getAttribute('activityLog') ?? [];
+        $requestActions = ['deadline_change_requested', 'negotiation_requested'];
+        $requests = [];
+
+        foreach ($activity as $event) {
+            $action = is_array($event) ? ($event['action'] ?? null) : ($event->action ?? null);
+            if (!in_array($action, $requestActions, true)) {
+                continue;
+            }
+
+            $metadata = is_array($event) ? ($event['metadata'] ?? []) : ($event->metadata ?? []);
+            $requests[] = [
+                'type' => $action,
+                'description' => is_array($event) ? ($event['description'] ?? '') : ($event->description ?? ''),
+                'metadata' => is_array($metadata) ? $metadata : [],
+                'created_at' => is_array($event) ? ($event['created_at'] ?? null) : ($event->created_at ?? null),
+                'user_id' => is_array($event) ? ($event['user_id'] ?? null) : ($event->user_id ?? null),
+            ];
+        }
+
+        return $requests;
     }
 }

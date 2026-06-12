@@ -63,6 +63,11 @@ class Brief extends Model
         return $this->belongsTo(Category::class, 'category_id', 'id', $relation);
     }
 
+    public function site(bool $relation = false)
+    {
+        return $this->belongsTo(Site::class, 'site_id', 'id', $relation);
+    }
+
     public function convertedPage(bool $relation = false)
     {
         return $this->belongsTo(Page::class, 'converted_page_id', 'id', $relation);
@@ -121,6 +126,11 @@ class Brief extends Model
     public function tasks()
     {
         return $this->hasMany(BriefTask::class);
+    }
+
+    public function deadlines()
+    {
+        return $this->hasMany(BriefDeadline::class)->orderBy('due_date');
     }
 
     public function versions()

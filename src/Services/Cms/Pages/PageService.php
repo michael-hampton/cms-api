@@ -72,6 +72,22 @@ class PageService
         return $this->pageRepository->getCompletePageData($pageId);
     }
 
+    public function findPage(int $pageId): ?Page
+    {
+        return $this->pageRepository->find($pageId);
+    }
+
+    public function pendingReviewForSite(int $siteId): Collection
+    {
+        return $this->pageRepository
+            ->query()
+            ->where('site_id', $siteId)
+            ->where('status', PageStatus::WAITING_APPROVAL->value)
+            ->whereNotNull('contributor_id')
+            ->orderBy('submitted_at')
+            ->get();
+    }
+
     public function createOrUpdatePageWithAllData(array $requestData, int $siteId): Page
     {
         $this->validateCompletePageData($requestData);
@@ -329,11 +345,11 @@ class PageService
         $page = $this->pageRepository->find($pageId);
 
         if (!$page) {
-            throw new \Exception("Page not found");
+            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
         }
 
         if (!$page->isWaitingApproval()) {
-            throw new \Exception("Page is not waiting for approval");
+            throw new \InvalidArgumentException("Article [{$pageId}] is not awaiting approval (status: {$page->status}).");
         }
 
         $approvedPage = $this->database->transaction(function () use ($page, $userId) {
@@ -365,28 +381,103 @@ class PageService
         return $approvedPage;
     }
 
-    /**
-     * Reject approval request
-     */
-    public function rejectPage(int $pageId, int $userId, ?string $reason = null): Page
+    public function submitPageForReview(int $pageId, int $contributorId): Page
     {
         $page = $this->pageRepository->find($pageId);
 
         if (!$page) {
-            throw new \Exception("Page not found");
+            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
+        }
+
+        if ((int)$page->contributor_id !== $contributorId) {
+            throw new \InvalidArgumentException("Page [{$pageId}] does not belong to contributor [{$contributorId}].");
+        }
+
+        if (!in_array($page->status, [PageStatus::DRAFT->value, PageStatus::ON_HOLD->value], true)) {
+            throw new \InvalidArgumentException(
+                "Article [{$pageId}] cannot be submitted from status [{$page->status}]."
+            );
+        }
+
+        $submittedPage = $this->database->transaction(function () use ($page, $contributorId) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::WAITING_APPROVAL->value,
+                'submitted_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $this->historyService->logPageWaitingApproval($page);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+
+        $this->dispatchSubmittedForApproval($submittedPage, $contributorId);
+
+        return $submittedPage;
+    }
+
+    public function resubmitPageForReview(int $pageId, int $contributorId): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
+        }
+
+        if ((int)$page->contributor_id !== $contributorId) {
+            throw new \InvalidArgumentException("Page [{$pageId}] does not belong to contributor [{$contributorId}].");
+        }
+
+        if ($page->status !== PageStatus::REJECTED->value) {
+            throw new \InvalidArgumentException(
+                "Article [{$pageId}] cannot be resubmitted from status [{$page->status}]."
+            );
+        }
+
+        $submittedPage = $this->database->transaction(function () use ($page, $contributorId) {
+            $updatedPage = $this->pageRepository->update($page->id, [
+                'status' => PageStatus::WAITING_APPROVAL->value,
+                'submitted_at' => date('Y-m-d H:i:s'),
+                'resubmission_count' => ((int)$page->resubmission_count) + 1,
+            ]);
+
+            $this->historyService->logPageWaitingApproval($page);
+
+            return $this->getCompletePageData($updatedPage->id);
+        });
+
+        $this->dispatchSubmittedForApproval($submittedPage, $contributorId);
+
+        return $submittedPage;
+    }
+
+    /**
+     * Reject approval request
+     */
+    public function rejectPage(int $pageId, int $userId, ?string $reason = null, ?string $notes = null): Page
+    {
+        $page = $this->pageRepository->find($pageId);
+
+        if (!$page) {
+            throw new \InvalidArgumentException("Page [{$pageId}] not found.");
         }
 
         if (!$page->isWaitingApproval()) {
-            throw new \Exception("Page is not waiting for approval");
+            throw new \InvalidArgumentException("Article [{$pageId}] is not awaiting approval (status: {$page->status}).");
         }
 
-        $rejectedPage = $this->database->transaction(function () use ($page, $userId, $reason) {
+        $rejectedPage = $this->database->transaction(function () use ($page, $userId, $reason, $notes) {
             // Remove approval if it was there
             $page->removeApproval();
 
-            // Change status back to draft
+            // Keep rejected pages in an explicit rejected workflow state.
             $updatedPage = $this->pageRepository->update($page->id, [
-                'status' => Pagestatus::DRAFT->value,
+                'status' => PageStatus::REJECTED->value,
+                'rejected_by' => $userId,
+                'rejected_at' => date('Y-m-d H:i:s'),
+                'rejection_reason' => $reason,
+                'rejection_notes' => $notes,
+                'approved_by' => null,
+                'approved_at' => null,
             ]);
 
             // Log rejection

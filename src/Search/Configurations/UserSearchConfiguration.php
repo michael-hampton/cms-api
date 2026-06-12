@@ -10,7 +10,7 @@ use App\Search\SortSpecification;
 
 class UserSearchConfiguration extends SearchConfiguration implements SearchConfigurationInterface
 {
-    use HasSite;
+    //use HasSite;
 
     public function configure(): void
     {

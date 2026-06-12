@@ -55,6 +55,7 @@ class NotificationController extends Controller
         );
 
         return $this->resourceResponse([
+            'data' => $items,
             'notifications' => $items,
             'next_cursor' => $page['next_cursor'],
             'unread_count' => $this->unreadCountForSite($userId, $siteId),
@@ -113,6 +114,13 @@ class NotificationController extends Controller
         }
 
         $this->service->markAsRead($user, $notificationId);
+
+        return $this->resourceResponse(['success' => true]);
+    }
+
+    public function markAsReadById(int $notification): JsonResponse
+    {
+        $this->service->markAsRead($this->resolveUser(), $notification);
 
         return $this->resourceResponse(['success' => true]);
     }

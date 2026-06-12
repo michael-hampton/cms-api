@@ -106,6 +106,8 @@ use App\Controllers\OpenCollab\ArticleCommentController;
 use App\Controllers\OpenCollab\ArticleHistoryController;
 use App\Controllers\OpenCollab\ArticlePaymentController;
 use App\Controllers\OpenCollab\ContributorAuthController;
+use App\Controllers\OpenCollab\ContributorBriefController;
+use App\Controllers\OpenCollab\ContributorBriefInboxController;
 use App\Controllers\OpenCollab\ContributorDashboardController;
 use App\Controllers\OpenCollab\ContributorNotificationPreferenceController;
 use App\Controllers\OpenCollab\ContributorPageController;
@@ -162,6 +164,7 @@ use App\Controllers\WorkflowController;
 use App\Framework\Authorization\AuthenticateWithToken;
 use App\Framework\Http\Router;
 use App\Framework\Middleware\AuthenticateMemberWithToken;
+use App\Framework\Middleware\RequireBriefAssignmentAccess;
 
 /**
  * @var $router Router
@@ -416,6 +419,34 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             '/open-collab/dashboard',
             [ContributorDashboardController::class, 'show']
         );
+
+        $router->get(
+            '/open-collab/briefs',
+            [ContributorBriefInboxController::class, 'apiIndex']
+        );
+
+        $router->group(['middleware' => [RequireBriefAssignmentAccess::class]], function ($router) {
+            $router->get('/open-collab/briefs/{brief}', [ContributorBriefController::class, 'apiShow']);
+            $router->get('/open-collab/briefs/{brief}/timeline', [ContributorBriefController::class, 'timeline']);
+            $router->get('/open-collab/briefs/{brief}/tasks', [ContributorBriefController::class, 'tasks']);
+            $router->patch('/open-collab/briefs/{brief}/tasks/{task}', [ContributorBriefController::class, 'updateTask']);
+            $router->post('/open-collab/briefs/{brief}/tasks/{task}', [ContributorBriefController::class, 'updateTask']);
+            $router->get('/open-collab/briefs/{brief}/attachments', [ContributorBriefController::class, 'attachments']);
+            $router->post('/open-collab/briefs/{brief}/attachments', [ContributorBriefController::class, 'uploadAttachment']);
+            $router->delete('/open-collab/briefs/{brief}/attachments/{attachment}', [ContributorBriefController::class, 'deleteAttachment']);
+            $router->get('/open-collab/briefs/{brief}/comments', [ContributorBriefController::class, 'comments']);
+            $router->post('/open-collab/briefs/{brief}/comments', [ContributorBriefController::class, 'createComment']);
+            $router->post('/open-collab/briefs/{brief}/accept', [ContributorBriefController::class, 'accept']);
+            $router->post('/open-collab/briefs/{brief}/reject', [ContributorBriefController::class, 'reject']);
+            $router->post('/open-collab/briefs/{brief}/negotiate', [ContributorBriefController::class, 'negotiate']);
+            $router->post('/open-collab/briefs/{brief}/request-clarification', [ContributorBriefController::class, 'requestClarification']);
+            $router->post('/open-collab/briefs/{brief}/request-deadline-change', [ContributorBriefController::class, 'requestDeadlineChange']);
+            $router->post('/open-collab/briefs/{brief}/submit', [ContributorBriefController::class, 'submit']);
+            $router->post('/open-collab/briefs/{brief}/resubmit', [ContributorBriefController::class, 'resubmit']);
+        });
+        $router->patch('/open-collab/comments/{comment}', [ContributorBriefController::class, 'updateComment']);
+        $router->post('/open-collab/comments/{comment}', [ContributorBriefController::class, 'updateComment']);
+        $router->post('/open-collab/comments/{comment}/resolve', [ContributorBriefController::class, 'resolveComment']);
 
         // Contributor pages (articles)
         $router->get(
@@ -1846,6 +1877,7 @@ $router->group(['prefix' => '/api/{site}/open-collab'], function () use ($router
         $router->get('', [NotificationController::class, 'index']);
         $router->get('/unread-count', [NotificationController::class, 'unreadCount']);
         $router->post('/read', [NotificationController::class, 'markAsRead']);
+        $router->post('/{notification}/read', [NotificationController::class, 'markAsReadById']);
         $router->post('/read-all', [NotificationController::class, 'markAllAsRead']);
         $router->get('/preferences', [ContributorNotificationPreferenceController::class, 'index']);
         $router->post('/preferences', [ContributorNotificationPreferenceController::class, 'update']);

@@ -41,6 +41,16 @@
                 Dashboard
             </a>
 
+            <a href="/<?= $site ?>/open-collab/briefs"
+               class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'briefs' ? 'active' : '' ?>">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd"
+                          d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414A2 2 0 0017.414 6L15 3.586A2 2 0 0013.586 3H4zm8 1.5V7a1 1 0 001 1h2.5v7H4V5h8z"
+                          clip-rule="evenodd"/>
+                </svg>
+                My Briefs
+            </a>
+
             <a href="/<?= $site ?>/open-collab/articles"
                class="oc-sidebar__nav-link <?= ($activeNav ?? '') === 'articles' ? 'active' : '' ?>">
                 <svg viewBox="0 0 20 20" fill="currentColor">

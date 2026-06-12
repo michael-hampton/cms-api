@@ -157,6 +157,7 @@ class Page extends Model
             PageStatus::WAITING_APPROVAL->value,
             PageStatus::PRIVATE->value,
             PageStatus::ON_HOLD->value,
+            PageStatus::REJECTED->value,
             PageStatus::INTERNAL->value,
         ];
     }
@@ -555,6 +556,11 @@ class Page extends Model
         return $this->status === PageStatus::ON_HOLD->value;;
     }
 
+    public function isRejected(): bool
+    {
+        return $this->status === PageStatus::REJECTED->value;
+    }
+
     /**
      * Check if status can be changed to target status
      */
@@ -577,12 +583,14 @@ class Page extends Model
                 PageStatus::PUBLISHED, // Only after approval
                 PageStatus::DRAFT,
                 PageStatus::ON_HOLD,
+                PageStatus::REJECTED,
                 PageStatus::ARCHIVED
             ],
             PageStatus::PUBLISHED->value => [
                 PageStatus::DRAFT,
                 PageStatus::PRIVATE,
                 PageStatus::ON_HOLD,
+                PageStatus::REJECTED,
                 PageStatus::ARCHIVED
             ],
             PageStatus::PRIVATE->value => [
@@ -599,12 +607,18 @@ class Page extends Model
                 PageStatus::PRIVATE,
                 PageStatus::ARCHIVED
             ],
+            PageStatus::REJECTED->value => [
+                PageStatus::DRAFT,
+                PageStatus::WAITING_APPROVAL,
+                PageStatus::ARCHIVED
+            ],
             PageStatus::INTERNAL->value => [  // NEW
                 PageStatus::DRAFT,
                 PageStatus::WAITING_APPROVAL,
                 PageStatus::PUBLISHED,
                 PageStatus::PRIVATE,
                 PageStatus::ON_HOLD,
+                PageStatus::REJECTED,
                 PageStatus::ARCHIVED
             ],
             PageStatus::ARCHIVED->value => [

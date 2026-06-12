@@ -839,31 +839,96 @@ class PageServiceTest extends FunctionalTestCase
         $this->invokePrivateMethod('processTagsForm', 1, $tagsForm, $this->siteId);
     }
 
-    public function testPublishPageWithApprovalRequiredGoesToWaitingApproval()
+    public function testPublishPageWithApprovalRequiredGoesToWaitingApproval(): void
     {
-        $page = Mockery::mock(Page::class)->makePartial();
-        $page->requires_approval = true;
-        $page->id = 1;
-        $page->status = 'draft';
+        $existingPage = Mockery::mock(Page::class)->makePartial();
+        $existingPage->id = 1;
+        $existingPage->title = 'Approval Required Page';
+        $existingPage->slug = 'approval-required-page';
+        $existingPage->status = PageStatus::DRAFT->value;
+        $existingPage->site_id = $this->siteId;
+        $existingPage->contributor_id = 5;
 
-        $this->pageRepository->shouldReceive('find')->with($page->id)->andReturn($page);
-        $this->pageRepository->shouldReceive('getCompletePageData')->andReturn($page);
-        $this->setupTransaction();
-        $this->pageRepository->shouldReceive('update')->once()->andReturn($page);
-        $this->pageHistory->shouldReceive('logPageWaitingApproval')->once();
+        $existingPage->shouldReceive('requiresApproval')
+            ->once()
+            ->andReturn(true);
 
-        $this->setPageHistoryUpdate();
+        $existingPage->shouldReceive('isApproved')
+            ->once()
+            ->andReturn(false);
+
+        $existingPage->shouldReceive('canTransitionTo')
+            ->with(PageStatus::PUBLISHED->value)
+            ->once()
+            ->andReturn(true);
+
+        $updatedPage = Mockery::mock(Page::class)->makePartial();
+        $updatedPage->id = 1;
+        $updatedPage->title = 'Approval Required Page';
+        $updatedPage->slug = 'approval-required-page';
+        $updatedPage->status = PageStatus::WAITING_APPROVAL->value;
+        $updatedPage->site_id = $this->siteId;
+        $updatedPage->contributor_id = 5;
 
         $requestData = [
-            'id' => $page->id,
-            'status' => 'published',
-            'forms' => ['meta' => ['status' => 'published']],
-            'site_id' => $this->siteId
+            'id' => 1,
+            'status' => PageStatus::PUBLISHED->value,
+            'title' => 'Approval Required Page',
+            'slug' => 'approval-required-page',
+            'page_type' => 'content',
+            'contributor_id' => 5,
         ];
 
-        $result = $this->service->updatePageWithAllData($page->id, $requestData, $this->siteId);
+        $this->pageRepository->shouldReceive('find')
+            ->once()
+            ->with(1)
+            ->andReturn($existingPage);
 
-        $this->assertNotNull($result);
+        $this->pageHistory->shouldReceive('logPageWaitingApproval')
+            ->once()
+            ->with($existingPage);
+
+        $this->setupTransaction();
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($existingPage);
+
+        $this->pageRepository->shouldReceive('update')
+            ->once()
+            ->with(
+                1,
+                Mockery::subset([
+                    'status' => PageStatus::WAITING_APPROVAL->value,
+                    'page_type' => 'content',
+                    'site_id' => $this->siteId,
+                ])
+            )
+            ->andReturn($updatedPage);
+
+        $this->pageHistory->shouldReceive('logPageUpdated')
+            ->once()
+            ->with(1, Mockery::type('array'), Mockery::type('array'))
+            ->andReturn(new PageHistory([
+                'id' => 55,
+                'page_id' => 1,
+                'user_id' => 5,
+            ]));
+
+        $this->firstEditorialChangeReporter
+            ->shouldReceive('reportIfNeeded')
+            ->once();
+
+        $this->pageRepository->shouldReceive('getCompletePageData')
+            ->once()
+            ->with(1)
+            ->andReturn($updatedPage);
+
+        $result = $this->service->updatePageWithAllData(1, $requestData, $this->siteId);
+
+        $this->assertSame($updatedPage, $result);
+        $this->assertSame(PageStatus::WAITING_APPROVAL->value, $result->status);
     }
 
     public function testPublishPageWithoutApprovalRequiredPublishes()
@@ -923,8 +988,8 @@ class PageServiceTest extends FunctionalTestCase
 
         $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
 
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage("Page is not waiting for approval");
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage("Article [1] is not awaiting approval (status: draft).");
 
         $this->service->approvePage(1, 1);
     }
@@ -947,6 +1012,62 @@ class PageServiceTest extends FunctionalTestCase
         $result = $this->service->rejectPage(1, 1, 'Not ready for publishing');
 
         $this->assertNotNull($result);
+    }
+
+    public function testSubmitPageForReviewTransitionsDraftToWaitingApproval()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = $this->siteId;
+        $page->contributor_id = 7;
+        $page->status = PageStatus::DRAFT->value;
+
+        $updated = Mockery::mock(Page::class)->makePartial();
+        $updated->id = 1;
+        $updated->status = PageStatus::WAITING_APPROVAL->value;
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn($id, $data) => $id === 1 && $data['status'] === PageStatus::WAITING_APPROVAL->value)
+            ->andReturn($updated);
+        $this->pageHistory->shouldReceive('logPageWaitingApproval')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($updated);
+
+        $result = $this->service->submitPageForReview(1, 7);
+
+        $this->assertSame($updated, $result);
+    }
+
+    public function testResubmitPageForReviewTransitionsRejectedToWaitingApproval()
+    {
+        $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 1;
+        $page->site_id = $this->siteId;
+        $page->contributor_id = 7;
+        $page->status = PageStatus::REJECTED->value;
+        $page->resubmission_count = 1;
+
+        $updated = Mockery::mock(Page::class)->makePartial();
+        $updated->id = 1;
+        $updated->status = PageStatus::WAITING_APPROVAL->value;
+        $updated->resubmission_count = 2;
+
+        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page);
+        $this->setupTransaction();
+        $this->pageRepository->shouldReceive('update')
+            ->once()
+            ->withArgs(fn($id, $data) => $id === 1
+                && $data['status'] === PageStatus::WAITING_APPROVAL->value
+                && $data['resubmission_count'] === 2)
+            ->andReturn($updated);
+        $this->pageHistory->shouldReceive('logPageWaitingApproval')->once();
+        $this->pageRepository->shouldReceive('getCompletePageData')->once()->andReturn($updated);
+
+        $result = $this->service->resubmitPageForReview(1, 7);
+
+        $this->assertSame($updated, $result);
     }
 
     public function testPutPageOnHold()

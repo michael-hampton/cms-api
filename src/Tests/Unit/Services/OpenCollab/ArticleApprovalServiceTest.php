@@ -5,326 +5,54 @@ namespace App\Tests\Unit\Services\OpenCollab;
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Enums\Pages\PageStatus;
-use App\Events\Cms\ContentApproved;
-use App\Events\Cms\ContentRejected;
-use App\Events\Cms\ContentSubmittedForApproval;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
-use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
+use App\Framework\Support\Collection;
 use App\Models\Page;
 use App\Models\Site;
-use App\Models\User;
-use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
+use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
-use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
-use Mockery\MockInterface;
+use PHPUnit\Framework\TestCase;
 
-class ArticleApprovalServiceTest extends FunctionalTestCase
+class ArticleApprovalServiceTest extends TestCase
 {
-    private ArticleApprovalService $service;
-    private MockInterface $pageRepository;
-    private MockInterface $activityRepository;
-    private MockInterface $eventDispatcher;
-    private MockInterface $databaseMock;
-    private MockInterface $policy;
-    private MockInterface $siteRepository;
+    private PageService $pageService;
+    private ActivityRepository $activityRepository;
+    private EventDispatcher $eventDispatcher;
+    private ContributorPolicy $policy;
+    private SiteRepository $siteRepository;
     private NotificationDispatcher $notificationDispatcher;
     private UserRepositoryInterface $userRepository;
-
-    // ── submitForReview() — policy enforcement ────────────────────────────────
-
-    public function test_submit_throws_onboarding_incomplete_when_policy_blocks(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::DRAFT->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldReceive('canSubmitForReview')->with(7, Mockery::type(Site::class))->andReturn(false);
-
-        $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
-
-        $this->pageRepository->shouldNotReceive('update');
-        $this->eventDispatcher->shouldNotReceive('dispatch');
-
-        $this->expectException(OnboardingIncompleteException::class);
-        $this->service->submitForReview(1, 7);
-    }
-
-    public function test_submit_transitions_draft_to_waiting_approval_when_policy_allows(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::DRAFT->value, 'site_id' => 1]);
-        $updated = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::WAITING_APPROVAL->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->with(1)->andReturn($page, $updated);
-        $this->policy->shouldReceive('canSubmitForReview')->andReturn(true);
-        $this->siteRepository->shouldReceive('find')->with(1)->andReturn($site);
-
-        $this->pageRepository->shouldReceive('update')
-            ->once()
-            ->withArgs(fn($id, $data) => $id === 1 && $data['status'] === PageStatus::WAITING_APPROVAL->value);
-        $this->activityRepository->shouldReceive('record')->once();
-        $this->eventDispatcher->shouldReceive('dispatch')
-            ->once()
-            ->withArgs(fn($e) => $e instanceof ArticleSubmittedForReviewEvent && $e->contributorId === 7);
-        $this->eventDispatcher->shouldReceive('dispatch')
-            ->once()
-            ->withArgs(fn($e) => $e instanceof ContentSubmittedForApproval && $e->ownerId === 7);
-
-        $result = $this->service->submitForReview(1, 7);
-
-        $this->assertEquals(PageStatus::WAITING_APPROVAL->value, $result->status);
-    }
-
-    public function test_submit_transitions_on_hold_to_waiting_approval_when_policy_allows(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::ON_HOLD->value, 'site_id' => 1]);
-        $updated = $this->makePage(['id' => 1, 'status' => PageStatus::WAITING_APPROVAL->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page, $updated);
-        $this->policy->shouldReceive('canSubmitForReview')->andReturn(true);
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
-        $this->pageRepository->shouldReceive('update')->once();
-        $this->activityRepository->shouldReceive('record')->once();
-        $this->eventDispatcher->shouldReceive('dispatch')->twice();
-
-        $this->service->submitForReview(1, 7);
-        $this->assertTrue(true);
-    }
-
-    public function test_submit_throws_for_non_owner(): void
-    {
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 99]);
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldNotReceive('canSubmitForReview');
-        $this->pageRepository->shouldNotReceive('update');
-        $this->eventDispatcher->shouldNotReceive('dispatch');
-
-        $this->expectException(UnauthorisedPageAccessException::class);
-        $this->service->submitForReview(1, 7);
-    }
-
-    public function test_submit_throws_for_already_published_page(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::PUBLISHED->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldReceive('canSubmitForReview')->andReturn(true);
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
-        $this->pageRepository->shouldNotReceive('update');
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->submitForReview(1, 7);
-    }
-
-    // ── resubmit() — policy enforcement ──────────────────────────────────────
-
-    public function test_resubmit_throws_onboarding_incomplete_when_policy_blocks(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::ON_HOLD->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldReceive('canSubmitForReview')->with(7, Mockery::type(Site::class))->andReturn(false);
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
-
-        $this->pageRepository->shouldNotReceive('update');
-        $this->eventDispatcher->shouldNotReceive('dispatch');
-
-        $this->expectException(OnboardingIncompleteException::class);
-        $this->service->resubmit(1, 7);
-    }
-
-    public function test_resubmit_increments_resubmission_count_when_policy_allows(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'status' => PageStatus::ON_HOLD->value, 'contributor_id' => 7, 'site_id' => 1, 'resubmission_count' => 1]);
-        $resubmitted = $this->makePage(['id' => 1, 'status' => PageStatus::WAITING_APPROVAL->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page, $resubmitted);
-        $this->policy->shouldReceive('canSubmitForReview')->andReturn(true);
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
-        $this->pageRepository->shouldReceive('update')
-            ->once()
-            ->withArgs(fn($id, $data) => $data['resubmission_count'] === 2);
-        $this->activityRepository->shouldReceive('record')->once();
-        $this->eventDispatcher->shouldReceive('dispatch')->once()
-            ->withArgs(fn($e) => $e instanceof ArticleSubmittedForReviewEvent);
-        $this->eventDispatcher->shouldReceive('dispatch')->once()
-            ->withArgs(fn($e) => $e instanceof ContentSubmittedForApproval);
-
-        $this->service->resubmit(1, 7);
-        $this->assertTrue(true);
-    }
-
-    public function test_resubmit_throws_for_non_on_hold_page(): void
-    {
-        $site = new Site(['id' => 1]);
-        $site->exists = true;
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 7, 'status' => PageStatus::DRAFT->value, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldReceive('canSubmitForReview')->andReturn(true);
-        $this->siteRepository->shouldReceive('find')->andReturn($site);
-        $this->pageRepository->shouldNotReceive('update');
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->resubmit(1, 7);
-    }
-
-    public function test_resubmit_throws_for_non_owner(): void
-    {
-        $page = $this->makePage(['id' => 1, 'contributor_id' => 99, 'status' => PageStatus::ON_HOLD->value]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->policy->shouldNotReceive('canSubmitForReview');
-        $this->pageRepository->shouldNotReceive('update');
-
-        $this->expectException(UnauthorisedPageAccessException::class);
-        $this->service->resubmit(1, 7);
-    }
-
-    // ── approve() ─────────────────────────────────────────────────────────────
-
-    public function test_approve_transitions_to_published_and_emits_event(): void
-    {
-        $page = $this->makePage(['id' => 1, 'status' => PageStatus::WAITING_APPROVAL->value, 'contributor_id' => 7, 'site_id' => 1]);
-        $published = $this->makePage(['id' => 1, 'status' => PageStatus::PUBLISHED->value, 'contributor_id' => 7, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page, $published);
-        $this->pageRepository->shouldReceive('update')
-            ->once()
-            ->withArgs(fn($id, $data) => $data['status'] === PageStatus::PUBLISHED->value && $data['approved_by'] === 55);
-        $this->activityRepository->shouldReceive('record')->once()
-            ->withArgs(fn($siteId, $userId, $type) => $type === ActivityEventType::ArticlePublished);
-        $this->eventDispatcher->shouldReceive('dispatch')
-            ->once()
-            ->withArgs(fn($e) => $e instanceof ContentApproved && $e->ownerId === 7 && $e->actorId === 55);
-
-        $this->userRepository->shouldNotReceive('find');
-        $this->notificationDispatcher->shouldNotReceive('dispatch');
-
-        $result = $this->service->approve(1, adminId: 55);
-
-        $this->assertEquals(PageStatus::PUBLISHED->value, $result->status);
-    }
-
-    public function test_approve_throws_when_page_not_awaiting_approval(): void
-    {
-        $page = $this->makePage(['id' => 1, 'status' => PageStatus::DRAFT->value]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->pageRepository->shouldNotReceive('update');
-        $this->eventDispatcher->shouldNotReceive('dispatch');
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->approve(1, 55);
-    }
-
-    public function test_approve_throws_when_page_not_found(): void
-    {
-        $this->pageRepository->shouldReceive('find')->andReturn(null);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->approve(999, 55);
-    }
-
-    // ── reject() ──────────────────────────────────────────────────────────────
-
-    public function test_reject_transitions_to_on_hold_with_reason(): void
-    {
-        $page = $this->makePage(['id' => 1, 'status' => PageStatus::WAITING_APPROVAL->value, 'contributor_id' => 7, 'site_id' => 1]);
-        $onHold = $this->makePage(['id' => 1, 'status' => PageStatus::ON_HOLD->value, 'contributor_id' => 7, 'site_id' => 1]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page, $onHold);
-        $this->pageRepository->shouldReceive('update')
-            ->once()
-            ->withArgs(function ($id, $data): bool {
-                return $data['status'] === PageStatus::ON_HOLD->value
-                    && $data['rejection_reason'] === RejectionReason::Quality->value
-                    && $data['rejection_notes'] === 'Needs more depth.';
-            });
-        $this->activityRepository->shouldReceive('record')->once();
-        $this->eventDispatcher->shouldReceive('dispatch')
-            ->once()
-            ->withArgs(fn($e) => $e instanceof ContentRejected && $e->ownerId === 7 && $e->reason === 'Needs more depth.');
-
-        $this->userRepository->shouldNotReceive('find');
-        $this->notificationDispatcher->shouldNotReceive('dispatch');
-
-        $this->service->reject(1, 55, RejectionReason::Quality, 'Needs more depth.');
-        $this->assertTrue(true);
-    }
-
-    public function test_reject_throws_when_page_not_awaiting_approval(): void
-    {
-        $page = $this->makePage(['id' => 1, 'status' => PageStatus::PUBLISHED->value]);
-
-        $this->pageRepository->shouldReceive('find')->andReturn($page);
-        $this->pageRepository->shouldNotReceive('update');
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->service->reject(1, 55, RejectionReason::Quality);
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private function makePage(array $attributes = []): Page
-    {
-        $defaults = [
-            'id' => 1,
-            'site_id' => 1,
-            'title' => 'Test Article',
-            'status' => PageStatus::DRAFT->value,
-            'contributor_id' => 7,
-            'resubmission_count' => 0,
-        ];
-        $page = new Page(array_merge($defaults, $attributes));
-        $page->exists = true;
-        return $page;
-    }
+    private ArticleApprovalService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->pageRepository = Mockery::mock(PageRepository::class);
+        $this->pageService = Mockery::mock(PageService::class);
         $this->activityRepository = Mockery::mock(ActivityRepository::class);
         $this->eventDispatcher = Mockery::mock(EventDispatcher::class);
-        $this->databaseMock = Mockery::mock(Database::class);
         $this->policy = Mockery::mock(ContributorPolicy::class);
         $this->siteRepository = Mockery::mock(SiteRepository::class);
         $this->notificationDispatcher = Mockery::mock(NotificationDispatcher::class);
         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
 
-        $this->databaseMock->shouldReceive('transaction')->andReturnUsing(fn(callable $cb) => $cb());
-
         $this->service = new ArticleApprovalService(
-            $this->pageRepository,
+            $this->pageService,
             $this->activityRepository,
             $this->eventDispatcher,
-            $this->databaseMock,
             $this->policy,
             $this->siteRepository,
             $this->notificationDispatcher,
-            $this->userRepository
+            $this->userRepository,
         );
     }
 
@@ -332,5 +60,137 @@ class ArticleApprovalServiceTest extends FunctionalTestCase
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+    public function test_submit_checks_policy_then_delegates_page_transition_to_page_service(): void
+    {
+        $page = $this->page(['status' => PageStatus::DRAFT->value]);
+        $submitted = $this->page(['status' => PageStatus::WAITING_APPROVAL->value]);
+        $site = Mockery::mock(Site::class);
+
+        $this->pageService->shouldReceive('findPage')->once()->with(1)->andReturn($page);
+        $this->siteRepository->shouldReceive('find')->once()->with(1)->andReturn($site);
+        $this->policy->shouldReceive('canSubmitForReview')->once()->with(7, $site)->andReturn(true);
+        $this->pageService->shouldReceive('submitPageForReview')->once()->with(1, 7)->andReturn($submitted);
+        $this->activityRepository->shouldReceive('record')
+            ->once()
+            ->with(1, 7, ActivityEventType::ArticleUpdated, ['page_id' => 1, 'action' => 'submitted_for_review']);
+        $this->eventDispatcher->shouldReceive('dispatch')
+            ->once()
+            ->withArgs(fn($event) => $event instanceof ArticleSubmittedForReviewEvent && $event->contributorId === 7);
+
+        $result = $this->service->submitForReview(1, 7);
+
+        $this->assertSame($submitted, $result);
+    }
+
+    public function test_submit_throws_when_policy_blocks(): void
+    {
+        $page = $this->page();
+        $site = Mockery::mock(Site::class);
+
+        $this->pageService->shouldReceive('findPage')->once()->with(1)->andReturn($page);
+        $this->siteRepository->shouldReceive('find')->once()->with(1)->andReturn($site);
+        $this->policy->shouldReceive('canSubmitForReview')->once()->with(7, $site)->andReturn(false);
+        $this->pageService->shouldNotReceive('submitPageForReview');
+
+        $this->expectException(OnboardingIncompleteException::class);
+
+        $this->service->submitForReview(1, 7);
+    }
+
+    public function test_submit_throws_for_non_owner(): void
+    {
+        $this->pageService->shouldReceive('findPage')->once()->with(1)->andReturn($this->page(['contributor_id' => 99]));
+        $this->policy->shouldNotReceive('canSubmitForReview');
+
+        $this->expectException(UnauthorisedPageAccessException::class);
+
+        $this->service->submitForReview(1, 7);
+    }
+
+    public function test_approve_delegates_to_page_service_and_records_activity(): void
+    {
+        $published = $this->page(['status' => PageStatus::PUBLISHED->value]);
+
+        $this->pageService->shouldReceive('approvePage')->once()->with(1, 55)->andReturn($published);
+        $this->activityRepository->shouldReceive('record')
+            ->once()
+            ->with(1, 7, ActivityEventType::ArticlePublished, ['page_id' => 1, 'approved_by' => 55]);
+
+        $this->assertSame($published, $this->service->approve(1, 55));
+    }
+
+    public function test_reject_delegates_to_page_service_and_records_activity(): void
+    {
+        $rejected = $this->page(['status' => PageStatus::REJECTED->value]);
+
+        $this->pageService->shouldReceive('rejectPage')
+            ->once()
+            ->with(1, 55, RejectionReason::Quality->value, 'Needs more depth.')
+            ->andReturn($rejected);
+        $this->activityRepository->shouldReceive('record')
+            ->once()
+            ->with(1, 7, ActivityEventType::ArticleUpdated, [
+                'page_id' => 1,
+                'action' => 'rejected',
+                'reason' => RejectionReason::Quality->value,
+                'rejected_by' => 55,
+            ]);
+
+        $this->assertSame($rejected, $this->service->reject(1, 55, RejectionReason::Quality, 'Needs more depth.'));
+    }
+
+    public function test_resubmit_checks_policy_then_delegates_to_page_service(): void
+    {
+        $page = $this->page(['status' => PageStatus::REJECTED->value, 'resubmission_count' => 1]);
+        $resubmitted = $this->page(['status' => PageStatus::WAITING_APPROVAL->value, 'resubmission_count' => 2]);
+        $site = Mockery::mock(Site::class);
+
+        $this->pageService->shouldReceive('findPage')->once()->with(1)->andReturn($page);
+        $this->siteRepository->shouldReceive('find')->once()->with(1)->andReturn($site);
+        $this->policy->shouldReceive('canSubmitForReview')->once()->with(7, $site)->andReturn(true);
+        $this->pageService->shouldReceive('resubmitPageForReview')->once()->with(1, 7)->andReturn($resubmitted);
+        $this->activityRepository->shouldReceive('record')
+            ->once()
+            ->with(1, 7, ActivityEventType::ArticleUpdated, [
+                'page_id' => 1,
+                'action' => 'resubmitted',
+                'resubmission_count' => 2,
+            ]);
+        $this->eventDispatcher->shouldReceive('dispatch')->once()->withArgs(
+            fn($event) => $event instanceof ArticleSubmittedForReviewEvent
+        );
+
+        $this->assertSame($resubmitted, $this->service->resubmit(1, 7));
+    }
+
+    public function test_pending_review_delegates_to_page_service(): void
+    {
+        $collection = Collection::make([$this->page()]);
+
+        $this->pageService->shouldReceive('pendingReviewForSite')->once()->with(1)->andReturn($collection);
+
+        $this->assertSame($collection, $this->service->pendingReviewForSite(1));
+    }
+
+    private function page(array $attributes = []): Page
+    {
+        $values = array_merge([
+            'id' => 1,
+            'site_id' => 1,
+            'title' => 'Test Article',
+            'status' => PageStatus::DRAFT->value,
+            'contributor_id' => 7,
+            'resubmission_count' => 0,
+        ], $attributes);
+
+        $page = Mockery::mock(Page::class);
+        $page->shouldReceive('relationLoaded')->andReturn(false);
+        foreach ($values as $key => $value) {
+            $page->shouldReceive('getAttribute')->with($key)->andReturn($value)->byDefault();
+        }
+
+        return $page;
     }
 }

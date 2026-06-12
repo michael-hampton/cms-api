@@ -141,6 +141,16 @@ class NotificationFormatter
 
     private function formatWorkflowNotification(UserNotification $notification): array
     {
+        if (str_starts_with($notification->type, 'brief_') && isset($notification->data['title'], $notification->data['message'])) {
+            return [
+                'title' => $notification->data['title'],
+                'message' => $notification->data['message'],
+                'action_url' => $notification->data['url'] ?? null,
+                'brief_id' => $notification->data['brief_id'] ?? null,
+                'url' => $notification->data['url'] ?? null,
+            ];
+        }
+
         $title = $notification->data['page_title']
             ?? $notification->data['brief_title']
             ?? $notification->data['content_title']
