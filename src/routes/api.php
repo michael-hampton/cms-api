@@ -9,6 +9,7 @@ use App\Controllers\Boost\BoostController;
 use App\Controllers\Cms\AuthorController;
 use App\Controllers\Cms\BlockController;
 use App\Controllers\Cms\BrandController;
+use App\Controllers\Cms\BriefAssignmentRequestController;
 use App\Controllers\Cms\BriefController;
 use App\Controllers\Cms\Briefs\BriefPresetController;
 use App\Controllers\Cms\CampaignController;
@@ -966,6 +967,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->delete('/brief-preset/{id}', [BriefPresetController::class, 'destroy']);
         $router->get('/brief-preset/{id}', [BriefPresetController::class, 'show']);
         $router->post('/brief/from-preset/{id}', [BriefPresetController::class, 'createFromPreset']);
+        $router->get('briefs/{briefId}/requests', [BriefAssignmentRequestController::class, 'index']);
+        $router->post('briefs/{briefId}/requests/{requestId}/respond', [BriefAssignmentRequestController::class, 'respond']);
+        $router->post('briefs/{briefId}/requests/{requestId}/approve', [BriefAssignmentRequestController::class, 'approve']);
 
 
         // Brief attachments

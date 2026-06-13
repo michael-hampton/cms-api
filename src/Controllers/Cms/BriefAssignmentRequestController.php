@@ -37,7 +37,19 @@ class BriefAssignmentRequestController extends Controller
 
             $requests = $this->requestService->getAllRequestsForBrief($briefId);
 
-            return $this->resourceResponse(['items' => $requests->map(fn($r) => $r->toArray())->toArray()]);
+            return $this->resourceResponse([
+                'items' => $requests
+                    ->map(function ($request): array {
+                        $data = $request->toArray();
+
+                        $data['requested_deadline_at'] = $request->requested_deadline_at
+                            ? $request->requested_deadline_at->format(DATE_ATOM)
+                            : null;
+
+                        return $data;
+                    })
+                    ->toArray(),
+            ]);
         } catch (Exception $e) {
             return $this->errorResponse($e->getMessage(), 500);
         }

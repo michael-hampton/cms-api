@@ -130,4 +130,54 @@ class ImageRepository extends Repository
     {
         return Image::with(['categories', 'tags', 'tags.tag'])->find($id);
     }
+
+    /**
+     * Search images scoped to a specific site, with optional filters.
+     * Replaces the base search() for OpenCollab contributor flows which must
+     * always be site-scoped.
+     */
+    public function searchForSite(SearchCriteria $criteria): PaginatedResult
+    {
+        $query = Image::active()
+            ->where('is_archived', false);
+
+        $filters = $criteria->filters ?? [];
+
+        if (!empty($filters['site_id'])) {
+            $query->where('site_id', (int) $filters['site_id']);
+        }
+
+        if (!empty($filters['uploaded_by'])) {
+            $query->where('created_by', (int) $filters['uploaded_by']);
+        }
+
+        if (!empty($filters['image_rights'])) {
+            $query->where('image_rights', $filters['image_rights']);
+        }
+
+        if (!empty($filters['uploaded_from'])) {
+            $query->where('created_at', '>=', $filters['uploaded_from']);
+        }
+
+        if (!empty($filters['uploaded_to'])) {
+            $query->where('created_at', '<=', $filters['uploaded_to']);
+        }
+
+        return $this->searchEngine->search($query, $criteria);
+    }
+
+    /**
+     * Fetch a batch of images by IDs scoped to a site.
+     * Used for article editor resolution (Ticket 10) — avoids N+1 queries.
+     *
+     * @param  int[] $imageIds
+     * @return \App\Framework\Support\Collection<Image>
+     */
+    public function findManyForSite(int $siteId, array $imageIds): \App\Framework\Support\Collection
+    {
+        return Image::active()
+            ->where('site_id', $siteId)
+            ->whereIn('id', $imageIds)
+            ->get();
+    }
 }
