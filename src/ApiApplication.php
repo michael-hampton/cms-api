@@ -247,6 +247,8 @@ use App\Services\Newsletter\Renderers\TeaserBlockRenderer;
 use App\Services\Newsletter\Renderers\TestimonialBlockRenderer;
 use App\Services\Newsletter\Renderers\TextBlockRenderer;
 use App\Services\Newsletter\Renderers\TrendingContentBlockRenderer;
+use App\Services\OpenCollab\CmsImageClient;
+use App\Services\OpenCollab\CmsImageClientInterface;
 use App\Services\OpenCollab\Dashboard\WidgetRegistry;
 use App\Services\OpenCollab\Dashboard\Widgets\ActivityWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\ApprovalWidget;
@@ -255,6 +257,8 @@ use App\Services\OpenCollab\Dashboard\Widgets\EarningsWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\OnboardingWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\QuickLinksWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\ReviewQueueWidget;
+use App\Services\OpenCollab\Policies\ContributorImagePolicy;
+use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 use App\Services\OpenCollab\Policies\ContributorPolicyService;
 use App\Services\Shared\NativeSessionStore;
@@ -395,6 +399,9 @@ class ApiApplication
 
             return $registry;
         });
+
+        $this->container->bind(CmsImageClientInterface::class, CmsImageClient::class);
+        $this->container->bind(ContributorImagePolicyInterface::class, ContributorImagePolicy::class);
 
         //stripe
 

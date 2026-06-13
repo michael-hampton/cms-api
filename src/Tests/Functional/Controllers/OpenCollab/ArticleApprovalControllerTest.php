@@ -34,6 +34,7 @@ class ArticleApprovalControllerTest extends FunctionalTestCase
         ]);
 
         $response = $this->getForSite('/api/open-collab/admin/articles/pending');
+
         $data = json_decode($response->getContent(), true);
         $items = array_values(array_filter($data, static fn($key) => is_int($key), ARRAY_FILTER_USE_KEY));
 

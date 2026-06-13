@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
+use App\Exceptions\OpenCollab\ImageBlockValidationFailedException;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Authorization\Auth;
@@ -76,6 +77,8 @@ class ArticleApprovalController extends Controller
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article approved and published.',
             ]);
+        } catch (ImageBlockValidationFailedException $e) {
+            return $this->errorResponse('Image validation failed. The article cannot be approved.', 422, $e->getErrors());
         } catch (GovernanceCheckFailedException $e) {
             return $this->errorResponse('Approval blocked by governance checks.', 422, [
                 'governance_failures' => $e->toArray(),
@@ -138,6 +141,8 @@ class ArticleApprovalController extends Controller
                 'pending_steps' => $e->getPendingSteps(),
                 'redirect' => '/contributor/onboarding',
             ]);
+        } catch (ImageBlockValidationFailedException $e) {
+            return $this->errorResponse('Image validation failed. The article cannot be approved.', 422, $e->getErrors());
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);
         } catch (InvalidArgumentException $e) {
@@ -162,6 +167,8 @@ class ArticleApprovalController extends Controller
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article resubmitted for review.',
             ]);
+        } catch (ImageBlockValidationFailedException $e) {
+            return $this->errorResponse('Image validation failed. The article cannot be approved.', 422, $e->getErrors());
         } catch (OnboardingIncompleteException $e) {
             return $this->errorResponse($e->getMessage(), 403, [
                 'pending_steps' => $e->getPendingSteps(),

@@ -8,6 +8,7 @@ use App\Enums\OpenCollab\RejectionReason;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
 use App\Events\OpenCollab\ChangesRequestedEvent;
 use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
+use App\Exceptions\OpenCollab\ImageBlockValidationFailedException;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Database\Database;
@@ -44,6 +45,7 @@ class ArticleApprovalService
         private readonly ModerationAuditService $auditService,
         private readonly ContentGovernanceGate $governanceGate,
         private readonly Database $database,
+        private readonly ImageBlockValidator $imageBlockValidator,
     ) {
     }
 
@@ -69,6 +71,8 @@ class ArticleApprovalService
             throw new OnboardingIncompleteException([]);
         }
 
+        $this->assertImageBlocksValid($page, $contributorId);
+
         $page = $this->database->transaction(function () use ($pageId, $contributorId) {
             $page = $this->pageService->submitPageForReview($pageId, $contributorId);
 
@@ -78,7 +82,7 @@ class ArticleApprovalService
                 type: ActivityEventType::ArticleUpdated,
                 payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
             );
-            
+
             $this->queueService->enqueueForSubmission($page, $contributorId, isResubmission: false);
 
             return $page;
@@ -103,6 +107,8 @@ class ArticleApprovalService
 
         return $this->database->transaction(function () use ($pageId, $adminId) {
             $page = $this->pageService->approvePage($pageId, $adminId);
+
+            $this->assertImageBlocksValid($page, $adminId);
 
             $this->activityRepository->record(
                 siteId: $page->site_id,
@@ -186,6 +192,8 @@ class ArticleApprovalService
         $page = $this->database->transaction(function () use ($pageId, $contributorId, $nextCount) {
             $page = $this->pageService->resubmitPageForReview($pageId, $contributorId);
 
+            $this->assertImageBlocksValid($page, $contributorId);
+
             $this->activityRepository->record(
                 siteId: $page->site_id,
                 userId: $contributorId,
@@ -254,5 +262,26 @@ class ArticleApprovalService
     public function pendingReviewForSite(int $siteId): \App\Framework\Support\Collection
     {
         return $this->pageService->pendingReviewForSite($siteId);
+    }
+
+    /**
+     * @throws ImageBlockValidationFailedException
+     */
+    private function assertImageBlocksValid(Page $page, int $contributorId): void
+    {
+        $blocks = $page->blocks ?? collect();
+        if (empty($blocks)) {
+            return;
+        }
+
+        $result = $this->imageBlockValidator->validateBlocks(
+            $blocks->toArray(),
+            (int) $page->site_id,
+            $contributorId,
+        );
+
+        if (!$result->passes) {
+            throw new ImageBlockValidationFailedException($result->errors);
+        }
     }
 }
