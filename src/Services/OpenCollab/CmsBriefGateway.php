@@ -10,19 +10,19 @@ use App\Models\BriefTask;
 use App\Models\Collaborator;
 use App\Repositories\Cms\Briefs\BriefCollaboratorRepository;
 use App\Repositories\OpenCollab\ContributorBriefRepository;
+use App\Services\Cms\BriefAssignmentRequestService;
 use App\Services\Cms\BriefService;
 
 class CmsBriefGateway
 {
     public function __construct(
-        private readonly BriefService $briefService,
-        private readonly BriefCollaboratorRepository $collaborators,
-        private readonly ContributorBriefRepository $briefs,
-        private readonly LogBriefActivity $activity,
+        private readonly BriefService                      $briefService,
+        private readonly BriefCollaboratorRepository       $collaborators,
+        private readonly ContributorBriefRepository        $briefs,
+        private readonly LogBriefActivity                  $activity,
         private readonly OpenCollabBriefNotificationService $notifications,
-    )
-    {
-    }
+        private readonly BriefAssignmentRequestService     $assignmentRequestService,
+    ) {}
 
     public function acceptAssignment(Brief $brief, Collaborator $assignment, int $userId): void
     {
@@ -34,38 +34,37 @@ class CmsBriefGateway
     public function rejectAssignment(Brief $brief, Collaborator $assignment, int $userId, string $reason): void
     {
         $this->collaborators->update($assignment->id, ['role' => 'rejected']);
-        $this->activity->handle($brief->id, $userId, 'assignment_rejected', 'Assignment rejected: ' . $reason);
-        $this->notify($brief, $userId, 'brief_assignment_rejected', 'Assignment rejected', "You rejected {$brief->title}.");
+
+        // Store the reason as structured CMS-owned data; activity log is secondary.
+        $this->assignmentRequestService->recordRejectionReason($brief, $userId, $reason);
     }
 
     public function requestClarification(Brief $brief, int $userId, string $message): void
     {
-        $this->briefService->addComment($brief->id, [
-            'user_id' => $userId,
-            'content' => $message,
-        ]);
-        $this->activity->handle($brief->id, $userId, 'clarification_requested', 'Clarification requested');
-        $this->notify($brief, $userId, 'brief_clarification_requested', 'Clarification requested', "Your clarification request was sent for {$brief->title}.");
+        $this->assignmentRequestService->createClarificationRequest($brief, $userId, $message);
     }
 
     public function requestDeadlineChange(Brief $brief, int $userId, string $requestedDeadline, string $reason): void
     {
-        $this->activity->handle($brief->id, $userId, 'deadline_change_requested', 'Deadline change requested: ' . $reason, [
-            'requested_deadline' => $requestedDeadline,
-            'reason' => $reason,
-            'status' => 'pending',
-        ]);
-        $this->notify($brief, $userId, 'brief_deadline_change_requested', 'Deadline change requested', "Your deadline change request was sent for {$brief->title}.");
+        $this->assignmentRequestService->createDeadlineChangeRequest(
+            brief: $brief,
+            contributorId: $userId,
+            requestedDeadline: $requestedDeadline,
+            reason: $reason,
+        );
     }
 
     public function negotiateAssignment(Brief $brief, Collaborator $assignment, int $userId, array $data): void
     {
         $this->collaborators->update($assignment->id, ['role' => 'negotiating']);
-        $this->activity->handle($brief->id, $userId, 'negotiation_requested', 'Negotiation requested: ' . $data['message'], [
-            'requested_deadline' => $data['requested_deadline'] ?? null,
-            'scope_details' => $data['scope_details'] ?? null,
-        ]);
-        $this->notify($brief, $userId, 'brief_negotiation_requested', 'Negotiation requested', "Your negotiation request was sent for {$brief->title}.");
+
+        $this->assignmentRequestService->createNegotiationRequest(
+            brief: $brief,
+            contributorId: $userId,
+            message: $data['message'],
+            requestedDeadline: $data['requested_deadline'] ?? null,
+            scopeDetails: $data['scope_details'] ?? null,
+        );
     }
 
     public function submit(Brief $brief, int $userId, string $notes = ''): void
@@ -88,7 +87,7 @@ class CmsBriefGateway
 
     public function updateTask(Brief $brief, int $taskId, int $userId, string $status): BriefTask
     {
-        $task = $this->briefs->findTaskForContributor((int)$brief->id, $taskId, $userId);
+        $task = $this->briefs->findTaskForContributor((int) $brief->id, $taskId, $userId);
 
         if (!$task) {
             throw new \RuntimeException('Task not found');
@@ -119,7 +118,7 @@ class CmsBriefGateway
             'file_name' => $file->getClientOriginalName(),
             'filesize' => $file->getSize(),
             'metadata' => [
-                'description' => trim((string)$request->get('description', '')),
+                'description' => trim((string) $request->get('description', '')),
                 'mime_type' => $file->getMimeType(),
                 'uploaded_by' => $userId,
                 'uploaded_by_name' => $userName,
@@ -134,7 +133,7 @@ class CmsBriefGateway
 
     public function deleteAttachment(Brief $brief, int $attachmentId, int $userId): void
     {
-        $attachment = $this->briefs->findAttachmentOwnedByContributor((int)$brief->id, $attachmentId, $userId);
+        $attachment = $this->briefs->findAttachmentOwnedByContributor((int) $brief->id, $attachmentId, $userId);
 
         if (!$attachment) {
             throw new \RuntimeException('Attachment not found');
@@ -164,7 +163,7 @@ class CmsBriefGateway
             throw new \RuntimeException('Comment not found');
         }
 
-        return $this->briefService->updateComment((int)$comment->brief_id, $commentId, ['content' => $content]);
+        return $this->briefService->updateComment((int) $comment->brief_id, $commentId, ['content' => $content]);
     }
 
     public function resolveComment(int $commentId, int $userId): BriefComment
@@ -175,7 +174,7 @@ class CmsBriefGateway
             throw new \RuntimeException('Comment not found');
         }
 
-        return $this->briefService->resolveComment((int)$comment->brief_id, $commentId, $userId);
+        return $this->briefService->resolveComment((int) $comment->brief_id, $commentId, $userId);
     }
 
     private function notify(Brief $brief, int $userId, string $type, string $title, string $message): void
