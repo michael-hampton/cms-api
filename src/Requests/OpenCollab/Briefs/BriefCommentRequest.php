@@ -24,7 +24,7 @@ class BriefCommentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->has('content')) {
-            $this->merge(['content' => trim((string) $this->input('content'))]);
+            $this->put('content', trim((string) $this->input('content')));
         }
     }
 }
