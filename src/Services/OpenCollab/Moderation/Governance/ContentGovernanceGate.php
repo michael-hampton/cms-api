@@ -6,6 +6,7 @@ use App\Enums\Pages\PageStatus;
 use App\Enums\OpenCollab\EscalationStatus;
 use App\Enums\OpenCollab\ModerationQueueStatus;
 use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
+use App\Repositories\Cms\ImageRepository;
 use App\Repositories\Cms\ImageRepositoryInterface; // ASSUMED: existing CMS image repo
 use App\Repositories\OpenCollab\ModerationEscalationRepository;
 use App\Repositories\OpenCollab\ModerationQueueRepository;
@@ -30,7 +31,7 @@ class ContentGovernanceGate
         private readonly ModerationQueueRepository $queueRepository,
         private readonly RiskMarkerRepository $riskMarkerRepository,
         private readonly ModerationEscalationRepository $escalationRepository,
-        private readonly ImageRepositoryInterface $imageRepository,
+        private readonly ImageRepository $imageRepository,
     ) {
     }
 
@@ -70,15 +71,15 @@ class ContentGovernanceGate
         $outstandingRisks = $this->riskMarkerRepository->outstandingForPage($page->site_id, $page->id);
 
         foreach ($outstandingRisks as $marker) {
-            if ($marker->severity->value === 'critical') {
+            if ($marker->severity === 'critical') {
                 $failures[] = new GovernanceFailure(
                     'unresolved_critical_risk',
-                    "Unresolved critical {$marker->risk_type->value} risk marker (id {$marker->id})."
+                    "Unresolved critical {$marker->risk_type} risk marker (id {$marker->id})."
                 );
-            } elseif ($marker->severity->value === 'high') {
+            } elseif ($marker->severity === 'high') {
                 $failures[] = new GovernanceFailure(
                     'unresolved_high_risk',
-                    "Unresolved high {$marker->risk_type->value} risk marker (id {$marker->id})."
+                    "Unresolved high {$marker->risk_type} risk marker (id {$marker->id})."
                 );
             }
         }

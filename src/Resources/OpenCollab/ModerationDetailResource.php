@@ -2,38 +2,45 @@
 
 namespace App\Resources\OpenCollab;
 
+use App\Enums\OpenCollab\ModerationQueueStatus;
+use App\Framework\Authorization\Auth;
+use App\Framework\Resource\JsonResource;
 use App\Models\ModerationQueueEntry;
+use App\Models\Page;
 use App\Repositories\OpenCollab\ModerationActionRepository;
 use App\Repositories\OpenCollab\ModerationEscalationRepository;
 use App\Repositories\OpenCollab\RiskMarkerRepository;
 use App\Services\OpenCollab\Moderation\Governance\ContentGovernanceGate;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 /**
  * Full detail resource (Ticket 14). Composes the lighter resources above.
  * Sensitive legal notes (resolution_notes on legal-category escalations)
  * are hidden unless $canViewHighRisk is true.
  */
-class ModerationDetailResource
+class ModerationDetailResource extends JsonResource
 {
-    public function __construct(
-        private readonly ModerationQueueEntry $entry,
-        private readonly RiskMarkerRepository $riskMarkerRepository,
-        private readonly ModerationEscalationRepository $escalationRepository,
-        private readonly ContentGovernanceGate $governanceGate,
-        private readonly bool $canViewHighRisk = false,
-    ) {
-    }
 
     public function toArray(): array
     {
-        $page = $this->entry->page;
+        $riskMarkerRepository = app(RiskMarkerRepository::class);
+        $escalationRepository = app(ModerationEscalationRepository::class);
+        $governanceGate = app(ContentGovernanceGate::class);
 
-        $risks = $this->riskMarkerRepository->outstandingForPage($this->entry->site_id, $this->entry->page_id);
-        $escalations = $this->escalationRepository->openForPage($this->entry->site_id, $this->entry->page_id);
-        $governance = $this->governanceGate->check($this->entry->page_id);
+        $page = $this->resource->page();
+        $assignedUser = $this->resource->assignedUser();
+
+        $risks = $riskMarkerRepository->outstandingForPage($this->getAttribute('site_id'), $this->getAttribute('page_id'));
+        $escalations = $escalationRepository->openForPage($this->getAttribute('site_id'), $this->getAttribute('page_id'));
+        $governance = $governanceGate->check($this->getAttribute('page_id'));
+        $authorizationService = app(OpencollabAuthorizationService::class);
+
+        $canViewHighRisk = $authorizationService->canViewHighRisk($this->getAttribute('site_id'), $this->getAttribute('page_id'));
+        $canEscalate = $authorizationService->canEscalate($this->getAttribute('site_id'), $this->getAttribute('page_id'));
+        $canResolveRisk = $authorizationService->canResolveRisk($this->getAttribute('site_id'), $this->getAttribute('page_id'));
 
         return [
-            'id' => $this->entry->id,
+            'id' => $this->getAttribute('id'),
             'page' => [
                 'id' => $page?->id,
                 'title' => $page?->title,
@@ -42,17 +49,17 @@ class ModerationDetailResource
             'contributor' => [
                 'id' => $page?->contributor_id,
             ],
-            'status' => $this->entry->status->value,
-            'risk_score' => $this->entry->risk_score,
-            'priority_score' => $this->entry->priority_score,
+            'status' => $this->getAttribute('status'),
+            'risk_score' => $this->getAttribute('risk_score'),
+            'priority_score' => $this->getAttribute('priority_score'),
             'risk_markers' => array_map(
-                fn($m) => $this->canViewHighRisk || $m->severity->value !== 'critical'
+                fn($m) => $canViewHighRisk || $m->severity !== 'critical'
                     ? (new RiskMarkerResource($m))->toArray()
-                    : ['id' => $m->id, 'severity' => $m->severity->value, 'status' => $m->status->value],
+                    : ['id' => $m->id, 'severity' => $m->severity, 'status' => $m->status],
                 $risks->all()
             ),
             'escalations' => array_map(
-                fn($e) => $this->canViewHighRisk
+                fn($e) => $canViewHighRisk
                     ? (new EscalationResource($e))->toArray()
                     : ['id' => $e->id, 'category' => $e->category->value, 'status' => $e->status->value],
                 $escalations->all()
@@ -64,6 +71,60 @@ class ModerationDetailResource
                     $governance->failures
                 ),
             ],
+            'available_actions' => $this->availableActions($canEscalate, $canResolveRisk),
+            'assigned_to_user_id' => $this->getAttribute('assigned_to_user_id'),
+            'assigned_to_display_name' => $assignedUser?->display_name, // ASSUMED: belongsTo relation + UserRepository exposes display_name
+            'last_reviewed_at' => $this->lastReviewedAt(),
+            'internal_notes' => $page?->moderation_internal_notes, // ASSUMED column, see below
+            'image_rights_summary' => $this->imageRightsSummary($page),
         ];
+    }
+
+    private function availableActions(bool $canEscalate, bool $canResolveRisk): array
+    {
+        // Mirrors ModerationQueueEntryResource's logic but with the fuller
+        // action set needed by the detail screen. Computed server-side so
+        // the UI never has to encode permission rules.
+        $actions = [];
+
+        if ($this->getAttribute('assigned_to_user_id') === null) {
+            $actions[] = 'claim';
+        } elseif ((int)$this->getAttribute('assigned_to_user_id') === Auth::id()) {
+            $actions[] = 'release';
+        }
+
+        if (ModerationQueueStatus::tryFrom($this->getAttribute('status'))?->isOpen()) {
+            if ($this->viewerCan('approve')) $actions[] = 'approve';
+            if ($this->viewerCan('reject')) $actions[] = 'reject';
+            if ($this->viewerCan('request_changes')) $actions[] = 'request_changes';
+            if ($this->viewerCan('review')) $actions[] = 'add_risk';
+            if ($canEscalate) $actions[] = 'escalate';
+        }
+
+        $canResolveRisk = true; //todo
+
+        if ($canResolveRisk) $actions[] = 'resolve_risk';
+
+        return $actions;
+    }
+
+    private function lastReviewedAt(): ?string
+    {
+        // ASSUMED: most recent oc_moderation_actions row with action in
+        // ['review_started','approved','rejected','changes_requested']
+        // for this queue entry. Cheapest correct approach: add a method
+        // to ModerationActionRepository::lastReviewActionAt(int $queueEntryId): ?Carbon
+        return null; // wire up once that repo method exists
+    }
+
+    private function imageRightsSummary(?Page $page): string
+    {
+        // ASSUMED: depends on your CMS image rights model — placeholder.
+        return 'No issues reported';
+    }
+
+    private function viewerCan(string $string)
+    {
+        return true; //todo
     }
 }

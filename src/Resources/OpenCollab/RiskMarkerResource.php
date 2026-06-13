@@ -13,32 +13,28 @@ class RiskMarkerResource extends JsonResource
             'id' => $this->getAttribute('id'),
 
             'risk_type' => $this
-                ->getAttribute('risk_type')
-                ?->value,
+                ->getAttribute('risk_type'),
 
             'source' => $this
-                ->getAttribute('source')
-                ?->value,
+                ->getAttribute('source'),
 
             'severity' => $this
-                ->getAttribute('severity')
-                ?->value,
+                ->getAttribute('severity'),
 
             'status' => $this
-                ->getAttribute('status')
-                ?->value,
+                ->getAttribute('status'),
 
             'confidence' => $this->getAttribute('confidence'),
             'details' => $this->getAttribute('details'),
-            'created_by_user_id' => $this->marker->getAttribute('created_by_user_id'),
+            'created_by_user_id' => $this->getAttribute('created_by_user_id'),
 
             'reviewed_at' => $this
                 ->getAttribute('reviewed_at')
-                ?->toIso8601String(),
+                ?->format('c'),
 
             'resolved_at' => $this
                 ->getAttribute('resolved_at')
-                ?->toIso8601String(),
+                ?->format('c'),
 
             'resolution_notes' => $this->getAttribute('resolution_notes'),
             'cms_image_id' => $this->getAttribute('cms_image_id'),

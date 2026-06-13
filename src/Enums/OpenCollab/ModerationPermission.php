@@ -1,4 +1,3 @@
-// src/Enums/OpenCollab/ModerationPermission.php
 <?php
 
 namespace App\Enums\OpenCollab;

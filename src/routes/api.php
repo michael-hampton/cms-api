@@ -100,6 +100,8 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\ModerationQueueController;
+use App\Controllers\OpenCollab\Admin\ModerationRiskController;
 use App\Controllers\OpenCollab\Admin\RbacAdminController;
 use App\Controllers\OpenCollab\Admin\SiteSettingsController;
 use App\Controllers\OpenCollab\ArticleApprovalController;
@@ -472,6 +474,23 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
                 [ContributorPageController::class, 'destroy']
             );
         });
+
+        $router->get(
+            '/open-collab/admin/moderation',
+            [ModerationQueueController::class, 'index']
+        );
+
+        $router->get('/open-collab/admin/moderation/{queueEntryId}', [ModerationQueueController::class, 'show']);
+
+        $router->post('/open-collab/admin/articles/{id}/request-changes', [ArticleApprovalController::class, 'requestChanges']);
+
+        $router->post('/open-collab/admin/moderation/{queueEntryId}/claim', [ModerationQueueController::class, 'claim']);
+
+        $router->post('/open-collab/admin/moderation/{queueEntryId}/risks', [ModerationRiskController::class, 'store']);
+
+        $router->post('/open-collab/admin/risks/{riskMarkerId}/resolve', [ModerationRiskController::class, 'resolve']);
+
+        $router->post('/open-collab/admin/risks/{riskMarkerId}/dismiss', [ModerationRiskController::class, 'dismiss']);
 
         $router->get(
             '/open-collab/admin/contributors',

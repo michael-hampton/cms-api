@@ -89,6 +89,13 @@ class ArticlePageController extends Controller
         ]);
     }
 
+    public function queue()
+    {
+        return $this->view('open-collab.admin.articles.queue', [
+            'site' => SiteContext::slug(),
+        ]);
+    }
+
     private function previewContent(string $content): string
     {
         $plain = html_entity_decode(strip_tags($content), ENT_QUOTES | ENT_HTML5, 'UTF-8');

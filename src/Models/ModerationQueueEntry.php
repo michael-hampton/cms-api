@@ -28,4 +28,9 @@ class ModerationQueueEntry extends Model
     {
         return $this->belongsTo(\App\Models\Page::class, 'page_id');
     }
+
+    public function assignedUser()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'assigned_to_user_id');
+    }
 }

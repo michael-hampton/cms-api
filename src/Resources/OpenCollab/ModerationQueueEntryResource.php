@@ -2,7 +2,11 @@
 
 namespace App\Resources\OpenCollab;
 
+use App\Framework\Authorization\Auth;
+use App\Framework\Resource\JsonResource;
+use App\Framework\Support\SiteContext;
 use App\Models\ModerationQueueEntry;
+use App\Services\Cms\ContentWorkflowAuthorizationService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Models\Site;
 
@@ -10,22 +14,14 @@ use App\Models\Site;
  * Lightweight list-view resource (Ticket 14).
  * Permission-aware "available actions" based on the viewing user.
  */
-class ModerationQueueEntryResource
+class ModerationQueueEntryResource extends JsonResource
 {
-    public function __construct(
-        private readonly ModerationQueueEntry $entry,
-        private readonly ?int $viewerUserId = null,
-        private readonly ?Site $site = null,
-        private readonly ?OpenCollabAuthorizationService $authorization = null,
-    ) {
-    }
-
     public function toArray(): array
     {
-        $page = $this->entry->page; // ASSUMED: relation defined on ModerationQueueEntry model
+        $page = $this->resource->page; // ASSUMED: relation defined on ModerationQueueEntry model
 
         return [
-            'id' => $this->entry->id,
+            'id' => $this->getAttribute('id'),
             'page' => [
                 'id' => $page?->id,
                 'title' => $page?->title,
@@ -33,32 +29,34 @@ class ModerationQueueEntryResource
             'contributor' => [
                 'id' => $page?->contributor_id,
             ],
-            'status' => $this->entry->status->value,
-            'submitted_at' => $this->entry->submitted_at->toIso8601String(),
-            'assigned_to_user_id' => $this->entry->assigned_to_user_id,
-            'risk_score' => $this->entry->risk_score,
-            'priority_score' => $this->entry->priority_score,
+            'status' => $this->getAttribute('status'),
+            'submitted_at' => $this->getAttribute('submitted_at')?->format('Y-m-d H:i:s'),
+            'assigned_to_user_id' => $this->getAttribute('assigned_to_user_id'),
+            'risk_score' => $this->getAttribute('risk_score'),
+            'priority_score' => $this->getAttribute('priority_score'),
             'available_actions' => $this->availableActions(),
         ];
     }
 
     private function availableActions(): array
     {
-        if ($this->viewerUserId === null || $this->site === null || $this->authorization === null) {
+        if (!Auth::user() || !SiteContext::slug()) {
             return [];
         }
 
         $actions = [];
 
-        if ($this->entry->assigned_to_user_id === null) {
+        if ($this->getAttribute('assigned_to_user_id') === null) {
             $actions[] = 'claim';
-        } elseif ((int)$this->entry->assigned_to_user_id === $this->viewerUserId) {
+        } elseif ((int)$this->getAttribute('assigned_to_user_id') === Auth::id()) {
             $actions[] = 'release';
         }
 
-        if ($this->authorization->canEscalate($this->viewerUserId, $this->site)) {
-            $actions[] = 'escalate';
-        }
+        $authorizationService = app(ContentWorkflowAuthorizationService::class);
+
+        $authorizationService->assertCanEscalate(Auth::id(), SiteContext::getId());
+
+        $actions[] = 'escalate';
 
         return $actions;
     }

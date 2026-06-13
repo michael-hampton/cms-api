@@ -7,6 +7,7 @@ use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Exceptions\OpenCollab\ModerationQueueClaimConflictException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
+use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\ModerationQueueRepository;
 use App\Repositories\OpenCollab\ModerationEscalationRepository;
@@ -52,11 +53,10 @@ class ModerationQueueController extends Controller
         $entries = $this->queueRepository->forSite(SiteContext::getId(), array_filter($filters));
 
         $site = $this->siteRepository->find(SiteContext::getId());
-        $viewerId = Auth::id();
 
-        return $this->resourceResponse(
-            $entries->map(fn($e) => (new ModerationQueueEntryResource($e, $viewerId, $site, $this->authorization))->toArray())->toArray()
-        );
+        $collection = new ResourceCollection($entries, ModerationQueueEntryResource::class);
+
+        return $this->resourceResponse($collection->toArray());
     }
 
     public function show(int $queueEntryId): JsonResponse
@@ -71,12 +71,9 @@ class ModerationQueueController extends Controller
             return $this->errorResponse('Queue entry not found.', 404);
         }
 
-        $site = $this->siteRepository->find(SiteContext::getId());
-        $canViewHighRisk = $this->authorization->canViewHighRisk(Auth::id(), $site);
-
-        return $this->jsonResponse(
+        return $this->resourceResponse(
             (new ModerationDetailResource(
-                $entry, $this->riskMarkerRepository, $this->escalationRepository, $this->governanceGate, $canViewHighRisk
+                $entry
             ))->toArray()
         );
     }

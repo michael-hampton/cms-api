@@ -152,48 +152,48 @@ class ContentWorkflowAuthorizationService
     public function assertCanRequestChanges(int $userId, int $siteId): void
     {
         $this->assertAny($userId, $siteId, [
-            ModerationPermission::PagesRequestChanges,
-            ModerationPermission::ContentRequestChanges,
+            ModerationPermission::PagesRequestChanges->value,
+            ModerationPermission::ContentRequestChanges->value,
         ], 'Missing permission: PagesRequestChanges');
     }
 
     public function assertCanEscalate(int $userId, int $siteId): void
     {
         $this->assertAny($userId, $siteId, [
-            ModerationPermission::PagesEscalate,
-            ModerationPermission::ContentEscalate,
+            ModerationPermission::PagesEscalate->value,
+            ModerationPermission::ContentEscalate->value,
         ], 'Missing permission: PagesEscalate');
     }
 
     public function assertCanViewHighRisk(int $userId, int $siteId): void
     {
         $this->assertAny($userId, $siteId, [
-            ModerationPermission::PagesViewHighRisk,
-            ModerationPermission::ContentViewHighRisk,
+            ModerationPermission::PagesViewHighRisk->value,
+            ModerationPermission::ContentViewHighRisk->value,
         ], 'Missing permission: PagesViewHighRisk');
     }
 
     public function assertCanAssignReview(int $userId, int $siteId): void
     {
         $this->assertAny($userId, $siteId, [
-            ModerationPermission::PagesAssignReview,
-            ModerationPermission::ContentAssignReview,
+            ModerationPermission::PagesAssignReview->value,
+            ModerationPermission::ContentAssignReview->value,
         ], 'Missing permission: PagesAssignReview');
     }
 
     public function assertCanOverridePriority(int $userId, int $siteId): void
     {
         $this->assertAny($userId, $siteId, [
-            ModerationPermission::PagesOverridePriority,
-            ModerationPermission::ContentOverridePriority,
+            ModerationPermission::PagesOverridePriority->value,
+            ModerationPermission::ContentOverridePriority->value,
         ], 'Missing permission: PagesOverridePriority');
     }
 
     public function assertCanResolveRisk(int $userId, int $siteI): void
     {
         $this->assertAny($userId, $siteI, [
-            ModerationPermission::PagesResolveRisk,
-            ModerationPermission::ContentResolveRisk,
+            ModerationPermission::PagesResolveRisk->value,
+            ModerationPermission::ContentResolveRisk->value,
         ], 'Missing permission: PagesResolveRisk');
     }
 }

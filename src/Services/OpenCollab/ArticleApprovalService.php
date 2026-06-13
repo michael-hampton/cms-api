@@ -78,7 +78,7 @@ class ArticleApprovalService
                 type: ActivityEventType::ArticleUpdated,
                 payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
             );
-
+            
             $this->queueService->enqueueForSubmission($page, $contributorId, isResubmission: false);
 
             return $page;

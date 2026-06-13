@@ -13,7 +13,7 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Repositories\OpenCollab\ArticleAccessRepository;
 use App\Repositories\OpenCollab\ArticlePaymentRepository;
-use App\Services\OpenCollab\Notifications\ArticlePaymentFailedNotification;
+use App\Services\OpenCollab\Notifications\ChangesRequestedNotification;
 use App\Services\OpenCollab\Notifications\ArticlePaymentSucceededNotification;
 
 /**
@@ -189,7 +189,7 @@ class ArticleAccessService
         $page = $this->pageRepository->find($payment->page_id);
         if ($page) {
             $this->notificationDispatcher->dispatch(
-                new ArticlePaymentFailedNotification($payment, $page)
+                new ChangesRequestedNotification($payment, $page)
             );
         }
     }

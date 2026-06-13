@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab;
 
+use App\Enums\OpenCollab\ModerationPermission;
 use App\Framework\Exceptions\UnauthorizedException;
 
 class OpenCollabAuthorizationService
@@ -25,6 +26,30 @@ class OpenCollabAuthorizationService
         }
 
         return false;
+    }
+
+    public function canViewHighRisk(int $userId, int $siteId): bool
+    {
+        return $this->allowsAny($userId, $siteId, [
+            ModerationPermission::PagesViewHighRisk->value,
+            ModerationPermission::ContentViewHighRisk->value,
+        ]);
+    }
+
+    public function canEscalate(int $userId, int $siteId): bool
+    {
+        return $this->allowsAny($userId, $siteId, [
+            ModerationPermission::PagesEscalate->value,
+            ModerationPermission::ContentEscalate->value,
+        ]);
+    }
+
+    public function canResolveRisk(int $userId, int $siteId): bool
+    {
+        return $this->allowsAny($userId, $siteId, [
+            ModerationPermission::PagesResolveRisk->value,
+            ModerationPermission::ContentResolveRisk->value,
+        ]);
     }
 
     public function assertAny(int $userId, int $siteId, array $permissions, string $message = 'Forbidden.'): void

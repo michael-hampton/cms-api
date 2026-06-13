@@ -15,6 +15,7 @@ use App\Requests\OpenCollab\CreateRiskMarkerRequest;
 use App\Requests\OpenCollab\DismissRiskMarkerRequest;
 use App\Requests\OpenCollab\ResolveRiskMarkerRequest;
 use App\Resources\OpenCollab\RiskMarkerResource;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\Risk\RiskMarkerService;
 
 /**
@@ -30,6 +31,7 @@ class ModerationRiskController extends Controller
     public function __construct(
         private readonly RiskMarkerService $riskMarkerService,
         private readonly ModerationQueueRepository $queueRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     ) {
         parent::__construct();
     }
@@ -61,7 +63,7 @@ class ModerationRiskController extends Controller
             queueEntryId: $entry->id,
         );
 
-        return $this->jsonResponse((new RiskMarkerResource($marker))->toArray(), 201);
+        return $this->resourceResponse((new RiskMarkerResource($marker))->toArray(), 201);
     }
 
     public function resolve(ResolveRiskMarkerRequest $request, int $riskMarkerId): JsonResponse
