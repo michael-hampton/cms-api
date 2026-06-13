@@ -31,10 +31,14 @@ class NegotiateBriefAssignmentRequest extends FormRequest
         $requestedDeadline = trim((string) $this->input('requested_deadline', ''));
         $scopeDetails = trim((string) $this->input('scope_details', ''));
 
-        $this->merge([
-            'message' => trim((string) $this->input('message', '')),
-            'requested_deadline' => $requestedDeadline !== '' ? $requestedDeadline : null,
-            'scope_details' => $scopeDetails !== '' ? $scopeDetails : null,
-        ]);
+        $this->put('message', trim((string) $this->input('message', '')));
+        $this->put(
+            'requested_deadline',
+            $requestedDeadline !== '' ? $requestedDeadline : null,
+        );
+        $this->put(
+            'scope_details',
+            $scopeDetails !== '' ? $scopeDetails : null,
+        );
     }
 }
