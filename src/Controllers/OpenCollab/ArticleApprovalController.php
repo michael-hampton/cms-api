@@ -5,6 +5,7 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Enums\OpenCollab\RejectionReason;
+use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
 use App\Framework\Authorization\Auth;
@@ -12,6 +13,7 @@ use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Requests\OpenCollab\RejectArticleRequest;
+use App\Requests\OpenCollab\RequestChangesRequest;
 use App\Resources\OpenCollab\ContributorPageResource;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
@@ -73,6 +75,10 @@ class ArticleApprovalController extends Controller
             return $this->jsonResponse([
                 'page' => (new ContributorPageResource($page))->toArray(),
                 'message' => 'Article approved and published.',
+            ]);
+        } catch (GovernanceCheckFailedException $e) {
+            return $this->errorResponse('Approval blocked by governance checks.', 422, [
+                'governance_failures' => $e->toArray(),
             ]);
         } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
@@ -163,6 +169,28 @@ class ArticleApprovalController extends Controller
             ]);
         } catch (UnauthorisedPageAccessException $e) {
             return $this->errorResponse($e->getMessage(), 403);
+        } catch (InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    public function requestChanges(RequestChangesRequest $request, int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['pages.request_changes', 'content.request_changes'])) {
+            return $response;
+        }
+
+        try {
+            $page = $this->approvalService->requestChanges(
+                pageId: $id,
+                adminId: Auth::id(),
+                notes: $request->validated()['notes'],
+            );
+
+            return $this->jsonResponse([
+                'page' => (new ContributorPageResource($page))->toArray(),
+                'message' => 'Changes requested.',
+            ]);
         } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

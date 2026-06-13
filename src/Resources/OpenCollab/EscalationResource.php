@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Resources\OpenCollab;
+
+use App\Models\ModerationEscalation;
+
+class EscalationResource
+{
+    public function __construct(private readonly ModerationEscalation $escalation)
+    {
+    }
+
+    public function toArray(): array
+    {
+        return [
+            'id' => $this->escalation->id,
+            'page_id' => $this->escalation->page_id,
+            'queue_entry_id' => $this->escalation->queue_entry_id,
+            'category' => $this->escalation->category->value,
+            'severity' => $this->escalation->severity->value,
+            'assigned_team' => $this->escalation->assigned_team,
+            'assigned_user_id' => $this->escalation->assigned_user_id,
+            'status' => $this->escalation->status->value,
+            'due_at' => $this->escalation->due_at?->toIso8601String(),
+            'created_at' => $this->escalation->created_at->toIso8601String(),
+            'acknowledged_at' => $this->escalation->acknowledged_at?->toIso8601String(),
+            'resolved_at' => $this->escalation->resolved_at?->toIso8601String(),
+            'resolution' => $this->escalation->resolution,
+            'resolution_notes' => $this->escalation->resolution_notes,
+        ];
+    }
+}

@@ -2,7 +2,7 @@
 
 namespace App\Repositories\OpenCollab;
 
-use App\Models\OpenCollab\ImageSubmissionEvidence;
+use App\Models\ImageSubmissionEvidence;
 
 interface ImageSubmissionEvidenceRepositoryInterface
 {

@@ -3,7 +3,7 @@
 namespace App\Repositories\OpenCollab;
 
 use App\Framework\Support\Collection;
-use App\Models\OpenCollab\ImageSubmissionEvidence;
+use App\Models\ImageSubmissionEvidence;
 use App\Repositories\Repository;
 
 class ImageSubmissionEvidenceRepository extends Repository implements ImageSubmissionEvidenceRepositoryInterface

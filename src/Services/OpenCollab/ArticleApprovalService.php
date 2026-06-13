@@ -3,10 +3,14 @@
 namespace App\Services\OpenCollab;
 
 use App\Enums\OpenCollab\ActivityEventType;
+use App\Enums\OpenCollab\ModerationActionType;
 use App\Enums\OpenCollab\RejectionReason;
 use App\Events\OpenCollab\ArticleSubmittedForReviewEvent;
+use App\Events\OpenCollab\ChangesRequestedEvent;
+use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
 use App\Exceptions\OpenCollab\OnboardingIncompleteException;
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
+use App\Framework\Database\Database;
 use App\Framework\Events\EventDispatcher;
 use App\Framework\Notifications\NotificationDispatcher;
 use App\Models\Page;
@@ -14,41 +18,38 @@ use App\Repositories\Cms\SiteRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
 use App\Services\Cms\Pages\PageService;
+use App\Services\OpenCollab\Moderation\Governance\ContentGovernanceGate;
+use App\Services\OpenCollab\Moderation\ModerationAuditService;
+use App\Services\OpenCollab\Moderation\ModerationQueueService;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
 
 /**
  * Governs the contributor article moderation lifecycle.
  *
- * Policy enforcement is injected via ContributorPolicy so the permission
- * logic is not duplicated here. The service throws OnboardingIncompleteException
- * when the policy blocks an action — callers translate this to the appropriate
- * HTTP response.
- *
- * Page state transitions are delegated to PageService. This service only checks
- * Open Collab policy and records Open Collab activity.
+ * Extended (not replaced) for the moderation queue / governance / audit
+ * features: each transition now also updates the moderation queue and
+ * writes an audit record, inside the same transaction as the page write.
  */
 class ArticleApprovalService
 {
     public function __construct(
-        private readonly PageService            $pageService,
-        private readonly ActivityRepository      $activityRepository,
-        private readonly EventDispatcher         $eventDispatcher,
-        private readonly ContributorPolicy       $policy,
-        private readonly SiteRepository          $siteRepository,
-        private readonly NotificationDispatcher  $notificationDispatcher,
+        private readonly PageService $pageService,
+        private readonly ActivityRepository $activityRepository,
+        private readonly EventDispatcher $eventDispatcher,
+        private readonly ContributorPolicy $policy,
+        private readonly SiteRepository $siteRepository,
+        private readonly NotificationDispatcher $notificationDispatcher,
         private readonly UserRepositoryInterface $userRepository,
-
-    )
-    {
+        private readonly ModerationQueueService $queueService,
+        private readonly ModerationAuditService $auditService,
+        private readonly ContentGovernanceGate $governanceGate,
+        private readonly Database $database,
+    ) {
     }
 
     /**
-     * Contributor submits their article for review.
-     * Transitions: draft|on_hold → waiting_approval
-     *
-     * @throws UnauthorisedPageAccessException if the contributor does not own the page
-     * @throws OnboardingIncompleteException   if compliance steps are outstanding
-     * @throws \InvalidArgumentException       if the page cannot be submitted
+     * @throws UnauthorisedPageAccessException
+     * @throws OnboardingIncompleteException
      */
     public function submitForReview(int $pageId, int $contributorId): Page
     {
@@ -58,8 +59,6 @@ class ArticleApprovalService
             throw new UnauthorisedPageAccessException();
         }
 
-        // Load site to pass to the policy. Falls back to a minimal Site model
-        // if the page site_id is not resolvable (shouldn't happen in practice).
         $site = $this->siteRepository->find($page->site_id);
 
         if (!$site) {
@@ -67,19 +66,23 @@ class ArticleApprovalService
         }
 
         if (!$this->policy->canSubmitForReview($contributorId, $site)) {
-            $pending = [];
-
-            throw new OnboardingIncompleteException($pending);
+            throw new OnboardingIncompleteException([]);
         }
 
-        $page = $this->pageService->submitPageForReview($pageId, $contributorId);
+        $page = $this->database->transaction(function () use ($pageId, $contributorId) {
+            $page = $this->pageService->submitPageForReview($pageId, $contributorId);
 
-        $this->activityRepository->record(
-            siteId: $page->site_id,
-            userId: $contributorId,
-            type: ActivityEventType::ArticleUpdated,
-            payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
-        );
+            $this->activityRepository->record(
+                siteId: $page->site_id,
+                userId: $contributorId,
+                type: ActivityEventType::ArticleUpdated,
+                payload: ['page_id' => $page->id, 'action' => 'submitted_for_review'],
+            );
+
+            $this->queueService->enqueueForSubmission($page, $contributorId, isResubmission: false);
+
+            return $page;
+        });
 
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
@@ -89,57 +92,76 @@ class ArticleApprovalService
     }
 
     /**
-     * Admin approves a contributor article.
-     * Transitions: waiting_approval → published
-     *
-     * @throws \InvalidArgumentException if the article is not in waiting_approval
+     * @throws \InvalidArgumentException if the article is not waiting_approval
+     * @throws GovernanceCheckFailedException if governance checks fail
      */
     public function approve(int $pageId, int $adminId): Page
     {
-        $page = $this->pageService->approvePage($pageId, $adminId);
+        // Read-only check BEFORE any writes — failure must not alter
+        // page or queue status (Ticket 10 acceptance criteria).
+        $this->governanceGate->assertCanApprove($pageId, $adminId);
 
-        $this->activityRepository->record(
-            siteId: $page->site_id,
-            userId: (int)$page->contributor_id,
-            type: ActivityEventType::ArticlePublished,
-            payload: ['page_id' => $page->id, 'approved_by' => $adminId],
-        );
+        return $this->database->transaction(function () use ($pageId, $adminId) {
+            $page = $this->pageService->approvePage($pageId, $adminId);
 
-        return $page;
+            $this->activityRepository->record(
+                siteId: $page->site_id,
+                userId: (int)$page->contributor_id,
+                type: ActivityEventType::ArticlePublished,
+                payload: ['page_id' => $page->id, 'approved_by' => $adminId],
+            );
+
+            $this->queueService->markApproved($page->id, $page->site_id);
+
+            $this->auditService->record(
+                siteId: $page->site_id,
+                pageId: $page->id,
+                actorUserId: $adminId,
+                action: ModerationActionType::Approved,
+            );
+
+            return $page;
+        });
     }
 
     /**
-     * Admin rejects a contributor article.
-     * Transitions: waiting_approval → on_hold
-     *
-     * @throws \InvalidArgumentException if the article is not in waiting_approval
+     * @throws \InvalidArgumentException if the article is not waiting_approval
      */
     public function reject(int $pageId, int $adminId, RejectionReason $reason, ?string $notes = null): Page
     {
-        $page = $this->pageService->rejectPage($pageId, $adminId, $reason->value, $notes);
+        return $this->database->transaction(function () use ($pageId, $adminId, $reason, $notes) {
+            $page = $this->pageService->rejectPage($pageId, $adminId, $reason->value, $notes);
 
-        $this->activityRepository->record(
-            siteId: $page->site_id,
-            userId: (int)$page->contributor_id,
-            type: ActivityEventType::ArticleUpdated,
-            payload: [
-                'page_id' => $page->id,
-                'action' => 'rejected',
-                'reason' => $reason->value,
-                'rejected_by' => $adminId,
-            ],
-        );
+            $this->activityRepository->record(
+                siteId: $page->site_id,
+                userId: (int)$page->contributor_id,
+                type: ActivityEventType::ArticleUpdated,
+                payload: [
+                    'page_id' => $page->id,
+                    'action' => 'rejected',
+                    'reason' => $reason->value,
+                    'rejected_by' => $adminId,
+                ],
+            );
 
-        return $page;
+            $this->queueService->markRejected($page->id, $page->site_id);
+
+            $this->auditService->record(
+                siteId: $page->site_id,
+                pageId: $page->id,
+                actorUserId: $adminId,
+                action: ModerationActionType::Rejected,
+                reasonCode: $reason->value,
+                notes: $notes,
+            );
+
+            return $page;
+        });
     }
 
     /**
-     * Contributor resubmits an article after rejection.
-     * Transitions: on_hold → waiting_approval
-     *
-     * @throws UnauthorisedPageAccessException if the contributor does not own the page
-     * @throws OnboardingIncompleteException   if compliance steps are outstanding
-     * @throws \InvalidArgumentException       if the article is not on_hold
+     * @throws UnauthorisedPageAccessException
+     * @throws OnboardingIncompleteException
      */
     public function resubmit(int $pageId, int $contributorId): Page
     {
@@ -160,18 +182,25 @@ class ArticleApprovalService
         }
 
         $nextCount = ((int)$page->resubmission_count) + 1;
-        $page = $this->pageService->resubmitPageForReview($pageId, $contributorId);
 
-        $this->activityRepository->record(
-            siteId: $page->site_id,
-            userId: $contributorId,
-            type: ActivityEventType::ArticleUpdated,
-            payload: [
-                'page_id' => $page->id,
-                'action' => 'resubmitted',
-                'resubmission_count' => $nextCount,
-            ],
-        );
+        $page = $this->database->transaction(function () use ($pageId, $contributorId, $nextCount) {
+            $page = $this->pageService->resubmitPageForReview($pageId, $contributorId);
+
+            $this->activityRepository->record(
+                siteId: $page->site_id,
+                userId: $contributorId,
+                type: ActivityEventType::ArticleUpdated,
+                payload: [
+                    'page_id' => $page->id,
+                    'action' => 'resubmitted',
+                    'resubmission_count' => $nextCount,
+                ],
+            );
+
+            $this->queueService->enqueueForSubmission($page, $contributorId, isResubmission: true);
+
+            return $page;
+        });
 
         $this->eventDispatcher->dispatch(
             new ArticleSubmittedForReviewEvent($page, $contributorId)
@@ -181,8 +210,47 @@ class ArticleApprovalService
     }
 
     /**
-     * Returns all articles awaiting approval for a site.
+     * Ticket 5 — moderator requests changes without full rejection.
+     * Transitions: waiting_approval -> on_hold; queue -> changes_requested.
+     *
+     * @throws \InvalidArgumentException if the article is not waiting_approval
      */
+    public function requestChanges(int $pageId, int $adminId, string $notes): Page
+    {
+        $page = $this->database->transaction(function () use ($pageId, $adminId, $notes) {
+            $page = $this->pageService->requestChangesForPage($pageId, $adminId, $notes);
+
+            $this->activityRepository->record(
+                siteId: $page->site_id,
+                userId: (int)$page->contributor_id,
+                type: ActivityEventType::ArticleUpdated,
+                payload: [
+                    'page_id' => $page->id,
+                    'action' => 'changes_requested',
+                    'requested_by' => $adminId,
+                ],
+            );
+
+            $this->queueService->markChangesRequested($page->id, $page->site_id);
+
+            $this->auditService->record(
+                siteId: $page->site_id,
+                pageId: $page->id,
+                actorUserId: $adminId,
+                action: ModerationActionType::ChangesRequested,
+                notes: $notes,
+            );
+
+            return $page;
+        });
+
+        $this->eventDispatcher->dispatch(
+            new ChangesRequestedEvent($page, $adminId, $notes)
+        );
+
+        return $page;
+    }
+
     public function pendingReviewForSite(int $siteId): \App\Framework\Support\Collection
     {
         return $this->pageService->pendingReviewForSite($siteId);

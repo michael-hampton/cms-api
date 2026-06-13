@@ -2,6 +2,7 @@
 
 namespace App\Services\Cms;
 
+use App\Enums\OpenCollab\ModerationPermission;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 class ContentWorkflowAuthorizationService
@@ -146,5 +147,53 @@ class ContentWorkflowAuthorizationService
         }
 
         throw $lastException;
+    }
+
+    public function assertCanRequestChanges(int $userId, int $siteId): void
+    {
+        $this->assertAny($userId, $siteId, [
+            ModerationPermission::PagesRequestChanges,
+            ModerationPermission::ContentRequestChanges,
+        ], 'Missing permission: PagesRequestChanges');
+    }
+
+    public function assertCanEscalate(int $userId, int $siteId): void
+    {
+        $this->assertAny($userId, $siteId, [
+            ModerationPermission::PagesEscalate,
+            ModerationPermission::ContentEscalate,
+        ], 'Missing permission: PagesEscalate');
+    }
+
+    public function assertCanViewHighRisk(int $userId, int $siteId): void
+    {
+        $this->assertAny($userId, $siteId, [
+            ModerationPermission::PagesViewHighRisk,
+            ModerationPermission::ContentViewHighRisk,
+        ], 'Missing permission: PagesViewHighRisk');
+    }
+
+    public function assertCanAssignReview(int $userId, int $siteId): void
+    {
+        $this->assertAny($userId, $siteId, [
+            ModerationPermission::PagesAssignReview,
+            ModerationPermission::ContentAssignReview,
+        ], 'Missing permission: PagesAssignReview');
+    }
+
+    public function assertCanOverridePriority(int $userId, int $siteId): void
+    {
+        $this->assertAny($userId, $siteId, [
+            ModerationPermission::PagesOverridePriority,
+            ModerationPermission::ContentOverridePriority,
+        ], 'Missing permission: PagesOverridePriority');
+    }
+
+    public function assertCanResolveRisk(int $userId, int $siteI): void
+    {
+        $this->assertAny($userId, $siteI, [
+            ModerationPermission::PagesResolveRisk,
+            ModerationPermission::ContentResolveRisk,
+        ], 'Missing permission: PagesResolveRisk');
     }
 }

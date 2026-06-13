@@ -1310,4 +1310,20 @@ class PageService
 
         return $approvedPage;
     }
+
+    public function requestChangesForPage(int $pageId, int $adminId, string $notes): Page
+    {
+        $page = $this->findPage($pageId);
+
+        if (!$page || $page->status !== PageStatus::WAITING_APPROVAL->value) {
+            throw new \InvalidArgumentException("Page [{$pageId}] is not awaiting approval.");
+        }
+
+        $page->update([
+            'status' => PageStatus::ON_HOLD->value,
+            'moderation_notes' => $notes, // ASSUMED column exists or add via migration
+        ]);
+
+        return $page->refresh();
+    }
 }

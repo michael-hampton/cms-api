@@ -1,8 +1,6 @@
 <?php
 
-namespace App\Models\OpenCollab;
-
-use App\Models\Model;
+namespace App\Models;
 
 class ImageSubmissionEvidence extends Model
 {
