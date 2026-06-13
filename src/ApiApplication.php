@@ -162,6 +162,8 @@ use App\Models\Page;
 use App\Observers\BlockObserver;
 use App\Observers\PageObserver;
 use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\OpenCollab\ImageSubmissionEvidenceRepository;
+use App\Repositories\OpenCollab\ImageSubmissionEvidenceRepositoryInterface;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Repositories\Vouchers\VoucherRepository;
@@ -257,6 +259,8 @@ use App\Services\OpenCollab\Dashboard\Widgets\EarningsWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\OnboardingWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\QuickLinksWidget;
 use App\Services\OpenCollab\Dashboard\Widgets\ReviewQueueWidget;
+use App\Services\OpenCollab\ImageSubmissionEvidenceService;
+use App\Services\OpenCollab\ImageSubmissionEvidenceServiceInterface;
 use App\Services\OpenCollab\Policies\ContributorImagePolicy;
 use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
 use App\Services\OpenCollab\Policies\ContributorPolicy;
@@ -402,6 +406,8 @@ class ApiApplication
 
         $this->container->bind(CmsImageClientInterface::class, CmsImageClient::class);
         $this->container->bind(ContributorImagePolicyInterface::class, ContributorImagePolicy::class);
+        $this->container->bind(ImageSubmissionEvidenceServiceInterface::class, ImageSubmissionEvidenceService::class);
+        $this->container->bind(ImageSubmissionEvidenceRepositoryInterface::class, ImageSubmissionEvidenceRepository::class);
 
         //stripe
 

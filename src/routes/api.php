@@ -119,6 +119,7 @@ use App\Controllers\OpenCollab\ContributorRequestController;
 use App\Controllers\OpenCollab\ContributorSettingsController;
 use App\Controllers\OpenCollab\DashboardPageNewController;
 use App\Controllers\OpenCollab\EarningsDisputeController;
+use App\Controllers\OpenCollab\ImageLibraryController;
 use App\Controllers\OpenCollab\InvitationController;
 use App\Controllers\OpenCollab\NotificationController;
 use App\Controllers\OpenCollab\OnboardingController;
@@ -481,16 +482,13 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         );
 
         $router->get('/open-collab/admin/moderation/{queueEntryId}', [ModerationQueueController::class, 'show']);
-
         $router->post('/open-collab/admin/articles/{id}/request-changes', [ArticleApprovalController::class, 'requestChanges']);
-
         $router->post('/open-collab/admin/moderation/{queueEntryId}/claim', [ModerationQueueController::class, 'claim']);
-
         $router->post('/open-collab/admin/moderation/{queueEntryId}/risks', [ModerationRiskController::class, 'store']);
-
         $router->post('/open-collab/admin/risks/{riskMarkerId}/resolve', [ModerationRiskController::class, 'resolve']);
-
         $router->post('/open-collab/admin/risks/{riskMarkerId}/dismiss', [ModerationRiskController::class, 'dismiss']);
+        $router->get('/open-collab/images', [ImageLibraryController::class, 'index']);
+        $router->post('/open-collab/images', [ImageLibraryController::class, 'store']);
 
         $router->get(
             '/open-collab/admin/contributors',

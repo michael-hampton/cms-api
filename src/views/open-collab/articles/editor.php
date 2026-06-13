@@ -996,6 +996,18 @@ $headerActions = '
     .preview-content li {
         margin-bottom: .35em;
     }
+
+    .block-image-selected {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .block-image-rights {
+        margin-top: 6px;
+        font-size: .72rem;
+        color: var(--slate);
+    }
 </style>
 
 <!-- Toast -->
@@ -1321,6 +1333,8 @@ $headerActions = '
     </div>
 </div>
 
+@include('open-collab/articles/partials/image-library-modal')
+
 @endsection
 
 @section('scripts')
@@ -1342,6 +1356,190 @@ $headerActions = '
      * removed. They are always first in the list, in order: heading, text, image.
      */
     const DEFAULT_BLOCK_IDS = {heading: '__default_heading__', text: '__default_text__', image: '__default_image__'};
+
+    const IMAGE_RIGHTS_LABELS = {
+        contributor_owned:    'Contributor-owned',
+        staff_owned:          'Staff-owned',
+        third_party_licensed: 'Licensed third-party',
+        agency:                'Agency',
+        editorial_use_only:   'Editorial use only',
+        royalty_free:         'Royalty Free',
+        public_domain:        'Public Domain',
+        creative_commons:     'Creative Commons',
+        all_rights_reserved:  'All Rights Reserved',
+        attribution_required: 'Attribution Required',
+        custom_license:       'Custom License',
+        unknown:              'Rights not confirmed',
+    };
+
+    function getImageRightsLabel(rights) {
+        return IMAGE_RIGHTS_LABELS[rights] ?? rights ?? 'Unknown';
+    }
+
+    function imageBlockDefaults() {
+        return {
+            cms_image_id: null,
+            image_url: '',
+            thumbnail_url: '',
+            name: '',
+            alt: '',
+            credit: '',
+            image_rights: '',
+            source_alt: '',
+            source_credit: '',
+            caption: '',
+            layout: 'full',
+            alignment: 'center',
+        };
+    }
+
+    function normaliseImageBlock(block) {
+        return {
+            ...imageBlockDefaults(),
+            ...block,
+
+            // Backwards compatibility for older saved/frontend block shapes.
+            cms_image_id: block.cms_image_id ?? block.cmsImageId ?? block.imageId ?? null,
+            image_url: block.image_url ?? block.src ?? '',
+            thumbnail_url: block.thumbnail_url ?? '',
+            image_rights: block.image_rights ?? block.imageRights ?? '',
+            source_alt: block.source_alt ?? block.alt ?? '',
+            source_credit: block.source_credit ?? block.credit ?? '',
+        };
+    }
+
+    function getImageLibrary() {
+        if (!window.imageLibrary) {
+            showToast('Image library is not available yet.', false);
+            return null;
+        }
+
+        window.imageLibrary.onSelect = function (blockId, image) {
+            applyLibraryImageToBlock(blockId, image);
+        };
+
+        return window.imageLibrary;
+    }
+
+    function openImageLibraryForBlock(blockId) {
+        const block = blocks.find(candidate => candidate.id === blockId);
+        const imageLibrary = getImageLibrary();
+
+        if (!block || !imageLibrary) {
+            return;
+        }
+
+        imageLibrary.open(blockId, block.cms_image_id ?? null);
+    }
+
+    function registerImageLibrarySelectionHandler() {
+        if (!window.imageLibrary) {
+            return;
+        }
+
+        window.imageLibrary.onSelect = function (blockId, image) {
+            applyLibraryImageToBlock(blockId, image);
+        };
+    }
+
+    document.addEventListener('DOMContentLoaded', registerImageLibrarySelectionHandler);
+
+    function applyLibraryImageToBlock(blockId, image) {
+        const block = blocks.find(candidate => candidate.id === blockId);
+
+        if (!block || block.type !== 'image') {
+            return;
+        }
+
+        const imageUrl = image.preview_url ?? image.url ?? image.thumbnail_url ?? '';
+        const thumbnailUrl = image.thumbnail_url ?? image.preview_url ?? image.url ?? '';
+        const sourceAlt = image.alt_text ?? image.alt ?? '';
+        const sourceCredit = image.credit ?? '';
+
+        // The default image block is the legacy multi-image drop area.
+        // It does not expose editable metadata fields, so selected library images are
+        // added to the thumbnail collection instead of replacing the whole block UI.
+        if (block.isDefault) {
+            const itemId = String(image.id ?? uid());
+            const alreadyAdded = defaultImageItems.some(item => String(item.id) === itemId);
+
+            if (!alreadyAdded) {
+                defaultImageItems.push({
+                    id: itemId,
+                    cms_image_id: image.id ?? null,
+                    url: imageUrl,
+                    thumbnail_url: thumbnailUrl,
+                    name: image.name ?? '',
+                    alt: sourceAlt,
+                    credit: sourceCredit,
+                    image_rights: image.image_rights ?? '',
+                });
+            }
+
+            if (!block.cms_image_id) {
+                block.cms_image_id = image.id ?? null;
+                block.image_url = imageUrl;
+                block.thumbnail_url = thumbnailUrl;
+                block.name = image.name ?? '';
+                block.alt = sourceAlt;
+                block.credit = sourceCredit;
+                block.image_rights = image.image_rights ?? '';
+                block.source_alt = sourceAlt;
+                block.source_credit = sourceCredit;
+            }
+
+            renderBlocks();
+            scheduleAutosave();
+            showToast(alreadyAdded ? 'Image already added' : 'Image added');
+            return;
+        }
+
+        const previousImageId = block.cms_image_id ?? null;
+        const nextImageId = image.id ?? null;
+
+        const isSameImage =
+            previousImageId !== null &&
+            nextImageId !== null &&
+            String(previousImageId) === String(nextImageId);
+
+        block.cms_image_id = nextImageId;
+        block.image_url = imageUrl;
+        block.thumbnail_url = thumbnailUrl;
+        block.name = image.name ?? '';
+        block.image_rights = image.image_rights ?? '';
+
+        // Keep the CMS metadata snapshot used by the explicit reset action.
+        // This deliberately avoids refetching CMS metadata when editing an existing article.
+        block.source_alt = sourceAlt;
+        block.source_credit = sourceCredit;
+
+        // Ticket 8 overwrite rules:
+        // Empty/different image = use CMS metadata.
+        // Same image = preserve contributor-edited alt/credit.
+        if (!isSameImage) {
+            block.alt = sourceAlt;
+            block.credit = sourceCredit;
+        }
+
+        renderBlocks();
+        scheduleAutosave();
+        showToast(isSameImage ? 'Image re-selected' : 'Image selected');
+    }
+
+    function resetImageBlockMetadata(blockId) {
+        const block = blocks.find(candidate => candidate.id === blockId);
+
+        if (!block || block.type !== 'image') {
+            return;
+        }
+
+        block.alt = block.source_alt ?? '';
+        block.credit = block.source_credit ?? '';
+
+        renderBlocks();
+        scheduleAutosave();
+        showToast('Image metadata reset');
+    }
 
     /**
      * blocks[] — each entry:
@@ -1366,7 +1564,8 @@ $headerActions = '
         const raw = <?= json_encode($page->blocks) ?>;
         if (Array.isArray(raw) && raw.length) {
             raw.forEach((b, i) => {
-                blocks.push({...b, id: b.id ?? uid(), order: b.order ?? i, isDefault: false});
+                const block = {...b, id: b.id ?? uid(), order: b.order ?? i, isDefault: false};
+                blocks.push(block.type === 'image' ? normaliseImageBlock(block) : block);
             });
             // Ensure we always have the three default blocks at positions 0-2
             ensureDefaultBlocks();
@@ -1385,8 +1584,11 @@ $headerActions = '
                 content: '<?= addslashes($page->content ?? '') ?>'
             },
             {
-                id: DEFAULT_BLOCK_IDS.image, type: 'image', isDefault: true, order: 2,
-                src: '', alt: '', caption: '', layout: 'full', alignment: 'center'
+                id: DEFAULT_BLOCK_IDS.image,
+                type: 'image',
+                isDefault: true,
+                order: 2,
+                ...imageBlockDefaults(),
             },
         ];
     })();
@@ -1403,8 +1605,11 @@ $headerActions = '
                 content: ''
             },
             {
-                id: DEFAULT_BLOCK_IDS.image, type: 'image', isDefault: true, order: -1,
-                src: '', alt: '', caption: '', layout: 'full', alignment: 'center'
+                id: DEFAULT_BLOCK_IDS.image,
+                type: 'image',
+                isDefault: true,
+                order: -1,
+                ...imageBlockDefaults(),
             },
         ];
         defaultDefs.forEach(def => {
@@ -1438,7 +1643,7 @@ $headerActions = '
             case 'list':
                 return {listType: 'ul', items: ['']};
             case 'image':
-                return {src: '', alt: '', caption: '', layout: 'full', alignment: 'center'};
+                return imageBlockDefaults();
             default:
                 return {};
         }
@@ -1753,81 +1958,201 @@ $headerActions = '
             // ── Image ─────────────────────────────────────────────────────
             case 'image': {
                 if (b.isDefault) {
-                    // Styled like the original image-upload-zone
-                    return `<div class="block-image-wrap" id="default-image-wrap"
-                             ondragover="event.preventDefault();this.classList.add('drag-over')"
-                             ondragleave="this.classList.remove('drag-over')"
-                             ondrop="handleDefaultImageDrop(event)">
-                    <div class="block-image-wrap__header">
-                        <span class="block-image-wrap__title">Images</span>
-                        <span class="block-image-wrap__hint">Drag &amp; drop images here — saved as image blocks</span>
-                        <button type="button" onclick="document.getElementById('default-image-file-input').click()"
-                                class="oc-btn oc-btn--ghost oc-btn--sm" style="font-size:.75rem;padding:4px 10px;">
-                            + Upload
-                        </button>
-                    </div>
-                    <div class="block-image-thumbs" id="default-image-thumbs">
-                        <span class="block-image-empty" id="default-image-empty">No images added yet</span>
-                    </div>
-                </div>`;
+                    return `<div class="block-image-wrap" id="default-image-wrap">
+            <div class="block-image-wrap__header">
+                <span class="block-image-wrap__title">Images</span>
+
+                <span class="block-image-wrap__hint">
+                    Add images from your Open Collab image library
+                </span>
+
+                <button type="button"
+                        onclick="openImageLibraryForBlock('${id}')"
+                        class="oc-btn oc-btn--ghost oc-btn--sm"
+                        style="font-size:.75rem;padding:4px 10px;">
+                    + Choose image
+                </button>
+            </div>
+
+            <div class="block-image-thumbs" id="default-image-thumbs">
+                <span class="block-image-empty" id="default-image-empty">
+                    No images added yet
+                </span>
+            </div>
+        </div>`;
                 }
 
-                // Non-default image block — FIX 5: reads src from blocks[] state, not from DOM
+                const imageBlock = normaliseImageBlock(b);
+                const rightsLabel = imageBlock.image_rights
+                    ? getImageRightsLabel(imageBlock.image_rights)
+                    : '';
+
                 return `<div class="block-card__body-inner">
-                <div>
-                    <label class="block-field-label">Image</label>
-                    ${b.src
-                    ? `<div class="block-image-preview">
-                                <img src="${escAttr(b.src)}" alt="${escAttr(b.alt ?? '')}">
-                                <button type="button" class="block-image-preview__remove"
-                                        onclick="clearBlockImage('${id}')" title="Remove image">✕</button>
-                           </div>`
-                    : `<div class="block-image-drop" id="img-drop-${id}"
-                                 onclick="triggerBlockImagePick('${id}')"
-                                 ondragover="event.preventDefault();this.classList.add('drag-over')"
-                                 ondragleave="this.classList.remove('drag-over')"
-                                 ondrop="handleBlockImageDrop(event,'${id}')">
-                                <div class="block-image-drop__hint">
-                                    <svg viewBox="0 0 20 20" fill="currentColor" width="20"
-                                         style="color:var(--slate-light);display:block;margin:0 auto 6px;">
-                                        <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
-                                    </svg>
-                                    Click or drag &amp; drop an image here
-                                </div>
-                           </div>`
+
+        <div>
+            <label class="block-field-label">Image</label>
+
+            ${imageBlock.image_url
+                    ? `<div class="block-image-selected">
+                    <div class="block-image-preview">
+                        <img src="${escAttr(imageBlock.image_url)}"
+                             alt="${escAttr(b.alt ?? '')}">
+
+                        <button type="button"
+                                class="block-image-preview__remove"
+                                onclick="clearBlockImage('${id}')"
+                                title="Remove image">
+                            ✕
+                        </button>
+                    </div>
+
+                    ${rightsLabel
+                        ? `<div class="block-image-rights">
+                            Image rights: ${escHtml(rightsLabel)}
+                        </div>`
+                        : ''
+                    }
+
+                    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                        <button type="button"
+                                class="oc-btn oc-btn--ghost oc-btn--sm"
+                                onclick="openImageLibraryForBlock('${id}')">
+                            Change image
+                        </button>
+
+                        <button type="button"
+                                class="oc-btn oc-btn--ghost oc-btn--sm"
+                                onclick="resetImageBlockMetadata('${id}')">
+                            Reset from image metadata
+                        </button>
+                    </div>
+                </div>`
+                    : `<div class="block-image-drop"
+                        id="img-drop-${id}"
+                        role="button"
+                        tabindex="0"
+                        onclick="openImageLibraryForBlock('${id}')"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openImageLibraryForBlock('${id}');}">
+
+                    <div class="block-image-drop__hint">
+                        <svg viewBox="0 0 20 20"
+                             fill="currentColor"
+                             width="20"
+                             style="color:var(--slate-light);display:block;margin:0 auto 6px;">
+                            <path fill-rule="evenodd"
+                                  d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
+                                  clip-rule="evenodd"/>
+                        </svg>
+
+                        Choose an image from your library
+                    </div>
+                </div>`
                 }
-                </div>
-                <div>
-                    <label class="block-field-label">Alt text</label>
-                    <input class="oc-input" type="text" placeholder="Describe the image for accessibility…"
-                        value="${escAttr(b.alt ?? '')}"
-                        oninput="patchBlock('${id}','alt',this.value)">
-                </div>
-                <div>
-                    <label class="block-field-label">Caption <span style="font-weight:400;color:var(--slate-light);">(optional)</span></label>
-                    <input class="oc-input" type="text" placeholder="Image caption…"
-                        value="${escAttr(b.caption ?? '')}"
-                        oninput="patchBlock('${id}','caption',this.value)">
-                </div>
-                <div class="block-field-row">
-                    <div>
-                        <label class="block-field-label">Layout</label>
-                        <select class="oc-input" oninput="patchBlock('${id}','layout',this.value)">
-                            <option value="full"   ${b.layout === 'full' ? 'selected' : ''}>Full width</option>
-                            <option value="wide"   ${b.layout === 'wide' ? 'selected' : ''}>Wide</option>
-                            <option value="normal" ${b.layout === 'normal' ? 'selected' : ''}>Normal</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block-field-label">Alignment</label>
-                        <select class="oc-input" oninput="patchBlock('${id}','alignment',this.value)">
-                            <option value="center" ${b.alignment === 'center' ? 'selected' : ''}>Centre</option>
-                            <option value="left"   ${b.alignment === 'left' ? 'selected' : ''}>Left</option>
-                            <option value="right"  ${b.alignment === 'right' ? 'selected' : ''}>Right</option>
-                        </select>
-                    </div>
-                </div>
-            </div>`;
+        </div>
+
+        <div>
+            <label class="block-field-label">
+                Image name
+            </label>
+
+            <input class="oc-input"
+                   type="text"
+                   maxlength="255"
+                   placeholder="Image name…"
+                   value="${escAttr(imageBlock.name ?? '')}"
+                   oninput="patchBlock('${id}','name',this.value)">
+        </div>
+
+        <div>
+            <label class="block-field-label">
+                Alt text
+            </label>
+
+            <input class="oc-input"
+                   type="text"
+                   maxlength="500"
+                   placeholder="Describe the image for accessibility…"
+                   value="${escAttr(imageBlock.alt ?? '')}"
+                   oninput="patchBlock('${id}','alt',this.value)">
+        </div>
+
+        <div>
+            <label class="block-field-label">
+                Credit
+                <span style="font-weight:400;color:var(--slate-light);">
+                    (optional override)
+                </span>
+            </label>
+
+            <input class="oc-input"
+                   type="text"
+                   maxlength="255"
+                   placeholder="Image credit…"
+                   value="${escAttr(imageBlock.credit ?? '')}"
+                   oninput="patchBlock('${id}','credit',this.value)">
+        </div>
+
+        <div>
+            <label class="block-field-label">
+                Caption
+                <span style="font-weight:400;color:var(--slate-light);">
+                    (optional)
+                </span>
+            </label>
+
+            <input class="oc-input"
+                   type="text"
+                   placeholder="Image caption…"
+                   value="${escAttr(b.caption ?? '')}"
+                   oninput="patchBlock('${id}','caption',this.value)">
+        </div>
+
+        <div class="block-field-row">
+            <div>
+                <label class="block-field-label">Layout</label>
+
+                <select class="oc-input"
+                        oninput="patchBlock('${id}','layout',this.value)">
+                    <option value="full"
+                            ${b.layout === 'full' ? 'selected' : ''}>
+                        Full width
+                    </option>
+
+                    <option value="wide"
+                            ${b.layout === 'wide' ? 'selected' : ''}>
+                        Wide
+                    </option>
+
+                    <option value="normal"
+                            ${b.layout === 'normal' ? 'selected' : ''}>
+                        Normal
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block-field-label">Alignment</label>
+
+                <select class="oc-input"
+                        oninput="patchBlock('${id}','alignment',this.value)">
+                    <option value="center"
+                            ${b.alignment === 'center' ? 'selected' : ''}>
+                        Centre
+                    </option>
+
+                    <option value="left"
+                            ${b.alignment === 'left' ? 'selected' : ''}>
+                        Left
+                    </option>
+
+                    <option value="right"
+                            ${b.alignment === 'right' ? 'selected' : ''}>
+                        Right
+                    </option>
+                </select>
+            </div>
+        </div>
+    </div>`;
             }
 
             default:
@@ -1893,7 +2218,7 @@ $headerActions = '
         defaultImageItems = defaultImageItems.filter(i => i.id !== id);
         // Update default image block src (use first image if any)
         const defImg = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.image);
-        if (defImg) defImg.src = defaultImageItems[0]?.url ?? '';
+        if (defImg) defImg.image_url = defaultImageItems[0]?.url ?? '';
         renderDefaultImageThumbs();
         scheduleAutosave();
     }
@@ -1918,11 +2243,20 @@ $headerActions = '
         }
         const url = await uploadImageXHR(file);
         if (!url) return;
-        const item = {id: uid(), url, alt: file.name.replace(/\.[^.]+$/, '')};
+        const item = {
+            id: uid(),
+            cms_image_id: null,
+            url,
+            thumbnail_url: url,
+            name: file.name.replace(/\.[^.]+$/, ''),
+            alt: file.name.replace(/\.[^.]+$/, ''),
+            credit: '',
+            image_rights: '',
+        };
         defaultImageItems.push(item);
         // Keep the default block's src pointing at the first uploaded image
         const defImg = blocks.find(b => b.id === DEFAULT_BLOCK_IDS.image);
-        if (defImg && !defImg.src) defImg.src = url;
+        if (defImg && !defImg.image_url) defImg.image_url = url;
         renderDefaultImageThumbs();
         scheduleAutosave();
         showToast('Image added');
@@ -1974,8 +2308,45 @@ $headerActions = '
     }
 
     function clearBlockImage(blockId) {
-        patchBlock(blockId, 'src', '');
+        const block = blocks.find(candidate => candidate.id === blockId);
+
+        if (!block || block.type !== 'image') {
+            return;
+        }
+
+        block.cms_image_id = null;
+        block.image_url = '';
+        block.thumbnail_url = '';
+        block.name = '';
+        block.alt = '';
+        block.credit = '';
+        block.image_rights = '';
+        block.source_alt = '';
+        block.source_credit = '';
+
         renderBlocks();
+        scheduleAutosave();
+    }
+
+    function serialiseImageBlock(block, order) {
+        const b = normaliseImageBlock(block);
+
+        return {
+            type: 'image',
+            order,
+            cms_image_id: b.cms_image_id,
+            image_url: b.image_url,
+            thumbnail_url: b.thumbnail_url,
+            name: b.name,
+            alt: b.alt,
+            credit: b.credit,
+            image_rights: b.image_rights,
+            source_alt: b.source_alt,
+            source_credit: b.source_credit,
+            caption: b.caption,
+            layout: b.layout,
+            alignment: b.alignment,
+        };
     }
 
     // =============================================================================
@@ -2256,21 +2627,29 @@ $headerActions = '
                     break;
                 case 'image':
                     if (b.isDefault) {
-                        // Expand into one image block per uploaded image
+                        // Expand the legacy default image collection into image blocks.
                         if (defaultImageItems.length) {
                             defaultImageItems.forEach(img => {
                                 payload.push({
-                                    type: 'image', order: order++, src: img.url,
-                                    alt: img.alt, caption: '', layout: 'full', alignment: 'center'
+                                    type: 'image',
+                                    order: order++,
+                                    cms_image_id: img.cms_image_id ?? null,
+                                    image_url: img.url ?? '',
+                                    thumbnail_url: img.thumbnail_url ?? '',
+                                    name: img.name ?? '',
+                                    alt: img.alt ?? '',
+                                    credit: img.credit ?? '',
+                                    image_rights: img.image_rights ?? '',
+                                    source_alt: img.alt ?? '',
+                                    source_credit: img.credit ?? '',
+                                    caption: '',
+                                    layout: 'full',
+                                    alignment: 'center',
                                 });
                             });
                         }
-                    } else if (b.src) {
-                        payload.push({
-                            type: 'image', order: order++, src: b.src,
-                            alt: b.alt ?? '', caption: b.caption ?? '',
-                            layout: b.layout ?? 'full', alignment: b.alignment ?? 'center'
-                        });
+                    } else if (normaliseImageBlock(b).image_url) {
+                        payload.push(serialiseImageBlock(b, order++));
                     }
                     break;
             }
@@ -2741,11 +3120,14 @@ $headerActions = '
                                 ${img.alt ? `<figcaption>${escHtml(img.alt)}</figcaption>` : ''}
                             </figure>`;
                         });
-                    } else if (b.src) {
-                        html += `<figure class="preview-image-block">
-                            <img src="${escAttr(b.src)}" alt="${escAttr(b.alt ?? '')}">
-                            ${b.caption ? `<figcaption>${escHtml(b.caption)}</figcaption>` : ''}
-                        </figure>`;
+                    } else {
+                        const imageBlock = normaliseImageBlock(b);
+                        if (imageBlock.image_url) {
+                            html += `<figure class="preview-image-block">
+                                <img src="${escAttr(imageBlock.image_url)}" alt="${escAttr(imageBlock.alt ?? '')}">
+                                ${imageBlock.caption ? `<figcaption>${escHtml(imageBlock.caption)}</figcaption>` : ''}
+                            </figure>`;
+                        }
                     }
                     break;
                 }

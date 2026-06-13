@@ -87,9 +87,9 @@ class ImageLibraryService
      * @throws \App\Framework\Exceptions\ValidationException  on invalid file/metadata
      */
     public function upload(
-        int             $userId,
-        Site            $site,
-        ImageUploadData $uploadData,
+        int               $userId,
+        Site              $site,
+        ImageUploadData   $uploadData,
         ImageEvidenceData $evidenceData,
     ): Image {
         if (!$this->imagePolicy->canUpload($userId, $site)) {
@@ -98,8 +98,24 @@ class ImageLibraryService
 
         $image = $this->cmsImageClient->upload((int) $site->id, $uploadData);
 
-        // Record evidence — non-critical to the upload succeeding but important for compliance.
-        // Failure here must not roll back the already-created CMS image.
+        $evidenceData = new ImageEvidenceData(
+            siteId: $evidenceData->siteId,
+            cmsImageId: (int) $image->id,
+            contributorUserId: $evidenceData->contributorUserId,
+            imageRights: $evidenceData->imageRights,
+            nameSubmitted: $evidenceData->nameSubmitted,
+            altTextSubmitted: $evidenceData->altTextSubmitted,
+            creditSubmitted: $evidenceData->creditSubmitted,
+            rightsConfirmation: $evidenceData->rightsConfirmation,
+            aiGenerated: $evidenceData->aiGenerated,
+            sponsoredContent: $evidenceData->sponsoredContent,
+            affiliateContent: $evidenceData->affiliateContent,
+            contributorProfileId: $evidenceData->contributorProfileId,
+            requestCorrelationId: $evidenceData->requestCorrelationId,
+            ipAddress: $evidenceData->ipAddress,
+            userAgent: $evidenceData->userAgent,
+        );
+
         try {
             $this->evidenceService->record($evidenceData);
         } catch (\Throwable $e) {

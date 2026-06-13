@@ -24,8 +24,7 @@
                     role="tab"
                     id="il-tab-library"
                     aria-selected="true"
-                    aria-controls="il-panel-library"
-                    onclick="window.imageLibrary.showTab('library')">
+                    aria-controls="il-panel-library">
                 Library
             </button>
             <button type="button"
@@ -33,8 +32,7 @@
                     role="tab"
                     id="il-tab-upload"
                     aria-selected="false"
-                    aria-controls="il-panel-upload"
-                    onclick="window.imageLibrary.showTab('upload')">
+                    aria-controls="il-panel-upload">
                 Upload new
             </button>
         </div>
@@ -92,11 +90,7 @@
                  class="il-drop-zone"
                  tabindex="0"
                  role="button"
-                 aria-label="Click or drag and drop an image to upload"
-                 onclick="document.getElementById('il-file-input').click()"
-                 ondragover="event.preventDefault();this.classList.add('il-drop-zone--over')"
-                 ondragleave="this.classList.remove('il-drop-zone--over')"
-                 ondrop="window.imageLibrary.handleDrop(event)">
+                 aria-label="Click or drag and drop an image to upload">
                 <svg viewBox="0 0 20 20" fill="currentColor" width="28" style="color:var(--slate-light);display:block;margin:0 auto 8px;">
                     <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
                 </svg>
@@ -105,6 +99,17 @@
                 </div>
             </div>
             <input type="file" id="il-file-input" accept="image/*" style="display:none;">
+
+            <div id="il-upload-preview"
+                 style="display:none;text-align:center;">
+                <img id="il-upload-preview-img"
+                     src=""
+                     alt=""
+                     style="max-height:220px;
+                max-width:100%;
+                border-radius:8px;
+                border:1px solid var(--border);">
+            </div>
 
             <!-- Upload form fields -->
             <div class="il-upload-form">
@@ -450,21 +455,9 @@
 
 <!-- ── Image Library JS ──────────────────────────────────────────────────── -->
 <script>
-    (function() {
+    (() => {
         'use strict';
 
-        // ── State ─────────────────────────────────────────────────────────────
-        let _activeBlockId       = null;
-        let _currentTab          = 'library';
-        let _selectedImage       = null;
-        let _currentPage         = 1;
-        let _totalPages          = 1;
-        let _searchDebounce      = null;
-        let _lastSearchXhr       = null;
-        let _pendingFile         = null;
-        let _isUploading         = false;
-
-        // RIGHTS_LABELS and BLOCKING_RIGHTS match the ImageRightsCreditPolicy PHP class
         const RIGHTS_LABELS = {
             contributor_owned:    'Contributor-owned',
             staff_owned:          'Staff-owned',
@@ -480,395 +473,730 @@
             unknown:              'Rights not confirmed',
         };
 
-        const RIGHTS_REQUIRING_CREDIT = [
-            'contributor_owned','third_party_licensed','agency',
-            'editorial_use_only','attribution_required','creative_commons',
-        ];
+        const RIGHTS_REQUIRING_CREDIT = new Set([
+            'contributor_owned',
+            'third_party_licensed',
+            'agency',
+            'editorial_use_only',
+            'attribution_required',
+            'creative_commons',
+        ]);
 
-        const BLOCKING_RIGHTS = ['unknown'];
+        const BLOCKING_RIGHTS = new Set(['unknown']);
 
-        // ── Public API ────────────────────────────────────────────────────────
-        window.imageLibrary = {
+        class ImageLibraryState {
+            constructor() {
+                this.activeBlockId = null;
+                this.currentTab = 'library';
+                this.selectedImage = null;
+                this.currentPage = 1;
+                this.totalPages = 1;
+                this.pendingFile = null;
+                this.isUploading = false;
+                this.searchTimer = null;
+                this.abortController = null;
+                this.preFocusEl = null;
+                this.trapHandler = null;
+            }
 
-            /** @type {function(string, object): void} Override in editor to handle selection */
-            onSelect: null,
+            resetForOpen(blockId) {
+                this.activeBlockId = blockId;
+                this.currentTab = 'library';
+                this.selectedImage = null;
+                this.currentPage = 1;
+                this.totalPages = 1;
+            }
+
+            resetForClose() {
+                this.activeBlockId = null;
+                this.selectedImage = null;
+            }
+        }
+
+        class ImageLibrary {
+            constructor() {
+                this.state = new ImageLibraryState();
+                this.onSelect = null;
+
+                this.el = this.cacheElements();
+                this.bindEvents();
+            }
+
+            cacheElements() {
+                const byId = id => document.getElementById(id);
+
+                return {
+                    modal: byId('image-library-modal'),
+                    closeBtn: byId('il-close-btn'),
+                    cancelBtn: byId('il-cancel-btn'),
+
+                    tabLibrary: byId('il-tab-library'),
+                    tabUpload: byId('il-tab-upload'),
+                    panelLibrary: byId('il-panel-library'),
+                    panelUpload: byId('il-panel-upload'),
+
+                    searchInput: byId('il-search-input'),
+                    status: byId('il-library-status'),
+                    grid: byId('il-grid'),
+                    pagination: byId('il-pagination'),
+                    prevBtn: byId('il-prev-btn'),
+                    nextBtn: byId('il-next-btn'),
+                    pageIndicator: byId('il-page-indicator'),
+
+                    detailPanel: byId('il-detail-panel'),
+                    detailImg: byId('il-detail-img'),
+                    detailName: byId('il-detail-name'),
+                    detailDims: byId('il-detail-dims'),
+                    detailRights: byId('il-detail-rights'),
+                    detailCredit: byId('il-detail-credit'),
+                    detailBlocked: byId('il-detail-blocked'),
+
+                    selectBtn: byId('il-select-btn'),
+                    uploadSubmitBtn: byId('il-upload-submit-btn'),
+
+                    fileInput: byId('il-file-input'),
+                    dropZone: byId('il-drop-zone'),
+                    dropZoneLabel: byId('il-drop-zone-label'),
+
+                    uploadErrors: byId('il-upload-errors'),
+                    uploadName: byId('il-upload-name'),
+                    uploadRights: byId('il-upload-rights'),
+                    uploadAlt: byId('il-upload-alt'),
+                    uploadCredit: byId('il-upload-credit'),
+                    uploadConfirm: byId('il-upload-rights-confirm'),
+                    uploadAiGenerated: byId('il-upload-ai-generated'),
+                    uploadSponsored: byId('il-upload-sponsored'),
+                    uploadAffiliate: byId('il-upload-affiliate'),
+                    uploadProgress: byId('il-upload-progress'),
+
+                    creditRequiredNote: byId('il-credit-required-note'),
+                    creditOptionalNote: byId('il-credit-optional-note'),
+                };
+            }
+
+            bindEvents() {
+                this.el.closeBtn.addEventListener('click', () => this.close());
+                this.el.cancelBtn.addEventListener('click', () => this.close());
+
+                this.el.modal.addEventListener('click', event => {
+                    if (event.target === this.el.modal) {
+                        this.close();
+                    }
+                });
+
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape' && this.isOpen()) {
+                        this.close();
+                    }
+                });
+
+                this.el.tabLibrary.addEventListener('click', () => this.showTab('library'));
+                this.el.tabUpload.addEventListener('click', () => this.showTab('upload'));
+
+                this.el.searchInput.addEventListener('input', () => this.handleSearchInput());
+
+                this.el.prevBtn.addEventListener('click', () => this.goToPreviousPage());
+                this.el.nextBtn.addEventListener('click', () => this.goToNextPage());
+
+                this.el.selectBtn.addEventListener('click', () => this.confirmSelectedImage());
+
+                this.el.fileInput.addEventListener('change', () => {
+                    const file = this.el.fileInput.files?.[0];
+
+                    if (file) {
+                        this.setUploadFile(file);
+                    }
+                });
+
+                this.el.uploadRights.addEventListener('change', () => {
+                    this.syncCreditRequirement();
+                    this.validateUploadForm();
+                });
+
+                [
+                    this.el.uploadName,
+                    this.el.uploadRights,
+                    this.el.uploadAlt,
+                    this.el.uploadCredit,
+                    this.el.uploadConfirm,
+                ].forEach(input => {
+                    input.addEventListener('input', () => this.validateUploadForm());
+                    input.addEventListener('change', () => this.validateUploadForm());
+                });
+
+                this.el.uploadSubmitBtn.addEventListener('click', () => this.submitUpload());
+
+                this.el.dropZone.addEventListener('click', () => this.el.fileInput.click());
+
+                this.el.dropZone.addEventListener('dragover', event => {
+                    event.preventDefault();
+                    this.el.dropZone.classList.add('il-drop-zone--over');
+                });
+
+                this.el.dropZone.addEventListener('dragleave', () => {
+                    this.el.dropZone.classList.remove('il-drop-zone--over');
+                });
+
+                this.el.dropZone.addEventListener('drop', event => this.handleDrop(event));
+            }
 
             open(blockId, currentCmsImageId = null) {
-                _activeBlockId   = blockId;
-                _selectedImage   = null;
-                _currentPage     = 1;
-                showModal();
-                showTab('library');
-                loadLibrary();
-            },
+                this.state.resetForOpen(blockId);
+
+                this.showModal();
+                this.showTab('library');
+                this.loadLibrary();
+            }
 
             close() {
-                hideModal();
-            },
+                this.hideModal();
+            }
 
-            showTab,
+            showModal() {
+                this.el.modal.style.display = 'grid';
+                this.el.closeBtn.focus();
+                this.trapFocus();
+            }
+
+            hideModal() {
+                this.el.modal.style.display = 'none';
+
+                this.state.resetForClose();
+                this.releaseFocusTrap();
+            }
+
+            isOpen() {
+                return this.el.modal.style.display !== 'none';
+            }
+
+            showTab(tab) {
+                this.state.currentTab = tab;
+
+                const isLibrary = tab === 'library';
+                const isUpload = tab === 'upload';
+
+                this.el.panelLibrary.style.display = isLibrary ? 'flex' : 'none';
+                this.el.panelUpload.style.display = isUpload ? 'flex' : 'none';
+
+                this.el.tabLibrary.classList.toggle('il-tab--active', isLibrary);
+                this.el.tabUpload.classList.toggle('il-tab--active', isUpload);
+
+                this.el.tabLibrary.setAttribute('aria-selected', String(isLibrary));
+                this.el.tabUpload.setAttribute('aria-selected', String(isUpload));
+
+                this.el.selectBtn.style.display = isLibrary ? '' : 'none';
+                this.el.uploadSubmitBtn.style.display = isUpload ? '' : 'none';
+
+                if (isUpload) {
+                    this.validateUploadForm();
+                }
+            }
+
+            handleSearchInput() {
+                clearTimeout(this.state.searchTimer);
+
+                this.state.currentPage = 1;
+
+                this.state.searchTimer = setTimeout(() => {
+                    this.loadLibrary();
+                }, 350);
+            }
+
+            goToPreviousPage() {
+                if (this.state.currentPage <= 1) {
+                    return;
+                }
+
+                this.state.currentPage--;
+                this.loadLibrary();
+            }
+
+            goToNextPage() {
+                if (this.state.currentPage >= this.state.totalPages) {
+                    return;
+                }
+
+                this.state.currentPage++;
+                this.loadLibrary();
+            }
+
+            async loadLibrary() {
+                const params = new URLSearchParams({
+                    page: this.state.currentPage,
+                    per_page: 24,
+                });
+
+                const search = this.el.searchInput.value.trim();
+
+                if (search) {
+                    params.set('search', search);
+                }
+
+                this.setLibraryStatus('loading', 'Loading your image library…');
+                this.el.grid.innerHTML = '';
+                this.el.pagination.style.display = 'none';
+                this.el.detailPanel.style.display = 'none';
+                this.el.selectBtn.disabled = true;
+
+                this.abortPreviousLibraryRequest();
+
+                const controller = new AbortController();
+                this.state.abortController = controller;
+
+                try {
+                    const response = await fetch(`/api/${SITE}/open-collab/images?${params}`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${TOKEN()}`,
+                            Accept: 'application/json',
+                        },
+                        signal: controller.signal,
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        this.handleLibraryError(response);
+                        return;
+                    }
+
+                    const items = data.items ?? data.data ?? [];
+                    const meta = data.pagination ?? data.meta ?? {};
+
+                    this.renderGrid(items, meta);
+                } catch (error) {
+                    if (error.name === 'AbortError') {
+                        return;
+                    }
+
+                    this.setLibraryStatus(
+                        'error',
+                        'The image library is temporarily unavailable. Your article has not been changed.'
+                    );
+                }
+            }
+
+            abortPreviousLibraryRequest() {
+                if (this.state.abortController) {
+                    this.state.abortController.abort();
+                }
+            }
+
+            handleLibraryError(response) {
+                if (response.status === 403) {
+                    this.setLibraryStatus(
+                        'error',
+                        'You do not have permission to browse the image library.'
+                    );
+                    return;
+                }
+
+                this.setLibraryStatus(
+                    'error',
+                    'The image library is temporarily unavailable. Your article has not been changed.'
+                );
+            }
+
+            renderGrid(items, meta) {
+                this.el.grid.innerHTML = '';
+                this.clearLibraryStatus();
+
+                this.state.totalPages = Number(
+                    meta.total_pages
+                    ?? meta.last_page
+                    ?? 1
+                );
+
+                this.state.currentPage = Number(
+                    meta.current_page
+                    ?? 1
+                );
+
+                if (!items.length) {
+                    this.renderEmptyLibrary();
+                    return;
+                }
+
+                items.forEach(image => {
+                    this.el.grid.appendChild(this.createGridItem(image));
+                });
+
+                this.renderPagination();
+            }
+
+            renderEmptyLibrary() {
+                const search = this.el.searchInput.value.trim();
+
+                this.setLibraryStatus(
+                    'empty',
+                    search ? 'No images match your search.' : 'You have not uploaded any images yet.'
+                );
+
+                if (!search) {
+                    this.appendEmptyLibraryCta();
+                }
+            }
+
+            createGridItem(image) {
+                const isBlocked = this.isBlockedImage(image);
+
+                const item = document.createElement('div');
+                item.className = `il-grid-item${isBlocked ? ' il-grid-item--blocked' : ''}`;
+                item.role = 'listitem';
+                item.tabIndex = isBlocked ? -1 : 0;
+                item.dataset.id = image.id;
+
+                item.setAttribute(
+                    'aria-label',
+                    `${image.name}${isBlocked ? ' (rights not confirmed, cannot select)' : ''}`
+                );
+
+                item.innerHTML = `
+                <img src="${this.escAttr(image.thumbnail_url || image.preview_url)}"
+                     alt="${this.escAttr(image.name)}"
+                     loading="lazy">
+                <span class="il-grid-item__rights-badge">
+                    ${this.escHtml(this.getRightsLabel(image.image_rights))}
+                </span>
+            `;
+
+                if (!isBlocked) {
+                    item.addEventListener('click', () => this.selectImage(image));
+                    item.addEventListener('keydown', event => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            this.selectImage(image);
+                        }
+                    });
+                }
+
+                return item;
+            }
+
+            renderPagination() {
+                if (this.state.totalPages <= 1) {
+                    this.el.pagination.style.display = 'none';
+                    return;
+                }
+
+                this.el.pagination.style.display = 'flex';
+                this.el.prevBtn.disabled = this.state.currentPage <= 1;
+                this.el.nextBtn.disabled = this.state.currentPage >= this.state.totalPages;
+                this.el.pageIndicator.textContent =
+                    `Page ${this.state.currentPage} of ${this.state.totalPages}`;
+            }
+
+            appendEmptyLibraryCta() {
+                const button = document.createElement('button');
+
+                button.type = 'button';
+                button.className = 'oc-btn oc-btn--ghost oc-btn--sm';
+                button.style.marginTop = '10px';
+                button.textContent = 'Upload an image';
+
+                button.addEventListener('click', () => this.showTab('upload'));
+
+                this.el.status.appendChild(button);
+            }
+
+            selectImage(image) {
+                this.state.selectedImage = image;
+
+                this.el.grid.querySelectorAll('.il-grid-item').forEach(item => {
+                    item.classList.toggle(
+                        'il-grid-item--selected',
+                        String(item.dataset.id) === String(image.id)
+                    );
+                });
+
+                this.renderDetailPanel(image);
+            }
+
+            renderDetailPanel(image) {
+                const isBlocked = this.isBlockedImage(image);
+
+                this.el.detailImg.src = image.preview_url || image.thumbnail_url;
+                this.el.detailImg.alt = image.name ?? '';
+
+                this.el.detailName.textContent = image.name ?? '';
+
+                this.el.detailDims.textContent =
+                    image.width && image.height
+                        ? `${image.width} × ${image.height}px`
+                        : '';
+
+                this.el.detailRights.textContent =
+                    `Rights: ${this.getRightsLabel(image.image_rights)}`;
+
+                if (image.credit) {
+                    this.el.detailCredit.textContent = `📷 ${image.credit}`;
+                    this.el.detailCredit.style.display = '';
+                } else {
+                    this.el.detailCredit.textContent = '';
+                    this.el.detailCredit.style.display = 'none';
+                }
+
+                if (isBlocked) {
+                    this.el.detailBlocked.textContent =
+                        'This image has unconfirmed rights and cannot be selected.';
+                    this.el.detailBlocked.style.display = '';
+                } else {
+                    this.el.detailBlocked.textContent = '';
+                    this.el.detailBlocked.style.display = 'none';
+                }
+
+                this.el.detailPanel.style.display = 'grid';
+                this.el.selectBtn.disabled = isBlocked;
+            }
+
+            confirmSelectedImage() {
+                const image = this.state.selectedImage;
+
+                if (!image || !this.state.activeBlockId) {
+                    return;
+                }
+
+                this.confirmSelection(image);
+            }
+
+            confirmSelection(image) {
+                if (typeof this.onSelect === 'function') {
+                    this.onSelect(this.state.activeBlockId, image);
+                }
+
+                this.close();
+            }
+
+            setLibraryStatus(type, message) {
+                this.el.status.className =
+                    `il-status${type === 'error' ? ' il-status--error' : ''}`;
+
+                this.el.status.innerHTML = this.escHtml(message);
+                this.el.status.style.display = '';
+            }
+
+            clearLibraryStatus() {
+                this.el.status.innerHTML = '';
+                this.el.status.style.display = 'none';
+            }
 
             handleDrop(event) {
                 event.preventDefault();
-                document.getElementById('il-drop-zone').classList.remove('il-drop-zone--over');
-                const file = Array.from(event.dataTransfer?.files ?? []).find(f => f.type.startsWith('image/'));
-                if (file) setUploadFile(file);
-            },
-        };
 
-        // ── Modal open/close ──────────────────────────────────────────────────
-        function showModal() {
-            const el = document.getElementById('image-library-modal');
-            el.style.display = 'grid';
-            document.getElementById('il-close-btn').focus();
-            trapFocus(el);
-        }
+                this.el.dropZone.classList.remove('il-drop-zone--over');
 
-        function hideModal() {
-            document.getElementById('image-library-modal').style.display = 'none';
-            _selectedImage = null;
-            _activeBlockId = null;
-            releaseFocusTrap();
-        }
+                const file = Array.from(event.dataTransfer?.files ?? [])
+                    .find(candidate => candidate.type.startsWith('image/'));
 
-        document.getElementById('il-close-btn').addEventListener('click', hideModal);
-        document.getElementById('il-cancel-btn').addEventListener('click', hideModal);
-        document.getElementById('image-library-modal').addEventListener('click', function(e) {
-            if (e.target === this) hideModal();
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && document.getElementById('image-library-modal').style.display !== 'none') {
-                hideModal();
+                if (file) {
+                    this.setUploadFile(file);
+                }
             }
-        });
 
-        // ── Tab switching ─────────────────────────────────────────────────────
-        function showTab(tab) {
-            _currentTab = tab;
-            document.getElementById('il-panel-library').style.display = tab === 'library' ? 'flex' : 'none';
-            document.getElementById('il-panel-upload').style.display  = tab === 'upload'  ? 'flex' : 'none';
-            document.getElementById('il-tab-library').classList.toggle('il-tab--active', tab === 'library');
-            document.getElementById('il-tab-upload').classList.toggle('il-tab--active',  tab === 'upload');
-            document.getElementById('il-tab-library').setAttribute('aria-selected', tab === 'library');
-            document.getElementById('il-tab-upload').setAttribute('aria-selected',  tab === 'upload');
-            document.getElementById('il-select-btn').style.display       = tab === 'library' ? '' : 'none';
-            document.getElementById('il-upload-submit-btn').style.display = tab === 'upload'  ? '' : 'none';
-        }
+            setUploadFile(file) {
+                this.state.pendingFile = file;
 
-        // ── Library: search + pagination ──────────────────────────────────────
-        document.getElementById('il-search-input').addEventListener('input', function() {
-            clearTimeout(_searchDebounce);
-            _currentPage  = 1;
-            _searchDebounce = setTimeout(loadLibrary, 350);
-        });
+                this.el.dropZoneLabel.textContent = file.name;
 
-        document.getElementById('il-prev-btn').addEventListener('click', function() {
-            if (_currentPage > 1) { _currentPage--; loadLibrary(); }
-        });
+                const preview = document.getElementById('il-upload-preview');
+                const previewImg = document.getElementById('il-upload-preview-img');
 
-        document.getElementById('il-next-btn').addEventListener('click', function() {
-            if (_currentPage < _totalPages) { _currentPage++; loadLibrary(); }
-        });
+                const reader = new FileReader();
 
-        function loadLibrary() {
-            const search  = document.getElementById('il-search-input').value.trim();
-            const params  = new URLSearchParams({ page: _currentPage, per_page: 24 });
-            if (search) params.set('search', search);
+                reader.onload = event => {
+                    previewImg.src = event.target.result;
+                    preview.style.display = 'block';
+                };
 
-            setLibraryStatus('loading', 'Loading your image library…');
-            document.getElementById('il-grid').innerHTML = '';
-            document.getElementById('il-pagination').style.display = 'none';
-            document.getElementById('il-detail-panel').style.display = 'none';
+                reader.readAsDataURL(file);
 
-            // Cancel any in-flight search
-            if (_lastSearchXhr) { _lastSearchXhr.abort(); }
+                if (!this.el.uploadName.value) {
+                    this.el.uploadName.value =
+                        file.name.replace(/\.[^.]+$/, '');
+                }
 
-            const xhr = new XMLHttpRequest();
-            _lastSearchXhr = xhr;
-            xhr.open('GET', `/api/${SITE}/open-collab/images?${params}`);
-            xhr.setRequestHeader('Authorization', `Bearer ${TOKEN()}`);
-            xhr.setRequestHeader('Accept', 'application/json');
+                this.validateUploadForm();
+            }
 
-            xhr.onload = function() {
-                if (xhr.status === 0) return; // aborted
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        renderGrid(data.data ?? [], data.meta ?? {});
-                    } catch {
-                        setLibraryStatus('error', 'Failed to load image library.');
+            syncCreditRequirement() {
+                const needsCredit = RIGHTS_REQUIRING_CREDIT.has(this.el.uploadRights.value);
+
+                this.el.creditRequiredNote.style.display = needsCredit ? '' : 'none';
+                this.el.creditOptionalNote.style.display = needsCredit ? 'none' : '';
+            }
+
+            validateUploadForm() {
+                const data = this.getUploadFormData();
+                const needsCredit = RIGHTS_REQUIRING_CREDIT.has(data.image_rights);
+
+                const isValid =
+                    !!this.state.pendingFile &&
+                    !!data.name &&
+                    !!data.image_rights &&
+                    !!data.alt_text &&
+                    data.rights_confirmation === '1' &&
+                    (!needsCredit || !!data.credit);
+
+                this.el.uploadSubmitBtn.disabled = !isValid || this.state.isUploading;
+
+                return isValid;
+            }
+
+            getUploadFormData() {
+                return {
+                    name: this.el.uploadName.value.trim(),
+                    image_rights: this.el.uploadRights.value,
+                    alt_text: this.el.uploadAlt.value.trim(),
+                    credit: this.el.uploadCredit.value.trim(),
+                    rights_confirmation: this.el.uploadConfirm.checked ? '1' : '0',
+                    ai_generated: this.el.uploadAiGenerated.checked ? '1' : '0',
+                    sponsored_content: this.el.uploadSponsored.checked ? '1' : '0',
+                    affiliate_content: this.el.uploadAffiliate.checked ? '1' : '0',
+                };
+            }
+
+            async submitUpload() {
+                if (this.state.isUploading || !this.validateUploadForm()) {
+                    return;
+                }
+
+                this.hideUploadErrors();
+                this.setUploading(true);
+
+                try {
+                    const response = await fetch(`/api/${SITE}/open-collab/images`, {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${TOKEN()}`,
+                            Accept: 'application/json',
+                        },
+                        body: this.buildUploadFormData(),
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        this.showUploadErrors(data.errors ?? {
+                            _: [data.message ?? 'Upload failed.'],
+                        });
+                        return;
                     }
-                } else if (xhr.status === 403) {
-                    setLibraryStatus('error', 'You do not have permission to browse the image library.');
-                } else {
-                    setLibraryStatus('error', 'The image library is temporarily unavailable. Your article has not been changed.');
+
+                    const image = data.image ?? data.data ?? data;
+
+                    this.confirmSelection(image);
+                } catch {
+                    this.showUploadErrors({
+                        _: ['A network error occurred. Please try again.'],
+                    });
+                } finally {
+                    this.setUploading(false);
+                    this.validateUploadForm();
                 }
-            };
-
-            xhr.onerror = function() {
-                setLibraryStatus('error', 'The image library is temporarily unavailable. Your article has not been changed.');
-            };
-
-            xhr.send();
-        }
-
-        function renderGrid(items, meta) {
-            const grid = document.getElementById('il-grid');
-            grid.innerHTML = '';
-            clearLibraryStatus();
-
-            _totalPages = meta.last_page ?? 1;
-            _currentPage = meta.current_page ?? 1;
-
-            if (!items.length) {
-                const search = document.getElementById('il-search-input').value.trim();
-                setLibraryStatus('empty', search
-                    ? 'No images match your search.'
-                    : 'You have not uploaded any images yet.'
-                );
-                if (!search) {
-                    appendEmptyLibraryCta();
-                }
-                return;
             }
 
-            items.forEach(img => {
-                const isBlocked = BLOCKING_RIGHTS.includes(img.image_rights);
-                const div = document.createElement('div');
-                div.className  = 'il-grid-item' + (isBlocked ? ' il-grid-item--blocked' : '');
-                div.role       = 'listitem';
-                div.tabIndex   = isBlocked ? -1 : 0;
-                div.dataset.id = img.id;
-                div.setAttribute('aria-label', img.name + (isBlocked ? ' (rights not confirmed, cannot select)' : ''));
+            buildUploadFormData() {
+                const formData = new FormData();
+                const data = this.getUploadFormData();
 
-                div.innerHTML = `
-                <img src="${escAttr(img.thumbnail_url || img.preview_url)}"
-                     alt="${escAttr(img.name)}"
-                     loading="lazy">
-                <span class="il-grid-item__rights-badge">${escHtml(RIGHTS_LABELS[img.image_rights] ?? img.image_rights ?? '')}</span>`;
+                formData.append('file', this.state.pendingFile);
 
-                if (!isBlocked) {
-                    div.addEventListener('click',   () => selectImage(img));
-                    div.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectImage(img); } });
-                }
-                grid.appendChild(div);
-            });
-
-            // Pagination
-            if (_totalPages > 1) {
-                document.getElementById('il-pagination').style.display = 'flex';
-                document.getElementById('il-prev-btn').disabled = _currentPage <= 1;
-                document.getElementById('il-next-btn').disabled = _currentPage >= _totalPages;
-                document.getElementById('il-page-indicator').textContent = `Page ${_currentPage} of ${_totalPages}`;
-            }
-        }
-
-        function appendEmptyLibraryCta() {
-            const status = document.getElementById('il-library-status');
-            const cta = document.createElement('button');
-            cta.type      = 'button';
-            cta.className = 'oc-btn oc-btn--ghost oc-btn--sm';
-            cta.style.marginTop = '10px';
-            cta.textContent = 'Upload an image';
-            cta.addEventListener('click', () => showTab('upload'));
-            status.appendChild(cta);
-        }
-
-        // ── Image selection ───────────────────────────────────────────────────
-        function selectImage(img) {
-            _selectedImage = img;
-
-            // Highlight selected grid item
-            document.querySelectorAll('.il-grid-item').forEach(el => {
-                el.classList.toggle('il-grid-item--selected', el.dataset.id == img.id);
-            });
-
-            // Populate detail panel
-            const isBlocked = BLOCKING_RIGHTS.includes(img.image_rights);
-            document.getElementById('il-detail-img').src    = img.preview_url || img.thumbnail_url;
-            document.getElementById('il-detail-img').alt    = img.name;
-            document.getElementById('il-detail-name').textContent = img.name;
-            document.getElementById('il-detail-dims').textContent =
-                img.width && img.height ? `${img.width} × ${img.height}px` : '';
-            document.getElementById('il-detail-rights').textContent =
-                'Rights: ' + (RIGHTS_LABELS[img.image_rights] ?? img.image_rights ?? 'Unknown');
-
-            const creditEl = document.getElementById('il-detail-credit');
-            if (img.credit) {
-                creditEl.textContent = '📷 ' + img.credit;
-                creditEl.style.display = '';
-            } else {
-                creditEl.style.display = 'none';
-            }
-
-            const blockedEl = document.getElementById('il-detail-blocked');
-            if (isBlocked) {
-                blockedEl.textContent = 'This image has unconfirmed rights and cannot be selected.';
-                blockedEl.style.display = '';
-            } else {
-                blockedEl.style.display = 'none';
-            }
-
-            document.getElementById('il-detail-panel').style.display = 'grid';
-            document.getElementById('il-select-btn').disabled = isBlocked;
-        }
-
-        document.getElementById('il-select-btn').addEventListener('click', function() {
-            if (!_selectedImage || !_activeBlockId) return;
-            confirmSelection(_selectedImage);
-        });
-
-        function confirmSelection(img) {
-            if (typeof window.imageLibrary.onSelect === 'function') {
-                window.imageLibrary.onSelect(_activeBlockId, img);
-            }
-            hideModal();
-        }
-
-        // ── Library status helpers ────────────────────────────────────────────
-        function setLibraryStatus(type, message) {
-            const el = document.getElementById('il-library-status');
-            el.className  = 'il-status' + (type === 'error' ? ' il-status--error' : '');
-            el.innerHTML  = escHtml(message);
-            el.style.display = '';
-        }
-
-        function clearLibraryStatus() {
-            const el = document.getElementById('il-library-status');
-            el.style.display = 'none';
-            el.innerHTML = '';
-        }
-
-        // ── Upload tab ────────────────────────────────────────────────────────
-        document.getElementById('il-file-input').addEventListener('change', function() {
-            if (this.files[0]) setUploadFile(this.files[0]);
-        });
-
-        function setUploadFile(file) {
-            _pendingFile = file;
-            document.getElementById('il-drop-zone-label').textContent = file.name;
-            document.getElementById('il-upload-name').value =
-                document.getElementById('il-upload-name').value || file.name.replace(/\.[^.]+$/, '');
-            validateUploadForm();
-        }
-
-        // Credit required indicator toggled by rights selection
-        document.getElementById('il-upload-rights').addEventListener('change', function() {
-            const needsCredit = RIGHTS_REQUIRING_CREDIT.includes(this.value);
-            document.getElementById('il-credit-required-note').style.display = needsCredit ? '' : 'none';
-            document.getElementById('il-credit-optional-note').style.display = needsCredit ? 'none' : '';
-            validateUploadForm();
-        });
-
-        ['il-upload-name','il-upload-rights','il-upload-alt','il-upload-credit','il-upload-rights-confirm']
-            .forEach(id => document.getElementById(id).addEventListener('input', validateUploadForm));
-        document.getElementById('il-upload-rights-confirm').addEventListener('change', validateUploadForm);
-
-        function validateUploadForm() {
-            const hasFile    = !!_pendingFile;
-            const name       = document.getElementById('il-upload-name').value.trim();
-            const rights     = document.getElementById('il-upload-rights').value;
-            const alt        = document.getElementById('il-upload-alt').value.trim();
-            const credit     = document.getElementById('il-upload-credit').value.trim();
-            const confirmed  = document.getElementById('il-upload-rights-confirm').checked;
-            const needCredit = RIGHTS_REQUIRING_CREDIT.includes(rights);
-
-            const valid = hasFile && name && rights && alt && confirmed && (!needCredit || credit);
-            document.getElementById('il-upload-submit-btn').disabled = !valid;
-            return valid;
-        }
-
-        document.getElementById('il-upload-submit-btn').addEventListener('click', submitUpload);
-
-        async function submitUpload() {
-            if (_isUploading || !validateUploadForm()) return;
-
-            const errBox = document.getElementById('il-upload-errors');
-            errBox.style.display = 'none';
-
-            _isUploading = true;
-            document.getElementById('il-upload-submit-btn').disabled = true;
-            document.getElementById('il-upload-progress').style.display = '';
-
-            const formData = new FormData();
-            formData.append('file',               _pendingFile);
-            formData.append('name',               document.getElementById('il-upload-name').value.trim());
-            formData.append('image_rights',       document.getElementById('il-upload-rights').value);
-            formData.append('alt_text',           document.getElementById('il-upload-alt').value.trim());
-            formData.append('credit',             document.getElementById('il-upload-credit').value.trim());
-            formData.append('rights_confirmation', document.getElementById('il-upload-rights-confirm').checked ? '1' : '0');
-            formData.append('ai_generated',       document.getElementById('il-upload-ai-generated').checked ? '1' : '0');
-            formData.append('sponsored_content',  document.getElementById('il-upload-sponsored').checked ? '1' : '0');
-            formData.append('affiliate_content',  document.getElementById('il-upload-affiliate').checked ? '1' : '0');
-
-            try {
-                const res = await fetch(`/api/${SITE}/open-collab/images`, {
-                    method:  'POST',
-                    headers: { Authorization: `Bearer ${TOKEN()}`, Accept: 'application/json' },
-                    body:    formData,
+                Object.entries(data).forEach(([key, value]) => {
+                    formData.append(key, value);
                 });
-                const data = await res.json();
 
-                if (res.ok) {
-                    const img = data.data;
-                    confirmSelection(img);
-                } else {
-                    showUploadErrors(data.errors ?? { _: [data.message ?? 'Upload failed.'] });
+                return formData;
+            }
+
+            setUploading(isUploading) {
+                this.state.isUploading = isUploading;
+                this.el.uploadProgress.style.display = isUploading ? '' : 'none';
+                this.el.uploadSubmitBtn.disabled = isUploading;
+            }
+
+            hideUploadErrors() {
+                this.el.uploadErrors.textContent = '';
+                this.el.uploadErrors.style.display = 'none';
+            }
+
+            showUploadErrors(errors) {
+                this.el.uploadErrors.textContent = Object.values(errors).flat().join(' ');
+                this.el.uploadErrors.style.display = '';
+            }
+
+            trapFocus() {
+                this.releaseFocusTrap();
+
+                this.state.preFocusEl = document.activeElement;
+
+                const focusable = this.el.modal.querySelectorAll(
+                    'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+                );
+
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+
+                if (!first || !last) {
+                    return;
                 }
-            } catch {
-                showUploadErrors({ _: ['A network error occurred. Please try again.'] });
-            } finally {
-                _isUploading = false;
-                document.getElementById('il-upload-progress').style.display = 'none';
-                validateUploadForm();
+
+                this.state.trapHandler = event => {
+                    if (event.key !== 'Tab') {
+                        return;
+                    }
+
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    }
+
+                    if (!event.shiftKey && document.activeElement === last) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                };
+
+                this.el.modal.addEventListener('keydown', this.state.trapHandler);
+            }
+
+            releaseFocusTrap() {
+                if (this.state.trapHandler) {
+                    this.el.modal.removeEventListener('keydown', this.state.trapHandler);
+                }
+
+                if (this.state.preFocusEl && typeof this.state.preFocusEl.focus === 'function') {
+                    this.state.preFocusEl.focus();
+                }
+
+                this.state.trapHandler = null;
+                this.state.preFocusEl = null;
+            }
+
+            isBlockedImage(image) {
+                return BLOCKING_RIGHTS.has(image.image_rights);
+            }
+
+            getRightsLabel(rights) {
+                return RIGHTS_LABELS[rights] ?? rights ?? 'Unknown';
+            }
+
+            escHtml(value) {
+                if (value == null) {
+                    return '';
+                }
+
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            escAttr(value) {
+                return this.escHtml(value ?? '');
             }
         }
 
-        function showUploadErrors(errors) {
-            const errBox = document.getElementById('il-upload-errors');
-            const messages = Object.values(errors).flat().join(' ');
-            errBox.textContent = messages;
-            errBox.style.display = '';
-            // Keep entered metadata intact — do not clear form on error
-        }
-
-        // ── Focus trap ────────────────────────────────────────────────────────
-        let _preFocusEl = null;
-        let _trapHandler = null;
-
-        function trapFocus(el) {
-            _preFocusEl = document.activeElement;
-            const focusable = el.querySelectorAll(
-                'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
-            );
-            const first = focusable[0];
-            const last  = focusable[focusable.length - 1];
-            _trapHandler = function(e) {
-                if (e.key !== 'Tab') return;
-                if (e.shiftKey) {
-                    if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-                } else {
-                    if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
-                }
-            };
-            el.addEventListener('keydown', _trapHandler);
-        }
-
-        function releaseFocusTrap() {
-            const el = document.getElementById('image-library-modal');
-            if (_trapHandler) el.removeEventListener('keydown', _trapHandler);
-            if (_preFocusEl) _preFocusEl.focus();
-            _trapHandler = null;
-            _preFocusEl  = null;
-        }
-
-        // ── Utilities ─────────────────────────────────────────────────────────
-        function escHtml(str) {
-            if (str == null) return '';
-            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-        }
-
-        function escAttr(str) { return escHtml(str ?? ''); }
-
+        window.imageLibrary = new ImageLibrary();
     })();
 </script>

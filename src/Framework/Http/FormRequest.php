@@ -18,6 +18,8 @@ use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
 use App\Framework\Validation\Rules\ExistsRule;
+use App\Framework\Validation\Rules\FileRule;
+use App\Framework\Validation\Rules\ImageRule;
 use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\IntegerRule;
 use App\Framework\Validation\Rules\MaxLengthRule;
@@ -243,7 +245,11 @@ abstract class  FormRequest extends Request
     protected function performValidation(): void
     {
         $rules = $this->convertPipeRulesToValidationRules($this->rules());
-        $data = $this->all();
+
+        $data = array_merge(
+            $this->all(),
+            $this->files()
+        );
 
         $result = $this->validator->validate($data, $rules);
 
@@ -251,14 +257,11 @@ abstract class  FormRequest extends Request
             throw new ValidationException('Validation failed', $result->getErrors());
         }
 
-        // Include all input fields except the ones that failed validation
         $failed = $result->getFailedFields();
         $validated = array_diff_key($data, array_flip($failed));
 
-        // Assign all valid data (including non-rule fields)
         $this->validatedData = $validated;
 
-        // Run after validation callbacks
         foreach ($this->after() as $callback) {
             if (is_callable($callback)) {
                 $callback($this);
@@ -359,7 +362,9 @@ abstract class  FormRequest extends Request
             'after_or_equal' => AfterOrEqualRule::class,
             'min_number' => MinRule::class,
             'max_number' => MaxRule::class,
-            'regex' => RegexRule::class
+            'regex' => RegexRule::class,
+            'file' => FileRule::class,
+            'image' => ImageRule::class,
         ];
 
         if (!isset($ruleMap[$ruleName])) {

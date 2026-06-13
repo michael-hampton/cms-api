@@ -8,6 +8,8 @@ use App\Framework\Validation\Rules\BetweenRule;
 use App\Framework\Validation\Rules\ConfirmedRule;
 use App\Framework\Validation\Rules\DateRule;
 use App\Framework\Validation\Rules\EmailRule;
+use App\Framework\Validation\Rules\FileRule;
+use App\Framework\Validation\Rules\ImageRule;
 use App\Framework\Validation\Rules\InRule;
 use App\Framework\Validation\Rules\AcceptedRule;
 use App\Framework\Validation\Rules\ArrayRule;
@@ -262,6 +264,8 @@ class Validator
             'sometimes' => SometimesRule::class,  // ADD THIS
             'confirmed' => ConfirmedRule::class,
             'accepted' => AcceptedRule::class,
+            'file' => FileRule::class,
+            'image' => ImageRule::class,
         ];
 
         if (!isset($ruleMap[$ruleName])) {

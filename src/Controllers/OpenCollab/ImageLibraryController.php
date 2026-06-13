@@ -165,7 +165,7 @@ class ImageLibraryController extends Controller
             return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'image' => ImageLibraryResource::make($image)->toArray()
         ], 201);
     }
