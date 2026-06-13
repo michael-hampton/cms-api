@@ -24,7 +24,7 @@ class RejectBriefAssignmentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->has('reason')) {
-            $this->merge(['reason' => trim((string) $this->input('reason'))]);
+            $this->put('reason', trim((string) $this->input('reason')));
         }
     }
 }
