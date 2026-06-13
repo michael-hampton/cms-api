@@ -24,7 +24,7 @@ class RequestBriefClarificationRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->has('message')) {
-            $this->merge(['message' => trim((string) $this->input('message'))]);
+            $this->put('message', trim((string) $this->input('message')));
         }
     }
 }
