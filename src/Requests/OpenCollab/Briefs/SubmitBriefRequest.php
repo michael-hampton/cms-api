@@ -23,6 +23,6 @@ class SubmitBriefRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $notes = trim((string) $this->input('notes', ''));
-        $this->merge(['notes' => $notes !== '' ? $notes : null]);
+        $this->put('notes', $notes !== '' ? $notes : null);
     }
 }
