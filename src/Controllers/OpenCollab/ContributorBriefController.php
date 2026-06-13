@@ -5,10 +5,17 @@ namespace App\Controllers\OpenCollab;
 use App\Controllers\Controller;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
-use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
 use App\Models\User;
 use App\Repositories\OpenCollab\ContributorBriefRepository;
+use App\Requests\OpenCollab\Briefs\BriefCommentRequest;
+use App\Requests\OpenCollab\Briefs\NegotiateBriefAssignmentRequest;
+use App\Requests\OpenCollab\Briefs\RejectBriefAssignmentRequest;
+use App\Requests\OpenCollab\Briefs\RequestBriefClarificationRequest;
+use App\Requests\OpenCollab\Briefs\RequestBriefDeadlineChangeRequest;
+use App\Requests\OpenCollab\Briefs\SubmitBriefRequest;
+use App\Requests\OpenCollab\Briefs\UpdateBriefTaskRequest;
+use App\Requests\OpenCollab\Briefs\UploadBriefAttachmentRequest;
 use App\Services\OpenCollab\CmsBriefGateway;
 use App\Services\OpenCollab\OpenCollabBriefAccessService;
 use App\Services\OpenCollab\OpenCollabBriefActionAvailabilityService;
@@ -61,15 +68,17 @@ class ContributorBriefController extends Controller
         ]));
     }
 
-    public function updateTask(Request $request, int $brief, int $task): JsonResponse
+    public function updateTask(UpdateBriefTaskRequest $request, int $brief, int $task): JsonResponse
     {
-        return $this->withBrief($brief, function ($model) use ($request, $task) {
-            $status = (string)$request->get('status', '');
-            if (!in_array($status, ['pending', 'in_progress', 'completed'], true)) {
-                return $this->validation(['status' => ['Invalid task status.']]);
-            }
+        $validated = $request->validated();
 
-            $updated = $this->gateway->updateTask($model, $task, Auth::id(), $status);
+        return $this->withBrief($brief, function ($model) use ($validated, $task) {
+            $updated = $this->gateway->updateTask(
+                $model,
+                $task,
+                Auth::id(),
+                $validated['status'],
+            );
 
             return $this->resourceResponse(['data' => $this->presenter->task($updated)]);
         });
@@ -82,7 +91,7 @@ class ContributorBriefController extends Controller
         ]));
     }
 
-    public function uploadAttachment(Request $request, int $brief): JsonResponse
+    public function uploadAttachment(UploadBriefAttachmentRequest $request, int $brief): JsonResponse
     {
         return $this->withBrief($brief, function ($model) use ($request) {
             try {
@@ -116,22 +125,25 @@ class ContributorBriefController extends Controller
         ]));
     }
 
-    public function createComment(Request $request, int $brief): JsonResponse
+    public function createComment(BriefCommentRequest $request, int $brief): JsonResponse
     {
-        return $this->withBrief($brief, function ($model) use ($request) {
-            $content = trim((string)$request->get('content', ''));
-            if ($content === '' || mb_strlen($content) > 3000) {
-                return $this->validation(['content' => ['Comment is required and must be 3000 characters or fewer.']]);
-            }
+        $validated = $request->validated();
 
-            $comment = $this->gateway->addComment($model, Auth::id(), $content);
+        return $this->withBrief($brief, function ($model) use ($validated) {
+            $comment = $this->gateway->addComment(
+                $model,
+                Auth::id(),
+                $validated['content'],
+            );
 
             return $this->resourceResponse(['data' => $this->presenter->comment($comment)], 201);
         });
     }
 
-    public function updateComment(Request $request, int $comment): JsonResponse
+    public function updateComment(BriefCommentRequest $request, int $comment): JsonResponse
     {
+        $validated = $request->validated();
+
         try {
             $model = $this->briefs->findComment($comment);
             if (!$model) {
@@ -139,12 +151,11 @@ class ContributorBriefController extends Controller
             }
 
             $this->access->assertCanAccessBrief((int)$model->brief_id, Auth::id(), SiteContext::getId());
-            $content = trim((string)$request->get('content', ''));
-            if ($content === '' || mb_strlen($content) > 3000) {
-                return $this->validation(['content' => ['Comment is required and must be 3000 characters or fewer.']]);
-            }
-
-            $updated = $this->gateway->updateComment($comment, Auth::id(), $content);
+            $updated = $this->gateway->updateComment(
+                $comment,
+                Auth::id(),
+                $validated['content'],
+            );
 
             return $this->resourceResponse(['data' => $this->presenter->comment($updated)]);
         } catch (\RuntimeException $exception) {
@@ -174,95 +185,107 @@ class ContributorBriefController extends Controller
         return $this->assignmentAction($brief, 'accept', fn($model, $assignment) => $this->gateway->acceptAssignment($model, $assignment, Auth::id()), 'Assignment accepted.');
     }
 
-    public function reject(Request $request, int $brief): JsonResponse
+    public function reject(RejectBriefAssignmentRequest $request, int $brief): JsonResponse
     {
-        $reason = trim((string)$request->get('reason', ''));
-        if ($reason === '' || mb_strlen($reason) > 1000) {
-            return $this->validation(['reason' => ['Reason is required and must be 1000 characters or fewer.']]);
-        }
+        $validated = $request->validated();
 
-        return $this->assignmentAction($brief, 'reject', fn($model, $assignment) => $this->gateway->rejectAssignment($model, $assignment, Auth::id(), $reason), 'Assignment rejected.');
+        return $this->assignmentAction(
+            $brief,
+            'reject',
+            fn($model, $assignment) => $this->gateway->rejectAssignment(
+                $model,
+                $assignment,
+                Auth::id(),
+                $validated['reason'],
+            ),
+            'Assignment rejected.',
+        );
     }
 
-    public function requestClarification(Request $request, int $brief): JsonResponse
+    public function requestClarification(RequestBriefClarificationRequest $request, int $brief): JsonResponse
     {
-        $message = trim((string)$request->get('message', ''));
-        if ($message === '' || mb_strlen($message) > 3000) {
-            return $this->validation(['message' => ['Message is required and must be 3000 characters or fewer.']]);
-        }
+        $validated = $request->validated();
 
-        return $this->assignmentAction($brief, 'request_clarification', fn($model) => $this->gateway->requestClarification($model, Auth::id(), $message), 'Clarification requested.');
+        return $this->assignmentAction(
+            $brief,
+            'request_clarification',
+            fn($model) => $this->gateway->requestClarification(
+                $model,
+                Auth::id(),
+                $validated['message'],
+            ),
+            'Clarification requested.',
+        );
     }
 
-    public function requestDeadlineChange(Request $request, int $brief): JsonResponse
+    public function requestDeadlineChange(RequestBriefDeadlineChangeRequest $request, int $brief): JsonResponse
     {
-        return $this->withBrief($brief, function ($model, $assignment) use ($request) {
-            $requestedDeadline = trim((string)$request->get('requested_deadline', ''));
-            $reason = trim((string)$request->get('reason', ''));
-            $currentDeadline = $this->presenter->deadline($model);
-            $errors = [];
+        $validated = $request->validated();
 
-            if ($requestedDeadline === '') {
-                $errors['requested_deadline'][] = 'Requested deadline is required.';
-            } elseif (strtotime($requestedDeadline) <= time()) {
-                $errors['requested_deadline'][] = 'Requested deadline cannot be in the past.';
-            } elseif ($currentDeadline && strtotime($requestedDeadline) <= strtotime($currentDeadline)) {
-                $errors['requested_deadline'][] = 'Requested deadline must be later than the current deadline.';
-            }
-
-            if ($reason === '' || mb_strlen($reason) > 1000) {
-                $errors['reason'][] = 'Reason is required and must be 1000 characters or fewer.';
-            }
-
-            if ($errors) {
-                return $this->validation($errors);
-            }
-
-            $this->actions->assertActionAvailable('request_deadline_change', $model, $assignment);
-            $this->gateway->requestDeadlineChange($model, Auth::id(), $requestedDeadline, $reason);
-
-            return $this->actionResponse($model->id, 'Deadline change requested.');
-        });
+        return $this->assignmentAction(
+            $brief,
+            'request_deadline_change',
+            fn($model) => $this->gateway->requestDeadlineChange(
+                $model,
+                Auth::id(),
+                $validated['requested_deadline'],
+                $validated['reason'],
+            ),
+            'Deadline change requested.',
+        );
     }
 
-    public function negotiate(Request $request, int $brief): JsonResponse
+    public function negotiate(NegotiateBriefAssignmentRequest $request, int $brief): JsonResponse
     {
-        $message = trim((string)$request->get('message', ''));
-        $requestedDeadline = trim((string)$request->get('requested_deadline', ''));
+        $validated = $request->validated();
 
-        if ($message === '' || mb_strlen($message) > 3000) {
-            return $this->validation(['message' => ['Message is required and must be 3000 characters or fewer.']]);
-        }
-
-        if ($requestedDeadline !== '' && strtotime($requestedDeadline) <= time()) {
-            return $this->validation(['requested_deadline' => ['Requested deadline cannot be in the past.']]);
-        }
-
-        return $this->assignmentAction($brief, 'negotiate', fn($model, $assignment) => $this->gateway->negotiateAssignment($model, $assignment, Auth::id(), [
-            'message' => $message,
-            'requested_deadline' => $requestedDeadline ?: null,
-            'scope_details' => trim((string)$request->get('scope_details', '')) ?: null,
-        ]), 'Negotiation requested.');
+        return $this->assignmentAction(
+            $brief,
+            'negotiate',
+            fn($model, $assignment) => $this->gateway->negotiateAssignment(
+                $model,
+                $assignment,
+                Auth::id(),
+                [
+                    'message' => $validated['message'],
+                    'requested_deadline' => $validated['requested_deadline'] ?? null,
+                    'scope_details' => $validated['scope_details'] ?? null,
+                ],
+            ),
+            'Negotiation requested.',
+        );
     }
 
-    public function submit(Request $request, int $brief): JsonResponse
+    public function submit(SubmitBriefRequest $request, int $brief): JsonResponse
     {
-        $notes = trim((string)$request->get('notes', ''));
-        if (mb_strlen($notes) > 2000) {
-            return $this->validation(['notes' => ['Submission notes must be 2000 characters or fewer.']]);
-        }
+        $validated = $request->validated();
 
-        return $this->assignmentAction($brief, 'submit', fn($model) => $this->gateway->submit($model, Auth::id(), $notes), 'Brief submitted for review.');
+        return $this->assignmentAction(
+            $brief,
+            'submit',
+            fn($model) => $this->gateway->submit(
+                $model,
+                Auth::id(),
+                $validated['notes'] ?? '',
+            ),
+            'Brief submitted for review.',
+        );
     }
 
-    public function resubmit(Request $request, int $brief): JsonResponse
+    public function resubmit(SubmitBriefRequest $request, int $brief): JsonResponse
     {
-        $notes = trim((string)$request->get('notes', ''));
-        if (mb_strlen($notes) > 2000) {
-            return $this->validation(['notes' => ['Submission notes must be 2000 characters or fewer.']]);
-        }
+        $validated = $request->validated();
 
-        return $this->assignmentAction($brief, 'resubmit', fn($model) => $this->gateway->resubmit($model, Auth::id(), $notes), 'Brief resubmitted for review.');
+        return $this->assignmentAction(
+            $brief,
+            'resubmit',
+            fn($model) => $this->gateway->resubmit(
+                $model,
+                Auth::id(),
+                $validated['notes'] ?? '',
+            ),
+            'Brief resubmitted for review.',
+        );
     }
 
     private function assignmentAction(int $brief, string $action, callable $handler, string $message): JsonResponse
