@@ -27,9 +27,13 @@ class RequestBriefDeadlineChangeRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge([
-            'requested_deadline' => trim((string) $this->input('requested_deadline', '')),
-            'reason' => trim((string) $this->input('reason', '')),
-        ]);
+        $this->put(
+            'requested_deadline',
+            trim((string) $this->input('requested_deadline', '')),
+        );
+        $this->put(
+            'reason',
+            trim((string) $this->input('reason', '')),
+        );
     }
 }
