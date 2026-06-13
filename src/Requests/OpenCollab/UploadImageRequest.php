@@ -19,6 +19,8 @@ class UploadImageRequest extends FormRequest
             'ai_generated'       => ['boolean'],
             'sponsored_content'  => ['boolean'],
             'affiliate_content'  => ['boolean'],
+            'contains_music' => ['sometimes', 'boolean'],
+            'unclear_rights' => ['sometimes', 'boolean'],
         ];
     }
 }

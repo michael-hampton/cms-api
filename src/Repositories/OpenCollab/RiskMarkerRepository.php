@@ -53,4 +53,33 @@ class RiskMarkerRepository
             ->where('source', $source)
             ->first();
     }
+
+    public function findExistingForPage(
+        int $siteId,
+        int $pageId,
+        string $riskType,
+        string $source,
+    ): ?ContentRiskMarker {
+        return ContentRiskMarker::query()
+            ->where('site_id', $siteId)
+            ->where('page_id', $pageId)
+            ->whereNull('cms_image_id')
+            ->where('risk_type', $riskType)
+            ->where('source', $source)
+            ->first();
+    }
+
+    public function findExistingForImage(
+        int $siteId,
+        int $cmsImageId,
+        string $riskType,
+        string $source,
+    ): ?ContentRiskMarker {
+        return ContentRiskMarker::query()
+            ->where('site_id', $siteId)
+            ->where('cms_image_id', $cmsImageId)
+            ->where('risk_type', $riskType)
+            ->where('source', $source)
+            ->first();
+    }
 }

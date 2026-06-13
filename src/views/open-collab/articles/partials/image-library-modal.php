@@ -172,6 +172,15 @@
                         <input type="checkbox" id="il-upload-affiliate">
                         <span>Contains affiliate content</span>
                     </label>
+                    <label class="oc-toggle-row oc-toggle-row--sm">
+                        <input type="checkbox" id="il-upload-contains-music">
+                        <span>Contains music</span>
+                    </label>
+
+                    <label class="oc-toggle-row oc-toggle-row--sm">
+                        <input type="checkbox" id="il-upload-unclear-rights">
+                        <span>Unclear image ownership / provenance</span>
+                    </label>
                 </div>
             </div>
 
@@ -565,6 +574,8 @@
                     uploadCredit: byId('il-upload-credit'),
                     uploadConfirm: byId('il-upload-rights-confirm'),
                     uploadAiGenerated: byId('il-upload-ai-generated'),
+                    uploadContainsMusic: byId('il-upload-contains-music'),
+                    uploadUnclearRights: byId('il-upload-unclear-rights'),
                     uploadSponsored: byId('il-upload-sponsored'),
                     uploadAffiliate: byId('il-upload-affiliate'),
                     uploadProgress: byId('il-upload-progress'),
@@ -1052,6 +1063,8 @@
                     ai_generated: this.el.uploadAiGenerated.checked ? '1' : '0',
                     sponsored_content: this.el.uploadSponsored.checked ? '1' : '0',
                     affiliate_content: this.el.uploadAffiliate.checked ? '1' : '0',
+                    contains_music: this.el.uploadContainsMusic.checked ? '1' : '0',
+                    unclear_rights: this.el.uploadUnclearRights.checked ? '1' : '0',
                 };
             }
 

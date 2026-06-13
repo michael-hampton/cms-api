@@ -25,6 +25,7 @@ class RiskMarkerResource extends JsonResource
                 ->getAttribute('status'),
 
             'confidence' => $this->getAttribute('confidence'),
+            'risk_score' => $this->getAttribute('risk_score'),
             'details' => $this->getAttribute('details'),
             'created_by_user_id' => $this->getAttribute('created_by_user_id'),
 

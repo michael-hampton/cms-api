@@ -96,7 +96,7 @@ class ModerationQueueController extends Controller
             return $this->errorResponse($e->getMessage(), 409);
         }
 
-        return $this->jsonResponse((new ModerationQueueEntryResource($entry))->toArray());
+        return $this->resourceResponse((new ModerationQueueEntryResource($entry))->toArray());
     }
 
     public function release(int $queueEntryId): JsonResponse
@@ -117,6 +117,6 @@ class ModerationQueueController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         }
 
-        return $this->jsonResponse((new ModerationQueueEntryResource($entry))->toArray());
+        return $this->resourceResponse((new ModerationQueueEntryResource($entry))->toArray());
     }
 }

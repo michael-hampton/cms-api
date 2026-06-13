@@ -5,10 +5,13 @@ namespace App\Services\OpenCollab;
 use App\DTO\OpenCollab\ImageEvidenceData;
 use App\DTO\OpenCollab\ImageSearchQuery;
 use App\DTO\OpenCollab\ImageUploadData;
+use App\Enums\OpenCollab\OpenCollabImageRights;
 use App\Models\Image;
 use App\Models\Site;
 use App\Search\PaginatedResult;
 use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
+use App\Services\OpenCollab\Risk\CreatorDeclarationRiskService;
+use App\Services\OpenCollab\Risk\ImageMetadataRiskService;
 
 /**
  * Orchestrates contributor image library operations.
@@ -25,6 +28,8 @@ class ImageLibraryService
         private readonly CmsImageClientInterface                $cmsImageClient,
         private readonly ContributorImagePolicyInterface        $imagePolicy,
         private readonly ImageSubmissionEvidenceServiceInterface $evidenceService,
+        private readonly CreatorDeclarationRiskService      $creatorDeclarationRiskService,
+        private readonly ImageMetadataRiskService $imageMetadataRiskService,
     ) {
     }
 
@@ -108,12 +113,36 @@ class ImageLibraryService
             creditSubmitted: $evidenceData->creditSubmitted,
             rightsConfirmation: $evidenceData->rightsConfirmation,
             aiGenerated: $evidenceData->aiGenerated,
+            containsMusic: $evidenceData->containsMusic,
             sponsoredContent: $evidenceData->sponsoredContent,
             affiliateContent: $evidenceData->affiliateContent,
+            unclearRights: $evidenceData->unclearRights,
             contributorProfileId: $evidenceData->contributorProfileId,
             requestCorrelationId: $evidenceData->requestCorrelationId,
             ipAddress: $evidenceData->ipAddress,
             userAgent: $evidenceData->userAgent,
+        );
+
+        $this->creatorDeclarationRiskService->recordForImageUpload(
+            siteId: (int) $site->id,
+            cmsImageId: (int) $image->id,
+            contributorUserId: $userId,
+            aiGenerated: $evidenceData->aiGenerated,
+            containsMusic: $evidenceData->containsMusic,
+            sponsoredContent: $evidenceData->sponsoredContent,
+            affiliateContent: $evidenceData->affiliateContent,
+            unclearRights: $evidenceData->unclearRights,
+            imageRights: $evidenceData->imageRights,
+        );
+
+        $this->imageMetadataRiskService->inspectUploadedImage(
+            siteId: (int) $site->id,
+            cmsImageId: (int) $image->id,
+            actorUserId: $userId,
+            imageRights: $evidenceData->imageRights,
+            altText: $evidenceData->altTextSubmitted,
+            credit: $evidenceData->creditSubmitted,
+            aiGenerated: $evidenceData->aiGenerated,
         );
 
         try {

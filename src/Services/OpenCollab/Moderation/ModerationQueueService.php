@@ -181,8 +181,11 @@ class ModerationQueueService
             throw new \InvalidArgumentException("Queue entry [{$queueEntryId}] not found.");
         }
 
-        if (ModerationQueueStatus::tryFrom($entry->status)?->isClosed()) {
-            // "Approval/rejection closes the queue and stops recalculation."
+        $status = $entry->status instanceof ModerationQueueStatus
+            ? $entry->status
+            : ModerationQueueStatus::tryFrom((string) $entry->status);
+
+        if ($status?->isClosed()) {
             return $entry;
         }
 

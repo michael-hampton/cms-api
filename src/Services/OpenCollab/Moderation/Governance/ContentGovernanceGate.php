@@ -2,12 +2,13 @@
 
 namespace App\Services\OpenCollab\Moderation\Governance;
 
+use App\Enums\OpenCollab\RiskSeverity;
+use App\Enums\OpenCollab\RiskType;
 use App\Enums\Pages\PageStatus;
 use App\Enums\OpenCollab\EscalationStatus;
 use App\Enums\OpenCollab\ModerationQueueStatus;
 use App\Exceptions\OpenCollab\GovernanceCheckFailedException;
 use App\Repositories\Cms\ImageRepository;
-use App\Repositories\Cms\ImageRepositoryInterface; // ASSUMED: existing CMS image repo
 use App\Repositories\OpenCollab\ModerationEscalationRepository;
 use App\Repositories\OpenCollab\ModerationQueueRepository;
 use App\Repositories\OpenCollab\RiskMarkerRepository;
@@ -68,18 +69,34 @@ class ContentGovernanceGate
         }
 
         // 2. Open risk markers (critical always blocks; high blocks per severity rule)
-        $outstandingRisks = $this->riskMarkerRepository->outstandingForPage($page->site_id, $page->id);
+        // 2. Open risk markers
+        $outstandingRisks = $this->riskMarkerRepository->outstandingForPage(
+            (int) $page->site_id,
+            (int) $page->id,
+        );
 
         foreach ($outstandingRisks as $marker) {
-            if ($marker->severity === 'critical') {
+            $severity = $marker->severity instanceof RiskSeverity
+                ? $marker->severity
+                : RiskSeverity::from((string) $marker->severity);
+
+            $riskType = $marker->risk_type instanceof RiskType
+                ? $marker->risk_type->value
+                : (string) $marker->risk_type;
+
+            if ($severity === RiskSeverity::Critical) {
                 $failures[] = new GovernanceFailure(
                     'unresolved_critical_risk',
-                    "Unresolved critical {$marker->risk_type} risk marker (id {$marker->id})."
+                    "Unresolved critical {$riskType} risk marker (id {$marker->id}).",
                 );
-            } elseif ($marker->severity === 'high') {
+
+                continue;
+            }
+
+            if ($severity === RiskSeverity::High) {
                 $failures[] = new GovernanceFailure(
                     'unresolved_high_risk',
-                    "Unresolved high {$marker->risk_type} risk marker (id {$marker->id})."
+                    "Unresolved high {$riskType} risk marker (id {$marker->id}).",
                 );
             }
         }

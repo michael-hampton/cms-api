@@ -100,6 +100,7 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\ModerationEscalationController;
 use App\Controllers\OpenCollab\Admin\ModerationQueueController;
 use App\Controllers\OpenCollab\Admin\ModerationRiskController;
 use App\Controllers\OpenCollab\Admin\RbacAdminController;
@@ -487,6 +488,16 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/open-collab/admin/moderation/{queueEntryId}/risks', [ModerationRiskController::class, 'store']);
         $router->post('/open-collab/admin/risks/{riskMarkerId}/resolve', [ModerationRiskController::class, 'resolve']);
         $router->post('/open-collab/admin/risks/{riskMarkerId}/dismiss', [ModerationRiskController::class, 'dismiss']);
+        $router->post('/open-collab/admin/moderation/{queueEntryId}/release', [ModerationQueueController::class, 'release']);
+        $router->get('/open-collab/admin/escalations', [ModerationEscalationController::class, 'index']);
+        $router->post('/open-collab/admin/escalations/{id}/resolve', [ModerationEscalationController::class, 'resolve']);
+        $router->post('/open-collab/admin/escalations/{id}/assign', [ModerationEscalationController::class, 'assign']);
+        $router->post('/open-collab/admin/escalations/{id}/acknowledge', [ModerationEscalationController::class, 'acknowledge']);
+
+
+
+
+        $router->post('/open-collab/admin/moderation/{queueEntryId}/escalate', [ModerationEscalationController::class, 'store']);
         $router->get('/open-collab/images', [ImageLibraryController::class, 'index']);
         $router->post('/open-collab/images', [ImageLibraryController::class, 'store']);
 

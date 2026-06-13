@@ -80,9 +80,9 @@ class ArticleApprovalController extends Controller
         } catch (ImageBlockValidationFailedException $e) {
             return $this->errorResponse('Image validation failed. The article cannot be approved.', 422, $e->getErrors());
         } catch (GovernanceCheckFailedException $e) {
-            return $this->errorResponse('Approval blocked by governance checks.', 422, [
+            return $this->resourceResponse([
                 'governance_failures' => $e->toArray(),
-            ]);
+            ], 422);
         } catch (InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

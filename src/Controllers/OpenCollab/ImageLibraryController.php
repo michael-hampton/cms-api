@@ -142,7 +142,7 @@ class ImageLibraryController extends Controller
 
         $evidenceData = new ImageEvidenceData(
             siteId: (int) $site->id,
-            cmsImageId: 0, // will be set after upload
+            cmsImageId: 0,
             contributorUserId: Auth::id(),
             imageRights: $imageRights,
             nameSubmitted: $data['name'],
@@ -150,8 +150,10 @@ class ImageLibraryController extends Controller
             creditSubmitted: $data['credit'] ?? '',
             rightsConfirmation: (bool) ($data['rights_confirmation'] ?? false),
             aiGenerated: (bool) ($data['ai_generated'] ?? false),
+            containsMusic: (bool) ($data['contains_music'] ?? false),
             sponsoredContent: (bool) ($data['sponsored_content'] ?? false),
             affiliateContent: (bool) ($data['affiliate_content'] ?? false),
+            unclearRights: (bool) ($data['unclear_rights'] ?? false),
             requestCorrelationId: $request->header('X-Request-ID'),
             ipAddress: $request->ip(),
             userAgent: $request->header('User-Agent'),

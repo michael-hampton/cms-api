@@ -3,7 +3,7 @@
 namespace App\Services\OpenCollab;
 
 use App\DTO\OpenCollab\ImageEvidenceData;
-use App\Models\OpenCollab\ImageSubmissionEvidence;
+use App\Models\ImageSubmissionEvidence;
 use App\Repositories\OpenCollab\ImageSubmissionEvidenceRepositoryInterface;
 
 /**

@@ -609,6 +609,26 @@ abstract class FunctionalTestCase extends TestCase
         ]);
     }
 
+    protected function ensurePermission(
+        string $name,
+        string $slug,
+        string $group,
+    ): OpenCollabPermission {
+        $permission = OpenCollabPermission::query()
+            ->where('slug', $slug)
+            ->first();
+
+        if ($permission !== null) {
+            return $permission;
+        }
+
+        return OpenCollabPermission::create([
+            'name' => $name,
+            'slug' => $slug,
+            'group' => $group,
+        ]);
+    }
+
     protected function deleteForSite(string $uri, array $headers = [], bool $forMember = false): Response
     {
         $response = $this->makeRequest('DELETE', $this->generateUrl($uri), [], $this->getDefaultHeaders($headers, $forMember));

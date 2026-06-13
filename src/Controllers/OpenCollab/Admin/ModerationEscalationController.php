@@ -14,6 +14,7 @@ use App\Requests\OpenCollab\EscalateContentRequest;
 use App\Requests\OpenCollab\ResolveEscalationRequest;
 use App\Resources\OpenCollab\EscalationResource;
 use App\Services\OpenCollab\Moderation\EscalationService;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
 
 /**
  * Routes:
@@ -30,6 +31,7 @@ class ModerationEscalationController extends Controller
     public function __construct(
         private readonly EscalationService $escalationService,
         private readonly ModerationEscalationRepository $escalationRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
     ) {
         parent::__construct();
     }
@@ -44,7 +46,7 @@ class ModerationEscalationController extends Controller
         $escalations = $this->escalationRepository->forSite(SiteContext::getId(), array_filter(['status' => $status]));
 
         return $this->resourceResponse(
-            $escalations->map(fn($e) => (new EscalationResource($e))->toArray())->toArray()
+            $escalations->map(fn($e) => (new EscalationResource($e)))->toArray(),
         );
     }
 
@@ -69,7 +71,7 @@ class ModerationEscalationController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         }
 
-        return $this->jsonResponse((new EscalationResource($escalation))->toArray(), 201);
+        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 201);
     }
 
     public function assign(int $id): JsonResponse
@@ -86,7 +88,7 @@ class ModerationEscalationController extends Controller
             return $this->errorResponse($e->getMessage(), 404);
         }
 
-        return $this->jsonResponse((new EscalationResource($escalation))->toArray());
+        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 201);
     }
 
     public function acknowledge(int $id): JsonResponse
@@ -101,7 +103,7 @@ class ModerationEscalationController extends Controller
             return $this->errorResponse($e->getMessage(), 404);
         }
 
-        return $this->jsonResponse((new EscalationResource($escalation))->toArray());
+        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 200);
     }
 
     public function resolve(ResolveEscalationRequest $request, int $id): JsonResponse
@@ -120,6 +122,6 @@ class ModerationEscalationController extends Controller
             return $this->errorResponse($e->getMessage(), 404);
         }
 
-        return $this->jsonResponse((new EscalationResource($escalation))->toArray());
+        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 200);
     }
 }

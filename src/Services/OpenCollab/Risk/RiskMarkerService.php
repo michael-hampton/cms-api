@@ -36,9 +36,17 @@ class RiskMarkerService
         ?int $createdByUserId = null,
         ?int $queueEntryId = null,
     ): ContentRiskMarker {
-        return $this->database->transaction(function () use (
-            $siteId, $pageId, $pageVersionId, $cmsImageId, $riskType, $source,
-            $severity, $details, $createdByUserId, $queueEntryId
+        $marker = $this->database->transaction(function () use (
+            $siteId,
+            $pageId,
+            $pageVersionId,
+            $cmsImageId,
+            $riskType,
+            $source,
+            $severity,
+            $details,
+            $createdByUserId,
+            $queueEntryId,
         ): ContentRiskMarker {
             $marker = $this->riskMarkerRepository->create([
                 'site_id' => $siteId,
@@ -60,17 +68,24 @@ class RiskMarkerService
                     actorUserId: $createdByUserId,
                     action: ModerationActionType::RiskAdded,
                     queueEntryId: $queueEntryId,
-                    metadata: ['risk_marker_id' => $marker->id, 'risk_type' => $riskType->value],
+                    metadata: [
+                        'risk_marker_id' => $marker->id,
+                        'risk_type' => $riskType->value,
+                    ],
                 );
             }
 
             return $marker;
-        }, function (ContentRiskMarker $marker) use ($createdByUserId) {
-            // post-commit: recalculation via event
-            $this->eventDispatcher->dispatch(
-                new RiskMarkerStatusChangedEvent($marker, $createdByUserId ?? 0)
-            );
         });
+
+        $this->eventDispatcher->dispatch(
+            new RiskMarkerStatusChangedEvent(
+                $marker,
+                $createdByUserId ?? 0,
+            )
+        );
+
+        return $marker;
     }
 
     /**
@@ -84,7 +99,11 @@ class RiskMarkerService
             throw new \InvalidArgumentException("Risk marker [{$markerId}] not found for this site.");
         }
 
-        if (in_array($marker->severity, [RiskSeverity::High, RiskSeverity::Critical], true) && empty($notes)) {
+        $severity = $marker->severity instanceof RiskSeverity
+            ? $marker->severity
+            : RiskSeverity::from($marker->severity);
+
+        if (in_array($severity, [RiskSeverity::High, RiskSeverity::Critical], true) && empty($notes)) {
             throw new \InvalidArgumentException('Notes are required when resolving a high or critical risk marker.');
         }
 

@@ -63,7 +63,7 @@ class ModerationRiskController extends Controller
             queueEntryId: $entry->id,
         );
 
-        return $this->resourceResponse((new RiskMarkerResource($marker))->toArray(), 201);
+        return $this->resourceResponse((new RiskMarkerResource($marker)->toArray()), 201);
     }
 
     public function resolve(ResolveRiskMarkerRequest $request, int $riskMarkerId): JsonResponse
@@ -83,7 +83,7 @@ class ModerationRiskController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         }
 
-        return $this->jsonResponse((new RiskMarkerResource($marker))->toArray());
+        return $this->resourceResponse((new RiskMarkerResource($marker)->toArray()));
     }
 
     public function dismiss(DismissRiskMarkerRequest $request, int $riskMarkerId): JsonResponse
@@ -103,6 +103,6 @@ class ModerationRiskController extends Controller
             return $this->errorResponse($e->getMessage(), 422);
         }
 
-        return $this->jsonResponse((new RiskMarkerResource($marker))->toArray());
+        return $this->resourceResponse((new RiskMarkerResource($marker)->toArray()));
     }
 }
