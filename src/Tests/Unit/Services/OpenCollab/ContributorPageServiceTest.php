@@ -3,19 +3,15 @@
 namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Exceptions\OpenCollab\UnauthorisedPageAccessException;
-use App\Framework\Events\EventDispatcher;
 use App\Models\Page;
 use App\Repositories\Cms\AuthorRepository;
 use App\Repositories\Cms\Pages\PageAuthorRepository;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Cms\UserRepositoryInterface;
 use App\Repositories\OpenCollab\ActivityRepository;
-use App\Repositories\OpenCollab\RbacRepository;
-use App\Repositories\UserNotificationRepository;
 use App\Services\Cms\Pages\PageService;
 use App\Services\OpenCollab\ArticleApprovalService;
 use App\Services\OpenCollab\ContributorPageService;
-use App\Services\OpenCollab\SitePermissionResolver;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use Mockery;
 use Mockery\MockInterface;
@@ -290,14 +286,10 @@ class ContributorPageServiceTest extends FunctionalTestCase
         $this->pageService = Mockery::mock(PageService::class);
         $this->pageRepository = Mockery::mock(PageRepository::class);
         $this->articleApprovalService = Mockery::mock(ArticleApprovalService::class);
-        $eventDispatcher = Mockery::mock(EventDispatcher::class);
         $this->activityRepository = Mockery::mock(ActivityRepository::class);
         $this->authorRepository = Mockery::mock(AuthorRepository::class);
         $this->pageAuthorRepository = Mockery::mock(PageAuthorRepository::class);
         $this->userRepository = Mockery::mock(UserRepositoryInterface::class);
-        $notificationRepository = Mockery::mock(UserNotificationRepository::class);
-        $rbacRepository = Mockery::mock(RbacRepository::class);
-        $permissionResolver = Mockery::mock(SitePermissionResolver::class);
 
         $this->activityRepository
             ->shouldReceive('record')
@@ -312,14 +304,10 @@ class ContributorPageServiceTest extends FunctionalTestCase
             $this->pageService,
             $this->pageRepository,
             $this->articleApprovalService,
-            $eventDispatcher,
             $this->activityRepository,
             $this->authorRepository,
             $this->pageAuthorRepository,
             $this->userRepository,
-            $notificationRepository,
-            $rbacRepository,
-            $permissionResolver,
         );
     }
 
