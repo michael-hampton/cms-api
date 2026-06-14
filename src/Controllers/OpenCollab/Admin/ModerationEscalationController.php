@@ -48,9 +48,13 @@ class ModerationEscalationController extends Controller
             array_filter(['status' => $status]),
         );
 
-        return $this->resourceResponse(
-            $escalations->map(fn($e) => (new EscalationResource($e)))->toArray(),
-        );
+        $items = $escalations
+            ->map(fn($escalation) => (new EscalationResource($escalation))->toArray())
+            ->toArray();
+
+        return $this->resourceResponse([
+            'data' => array_values($items),
+        ]);
     }
 
     public function store(EscalateContentRequest $request, int $queueEntryId): JsonResponse
