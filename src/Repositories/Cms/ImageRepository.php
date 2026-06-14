@@ -67,11 +67,9 @@ class ImageRepository extends Repository
             'unused_images' => Image::active()->doesntHave('usage')->count(),
         ];
 
-        // Format total size
         $stats['formatted_total_size'] = $this->formatBytes($stats['total_size']);
         $stats['formatted_avg_size'] = $this->formatBytes($stats['avg_size']);
 
-        // Get mime type breakdown
         $mimeTypes = Image::active()
             ->select('mime_type')
             ->selectRaw('COUNT(*) as count')
@@ -104,10 +102,8 @@ class ImageRepository extends Repository
 
     public function syncCategories(Image $image, array $categoryIds): array
     {
-        // Get the relationship handler by calling categories with relation=true
         $relationHandler = $image->categories(true);
 
-        // Now we can call sync on the RelationBuilder
         return $relationHandler->sync($categoryIds);
     }
 
@@ -118,6 +114,10 @@ class ImageRepository extends Repository
 
     public function syncTags(Image $image, array $tagIds): void
     {
+        if ($tagIds === []) {
+            return;
+        }
+
         $image->syncTags($tagIds);
     }
 
@@ -131,11 +131,6 @@ class ImageRepository extends Repository
         return Image::with(['categories', 'tags', 'tags.tag'])->find($id);
     }
 
-    /**
-     * Search images scoped to a specific site, with optional filters.
-     * Replaces the base search() for OpenCollab contributor flows which must
-     * always be site-scoped.
-     */
     public function searchForSite(SearchCriteria $criteria): PaginatedResult
     {
         $query = Image::active()
@@ -166,13 +161,6 @@ class ImageRepository extends Repository
         return $this->searchEngine->search($query, $criteria);
     }
 
-    /**
-     * Fetch a batch of images by IDs scoped to a site.
-     * Used for article editor resolution (Ticket 10) — avoids N+1 queries.
-     *
-     * @param  int[] $imageIds
-     * @return \App\Framework\Support\Collection<Image>
-     */
     public function findManyForSite(int $siteId, array $imageIds): \App\Framework\Support\Collection
     {
         return Image::active()
