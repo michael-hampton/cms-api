@@ -16,23 +16,24 @@ use App\Repositories\Cms\Briefs\BriefAssignmentRequestRepository;
 use App\Repositories\Cms\Briefs\BriefRepository;
 use App\Repositories\OpenCollab\ContributorBriefRepository;
 use App\Services\OpenCollab\OpenCollabBriefNotificationService;
+use DateTimeImmutable;
+use DateTimeInterface;
 use InvalidArgumentException;
 use RuntimeException;
+use Throwable;
 
 class BriefAssignmentRequestService
 {
     public function __construct(
-        private readonly BriefAssignmentRequestRepository  $requestRepository,
-        private readonly BriefRepository                   $briefRepository,
-        private readonly ContributorBriefRepository        $contributorBriefRepository,
-        private readonly LogBriefActivity                  $logActivity,
+        private readonly BriefAssignmentRequestRepository $requestRepository,
+        private readonly BriefRepository $briefRepository,
+        private readonly BriefService $briefService,
+        private readonly ContributorBriefRepository $contributorBriefRepository,
+        private readonly LogBriefActivity $logActivity,
         private readonly OpenCollabBriefNotificationService $notifications,
-        private readonly Database                          $database,
-    ) {}
-
-    // -------------------------------------------------------------------------
-    // Contributor-initiated creation
-    // -------------------------------------------------------------------------
+        private readonly Database $database,
+    ) {
+    }
 
     public function createClarificationRequest(
         Brief $brief,
@@ -53,12 +54,12 @@ class BriefAssignmentRequestService
 
         return $this->database->transaction(function () use ($brief, $assignment, $contributorId, $message) {
             $request = $this->requestRepository->create([
-                'brief_id'       => $brief->id,
-                'assignment_id'  => $assignment->id,
+                'brief_id' => $brief->id,
+                'assignment_id' => $assignment->id,
                 'contributor_id' => $contributorId,
-                'type'           => BriefAssignmentRequestType::Clarification->value,
-                'status'         => BriefAssignmentRequestStatus::Pending->value,
-                'message'        => $message,
+                'type' => BriefAssignmentRequestType::Clarification->value,
+                'status' => BriefAssignmentRequestStatus::Pending->value,
+                'message' => $message,
             ]);
 
             $this->logActivity->handle(
@@ -113,14 +114,20 @@ class BriefAssignmentRequestService
             );
         }
 
-        return $this->database->transaction(function () use ($brief, $assignment, $contributorId, $parsedDeadline, $reason) {
+        return $this->database->transaction(function () use (
+            $brief,
+            $assignment,
+            $contributorId,
+            $parsedDeadline,
+            $reason,
+        ) {
             $request = $this->requestRepository->create([
-                'brief_id'              => $brief->id,
-                'assignment_id'         => $assignment->id,
-                'contributor_id'        => $contributorId,
-                'type'                  => BriefAssignmentRequestType::DeadlineChange->value,
-                'status'                => BriefAssignmentRequestStatus::Pending->value,
-                'reason'                => $reason,
+                'brief_id' => $brief->id,
+                'assignment_id' => $assignment->id,
+                'contributor_id' => $contributorId,
+                'type' => BriefAssignmentRequestType::DeadlineChange->value,
+                'status' => BriefAssignmentRequestStatus::Pending->value,
+                'reason' => $reason,
                 'requested_deadline_at' => $parsedDeadline,
             ]);
 
@@ -167,21 +174,27 @@ class BriefAssignmentRequestService
             throw new InvalidArgumentException('Scope details must not exceed 5000 characters.');
         }
 
-        $parsedDeadline = null;
-        if ($requestedDeadline !== null) {
-            $parsedDeadline = $this->parseAndValidateFutureDeadline($requestedDeadline);
-        }
+        $parsedDeadline = $requestedDeadline !== null
+            ? $this->parseAndValidateFutureDeadline($requestedDeadline)
+            : null;
 
-        return $this->database->transaction(function () use ($brief, $assignment, $contributorId, $message, $parsedDeadline, $scopeDetails) {
+        return $this->database->transaction(function () use (
+            $brief,
+            $assignment,
+            $contributorId,
+            $message,
+            $parsedDeadline,
+            $scopeDetails,
+        ) {
             $request = $this->requestRepository->create([
-                'brief_id'              => $brief->id,
-                'assignment_id'         => $assignment->id,
-                'contributor_id'        => $contributorId,
-                'type'                  => BriefAssignmentRequestType::Negotiation->value,
-                'status'                => BriefAssignmentRequestStatus::Pending->value,
-                'message'               => $message,
+                'brief_id' => $brief->id,
+                'assignment_id' => $assignment->id,
+                'contributor_id' => $contributorId,
+                'type' => BriefAssignmentRequestType::Negotiation->value,
+                'status' => BriefAssignmentRequestStatus::Pending->value,
+                'message' => $message,
                 'requested_deadline_at' => $parsedDeadline,
-                'scope_details'         => $scopeDetails,
+                'scope_details' => $scopeDetails,
             ]);
 
             $this->logActivity->handle(
@@ -223,14 +236,14 @@ class BriefAssignmentRequestService
 
         return $this->database->transaction(function () use ($brief, $assignment, $contributorId, $reason) {
             $request = $this->requestRepository->create([
-                'brief_id'       => $brief->id,
-                'assignment_id'  => $assignment->id,
+                'brief_id' => $brief->id,
+                'assignment_id' => $assignment->id,
                 'contributor_id' => $contributorId,
-                'type'           => BriefAssignmentRequestType::Rejection->value,
-                'status'         => BriefAssignmentRequestStatus::Resolved->value,
-                'reason'         => $reason,
-                'resolved_by'    => $contributorId,
-                'resolved_at'    => now(),
+                'type' => BriefAssignmentRequestType::Rejection->value,
+                'status' => BriefAssignmentRequestStatus::Resolved->value,
+                'reason' => $reason,
+                'resolved_by' => $contributorId,
+                'resolved_at' => now(),
             ]);
 
             $this->logActivity->handle(
@@ -253,10 +266,6 @@ class BriefAssignmentRequestService
         });
     }
 
-    // -------------------------------------------------------------------------
-    // CMS editor resolution
-    // -------------------------------------------------------------------------
-
     public function approveDeadlineChangeRequest(
         BriefAssignmentRequest $request,
         int $editorId,
@@ -272,15 +281,15 @@ class BriefAssignmentRequestService
                 throw new RuntimeException('Brief not found for request.');
             }
 
-            // Re-validate the deadline is still in the future and still later than current.
             if ($request->requested_deadline_at !== null) {
-                $this->assertRequestedDeadlineIsLaterThanCurrent($brief, $request->requested_deadline_at);
-            }
+                $this->assertRequestedDeadlineIsLaterThanCurrent(
+                    $brief,
+                    $request->requested_deadline_at,
+                );
 
-            // Apply the new deadline to the brief.
-            if ($request->requested_deadline_at !== null) {
-                $this->briefRepository->update((int) $brief->id, [
-                    'deadline' => $request->requested_deadline_at,
+                $this->briefService->setDeadline((int) $brief->id, [
+                    'due_date' => $request->requested_deadline_at->format('Y-m-d H:i:s'),
+                    'user_id' => $editorId,
                 ]);
             }
 
@@ -359,36 +368,17 @@ class BriefAssignmentRequestService
         $this->assertTypeIs($request, BriefAssignmentRequestType::Negotiation);
         $this->assertRequestIsPending($request);
 
-        return $this->database->transaction(function () use ($request, $editorId, $editorResponse) {
-            $resolved = $this->requestRepository->resolve(
-                $request,
-                BriefAssignmentRequestStatus::Approved,
-                $editorId,
-                $editorResponse,
-            );
-
-            $brief = $this->briefRepository->find((int) $request->brief_id);
-
-            $this->logActivity->handle(
-                (int) $request->brief_id,
-                $editorId,
-                'negotiation.approved',
-                'Negotiation approved',
-                ['request_id' => $request->id, 'contributor_visible' => true],
-            );
-
-            if ($brief) {
-                $this->notifications->notifyContributor(
-                    (int) $request->contributor_id,
-                    $brief,
-                    'brief.negotiation_approved',
-                    'Negotiation approved',
-                    "Your negotiation request for {$brief->title} was approved.",
-                );
-            }
-
-            return $resolved;
-        });
+        return $this->resolveNegotiation(
+            $request,
+            $editorId,
+            BriefAssignmentRequestStatus::Approved,
+            'negotiation.approved',
+            'Negotiation approved',
+            'brief.negotiation_approved',
+            'Negotiation approved',
+            'was approved.',
+            $editorResponse,
+        );
     }
 
     public function rejectNegotiationRequest(
@@ -399,36 +389,17 @@ class BriefAssignmentRequestService
         $this->assertTypeIs($request, BriefAssignmentRequestType::Negotiation);
         $this->assertRequestIsPending($request);
 
-        return $this->database->transaction(function () use ($request, $editorId, $editorResponse) {
-            $resolved = $this->requestRepository->resolve(
-                $request,
-                BriefAssignmentRequestStatus::Rejected,
-                $editorId,
-                $editorResponse,
-            );
-
-            $brief = $this->briefRepository->find((int) $request->brief_id);
-
-            $this->logActivity->handle(
-                (int) $request->brief_id,
-                $editorId,
-                'negotiation.rejected',
-                'Negotiation rejected',
-                ['request_id' => $request->id, 'contributor_visible' => true],
-            );
-
-            if ($brief) {
-                $this->notifications->notifyContributor(
-                    (int) $request->contributor_id,
-                    $brief,
-                    'brief.negotiation_rejected',
-                    'Negotiation rejected',
-                    "Your negotiation request for {$brief->title} was not approved.",
-                );
-            }
-
-            return $resolved;
-        });
+        return $this->resolveNegotiation(
+            $request,
+            $editorId,
+            BriefAssignmentRequestStatus::Rejected,
+            'negotiation.rejected',
+            'Negotiation rejected',
+            'brief.negotiation_rejected',
+            'Negotiation rejected',
+            'was not approved.',
+            $editorResponse,
+        );
     }
 
     public function respondToClarificationRequest(
@@ -440,7 +411,9 @@ class BriefAssignmentRequestService
         $this->assertRequestIsPending($request);
 
         if (empty(trim($editorResponse))) {
-            throw new InvalidArgumentException('A response is required when responding to a clarification request.');
+            throw new InvalidArgumentException(
+                'A response is required when responding to a clarification request.',
+            );
         }
 
         return $this->database->transaction(function () use ($request, $editorId, $editorResponse) {
@@ -492,7 +465,7 @@ class BriefAssignmentRequestService
             $this->logActivity->handle(
                 (int) $request->brief_id,
                 $actorId,
-                "request.cancelled",
+                'request.cancelled',
                 'Request cancelled',
                 ['request_id' => $request->id, 'contributor_visible' => false],
             );
@@ -500,10 +473,6 @@ class BriefAssignmentRequestService
             return $resolved;
         });
     }
-
-    // -------------------------------------------------------------------------
-    // Queries
-    // -------------------------------------------------------------------------
 
     public function getPendingRequestsForBrief(int $briefId): Collection
     {
@@ -527,15 +496,62 @@ class BriefAssignmentRequestService
         return $this->requestRepository->find($id);
     }
 
-    // -------------------------------------------------------------------------
-    // Guards
-    // -------------------------------------------------------------------------
+    private function resolveNegotiation(
+        BriefAssignmentRequest $request,
+        int $editorId,
+        BriefAssignmentRequestStatus $status,
+        string $activityType,
+        string $activityLabel,
+        string $notificationType,
+        string $notificationTitle,
+        string $notificationSuffix,
+        ?string $editorResponse,
+    ): BriefAssignmentRequest {
+        return $this->database->transaction(function () use (
+            $request,
+            $editorId,
+            $status,
+            $activityType,
+            $activityLabel,
+            $notificationType,
+            $notificationTitle,
+            $notificationSuffix,
+            $editorResponse,
+        ) {
+            $resolved = $this->requestRepository->resolve(
+                $request,
+                $status,
+                $editorId,
+                $editorResponse,
+            );
+
+            $brief = $this->briefRepository->find((int) $request->brief_id);
+
+            $this->logActivity->handle(
+                (int) $request->brief_id,
+                $editorId,
+                $activityType,
+                $activityLabel,
+                ['request_id' => $request->id, 'contributor_visible' => true],
+            );
+
+            if ($brief) {
+                $this->notifications->notifyContributor(
+                    (int) $request->contributor_id,
+                    $brief,
+                    $notificationType,
+                    $notificationTitle,
+                    "Your negotiation request for {$brief->title} {$notificationSuffix}",
+                );
+            }
+
+            return $resolved;
+        });
+    }
 
     private function assertBriefAcceptsRequests(Brief $brief): void
     {
-        $blockedStatuses = ['archived', 'converted'];
-
-        if (in_array($brief->status, $blockedStatuses, true)) {
+        if (in_array($brief->status, ['archived', 'converted'], true)) {
             throw new RuntimeException(
                 "Brief is {$brief->status} and cannot accept new assignment requests.",
             );
@@ -544,11 +560,10 @@ class BriefAssignmentRequestService
 
     private function requireAssignment(Brief $brief, int $contributorId): Collaborator
     {
-        $siteId = (int) $brief->site_id;
         $assignment = $this->contributorBriefRepository->assignmentForBrief(
             (int) $brief->id,
             $contributorId,
-            $siteId,
+            (int) $brief->site_id,
         );
 
         if ($assignment === null) {
@@ -562,9 +577,7 @@ class BriefAssignmentRequestService
 
     private function assertAssignmentIsActive(Collaborator $assignment): void
     {
-        $terminalRoles = ['rejected'];
-
-        if (in_array($assignment->role, $terminalRoles, true)) {
+        if (in_array($assignment->role, ['rejected'], true)) {
             throw new RuntimeException(
                 'Assignment has been rejected; no further actions are permitted.',
             );
@@ -591,15 +604,15 @@ class BriefAssignmentRequestService
         }
     }
 
-    private function parseAndValidateFutureDeadline(string $deadline): \DateTimeImmutable
+    private function parseAndValidateFutureDeadline(string $deadline): DateTimeImmutable
     {
         try {
-            $parsed = new \DateTimeImmutable($deadline);
-        } catch (\Throwable) {
+            $parsed = new DateTimeImmutable($deadline);
+        } catch (Throwable) {
             throw new InvalidArgumentException("Invalid deadline date: '{$deadline}'.");
         }
 
-        if ($parsed <= new \DateTimeImmutable()) {
+        if ($parsed <= new DateTimeImmutable()) {
             throw new InvalidArgumentException('Requested deadline must be a future date.');
         }
 
@@ -608,20 +621,17 @@ class BriefAssignmentRequestService
 
     private function assertRequestedDeadlineIsLaterThanCurrent(
         Brief $brief,
-        \DateTimeInterface $requestedDeadline,
+        DateTimeInterface $requestedDeadline,
     ): void {
-        // Retrieve the brief's current deadline if one exists.
-        $currentDeadline = $brief->deadline ?? null;
+        $deadline = $this->briefService->getDeadline((int) $brief->id);
 
-        if ($currentDeadline === null) {
+        if ($deadline === null || empty($deadline['due_date'])) {
             return;
         }
 
-        $current = $currentDeadline instanceof \DateTimeInterface
-            ? $currentDeadline
-            : new \DateTimeImmutable((string) $currentDeadline);
+        $currentDeadline = new DateTimeImmutable((string) $deadline['due_date']);
 
-        if ($requestedDeadline <= $current) {
+        if ($requestedDeadline <= $currentDeadline) {
             throw new InvalidArgumentException(
                 'Requested deadline must be later than the current deadline.',
             );
