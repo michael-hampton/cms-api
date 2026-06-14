@@ -5,6 +5,7 @@ namespace App\Tests\Unit\Controllers\OpenCollab;
 use App\Controllers\OpenCollab\ArticlePageController;
 use App\Framework\Support\Collection;
 use App\Models\Block;
+use App\Models\Model;
 use App\Models\Page;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\OpenCollab\ArticleAccessService;
@@ -12,6 +13,7 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ReadabilityService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use ReflectionMethod;
 
 class ArticlePageControllerBlockHydrationTest extends TestCase
@@ -31,7 +33,8 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             Mockery::mock(OpenCollabAuthorizationService::class),
         );
 
-        $heading = new Block([
+        /** @var Block $heading */
+        $heading = $this->modelWithoutDatabase(Block::class, [
             'id' => 9,
             'type' => 'heading',
             'order' => 0,
@@ -42,7 +45,8 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             ],
         ]);
 
-        $text = new Block([
+        /** @var Block $text */
+        $text = $this->modelWithoutDatabase(Block::class, [
             'id' => 10,
             'type' => 'text',
             'order' => 1,
@@ -54,7 +58,8 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             ],
         ]);
 
-        $image = new Block([
+        /** @var Block $image */
+        $image = $this->modelWithoutDatabase(Block::class, [
             'id' => 11,
             'type' => 'image',
             'order' => 2,
@@ -68,11 +73,12 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             ],
         ]);
 
-        $page = new Page([
+        /** @var Page $page */
+        $page = $this->modelWithoutDatabase(Page::class, [
             'id' => 5,
             'title' => 'Existing article title',
+            'blocks' => Collection::make([$heading, $text, $image]),
         ]);
-        $page->blocks = Collection::make([$heading, $text, $image]);
 
         $method = new ReflectionMethod($controller, 'hydrateBlocksForEditor');
         $method->setAccessible(true);
@@ -93,5 +99,20 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
         $this->assertSame('/storage/uploads/image.jpg', $image->thumbnail_url);
         $this->assertSame('Existing image', $image->alt);
         $this->assertSame('Photographer', $image->credit);
+    }
+
+    /**
+     * Create a real model instance without running Model::__construct(), which
+     * normally resolves the database singleton and relation infrastructure.
+     */
+    private function modelWithoutDatabase(string $modelClass, array $attributes): Model
+    {
+        $reflection = new ReflectionClass($modelClass);
+
+        /** @var Model $model */
+        $model = $reflection->newInstanceWithoutConstructor();
+        $model->forceFill($attributes);
+
+        return $model;
     }
 }
