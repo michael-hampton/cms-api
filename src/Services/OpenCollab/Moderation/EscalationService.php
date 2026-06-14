@@ -102,8 +102,8 @@ class EscalationService
 
     /**
      * Resolving may leave the queue entry escalated if other open
-     * escalations remain — recalculation of queue status back to
-     * "queued" happens only when no open escalations remain.
+     * escalations remain — the queue returns to in_review only when
+     * the final open escalation has been resolved.
      */
     public function resolve(int $escalationId, int $userId, int $siteId, string $resolution, ?string $notes): ModerationEscalation
     {
@@ -117,14 +117,24 @@ class EscalationService
                 'resolution_notes' => $notes,
             ]);
 
-            $remainingOpen = $this->escalationRepository->openForPage($escalation->site_id, $escalation->page_id);
+            $remainingOpen = $this->escalationRepository->openForPage(
+                (int) $escalation->site_id,
+                (int) $escalation->page_id,
+            );
 
             if ($remainingOpen->isEmpty()) {
-                $queueEntry = $this->queueRepository->find($escalation->queue_entry_id);
-                if ($queueEntry !== null && $queueEntry->status === ModerationQueueStatus::Escalated) {
-                    $this->queueRepository->update($queueEntry->id, [
-                        'status' => ModerationQueueStatus::InReview->value,
-                    ]);
+                $queueEntry = $this->queueRepository->find((int) $escalation->queue_entry_id);
+
+                if ($queueEntry !== null) {
+                    $queueStatus = $queueEntry->status instanceof ModerationQueueStatus
+                        ? $queueEntry->status
+                        : ModerationQueueStatus::from((string) $queueEntry->status);
+
+                    if ($queueStatus === ModerationQueueStatus::Escalated) {
+                        $this->queueRepository->update($queueEntry->id, [
+                            'status' => ModerationQueueStatus::InReview->value,
+                        ]);
+                    }
                 }
             }
 
@@ -136,7 +146,7 @@ class EscalationService
     {
         $escalation = $this->escalationRepository->find($escalationId);
 
-        if ($escalation === null || (int)$escalation->site_id !== $siteId) {
+        if ($escalation === null || (int) $escalation->site_id !== $siteId) {
             throw new \InvalidArgumentException("Escalation [{$escalationId}] not found for this site.");
         }
 
