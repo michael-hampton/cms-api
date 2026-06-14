@@ -34,6 +34,7 @@ return [
     'singletons' => [
         // Explicit singleton bindings that can't be auto-discovered
         \App\Framework\Database\Database::class,
+        \App\Framework\Events\EventDispatcher::class,
         \App\Framework\View\SimpleTemplateEngine::class,
         \App\Framework\View\ViewRenderer::class,
         \App\Framework\Validation\Validator::class,
