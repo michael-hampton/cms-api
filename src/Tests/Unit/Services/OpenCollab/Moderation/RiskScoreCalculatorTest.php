@@ -37,6 +37,18 @@ class RiskScoreCalculatorTest extends TestCase
         $this->assertSame(10, $score);
     }
 
+    public function test_persisted_string_severity_is_normalised(): void
+    {
+        $marker = $this->marker(RiskSeverity::High->value);
+
+        $score = $this->calculator->calculate(Collection::make([$marker]));
+
+        $this->assertSame(60, $score);
+        $this->assertTrue(
+            $this->calculator->hasBlockingRisk(Collection::make([$marker]))
+        );
+    }
+
     public function test_multiple_markers_sum_severity_scores(): void
     {
         $markers = Collection::make([
@@ -83,7 +95,7 @@ class RiskScoreCalculatorTest extends TestCase
         $this->assertFalse($this->calculator->hasBlockingRisk(Collection::make([])));
     }
 
-    private function marker(RiskSeverity $severity): ContentRiskMarker
+    private function marker(RiskSeverity|string $severity): ContentRiskMarker
     {
         $marker = \Mockery::mock(ContentRiskMarker::class)->makePartial();
         $marker->severity = $severity;
