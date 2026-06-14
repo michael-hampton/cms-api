@@ -159,8 +159,10 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertNotEmpty($data);
-        $this->assertEquals($escalation->id, $data[0]['id']);
+        $this->assertTrue($data['success']);
+        $this->assertArrayHasKey('data', $data);
+        $this->assertCount(1, $data['data']);
+        $this->assertEquals($escalation->id, $data['data'][0]['id']);
     }
 
     public function test_wrong_site_escalation_cannot_be_resolved(): void
