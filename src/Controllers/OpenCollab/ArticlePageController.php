@@ -151,17 +151,14 @@ class ArticlePageController extends Controller
 
     private function approvalEditorScript(?int $pageId, ?string $status): string
     {
-        $pageIdJson = json_encode($pageId, JSON_THROW_ON_ERROR);
-        $statusJson = json_encode($status, JSON_THROW_ON_ERROR);
-
-        return <<<HTML
+        $script = <<<'HTML'
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const approvalButton = document.getElementById('publish-btn');
     if (!approvalButton) return;
 
-    const pageId = {$pageIdJson};
-    const pageStatus = {$statusJson};
+    const pageId = __PAGE_ID__;
+    const pageStatus = __PAGE_STATUS__;
     const approvalIcon = approvalButton.querySelector('svg')?.outerHTML ?? '';
 
     const setButton = (label, disabled = false) => {
@@ -251,6 +248,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 HTML;
+
+        return str_replace(
+            ['__PAGE_ID__', '__PAGE_STATUS__'],
+            [
+                json_encode($pageId, JSON_THROW_ON_ERROR),
+                json_encode($status, JSON_THROW_ON_ERROR),
+            ],
+            $script,
+        );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
