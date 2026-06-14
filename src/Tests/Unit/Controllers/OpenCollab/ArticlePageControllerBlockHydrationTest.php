@@ -22,7 +22,7 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_persisted_block_data_is_flattened_for_open_collab_editor(): void
+    public function test_persisted_blocks_are_restored_for_open_collab_editor(): void
     {
         $controller = new ArticlePageController(
             Mockery::mock(PageRepository::class),
@@ -31,19 +31,33 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             Mockery::mock(OpenCollabAuthorizationService::class),
         );
 
+        $heading = new Block([
+            'id' => 9,
+            'type' => 'heading',
+            'order' => 0,
+            'data' => [
+                'level' => 'h2',
+                'text' => 'Existing article title',
+                'subtitle' => '',
+            ],
+        ]);
+
         $text = new Block([
             'id' => 10,
             'type' => 'text',
-            'order' => 0,
+            'order' => 1,
             'data' => [
-                'content' => '<p>Existing article content</p>',
+                'paragraphs' => [
+                    'Existing article content',
+                    '<p>Second paragraph</p>',
+                ],
             ],
         ]);
 
         $image = new Block([
             'id' => 11,
             'type' => 'image',
-            'order' => 1,
+            'order' => 2,
             'data' => [
                 'image_id' => 39,
                 'src' => '/storage/uploads/image.jpg',
@@ -54,14 +68,26 @@ class ArticlePageControllerBlockHydrationTest extends TestCase
             ],
         ]);
 
-        $page = new Page(['id' => 5]);
-        $page->blocks = Collection::make([$text, $image]);
+        $page = new Page([
+            'id' => 5,
+            'title' => 'Existing article title',
+        ]);
+        $page->blocks = Collection::make([$heading, $text, $image]);
 
         $method = new ReflectionMethod($controller, 'hydrateBlocksForEditor');
         $method->setAccessible(true);
         $method->invoke($controller, $page);
 
-        $this->assertSame('<p>Existing article content</p>', $text->content);
+        $this->assertSame('__default_heading__', $heading->id);
+        $this->assertSame('Existing article title', $heading->text);
+
+        $this->assertSame('__default_text__', $text->id);
+        $this->assertSame(
+            '<p>Existing article content</p><p>Second paragraph</p>',
+            $text->content,
+        );
+
+        $this->assertSame('__default_image__', $image->id);
         $this->assertSame(39, $image->cms_image_id);
         $this->assertSame('/storage/uploads/image.jpg', $image->image_url);
         $this->assertSame('/storage/uploads/image.jpg', $image->thumbnail_url);
