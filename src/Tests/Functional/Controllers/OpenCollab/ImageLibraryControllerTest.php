@@ -115,9 +115,9 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals($image->id, $data['image']['id']);
-        $this->assertEquals('Show me', $data['image']['name']);
-        $this->assertEquals('A test image', $data['image']['alt_text']);
+        $this->assertEquals($image->id, $data['data']['image']['id']);
+        $this->assertEquals('Show me', $data['data']['image']['name']);
+        $this->assertEquals('A test image', $data['data']['image']['alt_text']);
     }
 
     public function test_contributor_cannot_show_another_contributors_private_image(): void
@@ -185,10 +185,10 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
-        $this->assertEquals('Contributor upload', $data['image']['name']);
+        $this->assertEquals('Contributor upload', $data['data']['image']['name']);
         $this->assertEquals(
             OpenCollabImageRights::StaffOwned->value,
-            $data['image']['image_rights'],
+            $data['data']['image']['image_rights'],
         );
 
         $this->assertDatabaseHas('images', [
@@ -226,6 +226,7 @@ class ImageLibraryControllerTest extends FunctionalTestCase
             'name' => 'Contributor upload',
             'image_rights' => OpenCollabImageRights::StaffOwned->value,
             'alt_text' => 'Uploaded image alt text',
+            'credit' => 'Open Collab contributor',
             'rights_confirmation' => true,
             'ai_generated' => false,
             'contains_music' => false,
