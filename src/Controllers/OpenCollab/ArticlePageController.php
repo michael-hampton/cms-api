@@ -14,15 +14,6 @@ use App\Services\OpenCollab\ArticleAccessService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
 use App\Services\OpenCollab\ReadabilityService;
 
-/**
- * Renders the public and contributor-facing article pages.
- *
- * Payment modal visibility rule:
- *   The modal is shown ONLY when the page is sellable (isSellable() === true).
- *   This requires: visibility = premium, price > 0, premium_approved_at set,
- *   and monetisation_disabled_at = null.
- *   The backend never relies on frontend modal state for eligibility.
- */
 class ArticlePageController extends Controller
 {
     use ResolvesUiComponents;
@@ -33,29 +24,15 @@ class ArticlePageController extends Controller
         private readonly ArticleAccessService           $accessService,
         private readonly ReadabilityService             $readabilityService,
         private readonly OpenCollabAuthorizationService $authorization,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
-    /**
-     * GET /articles/{slug}
-     *
-     * Three rendering states:
-     *   Free article                → full content, no paywall
-     *   Approved premium + no access → preview + payment button
-     *   Premium but NOT approved    → locked-content message, NO payment button
-     *   Approved premium + access   → full content
-     */
     public function show(string $slug)
     {
         $page = $this->pageRepository->findBySlug($slug);
 
-        if (!$page) {
-            return $this->notFound();
-        }
-
-        if ($page->status !== 'published') {
+        if (!$page || $page->status !== 'published') {
             return $this->notFound();
         }
 
@@ -64,7 +41,6 @@ class ArticlePageController extends Controller
         $email = $user?->email;
 
         $accessGranted = $this->accessService->canView($page, $userId, $email);
-
         $authorName = $page->contributor_id
             ? User::find($page->contributor_id)?->name
             : null;
@@ -73,12 +49,10 @@ class ArticlePageController extends Controller
             ? $page->content
             : $this->previewContent($page->content);
 
-        $showPaymentButton = !$accessGranted && $page->isSellable();
-
         return $this->view('open-collab.articles.show', [
             'page' => $page,
             'accessGranted' => $accessGranted,
-            'showPaymentButton' => $showPaymentButton,
+            'showPaymentButton' => !$accessGranted && $page->isSellable(),
             'content' => $content,
             'authorName' => $authorName,
             'readerEmail' => $email ?? '',
@@ -100,9 +74,6 @@ class ArticlePageController extends Controller
         return mb_substr($plain, 0, 300) . '…';
     }
 
-    /**
-     * GET /articles/create
-     */
     public function create()
     {
         if ($response = $this->authorizeSitePagePermissions(['content.create'])) {
@@ -119,9 +90,6 @@ class ArticlePageController extends Controller
         ]);
     }
 
-    /**
-     * GET /articles/{id}/edit
-     */
     public function edit(int $id)
     {
         if ($response = $this->authorizeSitePagePermissions(['content.edit_own'])) {
@@ -131,7 +99,7 @@ class ArticlePageController extends Controller
         $userId = Auth::id();
         $page = $this->pageRepository->getCompletePageData($id);
 
-        if (!$page || (int)$page->contributor_id !== (int)$userId) {
+        if (!$page || (int) $page->contributor_id !== (int) $userId) {
             return $this->redirect('/articles');
         }
 
@@ -149,19 +117,34 @@ class ArticlePageController extends Controller
         ]);
     }
 
-    /**
-     * Persisted CMS blocks keep parser fields inside the JSON `data` column.
-     * The Open Collab editor works with a flat frontend block object, so expose
-     * those fields at the page boundary without changing the shared parser or
-     * the stored block representation.
-     */
     private function hydrateBlocksForEditor(Page $page): void
     {
+        $defaultIds = [
+            'heading' => '__default_heading__',
+            'text' => '__default_text__',
+            'image' => '__default_image__',
+        ];
+        $assignedDefaults = [];
+
         foreach ($page->blocks ?? [] as $block) {
             $data = is_array($block->data) ? $block->data : [];
 
             foreach ($data as $key => $value) {
                 $block->{$key} = $value;
+            }
+
+            if (!isset($assignedDefaults[$block->type]) && isset($defaultIds[$block->type])) {
+                $block->id = $defaultIds[$block->type];
+                $assignedDefaults[$block->type] = true;
+            }
+
+            if ($block->type === 'heading' && empty($block->text)) {
+                $block->text = (string) ($page->title ?? '');
+            }
+
+            if ($block->type === 'text') {
+                $paragraphs = $data['paragraphs'] ?? [];
+                $block->content = $data['content'] ?? $this->paragraphsToEditorHtml($paragraphs);
             }
 
             if ($block->type === 'image') {
@@ -177,9 +160,21 @@ class ArticlePageController extends Controller
         }
     }
 
-    /**
-     * GET /articles
-     */
+    private function paragraphsToEditorHtml(array $paragraphs): string
+    {
+        return implode('', array_map(static function ($paragraph): string {
+            $paragraph = trim((string) $paragraph);
+
+            if ($paragraph === '') {
+                return '';
+            }
+
+            return str_starts_with($paragraph, '<')
+                ? $paragraph
+                : '<p>' . htmlspecialchars($paragraph, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</p>';
+        }, $paragraphs));
+    }
+
     public function index()
     {
         $articles = $this->pageRepository->getContributorPages(
