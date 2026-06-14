@@ -13,6 +13,7 @@ use App\Framework\Events\EventDispatcher;
 use App\Models\ContentRiskMarker;
 use App\Repositories\OpenCollab\RiskMarkerRepository;
 use App\Services\OpenCollab\Moderation\ModerationAuditService;
+use App\Services\OpenCollab\Moderation\ModerationQueueService;
 
 class RiskMarkerService
 {
@@ -21,6 +22,7 @@ class RiskMarkerService
         private readonly ModerationAuditService $auditService,
         private readonly EventDispatcher $eventDispatcher,
         private readonly Database $database,
+        private readonly ModerationQueueService $moderationQueueService,
     ) {
     }
 
@@ -77,6 +79,10 @@ class RiskMarkerService
 
             return $marker;
         });
+
+        if ($queueEntryId !== null) {
+            $this->moderationQueueService->recalculatePriority($queueEntryId);
+        }
 
         $this->eventDispatcher->dispatch(
             new RiskMarkerStatusChangedEvent(
