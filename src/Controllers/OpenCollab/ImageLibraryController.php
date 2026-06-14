@@ -10,6 +10,7 @@ use App\DTO\OpenCollab\ImageUploadData;
 use App\Enums\OpenCollab\OpenCollabImageRights;
 use App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Resource\PaginatedResourceCollection;
 use App\Framework\Support\SiteContext;
@@ -107,7 +108,11 @@ class ImageLibraryController extends Controller
             return $this->errorResponse('Site not found.', 404);
         }
 
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed', 422, $e->getErrors());
+        }
 
         try {
             $imageRights = OpenCollabImageRights::from($data['image_rights']);
@@ -149,7 +154,7 @@ class ImageLibraryController extends Controller
             $image = $this->libraryService->upload(Auth::id(), $site, $uploadData, $evidenceData);
         } catch (ImageLibraryAccessDeniedException) {
             return $this->errorResponse('You do not have permission to upload images.', 403);
-        } catch (\App\Framework\Exceptions\ValidationException $e) {
+        } catch (ValidationException $e) {
             return $this->errorResponse($e->getMessage(), 422, $e->getErrors());
         }
 
