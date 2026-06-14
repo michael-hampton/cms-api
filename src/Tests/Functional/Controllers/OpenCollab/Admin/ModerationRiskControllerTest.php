@@ -25,7 +25,10 @@ class ModerationRiskControllerTest extends FunctionalTestCase
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $response = $this->postForSite("/api/open-collab/admin/moderation/{$entry->id}/risks", [
@@ -36,15 +39,15 @@ class ModerationRiskControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
-        $this->assertEquals('copyright', $data['risk_type']);
-        $this->assertEquals('open', $data['status']);
+        $this->assertEquals(RiskType::Copyright->value, $data['risk_type']);
+        $this->assertEquals(RiskStatus::Open->value, $data['status']);
 
         $this->assertDatabaseHas('oc_content_risk_markers', [
             'site_id' => $this->siteId,
             'page_id' => $page->id,
-            'risk_type' => 'copyright',
-            'severity' => 'high',
-            'status' => 'open',
+            'risk_type' => RiskType::Copyright->value,
+            'severity' => RiskSeverity::High->value,
+            'status' => RiskStatus::Open->value,
         ]);
     }
 
@@ -52,7 +55,10 @@ class ModerationRiskControllerTest extends FunctionalTestCase
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $response = $this->postForSite("/api/open-collab/admin/moderation/{$entry->id}/risks", [
@@ -60,18 +66,26 @@ class ModerationRiskControllerTest extends FunctionalTestCase
             'severity' => RiskSeverity::High->value,
         ]);
 
+        $this->assertEquals(201, $response->getStatusCode());
+
         $entry->refresh();
 
-        $this->assertEquals(60, $entry->risk_score);
-        $this->assertGreaterThanOrEqual(60, $entry->priority_score);
+        $this->assertEquals(RiskSeverity::High->score(), $entry->risk_score);
+        $this->assertGreaterThanOrEqual(RiskSeverity::High->score(), $entry->priority_score);
     }
 
     public function test_unauthorised_user_cannot_add_risk_marker(): void
     {
-        $unauthorised = $this->createUser(['email' => 'no-perms-risk@example.com', 'role' => 'contributor']);
+        $unauthorised = $this->createUser([
+            'email' => 'no-perms-risk@example.com',
+            'role' => 'contributor',
+        ]);
         $this->actingAs($unauthorised);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $response = $this->postForSite("/api/open-collab/admin/moderation/{$entry->id}/risks", [
@@ -86,8 +100,13 @@ class ModerationRiskControllerTest extends FunctionalTestCase
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
-        $marker = $this->createRiskMarker($page, ['severity' => RiskSeverity::High->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+        $marker = $this->createRiskMarker($page, [
+            'severity' => RiskSeverity::High->value,
+        ]);
 
         $response = $this->postForSite("/api/open-collab/admin/risks/{$marker->id}/resolve", [
             'notes' => 'Confirmed cleared after legal review.',
@@ -96,34 +115,53 @@ class ModerationRiskControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('cleared', $data['status']);
+        $this->assertEquals(RiskStatus::Cleared->value, $data['status']);
         $this->assertEquals('Confirmed cleared after legal review.', $data['resolution_notes']);
+
+        $this->assertDatabaseHas('oc_content_risk_markers', [
+            'id' => $marker->id,
+            'status' => RiskStatus::Cleared->value,
+            'resolution_notes' => 'Confirmed cleared after legal review.',
+            'resolved_by_user_id' => $this->moderator->id,
+        ]);
     }
 
     public function test_resolving_high_risk_marker_without_notes_fails(): void
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
-        $marker = $this->createRiskMarker($page, ['severity' => RiskSeverity::High->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+        $marker = $this->createRiskMarker($page, [
+            'severity' => RiskSeverity::High->value,
+        ]);
 
         $response = $this->postForSite("/api/open-collab/admin/risks/{$marker->id}/resolve", []);
 
         $this->assertEquals(422, $response->getStatusCode());
-
         $this->assertDatabaseHas('oc_content_risk_markers', [
             'id' => $marker->id,
-            'status' => 'open',
+            'status' => RiskStatus::Open->value,
         ]);
     }
 
     public function test_unauthorised_user_cannot_resolve_risk_marker(): void
     {
-        $unauthorised = $this->createUser(['email' => 'no-perms-resolve@example.com', 'role' => 'contributor']);
+        $unauthorised = $this->createUser([
+            'email' => 'no-perms-resolve@example.com',
+            'role' => 'contributor',
+        ]);
         $this->actingAs($unauthorised);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
-        $marker = $this->createRiskMarker($page, ['severity' => RiskSeverity::Low->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+        $marker = $this->createRiskMarker($page, [
+            'severity' => RiskSeverity::Low->value,
+        ]);
 
         $response = $this->postForSite("/api/open-collab/admin/risks/{$marker->id}/resolve", []);
 
@@ -134,8 +172,13 @@ class ModerationRiskControllerTest extends FunctionalTestCase
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
-        $marker = $this->createRiskMarker($page, ['severity' => RiskSeverity::Low->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
+        $marker = $this->createRiskMarker($page, [
+            'severity' => RiskSeverity::Low->value,
+        ]);
 
         $response = $this->postForSite("/api/open-collab/admin/risks/{$marker->id}/dismiss", [
             'notes' => 'False positive.',
@@ -144,7 +187,13 @@ class ModerationRiskControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals('dismissed', $data['status']);
+        $this->assertEquals(RiskStatus::Dismissed->value, $data['status']);
+
+        $this->assertDatabaseHas('oc_content_risk_markers', [
+            'id' => $marker->id,
+            'status' => RiskStatus::Dismissed->value,
+            'resolution_notes' => 'False positive.',
+        ]);
     }
 
     private function createQueueEntry($page, array $attributes = []): ModerationQueueEntry
@@ -176,9 +225,13 @@ class ModerationRiskControllerTest extends FunctionalTestCase
         parent::setUp();
 
         $this->ensureSiteExists();
-
-        $this->moderator = $this->createUser(['email' => 'risk-moderator@example.com', 'role' => 'moderator']);
+        $this->ensurePermission('Review', 'pages.review', 'test');
         $this->ensurePermission('Resolve Risk', 'pages.resolve_risk', 'test');
+
+        $this->moderator = $this->createUser([
+            'email' => 'risk-moderator@example.com',
+            'role' => 'moderator',
+        ]);
         $this->grantSitePermission($this->moderator, 'pages.review');
         $this->grantSitePermission($this->moderator, 'pages.resolve_risk');
 
