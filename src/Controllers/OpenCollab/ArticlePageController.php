@@ -117,6 +117,7 @@ class ArticlePageController extends Controller
             'siteId' => SiteContext::getId(),
             'readabilityScore' => null,
             'currentUser' => Auth::user(),
+            'extraHead' => $this->approvalEditorScript(null, null),
         ]);
     }
 
@@ -144,7 +145,112 @@ class ArticlePageController extends Controller
             'siteId' => SiteContext::getId(),
             'readabilityScore' => $score?->readability_score,
             'currentUser' => Auth::user(),
+            'extraHead' => $this->approvalEditorScript((int)$page->id, (string)$page->status),
         ]);
+    }
+
+    private function approvalEditorScript(?int $pageId, ?string $status): string
+    {
+        $pageIdJson = json_encode($pageId, JSON_THROW_ON_ERROR);
+        $statusJson = json_encode($status, JSON_THROW_ON_ERROR);
+
+        return <<<HTML
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const approvalButton = document.getElementById('publish-btn');
+    if (!approvalButton) return;
+
+    const pageId = {$pageIdJson};
+    const pageStatus = {$statusJson};
+    const approvalIcon = approvalButton.querySelector('svg')?.outerHTML ?? '';
+
+    const setButton = (label, disabled = false) => {
+        approvalButton.innerHTML = `${approvalIcon} ${label}`;
+        approvalButton.disabled = disabled;
+    };
+
+    if (pageStatus === 'waiting_approval') {
+        approvalButton.removeAttribute('onclick');
+        setButton('Approval requested', true);
+        return;
+    }
+
+    approvalButton.removeAttribute('onclick');
+    setButton('Request approval');
+
+    const showApprovalError = (message) => {
+        const errorBox = document.getElementById('editor-errors');
+        if (errorBox) {
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+        }
+        if (typeof showToast === 'function') {
+            showToast(message, false);
+        }
+    };
+
+    const submitForApproval = async (id) => {
+        const endpoint = `/api/${SITE}/open-collab/pages/${id}/submit`;
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${TOKEN()}`,
+            },
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            const errors = data.errors ? Object.values(data.errors).flat().join(' ') : null;
+            throw new Error(errors || data.message || data.error || 'Could not request approval.');
+        }
+
+        sessionStorage.removeItem('oc_request_approval_after_save');
+        if (typeof showToast === 'function') {
+            showToast('✓ Approval requested');
+        }
+        setButton('Approval requested', true);
+    };
+
+    approvalButton.addEventListener('click', async () => {
+        setButton('Requesting approval…', true);
+
+        try {
+            if (!pageId) {
+                sessionStorage.setItem('oc_request_approval_after_save', '1');
+                const saved = await persistArticle('draft', {silent: true});
+                if (!saved) {
+                    sessionStorage.removeItem('oc_request_approval_after_save');
+                    setButton('Request approval');
+                }
+                return;
+            }
+
+            const saved = await persistArticle('draft', {silent: true});
+            if (!saved) {
+                setButton('Request approval');
+                return;
+            }
+
+            await submitForApproval(pageId);
+        } catch (error) {
+            sessionStorage.removeItem('oc_request_approval_after_save');
+            setButton('Request approval');
+            showApprovalError(error instanceof Error ? error.message : 'Could not request approval.');
+        }
+    });
+
+    if (pageId && sessionStorage.getItem('oc_request_approval_after_save') === '1') {
+        setButton('Requesting approval…', true);
+        submitForApproval(pageId).catch((error) => {
+            sessionStorage.removeItem('oc_request_approval_after_save');
+            setButton('Request approval');
+            showApprovalError(error instanceof Error ? error.message : 'Could not request approval.');
+        });
+    }
+});
+</script>
+HTML;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
