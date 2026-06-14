@@ -91,6 +91,65 @@ $breadcrumbs = [['label' => 'Escalations']];
     </div>
 </div>
 
+<div id="esc-resolve-modal"
+     class="oc-modal-backdrop"
+     style="display:none;"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="esc-resolve-modal-title">
+    <div class="oc-modal" role="document" style="max-width:520px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;">
+            <div>
+                <h3 id="esc-resolve-modal-title"
+                    style="font-family:var(--font-display);font-size:1.2rem;color:var(--navy);margin:0 0 4px;">
+                    Resolve escalation
+                </h3>
+                <p style="margin:0;color:var(--slate);font-size:.83rem;line-height:1.5;">
+                    Record the outcome and any supporting context. This will close the escalation for approval checks.
+                </p>
+            </div>
+            <button type="button"
+                    class="oc-btn oc-btn--ghost oc-btn--sm"
+                    id="esc-resolve-close-btn"
+                    aria-label="Close resolve escalation modal">✕</button>
+        </div>
+
+        <div class="oc-form-group">
+            <label class="oc-label" for="esc-resolution">Resolution</label>
+            <select class="oc-select" id="esc-resolution">
+                <option value="">Select resolution…</option>
+                <option value="cleared">Cleared — no issue found</option>
+                <option value="confirmed_violation">Confirmed violation</option>
+                <option value="remediated">Issue remediated</option>
+                <option value="accepted_risk">Risk accepted</option>
+                <option value="duplicate">Duplicate escalation</option>
+                <option value="not_applicable">Not applicable</option>
+            </select>
+        </div>
+
+        <div class="oc-form-group">
+            <label class="oc-label oc-label--optional" for="esc-resolution-notes">Resolution notes</label>
+            <textarea class="oc-textarea"
+                      id="esc-resolution-notes"
+                      rows="4"
+                      maxlength="2000"
+                      placeholder="Add any legal, editorial, or moderation context…"></textarea>
+            <div class="oc-help">These notes are internal and will be stored with the escalation.</div>
+        </div>
+
+        <div id="esc-resolve-errors"
+             class="oc-form-errors"
+             style="display:none;margin-bottom:14px;"></div>
+
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" class="oc-btn oc-btn--ghost" id="esc-resolve-cancel-btn">Cancel</button>
+            <button type="button" class="oc-btn oc-btn--primary" id="esc-resolve-submit-btn">
+                Resolve escalation
+            </button>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
@@ -101,12 +160,18 @@ $breadcrumbs = [['label' => 'Escalations']];
         #site;
         #token;
         #filters = {};
+        #resolveId = null;
+        #resolveButton = null;
 
         constructor(site, token) {
             this.#site = site;
             this.#token = token;
 
-            document.getElementById('esc-apply-filters').addEventListener('click', () => { this.#readFilters(); this.load(); });
+            document.getElementById('esc-apply-filters').addEventListener('click', () => {
+                this.#readFilters();
+                this.load();
+            });
+
             document.getElementById('esc-reset-filters').addEventListener('click', () => {
                 document.getElementById('esc-filter-status').value = '';
                 document.getElementById('esc-filter-category').value = '';
@@ -114,7 +179,22 @@ $breadcrumbs = [['label' => 'Escalations']];
                 this.#filters = {};
                 this.load();
             });
+
             document.getElementById('esc-retry-btn').addEventListener('click', () => this.load());
+            document.getElementById('esc-resolve-close-btn').addEventListener('click', () => this.#closeResolveModal());
+            document.getElementById('esc-resolve-cancel-btn').addEventListener('click', () => this.#closeResolveModal());
+            document.getElementById('esc-resolve-submit-btn').addEventListener('click', () => this.#submitResolve());
+            document.getElementById('esc-resolve-modal').addEventListener('click', event => {
+                if (event.target === event.currentTarget) {
+                    this.#closeResolveModal();
+                }
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') {
+                    this.#closeResolveModal();
+                }
+            });
 
             this.load();
         }
@@ -125,7 +205,7 @@ $breadcrumbs = [['label' => 'Escalations']];
             const category = document.getElementById('esc-filter-category').value;
             const severity = document.getElementById('esc-filter-severity').value;
             if (status) filters.status = status;
-            if (category) filters.category = category; // ASSUMED: forSite() supports category/severity filters — extend repository similarly to `status`
+            if (category) filters.category = category;
             if (severity) filters.severity = severity;
             this.#filters = filters;
         }
@@ -142,7 +222,7 @@ $breadcrumbs = [['label' => 'Escalations']];
             try {
                 const params = new URLSearchParams(this.#filters);
                 const res = await fetch(`/api/${this.#site}/open-collab/admin/escalations?${params.toString()}`, {
-                    headers: { Authorization: `Bearer ${this.#token()}`, Accept: 'application/json' },
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
                 });
 
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -156,7 +236,7 @@ $breadcrumbs = [['label' => 'Escalations']];
                     return;
                 }
 
-                body.innerHTML = items.map(e => this.#renderRow(e)).join('');
+                body.innerHTML = items.map(escalation => this.#renderRow(escalation)).join('');
                 this.#bindRowActions();
             } catch {
                 body.innerHTML = '';
@@ -164,87 +244,170 @@ $breadcrumbs = [['label' => 'Escalations']];
             }
         }
 
-        #renderRow(e) {
-            const actions = e.available_actions ?? []; // ASSUMED: EscalationResource gains the same permission-aware actions array
+        #renderRow(escalation) {
+            const actions = escalation.available_actions ?? [];
 
             return `
-                <tr data-id="${e.id}">
+                <tr data-id="${escalation.id}">
                     <td data-label="Article">
-                        <a href="/${this.#site}/open-collab/admin/moderation/${e.queue_entry_id}" style="color:var(--navy);font-weight:600;text-decoration:none;">
-                            ${this.#escape(e.page_title ?? `Page #${e.page_id}`)}
+                        <a href="/${this.#site}/open-collab/admin/moderation/${escalation.queue_entry_id}" style="color:var(--navy);font-weight:600;text-decoration:none;">
+                            ${this.#escape(escalation.page_title ?? `Page #${escalation.page_id}`)}
                         </a>
                     </td>
-                    <td data-label="Category">${this.#capitalise(e.category)}</td>
-                    <td data-label="Severity"><span class="oc-badge oc-badge--risk-${e.severity}">${this.#capitalise(e.severity)}</span></td>
-                    <td data-label="Assigned Team">${this.#escape(e.assigned_team)}</td>
-                    <td data-label="Assigned User">${e.assigned_user_display_name ?? (e.assigned_user_id ? `User #${e.assigned_user_id}` : '—')}</td>
-                    <td data-label="Due Date">${e.due_at ? this.#formatDate(e.due_at) : '—'}</td>
-                    <td data-label="Status"><span class="oc-badge oc-badge--status-${e.status}">${this.#capitalise(e.status)}</span></td>
+                    <td data-label="Category">${this.#capitalise(escalation.category)}</td>
+                    <td data-label="Severity"><span class="oc-badge oc-badge--risk-${escalation.severity}">${this.#capitalise(escalation.severity)}</span></td>
+                    <td data-label="Assigned Team">${this.#escape(escalation.assigned_team)}</td>
+                    <td data-label="Assigned User">${escalation.assigned_user_display_name ?? (escalation.assigned_user_id ? `User #${escalation.assigned_user_id}` : '—')}</td>
+                    <td data-label="Due Date">${escalation.due_at ? this.#formatDate(escalation.due_at) : '—'}</td>
+                    <td data-label="Status"><span class="oc-badge oc-badge--status-${escalation.status}">${this.#capitalise(escalation.status)}</span></td>
                     <td data-label="Actions" style="text-align:right;white-space:nowrap;">
-                        ${actions.includes('acknowledge') ? `<button class="oc-btn oc-btn--ghost oc-btn--sm" data-ack="${e.id}">Acknowledge</button>` : ''}
-                        ${actions.includes('resolve') ? `<button class="oc-btn oc-btn--primary oc-btn--sm" data-resolve="${e.id}">Resolve</button>` : ''}
+                        ${actions.includes('acknowledge') ? `<button class="oc-btn oc-btn--ghost oc-btn--sm" data-ack="${escalation.id}">Acknowledge</button>` : ''}
+                        ${actions.includes('resolve') ? `<button class="oc-btn oc-btn--primary oc-btn--sm" data-resolve="${escalation.id}">Resolve</button>` : ''}
                     </td>
                 </tr>
             `;
         }
 
         #bindRowActions() {
-            document.querySelectorAll('[data-ack]').forEach(btn =>
-                btn.addEventListener('click', () => this.#acknowledge(btn.dataset.ack, btn))
+            document.querySelectorAll('[data-ack]').forEach(button =>
+                button.addEventListener('click', () => this.#acknowledge(button.dataset.ack, button))
             );
-            document.querySelectorAll('[data-resolve]').forEach(btn =>
-                btn.addEventListener('click', () => this.#promptResolve(btn.dataset.resolve, btn))
+
+            document.querySelectorAll('[data-resolve]').forEach(button =>
+                button.addEventListener('click', () => this.#openResolveModal(button.dataset.resolve, button))
             );
         }
 
-        async #acknowledge(id, btn) {
-            btn.disabled = true;
+        async #acknowledge(id, button) {
+            button.disabled = true;
+
             try {
                 const res = await fetch(`/api/${this.#site}/open-collab/admin/escalations/${id}/acknowledge`, {
                     method: 'POST',
-                    headers: { Authorization: `Bearer ${this.#token()}`, Accept: 'application/json' },
+                    headers: {Authorization: `Bearer ${this.#token()}`, Accept: 'application/json'},
                 });
+
                 if (!res.ok) throw new Error('failed');
+
                 this.#showToast('Acknowledged');
                 this.load();
             } catch {
                 this.#showToast('Could not acknowledge', false);
-                btn.disabled = false;
+                button.disabled = false;
             }
         }
 
-        async #promptResolve(id, btn) {
-            const resolution = prompt('Resolution (e.g. "cleared", "confirmed_violation")');
-            if (!resolution) return;
-            const notes = prompt('Resolution notes (optional)') || undefined;
+        #openResolveModal(id, button) {
+            this.#resolveId = id;
+            this.#resolveButton = button;
 
-            btn.disabled = true;
+            document.getElementById('esc-resolution').value = '';
+            document.getElementById('esc-resolution-notes').value = '';
+            document.getElementById('esc-resolve-errors').style.display = 'none';
+            document.getElementById('esc-resolve-errors').textContent = '';
+            document.getElementById('esc-resolve-modal').style.display = 'grid';
+            document.getElementById('esc-resolution').focus();
+        }
+
+        #closeResolveModal() {
+            const modal = document.getElementById('esc-resolve-modal');
+            if (modal.style.display === 'none') return;
+
+            modal.style.display = 'none';
+            this.#resolveId = null;
+            this.#resolveButton = null;
+        }
+
+        async #submitResolve() {
+            const resolution = document.getElementById('esc-resolution').value;
+            const notes = document.getElementById('esc-resolution-notes').value.trim();
+            const errors = document.getElementById('esc-resolve-errors');
+            const submitButton = document.getElementById('esc-resolve-submit-btn');
+
+            errors.style.display = 'none';
+            errors.textContent = '';
+
+            if (!resolution) {
+                errors.textContent = 'Please select a resolution.';
+                errors.style.display = 'block';
+                document.getElementById('esc-resolution').focus();
+                return;
+            }
+
+            if (!this.#resolveId) {
+                errors.textContent = 'No escalation was selected.';
+                errors.style.display = 'block';
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<div class="oc-spinner"></div> Resolving…';
+            if (this.#resolveButton) this.#resolveButton.disabled = true;
+
             try {
-                const res = await fetch(`/api/${this.#site}/open-collab/admin/escalations/${id}/resolve`, {
+                const res = await fetch(`/api/${this.#site}/open-collab/admin/escalations/${this.#resolveId}/resolve`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Bearer ${this.#token()}`,
                         Accept: 'application/json',
                     },
-                    body: JSON.stringify({ resolution, notes }),
+                    body: JSON.stringify({
+                        resolution,
+                        notes: notes || undefined,
+                    }),
                 });
-                if (!res.ok) throw new Error('failed');
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    const message = data.error
+                        || data.message
+                        || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Could not resolve escalation.');
+                    throw new Error(message);
+                }
+
+                this.#closeResolveModal();
                 this.#showToast('Escalation resolved');
                 this.load();
-            } catch {
-                this.#showToast('Could not resolve escalation', false);
-                btn.disabled = false;
+            } catch (error) {
+                errors.textContent = error.message || 'Could not resolve escalation.';
+                errors.style.display = 'block';
+                if (this.#resolveButton) this.#resolveButton.disabled = false;
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Resolve escalation';
             }
         }
 
-        #capitalise(s) { return (s ?? '').replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase()); }
-        #formatDate(iso) { return new Date(iso).toLocaleString(undefined, { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
-        #escape(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
-        #showToast(msg, ok = true) {
-            const el = document.getElementById('status-toast');
-            el.textContent = msg; el.style.background = ok ? 'var(--navy)' : 'var(--red)';
-            el.style.opacity = '1'; setTimeout(() => { el.style.opacity = '0'; }, 3000);
+        #capitalise(value) {
+            return (value ?? '').replace(/_/g, ' ').replace(/^\w/, character => character.toUpperCase());
+        }
+
+        #formatDate(iso) {
+            return new Date(iso).toLocaleString(undefined, {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        }
+
+        #escape(value) {
+            const element = document.createElement('div');
+            element.textContent = value ?? '';
+            return element.innerHTML;
+        }
+
+        #showToast(message, ok = true) {
+            const element = document.getElementById('status-toast');
+            element.textContent = message;
+            element.style.background = ok ? 'var(--navy)' : 'var(--red)';
+            element.style.opacity = '1';
+            setTimeout(() => {
+                element.style.opacity = '0';
+            }, 3000);
         }
     }
 
