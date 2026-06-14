@@ -7,6 +7,7 @@ use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
 use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
+use App\Models\Page;
 use App\Models\User;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\OpenCollab\ArticleAccessService;
@@ -128,11 +129,13 @@ class ArticlePageController extends Controller
         }
 
         $userId = Auth::id();
-        $page = $this->pageRepository->find($id);
+        $page = $this->pageRepository->getCompletePageData($id);
 
         if (!$page || (int)$page->contributor_id !== (int)$userId) {
             return $this->redirect('/articles');
         }
+
+        $this->hydrateBlocksForEditor($page);
 
         $score = $this->readabilityService->getScore($id);
 
@@ -144,6 +147,34 @@ class ArticlePageController extends Controller
             'currentUser' => Auth::user(),
             'extraHead' => '<script src="/js/open-collab/article-approval-editor.js" defer></script>',
         ]);
+    }
+
+    /**
+     * Persisted CMS blocks keep parser fields inside the JSON `data` column.
+     * The Open Collab editor works with a flat frontend block object, so expose
+     * those fields at the page boundary without changing the shared parser or
+     * the stored block representation.
+     */
+    private function hydrateBlocksForEditor(Page $page): void
+    {
+        foreach ($page->blocks ?? [] as $block) {
+            $data = is_array($block->data) ? $block->data : [];
+
+            foreach ($data as $key => $value) {
+                $block->{$key} = $value;
+            }
+
+            if ($block->type === 'image') {
+                $block->cms_image_id = $data['image_id']
+                    ?? $data['cms_image_id']
+                    ?? null;
+                $block->image_url = $data['src']
+                    ?? $data['image_url']
+                    ?? '';
+                $block->thumbnail_url = $data['thumbnail_url']
+                    ?? $block->image_url;
+            }
+        }
     }
 
     /**
