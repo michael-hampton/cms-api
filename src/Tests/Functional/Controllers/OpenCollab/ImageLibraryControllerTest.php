@@ -115,9 +115,9 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertEquals($image->id, $data['data']['image']['id']);
-        $this->assertEquals('Show me', $data['data']['image']['name']);
-        $this->assertEquals('A test image', $data['data']['image']['alt_text']);
+        $this->assertEquals($image->id, $data['image']['id']);
+        $this->assertEquals('Show me', $data['image']['name']);
+        $this->assertEquals('A test image', $data['image']['alt_text']);
     }
 
     public function test_contributor_cannot_show_another_contributors_private_image(): void
@@ -147,19 +147,25 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $this->actingAs($this->contributor);
         $this->grantSitePermission($this->contributor, 'images.upload');
 
-        $response = $this->postForSite('/api/open-collab/images', []);
+        $response = $this->postForSite(
+            '/api/open-collab/images',
+            [],
+            [],
+            ['Accept' => 'application/json'],
+        );
 
         $this->assertEquals(422, $response->getStatusCode());
     }
 
     public function test_user_without_upload_permission_cannot_upload_image(): void
     {
-        $this->actingAs($this->contributor);
+        $this->actingAs($this->unauthorised);
 
         $response = $this->postForSite(
             '/api/open-collab/images',
             $this->validUploadPayload(),
-            ['file' => $this->createUploadedFile('library-test.jpg', 'image/jpeg')],
+            ['file' => $this->createUploadedFile('library-test.png', 'image/png')],
+            ['Accept' => 'application/json'],
         );
 
         $this->assertEquals(403, $response->getStatusCode());
@@ -173,7 +179,8 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $response = $this->postForSite(
             '/api/open-collab/images',
             $this->validUploadPayload(),
-            ['file' => $this->createUploadedFile('library-success.jpg', 'image/jpeg')],
+            ['file' => $this->createUploadedFile('library-success.png', 'image/png')],
+            ['Accept' => 'application/json'],
         );
         $data = json_decode($response->getContent(), true);
 
@@ -195,6 +202,7 @@ class ImageLibraryControllerTest extends FunctionalTestCase
     {
         return Image::create(array_merge([
             'site_id' => $this->siteId,
+            'created_by' => $this->authenticatedUser?->id,
             'name' => 'Library image',
             'filename' => uniqid('image-', true) . '.jpg',
             'original_name' => 'image.jpg',
@@ -254,8 +262,14 @@ class ImageLibraryControllerTest extends FunctionalTestCase
 
         $this->unauthorised = $this->createUser([
             'email' => 'image-library-no-permission@example.com',
-            'role' => 'contributor',
-            'is_contributor' => true,
+            'role' => 'viewer',
+            'is_contributor' => false,
         ]);
+        $this->grantSitePermission($this->unauthorised, 'images.browse_own', false);
+        $this->grantSitePermission($this->unauthorised, 'images.use_shared', false);
+        $this->grantSitePermission($this->unauthorised, 'images.upload', false);
+        $this->grantSitePermission($this->unauthorised, 'content.create', false);
+        $this->grantSitePermission($this->unauthorised, 'content.edit_own', false);
+        $this->grantSitePermission($this->unauthorised, 'pages.edit', false);
     }
 }
