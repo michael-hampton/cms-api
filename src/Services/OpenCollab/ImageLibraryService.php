@@ -5,7 +5,6 @@ namespace App\Services\OpenCollab;
 use App\DTO\OpenCollab\ImageEvidenceData;
 use App\DTO\OpenCollab\ImageSearchQuery;
 use App\DTO\OpenCollab\ImageUploadData;
-use App\Enums\OpenCollab\OpenCollabImageRights;
 use App\Models\Image;
 use App\Models\Site;
 use App\Search\PaginatedResult;
@@ -13,37 +12,23 @@ use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
 use App\Services\OpenCollab\Risk\CreatorDeclarationRiskService;
 use App\Services\OpenCollab\Risk\ImageMetadataRiskService;
 
-/**
- * Orchestrates contributor image library operations.
- *
- * Responsibilities:
- *  - Enforce contributor image policy before any CMS call
- *  - Delegate search and upload to CmsImageClientInterface
- *  - Record upload evidence after successful CMS upload
- *  - Never expose raw Image objects without a policy check
- */
 class ImageLibraryService
 {
     public function __construct(
-        private readonly CmsImageClientInterface                $cmsImageClient,
-        private readonly ContributorImagePolicyInterface        $imagePolicy,
+        private readonly CmsImageClientInterface                  $cmsImageClient,
+        private readonly ContributorImagePolicyInterface          $imagePolicy,
         private readonly ImageSubmissionEvidenceServiceInterface $evidenceService,
-        private readonly CreatorDeclarationRiskService      $creatorDeclarationRiskService,
-        private readonly ImageMetadataRiskService $imageMetadataRiskService,
+        private readonly CreatorDeclarationRiskService            $creatorDeclarationRiskService,
+        private readonly ImageMetadataRiskService                 $imageMetadataRiskService,
     ) {
     }
 
-    /**
-     * @throws \App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException
-     */
     public function search(int $userId, Site $site, ImageSearchQuery $query): PaginatedResult
     {
         if (!$this->imagePolicy->canBrowse($userId, $site)) {
             throw new \App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException();
         }
 
-        // Always scope search to images uploaded by this contributor
-        // unless they have broader access (checked inside the client via policy)
         $scopedQuery = new ImageSearchQuery(
             page:         $query->page,
             perPage:      $query->perPage,
@@ -59,9 +44,6 @@ class ImageLibraryService
         return $this->cmsImageClient->search((int) $site->id, $scopedQuery);
     }
 
-    /**
-     * @throws \App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException
-     */
     public function findForContributor(int $userId, Site $site, int $imageId): ?Image
     {
         if (!$this->imagePolicy->canBrowse($userId, $site)) {
@@ -70,27 +52,13 @@ class ImageLibraryService
 
         $image = $this->cmsImageClient->find((int) $site->id, $imageId);
 
-        if ($image === null) {
+        if ($image === null || !$this->imagePolicy->canUse($userId, $site, $image)) {
             return null;
-        }
-
-        if (!$this->imagePolicy->canUse($userId, $site, $image)) {
-            return null; // Return null not 403 — caller decides presentation
         }
 
         return $image;
     }
 
-    /**
-     * Upload a new image, record evidence, and return the created Image.
-     *
-     * Evidence is recorded only after a successful CMS upload.
-     * If evidence recording fails the upload still succeeds — the failure is
-     * logged but not propagated (the image exists in CMS).
-     *
-     * @throws \App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException
-     * @throws \App\Framework\Exceptions\ValidationException  on invalid file/metadata
-     */
     public function upload(
         int               $userId,
         Site              $site,
@@ -102,6 +70,18 @@ class ImageLibraryService
         }
 
         $image = $this->cmsImageClient->upload((int) $site->id, $uploadData);
+
+        // The shared CMS upload path does not know the authenticated contributor.
+        // Persist the Open Collab ownership and canonical submitted metadata here,
+        // then reload so the API resource is built from the stored values.
+        $image->update([
+            'created_by' => $userId,
+            'name' => $uploadData->name,
+            'alt_text' => $uploadData->altText,
+            'credit' => $uploadData->credit,
+            'image_rights' => $uploadData->imageRights->value,
+        ]);
+        $image = $image->fresh();
 
         $evidenceData = new ImageEvidenceData(
             siteId: $evidenceData->siteId,
@@ -154,13 +134,6 @@ class ImageLibraryService
         return $image;
     }
 
-    /**
-     * Batch-resolve images for article editor loading (Ticket 10).
-     * Missing or inaccessible IDs silently produce null entries.
-     *
-     * @param  int[] $imageIds
-     * @return array<int, Image|null>
-     */
     public function resolveForEditor(int $userId, Site $site, array $imageIds): array
     {
         if (empty($imageIds)) {
