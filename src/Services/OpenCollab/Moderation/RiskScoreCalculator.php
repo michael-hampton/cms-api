@@ -2,6 +2,7 @@
 
 namespace App\Services\OpenCollab\Moderation;
 
+use App\Enums\OpenCollab\RiskSeverity;
 use App\Framework\Support\Collection;
 use App\Models\ContentRiskMarker;
 
@@ -18,7 +19,7 @@ class RiskScoreCalculator
         $score = 0;
 
         foreach ($outstandingMarkers as $marker) {
-            $score += $marker->severity->score();
+            $score += $this->severityFor($marker)->score();
         }
 
         return $score;
@@ -27,11 +28,18 @@ class RiskScoreCalculator
     public function hasBlockingRisk(Collection $outstandingMarkers): bool
     {
         foreach ($outstandingMarkers as $marker) {
-            if ($marker->severity->isBlocking()) {
+            if ($this->severityFor($marker)->isBlocking()) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private function severityFor(ContentRiskMarker $marker): RiskSeverity
+    {
+        return $marker->severity instanceof RiskSeverity
+            ? $marker->severity
+            : RiskSeverity::from((string) $marker->severity);
     }
 }
