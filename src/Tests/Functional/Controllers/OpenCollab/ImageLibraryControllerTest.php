@@ -240,9 +240,13 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         parent::setUp();
 
         $this->ensureSiteExists();
-        $this->ensurePermission('Browse Own Images', 'images.browse_own', 'test');
-        $this->ensurePermission('Use Own Images', 'images.use_own', 'test');
-        $this->ensurePermission('Upload Images', 'images.upload', 'test');
+        $this->ensurePermission('Browse Own Images', 'images.browse_own', 'images');
+        $this->ensurePermission('Use Own Images', 'images.use_own', 'images');
+        $this->ensurePermission('Use Shared Images', 'images.use_shared', 'images');
+        $this->ensurePermission('Upload Images', 'images.upload', 'images');
+        $this->ensurePermission('Create Content', 'content.create', 'content');
+        $this->ensurePermission('Edit Own Content', 'content.edit_own', 'content');
+        $this->ensurePermission('Edit Pages', 'pages.edit', 'pages');
 
         $this->contributor = $this->createUser([
             'email' => 'image-library-contributor@example.com',
