@@ -32,6 +32,7 @@ class ContributorPageService
     public function createPage(array $requestData, int $contributorId, int $siteId): Page
     {
         $requestApproval = $this->requestsApproval($requestData);
+        $requestData = $this->adaptOpenCollabPayload($requestData);
         $requestData = $this->injectContributorDefaults(
             $requestData,
             $contributorId,
@@ -78,6 +79,7 @@ class ContributorPageService
             ? $page->status
             : PageStatus::DRAFT->value;
 
+        $requestData = $this->adaptOpenCollabPayload($requestData);
         $requestData = $this->injectContributorDefaults(
             $requestData,
             $contributorId,
@@ -150,6 +152,56 @@ class ContributorPageService
             );
     }
 
+    /**
+     * Open Collab uses contributor-facing image field names while the shared
+     * CMS block parser deliberately retains its established contract.
+     * Translate only at the Open Collab boundary.
+     */
+    private function adaptOpenCollabPayload(array $requestData): array
+    {
+        if (isset($requestData['blocks']) && is_array($requestData['blocks'])) {
+            $requestData['blocks'] = array_map(
+                fn(array $block): array => $this->adaptOpenCollabBlock($block),
+                $requestData['blocks'],
+            );
+        }
+
+        if (isset($requestData['gallery_slides']) && is_array($requestData['gallery_slides'])) {
+            $requestData['gallery_slides'] = array_map(function (array $slide): array {
+                if (isset($slide['blocks']) && is_array($slide['blocks'])) {
+                    $slide['blocks'] = array_map(
+                        fn(array $block): array => $this->adaptOpenCollabBlock($block),
+                        $slide['blocks'],
+                    );
+                }
+
+                return $slide;
+            }, $requestData['gallery_slides']);
+        }
+
+        return $requestData;
+    }
+
+    private function adaptOpenCollabBlock(array $block): array
+    {
+        if (($block['type'] ?? null) !== 'image') {
+            return $block;
+        }
+
+        if (!array_key_exists('image_id', $block) && array_key_exists('cms_image_id', $block)) {
+            $block['image_id'] = $block['cms_image_id'];
+        }
+
+        if (empty($block['src'])) {
+            $block['src'] = $block['image_url']
+                ?? $block['preview_url']
+                ?? $block['thumbnail_url']
+                ?? '';
+        }
+
+        return $block;
+    }
+
     private function injectContributorDefaults(
         array $requestData,
         int $contributorId,
@@ -187,7 +239,6 @@ class ContributorPageService
             }
 
             $author = $this->authorRepository->findByEmail($user->email);
-
             if (!$author) {
                 $author = $this->authorRepository->create([
                     'name' => $user->name ?? $user->email,
