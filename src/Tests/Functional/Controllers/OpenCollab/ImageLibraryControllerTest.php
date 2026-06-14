@@ -262,7 +262,7 @@ class ImageLibraryControllerTest extends FunctionalTestCase
 
         $this->unauthorised = $this->createUser([
             'email' => 'image-library-no-permission@example.com',
-            'role' => 'viewer',
+            'role' => 'user',
             'is_contributor' => false,
         ]);
         $this->grantSitePermission($this->unauthorised, 'images.browse_own', false);
