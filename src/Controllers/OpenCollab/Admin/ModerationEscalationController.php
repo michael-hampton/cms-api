@@ -42,8 +42,11 @@ class ModerationEscalationController extends Controller
             return $response;
         }
 
-        $status = request()->query('status'); // ASSUMED global request() helper
-        $escalations = $this->escalationRepository->forSite(SiteContext::getId(), array_filter(['status' => $status]));
+        $status = request()->query('status');
+        $escalations = $this->escalationRepository->forSite(
+            SiteContext::getId(),
+            array_filter(['status' => $status]),
+        );
 
         return $this->resourceResponse(
             $escalations->map(fn($e) => (new EscalationResource($e)))->toArray(),
@@ -88,7 +91,7 @@ class ModerationEscalationController extends Controller
             return $this->errorResponse($e->getMessage(), 404);
         }
 
-        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 201);
+        return $this->resourceResponse((new EscalationResource($escalation)->toArray()), 200);
     }
 
     public function acknowledge(int $id): JsonResponse
@@ -116,7 +119,11 @@ class ModerationEscalationController extends Controller
 
         try {
             $escalation = $this->escalationService->resolve(
-                $id, Auth::id(), SiteContext::getId(), $data['resolution'], $data['notes'] ?? null
+                $id,
+                Auth::id(),
+                SiteContext::getId(),
+                $data['resolution'],
+                $data['notes'] ?? null,
             );
         } catch (\InvalidArgumentException $e) {
             return $this->errorResponse($e->getMessage(), 404);
