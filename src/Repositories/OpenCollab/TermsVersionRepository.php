@@ -27,9 +27,21 @@ class TermsVersionRepository extends Repository
             ->first();
     }
 
+    public function latestMaterialPublishedForSite(int $siteId): ?TermsVersion
+    {
+        return TermsVersion::where('site_id', $siteId)
+            ->where('status', TermsVersionStatus::Published->value)
+            ->where('is_material_change', true)
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
     public function findForSite(int $id, int $siteId): ?TermsVersion
     {
-        return TermsVersion::where('id', $id)->where('site_id', $siteId)->first();
+        return TermsVersion::where('id', $id)
+            ->where('site_id', $siteId)
+            ->first();
     }
 
     public function hasAccepted(int $userId, int $siteId, int $termsVersionId): bool
