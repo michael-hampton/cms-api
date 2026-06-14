@@ -52,7 +52,6 @@ class ContributorAccountPageController extends Controller
             'guidelinesAck' => $this->guidelinesRepository->getForUser($userId, $siteId),
             'site' => SiteContext::slug(),
             'currentUser' => User::find($userId),
-            'extraHead' => '<script src="/js/open-collab/contributor-avatar-settings.js" defer></script>',
         ]);
     }
 }
