@@ -185,10 +185,10 @@ class ImageLibraryControllerTest extends FunctionalTestCase
         $data = json_decode($response->getContent(), true);
 
         $this->assertEquals(201, $response->getStatusCode());
-        $this->assertEquals('Contributor upload', $data['data']['image']['name']);
+        $this->assertEquals('Contributor upload', $data['image']['name']);
         $this->assertEquals(
             OpenCollabImageRights::StaffOwned->value,
-            $data['data']['image']['image_rights'],
+            $data['image']['image_rights'],
         );
 
         $this->assertDatabaseHas('images', [
