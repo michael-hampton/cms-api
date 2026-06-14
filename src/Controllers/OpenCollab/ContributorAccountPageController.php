@@ -36,8 +36,6 @@ class ContributorAccountPageController extends Controller
         $contract = $this->contractRepository->latestForSite($siteId);
         $profile = $this->contributorProfileRepository->findByUserId($userId);
 
-        // Ticket 1: build the same ProfileStepViewModel used by onboarding so the
-        // settings view can render dynamic fields through the shared partial.
         $profileFields = $site
             ? $this->profileFieldConfigService->activeFieldsForSite($site)
             : collect([]);
@@ -54,6 +52,7 @@ class ContributorAccountPageController extends Controller
             'guidelinesAck' => $this->guidelinesRepository->getForUser($userId, $siteId),
             'site' => SiteContext::slug(),
             'currentUser' => User::find($userId),
+            'extraHead' => '<script src="/js/open-collab/contributor-avatar-settings.js" defer></script>',
         ]);
     }
 }
