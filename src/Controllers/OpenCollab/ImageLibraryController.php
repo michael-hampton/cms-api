@@ -12,16 +12,11 @@ use App\Exceptions\OpenCollab\ImageLibraryAccessDeniedException;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Resource\PaginatedResourceCollection;
-use App\Framework\Resource\ResourceCollection;
 use App\Framework\Support\SiteContext;
 use App\Repositories\Cms\SiteRepository;
 use App\Requests\OpenCollab\SearchImagesRequest;
 use App\Requests\OpenCollab\UploadImageRequest;
-use App\Resources\BrandResource;
-use App\Resources\NewsletterBrandingConfigurationResource;
-use App\Resources\OpenCollab\ActivityEventResource;
 use App\Resources\OpenCollab\ImageLibraryResource;
-use App\Resources\PageResource;
 use App\Services\OpenCollab\ImageLibraryService;
 use App\Services\OpenCollab\Policies\ContributorImagePolicyInterface;
 
@@ -43,9 +38,6 @@ class ImageLibraryController extends Controller
         parent::__construct();
     }
 
-    /**
-     * GET /api/{site}/open-collab/images
-     */
     public function index(SearchImagesRequest $request): JsonResponse
     {
         $site = $this->siteRepository->find(SiteContext::getId());
@@ -86,9 +78,6 @@ class ImageLibraryController extends Controller
         return $this->resourceResponse($collection->toArray());
     }
 
-    /**
-     * GET /api/{site}/open-collab/images/{imageId}
-     */
     public function show(int $imageId): JsonResponse
     {
         $site = $this->siteRepository->find(SiteContext::getId());
@@ -108,12 +97,9 @@ class ImageLibraryController extends Controller
 
         return $this->jsonResponse([
             'image' => ImageLibraryResource::make($image)->toArray()
-        ], 201);
+        ]);
     }
 
-    /**
-     * POST /api/{site}/open-collab/images
-     */
     public function store(UploadImageRequest $request): JsonResponse
     {
         $site = $this->siteRepository->find(SiteContext::getId());
