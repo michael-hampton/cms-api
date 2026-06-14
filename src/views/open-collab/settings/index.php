@@ -598,15 +598,117 @@ $pageClass = '';
             return this.#pendingUrl;          // null = no change
         }
 
-        remove() {
-            this.#removing = true;
-            this.#pendingUrl = null;
-            const preview = document.getElementById('avatar-preview');
-            preview.innerHTML = `<span style="font-family:var(--font-display);font-size:1.5rem;color:var(--slate);user-select:none;">
-                ${(document.getElementById('display-name')?.value || 'U').trim().charAt(0).toUpperCase()}
-            </span>`;
-            // Mark the profile form dirty so the user knows to save
-            document.getElementById('profile-save-btn').disabled = false;
+        async remove() {
+            const removeButton = document.getElementById('avatar-remove-btn');
+            const errorElement = document.getElementById('avatar-error');
+            const originalButtonText = removeButton?.textContent || 'Remove';
+
+            if (errorElement) {
+                errorElement.textContent = '';
+                errorElement.style.display = 'none';
+            }
+
+            if (removeButton) {
+                removeButton.disabled = true;
+                removeButton.textContent = 'Removing…';
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/${this.#site}/open-collab/contributor/avatar`,
+                    {
+                        method: 'DELETE',
+                        headers: {
+                            Accept: 'application/json',
+                            Authorization: `Bearer ${this.#token}`,
+                        },
+                    },
+                );
+
+                const data = await response.json().catch(() => ({}));
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.message
+                        || data.error
+                        || 'Could not remove profile picture.',
+                    );
+                }
+
+                // The dedicated endpoint has already persisted avatar = null.
+                // Do not send avatar: '' again when the profile form is saved.
+                this.#pendingUrl = null;
+                this.#removing = false;
+
+                const preview = document.getElementById('avatar-preview');
+
+                if (preview) {
+                    const displayName =
+                        document.getElementById('display-name')?.value || 'U';
+
+                    const initial =
+                        displayName.trim().charAt(0).toUpperCase() || 'U';
+
+                    preview.innerHTML = '';
+
+                    const initials = document.createElement('span');
+                    initials.id = 'avatar-initials';
+                    initials.textContent = initial;
+                    initials.style.cssText = `
+                font-family: var(--font-display);
+                font-size: 1.5rem;
+                color: var(--slate);
+                user-select: none;
+            `;
+
+                    preview.appendChild(initials);
+                }
+
+                const fileInput = document.getElementById('avatar-file-input');
+
+                if (fileInput) {
+                    fileInput.value = '';
+                }
+
+                const progressWrap =
+                    document.getElementById('avatar-progress-wrap');
+
+                if (progressWrap) {
+                    progressWrap.style.display = 'none';
+                }
+
+                if (removeButton) {
+                    removeButton.style.display = 'none';
+                }
+
+                const successElement =
+                    document.getElementById('profile-success');
+
+                if (successElement) {
+                    successElement.textContent = '✓ Profile picture removed';
+                    successElement.style.display = 'flex';
+
+                    window.setTimeout(() => {
+                        successElement.style.display = 'none';
+                    }, 3000);
+                }
+            } catch (error) {
+                this.#removing = false;
+
+                if (removeButton) {
+                    removeButton.disabled = false;
+                    removeButton.textContent = originalButtonText;
+                }
+
+                if (errorElement) {
+                    errorElement.textContent =
+                        error instanceof Error
+                            ? error.message
+                            : 'Could not remove profile picture.';
+
+                    errorElement.style.display = 'block';
+                }
+            }
         }
 
         // ── Private ─────────────────────────────────────────────────────────
