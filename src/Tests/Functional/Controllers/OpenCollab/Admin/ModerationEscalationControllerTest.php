@@ -25,7 +25,10 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
     {
         $this->actingAs($this->moderator);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $response = $this->postForSite("/api/open-collab/admin/moderation/{$entry->id}/escalate", [
@@ -35,7 +38,6 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
 
         $data = json_decode($response->getContent(), true);
 
-
         $this->assertEquals(201, $response->getStatusCode());
         $this->assertEquals('copyright', $data['category']);
         $this->assertEquals('legal', $data['assigned_team']);
@@ -43,16 +45,22 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
 
         $this->assertDatabaseHas('oc_moderation_queue_entries', [
             'id' => $entry->id,
-            'status' => 'escalated',
+            'status' => ModerationQueueStatus::Escalated->value,
         ]);
     }
 
     public function test_unauthorised_user_cannot_escalate(): void
     {
-        $unauthorised = $this->createUser(['email' => 'no-perms-escalate@example.com', 'role' => 'contributor']);
+        $unauthorised = $this->createUser([
+            'email' => 'no-perms-escalate@example.com',
+            'role' => 'contributor',
+        ]);
         $this->actingAs($unauthorised);
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $response = $this->postForSite("/api/open-collab/admin/moderation/{$entry->id}/escalate", [
@@ -65,7 +73,10 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
 
     public function test_escalation_blocks_approval_until_resolved(): void
     {
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
 
         $this->actingAs($this->moderator);
@@ -74,18 +85,20 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
             'category' => EscalationCategory::Copyright->value,
             'severity' => RiskSeverity::High->value,
         ]);
+
+        $this->assertEquals(201, $escalateResponse->getStatusCode());
         $escalation = json_decode($escalateResponse->getContent(), true);
 
-        // Approval should now be blocked.
         $approveResponse = $this->postForSite("/api/open-collab/admin/articles/{$page->id}/approve");
         $approveData = json_decode($approveResponse->getContent(), true);
 
         $this->assertEquals(422, $approveResponse->getStatusCode());
         $this->assertNotEmpty($approveData['governance_failures']);
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
 
-        $this->assertDatabaseHas('pages', ['id' => $page->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
-
-        // Resolve as legal.
         $this->actingAs($this->legal);
 
         $resolveResponse = $this->postForSite("/api/open-collab/admin/escalations/{$escalation['id']}/resolve", [
@@ -95,17 +108,22 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
 
         $this->assertEquals(200, $resolveResponse->getStatusCode());
 
-        // Approval should now succeed.
         $this->actingAs($this->moderator);
-        $approveResponse2 = $this->postForSite("/api/open-collab/admin/articles/{$page->id}/approve");
+        $approveResponse = $this->postForSite("/api/open-collab/admin/articles/{$page->id}/approve");
 
-        $this->assertEquals(200, $approveResponse2->getStatusCode());
-        $this->assertDatabaseHas('pages', ['id' => $page->id, 'status' => PageStatus::PUBLISHED->value]);
+        $this->assertEquals(200, $approveResponse->getStatusCode());
+        $this->assertDatabaseHas('pages', [
+            'id' => $page->id,
+            'status' => PageStatus::PUBLISHED->value,
+        ]);
     }
 
-    public function test_escalation_acknowledge_and_assign(): void
+    public function test_escalation_can_be_acknowledged_and_assigned(): void
     {
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
         $escalation = $this->createEscalation($entry);
 
@@ -115,7 +133,7 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
         $ackData = json_decode($ackResponse->getContent(), true);
 
         $this->assertEquals(200, $ackResponse->getStatusCode());
-        $this->assertEquals('acknowledged', $ackData['status']);
+        $this->assertEquals(EscalationStatus::Acknowledged->value, $ackData['status']);
 
         $assignResponse = $this->postForSite("/api/open-collab/admin/escalations/{$escalation->id}/assign", [
             'user_id' => $this->legal->id,
@@ -128,26 +146,32 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
 
     public function test_index_lists_escalations_for_site(): void
     {
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+        ]);
         $entry = $this->createQueueEntry($page);
-        $this->createEscalation($entry);
+        $escalation = $this->createEscalation($entry);
 
         $this->actingAs($this->moderator);
 
         $response = $this->getForSite('/api/open-collab/admin/escalations');
-
         $data = json_decode($response->getContent(), true);
-        $items = $data['data'] ?? $data;
 
         $this->assertEquals(200, $response->getStatusCode());
-        $this->assertNotEmpty($items);
+        $this->assertNotEmpty($data);
+        $this->assertEquals($escalation->id, $data[0]['id']);
     }
 
     public function test_wrong_site_escalation_cannot_be_resolved(): void
     {
-        $otherSiteId = $this->createSite()->id; // ASSUMED helper
+        $otherSiteId = $this->createSite()->id;
 
-        $page = $this->createPage(['contributor_id' => $this->contributor->id, 'status' => PageStatus::WAITING_APPROVAL->value, 'site_id' => $otherSiteId]);
+        $page = $this->createPage([
+            'contributor_id' => $this->contributor->id,
+            'status' => PageStatus::WAITING_APPROVAL->value,
+            'site_id' => $otherSiteId,
+        ]);
         $entry = ModerationQueueEntry::create([
             'site_id' => $otherSiteId,
             'page_id' => $page->id,
@@ -158,7 +182,7 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
         ]);
         $escalation = $this->createEscalation($entry);
 
-        $this->actingAs($this->legal); // legal user belongs to $this->siteId, not $otherSiteId
+        $this->actingAs($this->legal);
 
         $response = $this->postForSite("/api/open-collab/admin/escalations/{$escalation->id}/resolve", [
             'resolution' => 'cleared',
@@ -202,19 +226,26 @@ class ModerationEscalationControllerTest extends FunctionalTestCase
         $this->ensureSiteExists();
 
         $this->ensurePermission('Resolve Risk', 'pages.resolve_risk', 'test');
-        $this->ensurePermission('View', 'pages.view_high_risk', 'test');
-        $this->ensurePermission('Escalate', 'pages.escalate', 'test'); // for acknowledge
+        $this->ensurePermission('View High Risk', 'pages.view_high_risk', 'test');
+        $this->ensurePermission('Escalate', 'pages.escalate', 'test');
+        $this->ensurePermission('Assign Review', 'pages.assign_review', 'test');
 
-        $this->moderator = $this->createUser(['email' => 'esc-moderator@example.com', 'role' => 'moderator']);
+        $this->moderator = $this->createUser([
+            'email' => 'esc-moderator@example.com',
+            'role' => 'moderator',
+        ]);
         $this->grantSitePermission($this->moderator, 'pages.review');
         $this->grantSitePermission($this->moderator, 'pages.approve');
         $this->grantSitePermission($this->moderator, 'pages.escalate');
 
-        $this->legal = $this->createUser(['email' => 'legal@example.com', 'role' => 'moderator']);
-
+        $this->legal = $this->createUser([
+            'email' => 'legal@example.com',
+            'role' => 'moderator',
+        ]);
         $this->grantSitePermission($this->legal, 'pages.resolve_risk');
         $this->grantSitePermission($this->legal, 'pages.view_high_risk');
-        $this->grantSitePermission($this->legal, 'pages.escalate'); // for acknowledge
+        $this->grantSitePermission($this->legal, 'pages.escalate');
+        $this->grantSitePermission($this->legal, 'pages.assign_review');
 
         $this->contributor = $this->createUser([
             'email' => 'esc-contributor@example.com',
