@@ -25,32 +25,29 @@ use App\Services\Cms\Pages\PageService;
 class ContributorPageService
 {
     public function __construct(
-        private readonly PageService        $pageService,
-        private readonly PageRepository     $pageRepository,
-        private readonly EventDispatcher    $eventDispatcher,
+        private readonly PageService $pageService,
+        private readonly PageRepository $pageRepository,
+        private readonly ArticleApprovalService $articleApprovalService,
+        private readonly EventDispatcher $eventDispatcher,
         private readonly ActivityRepository $activityRepository,
         private readonly AuthorRepository $authorRepository,
-        private readonly PageAuthorRepository    $pageAuthorRepository,
+        private readonly PageAuthorRepository $pageAuthorRepository,
         private readonly UserRepositoryInterface $userRepository,
         private readonly UserNotificationRepository $notificationRepository,
         private readonly RbacRepository $rbacRepository,
         private readonly SitePermissionResolver $permissionResolver,
-    )
-    {
+    ) {
     }
 
-    /**
-     * Create a new page owned by this contributor.
-     */
     public function createPage(array $requestData, int $contributorId, int $siteId): Page
     {
-        $requestData = $this->injectContributorDefaults($requestData, $contributorId);
+        $requestApproval = $this->requestsApproval($requestData);
+        $requestData = $this->injectContributorDefaults($requestData, $contributorId, PageStatus::DRAFT->value);
 
         $page = $this->pageService->createPageWithAllData($requestData, $siteId);
 
         $this->attachGuestAuthor($page, $contributorId, $siteId);
 
-        // Record activity — non-critical, swallow failures
         $this->recordActivity(
             siteId: $siteId,
             userId: $contributorId,
@@ -58,46 +55,45 @@ class ContributorPageService
             payload: ['page_id' => $page->id, 'title' => $page->title],
         );
 
-        if ($page->status === PageStatus::WAITING_APPROVAL->value) {
-            $this->notifyReviewers($page, $contributorId, $siteId);
+        if ($requestApproval) {
+            return $this->articleApprovalService->submitForReview((int) $page->id, $contributorId);
         }
 
         return $page;
     }
 
-    private function injectContributorDefaults(array $requestData, int $contributorId): array
-    {
-        $requestedStatus = strtolower((string)($requestData['status'] ?? $requestData['forms']['meta']['status'] ?? 'draft'));
-        $requestApproval = (bool)($requestData['submit_for_approval'] ?? $requestData['request_approval'] ?? false)
-            || in_array($requestedStatus, [PageStatus::PUBLISHED->value, PageStatus::WAITING_APPROVAL->value, 'published', 'waiting approval'], true);
-        $safeStatus = $requestApproval ? PageStatus::WAITING_APPROVAL->value : PageStatus::DRAFT->value;
-
-        $requestData['contributor_id'] = $contributorId;
-        $requestData['is_public_contribution'] = true;
-        $requestData['suppress_workflow_notifications'] = true;
-        $requestData['status'] = $safeStatus;
-        $requestData['forms']['meta']['status'] = $safeStatus;
-        return $requestData;
-    }
-
-    /**
-     * Update a page — contributor must own it.
-     *
-     * @throws UnauthorisedPageAccessException
-     */
     public function updatePage(int $pageId, array $requestData, int $contributorId, int $siteId): Page
     {
         $page = $this->pageRepository->find($pageId);
 
-        if (!$page || (int)$page->contributor_id !== $contributorId) {
+        if (!$page || (int) $page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
         }
 
-        $requestData = $this->injectContributorDefaults($requestData, $contributorId);
+        $requestApproval = $this->requestsApproval($requestData);
+        $isResubmission = $requestApproval && in_array(
+            $page->status,
+            [PageStatus::REJECTED->value, PageStatus::ON_HOLD->value],
+            true,
+        );
+
+        $statusForSave = $isResubmission
+            ? $page->status
+            : PageStatus::DRAFT->value;
+
+        $requestData = $this->injectContributorDefaults(
+            $requestData,
+            $contributorId,
+            $statusForSave,
+        );
         $requestData['id'] = $pageId;
 
-        $wasWaitingApproval = $page->status === PageStatus::WAITING_APPROVAL->value;
-        $updated = $this->pageService->updatePageWithAllData($pageId, $requestData, $siteId, $page);
+        $updated = $this->pageService->updatePageWithAllData(
+            $pageId,
+            $requestData,
+            $siteId,
+            $page,
+        );
 
         $this->recordActivity(
             siteId: $siteId,
@@ -106,11 +102,48 @@ class ContributorPageService
             payload: ['page_id' => $updated->id, 'title' => $updated->title],
         );
 
-        if (!$wasWaitingApproval && $updated->status === PageStatus::WAITING_APPROVAL->value) {
-            $this->notifyReviewers($updated, $contributorId, $siteId);
+        if (!$requestApproval) {
+            return $updated;
         }
 
-        return $updated;
+        return $isResubmission
+            ? $this->articleApprovalService->resubmit($pageId, $contributorId)
+            : $this->articleApprovalService->submitForReview($pageId, $contributorId);
+    }
+
+    private function requestsApproval(array $requestData): bool
+    {
+        $requestedStatus = strtolower((string) (
+            $requestData['status']
+            ?? $requestData['forms']['meta']['status']
+            ?? 'draft'
+        ));
+
+        return (bool) ($requestData['submit_for_approval'] ?? $requestData['request_approval'] ?? false)
+            || in_array(
+                $requestedStatus,
+                [
+                    PageStatus::PUBLISHED->value,
+                    PageStatus::WAITING_APPROVAL->value,
+                    'published',
+                    'waiting approval',
+                ],
+                true,
+            );
+    }
+
+    private function injectContributorDefaults(
+        array $requestData,
+        int $contributorId,
+        string $status,
+    ): array {
+        $requestData['contributor_id'] = $contributorId;
+        $requestData['is_public_contribution'] = true;
+        $requestData['suppress_workflow_notifications'] = true;
+        $requestData['status'] = $status;
+        $requestData['forms']['meta']['status'] = $status;
+
+        return $requestData;
     }
 
     private function notifyReviewers(Page $page, int $contributorId, int $siteId): void
@@ -118,9 +151,9 @@ class ContributorPageService
         $type = 'page_submitted_for_approval';
 
         foreach ($this->rbacRepository->usersForSite($siteId) as $user) {
-            $userId = (int)($user['id'] ?? 0);
+            $userId = (int) ($user['id'] ?? 0);
 
-            if (!$userId || (isset($user['is_active']) && !(bool)$user['is_active'])) {
+            if (!$userId || (isset($user['is_active']) && !(bool) $user['is_active'])) {
                 continue;
             }
 
@@ -132,12 +165,12 @@ class ContributorPageService
             }
 
             $this->notificationRepository->create($userId, $type, [
-                'page_id' => (int)$page->id,
-                'page_title' => (string)$page->title,
+                'page_id' => (int) $page->id,
+                'page_title' => (string) $page->title,
                 'site_id' => $siteId,
                 'content_type' => 'page',
-                'content_id' => (int)$page->id,
-                'content_title' => (string)$page->title,
+                'content_id' => (int) $page->id,
+                'content_title' => (string) $page->title,
                 'notification_type' => $type,
                 'action_user_id' => $contributorId,
                 'url' => "/admin/pages/{$page->id}/edit",
@@ -145,20 +178,15 @@ class ContributorPageService
         }
     }
 
-    /**
-     * Delete a page — contributor must own it.
-     *
-     * @throws UnauthorisedPageAccessException
-     */
     public function deletePage(int $pageId, int $contributorId): void
     {
         $page = $this->pageRepository->find($pageId);
 
-        if (!$page || (int)$page->contributor_id !== $contributorId) {
+        if (!$page || (int) $page->contributor_id !== $contributorId) {
             throw new UnauthorisedPageAccessException();
         }
 
-        $siteId = (int)$page->site_id;
+        $siteId = (int) $page->site_id;
         $title = $page->title;
 
         $this->pageRepository->delete($pageId);
@@ -171,28 +199,18 @@ class ContributorPageService
         );
     }
 
-    /**
-     * Record activity, swallowing any errors since activity recording
-     * is non-critical and must never block the primary operation.
-     */
-    private function recordActivity(int $siteId, int $userId, ActivityEventType $type, array $payload = []): void
-    {
+    private function recordActivity(
+        int $siteId,
+        int $userId,
+        ActivityEventType $type,
+        array $payload = [],
+    ): void {
         try {
             $this->activityRepository->record($siteId, $userId, $type, $payload);
         } catch (\Throwable) {
-            // Non-critical — do not propagate
         }
     }
 
-    /**
-     * Resolves or creates a guest Author for the contributor and links it to
-     * the page via PageAuthorRepository.
-     *
-     * Uses UserRepositoryInterface to look up the contributor — no static calls.
-     * Uses AuthorRepository::findByEmail() to check for an existing author.
-     * Uses AuthorRepository::isSlugTaken() to generate a unique guest slug.
-     * Uses PageAuthorRepository::link() for the pivot write.
-     */
     private function attachGuestAuthor(Page $page, int $contributorId, int $siteId): void
     {
         try {
@@ -220,14 +238,9 @@ class ContributorPageService
 
             $this->pageAuthorRepository->link($page->id, $author->id);
         } catch (\Throwable) {
-            // Non-critical — page creation already succeeded.
         }
     }
 
-    /**
-     * Generates a unique slug prefixed with 'guest-'.
-     * Uniqueness is checked via AuthorRepository::isSlugTaken() — no static calls.
-     */
     private function generateGuestSlug(string $name): string
     {
         $base = 'guest-' . strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', trim($name)));
