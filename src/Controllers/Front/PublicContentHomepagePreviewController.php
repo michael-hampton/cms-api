@@ -38,6 +38,7 @@ final class PublicContentHomepagePreviewController extends Controller
         $siteSlug = SiteContext::slug();
 
         return $this->view('public-content-v2/page', [
+            'preview' => true,
             'site' => $site,
             'siteSlug' => $siteSlug,
             'contentSlug' => (string)$page->slug,
