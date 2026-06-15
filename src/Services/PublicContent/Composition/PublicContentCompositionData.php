@@ -4,6 +4,7 @@ namespace App\Services\PublicContent\Composition;
 
 use App\Models\Member;
 use App\Models\Page;
+use App\Models\Territory;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicActivityFeedRepository;
@@ -37,8 +38,14 @@ final class PublicContentCompositionData
         string $siteSlug,
         ?Member $member,
         array $links,
+        ?Territory $territory = null,
     ): array {
         $badge = $member ? $this->commentBadges->next($member, $siteId) : null;
+        $directoryBase = '/' . rawurlencode($siteSlug);
+
+        if ($territory) {
+            $directoryBase .= '/' . rawurlencode((string)$territory->slug);
+        }
 
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
@@ -60,7 +67,8 @@ final class PublicContentCompositionData
             'viewCount' => $this->views->getTotalViewsForPage((int)$page->id),
             'links' => $links,
             'siteSlug' => $siteSlug,
-            'directoryBase' => '/' . rawurlencode($siteSlug),
+            'territory' => $territory,
+            'directoryBase' => $directoryBase,
         ];
     }
 }
