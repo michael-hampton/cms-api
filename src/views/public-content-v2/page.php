@@ -22,6 +22,10 @@ $description = 'Public content V2 preview';
     <div id="public-content-v2-supplementary" class="public-content-v2-supplementary"></div>
 </main>
 
+@include('consent-banner', ['site' => $site])
+@include('components/newsletter-account-creation-modal')
+@include('components/newsletter-modal')
+
 @css('public-content-v2.css')
 @css('public-content-v2-interactions.css')
 @js('base.js')
