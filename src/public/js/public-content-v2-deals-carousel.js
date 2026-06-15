@@ -26,6 +26,7 @@
             if (!this.track || this.root.dataset.mountedDealsHydrated === 'true') return;
             this.root.dataset.mountedDealsHydrated = 'true';
 
+            this.fixCardHitAreas();
             this.search?.removeAttribute('onkeyup');
             this.prev?.addEventListener('click', event => {
                 event.preventDefault();
@@ -42,6 +43,22 @@
             window.addEventListener('resize', () => this.refresh());
 
             requestAnimationFrame(() => this.refresh());
+        }
+
+        fixCardHitAreas() {
+            this.root.querySelectorAll('.deal-header-actions').forEach(overlay => {
+                overlay.style.pointerEvents = 'none';
+
+                overlay.querySelectorAll('a, button, .deal-wishlist-btn').forEach(control => {
+                    control.style.pointerEvents = 'auto';
+                });
+            });
+
+            this.root.querySelectorAll('.deal-actions').forEach(actions => {
+                actions.style.position = 'relative';
+                actions.style.zIndex = '20';
+                actions.style.pointerEvents = 'auto';
+            });
         }
 
         visibleCards() {
