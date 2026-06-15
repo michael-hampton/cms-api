@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicNavigationRepository;
+use App\Services\FooterRenderer;
 use App\Services\PublicContent\PublicContentRollout;
 
 final class PublicContentPreviewController extends Controller
@@ -13,6 +14,7 @@ final class PublicContentPreviewController extends Controller
     public function __construct(
         private readonly PublicContentRollout $rollout,
         private readonly PublicNavigationRepository $navigation,
+        private readonly FooterRenderer $footerRenderer,
     ) {
         parent::__construct();
     }
@@ -25,13 +27,16 @@ final class PublicContentPreviewController extends Controller
 
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
+        $footerMenu = $this->navigation->findActiveMenu($siteId, 'footer');
 
         return $this->view('public-content-v2/page', [
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
             'contentSlug' => $slug,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header'),
-            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer'),
+            'footerHtml' => $footerMenu
+                ? $this->footerRenderer->renderFooter($footerMenu)
+                : '',
             'apiUrl' => sprintf(
                 '/api/v1/%s/content/%s',
                 rawurlencode($siteSlug),
