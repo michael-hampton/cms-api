@@ -3,7 +3,6 @@
 namespace App\Controllers\Api\V1;
 
 use App\Actions\PublicContent\GetPublicContentAction;
-use App\Actions\PublicContent\PublicContentAccessDenied;
 use App\Controllers\Controller;
 use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
@@ -29,16 +28,12 @@ final class PublicContentController extends Controller
 
     private function respond(string $slug, ?string $regionSlug = null): JsonResponse
     {
-        try {
-            $document = $this->getPublicContent->execute(
-                SiteContext::getId(),
-                $slug,
-                MemberAuth::check() ? MemberAuth::getMember() : null,
-                $regionSlug,
-            );
-        } catch (PublicContentAccessDenied $exception) {
-            return $this->errorResponse($exception->getMessage(), 403);
-        }
+        $document = $this->getPublicContent->execute(
+            SiteContext::getId(),
+            $slug,
+            MemberAuth::check() ? MemberAuth::getMember() : null,
+            $regionSlug,
+        );
 
         if (!$document) {
             return $this->errorResponse('Content not found.', 404);
