@@ -71,8 +71,9 @@
         }
 
         recordView(url) {
-            if (!url) return Promise.resolve();
-            return this.request(url, {method: 'POST', body: '{}'});
+            return url
+                ? this.request(url, {method: 'POST', body: '{}'})
+                : Promise.resolve();
         }
     }
 
@@ -167,10 +168,11 @@
             root.replaceChildren();
             root.className = 'public-content-v2-app';
 
+            root.append(await this.region('notices', components.notices ?? []));
+
             const article = document.createElement('article');
             article.className = 'public-content-v2-document';
             article.dataset.contentId = documentData.id;
-
             article.append(await this.region('header', components.header ?? []));
 
             const layout = document.createElement('div');
@@ -192,6 +194,11 @@
             article.append(layout);
             article.append(await this.region('below-content', components['below-content'] ?? []));
             root.append(article);
+            root.append(await this.region('modals', components.modals ?? []));
+
+            document.dispatchEvent(new CustomEvent('public-content:document-composed', {
+                detail: {root, document: documentData},
+            }));
         }
 
         async region(name, components) {
@@ -230,7 +237,7 @@
                 const message = state.error?.status === 403
                     ? 'You do not have access to this content.'
                     : state.error?.message ?? 'Unable to load this content.';
-                root.innerHTML = `<div class="public-content-v2-error" role="alert"><h1>Content unavailable</h1><p></p><button type="button" data-action="retry">Try again</button></div>`;
+                root.innerHTML = '<div class="public-content-v2-error" role="alert"><h1>Content unavailable</h1><p></p><button type="button" data-action="retry">Try again</button></div>';
                 root.querySelector('p').textContent = message;
                 return;
             }
