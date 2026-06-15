@@ -4,6 +4,7 @@ namespace App\Services\Pricing;
 
 use App\DTO\Pricing\PriceDisclosureContext;
 use DateTimeInterface;
+use Throwable;
 
 final readonly class PriceDisclosureFormatter
 {
@@ -91,11 +92,15 @@ final readonly class PriceDisclosureFormatter
         $amount = $amountMinor / $divisor;
 
         if (class_exists(\NumberFormatter::class)) {
-            $formatter = new \NumberFormatter($context->locale, \NumberFormatter::CURRENCY);
-            $formatted = $formatter->formatCurrency($amount, $currency);
+            try {
+                $formatter = new \NumberFormatter($context->locale, \NumberFormatter::CURRENCY);
+                $formatted = $formatter->formatCurrency($amount, $currency);
 
-            if ($formatted !== false) {
-                return $formatted;
+                if ($formatted !== false) {
+                    return $formatted;
+                }
+            } catch (Throwable) {
+                // Invalid or unsupported locale: use deterministic fallback below.
             }
         }
 
@@ -114,16 +119,20 @@ final readonly class PriceDisclosureFormatter
         }
 
         if (class_exists(\IntlDateFormatter::class)) {
-            $formatter = new \IntlDateFormatter(
-                $locale,
-                \IntlDateFormatter::MEDIUM,
-                \IntlDateFormatter::NONE,
-                'UTC',
-            );
-            $formatted = $formatter->format($date);
+            try {
+                $formatter = new \IntlDateFormatter(
+                    $locale,
+                    \IntlDateFormatter::MEDIUM,
+                    \IntlDateFormatter::NONE,
+                    'UTC',
+                );
+                $formatted = $formatter->format($date);
 
-            if ($formatted !== false) {
-                return $formatted;
+                if ($formatted !== false) {
+                    return $formatted;
+                }
+            } catch (Throwable) {
+                // Invalid or unsupported locale: use deterministic fallback below.
             }
         }
 
