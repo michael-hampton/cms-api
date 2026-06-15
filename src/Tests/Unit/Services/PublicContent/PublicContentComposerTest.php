@@ -6,8 +6,11 @@ use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\Support\Collection;
 use App\Framework\View\ViewRenderer;
 use App\Models\Page;
+use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
+use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
+use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -58,6 +61,7 @@ final class PublicContentComposerTest extends TestCase
     private function compose(string $pageType, bool $withCategories = false): array
     {
         $page = Mockery::mock(Page::class)->makePartial();
+        $page->id = 42;
         $page->page_type = $pageType;
         $page->products = new Collection();
 
@@ -65,9 +69,17 @@ final class PublicContentComposerTest extends TestCase
         $views->shouldReceive('partial')
             ->andReturnUsing(static fn(string $template): string => '<div data-template="' . $template . '"></div>');
 
+        $pageWidgets = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $pageWidgets->shouldReceive('getForPage')
+            ->once()
+            ->with(42)
+            ->andReturn(new Collection());
+
         return (new PublicContentComposer(
             $views,
             new RegionalPublicContentComponentFactory($views),
+            new PublicContentWidgetRegistry(),
+            new PageWidgetLayoutResolver($pageWidgets),
         ))->compose(new PublicContentContext(
             page: $page,
             siteId: 1,
