@@ -19,13 +19,18 @@ final class PublicContentWidgetRegistry
 
     public function register(PublicContentWidgetDefinition $definition): void
     {
-        $key = $definition->key();
+        $key = $this->validateKey($definition);
 
-        if ($key === '') {
-            throw new InvalidArgumentException('Widget key cannot be empty.');
+        if (isset($this->definitions[$key])) {
+            return;
         }
 
         $this->definitions[$key] = $definition;
+    }
+
+    public function replace(PublicContentWidgetDefinition $definition): void
+    {
+        $this->definitions[$this->validateKey($definition)] = $definition;
     }
 
     public function get(string $key): PublicContentWidgetDefinition
@@ -46,5 +51,16 @@ final class PublicContentWidgetRegistry
     public function all(): array
     {
         return array_values($this->definitions);
+    }
+
+    private function validateKey(PublicContentWidgetDefinition $definition): string
+    {
+        $key = trim($definition->key());
+
+        if ($key === '') {
+            throw new InvalidArgumentException('Widget key cannot be empty.');
+        }
+
+        return $key;
     }
 }
