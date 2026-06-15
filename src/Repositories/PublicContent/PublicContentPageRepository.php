@@ -56,11 +56,44 @@ final class PublicContentPageRepository extends Repository
         return $page instanceof Page ? $page : null;
     }
 
+    public function findPublishedBySlugForTerritory(
+        int $siteId,
+        string $slug,
+        int $territoryId,
+        array $relations = [],
+    ): ?Page {
+        $query = $relations === [] ? Page::query() : Page::with($relations);
+
+        $page = $query
+            ->where('site_id', $siteId)
+            ->where('slug', $slug)
+            ->where('status', 'published')
+            ->whereHas('territories', function ($territories) use ($territoryId): void {
+                $territories->where('territories.id', $territoryId);
+            })
+            ->first();
+
+        return $page instanceof Page ? $page : null;
+    }
+
     public function findCompletePublishedBySlug(int $siteId, string $slug): ?Page
     {
         return $this->findPublishedBySlug(
             $siteId,
             $slug,
+            self::COMPLETE_RELATIONS,
+        );
+    }
+
+    public function findCompletePublishedBySlugForTerritory(
+        int $siteId,
+        string $slug,
+        int $territoryId,
+    ): ?Page {
+        return $this->findPublishedBySlugForTerritory(
+            $siteId,
+            $slug,
+            $territoryId,
             self::COMPLETE_RELATIONS,
         );
     }
