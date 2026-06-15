@@ -60,7 +60,7 @@ final class PublicContentCompositionData
             'viewCount' => $this->views->getTotalViewsForPage((int)$page->id),
             'links' => $links,
             'siteSlug' => $siteSlug,
-            'directoryBase' => '/' . rawurlencode($siteSlug) . '/content-v2',
+            'directoryBase' => '/' . rawurlencode($siteSlug),
         ];
     }
 }
