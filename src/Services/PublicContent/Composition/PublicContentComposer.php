@@ -48,6 +48,8 @@ final class PublicContentComposer
             (string)$context->page->page_type !== 'landing-page';
         $landing = static fn(PublicContentContext $context): bool =>
             (string)$context->page->page_type === 'landing-page';
+        $hasCategories = static fn(PublicContentContext $context): bool =>
+            $landing($context) && !empty($context->viewData['categories']);
         $hasProducts = static fn(PublicContentContext $context): bool =>
             $context->page->products && count($context->page->products) > 0;
         $hasDeals = static fn(PublicContentContext $context): bool =>
@@ -95,7 +97,7 @@ final class PublicContentComposer
                 'components/categories-widget',
                 'after-content',
                 100,
-                supports: $landing,
+                supports: $hasCategories,
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categories'] ?? [],
                     'layout' => 'carousel',
