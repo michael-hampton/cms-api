@@ -44,7 +44,7 @@ return [
     ],
 
     'bindings' => [
-        // Explicit interface-to-implementation bindings
-        // \App\Contracts\RepositoryInterface::class => \App\Repositories\DatabaseRepository::class,
+        \App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class
+            => \App\Repositories\PublicContent\PageWidgetRepository::class,
     ],
 ];
