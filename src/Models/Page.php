@@ -127,7 +127,6 @@ class Page extends Model
         'premium_rejected_at' => 'datetime',
         'premium_rejected_by' => 'integer',
         'monetisation_disabled_at' => 'datetime',
-        'monetisation_disabled_by' => 'integer',
         'first_editorial_change_reported_at' => 'datetime',
         'first_editorial_change_reported_by' => 'integer',
         'first_editorial_change_history_id' => 'integer',
@@ -153,38 +152,26 @@ class Page extends Model
         return $this->hasMany(Block::class, 'page_id', 'id', $relation)->orderBy('order');
     }
 
-    public function comments(bool $relation = false)
-    {
-        return $this->hasMany(Comment::class, 'page_id', 'id', $relation);
-    }
-
-    public function widgetOverrides(bool $relation = false): HasManyHandler|Collection
+    public function widgets(bool $relation = false)
     {
         return $this->hasMany(PageWidget::class, 'page_id', 'id', $relation)
             ->orderBy('region')
             ->orderBy('priority');
     }
 
+    public function comments(bool $relation = false)
+    {
+        return $this->hasMany(Comment::class, 'page_id', 'id', $relation);
+    }
+
     public function categories(bool $relation = false)
     {
-        return $this->belongsToMany(
-            Category::class,
-            'page_categories',
-            'page_id',
-            'category_id',
-            $relation
-        );
+        return $this->belongsToMany(Category::class, 'page_categories', 'page_id', 'category_id', $relation);
     }
 
     public function tags(bool $relation = false)
     {
-        return $this->belongsToMany(
-            Tag::class,
-            'page_tags',
-            'page_id',
-            'tag_id',
-            $relation
-        );
+        return $this->belongsToMany(Tag::class, 'page_tags', 'page_id', 'tag_id', $relation);
     }
 
     public function metadata(): ?Model
@@ -253,7 +240,7 @@ class Page extends Model
         return $query->where('status', PageStatus::PUBLISHED->value);
     }
 
-    public function scopeVisibleToMember(QueryBuilder $query, ?AuthenticatedMember $member): QueryBuilder
+    public function scopeVisibleTo(QueryBuilder $query, ?AuthenticatedMember $member): QueryBuilder
     {
         if (!$member) {
             return $query->where('visibility', PageVisibility::PUBLIC->value);
