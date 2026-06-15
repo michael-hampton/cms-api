@@ -16,7 +16,6 @@ $currency = $currency ?? '£';
 $showMerchantHeader = $showMerchantHeader ?? true;
 $items = $items ?? [];
 
-// ── Deduplicate items ────────────────────────────────────────────────────────
 $deduplicated = [];
 foreach ($items as $item) {
     if (!empty($item['subscription_plan_id'])) {
@@ -57,12 +56,9 @@ $groupIndex = 0;
 
         <?php foreach ($merchantData['items'] as $item):
             $isFreeGift = CartViewHelpers::isFreeGift($item);
-
-            // ── Resolve display name ─────────────────────────────────────
-            // For subscriptions the canonical name lives in options.plan_name.
-            // Fall back to product_name then name then 'Item'.
             $isSubscription = !empty($item['subscription_plan_id']);
             $opts = $item['options'] ?? [];
+            $lineSummary = $item['line_summary'] ?? null;
 
             if ($isSubscription && !empty($opts['plan_name'])) {
                 $productName = $opts['plan_name'];
@@ -74,9 +70,6 @@ $groupIndex = 0;
                 $productName = 'Item';
             }
 
-            // ── Resolve thumbnail ────────────────────────────────────────
-            // Subscription may store plan image in options.plan_image or
-            // directly on the plan object attached to the item.
             if ($isSubscription) {
                 $productImg = $opts['plan_image']
                         ?? $item['plan_image']
@@ -88,13 +81,11 @@ $groupIndex = 0;
             ?>
 
             <div class="cs-item" data-item-id="<?= $item['id'] ?>">
-                <!-- Thumbnail -->
                 <?php if ($productImg): ?>
                     <img src="<?= htmlspecialchars($productImg) ?>"
                          alt="<?= htmlspecialchars($productName) ?>"
                          class="cs-item-img">
                 <?php elseif ($isSubscription): ?>
-                    <!-- Subscription placeholder icon -->
                     <div class="cs-item-img-placeholder" aria-hidden="true"
                          style="background: linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5">
@@ -113,16 +104,12 @@ $groupIndex = 0;
                     </div>
                 <?php endif; ?>
 
-                <!-- Details -->
                 <div class="cs-item-details">
                     <div class="cs-item-name"><?= htmlspecialchars($productName) ?></div>
 
                     <?php if ($isSubscription && !empty($opts['delivery_type'])): ?>
                         <div class="cs-item-meta" style="font-size:.7rem; color:var(--text-secondary);">
                             <?= htmlspecialchars(ucfirst($opts['delivery_type'])) ?> delivery
-                            <?php if (!empty($opts['billing_period'])): ?>
-                                &bull; <?= htmlspecialchars($opts['billing_period']) ?>
-                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -143,10 +130,19 @@ $groupIndex = 0;
 
                     <div class="cs-item-meta">Qty: <?= (int)($item['quantity'] ?? 1) ?></div>
 
-                    <?php if (!empty($item['trial_days'])): ?>
-                        <div style="display:inline-flex;align-items:center;gap:.35rem;background:#f0fdf4;border:1px solid #6ee7b7;border-radius:100px;padding:.2rem .75rem;font-size:.75rem;font-weight:600;color:#065f46;margin-top:.4rem;line-height:1.6;">
-                            <span aria-hidden="true">🎁</span>
-                            <?= (int)$item['trial_days'] ?>-day free trial included
+                    <?php if ($isSubscription && !empty($lineSummary['label'])): ?>
+                        <div class="cs-item-meta"><?= htmlspecialchars($lineSummary['label']) ?></div>
+                    <?php endif; ?>
+
+                    <?php foreach (($lineSummary['badges'] ?? []) as $badge): ?>
+                        <div style="display:inline-flex;align-items:center;background:#f0fdf4;border:1px solid #6ee7b7;border-radius:100px;padding:.2rem .75rem;font-size:.75rem;font-weight:600;color:#065f46;margin-top:.4rem;line-height:1.6;">
+                            <?= htmlspecialchars($badge) ?>
+                        </div>
+                    <?php endforeach; ?>
+
+                    <?php if ($isSubscription && !empty($lineSummary['renewal_line'])): ?>
+                        <div class="cs-item-meta" style="margin-top:.35rem;">
+                            <?= htmlspecialchars($lineSummary['renewal_line']) ?>
                         </div>
                     <?php endif; ?>
 
@@ -159,12 +155,14 @@ $groupIndex = 0;
                     <?php endif; ?>
                 </div>
 
-                <!-- Price -->
                 <div class="cs-item-price <?= $isFreeGift ? 'cs-item-free' : '' ?>">
-                    <?= $isFreeGift
-                            ? 'FREE'
-                            : htmlspecialchars($currency) . number_format((float)($item['subtotal'] ?? 0), 2)
-                    ?>
+                    <?php if ($isFreeGift): ?>
+                        FREE
+                    <?php elseif ($isSubscription && !empty($lineSummary['main_line'])): ?>
+                        <?= htmlspecialchars($lineSummary['main_line']) ?>
+                    <?php else: ?>
+                        <?= htmlspecialchars($currency) . number_format((float)($item['subtotal'] ?? 0), 2) ?>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -172,7 +170,7 @@ $groupIndex = 0;
     </div>
 
     <?php if ($groupIndex < $groupCount): ?>
-    <div class="cs-group-divider"></div>
-<?php endif; ?>
+        <div class="cs-group-divider"></div>
+    <?php endif; ?>
 
 <?php endforeach; ?>
