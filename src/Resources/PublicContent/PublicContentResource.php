@@ -24,6 +24,7 @@ final readonly class PublicContentResource
             'authors' => $this->document->authors,
             'landing_sections' => $this->document->landingSections,
             'links' => $this->document->links,
+            'widgets' => $this->document->widgets,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
                 'regions' => array_map(
