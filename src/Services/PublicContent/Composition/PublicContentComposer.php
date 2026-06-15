@@ -24,7 +24,7 @@ final class PublicContentComposer
         $this->registerDefaults();
         $regions = [];
         $restricted = ($context->viewData['access']['can_view'] ?? true) === false;
-        $allowedRestrictedWidgets = ['page-title', 'paywall-overlay'];
+        $allowedRestrictedWidgets = ['page-title', 'paywall-overlay', 'subscription-modal'];
 
         foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
             if ($restricted && !in_array($placement->widgetKey, $allowedRestrictedWidgets, true)) {
