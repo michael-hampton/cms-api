@@ -3,10 +3,11 @@
 namespace App\Services\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\Models\Member;
 use App\Models\Page;
 use App\Parsers\BlockFactory;
 use App\Repositories\Cms\BlockRepository;
-use App\Services\Cms\Pages\BlockParserService;
+use App\Services\Cms\Pages\PageRenderService;
 use Throwable;
 
 final class PublicContentRenderer
@@ -14,20 +15,21 @@ final class PublicContentRenderer
     public function __construct(
         private readonly BlockRepository $blocks,
         private readonly BlockFactory $blockFactory,
-        private readonly BlockParserService $blockParser,
+        private readonly PageRenderService $pageRenderer,
     ) {
     }
 
     /**
-     * Structured block data is canonical. rendered_html is a transitional fallback.
+     * Structured block data is canonical. Region rendered_html is produced by the
+     * existing backend page renderer so adverts, grids and zones retain parity.
      *
      * @return array<string, ContentRegion>
      */
-    public function render(Page $page, int $siteId): array
+    public function render(Page $page, int $siteId, ?Member $member = null): array
     {
-        $regions = [
-            'main' => ['blocks' => [], 'html' => ''],
-            'sidebar' => ['blocks' => [], 'html' => ''],
+        $structuredRegions = [
+            'main' => [],
+            'sidebar' => [],
         ];
 
         foreach ($this->blocks->getPageBlocks($page->id) as $block) {
@@ -39,38 +41,32 @@ final class PublicContentRenderer
             $input = array_merge($raw, ['type' => $block->type]);
 
             try {
-                $dto = $this->blockFactory->make($input);
-                $structured = $dto->toArray();
+                $structured = $this->blockFactory->make($input)->toArray();
             } catch (Throwable) {
                 $structured = $raw;
             }
 
-            $renderedHtml = '';
-            try {
-                $renderedHtml = $this->blockParser->buildBlock(
-                    (int)$block->page_id,
-                    $input,
-                    (int)$block->order,
-                    false,
-                    $siteId,
-                );
-            } catch (Throwable $exception) {
-                error_log("Failed to render public content block {$block->id}: {$exception->getMessage()}");
-            }
-
-            $regions[$region]['blocks'][] = [
+            $structuredRegions[$region][] = [
                 'id' => (int)$block->id,
                 'type' => (string)$block->type,
                 'order' => (int)$block->order,
                 'data' => $structured,
-                'rendered_html' => $renderedHtml,
             ];
-            $regions[$region]['html'] .= $renderedHtml;
         }
 
+        $rendered = $this->pageRenderer->renderPage($page, $siteId, $member);
+
         return [
-            'main' => new ContentRegion('main', $regions['main']['blocks'], $regions['main']['html']),
-            'sidebar' => new ContentRegion('sidebar', $regions['sidebar']['blocks'], $regions['sidebar']['html']),
+            'main' => new ContentRegion(
+                'main',
+                $structuredRegions['main'],
+                (string)($rendered['main'] ?? ''),
+            ),
+            'sidebar' => new ContentRegion(
+                'sidebar',
+                $structuredRegions['sidebar'],
+                (string)($rendered['sidebar'] ?? ''),
+            ),
         ];
     }
 }
