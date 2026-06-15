@@ -11,6 +11,7 @@ final class PageWidgetLayoutResolver
     {
     }
 
+    /** @return list<WidgetPlacement> */
     public function resolve(PublicContentContext $context, PublicContentWidgetRegistry $registry): array
     {
         $placements = [];
@@ -20,8 +21,8 @@ final class PageWidgetLayoutResolver
             $placements[$placement->widgetKey] = $placement;
         }
 
-        foreach ($this->repository->getForPage((int) $context->page->id) as $record) {
-            $key = (string) $record->widget_key;
+        foreach ($this->repository->getForPage((int)$context->page->id) as $record) {
+            $key = (string)$record->widget_key;
 
             if (!$registry->has($key)) {
                 continue;
@@ -29,8 +30,8 @@ final class PageWidgetLayoutResolver
 
             $placements[$key] = $placements[$key]->withOverrides(
                 $record->region ?: null,
-                $record->priority !== null ? (int) $record->priority : null,
-                $record->is_enabled !== null ? (bool) $record->is_enabled : null,
+                $record->priority !== null ? (int)$record->priority : null,
+                $record->is_enabled !== null ? (bool)$record->is_enabled : null,
                 is_array($record->configuration) ? $record->configuration : [],
             );
         }
@@ -42,18 +43,6 @@ final class PageWidgetLayoutResolver
                 $resolved[] = $placement;
             }
         }
-
-        usort($resolved, static function (WidgetPlacement $left, WidgetPlacement $right): int {
-            if ($left->region !== $right->region) {
-                return strcmp($left->region, $right->region);
-            }
-
-            if ($left->priority !== $right->priority) {
-                return $left->priority <=> $right->priority;
-            }
-
-            return strcmp($left->widgetKey, $right->widgetKey);
-        });
 
         return $resolved;
     }
