@@ -41,6 +41,9 @@ final readonly class CartLineDisclosureService
             : null;
         $trialDays = $this->positiveInt($pricingFacts['trial_days'] ?? $planFacts['trial_days'] ?? null);
         $introCycles = $this->positiveInt($pricingFacts['intro_cycles'] ?? null);
+        $hasValidIntroCharge = $introUnitMinor !== null
+            && $introUnitMinor > 0
+            && $introCycles !== null;
         $period = (string)($pricingFacts['period_description'] ?? $planFacts['billing_period'] ?? 'monthly');
         [$periodAmount, $periodUnit] = $this->periodSpec($period);
         $labels = $this->periodLabels->labels(
@@ -49,23 +52,31 @@ final readonly class CartLineDisclosureService
             $locale,
             (string)($pricingFacts['period_display_strategy'] ?? 'raw'),
         );
+        $introPeriodLabel = $hasValidIntroCharge
+            ? $this->cyclesLabel($introCycles, $period)
+            : null;
 
         $context = new PriceDisclosureContext(
             locale: $locale,
             currency: $currency,
             quantity: $quantity,
             itemAmountMinor: $lineAmountMinor,
-            initialChargeAmountMinor: $introUnitMinor === null ? null : $introUnitMinor * $quantity,
+            initialChargeAmountMinor: $hasValidIntroCharge ? $introUnitMinor * $quantity : null,
             renewalAmountMinor: $renewalUnitMinor > 0 ? $renewalUnitMinor * $quantity : $lineAmountMinor,
             isRecurring: !((bool)($planFacts['is_one_time'] ?? false)),
             trialDays: $trialDays,
-            introCycles: $introCycles,
-            initialChargePeriodLabel: $introCycles === null ? null : $this->cyclesLabel($introCycles, $period),
-            introPeriodLabel: $introCycles === null ? null : $this->cyclesLabel($introCycles, $period),
+            introCycles: $hasValidIntroCharge ? $introCycles : null,
+            initialChargePeriodLabel: $introPeriodLabel,
+            introPeriodLabel: $introPeriodLabel,
             renewalPeriodLabel: $labels->renewal,
-            renewalDate: $this->renewalDate($item, $trialDays, $introCycles, $period),
+            renewalDate: $this->renewalDate(
+                $item,
+                $trialDays,
+                $hasValidIntroCharge ? $introCycles : null,
+                $period,
+            ),
             pricingLabel: $pricingFacts['label'] ?? null,
-            badges: $this->badges($trialDays, $introUnitMinor, $introCycles),
+            badges: $this->badges($trialDays, $hasValidIntroCharge),
             experienceLanguageLines: $experienceLanguageLines,
             storeLanguageLines: $storeLanguageLines,
             rawPeriodLabel: $labels->raw,
@@ -88,7 +99,15 @@ final readonly class CartLineDisclosureService
             $date = $date->add(new DateInterval('P' . $trialDays . 'D'));
         }
 
-        return $date->add($this->billingInterval($period, $introCycles ?? 1));
+        if ($introCycles !== null) {
+            return $date->add($this->billingInterval($period, $introCycles));
+        }
+
+        if ($trialDays !== null) {
+            return $date;
+        }
+
+        return $date->add($this->billingInterval($period, 1));
     }
 
     private function billingInterval(string $period, int $cycles): DateInterval
@@ -129,13 +148,13 @@ final readonly class CartLineDisclosureService
         return $total . ' ' . $unit . ($total === 1 ? '' : 's');
     }
 
-    private function badges(?int $trialDays, ?int $introUnitMinor, ?int $introCycles): array
+    private function badges(?int $trialDays, bool $hasValidIntroCharge): array
     {
         $badges = [];
         if ($trialDays !== null) {
             $badges[] = $trialDays . '-day trial';
         }
-        if ($introUnitMinor !== null && $introCycles !== null) {
+        if ($hasValidIntroCharge) {
             $badges[] = 'Intro price';
         }
         return $badges;
