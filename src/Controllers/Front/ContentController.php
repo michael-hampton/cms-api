@@ -218,6 +218,9 @@ class ContentController extends Controller
             'menu' => $menu,
             'member' => $member,
             'menuRenderer' => $this->menuRenderer,
+            'subscriptionModalData' => empty($page->contributor_id)
+                ? $this->modalService->getModalData($member, $siteId)
+                : null,
         ]);
     }
 }
