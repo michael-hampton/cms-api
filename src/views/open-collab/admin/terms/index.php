@@ -162,8 +162,9 @@ $breadcrumbs = [['label' => 'Terms & Conditions']];
 @section('scripts')
 <script>
 class TermsAdminManager {
-    constructor(root) {
+    constructor(root, tokenProvider) {
         this.root = root;
+        this.tokenProvider = tokenProvider;
         this.site = root.dataset.site;
         this.permissions = {
             create: root.dataset.canCreate === '1',
@@ -181,7 +182,6 @@ class TermsAdminManager {
         };
 
         this.apiBase = `/api/${this.site}/open-collab/admin/terms`;
-        this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
         this.cacheElements();
         this.bindEvents();
         this.load();
@@ -403,7 +403,6 @@ class TermsAdminManager {
             const response = await this.request(`${this.apiBase}/from-document`, {
                 method: 'POST',
                 body: formData,
-                headers: {},
             });
             const imported = response.terms ?? response.data?.terms;
             this.elements.importForm.reset();
@@ -418,15 +417,16 @@ class TermsAdminManager {
     }
 
     async request(url, options = {}) {
+        const isForm = options.body instanceof FormData;
+        const token = this.tokenProvider?.() || '';
         const headers = {
+            Authorization: `Bearer ${token}`,
             Accept: 'application/json',
-            ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-            ...(this.csrfToken ? { 'X-CSRF-TOKEN': this.csrfToken } : {}),
+            ...(isForm ? {} : { 'Content-Type': 'application/json' }),
             ...(options.headers ?? {}),
         };
 
         const response = await fetch(url, {
-            credentials: 'same-origin',
             ...options,
             headers,
         });
@@ -502,7 +502,10 @@ class TermsAdminManager {
 document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('terms-admin-root');
     if (root) {
-        window.termsAdminManager = new TermsAdminManager(root);
+        window.termsAdminManager = new TermsAdminManager(
+            root,
+            () => localStorage.getItem('oc_token') || '',
+        );
     }
 });
 </script>
