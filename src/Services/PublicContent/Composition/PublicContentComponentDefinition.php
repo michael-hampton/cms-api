@@ -17,7 +17,7 @@ final readonly class PublicContentComponentDefinition
         private int $priority,
         private array $styles = [],
         private array $scripts = [],
-        private array $endpoints = [],
+        private mixed $endpoints = null,
         private bool $stateful = false,
         private mixed $supports = null,
         private mixed $data = null,
@@ -32,6 +32,9 @@ final readonly class PublicContentComponentDefinition
     public function build(PublicContentContext $context): PublicContentComponent
     {
         $extra = $this->data === null ? [] : (array)($this->data)($context);
+        $endpoints = $this->endpoints === null
+            ? []
+            : (is_callable($this->endpoints) ? (array)($this->endpoints)($context) : (array)$this->endpoints);
 
         return new PublicContentComponent(
             id: $this->id,
@@ -41,7 +44,7 @@ final readonly class PublicContentComponentDefinition
             html: $this->views->partial($this->template, $context->with($extra)),
             styles: $this->styles,
             scripts: $this->scripts,
-            endpoints: $this->endpoints,
+            endpoints: $endpoints,
             stateful: $this->stateful,
         );
     }
