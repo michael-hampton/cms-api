@@ -28,7 +28,7 @@ class CategoryRepository extends Repository
     {
         return $this->query()
             ->where('site_id', $siteId)
-            ->withCount('products') // assumes Category has products() relationship
+            ->withCount('products')
             ->orderByDesc('products_count')
             ->get()
             ->map(fn($category) => (object)[
@@ -143,17 +143,13 @@ class CategoryRepository extends Repository
     public function getBySiteId(int $siteId): array
     {
         $categories = Category::where('site_id', $siteId)
-            ->withCount('pages', function ($query) use ($siteId) {
-                $query->where('status', 'published')->where('site_id', $siteId);
-            })
+            ->withCount('pages')
             ->orderBy('name', 'asc')
             ->get();
 
-
-        return $categories->filter(function ($category) {
-            return $category->pages_count > 0;
-        })->toArray();
-
+        return $categories
+            ->filter(static fn(Category $category): bool => (int)$category->pages_count > 0)
+            ->toArray();
     }
 
     protected function getModelClass(): string
