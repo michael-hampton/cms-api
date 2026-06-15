@@ -8,6 +8,7 @@ final class PriceDisclosureTemplateResolver
         'en_GB' => [
             'trial_with_start_charge' => ':initial_price for :initial_charge_period_label, including a :trial_period_label trial.',
             'trial_without_start_charge' => ':trial_period_label free trial.',
+            'introductory_price' => ':initial_price for :intro_period_label.',
             'subscription_without_trial' => ':item_price :renewal_period_label.',
             'renewal_with_date' => 'Renews on :renewal_date at :renewal_price :renewal_period_label.',
             'renewal_without_date' => 'Renews at :renewal_price :renewal_period_label.',
