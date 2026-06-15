@@ -90,8 +90,14 @@
                 link.remove();
             }
 
-            const scripts = [...template.content.querySelectorAll('script')];
-            scripts.forEach(script => script.remove());
+            const hasAddressLookup = Boolean(template.content.querySelector('#address-lookup'));
+            const scripts = [...template.content.querySelectorAll('script')]
+                .filter(script => {
+                    const source = script.textContent ?? '';
+                    return !source.includes('const addressLookup') || hasAddressLookup;
+                });
+
+            template.content.querySelectorAll('script').forEach(script => script.remove());
 
             return {
                 fragment: template.content.cloneNode(true),
