@@ -36,6 +36,9 @@ final readonly class PublicContentComponentDefinition
             ? []
             : (is_callable($this->endpoints) ? (array)($this->endpoints)($context) : (array)$this->endpoints);
 
+        $styles = $this->type === 'deals-carousel' ? [] : $this->styles;
+        $scripts = $this->type === 'deals-carousel' ? [] : $this->scripts;
+
         return new PublicContentComponent(
             id: $this->id,
             type: $this->type,
@@ -44,11 +47,11 @@ final readonly class PublicContentComponentDefinition
             html: $this->views->partial($this->template, $context->with($extra)),
             styles: array_map(
                 static fn(string $file): string => asset($file, 'css'),
-                $this->styles,
+                $styles,
             ),
             scripts: array_map(
                 static fn(string $file): string => asset($file, 'js'),
-                $this->scripts,
+                $scripts,
             ),
             endpoints: $endpoints,
             stateful: $this->stateful,
