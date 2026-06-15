@@ -5,41 +5,72 @@
     if (!root || root.dataset.preview !== 'true') return;
 
     const siteSlug = root.dataset.site;
-    const originalCreateResultCard = window.createResultCard;
+    if (!siteSlug) return;
 
-    if (typeof originalCreateResultCard !== 'function' || !siteSlug) return;
+    const toPreviewUrl = href => {
+        const url = new URL(href, window.location.origin);
+        if (url.origin !== window.location.origin) return null;
 
-    const toPreviewUrl = page => {
-        const raw = page?.url || `/${page?.slug ?? ''}`;
-        const url = new URL(raw, window.location.origin);
         const segments = url.pathname.split('/').filter(Boolean);
-        const slug = page?.slug || segments.at(-1);
+        if (segments[0] !== siteSlug) return null;
+        if (segments[1] === 'content-v2') return url;
 
+        const slug = segments.at(-1);
         if (!slug) return null;
 
         url.pathname = `/${siteSlug}/content-v2/${encodeURIComponent(slug)}`;
-        return url.href;
+        return url;
     };
 
-    window.createResultCard = function createPreviewResultCard(page, isShop = false) {
-        const card = originalCreateResultCard(page, isShop);
+    document.addEventListener('click', event => {
+        const card = event.target.closest?.('.search-result-card');
+        if (!card) return;
 
-        if (isShop || page?.page_type === 'deal' || page?.page_type === 'product' || !page?.can_view) {
-            return card;
-        }
+        // Shop/deal results must continue to use their normal product routes.
+        if (card.closest('#shopResultsGrid')) return;
 
-        const previewUrl = toPreviewUrl(page);
-        if (!previewUrl) return card;
+        // Locked cards intentionally open the subscription modal.
+        if (card.classList.contains('search-result-locked')) return;
 
-        card.onclick = event => {
-            if (event.target.closest('a, button')) return;
-            window.location.assign(previewUrl);
-        };
+        const readMore = card.querySelector('a.result-read-more[href]');
+        if (!readMore) return;
 
-        card.querySelectorAll('a.result-read-more').forEach(link => {
-            link.href = previewUrl;
+        const previewUrl = toPreviewUrl(readMore.href);
+        if (!previewUrl) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.location.assign(previewUrl.href);
+    }, true);
+
+    const observer = new MutationObserver(records => {
+        records.forEach(record => {
+            record.addedNodes.forEach(node => {
+                if (!(node instanceof Element)) return;
+
+                const cards = node.matches('.search-result-card')
+                    ? [node]
+                    : [...node.querySelectorAll('.search-result-card')];
+
+                cards.forEach(card => {
+                    if (card.closest('#shopResultsGrid') || card.classList.contains('search-result-locked')) {
+                        return;
+                    }
+
+                    const readMore = card.querySelector('a.result-read-more[href]');
+                    if (!readMore) return;
+
+                    const previewUrl = toPreviewUrl(readMore.href);
+                    if (previewUrl) {
+                        readMore.href = previewUrl.href;
+                    }
+                });
+            });
         });
+    });
 
-        return card;
-    };
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
 })();
