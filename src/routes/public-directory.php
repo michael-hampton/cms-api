@@ -6,6 +6,13 @@ use App\Framework\Http\Router;
 
 /** @var Router $router */
 
+$router->get('/{site}/content-v2/authors', [PublicDirectoryPageController::class, 'previewAuthors']);
+$router->get('/{site}/content-v2/authors/{slug}', [PublicDirectoryPageController::class, 'previewAuthor']);
+$router->get('/{site}/content-v2/categories', [PublicDirectoryPageController::class, 'previewCategories']);
+$router->get('/{site}/content-v2/categories/{slug}', [PublicDirectoryPageController::class, 'previewCategory']);
+$router->get('/{site}/content-v2/tags', [PublicDirectoryPageController::class, 'previewTags']);
+$router->get('/{site}/content-v2/tags/{slug}', [PublicDirectoryPageController::class, 'previewTag']);
+
 $router->get('/{site}/authors', [PublicDirectoryPageController::class, 'authors']);
 $router->get('/{site}/authors/{slug}', [PublicDirectoryPageController::class, 'author']);
 $router->get('/{site}/categories', [PublicDirectoryPageController::class, 'categories']);
