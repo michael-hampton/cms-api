@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Services\Pricing;
 
 use App\Services\Pricing\PeriodLabelFormatter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PeriodLabelFormatterTest extends TestCase
@@ -25,7 +26,7 @@ final class PeriodLabelFormatterTest extends TestCase
         self::assertSame('every 4 weeks', $labels->renewal);
     }
 
-    /** @dataProvider nonCompactDayProvider */
+    #[DataProvider('nonCompactDayProvider')]
     public function test_other_day_counts_do_not_cascade_to_larger_units(int $days): void
     {
         $labels = $this->formatter->labels($days, 'day', 'en_GB', 'compact_equivalent');
@@ -43,7 +44,7 @@ final class PeriodLabelFormatterTest extends TestCase
         ];
     }
 
-    /** @dataProvider singularProvider */
+    #[DataProvider('singularProvider')]
     public function test_singular_renewal_labels_omit_the_leading_one(string $unit, string $expected): void
     {
         self::assertSame($expected, $this->formatter->labels(1, $unit)->renewal);
