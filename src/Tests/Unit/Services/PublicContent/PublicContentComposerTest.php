@@ -10,6 +10,7 @@ use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
+use App\Services\PublicContent\Widgets\PaywallOverlayWidget;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -58,12 +59,34 @@ final class PublicContentComposerTest extends TestCase
         );
     }
 
-    private function compose(string $pageType, bool $withCategories = false): array
+    public function testRestrictedPageOnlyContainsTitleAndPaywall(): void
     {
+        $regions = $this->compose('article', restricted: true);
+
+        self::assertSame(
+            ['page-title'],
+            array_map(static fn($component) => $component->type, $regions['header']),
+        );
+        self::assertSame(
+            ['paywall-overlay'],
+            array_map(static fn($component) => $component->type, $regions['modals']),
+        );
+        self::assertArrayNotHasKey('after-content', $regions);
+        self::assertArrayNotHasKey('below-content', $regions);
+    }
+
+    private function compose(
+        string $pageType,
+        bool $withCategories = false,
+        bool $restricted = false,
+    ): array {
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 42;
         $page->page_type = $pageType;
         $page->products = new Collection();
+        $page->title = 'Premium article';
+        $page->slug = 'premium-article';
+        $page->is_paid = false;
 
         $views = Mockery::mock(ViewRenderer::class);
         $views->shouldReceive('partial')
@@ -75,10 +98,14 @@ final class PublicContentComposerTest extends TestCase
             ->with(42)
             ->andReturn(new Collection());
 
+        $registry = new PublicContentWidgetRegistry([
+            new PaywallOverlayWidget($views),
+        ]);
+
         return (new PublicContentComposer(
             $views,
             new RegionalPublicContentComponentFactory($views),
-            new PublicContentWidgetRegistry(),
+            $registry,
             new PageWidgetLayoutResolver($pageWidgets),
         ))->compose(new PublicContentContext(
             page: $page,
@@ -86,6 +113,10 @@ final class PublicContentComposerTest extends TestCase
             siteSlug: 'estate',
             member: null,
             viewData: [
+                'access' => [
+                    'can_view' => !$restricted,
+                    'reason' => $restricted ? 'subscription_required' : null,
+                ],
                 'categories' => $withCategories ? new Collection([(object)['id' => 1]]) : new Collection(),
                 'categoriesWithPages' => [],
                 'feedPages' => new Collection(),
