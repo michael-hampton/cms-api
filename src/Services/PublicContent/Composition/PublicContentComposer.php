@@ -23,8 +23,14 @@ final class PublicContentComposer
     {
         $this->registerDefaults();
         $regions = [];
+        $restricted = ($context->viewData['access']['can_view'] ?? true) === false;
+        $allowedRestrictedWidgets = ['page-title', 'paywall-overlay'];
 
         foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
+            if ($restricted && !in_array($placement->widgetKey, $allowedRestrictedWidgets, true)) {
+                continue;
+            }
+
             $definition = $this->registry->get($placement->widgetKey);
 
             if (!$definition->supports($context)) {
