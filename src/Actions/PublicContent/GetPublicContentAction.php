@@ -11,6 +11,7 @@ use App\Models\Territory;
 use App\Parsers\PageGridRenderer;
 use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
@@ -21,6 +22,7 @@ final class GetPublicContentAction
 {
     public function __construct(
         private readonly PublicContentPageRepository $pages,
+        private readonly PublicTerritoryRepository $territories,
         private readonly ArticleAccessService $access,
         private readonly PublicContentRenderer $renderer,
         private readonly PublicContentCompositionData $compositionData,
@@ -36,7 +38,7 @@ final class GetPublicContentAction
         ?string $territorySlug = null,
     ): ?PublicContentDocument {
         $territory = $territorySlug !== null
-            ? $this->findTerritory($siteId, $territorySlug)
+            ? $this->territories->findActiveBySlug($siteId, $territorySlug)
             : null;
 
         if ($territorySlug !== null && !$territory) {
@@ -77,6 +79,7 @@ final class GetPublicContentAction
             siteSlug: $siteSlug,
             member: $member,
             links: $links,
+            territory: $territory,
         );
 
         if ($territory) {
@@ -104,7 +107,11 @@ final class GetPublicContentAction
             components: $components,
             authors: $this->authors($page),
             landingSections: [],
-            links: $links,
+            links: array_merge($links, [
+                'canonical' => $territory
+                    ? sprintf('/%s/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$territory->slug), rawurlencode((string)$page->slug))
+                    : sprintf('/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$page->slug)),
+            ]),
             widgets: $territory ? [
                 'territory' => [
                     'id' => (int)$territory->id,
@@ -116,38 +123,22 @@ final class GetPublicContentAction
         );
     }
 
-    private function findTerritory(int $siteId, string $slug): ?Territory
-    {
-        $territory = Territory::where('site_id', $siteId)
-            ->where('slug', strtolower($slug))
-            ->where('is_active', true)
-            ->first();
-
-        return $territory instanceof Territory ? $territory : null;
-    }
-
     private function regionalViewData(Page $page, Territory $territory, int $siteId): array
     {
         $grid = $this->pageGrids->getActiveGridForTerritory((int)$territory->id);
 
         return [
             'territory' => $territory,
-            'allTerritories' => Territory::where('site_id', $siteId)
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->get(),
+            'allTerritories' => $this->territories->getActiveForSite($siteId),
             'pageGridHtml' => $grid
                 ? (new PageGridRenderer())->render($grid, $territory)
                 : null,
-            'regionArticles' => Page::where('site_id', $siteId)
-                ->where('status', 'published')
-                ->where('id', '!=', (int)$page->id)
-                ->whereHas('territories', function ($territories) use ($territory): void {
-                    $territories->where('territories.id', (int)$territory->id);
-                })
-                ->with(['customFields'])
-                ->limit(6)
-                ->get(),
+            'regionArticles' => $this->pages->getRelatedForTerritory(
+                $siteId,
+                (int)$territory->id,
+                (int)$page->id,
+                6,
+            ),
         ];
     }
 
