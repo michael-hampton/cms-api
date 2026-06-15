@@ -8,7 +8,7 @@
         </div>
         <div class="categories-list">
             <?php foreach ($page->categories as $category): ?>
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
+                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/categories/<?= urlencode($category->slug) ?>"
                    class="category-badge">
                     <?php if ($category->icon): ?>
                         <span class="category-badge-icon"><?= $category->icon ?></span>
