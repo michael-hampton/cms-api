@@ -19,11 +19,22 @@ final class PublicContentController extends Controller
 
     public function show(string $slug): JsonResponse
     {
+        return $this->respond($slug);
+    }
+
+    public function showRegional(string $regionSlug, string $slug): JsonResponse
+    {
+        return $this->respond($slug, $regionSlug);
+    }
+
+    private function respond(string $slug, ?string $regionSlug = null): JsonResponse
+    {
         try {
             $document = $this->getPublicContent->execute(
                 SiteContext::getId(),
                 $slug,
                 MemberAuth::check() ? MemberAuth::getMember() : null,
+                $regionSlug,
             );
         } catch (PublicContentAccessDenied $exception) {
             return $this->errorResponse($exception->getMessage(), 403);
@@ -38,6 +49,7 @@ final class PublicContentController extends Controller
             'meta' => [
                 'schema_version' => $document->schemaVersion,
                 'generated_at' => date(DATE_ATOM),
+                'region' => $regionSlug,
             ],
         ]);
     }
