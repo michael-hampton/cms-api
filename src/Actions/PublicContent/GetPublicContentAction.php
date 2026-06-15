@@ -117,7 +117,7 @@ final class GetPublicContentAction
                     'id' => (int)$territory->id,
                     'slug' => (string)$territory->slug,
                     'name' => (string)$territory->name,
-                    'locale' => $territory->locale ?? $territory->locale_code ?? null,
+                    'code' => $territory->code ?? null,
                 ],
             ] : [],
         );
