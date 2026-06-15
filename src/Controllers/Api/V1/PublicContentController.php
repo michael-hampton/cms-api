@@ -23,7 +23,7 @@ final class PublicContentController extends Controller
             $document = $this->getPublicContent->execute(
                 SiteContext::getId(),
                 $slug,
-                MemberAuth::getMember(),
+                MemberAuth::check() ? MemberAuth::member() : null,
             );
         } catch (PublicContentAccessDenied $exception) {
             return $this->errorResponse($exception->getMessage(), 403);
