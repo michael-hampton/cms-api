@@ -35,8 +35,15 @@
             if (!this.purchase) return;
 
             this.purchase.hidden = false;
-            await this.ensureStripe();
-            this.purchaseDialog?.focus();
+
+            try {
+                await this.ensureStripe();
+                this.purchaseDialog?.focus();
+            } catch (error) {
+                if (this.cardError) {
+                    this.cardError.textContent = error.message ?? 'Payment form could not be loaded.';
+                }
+            }
         }
 
         closePurchase() {
@@ -57,7 +64,13 @@
             if (!window.Stripe) {
                 await new Promise((resolve, reject) => {
                     const existing = document.querySelector('script[src="https://js.stripe.com/v3/"]');
+
                     if (existing) {
+                        if (window.Stripe) {
+                            resolve();
+                            return;
+                        }
+
                         existing.addEventListener('load', resolve, {once: true});
                         existing.addEventListener('error', reject, {once: true});
                         return;
@@ -139,11 +152,21 @@
         }
     }
 
-    document.addEventListener('public-content:component-mounted', event => {
-        if (event.detail.component.type !== 'paywall-overlay') return;
-        const root = event.detail.element.querySelector('[data-paywall-overlay]');
+    const hydrate = container => {
+        const root = container?.matches?.('[data-paywall-overlay]')
+            ? container
+            : container?.querySelector?.('[data-paywall-overlay]');
+
         if (!root || root.dataset.hydrated === 'true') return;
+
         root.dataset.hydrated = 'true';
         new PaywallOverlayController(root).start();
+    };
+
+    document.addEventListener('public-content:component-mounted', event => {
+        if (event.detail.component.type !== 'paywall-overlay') return;
+        hydrate(event.detail.element);
     });
+
+    hydrate(document);
 })();
