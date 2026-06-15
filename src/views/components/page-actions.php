@@ -86,5 +86,19 @@
     document.addEventListener('public-content:component-mounted', event => {
         initialise(event.detail.element, event.detail.component);
     });
+
+    document.querySelectorAll('[data-component="page-actions"]').forEach(element => {
+        let endpoints = {};
+        try {
+            endpoints = JSON.parse(element.dataset.endpoints || '{}');
+        } catch (error) {
+            endpoints = {};
+        }
+
+        initialise(element, {
+            type: 'page-actions',
+            endpoints,
+        });
+    });
 })();
 </script>
