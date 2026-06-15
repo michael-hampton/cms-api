@@ -112,99 +112,7 @@
         }
     }
 
-    class HeadingBlockRenderer {
-        render(block) {
-            const level = Math.min(6, Math.max(1, Number(block.data?.level ?? 2)));
-            const text = EscapeHtml.value(block.data?.text ?? block.data?.title ?? '');
-
-            return `<h${level}>${text}</h${level}>`;
-        }
-    }
-
-    class ParagraphBlockRenderer {
-        render(block) {
-            const html = block.data?.html ?? block.data?.content ?? block.data?.text ?? '';
-
-            if (typeof html !== 'string') {
-                return '';
-            }
-
-            return `<div class="public-content-v2-paragraph">${html}</div>`;
-        }
-    }
-
-    class ImageBlockRenderer {
-        render(block) {
-            const image = block.data?.image ?? block.data ?? {};
-            const src = image.src ?? image.url ?? block.data?.imageUrl ?? '';
-
-            if (!src) {
-                return '';
-            }
-
-            const alt = EscapeHtml.value(image.alt ?? block.data?.alt ?? '');
-            const caption = image.caption ?? block.data?.caption ?? '';
-
-            return `
-                <figure class="public-content-v2-image">
-                    <img src="${EscapeHtml.value(src)}" alt="${alt}" loading="lazy">
-                    ${caption ? `<figcaption>${EscapeHtml.value(caption)}</figcaption>` : ''}
-                </figure>
-            `;
-        }
-    }
-
-    class HtmlFallbackBlockRenderer {
-        render(block) {
-            if (typeof block.rendered_html === 'string' && block.rendered_html.trim() !== '') {
-                return `<div class="public-content-v2-fallback">${block.rendered_html}</div>`;
-            }
-
-            return `
-                <div class="public-content-v2-unsupported">
-                    Unsupported block: ${EscapeHtml.value(block.type ?? 'unknown')}
-                </div>
-            `;
-        }
-    }
-
-    class BlockRendererRegistry {
-        #renderers = new Map();
-
-        constructor(fallbackRenderer = new HtmlFallbackBlockRenderer()) {
-            this.fallbackRenderer = fallbackRenderer;
-            this.register('heading', new HeadingBlockRenderer());
-            this.register('paragraph', new ParagraphBlockRenderer());
-            this.register('text', new ParagraphBlockRenderer());
-            this.register('image', new ImageBlockRenderer());
-        }
-
-        register(type, renderer) {
-            this.#renderers.set(type, renderer);
-
-            return this;
-        }
-
-        render(block) {
-            const renderer = this.#renderers.get(block.type) ?? this.fallbackRenderer;
-
-            return `
-                <section
-                    class="public-content-v2-block public-content-v2-block--${EscapeHtml.value(block.type ?? 'unknown')}"
-                    data-block-id="${EscapeHtml.value(block.id ?? '')}"
-                    data-block-type="${EscapeHtml.value(block.type ?? 'unknown')}"
-                >
-                    ${renderer.render(block)}
-                </section>
-            `;
-        }
-    }
-
     class PublicContentView {
-        constructor(blockRegistry) {
-            this.blockRegistry = blockRegistry;
-        }
-
         render(root, state) {
             switch (state.status) {
                 case 'loading':
@@ -247,20 +155,22 @@
         }
 
         document(document) {
-            const main = document.content?.regions?.main ?? {blocks: []};
-            const sidebar = document.content?.regions?.sidebar ?? {blocks: []};
-            const hasSidebar = Array.isArray(sidebar.blocks) && sidebar.blocks.length > 0;
+            const main = document.content?.regions?.main ?? null;
+            const sidebar = document.content?.regions?.sidebar ?? null;
+            const mainHtml = this.regionHtml(main);
+            const sidebarHtml = this.regionHtml(sidebar);
+            const hasSidebar = sidebarHtml.trim() !== '';
 
             return `
                 <article class="public-content-v2-document" data-content-id="${EscapeHtml.value(document.id)}">
                     ${this.header(document)}
                     <div class="public-content-v2-layout ${hasSidebar ? 'has-sidebar' : 'full-width'}">
                         <div class="public-content-v2-main">
-                            ${this.region(main)}
+                            ${mainHtml || this.emptyRegion()}
                         </div>
                         ${hasSidebar ? `
                             <aside class="public-content-v2-sidebar">
-                                ${this.region(sidebar)}
+                                ${sidebarHtml}
                             </aside>
                         ` : ''}
                     </div>
@@ -290,14 +200,16 @@
             `;
         }
 
-        region(region) {
-            if (!Array.isArray(region.blocks) || region.blocks.length === 0) {
-                return '<div class="public-content-v2-empty"><p>No content blocks were returned.</p></div>';
+        regionHtml(region) {
+            if (!region || typeof region.rendered_html !== 'string') {
+                return '';
             }
 
-            return region.blocks
-                .map(block => this.blockRegistry.render(block))
-                .join('');
+            return region.rendered_html;
+        }
+
+        emptyRegion() {
+            return '<div class="public-content-v2-empty"><p>No rendered content was returned.</p></div>';
         }
     }
 
@@ -354,7 +266,7 @@
             root,
             api: new PublicContentApi(root.dataset.apiUrl),
             store: new PublicContentStore(),
-            view: new PublicContentView(new BlockRendererRegistry()),
+            view: new PublicContentView(),
         });
 
         app.start();
