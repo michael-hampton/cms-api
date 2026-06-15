@@ -3,6 +3,7 @@
 namespace App\Middleware\PublicContent;
 
 use App\Actions\PublicContent\RenderPublicContentPageAction;
+use App\Controllers\Front\ContentController;
 use App\Framework\Http\Request;
 use App\Framework\Middleware\MiddlewareInterface;
 use App\Framework\Support\SiteContext;
@@ -22,13 +23,36 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
 
     public function handle(Request $request, Closure|callable $next)
     {
+        if (!$this->targetsLegacyContentController($request)) {
+            return $next($request);
+        }
+
         $page = $this->resolvePage($request);
 
-        if (!$page || !$this->rollout->enabledFor($page)) {
+        if (
+            !$page
+            || $page->custom_handler
+            || !$this->rollout->enabledFor($page)
+        ) {
             return $next($request);
         }
 
         return $this->render->execute($page);
+    }
+
+    private function targetsLegacyContentController(Request $request): bool
+    {
+        $controllerAction = (string)$request->getAttribute('controller_action', '');
+
+        if ($controllerAction === '') {
+            return false;
+        }
+
+        $controllerClass = str_contains($controllerAction, '@')
+            ? explode('@', $controllerAction, 2)[0]
+            : $controllerAction;
+
+        return $controllerClass === ContentController::class;
     }
 
     private function resolvePage(Request $request): ?Page
