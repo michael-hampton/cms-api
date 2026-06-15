@@ -1,9 +1,8 @@
 @section('logic')
 <?php
-$allowedComponentKeys = $allowedComponentKeys ?? [];
-$canCreateTerms = in_array('terms.create_action', $allowedComponentKeys, true);
-$canEditTerms = in_array('terms.edit_action', $allowedComponentKeys, true);
-$canPublishTerms = in_array('terms.publish_action', $allowedComponentKeys, true);
+$canCreateTerms = $canCreateTerms ?? false;
+$canEditTerms = $canEditTerms ?? false;
+$canPublishTerms = $canPublishTerms ?? false;
 $pageTitle = 'Terms & Conditions';
 $activeNav = 'terms';
 $breadcrumbs = [['label' => 'Terms & Conditions']];
