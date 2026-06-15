@@ -12,9 +12,7 @@ final class PublicContentComposer
     {
     }
 
-    /**
-     * @return array<string, list<PublicContentComponent>>
-     */
+    /** @return array<string, list<PublicContentComponent>> */
     public function compose(PublicContentContext $context): array
     {
         $regions = [];
@@ -76,9 +74,40 @@ final class PublicContentComposer
                     'view' => $context->viewData['links']['view'] ?? null,
                 ],
             ),
-            $this->definition('categories-widget', 'categories-widget', 'components/categories-widget', 'after-content', 100, supports: $landing),
-            $this->definition('activity-feed', 'activity-feed-widget', 'components/activity-feed-widget', 'after-content', 110),
-            $this->definition('trending', 'trending-widget', 'components/trending-widget', 'after-content', 120),
+            $this->definition(
+                'categories-widget',
+                'categories-widget',
+                'components/categories-widget',
+                'after-content',
+                100,
+                supports: $landing,
+                data: static fn(PublicContentContext $context): array => [
+                    'categories' => $context->viewData['categories'] ?? [],
+                    'layout' => 'carousel',
+                ],
+            ),
+            $this->definition(
+                'activity-feed',
+                'activity-feed-widget',
+                'components/activity-feed-widget',
+                'after-content',
+                110,
+                data: static fn(PublicContentContext $context): array => [
+                    'feedPages' => $context->viewData['feedPages'] ?? [],
+                    'siteSlug' => $context->siteSlug,
+                ],
+            ),
+            $this->definition(
+                'trending',
+                'trending-widget',
+                'components/trending-widget',
+                'after-content',
+                120,
+                data: static fn(PublicContentContext $context): array => [
+                    'trendingPages' => $context->viewData['trendingPages'] ?? [],
+                    'siteSlug' => $context->siteSlug,
+                ],
+            ),
             $this->definition(
                 'products',
                 'product-section',
@@ -103,9 +132,23 @@ final class PublicContentComposer
                     'list' => $context->viewData['links']['comments'] ?? null,
                     'create' => $context->viewData['links']['comments'] ?? null,
                 ],
+                data: static fn(PublicContentContext $context): array => [
+                    'nextCommentBadge' => $context->viewData['nextCommentBadge'] ?? null,
+                ],
             ),
             $this->definition('links', 'social-links', 'components/links', 'after-content', 160),
-            $this->definition('category-pages', 'category-pages', 'components/category-pages', 'below-content', 200, supports: $hasCategoriesWithPages),
+            $this->definition(
+                'category-pages',
+                'category-pages',
+                'components/category-pages',
+                'below-content',
+                200,
+                supports: $hasCategoriesWithPages,
+                data: static fn(PublicContentContext $context): array => [
+                    'categories' => $context->viewData['categoriesWithPages'] ?? [],
+                    'site' => $context->siteSlug,
+                ],
+            ),
             $this->definition(
                 'deals',
                 'deals-carousel',
@@ -132,6 +175,7 @@ final class PublicContentComposer
         mixed $endpoints = null,
         bool $stateful = false,
         mixed $supports = null,
+        mixed $data = null,
     ): PublicContentComponentDefinition {
         return new PublicContentComponentDefinition(
             views: $this->views,
@@ -145,6 +189,7 @@ final class PublicContentComposer
             endpoints: $endpoints,
             stateful: $stateful,
             supports: $supports,
+            data: $data,
         );
     }
 }
