@@ -6,7 +6,9 @@ return [
     'shadow_enabled' => env('PUBLIC_CONTENT_V2_SHADOW_ENABLED', false),
     'site_ids' => [],
     'page_types' => ['page', 'content', 'article', 'landing-page'],
-    'widgets' => [],
+    'widgets' => [
+        \App\Services\PublicContent\Widgets\PaywallOverlayWidget::class,
+    ],
     'cache' => [
         'public_ttl_seconds' => 300,
         'viewer_state' => 'private, no-store',
