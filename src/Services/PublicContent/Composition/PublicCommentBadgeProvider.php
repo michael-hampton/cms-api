@@ -20,7 +20,11 @@ final class PublicCommentBadgeProvider
     {
         $earned = $this->earnedBadges->getEarnedBadges($member);
 
-        foreach ($this->badges->getActiveEngagementBadges($siteId) as $badge) {
+        $commentingBadges = $this->badges->getActiveEngagementBadges($siteId)
+            ->filter(fn($badge): bool => $this->commentThreshold($badge) !== null)
+            ->sortBy(fn($badge): int => $this->commentThreshold($badge) ?? PHP_INT_MAX);
+
+        foreach ($commentingBadges as $badge) {
             if ($earned->contains('id', $badge->id)) {
                 continue;
             }
@@ -29,6 +33,17 @@ final class PublicCommentBadgeProvider
                 'badge' => $badge,
                 'progress' => $this->badgeService->calculateBadgeProgress($member, $badge),
             ];
+        }
+
+        return null;
+    }
+
+    private function commentThreshold($badge): ?int
+    {
+        foreach ((array)$badge->criteria as $criteria) {
+            if (($criteria['type'] ?? null) === 'comments_count') {
+                return (int)($criteria['value'] ?? 0);
+            }
         }
 
         return null;
