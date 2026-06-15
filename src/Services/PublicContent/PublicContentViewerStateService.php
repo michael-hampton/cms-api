@@ -2,15 +2,13 @@
 
 namespace App\Services\PublicContent;
 
-use App\Models\Badge;
 use App\Models\Member;
 use App\Models\Page;
-use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Members\ArticleGiftingService;
-use App\Services\Members\BadgeService;
+use App\Services\PublicContent\Composition\PublicCommentBadgeProvider;
 
 final class PublicContentViewerStateService
 {
@@ -19,8 +17,7 @@ final class PublicContentViewerStateService
         private readonly PageViewRepository $views,
         private readonly ArticleAccessService $access,
         private readonly ArticleGiftingService $gifting,
-        private readonly BadgeRepository $badges,
-        private readonly BadgeService $badgeService,
+        private readonly PublicCommentBadgeProvider $commentBadges,
     ) {
     }
 
@@ -30,6 +27,7 @@ final class PublicContentViewerStateService
         $decision = $this->access->canView($page, $member);
         $base = '/api/v1/' . rawurlencode($siteSlug) . '/content/' . $page->id;
         $gift = $member ? $this->gifting->checkAndClaimGiftForPage($member, $page) : null;
+        $nextBadge = $member ? $this->commentBadges->next($member, $siteId) : null;
 
         return [
             'authenticated' => $authenticated,
@@ -50,7 +48,12 @@ final class PublicContentViewerStateService
                 'claimed' => true,
                 'message' => 'Gift access has been applied to this article.',
             ] : null,
-            'next_comment_badge' => $member ? $this->nextCommentBadge($member, $siteId) : null,
+            'next_comment_badge' => $nextBadge ? [
+                'id' => (int)$nextBadge['badge']->id,
+                'name' => (string)$nextBadge['badge']->name,
+                'description' => $nextBadge['badge']->description ?? null,
+                'progress' => $nextBadge['progress'],
+            ] : null,
             'actions' => [
                 'like' => $base . '/like',
                 'view' => $base . '/views',
@@ -58,38 +61,5 @@ final class PublicContentViewerStateService
                 'login' => '/' . rawurlencode($siteSlug) . '/member/login',
             ],
         ];
-    }
-
-    private function nextCommentBadge(Member $member, int $siteId): ?array
-    {
-        $earned = $this->badges->getEarnedBadges($member);
-
-        $badges = Badge::where('site_id', $siteId)
-            ->where('is_active', true)
-            ->where('category', 'engagement')
-            ->get()
-            ->filter(static function ($badge) {
-                return collect($badge->criteria)
-                    ->contains(static fn($criteria) => ($criteria['type'] ?? null) === 'comments_count');
-            })
-            ->sortBy(static function ($badge) {
-                return collect($badge->criteria)
-                    ->firstWhere('type', 'comments_count')['value'] ?? PHP_INT_MAX;
-            });
-
-        foreach ($badges as $badge) {
-            if ($earned->contains('id', $badge->id)) {
-                continue;
-            }
-
-            return [
-                'id' => (int)$badge->id,
-                'name' => (string)$badge->name,
-                'description' => $badge->description ?? null,
-                'progress' => $this->badgeService->calculateBadgeProgress($member, $badge),
-            ];
-        }
-
-        return null;
     }
 }
