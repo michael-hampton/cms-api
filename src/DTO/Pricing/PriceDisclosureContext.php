@@ -24,6 +24,9 @@ final readonly class PriceDisclosureContext
         public array $badges = [],
         public array $experienceLanguageLines = [],
         public array $storeLanguageLines = [],
+        public ?string $rawPeriodLabel = null,
+        public ?string $numericPeriodLabel = null,
+        public ?string $wordedPeriodLabel = null,
     ) {
     }
 
