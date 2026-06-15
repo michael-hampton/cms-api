@@ -5,13 +5,15 @@ namespace App\Controllers\Front;
 use App\Controllers\Controller;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
-use App\Models\Menu;
+use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\PublicContent\PublicContentRollout;
 
 final class PublicContentPreviewController extends Controller
 {
-    public function __construct(private readonly PublicContentRollout $rollout)
-    {
+    public function __construct(
+        private readonly PublicContentRollout $rollout,
+        private readonly PublicNavigationRepository $navigation,
+    ) {
         parent::__construct();
     }
 
@@ -28,16 +30,8 @@ final class PublicContentPreviewController extends Controller
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
             'contentSlug' => $slug,
-            'menu' => Menu::where('is_active', true)
-                ->where('site_id', $siteId)
-                ->where('menu_type', 'header')
-                ->with(['items'])
-                ->first(),
-            'footerMenu' => Menu::where('is_active', true)
-                ->where('site_id', $siteId)
-                ->where('menu_type', 'footer')
-                ->with(['items'])
-                ->first(),
+            'menu' => $this->navigation->findActiveMenu($siteId, 'header'),
+            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer'),
             'apiUrl' => sprintf(
                 '/api/v1/%s/content/%s',
                 rawurlencode($siteSlug),
