@@ -33,7 +33,7 @@ final class PublicContentController extends Controller
             return $this->errorResponse('Content not found.', 404);
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'data' => (new PublicContentResource($document))->toArray(),
             'meta' => [
                 'schema_version' => $document->schemaVersion,
