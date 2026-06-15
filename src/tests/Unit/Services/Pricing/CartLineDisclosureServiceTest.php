@@ -14,17 +14,7 @@ final class CartLineDisclosureServiceTest extends TestCase
 {
     public function test_disclosure_output_is_rebuilt_after_cart_amount_mutation(): void
     {
-        $service = new CartLineDisclosureService(
-            new PriceDisclosureFormatter(new PriceDisclosureTemplateResolver()),
-            new PeriodLabelFormatter(),
-            new class implements ClockInterface {
-                public function now(): DateTimeImmutable
-                {
-                    return new DateTimeImmutable('2026-06-15 12:00:00 UTC');
-                }
-            },
-        );
-
+        $service = $this->service();
         $item = [
             'subscription_plan_id' => 10,
             'quantity' => 1,
@@ -55,20 +45,86 @@ final class CartLineDisclosureServiceTest extends TestCase
         self::assertNotSame($first['line_summary'], $second['line_summary']);
     }
 
-    public function test_invalid_optional_context_values_fall_back_without_throwing(): void
+    public function test_trial_and_intro_window_are_both_included_in_renewal_date(): void
     {
-        $service = new CartLineDisclosureService(
-            new PriceDisclosureFormatter(new PriceDisclosureTemplateResolver()),
-            new PeriodLabelFormatter(),
-            new class implements ClockInterface {
-                public function now(): DateTimeImmutable
-                {
-                    return new DateTimeImmutable('2026-06-15 12:00:00 UTC');
-                }
-            },
+        $result = $this->service()->enrich(
+            item: [
+                'subscription_plan_id' => 10,
+                'quantity' => 1,
+                'amount_minor' => 2200,
+                'options' => [],
+            ],
+            planFacts: ['billing_period' => 'monthly', 'is_one_time' => false],
+            locale: 'en_GB',
+            currency: 'GBP',
+            pricingFacts: [
+                'price' => 22.00,
+                'intro_price' => 8.99,
+                'intro_cycles' => 1,
+                'trial_days' => 14,
+                'period_description' => '4 weeks',
+            ],
         );
 
-        $result = $service->enrich(
+        self::assertStringContainsString('8.99', $result['line_summary']['main_line']);
+        self::assertStringContainsString('4 weeks', $result['line_summary']['main_line']);
+        self::assertStringContainsString('27 Jul 2026', $result['line_summary']['renewal_line']);
+        self::assertStringContainsString('22.00', $result['line_summary']['renewal_line']);
+    }
+
+    public function test_numeric_month_period_drives_label_and_renewal_date(): void
+    {
+        $result = $this->service()->enrich(
+            item: [
+                'subscription_plan_id' => 10,
+                'quantity' => 1,
+                'amount_minor' => 2200,
+                'options' => [],
+            ],
+            planFacts: ['billing_period' => 'monthly', 'is_one_time' => false],
+            locale: 'en_GB',
+            currency: 'GBP',
+            pricingFacts: [
+                'price' => 22.00,
+                'period_description' => '2 months',
+            ],
+        );
+
+        self::assertStringContainsString('every 2 months', $result['line_summary']['main_line']);
+        self::assertStringContainsString('15 Aug 2026', $result['line_summary']['renewal_line']);
+    }
+
+    public function test_twenty_eight_day_period_can_render_compact_equivalent(): void
+    {
+        $result = $this->service()->enrich(
+            item: [
+                'subscription_plan_id' => 10,
+                'quantity' => 1,
+                'amount_minor' => 2200,
+                'options' => [],
+            ],
+            planFacts: ['billing_period' => 'monthly', 'is_one_time' => false],
+            locale: 'en_GB',
+            currency: 'GBP',
+            experienceLanguageLines: [
+                'en_GB' => [
+                    'subscription_without_trial' => ':numeric_period_label / :raw_period_label',
+                ],
+            ],
+            pricingFacts: [
+                'price' => 22.00,
+                'period_description' => '28 days',
+                'period_display_strategy' => 'compact_equivalent',
+            ],
+        );
+
+        self::assertSame('4 weeks / 28 days', $result['line_summary']['main_line']);
+        self::assertStringContainsString('13 Jul 2026', $result['line_summary']['renewal_line']);
+    }
+
+    public function test_invalid_optional_context_values_fall_back_without_throwing(): void
+    {
+        $result = $this->service()->enrich(
             item: [
                 'subscription_plan_id' => 10,
                 'quantity' => 1,
@@ -90,5 +146,19 @@ final class CartLineDisclosureServiceTest extends TestCase
         self::assertArrayHasKey('line_summary', $result);
         self::assertStringNotContainsString(':missing_token', $result['line_summary']['main_line']);
         self::assertStringContainsString('ZZZ 9.99', $result['line_summary']['main_line']);
+    }
+
+    private function service(): CartLineDisclosureService
+    {
+        return new CartLineDisclosureService(
+            new PriceDisclosureFormatter(new PriceDisclosureTemplateResolver()),
+            new PeriodLabelFormatter(),
+            new class implements ClockInterface {
+                public function now(): DateTimeImmutable
+                {
+                    return new DateTimeImmutable('2026-06-15 12:00:00 UTC');
+                }
+            },
+        );
     }
 }
