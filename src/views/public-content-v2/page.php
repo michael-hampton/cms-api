@@ -5,17 +5,19 @@ $description = 'Public content V2 preview';
 
 @include('header', ['menu' => $menu])
 
-<main class="public-content-v2-shell">
-    <div
-        id="public-content-v2-app"
-        class="public-content-v2-app"
-        data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
-        data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
-        data-slug="<?= htmlspecialchars($contentSlug, ENT_QUOTES, 'UTF-8') ?>"
-    >
-        <div class="public-content-v2-status" role="status" aria-live="polite">
-            <div class="public-content-v2-spinner" aria-hidden="true"></div>
-            <p>Loading content…</p>
+<main class="mt-20">
+    <div class="container">
+        <div
+            id="public-content-v2-app"
+            class="public-content-v2-app"
+            data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
+            data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-slug="<?= htmlspecialchars($contentSlug, ENT_QUOTES, 'UTF-8') ?>"
+        >
+            <div class="public-content-v2-status" role="status" aria-live="polite">
+                <div class="public-content-v2-spinner" aria-hidden="true"></div>
+                <p>Loading content…</p>
+            </div>
         </div>
     </div>
 </main>
