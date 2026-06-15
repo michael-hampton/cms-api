@@ -1,4 +1,6 @@
-<div class="deal-card" data-title="<?= strtolower(htmlspecialchars($deal['title'])) ?>">
+<div class="deal-card"
+     data-title="<?= strtolower(htmlspecialchars($deal['title'])) ?>"
+     data-product-id="<?= (int)$deal['product_id'] ?>">
 
     <div class="deal-header-actions">
         <div class="deal-badge">
@@ -35,15 +37,19 @@
         </div>
 
         <div class="deal-actions">
-            <button class="deal-add-cart" onclick="event.stopPropagation(); addToCart(<?= $deal['product_id'] ?>)">
+            <button type="button"
+                    class="deal-add-cart"
+                    data-action="add-to-cart"
+                    data-product-id="<?= (int)$deal['product_id'] ?>">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="9" cy="21" r="1"></circle>
                     <circle cx="20" cy="21" r="1"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
-                Add to Cart
+                <span>Add to Cart</span>
             </button>
-            <button class="deal-cta"
+            <button type="button"
+                    class="deal-cta"
                     onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/shop/details/<?= $deal['slug'] ?>'">
                 View Deal
             </button>
