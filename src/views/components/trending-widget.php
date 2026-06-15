@@ -2,20 +2,11 @@
 /**
  * trending-widget.php
  *
- * Site-wide trending pages widget. No member context required.
- *
- * Expected variables injected by the controller / view composer:
- *   $trendingPages  – Collection of Page models with like_count_24h, comment_count_24h,
- *                     categories (relation), metadata (relation)
- *   $siteSlug       – string  e.g. "estate"
+ * Expected variables injected by the public content composer:
+ *   $trendingPages – Collection of Page models with counts and relations
+ *   $siteSlug      – current site slug
  */
-/** @var \App\Framework\Support\Collection $trendingPages */
-$trendingPages = app(\App\Services\Recommendations\ContentRecommendationService::class)
-        ->getTrendingConversations(\App\Framework\Support\SiteContext::getId(), 3);
 
-
-/** @var string $siteSlug */
-$siteSlug = \App\Framework\Support\SiteContext::slug();
 if (empty($trendingPages) || $trendingPages->count() === 0) {
     return;
 }
@@ -99,7 +90,6 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
 </section>
 
 <style>
-    /* ── Trending Widget ──────────────────────────────────────── */
     .trending-widget {
         margin-bottom: 3rem;
         margin-top: 3rem;
@@ -142,14 +132,12 @@ if (empty($trendingPages) || $trendingPages->count() === 0) {
         opacity: 0.75;
     }
 
-    /* Grid */
     .trending-widget__grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
         gap: 1.25rem;
     }
 
-    /* Card */
     .trending-card {
         background: #fff;
         border: 1px solid var(--border-color, #e5e7eb);
