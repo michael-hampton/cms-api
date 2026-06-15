@@ -2,6 +2,7 @@
 
 namespace App\Actions\PublicContent;
 
+use App\DTO\PublicContent\ContentRegion;
 use App\DTO\PublicContent\PublicContentContext;
 use App\DTO\PublicContent\PublicContentDocument;
 use App\Framework\Support\SiteContext;
@@ -57,13 +58,6 @@ final class GetPublicContentAction
             throw new RuntimeException('Public content site scope mismatch.');
         }
 
-        $decision = $this->access->canView($page, $member);
-        if (!($decision['can_view'] ?? false)) {
-            throw new PublicContentAccessDenied(
-                (string)($decision['reason'] ?? 'Content access denied.'),
-            );
-        }
-
         $siteSlug = SiteContext::slug();
         $base = '/api/v1/' . rawurlencode($siteSlug) . '/content/' . $page->id;
         $links = [
@@ -71,7 +65,29 @@ final class GetPublicContentAction
             'comments' => $base . '/comments',
             'like' => $base . '/like',
             'view' => $base . '/views',
+            'canonical' => $territory
+                ? sprintf('/%s/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$territory->slug), rawurlencode((string)$page->slug))
+                : sprintf('/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$page->slug)),
         ];
+
+        $decision = $this->access->canView($page, $member);
+        $canView = (bool)($decision['can_view'] ?? false);
+        $access = [
+            'can_view' => $canView,
+            'reason' => $canView ? null : (string)($decision['reason'] ?? 'subscription_required'),
+        ];
+
+        if (!$canView) {
+            return $this->restrictedDocument(
+                page: $page,
+                siteId: $siteId,
+                siteSlug: $siteSlug,
+                member: $member,
+                territory: $territory,
+                links: $links,
+                access: $access,
+            );
+        }
 
         $viewData = $this->compositionData->build(
             page: $page,
@@ -81,6 +97,7 @@ final class GetPublicContentAction
             links: $links,
             territory: $territory,
         );
+        $viewData['access'] = $access;
 
         if ($territory) {
             $viewData = array_merge($viewData, $this->regionalViewData($page, $territory, $siteId));
@@ -107,19 +124,57 @@ final class GetPublicContentAction
             components: $components,
             authors: $this->authors($page),
             landingSections: [],
-            links: array_merge($links, [
-                'canonical' => $territory
-                    ? sprintf('/%s/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$territory->slug), rawurlencode((string)$page->slug))
-                    : sprintf('/%s/%s', rawurlencode($siteSlug), rawurlencode((string)$page->slug)),
-            ]),
-            widgets: $territory ? [
-                'territory' => [
-                    'id' => (int)$territory->id,
-                    'slug' => (string)$territory->slug,
-                    'name' => (string)$territory->name,
-                    'code' => $territory->code ?? null,
-                ],
-            ] : [],
+            links: $links,
+            widgets: $territory ? ['territory' => $this->territoryData($territory)] : [],
+            access: $access,
+        );
+    }
+
+    private function restrictedDocument(
+        Page $page,
+        int $siteId,
+        string $siteSlug,
+        ?Member $member,
+        ?Territory $territory,
+        array $links,
+        array $access,
+    ): PublicContentDocument {
+        $preview = trim((string)($page->listing_synopsis ?: $page->meta_description ?: $page->description ?: ''));
+        $previewHtml = $preview !== ''
+            ? '<div class="premium-content-preview"><p>' . htmlspecialchars($preview, ENT_QUOTES, 'UTF-8') . '</p></div>'
+            : '<div class="premium-content-preview" aria-hidden="true"></div>';
+
+        $viewData = [
+            'access' => $access,
+            'links' => $links,
+            'siteSlug' => $siteSlug,
+            'territory' => $territory,
+        ];
+
+        $components = $this->composer->compose(new PublicContentContext(
+            page: $page,
+            siteId: $siteId,
+            siteSlug: $siteSlug,
+            member: $member,
+            viewData: $viewData,
+        ));
+
+        return new PublicContentDocument(
+            id: (int)$page->id,
+            siteId: (int)$page->site_id,
+            slug: (string)$page->slug,
+            type: (string)$page->page_type,
+            title: (string)$page->title,
+            summary: $page->meta_description ?: null,
+            seo: $page->seo ? $page->seo->toArray() : [],
+            taxonomy: $this->taxonomy($page),
+            regions: [new ContentRegion('main', [], $previewHtml)],
+            components: $components,
+            authors: $this->authors($page),
+            landingSections: [],
+            links: $links,
+            widgets: $territory ? ['territory' => $this->territoryData($territory)] : [],
+            access: $access,
         );
     }
 
@@ -130,9 +185,7 @@ final class GetPublicContentAction
         return [
             'territory' => $territory,
             'allTerritories' => $this->territories->getActiveForSite($siteId),
-            'pageGridHtml' => $grid
-                ? (new PageGridRenderer())->render($grid, $territory)
-                : null,
+            'pageGridHtml' => $grid ? (new PageGridRenderer())->render($grid, $territory) : null,
             'regionArticles' => $this->pages->getRelatedForTerritory(
                 $siteId,
                 (int)$territory->id,
@@ -142,7 +195,7 @@ final class GetPublicContentAction
         ];
     }
 
-    private function taxonomy($page): array
+    private function taxonomy(Page $page): array
     {
         return [
             'categories' => $page->categories?->map(static fn($item) => [
@@ -158,7 +211,7 @@ final class GetPublicContentAction
         ];
     }
 
-    private function authors($page): array
+    private function authors(Page $page): array
     {
         return $page->authors?->map(static fn($author) => [
             'id' => (int)$author->id,
@@ -167,5 +220,15 @@ final class GetPublicContentAction
             'bio' => $author->bio ?? null,
             'image' => $author->avatar ?? null,
         ])->toArray() ?? [];
+    }
+
+    private function territoryData(Territory $territory): array
+    {
+        return [
+            'id' => (int)$territory->id,
+            'slug' => (string)$territory->slug,
+            'name' => (string)$territory->name,
+            'code' => $territory->code ?? null,
+        ];
     }
 }
