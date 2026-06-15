@@ -24,11 +24,11 @@ final class PublicContentViewerStateService
     ) {
     }
 
-    public function for(Page $page, int $siteId, ?Member $member): array
+    public function for(Page $page, int $siteId, string $siteSlug, ?Member $member): array
     {
         $authenticated = $member !== null;
         $decision = $this->access->canView($page, $member);
-        $base = '/api/v1/' . $siteId . '/content/' . $page->id;
+        $base = '/api/v1/' . rawurlencode($siteSlug) . '/content/' . $page->id;
         $gift = $member ? $this->gifting->checkAndClaimGiftForPage($member, $page) : null;
 
         return [
@@ -55,7 +55,7 @@ final class PublicContentViewerStateService
                 'like' => $base . '/like',
                 'view' => $base . '/views',
                 'comments' => $base . '/comments',
-                'login' => '/member/login',
+                'login' => '/' . rawurlencode($siteSlug) . '/member/login',
             ],
         ];
     }
