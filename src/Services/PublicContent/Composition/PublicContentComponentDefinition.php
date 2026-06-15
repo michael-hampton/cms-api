@@ -5,8 +5,10 @@ namespace App\Services\PublicContent\Composition;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
+use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
+use App\Services\PublicContent\Widgets\WidgetPlacement;
 
-final readonly class PublicContentComponentDefinition
+final readonly class PublicContentComponentDefinition implements PublicContentWidgetDefinition
 {
     public function __construct(
         private ViewRenderer $views,
@@ -24,17 +26,36 @@ final readonly class PublicContentComponentDefinition
     ) {
     }
 
-    public function supports(PublicContentContext $context): bool
+    public function key(): string
     {
-        return $this->supports === null || (bool)($this->supports)($context);
+        return $this->id;
     }
 
-    public function build(PublicContentContext $context): PublicContentComponent
+    public function defaultPlacement(): WidgetPlacement
     {
-        $extra = $this->data === null ? [] : (array)($this->data)($context);
+        return new WidgetPlacement(
+            widgetKey: $this->id,
+            region: $this->region,
+            priority: $this->priority,
+        );
+    }
+
+    public function supports(PublicContentContext $context): bool
+    {
+        return $this->supports === null || (bool) ($this->supports)($context);
+    }
+
+    public function build(
+        PublicContentContext $context,
+        ?WidgetPlacement $placement = null,
+    ): PublicContentComponent {
+        $placement ??= $this->defaultPlacement();
+        $extra = $this->data === null ? [] : (array) ($this->data)($context);
+        $extra['widgetConfiguration'] = $placement->configuration;
+
         $endpoints = $this->endpoints === null
             ? []
-            : (is_callable($this->endpoints) ? (array)($this->endpoints)($context) : (array)$this->endpoints);
+            : (is_callable($this->endpoints) ? (array) ($this->endpoints)($context) : (array) $this->endpoints);
 
         $styles = $this->type === 'deals-carousel' ? [] : $this->styles;
         $scripts = $this->type === 'deals-carousel' ? [] : $this->scripts;
@@ -42,8 +63,8 @@ final readonly class PublicContentComponentDefinition
         return new PublicContentComponent(
             id: $this->id,
             type: $this->type,
-            region: $this->region,
-            priority: $this->priority,
+            region: $placement->region,
+            priority: $placement->priority,
             html: $this->views->partial($this->template, $context->with($extra)),
             styles: array_map(
                 static fn(string $file): string => asset($file, 'css'),
