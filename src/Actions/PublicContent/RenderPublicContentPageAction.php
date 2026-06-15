@@ -47,7 +47,6 @@ class RenderPublicContentPageAction
             'pageTitle' => (string)$page->title,
             'pageDescription' => $page->meta_description ?? '',
             'territory' => $territory,
-            'locale' => $territory->locale ?? $territory->locale_code ?? null,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header', $territoryId),
             'menuRenderer' => $this->menuRenderer,
             'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', $territoryId),
