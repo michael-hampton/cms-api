@@ -16,7 +16,11 @@ $description = 'Public content V2 preview';
             <p>Loading content…</p>
         </div>
     </div>
+
+    <div id="public-content-v2-supplementary" class="public-content-v2-supplementary"></div>
 </main>
 
 @css('public-content-v2.css')
+@css('public-content-v2-interactions.css')
 @js('public-content-v2.js')
+@js('public-content-v2-supplementary.js')
