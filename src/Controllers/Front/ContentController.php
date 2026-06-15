@@ -20,48 +20,53 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\PageViewRepository;
+use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\PageRenderService;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
+use App\Services\PublicContent\PublicContentRollout;
 use App\Services\Subscriptions\SubscriptionModalService;
-use App\Services\Url\UrlResolutionResult;
 
 class ContentController extends Controller
 {
     public function __construct(
-        private readonly BlockParserService   $blockParserService,
-        private readonly CommentRepository    $commentRepository,
-        private readonly PageViewRepository   $pageViewRepository,
-        private readonly PageGridRepository   $pageGridRepository,
-        private readonly ActivityTracking         $activityTracking,
+        private readonly BlockParserService $blockParserService,
+        private readonly CommentRepository $commentRepository,
+        private readonly PageViewRepository $pageViewRepository,
+        private readonly PageGridRepository $pageGridRepository,
+        private readonly ActivityTracking $activityTracking,
         private readonly SubscriptionModalService $modalService,
-        private readonly PageRenderService    $pageRenderService,
+        private readonly PageRenderService $pageRenderService,
         private readonly ArticleAccessService $articleAccessService,
-        private readonly BadgeRepository      $badgeRepository,
+        private readonly BadgeRepository $badgeRepository,
         private readonly PageRepository $pageRepository,
-        private readonly DealsService   $dealsService,
-        private readonly ArticleGiftingService $articleGiftingService
-    )
-    {
+        private readonly DealsService $dealsService,
+        private readonly ArticleGiftingService $articleGiftingService,
+        private readonly PublicContentRollout $publicContentRollout,
+        private readonly PublicNavigationRepository $publicNavigation,
+        private readonly MenuRenderer $menuRenderer,
+    ) {
         parent::__construct();
     }
 
     public function show(Page $page)
     {
+        if ($this->publicContentRollout->enabledFor($page)) {
+            return $this->showPublicContentV2($page);
+        }
+
         $member = MemberAuth::getMember();
         $memberId = $member ? $member->id : null;
 
         $accessCheck = $this->articleAccessService->canView($page, $member);
 
         if (!$accessCheck['can_view']) {
-            // Redirect to subscription page or show paywall
             return $this->showPaywall($page, $accessCheck['reason']);
         }
 
-        // Get site-specific menu
         $siteId = SiteContext::getId();
 
         $menu = Menu::where('is_active', true)
@@ -76,8 +81,6 @@ class ContentController extends Controller
             ->with(['items'])
             ->first();
 
-
-        // Load page relationships
         $page->load([
             'blocks', 'categories', 'tags', 'metadata',
             'seo', 'settings', 'social', 'customFields', 'authors', 'products', 'comments'
@@ -100,11 +103,9 @@ class ContentController extends Controller
 
         $this->activityTracking->trackPageView($page);
 
-        // Check and auto-claim gift if member is logged in
         $claimedGift = null;
         if (MemberAuth::check()) {
             $member = MemberAuth::getMember();
-
             $claimedGift = $this->articleGiftingService->checkAndClaimGiftForPage($member, $page);
         }
 
@@ -116,8 +117,8 @@ class ContentController extends Controller
             'site' => SiteContext::get(),
             'member' => $member,
             'subscriptionModalData' => $modalData,
-            'menuRenderer' => new MenuRenderer(),
-            'claimedGift' => $claimedGift
+            'menuRenderer' => $this->menuRenderer,
+            'claimedGift' => $claimedGift,
         ];
 
         $data['allCategories'] = Category::where('site_id', $siteId)
@@ -131,9 +132,6 @@ class ContentController extends Controller
 
         if ($member) {
             $badgeService = app(\App\Services\Members\BadgeService::class);
-            $siteId = SiteContext::getId();
-
-            // Get commenting badges
             $commentingBadges = Badge::where('site_id', $siteId)
                 ->where('is_active', true)
                 ->where('category', 'engagement')
@@ -148,7 +146,6 @@ class ContentController extends Controller
                 })
                 ->all();
 
-            // Find next badge to earn
             $nextCommentBadge = null;
             $badgeProgress = null;
 
@@ -164,29 +161,21 @@ class ContentController extends Controller
             $data['commentBadgeProgress'] = $badgeProgress;
         }
 
-        // Add like information if member is logged in
-        if ($member) {
-            $data['isLiked'] = PageLike::isLikedBy($page->id, $member->id, $siteId);
-        } else {
-            $data['isLiked'] = false;
-        }
-
+        $data['isLiked'] = $member
+            ? PageLike::isLikedBy($page->id, $member->id, $siteId)
+            : false;
         $data['likeCount'] = PageLike::getLikeCount($page->id);
         $data['viewCount'] = PageView::getTotalViewCount($page->id);
 
-        // Use site-specific theme if available
         $theme = SiteContext::getTheme();
         $viewPath = "{$theme}/page";
-
         $data['todaysDeals'] = $this->dealsService->getTodaysDeals(10);
 
-        // Fallback to default theme if theme view doesn't exist
         if (!$this->viewExists($viewPath)) {
-            $viewPath = "estate/page";
+            $viewPath = 'estate/page';
         }
 
-        $html = $this->pageRenderService->renderPage($page, $siteId, MemberAuth::getMember());
-        $data['html'] = $html;
+        $data['html'] = $this->pageRenderService->renderPage($page, $siteId, MemberAuth::getMember());
 
         if ($page->page_type === 'landing-page' && !empty($data['allCategories'])) {
             $data['categoriesWithPages'] = $this->getCategoryPages($siteId, $data['allCategories']);
@@ -199,8 +188,29 @@ class ContentController extends Controller
     {
         $sites = Site::active()->get();
 
-        return $this->view('estate/sites', [
-            'sites' => $sites
+        return $this->view('estate/sites', ['sites' => $sites]);
+    }
+
+    private function showPublicContentV2(Page $page): Response
+    {
+        $siteId = SiteContext::getId();
+        $siteSlug = SiteContext::slug();
+
+        return $this->view('public-content-v2/page', [
+            'preview' => false,
+            'site' => SiteContext::get(),
+            'siteSlug' => $siteSlug,
+            'contentSlug' => (string)$page->slug,
+            'pageTitle' => (string)$page->title,
+            'pageDescription' => $page->meta_description ?? '',
+            'menu' => $this->publicNavigation->findActiveMenu($siteId, 'header'),
+            'menuRenderer' => $this->menuRenderer,
+            'footerMenu' => $this->publicNavigation->findActiveMenu($siteId, 'footer'),
+            'apiUrl' => sprintf(
+                '/api/v1/%s/content/%s',
+                rawurlencode($siteSlug),
+                rawurlencode((string)$page->slug),
+            ),
         ]);
     }
 
@@ -208,21 +218,14 @@ class ContentController extends Controller
     {
         $categoriesWithPages = [];
 
-        // Load pages for each category
         foreach ($categories as $category) {
-
-            $categoryPages = $this->pageRepository->getPagesByCategory(
-                $category->id,
-                6, // Limit to 6 pages per category
-                $siteId
-            );
+            $categoryPages = $this->pageRepository->getPagesByCategory($category->id, 6, $siteId);
 
             if (!$categoryPages->count() || $categoryPages->count() < 3) {
                 continue;
             }
 
             $categoriesWithPages[$category->id]['category'] = $category;
-
             $categoriesWithPages[$category->id]['pages'] = $categoryPages;
         }
 
@@ -245,7 +248,7 @@ class ContentController extends Controller
             'reason' => $reason,
             'menu' => $menu,
             'member' => $member,
-            'menuRenderer' => new MenuRenderer()
+            'menuRenderer' => $this->menuRenderer,
         ]);
     }
 }
