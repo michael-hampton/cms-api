@@ -1,0 +1,14 @@
+.public-content-v2-app .deal-header-actions {
+    pointer-events: none;
+}
+
+.public-content-v2-app .deal-header-actions .deal-wishlist-btn,
+.public-content-v2-app .deal-header-actions a,
+.public-content-v2-app .deal-header-actions button {
+    pointer-events: auto;
+}
+
+.public-content-v2-app .deal-actions {
+    position: relative;
+    z-index: 20;
+}
