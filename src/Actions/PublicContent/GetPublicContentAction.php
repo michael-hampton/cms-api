@@ -54,7 +54,7 @@ final class GetPublicContentAction
                     'slug' => (string)$tag->slug,
                 ])->toArray() ?? [],
             ],
-            regions: $this->renderer->render($page, $siteId),
+            regions: $this->renderer->render($page, $siteId, $member),
         );
     }
 }
