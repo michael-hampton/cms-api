@@ -37,8 +37,13 @@ final class PublicContentViewerController extends Controller
             return $this->errorResponse('Content not found.', 404);
         }
 
-        return $this->jsonResponse([
-            'data' => $this->viewerState->for($page, SiteContext::getId(), MemberAuth::check() ? MemberAuth::member() : null),
+        return $this->resourceResponse([
+            'data' => $this->viewerState->for(
+                $page,
+                SiteContext::getId(),
+                SiteContext::slug(),
+                MemberAuth::check() ? MemberAuth::member() : null,
+            ),
         ]);
     }
 
@@ -106,7 +111,7 @@ final class PublicContentViewerController extends Controller
             $request->header('Referer'),
         );
 
-        return $this->jsonResponse(['success' => true], 201);
+        return $this->resourceResponse(['data' => ['recorded' => true]], 201);
     }
 
     public function comments(int $pageId): JsonResponse
@@ -115,7 +120,7 @@ final class PublicContentViewerController extends Controller
             return $this->errorResponse('Content not found.', 404);
         }
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'data' => [
                 'comments' => $this->comments->getCommentsForPage($pageId)->toArray(),
                 'stats' => $this->comments->getCommentStats($pageId)->toArray(),
@@ -153,7 +158,7 @@ final class PublicContentViewerController extends Controller
         $this->activityTracking->trackComment($comment);
         event(new CommentPostedByMember($member->id, SiteContext::getId(), $pageId));
 
-        return $this->jsonResponse([
+        return $this->resourceResponse([
             'data' => [
                 'id' => $comment->id,
                 'name' => $comment->name,
