@@ -6,6 +6,7 @@ use App\Actions\OpenCollab\Legal\AcceptTermsVersionAction;
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\TermsVersionRepository;
@@ -30,7 +31,7 @@ class TermsOnboardingController extends Controller
 
     public function show(): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+        if ($response = $this->authorizeSitePermissions(['terms.view'])) {
             return $response;
         }
 
@@ -48,12 +49,17 @@ class TermsOnboardingController extends Controller
 
     public function accept(AcceptTermsRequest $request): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['onboarding.view'])) {
+        if ($response = $this->authorizeSitePermissions(['terms.accept'])) {
             return $response;
         }
 
         $siteId = SiteContext::getId();
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
+        }
+
         $required = $this->requirements->currentRequiredVersion($siteId);
 
         if (!$required) {

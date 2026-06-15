@@ -100,6 +100,8 @@ use App\Controllers\OpenCollab\Admin\AdminContributorController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelinesController;
 use App\Controllers\OpenCollab\Admin\AdminGuidelineTemplateController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsController;
+use App\Controllers\OpenCollab\Admin\AdminTermsController;
+use App\Controllers\OpenCollab\Admin\AdminTermsEvidenceController;
 use App\Controllers\OpenCollab\Admin\ModerationEscalationController;
 use App\Controllers\OpenCollab\Admin\ModerationQueueController;
 use App\Controllers\OpenCollab\Admin\ModerationRiskController;
@@ -132,6 +134,7 @@ use App\Controllers\OpenCollab\PayoutStatementController;
 use App\Controllers\OpenCollab\ResendInvitationController;
 use App\Controllers\OpenCollab\StripeConnectController;
 use App\Controllers\OpenCollab\StripeWebhookController;
+use App\Controllers\OpenCollab\TermsOnboardingController;
 use App\Controllers\OpenCollab\ViolationController;
 use App\Controllers\OpenCollab\WidgetSettingsController;
 use App\Controllers\Product\MerchantContactController;
@@ -421,6 +424,9 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
             [ContributorProfileSampleLinksController::class, 'update']
         );
 
+        $router->get('/open-collab/onboarding/terms', [TermsOnboardingController::class, 'show']);
+        $router->post('/open-collab/onboarding/terms', [TermsOnboardingController::class, 'accept']);
+
         $router->get(
             '/open-collab/dashboard',
             [ContributorDashboardController::class, 'show']
@@ -522,6 +528,15 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/open-collab/admin/contracts/{id}/clone', [AdminContractController::class, 'clone']);
         $router->post('/open-collab/admin/contracts/from-template', [AdminContractController::class, 'storeFromTemplate']);
         $router->post('/open-collab/admin/contracts/from-document', [AdminContractController::class, 'storeFromDocument']);
+
+        $router->get('/open-collab/admin/terms', [AdminTermsController::class, 'index']);
+        $router->get('/open-collab/admin/terms/latest', [AdminTermsController::class, 'latest']);
+        $router->post('/open-collab/admin/terms', [AdminTermsController::class, 'store']);
+        $router->get('/open-collab/admin/terms/{id}', [AdminTermsController::class, 'show']);
+        $router->put('/open-collab/admin/terms/{id}', [AdminTermsController::class, 'update']);
+        $router->post('/open-collab/admin/terms/{id}/publish', [AdminTermsController::class, 'publish']);
+        $router->post('/open-collab/admin/terms/from-document', [AdminTermsController::class, 'storeFromDocument']);
+        $router->get('/open-collab/admin/terms-evidence/{id}', [AdminTermsEvidenceController::class, 'show']);
 
         $router->get('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'index']);
         $router->post('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'store']);

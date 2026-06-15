@@ -14,7 +14,7 @@ class TermsAcceptanceEvidenceServiceTest extends TestCase
     public function test_missing_acceptance_throws(): void
     {
         $this->expectException(RuntimeException::class);
-        (new TermsAcceptanceEvidenceService())->get(999999);
+        (new TermsAcceptanceEvidenceService(fn() => null))->get(999999);
     }
 
     public function test_hash_verification_logic_is_reproducible(): void

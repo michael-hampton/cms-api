@@ -36,6 +36,7 @@ enum OnboardingStepStatus: string
 
     /** All valid step keys, in canonical display order. */
     public const STEPS = [
+        'terms',
         'profile',
         'payment_setup',
         'kyc_verification',

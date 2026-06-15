@@ -81,11 +81,12 @@ if ($profile && !empty($profile->expertise)) {
                     </div>
                 <?php endif;?>
 
-                <!-- ── PROFILE STEP ─────────────────────────── -->
-                <!-- ── PROFILE STEP ─────────────────────────── -->
                 <?php $profileStep = $vm->profileStep(); ?>
 
-                <?php if ($vm->currentStepName() === 'profile' && $profileStep): ?>
+                <?php if ($vm->currentStepName() === 'terms'): ?>
+                    @include('open-collab/onboarding/partials/terms', ['terms' => $terms])
+
+                <?php elseif ($vm->currentStepName() === 'profile' && $profileStep): ?>
                     <form id="onboarding-form" class="oc-step-form" method="POST" enctype="multipart/form-data" novalidate>
                         <input type="hidden" name="_token" value="<?= csrf_token() ?>">
 

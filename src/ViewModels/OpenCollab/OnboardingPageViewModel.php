@@ -15,14 +15,15 @@ use App\Models\Site;
  *                    each entry: ['step' => string, 'reason' => string, 'meta' => array]
  *   - $site          is the Site model for the current request
  *
- * Steps are always presented in canonical order: profile → payment → contract → guidelines.
+ * Steps are always presented in canonical order: terms → profile → payment → contract → guidelines.
  * Steps that the site does not require are excluded entirely from the applicable set.
  */
 final class OnboardingPageViewModel
 {
     /** Canonical display order — do not reorder. */
-    private const STEP_ORDER = ['profile', 'payment_setup', 'kyc_verification', 'contract', 'guidelines', 'age_verification'];
+    private const STEP_ORDER = ['terms', 'profile', 'payment_setup', 'kyc_verification', 'contract', 'guidelines', 'age_verification'];
     private const STEP_LABELS = [
+        'terms' => 'Terms',
         'profile' => 'Profile',
         'payment_setup' => 'Payment',
         'contract' => 'Contract',
@@ -32,6 +33,7 @@ final class OnboardingPageViewModel
     ];
 
     private const STEP_TITLES = [
+        'terms' => 'Accept the terms',
         'profile' => 'Set up your profile',
         'payment_setup' => 'Payment details',
         'contract' => 'Sign the contract',
@@ -41,6 +43,7 @@ final class OnboardingPageViewModel
     ];
 
     private const STEP_ICONS = [
+        'terms' => '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h5l5 5v9a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm7 0v3h3l-3-3zM7 10a1 1 0 100 2h6a1 1 0 100-2H7zm0 4a1 1 0 100 2h4a1 1 0 100-2H7z" clip-rule="evenodd"/>',
         'profile' => '<path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>',
         'payment_setup' => '<path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/><path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>',
         'contract' => '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"/>',
@@ -92,7 +95,7 @@ final class OnboardingPageViewModel
                 'guidelines' => (bool)($this->site->require_guidelines_ack ?? true),
                 'age_verification' => (bool)($this->site->require_age_verification ?? true),
                 'kyc_verification' => (bool)($this->site->require_kyc_verification ?? false),
-                default => true, // profile is always required
+                default => true, // terms and profile are always required
             },
         ));
     }

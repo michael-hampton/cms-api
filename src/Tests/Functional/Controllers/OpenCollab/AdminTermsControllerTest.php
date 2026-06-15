@@ -12,7 +12,7 @@ class AdminTermsControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(200, $response);
         $body = $this->decodeJson($response);
-        $this->assertSame([], $body['terms']);
+        $this->assertSame([], $body['data']['terms']);
     }
 
     public function test_store_creates_draft_terms_version(): void
@@ -28,8 +28,8 @@ class AdminTermsControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(201, $response);
         $body = $this->decodeJson($response);
-        $this->assertSame('1.0.0', $body['terms']['semantic_version']);
-        $this->assertSame('draft', $body['terms']['status']);
+        $this->assertSame('1.0.0', $body['data']['terms']['semantic_version']);
+        $this->assertSame('draft', $body['data']['terms']['status']);
         $this->assertDatabaseHas('oc_terms_versions', [
             'semantic_version' => '1.0.0',
             'title' => 'Contributor Terms',
@@ -53,12 +53,12 @@ class AdminTermsControllerTest extends FunctionalTestCase
             'title' => 'Contributor Terms',
             'source_content' => str_repeat('Terms content for a single site. ', 3),
         ]);
-        $created = $this->decodeJson($create);
+        $created = $this->decodeJson($create)['data'];
 
         $response = $this->getForSite('/api/open-collab/admin/terms/' . $created['terms']['id']);
 
         $this->assertResponseStatus(200, $response);
-        $body = $this->decodeJson($response);
+        $body = $this->decodeJson($response)['data'];
         $this->assertSame($created['terms']['id'], $body['terms']['id']);
     }
 
@@ -69,7 +69,7 @@ class AdminTermsControllerTest extends FunctionalTestCase
             'title' => 'Contributor Terms',
             'source_content' => str_repeat('Original terms wording. ', 4),
         ]);
-        $created = $this->decodeJson($create);
+        $created = $this->decodeJson($create)['data'];
 
         $response = $this->putForSite('/api/open-collab/admin/terms/' . $created['terms']['id'], [
             'title' => 'Updated Contributor Terms',
@@ -92,12 +92,12 @@ class AdminTermsControllerTest extends FunctionalTestCase
             'source_format' => 'html',
             'is_material_change' => true,
         ]);
-        $created = $this->decodeJson($create);
+        $created = $this->decodeJson($create)['data'];
 
         $response = $this->postForSite('/api/open-collab/admin/terms/' . $created['terms']['id'] . '/publish');
 
         $this->assertResponseStatus(200, $response);
-        $body = $this->decodeJson($response);
+        $body = $this->decodeJson($response)['data'];
         $this->assertSame('published', $body['terms']['status']);
         $this->assertSame(
             hash('sha256', $body['terms']['rendered_content']),
@@ -112,7 +112,7 @@ class AdminTermsControllerTest extends FunctionalTestCase
             'title' => 'Locked Terms',
             'source_content' => str_repeat('<p>Locked terms wording.</p>', 3),
         ]);
-        $created = $this->decodeJson($create);
+        $created = $this->decodeJson($create)['data'];
         $this->postForSite('/api/open-collab/admin/terms/' . $created['terms']['id'] . '/publish');
 
         $response = $this->putForSite('/api/open-collab/admin/terms/' . $created['terms']['id'], [

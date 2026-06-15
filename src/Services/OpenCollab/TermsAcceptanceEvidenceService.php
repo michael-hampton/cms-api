@@ -8,9 +8,15 @@ use RuntimeException;
 
 class TermsAcceptanceEvidenceService
 {
+    public function __construct(private readonly mixed $findAcceptance = null)
+    {
+    }
+
     public function get(int $acceptanceId): TermsAcceptanceEvidence
     {
-        $acceptance = UserTermsAcceptance::find($acceptanceId);
+        $acceptance = is_callable($this->findAcceptance)
+            ? ($this->findAcceptance)($acceptanceId)
+            : UserTermsAcceptance::find($acceptanceId);
 
         if (!$acceptance) {
             throw new RuntimeException('Terms acceptance evidence not found.');

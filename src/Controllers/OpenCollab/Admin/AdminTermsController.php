@@ -5,11 +5,12 @@ namespace App\Controllers\OpenCollab\Admin;
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
 use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
 use App\Framework\Http\JsonResponse;
-use App\Framework\Http\Request;
 use App\Framework\Http\UploadedFile;
 use App\Framework\Support\SiteContext;
 use App\Repositories\OpenCollab\TermsVersionRepository;
+use App\Requests\OpenCollab\StoreTermsFromDocumentRequest;
 use App\Requests\OpenCollab\StoreTermsVersionRequest;
 use App\Requests\OpenCollab\UpdateTermsVersionRequest;
 use App\Resources\OpenCollab\TermsVersionResource;
@@ -31,7 +32,7 @@ class AdminTermsController extends Controller
 
     public function index(): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['terms.edit', 'terms.publish', 'terms.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['terms.view', 'terms.edit', 'terms.publish', 'terms.archive'])) {
             return $response;
         }
 
@@ -58,7 +59,7 @@ class AdminTermsController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        if ($response = $this->authorizeSitePermissions(['terms.edit', 'terms.publish', 'terms.archive'])) {
+        if ($response = $this->authorizeSitePermissions(['terms.view', 'terms.edit', 'terms.publish', 'terms.archive'])) {
             return $response;
         }
 
@@ -76,7 +77,12 @@ class AdminTermsController extends Controller
             return $response;
         }
 
-        $data = $request->validated();
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
+        }
+
         $terms = $this->service->createDraft(
             SiteContext::getId(),
             (string)$data['semantic_version'],
@@ -104,7 +110,10 @@ class AdminTermsController extends Controller
         }
 
         try {
-            $terms = $this->service->updateDraft($terms, $request->validated());
+            $data = $request->validated();
+            $terms = $this->service->updateDraft($terms, $data);
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
         } catch (RuntimeException $exception) {
             return $this->errorResponse($exception->getMessage(), 409);
         }
@@ -132,7 +141,7 @@ class AdminTermsController extends Controller
         return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()]);
     }
 
-    public function storeFromDocument(Request $request): JsonResponse
+    public function storeFromDocument(StoreTermsFromDocumentRequest $request): JsonResponse
     {
         if ($response = $this->authorizeSitePermissions(['terms.create'])) {
             return $response;
@@ -143,26 +152,26 @@ class AdminTermsController extends Controller
             return $this->errorResponse('Document is required.', 422);
         }
 
-        $semanticVersion = trim((string)$request->input('semantic_version', ''));
-        $title = trim((string)$request->input('title', ''));
-        if ($semanticVersion === '' || $title === '') {
-            return $this->errorResponse('Semantic version and title are required.', 422);
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
         }
 
         $terms = $this->service->createDraftFromDocument(
             $file,
             SiteContext::getId(),
-            $semanticVersion,
-            $title,
+            (string)$data['semantic_version'],
+            (string)$data['title'],
             Auth::id(),
-            (bool)$request->input('is_material_change', false),
-            $request->input('change_summary'),
+            (bool)($data['is_material_change'] ?? false),
+            $data['change_summary'] ?? null,
         );
 
         return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()], 201);
     }
 
-    private function uploadedDocument(Request $request): ?UploadedFile
+    private function uploadedDocument(StoreTermsFromDocumentRequest $request): ?UploadedFile
     {
         return $request->files()['document'] ?? $request->file('document');
     }

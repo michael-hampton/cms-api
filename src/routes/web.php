@@ -73,6 +73,7 @@ use App\Controllers\OpenCollab\Admin\AdminInvitationPageController;
 use App\Controllers\OpenCollab\Admin\AdminPaymentTermsPageController;
 use App\Controllers\OpenCollab\Admin\AdminPayoutPageController;
 use App\Controllers\OpenCollab\Admin\AdminScheduledPayoutsPageController;
+use App\Controllers\OpenCollab\Admin\AdminTermsPageController;
 use App\Controllers\OpenCollab\Admin\AdminViolationPageController;
 use App\Controllers\OpenCollab\Admin\ModerationPageController;
 use App\Controllers\OpenCollab\Admin\SiteIndexController;
@@ -593,6 +594,8 @@ $router->group(['middleware' => [RequireAdminRole::class, RequireOpenCollabPageP
         [AdminContractPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/guidelines',
         [AdminGuidelinesPageController::class, 'index']);
+    $router->get('/{site}/open-collab/admin/terms',
+        [AdminTermsPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/contributors',
         [AdminContributorPageController::class, 'index']);
     $router->get('/{site}/open-collab/admin/contributors/{id}',

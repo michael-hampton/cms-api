@@ -37,6 +37,7 @@ class TermsLifecycleEventServiceTest extends TestCase
                 && $event->requiresReacceptance === true));
 
         $service->published($terms, 99);
+        $this->assertTrue(true);
     }
 
     public function test_accepted_dispatches_terms_accepted_event(): void
@@ -58,5 +59,6 @@ class TermsLifecycleEventServiceTest extends TestCase
                 && $event->acceptedVia === 'onboarding'));
 
         $service->accepted($acceptance);
+        $this->assertTrue(true);
     }
 }

@@ -9,7 +9,7 @@ class StoreTermsVersionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'semantic_version' => ['required', 'string', 'max:32'],
+            'semantic_version' => ['required', 'string', 'max:32', 'regex:/^\d+\.\d+\.\d+$/'],
             'title' => ['required', 'string', 'max:255'],
             'source_content' => ['required', 'string', 'min:50'],
             'source_format' => ['nullable', 'string', 'max:20'],

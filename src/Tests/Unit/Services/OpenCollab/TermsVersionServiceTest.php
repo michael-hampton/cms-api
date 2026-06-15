@@ -7,6 +7,7 @@ use App\Framework\Database\Database;
 use App\Models\TermsVersion;
 use App\Repositories\OpenCollab\TermsVersionRepository;
 use App\Services\OpenCollab\OpenCollabDocumentService;
+use App\Services\OpenCollab\TermsLifecycleEventService;
 use App\Services\OpenCollab\TermsVersionService;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -26,10 +27,13 @@ class TermsVersionServiceTest extends TestCase
         $repository = Mockery::mock(TermsVersionRepository::class);
         $documents = Mockery::mock(OpenCollabDocumentService::class);
         $database = Mockery::mock(Database::class);
-        $service = new TermsVersionService($repository, $documents, $database);
+        $events = Mockery::mock(TermsLifecycleEventService::class);
+        $service = new TermsVersionService($repository, $documents, $database, $events);
         $draft = $this->terms(['id' => 1, 'status' => TermsVersionStatus::Draft->value]);
 
         $database->shouldReceive('transaction')->once()->andReturnUsing(fn(callable $callback) => $callback());
+        $events->shouldNotReceive('published');
+        $events->shouldNotReceive('accepted');
         $repository->shouldReceive('create')->once()->with(Mockery::subset([
             'site_id' => 10,
             'semantic_version' => '1.0.0',
@@ -57,7 +61,8 @@ class TermsVersionServiceTest extends TestCase
         $repository = Mockery::mock(TermsVersionRepository::class);
         $documents = Mockery::mock(OpenCollabDocumentService::class);
         $database = Mockery::mock(Database::class);
-        $service = new TermsVersionService($repository, $documents, $database);
+        $events = Mockery::mock(TermsLifecycleEventService::class);
+        $service = new TermsVersionService($repository, $documents, $database, $events);
 
         $current = $this->terms(['id' => 1, 'site_id' => 10, 'status' => TermsVersionStatus::Published->value]);
         $draft = $this->terms([
@@ -81,6 +86,7 @@ class TermsVersionServiceTest extends TestCase
                 && $attributes['published_by_user_id'] === 99;
         }));
         $draft->shouldReceive('fresh')->once()->andReturn($draft);
+        $events->shouldReceive('published')->once()->with($draft, 99);
 
         $this->assertSame($draft, $service->publish($draft, 99));
     }
@@ -91,6 +97,7 @@ class TermsVersionServiceTest extends TestCase
             Mockery::mock(TermsVersionRepository::class),
             Mockery::mock(OpenCollabDocumentService::class),
             Mockery::mock(Database::class),
+            Mockery::mock(TermsLifecycleEventService::class),
         );
         $published = $this->terms(['status' => TermsVersionStatus::Published->value]);
 
@@ -105,6 +112,7 @@ class TermsVersionServiceTest extends TestCase
             $repository,
             Mockery::mock(OpenCollabDocumentService::class),
             Mockery::mock(Database::class),
+            $events = Mockery::mock(TermsLifecycleEventService::class),
         );
         $terms = $this->terms([
             'id' => 5,
@@ -123,6 +131,7 @@ class TermsVersionServiceTest extends TestCase
             'user_agent' => 'PHPUnit',
             'accepted_via' => 'onboarding',
         ]))->andReturn($acceptance);
+        $events->shouldReceive('accepted')->once()->with($acceptance);
 
         $this->assertSame($acceptance, $service->accept($terms, 20, '127.0.0.1', 'PHPUnit'));
     }

@@ -64,6 +64,15 @@ return [
         ['name' => 'View Contract', 'slug' => 'contract.view', 'group' => 'contracts'],
         ['name' => 'Sign Contract', 'slug' => 'contract.sign', 'group' => 'contracts'],
 
+        // Terms
+        ['name' => 'View Terms', 'slug' => 'terms.view', 'group' => 'terms'],
+        ['name' => 'Create Terms', 'slug' => 'terms.create', 'group' => 'terms'],
+        ['name' => 'Edit Terms', 'slug' => 'terms.edit', 'group' => 'terms'],
+        ['name' => 'Publish Terms', 'slug' => 'terms.publish', 'group' => 'terms'],
+        ['name' => 'Archive Terms', 'slug' => 'terms.archive', 'group' => 'terms'],
+        ['name' => 'Accept Terms', 'slug' => 'terms.accept', 'group' => 'terms'],
+        ['name' => 'View Terms Evidence', 'slug' => 'terms.evidence.view', 'group' => 'terms'],
+
         // Guidelines
         ['name' => 'Create Guideline', 'slug' => 'guideline.create', 'group' => 'guidelines'],
         ['name' => 'Edit Guideline', 'slug' => 'guideline.edit', 'group' => 'guidelines'],
@@ -204,6 +213,8 @@ return [
 
                 'payout.request',
                 'contract.sign',
+                'terms.view',
+                'terms.accept',
                 'guideline.acknowledge',
                 'onboarding.view',
             ],
@@ -244,7 +255,7 @@ return [
         'legal' => [
             'name' => 'Legal',
             'is_system' => true,
-            'permissions' => ['contract.create', 'contract.edit', 'contract.publish', 'contract.archive', 'contract.view', 'guideline.create', 'guideline.edit', 'guideline.publish', 'guideline.archive'],
+            'permissions' => ['contract.create', 'contract.edit', 'contract.publish', 'contract.archive', 'contract.view', 'terms.view', 'terms.create', 'terms.edit', 'terms.publish', 'terms.archive', 'terms.evidence.view', 'guideline.create', 'guideline.edit', 'guideline.publish', 'guideline.archive'],
         ],
         'brand_manager' => [
             'name' => 'Brand Manager',
@@ -357,9 +368,9 @@ return [
         'admin' => ['site_role' => 'site_admin', 'permissions' => ['*']],
         'agent' => ['site_role' => 'site_admin', 'permissions' => ['*']],
         'finance' => ['site_role' => 'finance', 'permissions' => ['payout.view', 'payout.approve', 'payout.reject', 'payout.mark_paid', 'ledger.view']],
-        'legal' => ['site_role' => 'legal', 'permissions' => ['contract.create', 'contract.edit', 'contract.publish', 'contract.archive', 'contract.view', 'guideline.create', 'guideline.edit', 'guideline.publish', 'guideline.archive']],
-        'creator' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'onboarding.view']],
-        'contributor' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'payout.request', 'contract.sign', 'guideline.acknowledge', 'onboarding.view']],
+        'legal' => ['site_role' => 'legal', 'permissions' => ['contract.create', 'contract.edit', 'contract.publish', 'contract.archive', 'contract.view', 'terms.view', 'terms.create', 'terms.edit', 'terms.publish', 'terms.archive', 'terms.evidence.view', 'guideline.create', 'guideline.edit', 'guideline.publish', 'guideline.archive']],
+        'creator' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'terms.view', 'terms.accept', 'onboarding.view']],
+        'contributor' => ['site_role' => 'creator', 'permissions' => ['content.create', 'content.submit', 'content.edit_own', 'pages.create', 'pages.submit_for_approval', 'pages.edit', 'payout.request', 'contract.sign', 'terms.view', 'terms.accept', 'guideline.acknowledge', 'onboarding.view']],
         'reviewer' => [
             'site_role' => 'reviewer',
             'permissions' => [

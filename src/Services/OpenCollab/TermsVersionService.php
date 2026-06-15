@@ -8,6 +8,7 @@ use App\Framework\Http\UploadedFile;
 use App\Models\TermsVersion;
 use App\Models\UserTermsAcceptance;
 use App\Repositories\OpenCollab\TermsVersionRepository;
+use App\ValueObjects\OpenCollab\SemanticVersion;
 use RuntimeException;
 
 class TermsVersionService
@@ -16,11 +17,14 @@ class TermsVersionService
         private readonly TermsVersionRepository $repository,
         private readonly OpenCollabDocumentService $documentService,
         private readonly Database $database,
+        private readonly TermsLifecycleEventService $events,
     ) {
     }
 
     public function createDraft(int $siteId, string $semanticVersion, string $title, string $content, int $userId, array $metadata = []): TermsVersion
     {
+        $semanticVersion = SemanticVersion::fromString($semanticVersion)->value();
+
         return $this->database->transaction(function () use ($siteId, $semanticVersion, $title, $content, $userId, $metadata): TermsVersion {
             return $this->repository->create([
                 'site_id' => $siteId,
@@ -74,7 +78,10 @@ class TermsVersionService
                 'published_by_user_id' => $userId,
             ]);
 
-            return $terms->fresh() ?? $terms;
+            $published = $terms->fresh() ?? $terms;
+            $this->events->published($published, $userId);
+
+            return $published;
         });
     }
 
@@ -104,7 +111,7 @@ class TermsVersionService
             throw new RuntimeException('Only published terms can be accepted.');
         }
 
-        return $this->repository->recordAcceptance([
+        $acceptance = $this->repository->recordAcceptance([
             'site_id' => (int)$terms->site_id,
             'user_id' => $userId,
             'terms_version_id' => (int)$terms->id,
@@ -114,6 +121,10 @@ class TermsVersionService
             'user_agent' => $userAgent,
             'accepted_via' => $via,
         ]);
+
+        $this->events->accepted($acceptance);
+
+        return $acceptance;
     }
 
     public function assertEditable(TermsVersion $terms): void

@@ -31,9 +31,9 @@ class TermsOnboardingControllerTest extends FunctionalTestCase
 
         $this->assertResponseStatus(200, $response);
         $body = $this->decodeJson($response);
-        $this->assertSame($terms->id, $body['terms']['id']);
-        $this->assertSame('1.0.0', $body['terms']['version']);
-        $this->assertTrue($body['acceptance_required']);
+        $this->assertSame($terms->id, $body['data']['terms']['id']);
+        $this->assertSame('1.0.0', $body['data']['terms']['version']);
+        $this->assertTrue($body['data']['acceptance_required']);
     }
 
     public function test_accept_rejects_stale_terms_version(): void
