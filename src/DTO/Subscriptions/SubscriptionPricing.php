@@ -15,7 +15,6 @@ class SubscriptionPricing
         public ?array $shippingAddressSnapshot = [],
         public ?float $originalAmount = 0,
         public ?int   $pricingTierId = null,
-        public ?string $currency = null,
     )
     {
     }

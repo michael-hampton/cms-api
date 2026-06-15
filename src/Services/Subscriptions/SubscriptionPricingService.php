@@ -111,7 +111,6 @@ class SubscriptionPricingService
                 : null,
             originalAmount: $item['price'] ?? 0,
             pricingTierId: $item['options']['pricing_tier_id'] ?? null,
-            currency: $item['currency'] ?? null,
         );
     }
 
@@ -189,7 +188,6 @@ class SubscriptionPricingService
                 : null,
             originalAmount: $originalAmount,
             pricingTierId: $resolvedPrice->pricingTierId,
-            currency: $resolvedPrice->currency,
         );
     }
 

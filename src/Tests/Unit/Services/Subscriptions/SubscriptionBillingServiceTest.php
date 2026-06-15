@@ -358,7 +358,6 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
                 $dto->stripePriceId    === 'price_std'
                 && $dto->stripeCustomerId === 'cus_test'
                 && $dto->trialDays        === null
-                && $dto->currency         === 'eur'
             ))
             ->andReturn($this->makeResult());
 
@@ -505,7 +504,6 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         $subscription->plan_id   = 1;
         $subscription->member_id = 1;
         $subscription->site_id   = 1;
-        $subscription->currency  = 'GBP';
 
         $plan = m::mock(SubscriptionPlan::class)->makePartial();
         $plan->id = 1;
@@ -515,7 +513,6 @@ class SubscriptionBillingServiceTest extends FunctionalTestCase
         $pricing->stripe_price_id       = $stripePriceId;
         $pricing->stripe_intro_price_id = $stripeIntroPriceId;
         $pricing->intro_cycles          = $introCycles;
-        $pricing->currency              = 'EUR';
 
         return [$subscription, $plan, $pricing];
     }

@@ -87,7 +87,6 @@ class StripeCustomerGateway implements StripeCustomerGatewayInterface
             $customer = $this->stripe->customers->retrieve(
                 $member->stripe_customer_id
             );
-
             return $customer->id;
         } catch (ApiErrorException) {
             // Customer no longer exists in Stripe — fall through to create

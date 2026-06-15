@@ -159,25 +159,6 @@ class SubscriptionRepository extends Repository
             ->count();
     }
 
-    public function findActiveWithDifferentCurrency(int $memberId, string $currency, ?int $excludeSubscriptionId = null): ?Subscription
-    {
-        $query = Subscription::where('member_id', $memberId)
-            ->whereIn('status', [
-                SubscriptionStatus::ACTIVE->value,
-                SubscriptionStatus::TRIALING->value,
-                SubscriptionStatus::GRACE_PERIOD->value,
-                SubscriptionStatus::RETRYING->value,
-                SubscriptionStatus::PAST_DUE->value,
-            ])
-            ->whereRaw('UPPER(currency) != :currency', ['currency' => strtoupper($currency)]);
-
-        if ($excludeSubscriptionId !== null) {
-            $query->where('id', '!=', $excludeSubscriptionId);
-        }
-
-        return $query->first();
-    }
-
     public function cancelSubscription(int $subscriptionId): bool
     {
         $subscription = $this->find($subscriptionId);

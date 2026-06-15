@@ -47,7 +47,7 @@ class OneTimeSubscriptionCheckoutService
     public function processCheckout(array $data, int $siteId): array
     {
         $data = $this->normaliseVoucherData($data);
-        $subscriptionItems = $this->getSubscriptionItems($siteId);
+        $subscriptionItems = $this->getSubscriptionItems();
 
         if (empty($subscriptionItems)) {
             throw new CheckoutException('No subscription in cart');
@@ -60,7 +60,6 @@ class OneTimeSubscriptionCheckoutService
             );
         }
 
-        $siteId = $this->resolveSubscriptionSiteId($subscriptionItems, $siteId);
         $member = $this->memberAuth->getMember();
 
         // Phase 1: lock plans, validate availability, reserve issue stock,
@@ -286,26 +285,12 @@ class OneTimeSubscriptionCheckoutService
         return 'Removed: ' . implode(', ', $descriptions) . '.';
     }
 
-    private function getSubscriptionItems(?int $siteId = null): array
+    private function getSubscriptionItems(): array
     {
         return array_values(array_filter(
-            $this->cartService->getItems($siteId),
+            $this->cartService->getItems(),
             fn($item) => !empty($item['subscription_plan_id'])
         ));
-    }
-
-    private function resolveSubscriptionSiteId(array $subscriptionItems, int $fallbackSiteId): int
-    {
-        $siteIds = array_values(array_unique(array_filter(array_map(
-            static fn(array $item): int => (int)($item['site_id'] ?? 0),
-            $subscriptionItems,
-        ))));
-
-        if (count($siteIds) > 1) {
-            throw new CheckoutException('Subscription checkout cannot contain plans from multiple sites.');
-        }
-
-        return $siteIds[0] ?? $fallbackSiteId;
     }
 
     private function validateAttachEstimatesAndReserveStock(array $subscriptionItems): array

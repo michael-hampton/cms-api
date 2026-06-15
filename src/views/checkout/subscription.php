@@ -10,7 +10,9 @@
  *   bool   $isSubscription   — always true for this view
  */
 
-$site = $plan->site->slug ?? 'default';
+use App\Framework\Support\SiteContext;
+
+$site = SiteContext::slug();
 $apiBase = '/api/' . $site;
 $displayCurrency = strtoupper($plan->currency ?? 'GBP');
 

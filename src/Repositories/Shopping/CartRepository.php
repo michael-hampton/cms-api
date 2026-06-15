@@ -25,7 +25,7 @@ class CartRepository extends Repository
         return CartItem::class;
     }
 
-    public function findBySessionOrUser(?int $userId, string $sessionId, ?int $siteId = null): Collection
+    public function findBySessionOrUser(?int $userId, string $sessionId): Collection
     {
         $query = $this->model->query();
 
@@ -33,10 +33,6 @@ class CartRepository extends Repository
             $query->where('user_id', $userId);
         } else {
             $query->where('session_id', $sessionId);
-        }
-
-        if ($siteId !== null) {
-            $query->where('site_id', $siteId);
         }
 
         return $query->with(['product', 'merchant'])->get();
@@ -84,7 +80,7 @@ class CartRepository extends Repository
         return $query->first();
     }
 
-    public function deleteBySessionOrUser(?int $userId, string $sessionId, ?int $siteId = null): bool
+    public function deleteBySessionOrUser(?int $userId, string $sessionId): bool
     {
         $query = $this->model->query();
 
@@ -92,16 +88,12 @@ class CartRepository extends Repository
             $query->where('user_id', $userId);
         } else {
             $query->where('session_id', $sessionId);
-        }
-
-        if ($siteId !== null) {
-            $query->where('site_id', $siteId);
         }
 
         return $query->delete() > 0;
     }
 
-    public function getCountBySessionOrUser(?int $userId, string $sessionId, ?int $siteId = null): int
+    public function getCountBySessionOrUser(?int $userId, string $sessionId): int
     {
         $query = $this->model->query();
 
@@ -109,10 +101,6 @@ class CartRepository extends Repository
             $query->where('user_id', $userId);
         } else {
             $query->where('session_id', $sessionId);
-        }
-
-        if ($siteId !== null) {
-            $query->where('site_id', $siteId);
         }
 
         $sum = $query->sum('quantity');

@@ -345,7 +345,7 @@ class CartServiceTest extends FunctionalTestCase
     public function testGetCountReturnsCorrectCount()
     {
         $this->cartRepository->shouldReceive('getCountBySessionOrUser')
-            ->with(null, Mockery::any(), null)
+            ->with(null, Mockery::any())
             ->once()
             ->andReturn(5);
 

@@ -35,7 +35,6 @@ class StripeSubscriptionOrchestratorTest extends TestCase
 
         $this->subscriptionRepository = m::mock(SubscriptionRepository::class);
         $this->subscriptionRepository->shouldReceive('memberHadTrialOnPlan')->andReturn(false)->byDefault();
-        $this->subscriptionRepository->shouldReceive('findActiveWithDifferentCurrency')->andReturn(null)->byDefault();
 
         $this->orchestrator = new StripeSubscriptionOrchestrator(
             $this->customerGateway,
@@ -338,34 +337,6 @@ class StripeSubscriptionOrchestratorTest extends TestCase
         );
 
         $this->assertTrue(true);
-    }
-
-    public function test_rejects_existing_stripe_customer_with_active_subscription_in_different_currency(): void
-    {
-        [$subscription, $plan, $member, $pricingTier] = $this->makeModels();
-        $member->stripe_customer_id = 'cus_existing';
-        $subscription->currency = 'USD';
-        $pricingTier->currency = 'USD';
-
-        $existing = m::mock(Subscription::class)->makePartial();
-        $existing->currency = 'GBP';
-
-        $plan->shouldReceive('getDefaultPricing')->andReturn($pricingTier);
-
-        $this->subscriptionRepository
-            ->shouldReceive('findActiveWithDifferentCurrency')
-            ->once()
-            ->with($member->id, 'USD', $subscription->id)
-            ->andReturn($existing);
-
-        $this->customerGateway->shouldNotReceive('getOrCreate');
-        $this->billingService->shouldNotReceive('createSubscription');
-        $subscription->shouldNotReceive('update');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('existing Stripe customer has an active GBP subscription');
-
-        $this->orchestrator->create($subscription, $plan, $member, []);
     }
 
     // ── Result persistence ────────────────────────────────────────────────────

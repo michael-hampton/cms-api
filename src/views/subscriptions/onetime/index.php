@@ -1179,7 +1179,6 @@ $selectedTags = !empty($filters['tags'])
                                     </a>
                                     <button class="plan-card__btn plan-card__btn--cart"
                                             data-plan-id="<?= $plan->id ?>"
-                                            data-site-slug="<?= htmlspecialchars($plan->site->slug ?? '') ?>"
                                             data-pricing-tier-id="<?= $tierId ?>"
                                             data-delivery_type="<?= htmlspecialchars($plan->getDeliveryOptions()[0] ?? '') ?>"
                                             title="Add to cart"
@@ -1257,7 +1256,7 @@ $selectedTags = !empty($filters['tags'])
 <script>
     // ── Bootstrap constants ───────────────────────────────────────────────
     const SITE            = 'press-stack';
-    const API_BASE        = '';
+    const API_BASE        = '/api/press-stack';
     let CURRENCY_SYMBOL   = '<?= $currencySymbol ?>';
 
     // ── Utilities ─────────────────────────────────────────────────────────
@@ -1291,8 +1290,6 @@ $selectedTags = !empty($filters['tags'])
         _notify()     { this._listeners.forEach(fn => fn(this)); }
 
         async load() {
-            if (!this.apiBase) return;
-
             try {
                 const res    = await fetch(`${this.apiBase}/cart`);
                 this._data   = await res.json();
@@ -1300,12 +1297,8 @@ $selectedTags = !empty($filters['tags'])
             } catch (e) { console.error('Cart load error:', e); }
         }
 
-        async addItem(type, id, deliveryType, pricingTierId = null, siteSlug = null) {
-            const siteBase = siteSlug ? `/api/${encodeURIComponent(siteSlug)}` : this.apiBase;
-            const endpoint = type === 'plan'
-                ? `${siteBase}/cart/subscription`
-                : '/cart/add-bundle';
-
+        async addItem(type, id, deliveryType, pricingTierId = null) {
+            const endpoint = type === 'plan' ? '/cart/subscription' : '/cart/add-bundle';
             try {
                 const payload = { type, bundle_id: id, plan_id: id, quantity: 1, delivery_type: deliveryType };
                 if (pricingTierId) payload.pricing_tier_id = pricingTierId;
@@ -1315,11 +1308,7 @@ $selectedTags = !empty($filters['tags'])
                     body: JSON.stringify(payload),
                 });
                 const data = await res.json();
-                if (data.success) {
-                    if (siteBase) this.apiBase = siteBase;
-                    await this.load();
-                    return true;
-                }
+                if (data.success) { await this.load(); return true; }
                 return false;
             } catch (e) { console.error('Add to cart error:', e); return false; }
         }
@@ -1383,8 +1372,7 @@ $selectedTags = !empty($filters['tags'])
 
             const deliveryType  = btn.dataset.delivery_type;
             const pricingTierId = btn.dataset.pricingTierId ? parseInt(btn.dataset.pricingTierId) : null;
-            const siteSlug      = btn.dataset.siteSlug || null;
-            const success       = await this.cartService.addItem(type, id, deliveryType, pricingTierId, siteSlug);
+            const success       = await this.cartService.addItem(type, id, deliveryType, pricingTierId);
 
             btn.classList.remove('is-loading');
 
@@ -1692,7 +1680,7 @@ $selectedTags = !empty($filters['tags'])
                 coverHtml = `<div class="plan-card__image">${escHtml((plan.name || '?')[0].toUpperCase())}</div>`;
             }
 
-            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${promoHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-site-slug="${escHtml(plan.site_slug || '')}" data-delivery_type="${cartDt}" data-pricing-tier-id="${plan.pricing_tier_id || ''}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
+            return `<article class="plan-card">${this._renderBadge(plan)}${coverHtml}<div class="plan-card__body">${site}<div class="plan-card__name">${escHtml(plan.name)}</div><div class="plan-card__meta">${this._deliveryPills(plan)}${catPills}${tagPills}</div>${releaseHtml}${promoHtml}${desc}${featuresHtml}<div class="plan-card__pricing"><div><div class="plan-card__from">from</div>${wasLine}<div class="${priceClass}">${CURRENCY_SYMBOL}${price.toFixed(2)}</div></div><div><div class="plan-card__price-period">/ ${escHtml(plan.billing_period || 'month')}</div>${saleNote}</div></div><div style="display:flex;gap:8px;"><a href="${escHtml(plan.detail_url)}" class="${btnClass}" style="flex:1;">${btnLabel}</a><button class="plan-card__btn plan-card__btn--cart" data-plan-id="${plan.id}" data-delivery_type="${cartDt}" data-pricing-tier-id="${plan.pricing_tier_id || ''}" title="Add to cart" onclick="window.shop.cart.addItem('plan',${plan.id},this)">🛒</button></div></div></article>`;
         }
 
         _renderPagination(p) {

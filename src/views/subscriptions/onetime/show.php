@@ -763,8 +763,8 @@ $coverIsIssue     = (bool) $issueCoverImage;
 
 <?php /* JS block is identical to original show.php — no changes needed */ ?>
 <script>
-    const API_BASE        = '/api/<?= htmlspecialchars($plan->site->slug ?? SiteContext::slug() ?? 'default') ?>';
-    const SITE            = 'press-stack';
+    const API_BASE        = '/api/<?= SiteContext::slug() ?? 'default' ?>';
+    const SITE            = '<?= SiteContext::slug() ?? 'default' ?>';
     const PLAN_ID         = <?= (int)$plan->id ?>;
     const CURRENCY_SYMBOL = '<?= $currencySymbol ?>';
 
