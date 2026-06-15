@@ -1,6 +1,7 @@
 <?php
-$title = 'Content preview';
-$description = 'Public content V2 preview';
+$preview = (bool)($preview ?? false);
+$title = $preview ? 'Content preview' : ($pageTitle ?? '');
+$description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '');
 ?>
 
 @include('header', ['menu' => $menu])
@@ -13,6 +14,7 @@ $description = 'Public content V2 preview';
             data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
             data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
             data-slug="<?= htmlspecialchars($contentSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-preview="<?= $preview ? 'true' : 'false' ?>"
         >
             <div class="public-content-v2-status" role="status" aria-live="polite">
                 <div class="public-content-v2-spinner" aria-hidden="true"></div>
@@ -33,6 +35,8 @@ $description = 'Public content V2 preview';
 @css('public-content-v2.css')
 @js('base.js')
 @js('public-content-v2-member-hub-loader.js')
-@js('public-content-v2-preview-links.js')
+<?php if ($preview): ?>
+    @js('public-content-v2-preview-links.js')
+<?php endif; ?>
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2.js')
