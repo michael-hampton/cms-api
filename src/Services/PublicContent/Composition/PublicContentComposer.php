@@ -109,6 +109,7 @@ final class PublicContentComposer
                 'components/activity-feed-widget',
                 'after-content',
                 110,
+                supports: $landing,
                 data: static fn(PublicContentContext $context): array => [
                     'feedPages' => $context->viewData['feedPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
@@ -176,7 +177,14 @@ final class PublicContentComposer
                 scripts: ['deals-carousel.js'],
                 supports: $hasDeals,
             ),
-            $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220),
+            $this->definition(
+                'guest-contributors',
+                'guest-contributors',
+                'components/guest-contributors',
+                'below-content',
+                220,
+                supports: $landing,
+            ),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: $notLanding),
             $this->definition(
                 'subscription-modal',
