@@ -2,6 +2,7 @@
 
 namespace App\ViewModels\Checkout;
 
+use App\Models\SubscriptionPlanPricing;
 use App\Services\Pricing\CartLineDisclosureService;
 
 final readonly class CheckoutPageViewModel
@@ -46,11 +47,24 @@ final readonly class CheckoutPageViewModel
         string $site,
         CartLineDisclosureService $disclosures,
         array $plansById,
-        array $pricingById = [],
         string $locale = 'en_GB',
-        array $experienceLanguageLines = [],
-        array $storeLanguageLines = [],
+        array $copyOverrides = [],
+        array $formatterSettings = [],
+        array $pricingById = [],
     ): self {
+        if ($pricingById === []) {
+            $pricingIds = array_values(array_unique(array_filter(array_map(
+                static fn(array $item): int => (int)($item['options']['pricing_tier_id'] ?? 0),
+                $items,
+            ))));
+
+            if ($pricingIds !== []) {
+                foreach (SubscriptionPlanPricing::whereIn('id', $pricingIds)->get() as $pricing) {
+                    $pricingById[(int)$pricing->id] = $pricing;
+                }
+            }
+        }
+
         $subscriptionItems = [];
         $productItems = [];
         $resolvedItems = [];
@@ -64,6 +78,7 @@ final readonly class CheckoutPageViewModel
                 $plan = $plansById[$planId] ?? null;
                 $pricingId = (int)($item['options']['pricing_tier_id'] ?? 0);
                 $pricing = $pricingById[$pricingId] ?? null;
+                $deliveryType = (string)($item['options']['delivery_type'] ?? 'digital');
 
                 $planFacts = [
                     'billing_period' => $plan?->billing_period ?? 'monthly',
@@ -72,8 +87,8 @@ final readonly class CheckoutPageViewModel
                 ];
 
                 $pricingFacts = $pricing === null ? [] : [
-                    'price' => $pricing->getEffectivePrice((string)($item['options']['delivery_type'] ?? 'digital')),
-                    'renewal_price' => $pricing->getEffectivePrice((string)($item['options']['delivery_type'] ?? 'digital')),
+                    'price' => $pricing->getEffectivePrice($deliveryType),
+                    'renewal_price' => $pricing->getEffectivePrice($deliveryType),
                     'trial_days' => $pricing->trial_days,
                     'intro_price' => $pricing->intro_price,
                     'intro_cycles' => $pricing->intro_cycles,
@@ -86,14 +101,14 @@ final readonly class CheckoutPageViewModel
                     planFacts: $planFacts,
                     locale: $locale,
                     currency: $currency,
-                    experienceLanguageLines: $experienceLanguageLines,
-                    storeLanguageLines: $storeLanguageLines,
+                    experienceLanguageLines: $copyOverrides,
+                    storeLanguageLines: [],
                     pricingFacts: $pricingFacts,
                 );
 
-                $deliveryType = strtolower((string)($item['options']['delivery_type'] ?? 'print'));
-                $hasDigital = $hasDigital || str_contains($deliveryType, 'digital');
-                $hasPrint = $hasPrint || $deliveryType !== 'digital';
+                $normalizedDeliveryType = strtolower($deliveryType);
+                $hasDigital = $hasDigital || str_contains($normalizedDeliveryType, 'digital');
+                $hasPrint = $hasPrint || $normalizedDeliveryType !== 'digital';
                 $subscriptionItems[] = $item;
             } else {
                 $hasPrint = true;
