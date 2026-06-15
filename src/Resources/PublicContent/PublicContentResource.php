@@ -26,10 +26,7 @@ final readonly class PublicContentResource
             'access' => $this->document->access,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
-                'regions' => array_map(
-                    static fn($region) => $region->toArray(),
-                    $this->document->regions,
-                ),
+                'regions' => $this->regions(),
                 'components' => array_map(
                     static fn(array $components): array => array_map(
                         static fn($component): array => $component->toArray(),
@@ -39,5 +36,16 @@ final readonly class PublicContentResource
                 ),
             ],
         ];
+    }
+
+    private function regions(): array
+    {
+        $regions = [];
+
+        foreach ($this->document->regions as $region) {
+            $regions[$region->name] = $region->toArray();
+        }
+
+        return $regions;
     }
 }
