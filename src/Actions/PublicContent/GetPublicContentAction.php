@@ -144,11 +144,16 @@ final class GetPublicContentAction
             ? '<div class="premium-content-preview"><p>' . htmlspecialchars($preview, ENT_QUOTES, 'UTF-8') . '</p></div>'
             : '<div class="premium-content-preview" aria-hidden="true"></div>';
 
+        $isContributorCreated = !empty($page->contributor_id);
         $viewData = [
             'access' => $access,
             'links' => $links,
             'siteSlug' => $siteSlug,
             'territory' => $territory,
+            'isContributorCreated' => $isContributorCreated,
+            'subscriptionModalData' => $isContributorCreated
+                ? null
+                : $this->compositionData->subscriptionModalData($member, $siteId),
         ];
 
         $components = $this->composer->compose(new PublicContentContext(
