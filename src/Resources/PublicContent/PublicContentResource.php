@@ -23,6 +23,7 @@ final readonly class PublicContentResource
             'taxonomy' => $this->document->taxonomy,
             'authors' => $this->document->authors,
             'links' => $this->document->links,
+            'access' => $this->document->access,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
                 'regions' => array_map(
