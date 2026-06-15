@@ -54,8 +54,24 @@ final class PublicContentComposer
             !empty($context->viewData['todaysDeals']);
         $hasCategoriesWithPages = static fn(PublicContentContext $context): bool =>
             $landing($context) && !empty($context->viewData['categoriesWithPages']);
+        $hasClaimedGift = static fn(PublicContentContext $context): bool =>
+            !empty($context->viewData['claimedGift']);
+        $hasSubscriptionModal = static fn(PublicContentContext $context): bool =>
+            !empty($context->viewData['subscriptionModalData']);
+        $hasMember = static fn(PublicContentContext $context): bool => $context->member !== null;
 
         return [
+            $this->definition(
+                'claimed-gift',
+                'claimed-gift',
+                'public-content-v2/components/gift-claimed',
+                'notices',
+                5,
+                supports: $hasClaimedGift,
+                data: static fn(PublicContentContext $context): array => [
+                    'claimedGift' => $context->viewData['claimedGift'] ?? null,
+                ],
+            ),
             $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10),
             $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: $notLanding),
             $this->definition('tags', 'tags', 'tags', 'header', 30, supports: $notLanding),
@@ -65,7 +81,6 @@ final class PublicContentComposer
                 'components/page-actions',
                 'header',
                 40,
-                scripts: ['page-actions.js'],
                 stateful: true,
                 supports: $notLanding,
                 endpoints: static fn(PublicContentContext $context): array => [
@@ -125,7 +140,6 @@ final class PublicContentComposer
                 'components/comments',
                 'after-content',
                 150,
-                scripts: ['comments.js'],
                 stateful: true,
                 supports: $notLanding,
                 endpoints: static fn(PublicContentContext $context): array => [
@@ -134,6 +148,7 @@ final class PublicContentComposer
                 ],
                 data: static fn(PublicContentContext $context): array => [
                     'nextCommentBadge' => $context->viewData['nextCommentBadge'] ?? null,
+                    'commentBadgeProgress' => $context->viewData['commentBadgeProgress'] ?? null,
                 ],
             ),
             $this->definition('links', 'social-links', 'components/links', 'after-content', 160),
@@ -161,6 +176,21 @@ final class PublicContentComposer
             ),
             $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: $notLanding),
+            $this->definition(
+                'subscription-modal',
+                'subscription-modal',
+                'components/subscription-modal',
+                'modals',
+                300,
+                supports: $hasSubscriptionModal,
+                data: static fn(PublicContentContext $context): array => [
+                    'subscriptionModalData' => $context->viewData['subscriptionModalData'] ?? null,
+                ],
+            ),
+            $this->definition('newsletter-account-modal', 'newsletter-account-modal', 'components/newsletter-account-creation-modal', 'modals', 310),
+            $this->definition('newsletter-modal', 'newsletter-modal', 'components/newsletter-modal', 'modals', 320),
+            $this->definition('comment-modal', 'comment-modal', 'components/comment-modal', 'modals', 330),
+            $this->definition('badge-earned-modal', 'badge-earned-modal', 'components/badge-earned-modal', 'modals', 340, supports: $hasMember),
         ];
     }
 
