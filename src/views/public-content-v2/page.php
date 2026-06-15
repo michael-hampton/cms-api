@@ -22,14 +22,17 @@ $description = 'Public content V2 preview';
     </div>
 </main>
 
-<?php if (!empty($footerHtml)): ?>
-    <?= $footerHtml ?>
+<?php if (isset($footerMenu) && $footerMenu): ?>
+    <?php $footerRenderer = new \App\Services\FooterRenderer(); ?>
+    <?= $footerRenderer->renderFooter($footerMenu) ?>
 <?php endif; ?>
 
 @include('consent-banner', ['site' => $site])
 
+@css('member-hub.css')
 @css('public-content-v2.css')
 @js('base.js')
+@js('member-hub.js')
 @js('public-content-v2-preview-links.js')
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2.js')
