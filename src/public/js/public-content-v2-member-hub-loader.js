@@ -18,8 +18,14 @@
         originalAlert(message);
     };
 
+    const loaderUrl = new URL(document.currentScript.src, window.location.origin);
+    loaderUrl.pathname = loaderUrl.pathname.replace(
+        /public-content-v2-member-hub-loader\.js$/,
+        'member-hub.js',
+    );
+
     const script = document.createElement('script');
-    script.src = `/js/member-hub.js?v=${Date.now()}`;
+    script.src = loaderUrl.href;
     script.defer = true;
     document.body.append(script);
 })();
