@@ -42,4 +42,5 @@ $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '')
 <?php endif; ?>
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2-deals-carousel.js')
+@js('public-content-v2-deals-cart.js')
 @js('public-content-v2.js')
