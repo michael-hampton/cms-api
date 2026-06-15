@@ -1,10 +1,11 @@
 <?php
 $metadataVisibility = $page->metadata->visibility ?? null;
-$isPurchasablePremium = (bool)$page->is_paid
+$isContributorCreated = !empty($page->contributor_id);
+$isPurchasablePremium = $isContributorCreated
+    && (bool)$page->is_paid
     && (int)$page->price > 0
     && !empty($page->premium_approved_at)
     && empty($page->monetisation_disabled_at)
-    && !empty($page->contributor_id)
     && $metadataVisibility === 'premium';
 $siteSlug = \App\Framework\Support\SiteContext::slug();
 $canonical = '/' . $siteSlug . '/' . ltrim((string)$page->slug, '/');
@@ -19,6 +20,7 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
     data-site-slug="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
     data-purchase-endpoint="/api/<?= rawurlencode($siteSlug) ?>/open-collab/pages/<?= (int)$page->id ?>/purchase"
     data-stripe-key="<?= htmlspecialchars((string)$stripeKey, ENT_QUOTES, 'UTF-8') ?>"
+    data-contributor-created="<?= $isContributorCreated ? 'true' : 'false' ?>"
     role="dialog"
     aria-modal="true"
     aria-labelledby="paywall-title"
@@ -67,7 +69,9 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
                     Buy Article — <?= $priceFormatted ?>
                 </button>
             <?php else: ?>
-                <a class="btn btn-primary btn-lg" href="/<?= rawurlencode($siteSlug) ?>/subscribe">View Subscription Plans</a>
+                <button class="btn btn-primary btn-lg" type="button" data-paywall-open-subscription>
+                    View Subscription Plans
+                </button>
             <?php endif; ?>
 
             <?php if (!$member): ?>
