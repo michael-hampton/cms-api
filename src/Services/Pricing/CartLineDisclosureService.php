@@ -80,31 +80,39 @@ final readonly class CartLineDisclosureService
 
     private function renewalDate(array $item, ?int $trialDays, ?int $introCycles, string $period): DateTimeImmutable
     {
-        $start = !empty($item['options']['start_date'])
+        $date = !empty($item['options']['start_date'])
             ? new DateTimeImmutable((string)$item['options']['start_date'], new DateTimeZone('UTC'))
             : $this->clock->now()->setTimezone(new DateTimeZone('UTC'));
 
         if ($trialDays !== null) {
-            return $start->add(new DateInterval('P' . $trialDays . 'D'));
+            $date = $date->add(new DateInterval('P' . $trialDays . 'D'));
         }
 
-        return $start->add($this->billingInterval($period, $introCycles ?? 1));
+        return $date->add($this->billingInterval($period, $introCycles ?? 1));
     }
 
     private function billingInterval(string $period, int $cycles): DateInterval
     {
-        return match (strtolower($period)) {
-            'daily', 'day' => new DateInterval('P' . $cycles . 'D'),
-            'weekly', 'week' => new DateInterval('P' . $cycles . 'W'),
-            'quarterly', 'quarter' => new DateInterval('P' . ($cycles * 3) . 'M'),
-            'yearly', 'annual', 'annually', 'year' => new DateInterval('P' . $cycles . 'Y'),
-            default => new DateInterval('P' . $cycles . 'M'),
+        [$amount, $unit] = $this->periodSpec($period);
+        $total = max(1, $amount * max(1, $cycles));
+
+        return match ($unit) {
+            'day' => new DateInterval('P' . $total . 'D'),
+            'week' => new DateInterval('P' . $total . 'W'),
+            'year' => new DateInterval('P' . $total . 'Y'),
+            default => new DateInterval('P' . $total . 'M'),
         };
     }
 
     private function periodSpec(string $period): array
     {
-        return match (strtolower(trim($period))) {
+        $normalized = strtolower(trim($period));
+
+        if (preg_match('/^(\d+)\s*(day|week|month|year)s?$/', $normalized, $matches) === 1) {
+            return [max(1, (int)$matches[1]), $matches[2]];
+        }
+
+        return match ($normalized) {
             'daily', 'day' => [1, 'day'],
             'weekly', 'week' => [1, 'week'],
             'quarterly', 'quarter' => [3, 'month'],
@@ -115,15 +123,10 @@ final readonly class CartLineDisclosureService
 
     private function cyclesLabel(int $cycles, string $period): string
     {
-        $unit = match (strtolower($period)) {
-            'daily', 'day' => 'day',
-            'weekly', 'week' => 'week',
-            'quarterly', 'quarter' => 'quarter',
-            'yearly', 'annual', 'annually', 'year' => 'year',
-            default => 'month',
-        };
+        [$amount, $unit] = $this->periodSpec($period);
+        $total = max(1, $cycles) * $amount;
 
-        return $cycles . ' ' . $unit . ($cycles === 1 ? '' : 's');
+        return $total . ' ' . $unit . ($total === 1 ? '' : 's');
     }
 
     private function badges(?int $trialDays, ?int $introUnitMinor, ?int $introCycles): array
