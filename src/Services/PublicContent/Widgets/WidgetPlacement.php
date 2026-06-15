@@ -24,7 +24,10 @@ final readonly class WidgetPlacement
             region: $region ?? $this->region,
             priority: $priority ?? $this->priority,
             enabled: $enabled ?? $this->enabled,
-            configuration: $configuration ?? $this->configuration,
+            configuration: array_replace(
+                $this->configuration,
+                $configuration ?? [],
+            ),
         );
     }
 
