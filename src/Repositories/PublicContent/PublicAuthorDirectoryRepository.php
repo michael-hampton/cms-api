@@ -4,7 +4,7 @@ namespace App\Repositories\PublicContent;
 
 use App\Framework\Support\Collection;
 use App\Models\Author;
-use App\Models\Page;
+use App\Models\PageAuthor;
 use App\Repositories\Repository;
 
 final class PublicAuthorDirectoryRepository extends Repository
@@ -29,12 +29,16 @@ final class PublicAuthorDirectoryRepository extends Repository
 
     public function getPublishedPages(int $siteId, int $authorId): Collection
     {
-        return Page::with(['metadata', 'categories', 'tags', 'authors'])
-            ->where('site_id', $siteId)
-            ->where('status', 'published')
-            ->whereHas('authors', static fn($query) => $query->where('authors.id', $authorId))
-            ->orderByDesc('published_at')
-            ->get();
+        return PageAuthor::with(['page.metadata', 'page.categories', 'page.tags', 'page.authors'])
+            ->where('author_id', $authorId)
+            ->orderBy('sort_order')
+            ->get()
+            ->map(static fn($item) => $item->page)
+            ->filter(static fn($page): bool =>
+                $page !== null
+                && (int)$page->site_id === $siteId
+                && (string)$page->status === 'published'
+            );
     }
 
     protected function getModelClass(): string
