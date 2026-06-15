@@ -12,9 +12,9 @@ use App\Framework\Authorization\MemberAuth;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
-use App\Models\Page;
 use App\Repositories\Members\PageLikeRepository;
 use App\Repositories\Members\PageViewRepository;
+use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\Members\Comments\CommentService;
 use App\Services\PublicContent\PublicContentViewerStateService;
 
@@ -22,6 +22,7 @@ final class PublicContentViewerController extends Controller
 {
     public function __construct(
         private readonly PublicContentViewerStateService $viewerState,
+        private readonly PublicContentPageRepository $pages,
         private readonly PageLikeRepository $likes,
         private readonly PageViewRepository $views,
         private readonly CommentService $comments,
@@ -78,8 +79,7 @@ final class PublicContentViewerController extends Controller
             return $this->errorResponse('Authentication required.', 401);
         }
 
-        $page = $this->findPage($pageId);
-        if (!$page) {
+        if (!$this->findPage($pageId)) {
             return $this->errorResponse('Content not found.', 404);
         }
 
@@ -96,8 +96,7 @@ final class PublicContentViewerController extends Controller
 
     public function recordView(int $pageId, Request $request): JsonResponse
     {
-        $page = $this->findPage($pageId);
-        if (!$page) {
+        if (!$this->findPage($pageId)) {
             return $this->errorResponse('Content not found.', 404);
         }
 
@@ -169,13 +168,8 @@ final class PublicContentViewerController extends Controller
         ], 201);
     }
 
-    private function findPage(int $pageId): ?Page
+    private function findPage(int $pageId)
     {
-        $page = Page::where('id', $pageId)
-            ->where('site_id', SiteContext::getId())
-            ->where('status', 'published')
-            ->first();
-
-        return $page instanceof Page ? $page : null;
+        return $this->pages->findPublishedById($pageId, SiteContext::getId());
     }
 }
