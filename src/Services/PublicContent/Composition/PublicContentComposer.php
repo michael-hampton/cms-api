@@ -5,26 +5,33 @@ namespace App\Services\PublicContent\Composition;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
+use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
+use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 
 final class PublicContentComposer
 {
     public function __construct(
         private readonly ViewRenderer $views,
         private readonly RegionalPublicContentComponentFactory $regionalComponents,
+        private readonly PublicContentWidgetRegistry $registry,
+        private readonly PageWidgetLayoutResolver $layouts,
     ) {
     }
 
     /** @return array<string, list<PublicContentComponent>> */
     public function compose(PublicContentContext $context): array
     {
+        $this->registerDefaults();
         $regions = [];
 
-        foreach ($this->definitions() as $definition) {
+        foreach ($this->layouts->resolve($context, $this->registry) as $placement) {
+            $definition = $this->registry->get($placement->widgetKey);
+
             if (!$definition->supports($context)) {
                 continue;
             }
 
-            $component = $definition->build($context);
+            $component = $definition->build($context, $placement);
             if (trim($component->html) === '') {
                 continue;
             }
@@ -46,6 +53,13 @@ final class PublicContentComposer
         }
 
         return $regions;
+    }
+
+    private function registerDefaults(): void
+    {
+        foreach ($this->definitions() as $definition) {
+            $this->registry->register($definition);
+        }
     }
 
     /** @return list<PublicContentComponentDefinition> */
@@ -70,86 +84,41 @@ final class PublicContentComposer
         $hasMember = static fn(PublicContentContext $context): bool => $context->member !== null;
 
         return [
-            $this->definition(
-                'claimed-gift',
-                'claimed-gift',
-                'public-content-v2/components/gift-claimed',
-                'notices',
-                5,
+            $this->definition('claimed-gift', 'claimed-gift', 'public-content-v2/components/gift-claimed', 'notices', 5,
                 supports: $hasClaimedGift,
-                data: static fn(PublicContentContext $context): array => [
-                    'claimedGift' => $context->viewData['claimedGift'] ?? null,
-                ],
-            ),
+                data: static fn(PublicContentContext $context): array => ['claimedGift' => $context->viewData['claimedGift'] ?? null]),
             $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10),
             $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: $notLanding),
             $this->definition('tags', 'tags', 'tags', 'header', 30, supports: $notLanding),
-            $this->definition(
-                'page-actions',
-                'page-actions',
-                'components/page-actions',
-                'header',
-                40,
+            $this->definition('page-actions', 'page-actions', 'components/page-actions', 'header', 40,
                 stateful: true,
                 supports: $notLanding,
                 endpoints: static fn(PublicContentContext $context): array => [
                     'viewer' => $context->viewData['links']['viewer_state'] ?? null,
                     'like' => $context->viewData['links']['like'] ?? null,
                     'view' => $context->viewData['links']['view'] ?? null,
-                ],
-            ),
-            $this->definition(
-                'categories-widget',
-                'categories-widget',
-                'components/categories-widget',
-                'after-content',
-                100,
+                ]),
+            $this->definition('categories-widget', 'categories-widget', 'components/categories-widget', 'after-content', 100,
                 supports: $hasCategories,
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categories'] ?? [],
                     'layout' => 'carousel',
-                ],
-            ),
-            $this->definition(
-                'activity-feed',
-                'activity-feed-widget',
-                'components/activity-feed-widget',
-                'after-content',
-                110,
+                ]),
+            $this->definition('activity-feed', 'activity-feed-widget', 'components/activity-feed-widget', 'after-content', 110,
                 supports: $landing,
                 data: static fn(PublicContentContext $context): array => [
                     'feedPages' => $context->viewData['feedPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
-                ],
-            ),
-            $this->definition(
-                'trending',
-                'trending-widget',
-                'components/trending-widget',
-                'after-content',
-                120,
+                ]),
+            $this->definition('trending', 'trending-widget', 'components/trending-widget', 'after-content', 120,
                 data: static fn(PublicContentContext $context): array => [
                     'trendingPages' => $context->viewData['trendingPages'] ?? [],
                     'siteSlug' => $context->siteSlug,
-                ],
-            ),
-            $this->definition(
-                'products',
-                'product-section',
-                'components/product-section',
-                'after-content',
-                130,
-                styles: ['products.css'],
-                scripts: ['product-interactions.js'],
-                supports: $hasProducts,
-            ),
+                ]),
+            $this->definition('products', 'product-section', 'components/product-section', 'after-content', 130,
+                styles: ['products.css'], scripts: ['product-interactions.js'], supports: $hasProducts),
             $this->definition('newsletter', 'newsletter-signup-widget', 'components/newsletter-signup-widget', 'after-content', 140, stateful: true),
-            $this->definition(
-                'comments',
-                'comments',
-                'components/comments',
-                'after-content',
-                150,
+            $this->definition('comments', 'comments', 'components/comments', 'after-content', 150,
                 stateful: true,
                 supports: $notLanding,
                 endpoints: static fn(PublicContentContext $context): array => [
@@ -159,51 +128,23 @@ final class PublicContentComposer
                 data: static fn(PublicContentContext $context): array => [
                     'nextCommentBadge' => $context->viewData['nextCommentBadge'] ?? null,
                     'commentBadgeProgress' => $context->viewData['commentBadgeProgress'] ?? null,
-                ],
-            ),
+                ]),
             $this->definition('links', 'social-links', 'components/links', 'after-content', 160),
-            $this->definition(
-                'category-pages',
-                'category-pages',
-                'components/category-pages',
-                'below-content',
-                200,
+            $this->definition('category-pages', 'category-pages', 'components/category-pages', 'below-content', 200,
                 supports: $hasCategoriesWithPages,
                 data: static fn(PublicContentContext $context): array => [
                     'categories' => $context->viewData['categoriesWithPages'] ?? [],
                     'site' => $context->siteSlug,
-                ],
-            ),
-            $this->definition(
-                'deals',
-                'deals-carousel',
-                'components/deals-carousel',
-                'below-content',
-                210,
-                styles: ['deals-carousel.css'],
-                scripts: ['deals-carousel.js'],
-                supports: $hasDeals,
-            ),
-            $this->definition(
-                'guest-contributors',
-                'guest-contributors',
-                'components/guest-contributors',
-                'below-content',
-                220,
-                supports: $landing,
-            ),
+                ]),
+            $this->definition('deals', 'deals-carousel', 'components/deals-carousel', 'below-content', 210,
+                styles: ['deals-carousel.css'], scripts: ['deals-carousel.js'], supports: $hasDeals),
+            $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220, supports: $landing),
             $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: $notLanding),
-            $this->definition(
-                'subscription-modal',
-                'subscription-modal',
-                'components/subscription-modal',
-                'modals',
-                300,
+            $this->definition('subscription-modal', 'subscription-modal', 'components/subscription-modal', 'modals', 300,
                 supports: $hasSubscriptionModal,
                 data: static fn(PublicContentContext $context): array => [
                     'subscriptionModalData' => $context->viewData['subscriptionModalData'] ?? null,
-                ],
-            ),
+                ]),
             $this->definition('newsletter-account-modal', 'newsletter-account-modal', 'components/newsletter-account-creation-modal', 'modals', 310),
             $this->definition('newsletter-modal', 'newsletter-modal', 'components/newsletter-modal', 'modals', 320),
             $this->definition('comment-modal', 'comment-modal', 'components/comment-modal', 'modals', 330),
