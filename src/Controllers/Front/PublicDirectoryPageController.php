@@ -17,14 +17,34 @@ final class PublicDirectoryPageController extends Controller
         parent::__construct();
     }
 
-    public function index(string $type): Response
+    public function authors(): Response
     {
-        return $this->render($type, null);
+        return $this->render('author', null);
     }
 
-    public function show(string $type, string $slug): Response
+    public function author(string $slug): Response
     {
-        return $this->render($type, $slug);
+        return $this->render('author', $slug);
+    }
+
+    public function categories(): Response
+    {
+        return $this->render('category', null);
+    }
+
+    public function category(string $slug): Response
+    {
+        return $this->render('category', $slug);
+    }
+
+    public function tags(): Response
+    {
+        return $this->render('tag', null);
+    }
+
+    public function tag(string $slug): Response
+    {
+        return $this->render('tag', $slug);
     }
 
     private function render(string $type, ?string $slug): Response
