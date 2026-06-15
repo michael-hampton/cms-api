@@ -3,6 +3,7 @@
 namespace App\Actions\PublicContent;
 
 use App\DTO\PublicContent\PublicContentDocument;
+use App\Models\Category;
 use App\Models\Member;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
@@ -33,6 +34,7 @@ final class GetPublicContentAction
         }
 
         $page = $this->pages->getCompletePageData((int)$page->id) ?? $page;
+        $base = '/api/v1/' . $siteId . '/content/' . $page->id;
 
         return new PublicContentDocument(
             id: (int)$page->id,
@@ -55,6 +57,60 @@ final class GetPublicContentAction
                 ])->toArray() ?? [],
             ],
             regions: $this->renderer->render($page, $siteId, $member),
+            authors: $this->authors($page),
+            landingSections: $this->landingSections($page, $siteId),
+            links: [
+                'viewer_state' => $base . '/viewer-state',
+                'comments' => $base . '/comments',
+                'like' => $base . '/like',
+                'view' => $base . '/views',
+            ],
         );
+    }
+
+    private function authors($page): array
+    {
+        if (!$page->authors) {
+            return [];
+        }
+
+        return $page->authors->map(static fn($author) => [
+            'id' => (int)$author->id,
+            'name' => (string)($author->name ?? ''),
+            'slug' => (string)($author->slug ?? ''),
+            'bio' => $author->bio ?? null,
+            'image' => $author->image ?? $author->image_url ?? null,
+        ])->toArray();
+    }
+
+    private function landingSections($page, int $siteId): array
+    {
+        if ((string)$page->page_type !== 'landing-page') {
+            return [];
+        }
+
+        $sections = [];
+        foreach (Category::where('site_id', $siteId)->orderBy('name')->get() as $category) {
+            $pages = $this->pages->getPagesByCategory((int)$category->id, 6, $siteId);
+            if ($pages->count() < 3) {
+                continue;
+            }
+
+            $sections[] = [
+                'category' => [
+                    'id' => (int)$category->id,
+                    'name' => (string)$category->name,
+                    'slug' => (string)$category->slug,
+                ],
+                'pages' => $pages->map(static fn($item) => [
+                    'id' => (int)$item->id,
+                    'title' => (string)$item->title,
+                    'slug' => (string)$item->slug,
+                    'summary' => $item->meta_description ?? null,
+                ])->toArray(),
+            ];
+        }
+
+        return $sections;
     }
 }
