@@ -34,11 +34,17 @@
         }
 
         openSubscription() {
-            if (typeof window.openSubscriptionModal !== 'function') {
-                throw new Error('Subscription modal is not available on this page.');
+            if (typeof window.showSubscriptionModal === 'function') {
+                window.showSubscriptionModal(null, null, true);
+                return;
             }
 
-            window.openSubscriptionModal();
+            if (typeof window.openSubscriptionModal === 'function') {
+                window.openSubscriptionModal();
+                return;
+            }
+
+            throw new Error('Subscription modal is not available on this page.');
         }
 
         async openPurchase() {
