@@ -21,35 +21,65 @@ final class PublicDirectoryPageController extends Controller
 
     public function authors(): Response
     {
-        return $this->render('author', null);
+        return $this->render('author', null, false);
     }
 
     public function author(string $slug): Response
     {
-        return $this->render('author', $slug);
+        return $this->render('author', $slug, false);
     }
 
     public function categories(): Response
     {
-        return $this->render('category', null);
+        return $this->render('category', null, false);
     }
 
     public function category(string $slug): Response
     {
-        return $this->render('category', $slug);
+        return $this->render('category', $slug, false);
     }
 
     public function tags(): Response
     {
-        return $this->render('tag', null);
+        return $this->render('tag', null, false);
     }
 
     public function tag(string $slug): Response
     {
-        return $this->render('tag', $slug);
+        return $this->render('tag', $slug, false);
     }
 
-    private function render(string $type, ?string $slug): Response
+    public function previewAuthors(): Response
+    {
+        return $this->render('author', null, true);
+    }
+
+    public function previewAuthor(string $slug): Response
+    {
+        return $this->render('author', $slug, true);
+    }
+
+    public function previewCategories(): Response
+    {
+        return $this->render('category', null, true);
+    }
+
+    public function previewCategory(string $slug): Response
+    {
+        return $this->render('category', $slug, true);
+    }
+
+    public function previewTags(): Response
+    {
+        return $this->render('tag', null, true);
+    }
+
+    public function previewTag(string $slug): Response
+    {
+        return $this->render('tag', $slug, true);
+    }
+
+    private function render(string $type, ?string $slug, bool $preview): Response
     {
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
@@ -65,6 +95,7 @@ final class PublicDirectoryPageController extends Controller
             'siteSlug' => $siteSlug,
             'type' => $type,
             'slug' => $slug,
+            'preview' => $preview,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header'),
             'menuRenderer' => $this->menuRenderer,
             'footerHtml' => $footerMenu
