@@ -7,9 +7,42 @@ $displayTerms = $terms ?? null;
         Terms &amp; Conditions are not currently available. Please contact support before continuing.
     </div>
 <?php else: ?>
+    <?php
+    $termsId = is_array($displayTerms)
+        ? (int)($displayTerms['id'] ?? 0)
+        : (int)$displayTerms->id;
+    $version = is_array($displayTerms)
+        ? (string)($displayTerms['version'] ?? '')
+        : (string)$displayTerms->semantic_version;
+    $mode = is_array($displayTerms)
+        ? (string)($displayTerms['mode'] ?? 'html')
+        : 'html';
+    $content = is_array($displayTerms)
+        ? (string)($displayTerms['content'] ?? '')
+        : (string)($displayTerms->rendered_content ?: $displayTerms->source_content);
+    $documentUrl = is_array($displayTerms)
+        ? ($displayTerms['documentUrl'] ?? null)
+        : null;
+    $downloadUrl = is_array($displayTerms)
+        ? ($displayTerms['downloadUrl'] ?? null)
+        : null;
+    $filename = is_array($displayTerms)
+        ? ($displayTerms['filename'] ?? 'Terms document')
+        : 'Terms document';
+    $mimeType = is_array($displayTerms)
+        ? (string)($displayTerms['mimeType'] ?? '')
+        : '';
+    $isMaterialChange = is_array($displayTerms)
+        ? (bool)($displayTerms['isMaterialChange'] ?? false)
+        : (bool)$displayTerms->is_material_change;
+    $changeSummary = is_array($displayTerms)
+        ? ($displayTerms['changeSummary'] ?? null)
+        : $displayTerms->change_summary;
+    ?>
+
     <form id="onboarding-form" method="POST" action="<?= url('/api/' . $siteSlug . '/open-collab/onboarding/terms') ?>" novalidate>
         <input type="hidden" name="_token" value="<?= csrf_token() ?>">
-        <input type="hidden" name="terms_version_id" value="<?= (int)$displayTerms->id ?>">
+        <input type="hidden" name="terms_version_id" value="<?= $termsId ?>">
 
         <div class="oc-alert oc-alert--info" style="margin-bottom:20px;">
             <strong>Please review the OpenCollab Terms &amp; Conditions.</strong>
@@ -19,24 +52,71 @@ $displayTerms = $terms ?? null;
         </div>
 
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
-            <span class="oc-badge oc-badge--muted">Version <?= htmlspecialchars($displayTerms->semantic_version) ?></span>
-            <?php if ($displayTerms->is_material_change): ?>
+            <span class="oc-badge oc-badge--muted">Version <?= htmlspecialchars($version) ?></span>
+            <?php if ($isMaterialChange): ?>
                 <span class="oc-badge oc-badge--danger">Material update</span>
             <?php endif; ?>
         </div>
 
-        <?php if ($displayTerms->change_summary): ?>
+        <?php if ($changeSummary): ?>
             <div style="border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;background:var(--cream);">
                 <strong style="display:block;margin-bottom:5px;">What changed</strong>
-                <div class="oc-muted" style="line-height:1.55;"><?= nl2br(htmlspecialchars($displayTerms->change_summary)) ?></div>
+                <div class="oc-muted" style="line-height:1.55;"><?= nl2br(htmlspecialchars((string)$changeSummary)) ?></div>
             </div>
         <?php endif; ?>
 
-        <div tabindex="0"
-             aria-label="Terms and Conditions content"
-             style="height:380px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);background:#fff;padding:24px;line-height:1.7;margin-bottom:18px;">
-            <?= $displayTerms->rendered_content ?>
-        </div>
+        <?php if ($mode === 'html' && trim($content) !== ''): ?>
+            <div tabindex="0"
+                 aria-label="Terms and Conditions content"
+                 style="height:380px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);background:#fff;padding:24px;line-height:1.7;margin-bottom:18px;">
+                <?= $content ?>
+            </div>
+        <?php elseif ($documentUrl): ?>
+            <div style="border:1px solid var(--border);border-radius:var(--radius);background:#fff;padding:18px;margin-bottom:18px;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px;">
+                    <div>
+                        <strong><?= htmlspecialchars((string)$filename) ?></strong>
+                        <?php if ($mimeType): ?>
+                            <div class="oc-muted" style="font-size:.78rem;margin-top:4px;">
+                                <?= htmlspecialchars($mimeType) ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <a class="oc-btn oc-btn--ghost oc-btn--sm"
+                           href="<?= htmlspecialchars((string)$documentUrl) ?>"
+                           target="_blank"
+                           rel="noopener">
+                            Open document
+                        </a>
+
+                        <?php if ($downloadUrl): ?>
+                            <a class="oc-btn oc-btn--ghost oc-btn--sm"
+                               href="<?= htmlspecialchars((string)$downloadUrl) ?>">
+                                Download
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if ($mimeType === 'application/pdf'): ?>
+                    <iframe
+                        src="<?= htmlspecialchars((string)$documentUrl) ?>"
+                        title="Terms and Conditions document"
+                        style="width:100%;height:520px;border:1px solid var(--border);border-radius:var(--radius);background:#f8fafc;">
+                    </iframe>
+                <?php else: ?>
+                    <div class="oc-alert oc-alert--info">
+                        Open the uploaded document to review the full Terms and Conditions before accepting.
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php else: ?>
+            <div class="oc-alert oc-alert--warning" style="margin-bottom:18px;">
+                The Terms and Conditions content could not be displayed. Please contact support before accepting.
+            </div>
+        <?php endif; ?>
 
         <label style="display:flex;gap:12px;align-items:flex-start;border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fff;margin-bottom:20px;cursor:pointer;">
             <input type="checkbox" name="agreed" value="1" required style="margin-top:3px;">
