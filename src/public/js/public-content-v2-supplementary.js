@@ -2,7 +2,7 @@
     'use strict';
 
     class SupplementaryStore {
-        #state = Object.freeze({status: 'idle', widgets: null, error: null});
+        #state = Object.freeze({status: 'idle', widgets: null, viewer: null, error: null});
         #listeners = new Set();
 
         subscribe(listener) {
@@ -23,16 +23,24 @@
             this.fetchClient = fetchClient;
         }
 
-        async load() {
-            const response = await this.fetchClient(this.url, {
+        async get(url) {
+            const response = await this.fetchClient(url, {
                 credentials: 'same-origin',
                 headers: {Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
             });
             const payload = await response.json();
             if (!response.ok || !payload.data) {
-                throw new Error(payload.message ?? 'Unable to load page widgets.');
+                throw new Error(payload.message ?? 'Unable to load page data.');
             }
-            return payload.data.widgets ?? {};
+            return payload.data;
+        }
+
+        async load() {
+            const content = await this.get(this.url);
+            const viewer = content.links?.viewer_state
+                ? await this.get(content.links.viewer_state)
+                : null;
+            return {widgets: content.widgets ?? {}, viewer};
         }
     }
 
@@ -55,8 +63,23 @@
                 return;
             }
             if (state.status === 'loaded') {
-                root.innerHTML = this.widgets(state.widgets ?? {});
+                root.innerHTML = this.notices(state.viewer) + this.widgets(state.widgets ?? {});
             }
+        }
+
+        notices(viewer) {
+            if (!viewer) return '';
+            const notices = [];
+            if (viewer.subscription?.required) {
+                notices.push(`<div class="public-content-v2-notice is-warning"><strong>Subscription required.</strong> ${HtmlEscape.value(viewer.subscription.reason)}</div>`);
+            }
+            if (viewer.gift?.claimed) {
+                notices.push(`<div class="public-content-v2-notice is-success"><strong>Gift claimed.</strong> ${HtmlEscape.value(viewer.gift.message)}</div>`);
+            }
+            if (viewer.next_comment_badge) {
+                notices.push(`<div class="public-content-v2-notice"><strong>Next badge: ${HtmlEscape.value(viewer.next_comment_badge.name)}</strong></div>`);
+            }
+            return notices.join('');
         }
 
         widgets(widgets) {
@@ -111,7 +134,7 @@
         }
 
         start() {
-            this.unsubscribe = this.store.subscribe(state => this.view.render(this.root, state));
+            this.store.subscribe(state => this.view.render(this.root, state));
             this.root.addEventListener('click', this.onClick);
             this.load();
         }
@@ -119,7 +142,8 @@
         async load() {
             this.store.setState({status: 'loading', error: null});
             try {
-                this.store.setState({status: 'loaded', widgets: await this.api.load()});
+                const data = await this.api.load();
+                this.store.setState({status: 'loaded', ...data});
             } catch (error) {
                 this.store.setState({status: 'error', error});
             }
