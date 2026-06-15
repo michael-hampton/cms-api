@@ -43,7 +43,7 @@ final class PublicContentViewerController extends Controller
                 $page,
                 SiteContext::getId(),
                 SiteContext::slug(),
-                MemberAuth::check() ? MemberAuth::member() : null,
+                MemberAuth::check() ? MemberAuth::getMember() : null,
             ),
         ]);
     }
@@ -137,16 +137,24 @@ final class PublicContentViewerController extends Controller
             return $this->errorResponse('Content not found.', 404);
         }
 
-        $member = MemberAuth::member();
+        $member = MemberAuth::getMember();
+        if (!$member) {
+            return $this->errorResponse('Authenticated member not found.', 401);
+        }
+
         $content = trim((string)$request->get('content'));
         if ($content === '') {
             return $this->errorResponse('Comment content is required.', 422);
         }
 
+        $name = $member->display_name
+            ?: trim((string)$member->first_name . ' ' . (string)$member->last_name)
+            ?: 'Member';
+
         $comment = $this->comments->createComment(CreateCommentDTO::fromArray([
             'page_id' => $pageId,
             'member_id' => $member->id,
-            'name' => $member->name ?? 'Member',
+            'name' => $name,
             'email' => $member->email ?? '',
             'content' => $content,
             'site_id' => SiteContext::getId(),
