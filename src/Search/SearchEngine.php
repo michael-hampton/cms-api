@@ -38,7 +38,10 @@ class SearchEngine
             }
         }
 
-        $total = $queryBuilder->count();
+        // QueryBuilder::toSql() allocates parameter names while compiling.
+        // Count on a clone so its compilation state cannot leak into the data query.
+        $countQuery = clone $queryBuilder;
+        $total = $countQuery->count();
 
         $queryBuilder = $queryBuilder
             ->limit($criteria->getPerPage())
