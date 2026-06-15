@@ -119,14 +119,53 @@
             this.api = api;
             this.store = store;
             this.view = view;
+            this.siteSlug = root.dataset.site;
+            this.preview = root.dataset.preview === 'true';
         }
 
         start() {
             this.store.subscribe(state => this.view.render(this.root, state));
-            this.root.addEventListener('click', event => {
-                if (event.target.closest('[data-action="retry"]')) this.load();
-            });
+            this.root.addEventListener('click', event => this.onClick(event));
             this.load();
+        }
+
+        onClick(event) {
+            if (event.target.closest('[data-action="retry"]')) {
+                this.load();
+                return;
+            }
+
+            if (!this.preview) return;
+
+            const link = event.target.closest('a[href]');
+            if (!link || link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
+
+            const url = new URL(link.href, window.location.origin);
+            if (url.origin !== window.location.origin) return;
+
+            const target = this.toPreviewPath(url.pathname);
+            if (!target || target === url.pathname) return;
+
+            event.preventDefault();
+            window.location.assign(`${target}${url.search}${url.hash}`);
+        }
+
+        toPreviewPath(pathname) {
+            const segments = pathname.split('/').filter(Boolean);
+            if (segments[0] !== this.siteSlug) return null;
+
+            if (segments.length === 1) return `/${this.siteSlug}/content-v2`;
+            if (segments[1] === 'content-v2') return pathname;
+
+            if (['authors', 'categories', 'tags'].includes(segments[1])) {
+                return `/${this.siteSlug}/content-v2/${segments.slice(1).join('/')}`;
+            }
+
+            if (segments.length === 2) {
+                return `/${this.siteSlug}/content-v2/${encodeURIComponent(segments[1])}`;
+            }
+
+            return null;
         }
 
         async load() {
