@@ -6,16 +6,17 @@ use App\DTO\PublicContent\PublicContentContext;
 use App\DTO\PublicContent\PublicContentDocument;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
-use App\Repositories\Cms\Pages\PageRepository;
+use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\PublicContentCompositionData;
 use App\Services\PublicContent\PublicContentRenderer;
+use RuntimeException;
 
 final class GetPublicContentAction
 {
     public function __construct(
-        private readonly PageRepository $pages,
+        private readonly PublicContentPageRepository $pages,
         private readonly ArticleAccessService $access,
         private readonly PublicContentRenderer $renderer,
         private readonly PublicContentCompositionData $compositionData,
@@ -25,10 +26,14 @@ final class GetPublicContentAction
 
     public function execute(int $siteId, string $slug, ?Member $member = null): ?PublicContentDocument
     {
-        $page = $this->pages->findBySlug($slug, $siteId);
+        $page = $this->pages->findCompletePublishedBySlug($siteId, $slug);
 
-        if (!$page || (string)$page->status !== 'published') {
+        if (!$page) {
             return null;
+        }
+
+        if ((int)$page->site_id !== $siteId) {
+            throw new RuntimeException('Public content site scope mismatch.');
         }
 
         $decision = $this->access->canView($page, $member);
@@ -38,7 +43,6 @@ final class GetPublicContentAction
             );
         }
 
-        $page = $this->pages->getCompletePageData((int)$page->id) ?? $page;
         $siteSlug = SiteContext::slug();
         $base = '/api/v1/' . rawurlencode($siteSlug) . '/content/' . $page->id;
         $links = [
