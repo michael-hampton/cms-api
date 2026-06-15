@@ -9,7 +9,9 @@ use App\Repositories\Members\PageViewRepository;
 use App\Repositories\PublicContent\PublicActivityFeedRepository;
 use App\Repositories\PublicContent\PublicCategoryRepository;
 use App\Repositories\Recommendations\TrendingContentRepository;
+use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
+use App\Services\Subscriptions\SubscriptionModalService;
 
 final class PublicContentCompositionData
 {
@@ -22,6 +24,8 @@ final class PublicContentCompositionData
         private readonly PublicCommentBadgeProvider $commentBadges,
         private readonly PageLikeRepository $likes,
         private readonly PageViewRepository $views,
+        private readonly ArticleGiftingService $gifting,
+        private readonly SubscriptionModalService $subscriptionModal,
     ) {
     }
 
@@ -32,13 +36,20 @@ final class PublicContentCompositionData
         ?Member $member,
         array $links,
     ): array {
+        $badge = $member ? $this->commentBadges->next($member, $siteId) : null;
+
         return [
             'categories' => $this->categories->getActiveWithPages($siteId),
             'categoriesWithPages' => $this->landingSections->for($page, $siteId),
             'feedPages' => $this->activityFeed->latestPublished($siteId, 10),
             'trendingPages' => $this->trending->getTrendingConversations($siteId, 3),
             'todaysDeals' => $this->deals->getTodaysDeals(10),
-            'nextCommentBadge' => $member ? $this->commentBadges->next($member, $siteId) : null,
+            'nextCommentBadge' => $badge['badge'] ?? null,
+            'commentBadgeProgress' => $badge['progress'] ?? null,
+            'claimedGift' => $member
+                ? $this->gifting->checkAndClaimGiftForPage($member, $page)
+                : null,
+            'subscriptionModalData' => $this->subscriptionModal->getModalData($member, $siteId),
             'comments' => $page->comments ?? [],
             'isLiked' => $member
                 ? $this->likes->isLikedBy((int)$page->id, (int)$member->id, $siteId)
