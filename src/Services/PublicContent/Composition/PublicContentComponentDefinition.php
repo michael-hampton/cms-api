@@ -42,8 +42,14 @@ final readonly class PublicContentComponentDefinition
             region: $this->region,
             priority: $this->priority,
             html: $this->views->partial($this->template, $context->with($extra)),
-            styles: $this->styles,
-            scripts: $this->scripts,
+            styles: array_map(
+                static fn(string $file): string => asset($file, 'css'),
+                $this->styles,
+            ),
+            scripts: array_map(
+                static fn(string $file): string => asset($file, 'js'),
+                $this->scripts,
+            ),
             endpoints: $endpoints,
             stateful: $this->stateful,
         );
