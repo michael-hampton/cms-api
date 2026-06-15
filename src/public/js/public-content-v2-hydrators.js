@@ -137,4 +137,10 @@
     document.addEventListener('public-content:component-mounted', event => {
         registry.hydrate(event.detail.element, event.detail.component);
     });
+
+    document.addEventListener('public-content:document-composed', event => {
+        event.detail.root
+            .querySelector('[data-region="header"]')
+            ?.classList.add('page-header');
+    });
 })();
