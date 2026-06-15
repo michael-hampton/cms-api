@@ -2,9 +2,14 @@
     min-height: 20rem;
 }
 
-.public-content-region,
+.public-content-v2-document,
+.public-content-region:not(.public-content-region--header),
 .public-content-component {
     display: contents;
+}
+
+.public-content-region--header {
+    display: block;
 }
 
 .public-content-v2-status,
