@@ -7,7 +7,8 @@
             this.dialog = root.querySelector('.paywall-overlay__dialog');
             this.purchase = root.querySelector('[data-paywall-purchase]');
             this.purchaseDialog = root.querySelector('.paywall-purchase__dialog');
-            this.openButton = root.querySelector('[data-paywall-open-purchase]');
+            this.openPurchaseButton = root.querySelector('[data-paywall-open-purchase]');
+            this.openSubscriptionButton = root.querySelector('[data-paywall-open-subscription]');
             this.closeButton = root.querySelector('[data-paywall-close-purchase]');
             this.submitButton = root.querySelector('[data-paywall-submit-payment]');
             this.email = root.querySelector('[data-paywall-email]');
@@ -25,10 +26,19 @@
             document.body.classList.add('paywall-open');
             queueMicrotask(() => this.dialog?.focus());
 
-            this.openButton?.addEventListener('click', () => this.openPurchase());
+            this.openPurchaseButton?.addEventListener('click', () => this.openPurchase());
+            this.openSubscriptionButton?.addEventListener('click', () => this.openSubscription());
             this.closeButton?.addEventListener('click', () => this.closePurchase());
             this.submitButton?.addEventListener('click', () => this.submitPayment());
             document.addEventListener('keydown', event => this.onKeydown(event));
+        }
+
+        openSubscription() {
+            if (typeof window.openSubscriptionModal !== 'function') {
+                throw new Error('Subscription modal is not available on this page.');
+            }
+
+            window.openSubscriptionModal();
         }
 
         async openPurchase() {
@@ -49,7 +59,7 @@
         closePurchase() {
             if (!this.purchase || this.processing) return;
             this.purchase.hidden = true;
-            this.openButton?.focus();
+            this.openPurchaseButton?.focus();
         }
 
         onKeydown(event) {
