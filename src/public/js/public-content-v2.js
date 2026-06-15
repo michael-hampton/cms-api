@@ -90,14 +90,8 @@
                 link.remove();
             }
 
-            const hasAddressLookup = Boolean(template.content.querySelector('#address-lookup'));
-            const scripts = [...template.content.querySelectorAll('script')]
-                .filter(script => {
-                    const source = script.textContent ?? '';
-                    return !source.includes('const addressLookup') || hasAddressLookup;
-                });
-
-            template.content.querySelectorAll('script').forEach(script => script.remove());
+            const scripts = [...template.content.querySelectorAll('script')];
+            scripts.forEach(script => script.remove());
 
             return {
                 fragment: template.content.cloneNode(true),
@@ -105,18 +99,22 @@
             };
         }
 
-        async execute(scripts) {
-            for (const script of scripts) {
-                if (script.src) {
-                    await this.loadScript(script.src);
-                    continue;
-                }
+        executeAfterMount(scripts) {
+            if (!scripts.length) return;
 
-                const executable = document.createElement('script');
-                executable.textContent = script.textContent;
-                document.body.append(executable);
-                executable.remove();
-            }
+            window.setTimeout(async () => {
+                for (const script of scripts) {
+                    if (script.src) {
+                        await this.loadScript(script.src);
+                        continue;
+                    }
+
+                    const executable = document.createElement('script');
+                    executable.textContent = script.textContent;
+                    document.body.append(executable);
+                    executable.remove();
+                }
+            }, 0);
         }
 
         loadStyle(url) {
@@ -164,6 +162,7 @@
         constructor(assetLoader, hydrator) {
             this.assetLoader = assetLoader;
             this.hydrator = hydrator;
+            this.pendingScripts = [];
         }
 
         async render(root, documentData) {
@@ -171,6 +170,7 @@
             const components = documentData.content?.components ?? {};
             const sidebarHtml = rendered.sidebar?.rendered_html ?? '';
 
+            this.pendingScripts = [];
             root.replaceChildren();
             root.className = 'public-content-v2-app';
 
@@ -205,6 +205,10 @@
             document.dispatchEvent(new CustomEvent('public-content:document-composed', {
                 detail: {root, document: documentData},
             }));
+
+            for (const scripts of this.pendingScripts) {
+                this.assetLoader.executeAfterMount(scripts);
+            }
         }
 
         async region(name, components) {
@@ -222,8 +226,8 @@
 
                 this.hydrator.hydrate(element, component);
 
-                if (component.type !== 'guest-contributors') {
-                    await this.assetLoader.execute(prepared.scripts);
+                if (component.type !== 'guest-contributors' && prepared.scripts.length) {
+                    this.pendingScripts.push(prepared.scripts);
                 }
             }
 
