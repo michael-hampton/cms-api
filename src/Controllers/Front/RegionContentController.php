@@ -6,13 +6,12 @@ use App\Actions\PublicContent\RenderPublicContentPageAction;
 use App\Controllers\Controller;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
-use App\Models\Menu;
-use App\Models\Page;
-use App\Models\Territory;
 use App\Parsers\PageGridRenderer;
 use App\Repositories\Cms\Pages\PageGridRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\PublicContent\PublicContentPageRepository;
+use App\Repositories\PublicContent\PublicNavigationRepository;
+use App\Repositories\PublicContent\PublicTerritoryRepository;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\PublicContent\PublicContentRollout;
 
@@ -23,6 +22,8 @@ class RegionContentController extends Controller
         private readonly CommentRepository $commentRepository,
         private readonly PageGridRepository $pageGridRepository,
         private readonly PublicContentPageRepository $publicPages,
+        private readonly PublicTerritoryRepository $territories,
+        private readonly PublicNavigationRepository $navigation,
         private readonly PublicContentRollout $rollout,
         private readonly RenderPublicContentPageAction $renderPublicContent,
     ) {
@@ -32,13 +33,9 @@ class RegionContentController extends Controller
     public function show(string $regionSlug, string $pageSlug): Response
     {
         $siteId = SiteContext::getId();
+        $territory = $this->territories->findActiveBySlug($siteId, $regionSlug);
 
-        $territory = Territory::where('slug', strtolower($regionSlug))
-            ->where('site_id', $siteId)
-            ->where('is_active', true)
-            ->first();
-
-        if (!$territory instanceof Territory) {
+        if (!$territory) {
             return $this->notFound('Region not found.');
         }
 
@@ -48,16 +45,12 @@ class RegionContentController extends Controller
             (int)$territory->id,
         );
 
-        if (!$page instanceof Page) {
+        if (!$page) {
             return $this->notFound('Regional content not found.');
         }
 
         if ($this->rollout->enabledFor($page)) {
-            return $this->renderPublicContent->execute(
-                $page,
-                false,
-                $territory,
-            );
+            return $this->renderPublicContent->execute($page, false, $territory);
         }
 
         $pageGrid = $this->pageGridRepository->getActiveGridForTerritory((int)$territory->id);
@@ -65,43 +58,19 @@ class RegionContentController extends Controller
             ? (new PageGridRenderer())->render($pageGrid, $territory)
             : null;
 
-        $menu = Menu::where('is_active', true)
-            ->where('site_id', $siteId)
-            ->where('menu_type', 'header')
-            ->whereHas('territories', function ($query) use ($territory): void {
-                $query->where('territories.id', (int)$territory->id);
-            })
-            ->with(['items'])
-            ->first();
-
-        $footerMenu = Menu::where('is_active', true)
-            ->where('site_id', $siteId)
-            ->where('menu_type', 'footer')
-            ->with(['items'])
-            ->first();
-
-        $allTerritories = Territory::where('site_id', $siteId)
-            ->where('is_active', true)
-            ->get();
-
-        $regionArticles = Page::where('site_id', $siteId)
-            ->where('status', 'published')
-            ->where('id', '!=', (int)$page->id)
-            ->whereHas('territories', function ($query) use ($territory): void {
-                $query->where('territories.id', (int)$territory->id);
-            })
-            ->with(['customFields'])
-            ->limit(6)
-            ->get();
-
         $data = [
-            'menu' => $menu,
+            'menu' => $this->navigation->findActiveMenu($siteId, 'header', (int)$territory->id),
             'pageGridHtml' => $pageGridHtml,
-            'footerMenu' => $footerMenu,
+            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', (int)$territory->id),
             'page' => $page,
             'territory' => $territory,
-            'allTerritories' => $allTerritories,
-            'regionArticles' => $regionArticles,
+            'allTerritories' => $this->territories->getActiveForSite($siteId),
+            'regionArticles' => $this->publicPages->getRelatedForTerritory(
+                $siteId,
+                (int)$territory->id,
+                (int)$page->id,
+                6,
+            ),
             'blockParserService' => $this->blockParserService,
             'site' => SiteContext::get(),
             'comments' => $this->commentRepository->getCommentsForPage((int)$page->id, true),
