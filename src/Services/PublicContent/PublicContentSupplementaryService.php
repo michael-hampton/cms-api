@@ -98,6 +98,8 @@ final class PublicContentSupplementaryService
     private function contributors(int $siteId): array
     {
         return Author::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->where('is_guest', true)
             ->orderBy('created_at', 'desc')
             ->limit(6)
             ->get()
@@ -106,7 +108,7 @@ final class PublicContentSupplementaryService
                 'name' => (string)($author->name ?? ''),
                 'slug' => (string)($author->slug ?? ''),
                 'bio' => $author->bio ?? null,
-                'image' => $author->image ?? $author->image_url ?? null,
+                'image' => $author->avatar ?? null,
             ])->toArray();
     }
 }
