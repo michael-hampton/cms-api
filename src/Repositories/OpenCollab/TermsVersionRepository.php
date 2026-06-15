@@ -37,15 +37,8 @@ class TermsVersionRepository extends Repository
             ->first();
     }
 
-    public function findForSite(int $id, int $siteId, array $relations = []): ?TermsVersion
+    public function findForSite(int $id, int $siteId): ?TermsVersion
     {
-        if ($relations !== []) {
-            return TermsVersion::with($relations)
-                ->where('id', $id)
-                ->where('site_id', $siteId)
-                ->first();
-        }
-
         return TermsVersion::where('id', $id)
             ->where('site_id', $siteId)
             ->first();
