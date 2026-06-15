@@ -7,6 +7,7 @@ use App\Framework\Support\Collection;
 use App\Framework\View\ViewRenderer;
 use App\Models\Page;
 use App\Services\PublicContent\Composition\PublicContentComposer;
+use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 
@@ -64,7 +65,10 @@ final class PublicContentComposerTest extends TestCase
         $views->shouldReceive('partial')
             ->andReturnUsing(static fn(string $template): string => '<div data-template="' . $template . '"></div>');
 
-        return (new PublicContentComposer($views))->compose(new PublicContentContext(
+        return (new PublicContentComposer(
+            $views,
+            new RegionalPublicContentComponentFactory($views),
+        ))->compose(new PublicContentContext(
             page: $page,
             siteId: 1,
             siteSlug: 'estate',
