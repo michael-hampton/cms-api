@@ -39,6 +39,8 @@ use DateTimeImmutable;
 use Exception;
 use RuntimeException;
 use Throwable;
+use App\Services\Pricing\CartLineDisclosureService;
+use App\ViewModels\Checkout\CheckoutPageViewModel;
 
 class CartController extends Controller
 {
@@ -59,13 +61,13 @@ class CartController extends Controller
         private readonly OTPRepository                      $OTPRepository,
         private readonly CheckoutIdentityService            $identityService,
         private readonly CartPersistenceService             $cartPersistence,
-        private readonly CartMigrationService   $cartMigration,
-        private GiftResolutionService           $giftResolutionService,
-        private readonly SubscriptionRepository $subscriptionRepository,
-        private readonly CurrencyResolver       $currencyResolver,
+        private readonly CartMigrationService               $cartMigration,
+        private readonly GiftResolutionService              $giftResolutionService,
+        private readonly SubscriptionRepository             $subscriptionRepository,
+        private readonly CurrencyResolver                   $currencyResolver,
         private readonly AddressRepository                  $addressRepository,
-    )
-    {
+        private readonly CartLineDisclosureService          $cartLineDisclosureService,
+    ) {
         parent::__construct();
     }
 
@@ -276,26 +278,66 @@ class CartController extends Controller
 
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
 
-        $cartData = [
-            'items' => $items,
-            'total' => $this->cartService->getTotal(),
-            'count' => $this->cartService->getCount(),
-            'requiresShipping' => ($member === null || $member->addresses->count() === 0) || $this->cartService->requiresShipping(),
-            'shipping' => $shipping,
-            'subtotal' => $subtotal,
-            'savedCards' => $savedCards,
-            'tax' => $tax->taxCents / 100,
-            'tax_rate' => $tax->rate,
-            'hasPreOrders' => $this->detectPreOrders($items),
-            'member' => $member,
-            'checkoutMode' => 'steps',
-            'currency' => $currencyCode,
-            'currencySymbol' => $currencySymbol,
-            'isOneTimeCart' => $isOneTimeCart,
-            'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
+        $member = MemberAuth::check()
+            ? MemberAuth::getMember()
+            : null;
+
+        $subscriptionPlanIds = array_values(array_unique(array_filter(
+            array_map(
+                static fn(array $item): int => (int)($item['subscription_plan_id'] ?? 0),
+                $items,
+            ),
+        )));
+
+        $plansById = [];
+
+        if ($subscriptionPlanIds !== []) {
+            $plans = SubscriptionPlan::whereIn('id', $subscriptionPlanIds)->get();
+
+            foreach ($plans as $plan) {
+                $plansById[(int)$plan->id] = $plan;
+            }
+        }
+
+        /*
+         * These should eventually come from the resolved Experience.
+         *
+         * They are explicit here for now so the view model API is already compatible
+         * with Experience-owned disclosure configuration.
+         */
+        $locale = 'en_GB';
+        $copyOverrides = [];
+        $formatterSettings = [
+            'period_display_strategy' => 'normalized',
         ];
 
-        return $this->view('checkout/index', $cartData);
+        $vm = CheckoutPageViewModel::make(
+            items: $items,
+            shipping: $shipping,
+            tax: $tax->taxCents / 100,
+            taxRate: $tax->rate,
+            currency: $currencyCode,
+            checkoutMode: 'steps',
+            requiresShipping: $this->cartService->requiresShipping(),
+            memberHasAddresses: $member !== null
+            && $member->addresses->count() > 0,
+            isOneTimeCart: $isOneTimeCart,
+            isMixedSubscriptionCart: $isMixedSubscriptionCart,
+            hasPreOrders: $this->detectPreOrders($items),
+            appliedVoucher: Session::get('applied_voucher_code'),
+            site: SiteContext::slug(),
+            disclosures: $this->cartLineDisclosureService,
+            plansById: $plansById,
+            locale: $locale,
+            copyOverrides: $copyOverrides,
+            formatterSettings: $formatterSettings,
+        );
+
+        return $this->view('checkout/index', [
+            'vm' => $vm,
+            'member' => $member,
+            'savedCards' => $savedCards,
+        ]);
     }
 
     private function subscriptionCheckout(int $planId, bool $isRenewal = false)
