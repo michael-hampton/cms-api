@@ -135,6 +135,13 @@ class TermsVersionService
         }
     }
 
+    public function deleteDraft(TermsVersion $terms): void
+    {
+        $this->assertEditable($terms);
+
+        $terms->delete();
+    }
+
     private function render(string $content, string $format): string
     {
         return $format === 'html' ? trim($content) : nl2br(htmlspecialchars(trim($content), ENT_QUOTES, 'UTF-8'));

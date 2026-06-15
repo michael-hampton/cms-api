@@ -3031,3 +3031,9 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+.oc-badge--muted {
+    background: var(--slate-pale);
+    color: var(--slate);
+    border: 1px solid var(--border);
+}

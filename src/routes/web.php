@@ -636,7 +636,7 @@ $router->group(['middleware' => [RequireContributorAuth::class, CheckContributor
     $router->get('/{site}/open-collab/briefs', [ContributorBriefInboxController::class, 'index']);
     $router->get('/{site}/open-collab/briefs/{brief}', [ContributorBriefController::class, 'show']);
     $router->get('/{site}/open-collab/articles', [ArticlePageController::class, 'index']);
-    $router->get('/{site}/open-collab/queue', [ArticlePageController::class, 'queue']);
+    $router->get('/{site}/open-collab/admin/queue', [ArticlePageController::class, 'queue']);
     $router->get('/{site}/open-collab/admin/moderation/{id}', [ModerationPageController::class, 'show']);
     $router->get('/{site}/open-collab/payouts', [PayoutPageController::class, 'index']);
     $router->get('/{site}/open-collab/earnings', [ContributorEarningsPageController::class, 'index']);

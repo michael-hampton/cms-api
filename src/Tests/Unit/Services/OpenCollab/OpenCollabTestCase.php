@@ -22,6 +22,20 @@ abstract class OpenCollabTestCase extends TestCase
     {
         $image = Mockery::mock(Image::class)->makePartial();
 
+        $image->shouldReceive('update')
+            ->byDefault()
+            ->andReturnUsing(function (array $attributes) use ($image): bool {
+                foreach ($attributes as $key => $value) {
+                    $image->$key = $value;
+                }
+
+                return true;
+            });
+
+        $image->shouldReceive('fresh')
+            ->byDefault()
+            ->andReturnSelf();
+
         $defaults = [
             'id'           => 1,
             'site_id'      => 4,

@@ -537,6 +537,10 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/open-collab/admin/terms/{id}/publish', [AdminTermsController::class, 'publish']);
         $router->post('/open-collab/admin/terms/from-document', [AdminTermsController::class, 'storeFromDocument']);
         $router->get('/open-collab/admin/terms-evidence/{id}', [AdminTermsEvidenceController::class, 'show']);
+        $router->delete(
+            '/open-collab/admin/terms/{id}',
+            [AdminTermsController::class, 'destroy'],
+        );
 
         $router->get('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'index']);
         $router->post('/open-collab/admin/contract-templates', [AdminContractTemplateController::class, 'store']);

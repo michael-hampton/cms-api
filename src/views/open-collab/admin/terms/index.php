@@ -111,6 +111,14 @@ $breadcrumbs = [['label' => 'Terms & Conditions']];
                         <div class="oc-form-group">
                             <label class="oc-label" for="terms-source-content">Terms content</label>
                             <textarea class="oc-textarea" id="terms-source-content" name="source_content" rows="18" required style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.55;"></textarea>
+                            <div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;font-size:.78rem;">
+                                <span id="terms-content-message" class="oc-muted">
+                                    Minimum 50 characters required.
+                                </span>
+                                                            <span id="terms-content-counter" class="oc-muted">
+                                    0 / 50
+                                </span>
+                            </div>
                         </div>
 
                         <div style="display:flex;justify-content:flex-end;gap:10px;">
@@ -170,6 +178,7 @@ class TermsAdminManager {
             create: root.dataset.canCreate === '1',
             edit: root.dataset.canEdit === '1',
             publish: root.dataset.canPublish === '1',
+            delete: root.dataset.canDelete === '1',
         };
 
         this.state = {
@@ -212,10 +221,16 @@ class TermsAdminManager {
             importErrors: document.getElementById('terms-import-errors'),
             importButton: document.getElementById('terms-import-btn'),
             toast: document.getElementById('terms-toast'),
+            contentMessage: document.getElementById('terms-content-message'),
+            contentCounter: document.getElementById('terms-content-counter'),
         };
     }
 
     bindEvents() {
+        this.elements.sourceContent?.addEventListener(
+            'input',
+            () => this.updateContentValidation(),
+        );
         this.elements.createButton?.addEventListener('click', () => this.select(null));
         this.elements.resetButton?.addEventListener('click', () => this.select(null));
         this.elements.form?.addEventListener('submit', event => {
@@ -229,10 +244,26 @@ class TermsAdminManager {
         });
         this.elements.list?.addEventListener('click', event => {
             const button = event.target.closest('[data-terms-id]');
-            if (!button) return;
+
+            if (!button) {
+                return;
+            }
+
             const id = Number(button.dataset.termsId);
-            const item = this.state.items.find(candidate => Number(candidate.id) === id);
-            if (item) this.select(item);
+            const item = this.state.items.find(
+                candidate => Number(candidate.id) === id,
+            );
+
+            if (!item) {
+                return;
+            }
+
+            if (button.dataset.action === 'delete') {
+                this.deleteDraft(item);
+                return;
+            }
+
+            this.select(item);
         });
     }
 
@@ -269,6 +300,40 @@ class TermsAdminManager {
         }
     }
 
+    updateContentValidation() {
+        const minimum = 50;
+        const length = this.elements.sourceContent.value.trim().length;
+        const valid = length >= minimum;
+        const item = this.state.selected;
+        const status = item ? this.normaliseStatus(item.status) : 'draft';
+        const locked = Boolean(item && status !== 'draft');
+        const hasPermission = item
+            ? this.permissions.edit
+            : this.permissions.create;
+
+        this.elements.contentCounter.textContent = `${length} / ${minimum}`;
+
+        if (valid) {
+            this.elements.contentMessage.textContent = 'Minimum length met.';
+            this.elements.contentMessage.style.color = 'var(--green)';
+            this.elements.contentCounter.style.color = 'var(--green)';
+        } else {
+            const remaining = minimum - length;
+
+            this.elements.contentMessage.textContent =
+                `${remaining} more character${remaining === 1 ? '' : 's'} required.`;
+
+            this.elements.contentMessage.style.color = 'var(--red)';
+            this.elements.contentCounter.style.color = 'var(--red)';
+        }
+
+        this.elements.saveButton.disabled =
+            this.state.saving ||
+            locked ||
+            !hasPermission ||
+            !valid;
+    }
+
     renderList() {
         const items = this.state.items;
         this.elements.count.textContent = String(items.length);
@@ -284,6 +349,34 @@ class TermsAdminManager {
                     : 'oc-badge--warning';
             const selected = this.state.selected && Number(this.state.selected.id) === Number(item.id);
             const action = status === 'draft' && this.permissions.edit ? 'Edit' : 'View';
+            const canDelete =
+                status === 'draft' &&
+                this.permissions.delete;
+
+            const actions = [
+                `<button
+        type="button"
+        class="oc-btn oc-btn--ghost oc-btn--sm"
+        data-action="select"
+        data-terms-id="${Number(item.id)}"
+    >
+        ${action}
+    </button>`,
+            ];
+
+            if (canDelete) {
+                actions.push(`
+        <button
+            type="button"
+            class="oc-btn oc-btn--ghost oc-btn--sm"
+            data-action="delete"
+            data-terms-id="${Number(item.id)}"
+            style="color:var(--red);"
+        >
+            Delete
+        </button>
+    `);
+            }
 
             return `
                 <tr style="border-bottom:1px solid var(--border);${selected ? 'background:var(--amber-pale);' : ''}">
@@ -298,8 +391,10 @@ class TermsAdminManager {
                         </span>
                     </td>
                     <td style="padding:16px 18px;"><span class="oc-badge ${badgeClass}">${this.escape(this.ucfirst(status))}</span></td>
-                    <td style="padding:16px 18px;text-align:right;">
-                        <button type="button" class="oc-btn oc-btn--ghost oc-btn--sm" data-terms-id="${Number(item.id)}">${action}</button>
+                   <td style="padding:16px 18px;text-align:right;">
+                        <div style="display:flex;justify-content:flex-end;gap:6px;">
+                            ${actions.join('')}
+                        </div>
                     </td>
                 </tr>`;
         }).join('');
@@ -338,12 +433,29 @@ class TermsAdminManager {
     async save() {
         if (this.state.saving) return;
         const item = this.state.selected;
+
+        const sourceContent = this.elements.sourceContent.value.trim();
+
+        if (sourceContent.length < 50) {
+            this.showErrors(this.elements.formErrors, {
+                errors: {
+                    source_content: [
+                        `Terms content must be at least 50 characters. ${50 - sourceContent.length} more required.`,
+                    ],
+                },
+            });
+
+            this.elements.sourceContent.focus();
+            this.updateContentValidation();
+            return;
+        }
+
         const payload = {
             semantic_version: this.elements.semanticVersion.value.trim(),
             title: this.elements.title.value.trim(),
             change_summary: this.elements.changeSummary.value.trim() || null,
             is_material_change: this.elements.materialChange.checked,
-            source_content: this.elements.sourceContent.value,
+            source_content: sourceContent,
             source_format: 'html',
         };
 
@@ -367,6 +479,45 @@ class TermsAdminManager {
         } finally {
             this.setState({ saving: false });
             this.setButtonBusy(this.elements.saveButton, false, 'Save draft');
+        }
+    }
+
+    async deleteDraft(item) {
+        if (
+            !this.permissions.delete ||
+            this.normaliseStatus(item.status) !== 'draft'
+        ) {
+            return;
+        }
+
+        const confirmed = window.confirm(
+            `Delete Terms v${item.semantic_version}? This cannot be undone.`,
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await this.request(
+                `${this.apiBase}/${item.id}`,
+                { method: 'DELETE' },
+            );
+
+            if (
+                this.state.selected &&
+                Number(this.state.selected.id) === Number(item.id)
+            ) {
+                this.state.selected = null;
+            }
+
+            this.showToast('Terms draft deleted.');
+            await this.load();
+        } catch (error) {
+            this.showToast(
+                error.message || 'Unable to delete draft.',
+                true,
+            );
         }
     }
 
@@ -448,9 +599,19 @@ class TermsAdminManager {
     }
 
     setButtonBusy(button, busy, label) {
-        if (!button) return;
-        button.disabled = busy;
+        if (!button) {
+            return;
+        }
+
         button.textContent = label;
+
+        if (button === this.elements.saveButton) {
+            this.state.saving = busy;
+            this.updateContentValidation();
+            return;
+        }
+
+        button.disabled = busy;
     }
 
     showErrors(container, error) {

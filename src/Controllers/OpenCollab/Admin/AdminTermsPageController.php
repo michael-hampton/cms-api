@@ -35,6 +35,11 @@ class AdminTermsPageController extends Controller
             'canCreateTerms' => $this->authorization->allows($userId, $siteId, 'terms.create'),
             'canEditTerms' => $this->authorization->allows($userId, $siteId, 'terms.edit'),
             'canPublishTerms' => $this->authorization->allows($userId, $siteId, 'terms.publish'),
+            'canDeleteTerms' => $this->authorization->allows(
+                $userId,
+                $siteId,
+                'terms.delete',
+            ),
             'termsVersions' => $this->repository->allForSite($siteId),
             'selectedTerms' => $selectedId > 0
                 ? $this->repository->findForSite($selectedId, $siteId)

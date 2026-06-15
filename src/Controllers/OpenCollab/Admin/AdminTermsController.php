@@ -171,6 +171,39 @@ class AdminTermsController extends Controller
         return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()], 201);
     }
 
+    // AdminTermsController
+    public function destroy(int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.delete'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->findForSite(
+            $id,
+            SiteContext::getId(),
+        );
+
+        if (!$terms) {
+            return $this->errorResponse(
+                'Terms version not found.',
+                404,
+            );
+        }
+
+        try {
+            $this->service->deleteDraft($terms);
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse(
+                $exception->getMessage(),
+                409,
+            );
+        }
+
+        return $this->jsonResponse([
+            'message' => 'Terms draft deleted.',
+        ]);
+    }
+
     private function uploadedDocument(StoreTermsFromDocumentRequest $request): ?UploadedFile
     {
         return $request->files()['document'] ?? $request->file('document');
