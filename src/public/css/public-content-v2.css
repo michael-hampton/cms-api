@@ -1,16 +1,14 @@
-.public-content-v2-shell {
-    margin: 5rem auto 0;
-    max-width: 1280px;
-    padding: 0 1.5rem 4rem;
-}
-
 .public-content-v2-app {
     min-height: 20rem;
 }
 
+.public-content-region,
+.public-content-component {
+    display: contents;
+}
+
 .public-content-v2-status,
-.public-content-v2-error,
-.public-content-v2-empty {
+.public-content-v2-error {
     align-items: center;
     display: flex;
     flex-direction: column;
@@ -29,76 +27,6 @@
     width: 2.5rem;
 }
 
-.public-content-v2-header {
-    border-bottom: 1px solid #e5e7eb;
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-}
-
-.public-content-v2-title {
-    font-size: clamp(2rem, 5vw, 4rem);
-    line-height: 1.05;
-    margin: 0;
-}
-
-.public-content-v2-summary {
-    color: #4b5563;
-    font-size: 1.125rem;
-    margin: 1rem 0 0;
-    max-width: 52rem;
-}
-
-.public-content-v2-taxonomy {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 1.25rem;
-}
-
-.public-content-v2-chip {
-    background: #f3f4f6;
-    border-radius: 999px;
-    color: #374151;
-    display: inline-flex;
-    font-size: 0.875rem;
-    padding: 0.35rem 0.75rem;
-}
-
-.public-content-v2-layout {
-    display: grid;
-    gap: 2rem;
-    grid-template-columns: minmax(0, 1fr);
-}
-
-.public-content-v2-layout.has-sidebar {
-    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
-}
-
-.public-content-v2-main,
-.public-content-v2-sidebar {
-    min-width: 0;
-}
-
-.public-content-v2-block + .public-content-v2-block {
-    margin-top: 1.5rem;
-}
-
-.public-content-v2-fallback > :first-child {
-    margin-top: 0;
-}
-
-.public-content-v2-fallback > :last-child {
-    margin-bottom: 0;
-}
-
-.public-content-v2-unsupported {
-    background: #fff7ed;
-    border: 1px solid #fdba74;
-    border-radius: 0.5rem;
-    color: #9a3412;
-    padding: 1rem;
-}
-
 .public-content-v2-error {
     background: #fef2f2;
     border: 1px solid #fecaca;
@@ -107,19 +35,13 @@
     padding: 2rem;
 }
 
-.public-content-v2-retry {
+.public-content-v2-error button {
     background: #111827;
     border: 0;
     border-radius: 0.5rem;
     color: #fff;
     cursor: pointer;
     padding: 0.75rem 1rem;
-}
-
-@media (max-width: 900px) {
-    .public-content-v2-layout.has-sidebar {
-        grid-template-columns: minmax(0, 1fr);
-    }
 }
 
 @keyframes public-content-v2-spin {
