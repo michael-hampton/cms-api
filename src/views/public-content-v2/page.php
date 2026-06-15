@@ -30,5 +30,6 @@ $description = 'Public content V2 preview';
 
 @css('public-content-v2.css')
 @js('base.js')
+@js('public-content-v2-preview-links.js')
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2.js')
