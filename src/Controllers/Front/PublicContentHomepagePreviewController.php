@@ -7,6 +7,7 @@ use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicContentPageRepository;
 use App\Repositories\PublicContent\PublicNavigationRepository;
+use App\Services\Cms\MenuRenderer;
 use App\Services\FooterRenderer;
 use App\Services\PublicContent\PublicContentRollout;
 
@@ -17,6 +18,7 @@ final class PublicContentHomepagePreviewController extends Controller
         private readonly PublicContentPageRepository $pages,
         private readonly PublicNavigationRepository $navigation,
         private readonly FooterRenderer $footerRenderer,
+        private readonly MenuRenderer $menuRenderer,
     ) {
         parent::__construct();
     }
@@ -43,6 +45,7 @@ final class PublicContentHomepagePreviewController extends Controller
             'siteSlug' => $siteSlug,
             'contentSlug' => (string)$page->slug,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header'),
+            'menuRenderer' => $this->menuRenderer,
             'footerHtml' => $footerMenu
                 ? $this->footerRenderer->renderFooter($footerMenu)
                 : '',
