@@ -24,7 +24,7 @@ class PublicContentRollout
 
         $pageTypes = $this->csvStrings((string)env(
             'PUBLIC_CONTENT_V2_PAGE_TYPES',
-            'page,article,landing-page',
+            'page,content,article,landing-page',
         ));
 
         return $pageTypes === [] || in_array((string)$page->page_type, $pageTypes, true);
