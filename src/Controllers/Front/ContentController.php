@@ -20,14 +20,12 @@ use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\Members\BadgeRepository;
 use App\Repositories\Members\CommentRepository;
 use App\Repositories\Members\PageViewRepository;
-use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\Cms\MenuRenderer;
 use App\Services\Cms\Pages\ArticleAccessService;
 use App\Services\Cms\Pages\BlockParserService;
 use App\Services\Cms\Pages\PageRenderService;
 use App\Services\Members\ArticleGiftingService;
 use App\Services\Offers\DealsService;
-use App\Services\PublicContent\PublicContentRollout;
 use App\Services\Subscriptions\SubscriptionModalService;
 
 class ContentController extends Controller
@@ -45,8 +43,6 @@ class ContentController extends Controller
         private readonly PageRepository $pageRepository,
         private readonly DealsService $dealsService,
         private readonly ArticleGiftingService $articleGiftingService,
-        private readonly PublicContentRollout $publicContentRollout,
-        private readonly PublicNavigationRepository $publicNavigation,
         private readonly MenuRenderer $menuRenderer,
     ) {
         parent::__construct();
@@ -54,10 +50,6 @@ class ContentController extends Controller
 
     public function show(Page $page)
     {
-        if ($this->publicContentRollout->enabledFor($page)) {
-            return $this->showPublicContentV2($page);
-        }
-
         $member = MemberAuth::getMember();
         $memberId = $member ? $member->id : null;
 
@@ -189,29 +181,6 @@ class ContentController extends Controller
         $sites = Site::active()->get();
 
         return $this->view('estate/sites', ['sites' => $sites]);
-    }
-
-    private function showPublicContentV2(Page $page): Response
-    {
-        $siteId = SiteContext::getId();
-        $siteSlug = SiteContext::slug();
-
-        return $this->view('public-content-v2/page', [
-            'preview' => false,
-            'site' => SiteContext::get(),
-            'siteSlug' => $siteSlug,
-            'contentSlug' => (string)$page->slug,
-            'pageTitle' => (string)$page->title,
-            'pageDescription' => $page->meta_description ?? '',
-            'menu' => $this->publicNavigation->findActiveMenu($siteId, 'header'),
-            'menuRenderer' => $this->menuRenderer,
-            'footerMenu' => $this->publicNavigation->findActiveMenu($siteId, 'footer'),
-            'apiUrl' => sprintf(
-                '/api/v1/%s/content/%s',
-                rawurlencode($siteSlug),
-                rawurlencode((string)$page->slug),
-            ),
-        ]);
     }
 
     private function getCategoryPages(int $siteId, $categories)
