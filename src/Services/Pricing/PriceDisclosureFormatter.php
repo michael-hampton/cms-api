@@ -46,6 +46,7 @@ final readonly class PriceDisclosureFormatter
         $mainKey = match (true) {
             $context->hasTrial() && $context->hasValidInitialCharge() => 'trial_with_start_charge',
             $context->hasTrial() => 'trial_without_start_charge',
+            $context->hasValidInitialCharge() => 'introductory_price',
             default => 'subscription_without_trial',
         };
 
