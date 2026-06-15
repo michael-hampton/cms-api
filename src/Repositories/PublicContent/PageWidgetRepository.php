@@ -4,9 +4,10 @@ namespace App\Repositories\PublicContent;
 
 use App\Framework\Support\Collection;
 use App\Models\PageWidget;
+use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Repositories\Repository;
 
-final class PageWidgetRepository extends Repository
+final class PageWidgetRepository extends Repository implements PageWidgetRepositoryInterface
 {
     public function getForPage(int $pageId): Collection
     {
