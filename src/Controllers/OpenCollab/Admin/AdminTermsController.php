@@ -1,0 +1,211 @@
+<?php
+
+namespace App\Controllers\OpenCollab\Admin;
+
+use App\Controllers\Controller;
+use App\Controllers\OpenCollab\Concerns\AuthorizesSitePermissions;
+use App\Framework\Authorization\Auth;
+use App\Framework\Exceptions\ValidationException;
+use App\Framework\Http\JsonResponse;
+use App\Framework\Http\UploadedFile;
+use App\Framework\Support\SiteContext;
+use App\Repositories\OpenCollab\TermsVersionRepository;
+use App\Requests\OpenCollab\StoreTermsFromDocumentRequest;
+use App\Requests\OpenCollab\StoreTermsVersionRequest;
+use App\Requests\OpenCollab\UpdateTermsVersionRequest;
+use App\Resources\OpenCollab\TermsVersionResource;
+use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\Services\OpenCollab\TermsVersionService;
+use RuntimeException;
+
+class AdminTermsController extends Controller
+{
+    use AuthorizesSitePermissions;
+
+    public function __construct(
+        private readonly TermsVersionRepository $repository,
+        private readonly TermsVersionService $service,
+        private readonly OpenCollabAuthorizationService $authorization,
+    ) {
+        parent::__construct();
+    }
+
+    public function index(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.view', 'terms.edit', 'terms.publish', 'terms.archive'])) {
+            return $response;
+        }
+
+        return $this->jsonResponse([
+            'terms' => $this->repository->allForSite(SiteContext::getId())
+                ->map(fn($terms) => (new TermsVersionResource($terms))->toArray())
+                ->toArray(),
+        ]);
+    }
+
+    public function latest(): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.view', 'terms.publish'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->latestPublishedForSite(SiteContext::getId());
+        if (!$terms) {
+            return $this->errorResponse('No published Terms and Conditions found for this site.', 404);
+        }
+
+        return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()]);
+    }
+
+    public function show(int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.view', 'terms.edit', 'terms.publish', 'terms.archive'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->findForSite($id, SiteContext::getId());
+        if (!$terms) {
+            return $this->errorResponse('Terms version not found.', 404);
+        }
+
+        return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()]);
+    }
+
+    public function store(StoreTermsVersionRequest $request): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.create'])) {
+            return $response;
+        }
+
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
+        }
+
+        $terms = $this->service->createDraft(
+            SiteContext::getId(),
+            (string)$data['semantic_version'],
+            (string)$data['title'],
+            (string)$data['source_content'],
+            Auth::id(),
+            $data,
+        );
+
+        return $this->jsonResponse([
+            'terms' => (new TermsVersionResource($terms))->toArray(),
+            'message' => 'Terms version created.',
+        ], 201);
+    }
+
+    public function update(UpdateTermsVersionRequest $request, int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.edit'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->findForSite($id, SiteContext::getId());
+        if (!$terms) {
+            return $this->errorResponse('Terms version not found.', 404);
+        }
+
+        try {
+            $data = $request->validated();
+            $terms = $this->service->updateDraft($terms, $data);
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), 409);
+        }
+
+        return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()]);
+    }
+
+    public function publish(int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.publish'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->findForSite($id, SiteContext::getId());
+        if (!$terms) {
+            return $this->errorResponse('Terms version not found.', 404);
+        }
+
+        try {
+            $terms = $this->service->publish($terms, Auth::id());
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse($exception->getMessage(), 409);
+        }
+
+        return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()]);
+    }
+
+    public function storeFromDocument(StoreTermsFromDocumentRequest $request): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.create'])) {
+            return $response;
+        }
+
+        $file = $this->uploadedDocument($request);
+        if (!$file) {
+            return $this->errorResponse('Document is required.', 422);
+        }
+
+        try {
+            $data = $request->validated();
+        } catch (ValidationException $exception) {
+            return $this->errorResponse('Validation failed', 422, $exception->getErrors());
+        }
+
+        $terms = $this->service->createDraftFromDocument(
+            $file,
+            SiteContext::getId(),
+            (string)$data['semantic_version'],
+            (string)$data['title'],
+            Auth::id(),
+            (bool)($data['is_material_change'] ?? false),
+            $data['change_summary'] ?? null,
+        );
+
+        return $this->jsonResponse(['terms' => (new TermsVersionResource($terms))->toArray()], 201);
+    }
+
+    // AdminTermsController
+    public function destroy(int $id): JsonResponse
+    {
+        if ($response = $this->authorizeSitePermissions(['terms.delete'])) {
+            return $response;
+        }
+
+        $terms = $this->repository->findForSite(
+            $id,
+            SiteContext::getId(),
+        );
+
+        if (!$terms) {
+            return $this->errorResponse(
+                'Terms version not found.',
+                404,
+            );
+        }
+
+        try {
+            $this->service->deleteDraft($terms);
+        } catch (RuntimeException $exception) {
+            return $this->errorResponse(
+                $exception->getMessage(),
+                409,
+            );
+        }
+
+        return $this->jsonResponse([
+            'message' => 'Terms draft deleted.',
+        ]);
+    }
+
+    private function uploadedDocument(StoreTermsFromDocumentRequest $request): ?UploadedFile
+    {
+        return $request->files()['document'] ?? $request->file('document');
+    }
+}

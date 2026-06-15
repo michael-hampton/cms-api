@@ -18,6 +18,7 @@ use App\Services\OpenCollab\ContributorAgeValidationService;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorProfileCompletionService;
 use App\Services\OpenCollab\StripeConnectAccountService;
+use App\Services\OpenCollab\TermsAcceptanceRequirementService;
 use App\Tests\Functional\Controllers\FunctionalTestCase;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -55,6 +56,7 @@ class ContributorOnboardingServiceTest extends TestCase
     private ContributorAgeValidationService $ageService;
     private ContributorOnboardingRepository $contributorOnboardingRepository;
     private ContributorProfileCompletionService $contributorProfileCompletionService;
+    private TermsAcceptanceRequirementService $termsRequirementService;
 
     // ── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -68,6 +70,7 @@ class ContributorOnboardingServiceTest extends TestCase
         $this->guidelinesRepo = Mockery::mock(GuidelinesRepository::class);
         $this->contributorOnboardingRepository = Mockery::mock(ContributorOnboardingRepository::class);
         $this->contributorProfileCompletionService = Mockery::mock(ContributorProfileCompletionService::class);
+        $this->termsRequirementService = Mockery::mock(TermsAcceptanceRequirementService::class);
         $this->ageService     = new ContributorAgeValidationService();
 
         // Default: step repo reports no rows exist for any step.
@@ -82,9 +85,12 @@ class ContributorOnboardingServiceTest extends TestCase
             ageValidationService:      $this->ageService,
             contributorOnboardingRepository:  $this->contributorOnboardingRepository,
             profileCompletionService: $this->contributorProfileCompletionService,
+            termsRequirementService: $this->termsRequirementService,
         );
 
         $this->contributorProfileCompletionService->shouldReceive('isComplete')->andReturn(true)->byDefault();
+        $this->termsRequirementService->shouldReceive('currentRequiredVersion')->andReturn(null)->byDefault();
+        $this->termsRequirementService->shouldReceive('requiresAcceptance')->andReturn(false)->byDefault();
     }
 
     protected function tearDown(): void
@@ -1276,6 +1282,7 @@ class ContributorOnboardingServiceTest extends TestCase
             ageValidationService: $this->ageService,
             contributorOnboardingRepository: $this->contributorOnboardingRepository,
             profileCompletionService: $this->contributorProfileCompletionService,
+            termsRequirementService: $this->termsRequirementService,
             stripeConnectAccountService: $stripe,
         );
     }

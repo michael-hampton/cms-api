@@ -256,13 +256,15 @@ class OnboardingControllerTest extends FunctionalTestCase
             'is_contributor' => true,
         ]);
 
-        $permission = OpenCollabPermission::where('slug', $permissionSlug)->first();
-        OpenCollabSiteUserPermission::create([
-            'site_id' => $this->siteId,
-            'user_id' => $user->id,
-            'permission_id' => $permission->id,
-            'granted' => true,
-        ]);
+        foreach (array_unique(['onboarding.view', $permissionSlug]) as $slug) {
+            $permission = OpenCollabPermission::where('slug', $slug)->first();
+            OpenCollabSiteUserPermission::create([
+                'site_id' => $this->siteId,
+                'user_id' => $user->id,
+                'permission_id' => $permission->id,
+                'granted' => true,
+            ]);
+        }
 
         return $user;
     }

@@ -14,6 +14,7 @@ use App\Repositories\OpenCollab\GuidelinesRepository;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorProfileFieldConfigService;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
+use App\Services\OpenCollab\TermsAcceptanceRequirementService;
 use App\ViewModels\OpenCollab\OnboardingLegalDocumentViewModelFactory;
 use App\ViewModels\OpenCollab\OnboardingPageViewModel;
 use App\ViewModels\OpenCollab\ProfileStepViewModel;
@@ -23,22 +24,19 @@ class OnboardingPageController extends Controller
     use AuthorizesSitePagePermissions;
 
     public function __construct(
-        private readonly ContributorOnboardingService         $onboardingService,
-        private readonly ContractRepository                   $contractRepository,
-        private readonly GuidelinesRepository                 $guidelinesRepository,
-        private readonly GuidelinesContentRepository          $guidelinesContentRepository,
-        private readonly OpenCollabAuthorizationService       $authorization,
-        private readonly ContributorProfileRepository         $contributorProfileRepository,
+        private readonly ContributorOnboardingService $onboardingService,
+        private readonly ContractRepository $contractRepository,
+        private readonly GuidelinesRepository $guidelinesRepository,
+        private readonly GuidelinesContentRepository $guidelinesContentRepository,
+        private readonly OpenCollabAuthorizationService $authorization,
+        private readonly ContributorProfileRepository $contributorProfileRepository,
         private readonly ContributorProfileFieldConfigService $profileFieldConfigService,
         private readonly OnboardingLegalDocumentViewModelFactory $legalDocumentFactory,
-    )
-    {
+        private readonly TermsAcceptanceRequirementService $termsRequirementService,
+    ) {
         parent::__construct();
     }
 
-    /**
-     * GET /onboarding
-     */
     public function show()
     {
         if ($response = $this->authorizeSitePagePermissions(['onboarding.view'])) {
@@ -59,47 +57,42 @@ class OnboardingPageController extends Controller
             exit;
         }
 
-        $profile = $this->contributorProfileRepository->findByUserId(Auth::id());
-
+        $profile = $this->contributorProfileRepository->findByUserId($userId);
         $profileFields = $this->profileFieldConfigService->activeFieldsForSite($site);
-
         $profileStep = ProfileStepViewModel::fromFields($profileFields, $profile);
-
         $viewModel = new OnboardingPageViewModel(
-            pendingSteps: $this->onboardingService->pendingSteps(Auth::id(), $site),
+            pendingSteps: $pending,
             site: $site,
             profileStep: $profileStep,
         );
+
+        $terms = $viewModel->currentStepName() === 'terms'
+            ? $this->termsRequirementService->currentVisibleVersion((int)$site->id)
+            : null;
         $contract = $viewModel->currentStepName() === 'contract'
             ? $this->contractRepository->latestForSite($site->id)
             : null;
-
         $publishedGuidelines = $viewModel->currentStepName() === 'guidelines'
             ? $this->guidelinesContentRepository->latestPublishedForSite($site->id)
             : null;
 
         return $this->view('open-collab.onboarding.index', [
             'vm' => $viewModel,
-
+            'terms' => $this->legalDocumentFactory->forTerms($terms),
+            'termsDisplay' => $this->legalDocumentFactory->forTerms($terms),
             'contract' => $contract,
             'contractDisplay' => $this->legalDocumentFactory->forContract($contract),
-
             'siteGuidelines' => $publishedGuidelines,
             'guidelinesDisplay' => $this->legalDocumentFactory->forGuideline($publishedGuidelines),
-
             'siteGuidelinesVersion' => $publishedGuidelines?->version
                 ?? $this->guidelinesRepository->latestVersion($site->id),
-
             'site' => SiteContext::slug(),
-
+            'siteSlug' => SiteContext::slug(),
             'stripePublicKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
-
             'currentUser' => Auth::user(),
-
-            'profile' => $this->contributorProfileRepository->findByUserId(Auth::id()),
-
+            'profile' => $profile,
             'profileFields' => $viewModel->currentStepName() === 'profile'
-                ? $this->profileFieldConfigService->activeFieldsForSite($site)
+                ? $profileFields
                 : collect([]),
         ]);
     }

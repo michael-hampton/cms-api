@@ -4,7 +4,6 @@ namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
-use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Support\SiteContext;
 use App\Services\OpenCollab\OpenCollabAuthorizationService;
@@ -15,12 +14,10 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
 class AdminContractPageController extends Controller
 {
     use AuthorizesSitePagePermissions;
-    use ResolvesUiComponents;
 
     public function __construct(
         private readonly OpenCollabAuthorizationService $authorization,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
@@ -30,8 +27,15 @@ class AdminContractPageController extends Controller
             return $response;
         }
 
+        $userId = (int)Auth::id();
+        $siteId = (int)SiteContext::getId();
+
         return $this->view('open-collab.admin.contracts.index', [
-            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('contract.index'),
+            'canCreateContract' => $this->authorization->allows($userId, $siteId, 'contract.create'),
+            'canEditContract' => $this->authorization->allows($userId, $siteId, 'contract.edit'),
+            'canPublishContract' => $this->authorization->allows($userId, $siteId, 'contract.publish'),
+            'canDeleteContract' => $this->authorization->allows($userId, $siteId, 'contract.delete'),
+            'canCloneContract' => $this->authorization->allows($userId, $siteId, 'contract.clone'),
             'pageTitle' => 'Contributor Contracts',
             'activeNav' => 'contracts',
             'breadcrumbs' => [['label' => 'Contracts']],

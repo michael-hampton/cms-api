@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Services\OpenCollab;
 
+use App\DTO\OpenCollab\ImageBlockValidationResult;
 use App\Enums\OpenCollab\ActivityEventType;
 use App\Enums\OpenCollab\ModerationActionType;
 use App\Enums\OpenCollab\RejectionReason;
@@ -63,6 +64,14 @@ class ArticleApprovalServiceTest extends TestCase
             ->andReturnUsing(
                 static fn(callable $callback) => $callback()
             );
+
+        $this->imageBlockValidator
+            ->shouldReceive('validateBlocks')
+            ->byDefault()
+            ->andReturn(new ImageBlockValidationResult(
+                passes: true,
+                errors: [],
+            ));
 
         $this->service = new ArticleApprovalService(
             $this->pageService,

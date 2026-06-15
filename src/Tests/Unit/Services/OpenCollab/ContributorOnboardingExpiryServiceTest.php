@@ -17,6 +17,7 @@ use App\Services\OpenCollab\ContributorAgeValidationService;
 use App\Services\OpenCollab\ContributorOnboardingExpiryService;
 use App\Services\OpenCollab\ContributorOnboardingService;
 use App\Services\OpenCollab\ContributorProfileCompletionService;
+use App\Services\OpenCollab\TermsAcceptanceRequirementService;
 use App\Tests\Support\CapturesConsoleOutput;
 use Mockery;
 use Mockery\MockInterface;
@@ -621,6 +622,10 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
      */
     private function makeOnboardingService(Site $site): ContributorOnboardingService
     {
+        $termsRequirementService = Mockery::mock(TermsAcceptanceRequirementService::class);
+        $termsRequirementService->shouldReceive('currentRequiredVersion')->andReturn(null)->byDefault();
+        $termsRequirementService->shouldReceive('requiresAcceptance')->andReturn(false)->byDefault();
+
         return new ContributorOnboardingService(
             profileRepository:               $this->profileRepo,
             onboardingStepRepository:        $this->stepRepo,
@@ -629,6 +634,7 @@ class ContributorOnboardingExpiryServiceTest extends TestCase
             ageValidationService:            new ContributorAgeValidationService(),
             contributorOnboardingRepository: $this->onboardingRepo,
             profileCompletionService:        $this->profileCompletionService,
+            termsRequirementService:         $termsRequirementService,
         );
     }
 }

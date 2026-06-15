@@ -46,6 +46,7 @@ class ContributorOnboardingService
         private readonly ContributorAgeValidationService     $ageValidationService,
         private readonly ContributorOnboardingRepository     $contributorOnboardingRepository,
         private readonly ContributorProfileCompletionService $profileCompletionService,
+        private readonly TermsAcceptanceRequirementService   $termsRequirementService,
         private readonly ?StripeConnectAccountService        $stripeConnectAccountService = null,
     ) {}
 
@@ -311,7 +312,13 @@ class ContributorOnboardingService
      */
     private function applicableStepsFromRequirements(OnboardingRequirements $req): array
     {
-        $steps = ['profile'];
+        $steps = [];
+
+        if ($this->termsRequirementService->currentRequiredVersion($req->siteId) !== null) {
+            $steps[] = 'terms';
+        }
+
+        $steps[] = 'profile';
 
         if ($req->requirePaymentSetup) {
             $steps[] = 'payment_setup';
@@ -384,6 +391,10 @@ class ContributorOnboardingService
             return null;
         }
 
+        if ($step === 'terms' && $domainPasses) {
+            return null;
+        }
+
         if ($rowIsCompleted && !$domainPasses) {
             return [
                 'step'   => $step,
@@ -409,6 +420,7 @@ class ContributorOnboardingService
     private function checkDomainForStep(int $userId, OnboardingRequirements $req, string $step, ?Site $site = null): array
     {
         return match ($step) {
+            'terms'            => $this->checkTermsDomain($userId, $req),
             'profile'          => $this->checkProfileDomain($userId, $req, $site),
             'payment_setup'    => $this->checkPaymentDomain($userId),
             'kyc_verification' => $this->checkKycDomain($userId, $req),
@@ -420,6 +432,34 @@ class ContributorOnboardingService
     }
 
     // ── Domain checks ─────────────────────────────────────────────────────────
+
+    /** @return array{0: bool, 1: string, 2: array} */
+    private function checkTermsDomain(int $userId, OnboardingRequirements $req): array
+    {
+        $requiredTerms = $this->termsRequirementService->currentRequiredVersion($req->siteId);
+
+        if (!$this->termsRequirementService->requiresAcceptance($userId, $req->siteId)) {
+            return [
+                true,
+                '',
+                [
+                    'required_version_id' => $requiredTerms?->id,
+                    'semantic_version' => $requiredTerms?->semantic_version,
+                    'is_material_change' => $requiredTerms?->is_material_change,
+                ],
+            ];
+        }
+
+        return [
+            false,
+            'Accept the current OpenCollab Terms and Conditions.',
+            [
+                'required_version_id' => $requiredTerms?->id,
+                'semantic_version' => $requiredTerms?->semantic_version,
+                'is_material_change' => $requiredTerms?->is_material_change,
+            ],
+        ];
+    }
 
     /**
      * Profile domain check.

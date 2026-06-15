@@ -294,6 +294,8 @@ use Exception;
 use RuntimeException;
 use Stripe\StripeClient;
 use Throwable;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepository;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepositoryInterface;
 
 require_once __DIR__ . '/bootstrap.php';
 
@@ -353,6 +355,11 @@ class ApiApplication
                 config('print.local.export_dir', __DIR__ . '/../storage/exports/print')
             );
         });
+
+        $this->container->bind(
+            UserTermsAcceptanceRepositoryInterface::class,
+            UserTermsAcceptanceRepository::class
+        );
 
         $this->container->singleton(LabelFormatStrategyRegistry::class, function ($app) {
             $registry = new LabelFormatStrategyRegistry();
