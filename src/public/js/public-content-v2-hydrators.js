@@ -15,9 +15,7 @@
             });
 
             const payload = await response.json();
-            if (!response.ok) {
-                throw new Error(payload.message ?? payload.error ?? 'The request failed.');
-            }
+            if (!response.ok) throw new Error(payload.message ?? payload.error ?? 'The request failed.');
             return payload;
         }
     }
@@ -29,8 +27,7 @@
         }
 
         normalize(url) {
-            if (!url) return url;
-            return String(url).replace(/^\/public\//, '/');
+            return url ? String(url).replace(/^\/public\//, '/') : url;
         }
 
         load(component) {
@@ -44,6 +41,8 @@
                 link.href = url;
                 document.head.append(link);
             }
+
+            if (component.type === 'deals-carousel') return;
 
             for (const source of component.assets?.scripts ?? []) {
                 const url = this.normalize(source);
@@ -74,15 +73,10 @@
         async toggle() {
             const endpoint = this.component.endpoints?.like;
             if (!endpoint) return;
-
             const liked = this.button.classList.contains('liked');
             this.button.disabled = true;
-
             try {
-                const payload = await this.api.request(endpoint, {
-                    method: liked ? 'DELETE' : 'PUT',
-                    body: liked ? undefined : '{}',
-                });
+                const payload = await this.api.request(endpoint, {method: liked ? 'DELETE' : 'PUT', body: liked ? undefined : '{}'});
                 const viewer = payload.data;
                 this.button.classList.toggle('liked', Boolean(viewer?.liked));
                 this.button.querySelector('.like-icon').textContent = viewer?.liked ? '❤️' : '🤍';
@@ -98,7 +92,6 @@
 
     class GuestContributorsCarousel {
         constructor(element) {
-            this.element = element;
             this.root = element.querySelector('.oc-section');
             this.track = this.root?.querySelector('#track') ?? null;
             this.outer = this.root?.querySelector('#trackOuter') ?? null;
@@ -115,21 +108,17 @@
         start() {
             if (!this.root || !this.track || !this.outer || !this.cards.length || this.root.dataset.hydrated === 'true') return;
             this.root.dataset.hydrated = 'true';
-
             this.dots = this.cards.map((_, index) => {
                 const dot = document.createElement('button');
                 dot.className = 'oc-dot';
                 dot.type = 'button';
-                dot.setAttribute('role', 'tab');
                 dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
                 dot.addEventListener('click', () => this.goTo(index));
                 this.dotsHost?.append(dot);
                 return dot;
             });
-
             this.prev?.addEventListener('click', () => this.goTo(this.current - 1));
             this.next?.addEventListener('click', () => this.goTo(this.current + 1));
-            this.bindPointerEvents();
             this.render();
             this.restartAuto();
         }
@@ -145,45 +134,107 @@
                 card.classList.toggle('is-active', index === this.current);
                 card.classList.toggle('is-adjacent', index === this.current - 1 || index === this.current + 1);
             });
-
-            requestAnimationFrame(() => {
-                let offset = 0;
-                for (let index = 0; index < this.current; index++) {
-                    offset += this.cards[index].offsetWidth + 20;
-                }
-                this.track.style.transform = `translateX(-${offset}px)`;
-            });
-
-            this.dots.forEach((dot, index) => {
-                dot.classList.toggle('is-active', index === this.current);
-                dot.setAttribute('aria-selected', String(index === this.current));
-            });
-
+            let offset = 0;
+            for (let index = 0; index < this.current; index++) offset += this.cards[index].offsetWidth + 20;
+            this.track.style.transform = `translateX(-${offset}px)`;
+            this.dots.forEach((dot, index) => dot.classList.toggle('is-active', index === this.current));
             if (this.prev) this.prev.disabled = this.current === 0;
             if (this.next) this.next.disabled = this.current === this.cards.length - 1;
             if (this.progress) this.progress.style.width = `${((this.current + 1) / this.cards.length) * 100}%`;
             if (this.count) this.count.textContent = `${String(this.current + 1).padStart(2, '0')} / ${String(this.cards.length).padStart(2, '0')}`;
         }
 
-        bindPointerEvents() {
-            let start = null;
-            this.outer.addEventListener('pointerdown', event => {
-                start = event.clientX;
-                this.outer.setPointerCapture(event.pointerId);
-            });
-            this.outer.addEventListener('pointerup', event => {
-                if (start === null) return;
-                const delta = start - event.clientX;
-                if (Math.abs(delta) > 50) this.goTo(this.current + (delta > 0 ? 1 : -1));
-                start = null;
-            });
+        restartAuto() {
+            clearInterval(this.timer);
+            this.timer = setInterval(() => this.goTo(this.current < this.cards.length - 1 ? this.current + 1 : 0), 5200);
+        }
+    }
+
+    class DealsCarouselComponent {
+        constructor(element) {
+            this.root = element.querySelector('.deals-carousel-wrapper');
+            this.track = this.root?.querySelector('.deals-carousel-track') ?? null;
+            this.prev = this.root?.querySelector('.carousel-arrow-left') ?? null;
+            this.next = this.root?.querySelector('.carousel-arrow-right') ?? null;
+            this.dotsHost = this.root?.querySelector('.carousel-dots') ?? null;
+            this.search = this.root?.querySelector('.deals-search-input') ?? null;
+            this.noResults = this.root?.querySelector('.deals-no-results') ?? null;
+            this.index = 0;
         }
 
-        restartAuto() {
-            window.clearInterval(this.timer);
-            this.timer = window.setInterval(() => {
-                this.goTo(this.current < this.cards.length - 1 ? this.current + 1 : 0);
-            }, 5200);
+        start() {
+            if (!this.root || !this.track || this.root.dataset.hydrated === 'true') return;
+            this.root.dataset.hydrated = 'true';
+            this.prev?.removeAttribute('onclick');
+            this.next?.removeAttribute('onclick');
+            this.search?.removeAttribute('onkeyup');
+            this.root.querySelector('.refresh-deals-btn')?.removeAttribute('onclick');
+            this.prev?.addEventListener('click', event => { event.preventDefault(); this.move(-1); });
+            this.next?.addEventListener('click', event => { event.preventDefault(); this.move(1); });
+            this.search?.addEventListener('input', () => this.filter());
+            window.addEventListener('resize', () => this.render());
+            this.buildDots();
+            this.render();
+        }
+
+        cards() {
+            return [...this.track.querySelectorAll('.deal-card:not(.is-hidden)')];
+        }
+
+        itemsPerView() {
+            const card = this.cards()[0];
+            if (!card) return 1;
+            const gap = parseFloat(getComputedStyle(this.track).gap || '0');
+            return Math.max(1, Math.floor(this.track.clientWidth / (card.offsetWidth + gap)));
+        }
+
+        maxIndex() {
+            return Math.max(0, this.cards().length - this.itemsPerView());
+        }
+
+        move(direction) {
+            this.index = Math.max(0, Math.min(this.maxIndex(), this.index + direction));
+            this.render();
+        }
+
+        render() {
+            const cards = this.cards();
+            this.index = Math.min(this.index, this.maxIndex());
+            const card = cards[0];
+            const gap = parseFloat(getComputedStyle(this.track).gap || '0');
+            const offset = card ? this.index * (card.offsetWidth + gap) : 0;
+            this.track.scrollTo({left: offset, behavior: 'smooth'});
+            if (this.prev) this.prev.disabled = this.index === 0;
+            if (this.next) this.next.disabled = this.index >= this.maxIndex();
+            [...(this.dotsHost?.children ?? [])].forEach((dot, i) => dot.classList.toggle('active', i === this.index));
+        }
+
+        buildDots() {
+            if (!this.dotsHost) return;
+            this.dotsHost.replaceChildren();
+            for (let i = 0; i <= this.maxIndex(); i++) {
+                const dot = document.createElement('button');
+                dot.type = 'button';
+                dot.className = 'carousel-dot';
+                dot.setAttribute('aria-label', `Go to deal ${i + 1}`);
+                dot.addEventListener('click', () => { this.index = i; this.render(); });
+                this.dotsHost.append(dot);
+            }
+        }
+
+        filter() {
+            const query = this.search.value.trim().toLowerCase();
+            let visible = 0;
+            this.track.querySelectorAll('.deal-card').forEach(card => {
+                const title = (card.dataset.title || card.textContent || '').toLowerCase();
+                const show = title.includes(query);
+                card.classList.toggle('is-hidden', !show);
+                if (show) visible++;
+            });
+            if (this.noResults) this.noResults.style.display = visible ? 'none' : 'block';
+            this.index = 0;
+            this.buildDots();
+            this.render();
         }
     }
 
@@ -209,13 +260,10 @@
             const endpoint = this.component.endpoints?.create;
             const content = String(new FormData(this.form).get('content') ?? '').trim();
             if (!endpoint || !content) return;
-
             this.submit.disabled = true;
             try {
                 const payload = await this.api.request(endpoint, {method: 'POST', body: JSON.stringify({content})});
-                this.message.textContent = payload.data?.status === 'approved'
-                    ? 'Your comment has been posted.'
-                    : 'Your comment has been submitted for review.';
+                this.message.textContent = payload.data?.status === 'approved' ? 'Your comment has been posted.' : 'Your comment has been submitted for review.';
                 this.message.className = `form-message ${payload.data?.status === 'approved' ? 'success' : 'pending'}`;
                 this.message.style.display = 'block';
                 this.form.reset();
@@ -233,9 +281,7 @@
         constructor(element) { this.element = element; }
         start() {
             this.element.addEventListener('click', event => {
-                if (event.target.closest('button, [data-newsletter-trigger]')) {
-                    document.dispatchEvent(new CustomEvent('newsletter:open'));
-                }
+                if (event.target.closest('button, [data-newsletter-trigger]')) document.dispatchEvent(new CustomEvent('newsletter:open'));
             });
         }
     }
@@ -247,6 +293,7 @@
             this.factories = new Map([
                 ['page-actions', (element, component) => new PageActionsComponent(element, component, this.api)],
                 ['guest-contributors', element => new GuestContributorsCarousel(element)],
+                ['deals-carousel', element => new DealsCarouselComponent(element)],
                 ['comments', (element, component) => new CommentsComponent(element, component, this.api)],
                 ['newsletter-signup-widget', element => new NewsletterComponent(element)],
             ]);
@@ -260,12 +307,6 @@
     }
 
     const registry = new ComponentHydratorRegistry(new PublicContentComponentApi());
-
-    document.addEventListener('public-content:component-mounted', event => {
-        registry.hydrate(event.detail.element, event.detail.component);
-    });
-
-    document.addEventListener('public-content:document-composed', event => {
-        event.detail.root.querySelector('[data-region="header"]')?.classList.add('page-header');
-    });
+    document.addEventListener('public-content:component-mounted', event => registry.hydrate(event.detail.element, event.detail.component));
+    document.addEventListener('public-content:document-composed', event => event.detail.root.querySelector('[data-region="header"]')?.classList.add('page-header'));
 })();
