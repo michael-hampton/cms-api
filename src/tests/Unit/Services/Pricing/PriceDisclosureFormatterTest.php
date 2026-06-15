@@ -15,7 +15,7 @@ final class PriceDisclosureFormatterTest extends TestCase
         return new PriceDisclosureFormatter(new PriceDisclosureTemplateResolver());
     }
 
-    public function test_quantity_adjusted_annual_amount_is_disclosed(): void
+    public function test_quantity_adjusted_annual_amount_and_renewal_are_disclosed(): void
     {
         $summary = $this->formatter()->format($this->context(
             itemAmountMinor: 19800,
@@ -25,9 +25,11 @@ final class PriceDisclosureFormatterTest extends TestCase
 
         self::assertStringContainsString('198.00', $summary['main_line']);
         self::assertStringContainsString('per year', $summary['main_line']);
+        self::assertStringContainsString('198.00', $summary['renewal_line']);
+        self::assertStringContainsString('per year', $summary['renewal_line']);
     }
 
-    public function test_trial_with_valid_initial_charge_uses_start_charge_template(): void
+    public function test_trial_with_initial_charge_over_four_weeks_and_renewal_copy(): void
     {
         $summary = $this->formatter()->format($this->context(
             initialChargeAmountMinor: 500,
@@ -41,6 +43,8 @@ final class PriceDisclosureFormatterTest extends TestCase
         self::assertStringContainsString('5.00', $summary['main_line']);
         self::assertStringContainsString('4 weeks', $summary['main_line']);
         self::assertStringContainsString('14 days', $summary['main_line']);
+        self::assertStringContainsString('20.00', $summary['renewal_line']);
+        self::assertStringContainsString('per month', $summary['renewal_line']);
     }
 
     public function test_trial_without_initial_charge_uses_free_trial_template(): void
@@ -80,6 +84,30 @@ final class PriceDisclosureFormatterTest extends TestCase
         self::assertStringStartsWith('Store', $summary['main_line']);
     }
 
+    public function test_missing_overrides_use_built_in_default(): void
+    {
+        $summary = $this->formatter()->format($this->context());
+
+        self::assertStringContainsString('9.99', $summary['main_line']);
+        self::assertStringContainsString('per month', $summary['main_line']);
+    }
+
+    public function test_localized_context_tokens_are_available_to_active_locale_override(): void
+    {
+        $summary = $this->formatter()->format($this->context(
+            experienceLanguageLines: [
+                'en_GB' => [
+                    'subscription_without_trial' => ':numeric_period_label / :worded_period_label / :raw_period_label',
+                ],
+            ],
+            rawPeriodLabel: '28 days',
+            numericPeriodLabel: '4 weeks',
+            wordedPeriodLabel: 'four weeks',
+        ));
+
+        self::assertSame('4 weeks / four weeks / 28 days', $summary['main_line']);
+    }
+
     public function test_unknown_tokens_fall_back_without_leaking_placeholder(): void
     {
         $summary = $this->formatter()->format($this->context(
@@ -110,6 +138,9 @@ final class PriceDisclosureFormatterTest extends TestCase
         ?string $renewalPeriodLabel = 'per month',
         array $experienceLanguageLines = [],
         array $storeLanguageLines = [],
+        ?string $rawPeriodLabel = null,
+        ?string $numericPeriodLabel = null,
+        ?string $wordedPeriodLabel = null,
     ): PriceDisclosureContext {
         return new PriceDisclosureContext(
             locale: 'en_GB',
@@ -127,6 +158,9 @@ final class PriceDisclosureFormatterTest extends TestCase
             renewalDate: new DateTimeImmutable('2026-07-01 00:00:00 UTC'),
             experienceLanguageLines: $experienceLanguageLines,
             storeLanguageLines: $storeLanguageLines,
+            rawPeriodLabel: $rawPeriodLabel,
+            numericPeriodLabel: $numericPeriodLabel,
+            wordedPeriodLabel: $wordedPeriodLabel,
         );
     }
 }
