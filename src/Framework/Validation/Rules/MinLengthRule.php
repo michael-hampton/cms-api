@@ -4,16 +4,19 @@ namespace App\Framework\Validation\Rules;
 
 class MinLengthRule extends BaseValidationRule
 {
-    private $minLength;
+    private int $minLength;
 
     public function __construct(int $minLength = 1)
     {
         $this->minLength = $minLength;
+        $this->parameters = [$minLength];
     }
 
     public function setParameters(array $parameters): void
     {
-        if (!empty($parameters)) {
+        parent::setParameters($parameters);
+
+        if ($parameters !== []) {
             $this->minLength = (int)$parameters[0];
         }
     }
@@ -28,16 +31,13 @@ class MinLengthRule extends BaseValidationRule
             return count($value) >= $this->minLength;
         }
 
-        // For scalar values, check string length
         return strlen((string)$value) >= $this->minLength;
     }
 
-    /**
-     * Count all elements in a multidimensional array recursively
-     */
     protected function countElementsRecursive(array $array): int
     {
         $count = 0;
+
         foreach ($array as $item) {
             if (is_array($item)) {
                 $count += $this->countElementsRecursive($item);
@@ -45,12 +45,12 @@ class MinLengthRule extends BaseValidationRule
                 $count++;
             }
         }
+
         return $count;
     }
 
     protected function getDefaultMessage(): string
     {
-        $min = $this->parameters[0] ?? 1;
-        return "This field must be at least {$min} characters";
+        return "This field must be at least {$this->minLength} characters";
     }
 }
