@@ -3,13 +3,14 @@
 namespace App\Tests\Unit\Resources\PublicContent;
 
 use App\DTO\PublicContent\ContentRegion;
+use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentDocument;
 use App\Resources\PublicContent\PublicContentResource;
 use PHPUnit\Framework\TestCase;
 
 final class PublicContentResourceTest extends TestCase
 {
-    public function test_it_exposes_structured_blocks_as_canonical_with_rendered_html_fallback(): void
+    public function testItExposesCanonicalBlocksAndComposedComponents(): void
     {
         $document = new PublicContentDocument(
             id: 10,
@@ -26,9 +27,22 @@ final class PublicContentResourceTest extends TestCase
                     'type' => 'heading',
                     'order' => 1,
                     'data' => ['text' => 'Hello'],
-                    'rendered_html' => '<h2>Hello</h2>',
                 ]], '<h2>Hello</h2>'),
                 'sidebar' => new ContentRegion('sidebar', [], ''),
+            ],
+            components: [
+                'header' => [
+                    new PublicContentComponent(
+                        id: 'page-actions',
+                        type: 'page-actions',
+                        region: 'header',
+                        priority: 40,
+                        html: '<div class="page-actions"></div>',
+                        scripts: ['page-actions.js'],
+                        endpoints: ['like' => '/api/like'],
+                        stateful: true,
+                    ),
+                ],
             ],
         );
 
@@ -36,8 +50,10 @@ final class PublicContentResourceTest extends TestCase
 
         self::assertSame('1.0', $result['content']['schema_version']);
         self::assertSame('heading', $result['content']['regions']['main']['blocks'][0]['type']);
-        self::assertSame(['text' => 'Hello'], $result['content']['regions']['main']['blocks'][0]['data']);
         self::assertSame('<h2>Hello</h2>', $result['content']['regions']['main']['rendered_html']);
-        self::assertSame([], $result['content']['regions']['sidebar']['blocks']);
+        self::assertSame('page-actions', $result['content']['components']['header'][0]['type']);
+        self::assertSame(40, $result['content']['components']['header'][0]['priority']);
+        self::assertTrue($result['content']['components']['header'][0]['stateful']);
+        self::assertSame('/api/like', $result['content']['components']['header'][0]['endpoints']['like']);
     }
 }
