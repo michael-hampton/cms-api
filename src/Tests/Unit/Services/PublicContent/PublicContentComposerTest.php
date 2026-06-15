@@ -18,24 +18,56 @@ final class PublicContentComposerTest extends TestCase
         parent::tearDown();
     }
 
-    public function testItBuildsOrderedComponentRegionsWithoutAViewIncludeList(): void
+    public function testArticleDoesNotContainHomepageOnlyComponents(): void
+    {
+        $regions = $this->compose('article');
+
+        self::assertSame(
+            ['page-title', 'category-pills', 'tags', 'page-actions'],
+            array_map(static fn($component) => $component->type, $regions['header']),
+        );
+        self::assertSame(
+            ['trending-widget', 'newsletter-signup-widget', 'comments', 'social-links'],
+            array_map(static fn($component) => $component->type, $regions['after-content']),
+        );
+        self::assertSame(
+            ['authors'],
+            array_map(static fn($component) => $component->type, $regions['below-content']),
+        );
+    }
+
+    public function testLandingPageContainsHomepageOnlyComponents(): void
+    {
+        $regions = $this->compose('landing-page', withCategories: true);
+
+        self::assertContains(
+            'activity-feed-widget',
+            array_map(static fn($component) => $component->type, $regions['after-content']),
+        );
+        self::assertContains(
+            'guest-contributors',
+            array_map(static fn($component) => $component->type, $regions['below-content']),
+        );
+        self::assertArrayNotHasKey('header', $regions);
+    }
+
+    private function compose(string $pageType, bool $withCategories = false): array
     {
         $page = Mockery::mock(Page::class)->makePartial();
-        $page->page_type = 'article';
+        $page->page_type = $pageType;
         $page->products = new Collection();
 
         $views = Mockery::mock(ViewRenderer::class);
         $views->shouldReceive('partial')
             ->andReturnUsing(static fn(string $template): string => '<div data-template="' . $template . '"></div>');
 
-        $composer = new PublicContentComposer($views);
-        $regions = $composer->compose(new PublicContentContext(
+        return (new PublicContentComposer($views))->compose(new PublicContentContext(
             page: $page,
             siteId: 1,
             siteSlug: 'estate',
             member: null,
             viewData: [
-                'categories' => new Collection(),
+                'categories' => $withCategories ? new Collection([(object)['id' => 1]]) : new Collection(),
                 'categoriesWithPages' => [],
                 'feedPages' => new Collection(),
                 'trendingPages' => new Collection(),
@@ -52,18 +84,5 @@ final class PublicContentComposerTest extends TestCase
                 ],
             ],
         ));
-
-        self::assertSame(
-            ['page-title', 'category-pills', 'tags', 'page-actions'],
-            array_map(static fn($component) => $component->type, $regions['header']),
-        );
-        self::assertSame(
-            ['activity-feed-widget', 'trending-widget', 'newsletter-signup-widget', 'comments', 'social-links'],
-            array_map(static fn($component) => $component->type, $regions['after-content']),
-        );
-        self::assertSame(
-            ['guest-contributors', 'authors'],
-            array_map(static fn($component) => $component->type, $regions['below-content']),
-        );
     }
 }
