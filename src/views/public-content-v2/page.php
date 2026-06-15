@@ -37,6 +37,8 @@ $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '')
 @js('public-content-v2-member-hub-loader.js')
 <?php if ($preview): ?>
     @js('public-content-v2-preview-links.js')
+<?php else: ?>
+    @js('public-content-v2-production-links.js')
 <?php endif; ?>
 @js('public-content-v2-hydrators.js')
 @js('public-content-v2.js')
