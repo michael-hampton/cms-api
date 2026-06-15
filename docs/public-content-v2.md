@@ -8,6 +8,7 @@ Implemented beside the legacy public content controller and views. The legacy ro
 
 - `GET /{site}/content-v2/{slug}` — V2 preview page
 - `GET /api/v1/{site}/content/{slug}` — public content composition document
+- `GET /api/v1/{site}/regions/{regionSlug}/content/{slug}` — regional public content document
 - `GET /api/v1/{site}/content/{pageId}/viewer-state` — member-specific state
 - `PUT /api/v1/{site}/content/{pageId}/like` — like page
 - `DELETE /api/v1/{site}/content/{pageId}/like` — unlike page
@@ -64,7 +65,107 @@ Each component includes:
 }
 ```
 
-`PublicContentComposer` owns component registration, visibility, region and ordering. Adding a component does not require changing the V2 page template or browser composer.
+`PublicContentComposer` resolves registered widget definitions through `PublicContentWidgetRegistry` and page placements through `PageWidgetLayoutResolver`. Adding a component does not require changing the V2 page template or browser composer.
+
+## Widget definitions and page overrides
+
+Widget behaviour is developer-owned through:
+
+```text
+src/Services/PublicContent/Widgets/PublicContentWidgetDefinition.php
+```
+
+A definition provides:
+
+- a stable widget key
+- a default region and priority
+- an eligibility rule
+- backend-rendered HTML
+- assets and API endpoints where needed
+
+Page-specific layout overrides are stored in `page_widgets`:
+
+```text
+page_id
+widget_key
+region
+priority
+is_enabled
+configuration
+```
+
+No `page_widgets` records are required for existing pages. In the absence of overrides, all current widgets retain their existing eligibility, region and order.
+
+Example override:
+
+```sql
+INSERT INTO page_widgets (
+    page_id,
+    widget_key,
+    region,
+    priority,
+    is_enabled,
+    configuration
+) VALUES (
+    42,
+    'comments',
+    'below-content',
+    20,
+    1,
+    '{"title":"Discussion"}'
+);
+```
+
+Disable a widget for one page:
+
+```sql
+INSERT INTO page_widgets (
+    page_id,
+    widget_key,
+    region,
+    priority,
+    is_enabled
+) VALUES (
+    42,
+    'newsletter',
+    'after-content',
+    140,
+    0
+);
+```
+
+Database configuration cannot bypass a widget definition's `supports()` rule. A page may move, configure or disable an eligible widget, but it cannot force an invalid widget onto unsupported content.
+
+## Registering a new widget
+
+Create a class implementing:
+
+```php
+App\Services\PublicContent\Widgets\PublicContentWidgetDefinition
+```
+
+Register its class in:
+
+```php
+// config/public-content.php
+'widgets' => [
+    App\Services\PublicContent\Widgets\RelatedProductsWidget::class,
+],
+```
+
+The widget service provider resolves each configured definition through the container and adds it to the singleton registry. Existing keys are preserved; a provider may call `replace()` explicitly when intentional replacement is required.
+
+Widget-specific page configuration is available to backend partials as:
+
+```php
+$widgetConfiguration
+```
+
+and to custom definitions through:
+
+```php
+$placement->config('key', $default)
+```
 
 ## Visual parity
 
@@ -77,7 +178,7 @@ The composition layer renders the existing production partials through `ViewRend
 - JavaScript hooks
 - asset directives
 
-Registered legacy components include page title, taxonomy, page actions, category widgets, activity feed, trending, products, newsletter, comments, social links, category pages, deals, guest contributors, authors, gift notice and all page modals.
+Registered legacy components include page title, taxonomy, page actions, category widgets, activity feed, trending, products, newsletter, comments, social links, category pages, deals, guest contributors, authors, regional context, gift notice and all page modals.
 
 The V2 shell uses the legacy `mt-20 > .container`, `.page-header`, `.page-layout`, `.main-content` and `.sidebar` hierarchy. Neutral composition wrappers use `display: contents` so they do not alter legacy selectors or layout.
 
@@ -88,6 +189,8 @@ Controllers, actions, services and views do not define database queries for the 
 ```text
 src/Repositories/PublicContent/
 ```
+
+`PageWidgetLayoutResolver` depends on `PageWidgetRepositoryInterface`; page-widget persistence remains outside the composer.
 
 Composition providers may filter or order repository results, but they do not construct database queries.
 
@@ -114,7 +217,7 @@ PUBLIC_CONTENT_V2_PREVIEW_ENABLED=true
 PUBLIC_CONTENT_V2_ENABLED=false
 PUBLIC_CONTENT_V2_SHADOW_ENABLED=false
 PUBLIC_CONTENT_V2_SITE_IDS=
-PUBLIC_CONTENT_V2_PAGE_TYPES=page,article,landing-page
+PUBLIC_CONTENT_V2_PAGE_TYPES=page,content,article,landing-page
 ```
 
 The preview route can be disabled independently. Production cutover remains disabled by default.
