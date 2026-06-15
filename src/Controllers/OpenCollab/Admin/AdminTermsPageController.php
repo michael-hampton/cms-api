@@ -4,7 +4,6 @@ namespace App\Controllers\OpenCollab\Admin;
 
 use App\Controllers\Controller;
 use App\Controllers\OpenCollab\Concerns\AuthorizesSitePagePermissions;
-use App\Controllers\OpenCollab\Concerns\ResolvesUiComponents;
 use App\Framework\Authorization\Auth;
 use App\Framework\Http\Request;
 use App\Framework\Support\SiteContext;
@@ -14,7 +13,6 @@ use App\Services\OpenCollab\OpenCollabAuthorizationService;
 class AdminTermsPageController extends Controller
 {
     use AuthorizesSitePagePermissions;
-    use ResolvesUiComponents;
 
     public function __construct(
         private readonly TermsVersionRepository $repository,
@@ -29,11 +27,14 @@ class AdminTermsPageController extends Controller
             return $response;
         }
 
-        $siteId = SiteContext::getId();
+        $userId = (int)Auth::id();
+        $siteId = (int)SiteContext::getId();
         $selectedId = (int)$request->input('terms_id', 0);
 
         return $this->view('open-collab.admin.terms.index', [
-            'allowedComponentKeys' => $this->allowedUiComponentKeysForSurface('terms.index'),
+            'canCreateTerms' => $this->authorization->allows($userId, $siteId, 'terms.create'),
+            'canEditTerms' => $this->authorization->allows($userId, $siteId, 'terms.edit'),
+            'canPublishTerms' => $this->authorization->allows($userId, $siteId, 'terms.publish'),
             'termsVersions' => $this->repository->allForSite($siteId),
             'selectedTerms' => $selectedId > 0
                 ? $this->repository->findForSite($selectedId, $siteId)
