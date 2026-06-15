@@ -4,7 +4,7 @@ namespace App\Services\PublicContent;
 
 use App\Models\Page;
 
-final class PublicContentRollout
+class PublicContentRollout
 {
     public function previewEnabled(): bool
     {
