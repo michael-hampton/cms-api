@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Framework\ServiceProvider\ServiceProvider;
-use App\Framework\Support\Config;
 use App\Services\PublicContent\Widgets\PublicContentWidgetDefinition;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 
@@ -18,7 +17,7 @@ final class PublicContentWidgetServiceProvider extends ServiceProvider
     {
         $registry = $this->container->resolve(PublicContentWidgetRegistry::class);
 
-        foreach (Config::get('public-content.widgets', []) as $className) {
+        foreach (config('public-content.widgets', []) as $className) {
             $widget = $this->container->resolve($className);
 
             if ($widget instanceof PublicContentWidgetDefinition) {
