@@ -29,6 +29,7 @@ final class PublicContentPreviewController extends Controller
         $siteSlug = SiteContext::slug();
 
         return $this->view('public-content-v2/page', [
+            'preview' => true,
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
             'contentSlug' => $slug,
