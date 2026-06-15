@@ -215,7 +215,12 @@
                 region.append(element);
 
                 this.hydrator.hydrate(element, component);
-                await this.assetLoader.execute(prepared.scripts);
+
+                // guest-contributors is hydrated by the class-based registry. Its
+                // legacy inline script uses global IDs and breaks when API-mounted.
+                if (component.type !== 'guest-contributors') {
+                    await this.assetLoader.execute(prepared.scripts);
+                }
             }
 
             return region;
@@ -278,6 +283,23 @@
         onClick(event) {
             if (event.target.closest('[data-action="retry"]')) {
                 this.load();
+                return;
+            }
+
+            const link = event.target.closest('a[href]');
+            if (!link || link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) {
+                return;
+            }
+
+            const url = new URL(link.href, window.location.origin);
+            const canonicalPath = url.pathname
+                .replace(/\/category\//, '/categories/')
+                .replace(/\/tag\//, '/tags/')
+                .replace(/\/author\//, '/authors/');
+
+            if (canonicalPath !== url.pathname) {
+                event.preventDefault();
+                window.location.assign(`${canonicalPath}${url.search}${url.hash}`);
             }
         }
     }
