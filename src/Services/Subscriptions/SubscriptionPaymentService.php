@@ -57,12 +57,19 @@ class SubscriptionPaymentService
         // ── 1. Create Stripe subscription via orchestrator ───────────────────
         $member = $subscription->member;
 
-        $stripeResult = $this->subscriptionOrchestrator->create(
-            $subscription,
-            $plan,
-            $member,
-            $data,
-        );
+        try {
+            $stripeResult = $this->subscriptionOrchestrator->create(
+                $subscription,
+                $plan,
+                $member,
+                $data,
+            );
+        } catch (\RuntimeException $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
 
         // ── 2. Resolve invoice amount ────────────────────────────────────────
         $invoiceAmountCents = $this->resolveInvoiceAmountCents(

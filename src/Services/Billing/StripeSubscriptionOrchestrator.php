@@ -57,6 +57,9 @@ class StripeSubscriptionOrchestrator
     ): StripeSubscriptionResultDto {
         // 1. Resolve pricing tier
         $pricingTier = $this->resolvePricingTier($plan, $data);
+        $currency = $this->resolveCurrency($subscription, $pricingTier, $plan);
+
+        $this->assertCustomerCurrencyIsCompatible($subscription, $member, $currency);
 
         // 2. Resolve customer address and get or create Stripe customer
         $address    = $member->resolveBillingAddress();
@@ -118,6 +121,40 @@ class StripeSubscriptionOrchestrator
         }
 
         return $tier;
+    }
+
+    private function resolveCurrency(
+        Subscription $subscription,
+        SubscriptionPlanPricing $pricingTier,
+        SubscriptionPlan $plan,
+    ): string {
+        return strtoupper(
+            trim((string)($pricingTier->currency ?: $subscription->currency ?: $plan->currency ?: 'GBP'))
+        );
+    }
+
+    private function assertCustomerCurrencyIsCompatible(
+        Subscription $subscription,
+        Member $member,
+        string $currency,
+    ): void {
+        if (empty($member->stripe_customer_id)) {
+            return;
+        }
+
+        $existing = $this->subscriptionRepository->findActiveWithDifferentCurrency(
+            $member->id,
+            $currency,
+            $subscription->id,
+        );
+
+        if ($existing === null) {
+            return;
+        }
+
+        throw new \RuntimeException(
+            "Cannot create a {$currency} Stripe subscription for this member because their existing Stripe customer has an active {$existing->currency} subscription."
+        );
     }
 
     private function persistResult(

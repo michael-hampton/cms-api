@@ -272,23 +272,23 @@ class CartService
         return false;
     }
 
-    public function clear(): void
+    public function clear(?int $siteId = null): void
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        $this->cartRepository->deleteBySessionOrUser($userId, $sessionId);
+        $this->cartRepository->deleteBySessionOrUser($userId, $sessionId, $siteId);
     }
 
     /**
      * Get cart total by summing all item subtotals.
      */
-    public function getTotal(): float
+    public function getTotal(?int $siteId = null): float
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId, $siteId);
 
         return (float)$items->sum('subtotal');
     }
@@ -296,12 +296,12 @@ class CartService
     /**
      * Get total item count (sum of all quantities).
      */
-    public function getCount(): int
+    public function getCount(?int $siteId = null): int
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        return $this->cartRepository->getCountBySessionOrUser($userId, $sessionId);
+        return $this->cartRepository->getCountBySessionOrUser($userId, $sessionId, $siteId);
     }
 
     /**
@@ -698,16 +698,17 @@ class CartService
         return array_values($grouped);
     }
 
-    public function requiresShipping(): bool
+    public function requiresShipping(?int $siteId = null): bool
     {
-        return !$this->hasOnlyDigitalItems();
+        return !$this->hasOnlyDigitalItems($siteId);
     }
 
-    public function hasOnlyDigitalItems(): bool
+    public function hasOnlyDigitalItems(?int $siteId = null): bool
     {
         $items = $this->cartRepository->findBySessionOrUser(
             $this->getUserId(),
-            $this->getSessionId()
+            $this->getSessionId(),
+            $siteId
         );
 
         foreach ($items as $item) {
@@ -936,12 +937,12 @@ class CartService
         ];
     }
 
-    public function getItems(): array
+    public function getItems(?int $siteId = null): array
     {
         $sessionId = $this->getSessionId();
         $userId = $this->getUserId();
 
-        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId);
+        $items = $this->cartRepository->findBySessionOrUser($userId, $sessionId, $siteId);
 
         return $items->map(function ($item) {
             $product = $item->product;
@@ -961,6 +962,7 @@ class CartService
                 'options' => $item->options,
                 'item_type' => $item->getItemType(),
                 'merchant_id' => $item->getMerchantId(),
+                'site_id' => $item->site_id,
                 'subscription_plan_id' => $item->subscription_plan_id,
             ];
 
@@ -979,7 +981,7 @@ class CartService
 
                 $itemData['product_name'] = $plan?->name ?? 'Subscription';
                 $itemData['plan_name'] = $plan?->name ?? 'Subscription';
-                $itemData['currency'] = $plan?->currency ?? 'GBP';
+                $itemData['currency'] = $pricingTier?->currency ?: ($plan?->currency ?? 'GBP');
                 $itemData['tier_label'] = $pricingTier?->label ?? null;
                 $itemData['tier_duration_months'] = $pricingTier?->duration_months ?? null;
                 $itemData['tier_issue_count'] = $pricingTier?->issue_count ?? null;

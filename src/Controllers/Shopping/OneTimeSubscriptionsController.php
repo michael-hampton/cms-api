@@ -12,6 +12,7 @@ use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
+use App\Models\Site;
 use App\Models\Subscription;
 use App\Repositories\Billing\OrderRepository;
 use App\Repositories\Members\AddressRepository;
@@ -240,6 +241,7 @@ class OneTimeSubscriptionsController extends Controller
             'is_limited_offer' => $plan->end_date && $plan->end_date->diffInDays(now()) <= 30,
             'release_date' => $plan->release_date?->format('Y-m-d'),
             'site_name' => $plan->site->name ?? $plan->site_name ?? '',
+            'site_slug' => $plan->site->slug ?? '',
             'detail_url' => url('/press-stack/' . $plan->slug),
             'print_image_url' => $plan->print_image_url,
             'digital_image_url' => $plan->digital_image_url,
@@ -260,7 +262,9 @@ class OneTimeSubscriptionsController extends Controller
     {
         try {
             $data = $request->all();
-            $siteId = SiteContext::getId();
+            $routeSiteId = $this->resolveRouteSiteId($request);
+            $items = $this->cartService->getItems($routeSiteId);
+            $siteId = $this->resolveCheckoutSiteId($items, $routeSiteId);
             $member = MemberAuth::getMember();
 
             if (!$member && !empty($data['email'])) {
@@ -314,8 +318,6 @@ class OneTimeSubscriptionsController extends Controller
                 );
             }
 
-            $items = $this->cartService->getItems();
-
             if (!$items) {
                 return $this->errorResponse('No items in cart', 400);
             }
@@ -362,6 +364,8 @@ class OneTimeSubscriptionsController extends Controller
         if (!empty($subscriptionId)) {
             $subscriptionIds = [$subscriptionId];
         }
+
+        $routeSiteId = $this->resolveRouteSiteId($request);
 
         // ── One-time payment flow (paymentIntentId present) ───────────────────
         // Stripe already charged the card; verify the intent and record payment.
@@ -418,6 +422,13 @@ class OneTimeSubscriptionsController extends Controller
                 ], 404);
             }
 
+            if ($routeSiteId !== null && (int)$subscription->site_id !== $routeSiteId) {
+                return $this->jsonResponse([
+                    'success' => false,
+                    'message' => 'Subscription does not belong to this site',
+                ], 400);
+            }
+
             // processSubscriptionPayment handles:
             //   - getOrCreateCustomer  (creates Stripe customer + saves stripe_customer_id)
             //   - payment method attachment + set as default
@@ -457,7 +468,7 @@ class OneTimeSubscriptionsController extends Controller
                 paymentId: $paymentResult['payment_id'],
                 amountCents: $subscription->price_paid_cents
                 ?? (int)round($subscription->price * 100),
-                currency: strtoupper($subscription->plan->currency),
+                currency: strtoupper($subscription->currency ?: $subscription->plan->currency),
             ));
         }
 
@@ -478,6 +489,41 @@ class OneTimeSubscriptionsController extends Controller
         Session::forget('applied_voucher_code');
         Session::forget('checkout_token');
         Session::forget('pending_otp_email');
+    }
+
+    private function resolveCheckoutSiteId(array $items, ?int $fallbackSiteId = null): int
+    {
+        $siteIds = array_values(array_unique(array_filter(array_map(
+            static fn(array $item): int => (int)($item['site_id'] ?? 0),
+            $items,
+        ))));
+
+        if (count($siteIds) === 1) {
+            $site = Site::where('id', $siteIds[0])
+                ->where('is_active', 1)
+                ->first();
+
+            if ($site) {
+                return (int)$site->id;
+            }
+        }
+
+        return $fallbackSiteId ?? SiteContext::getId();
+    }
+
+    private function resolveRouteSiteId(Request $request): ?int
+    {
+        $routeSlug = $request->route('site');
+
+        if (!$routeSlug) {
+            return null;
+        }
+
+        $site = Site::where('slug', (string)$routeSlug)
+            ->where('is_active', 1)
+            ->first();
+
+        return $site ? (int)$site->id : null;
     }
 
     public function showMultiple(Request $request)

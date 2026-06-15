@@ -13,6 +13,7 @@ use App\Framework\Http\Request;
 use App\Framework\Session\Session;
 use App\Framework\Support\SiteContext;
 use App\Models\Member;
+use App\Models\Site;
 use App\Models\SubscriptionPlan;
 use App\Repositories\Auth\OTPRepository;
 use App\Repositories\Billing\OrderRepository;
@@ -182,20 +183,21 @@ class CartController extends Controller
 
     public function index()
     {
-        $items = $this->cartService->getItems();
+        $siteId = SiteContext::getId();
+        $items = $this->cartService->getItems($siteId);
         $subtotal = collect($items)->sum('subtotal');
 
-        $shipping = $this->cartService->requiresShipping()
+        $shipping = $this->cartService->requiresShipping($siteId)
             ? $this->shippingService->calculateShipping($subtotal, Session::get('shipping_address', []))
             : 0.00;
 
         $tax = $this->calculateTax($subtotal, $shipping);
 
         return $this->resourceResponse([
-            'items' => $this->cartService->getItems(),
-            'total' => $this->cartService->getTotal(),
-            'count' => $this->cartService->getCount(),
-            'requiresShipping' => $this->cartService->requiresShipping(),
+            'items' => $items,
+            'total' => $this->cartService->getTotal($siteId),
+            'count' => $this->cartService->getCount($siteId),
+            'requiresShipping' => $this->cartService->requiresShipping($siteId),
             'shipping' => $shipping,
             'tax' => $tax->taxCents / 100,
             'tax_rate' => $tax->rate,
@@ -224,7 +226,9 @@ class CartController extends Controller
             }
         }
 
-        $items = $this->cartService->getItems();
+        $requestedSite = $this->resolveRequestedCheckoutSite($request);
+        $requestedSiteId = $requestedSite?->id;
+        $items = $this->cartService->getItems($requestedSiteId);
         $deliveryMethod = DeliveryMethodConfig::default();
 
         $items = array_map(function ($item) use ($deliveryMethod) {
@@ -264,16 +268,19 @@ class CartController extends Controller
 
         $isOneTimeCart = !empty($subscriptionItems) && $hasOneTimeSubscriptions && !$hasRecurringSubscriptions;
         $isMixedSubscriptionCart = $hasOneTimeSubscriptions && $hasRecurringSubscriptions;
+        $checkoutSite = $requestedSite ?? $this->resolveCheckoutSite($items);
+        $checkoutSiteId = $checkoutSite?->id ?? SiteContext::getId();
+        $checkoutSiteSlug = $checkoutSite?->slug ?? SiteContext::slug();
 
         $subtotal = collect($items)->sum('subtotal');
 
-        $shipping = $this->cartService->requiresShipping()
+        $shipping = $this->cartService->requiresShipping($requestedSiteId)
             ? $this->shippingService->calculateShipping($subtotal, Session::get('shipping_address', []))
             : 0.00;
 
         $tax = $this->calculateTax($subtotal, $shipping);
 
-        $currencyCode = $this->currencyResolver->resolveUpperCase();
+        $currencyCode = $this->currencyResolver->resolveUpperCase($checkoutSiteId);
         $currencySymbol = $this->currencyResolver->symbol($currencyCode);
 
         $member = MemberAuth::check() ? MemberAuth::getMember() : null;
@@ -318,14 +325,14 @@ class CartController extends Controller
             taxRate: $tax->rate,
             currency: $currencyCode,
             checkoutMode: 'steps',
-            requiresShipping: $this->cartService->requiresShipping(),
+            requiresShipping: $this->cartService->requiresShipping($requestedSiteId),
             memberHasAddresses: $member !== null
             && $member->addresses->count() > 0,
             isOneTimeCart: $isOneTimeCart,
             isMixedSubscriptionCart: $isMixedSubscriptionCart,
             hasPreOrders: $this->detectPreOrders($items),
             appliedVoucher: Session::get('applied_voucher_code'),
-            site: SiteContext::slug(),
+            site: $checkoutSiteSlug,
             disclosures: $this->cartLineDisclosureService,
             plansById: $plansById,
             locale: $locale,
@@ -554,6 +561,41 @@ class CartController extends Controller
         Session::forget('pending_otp_email');
     }
 
+    private function resolveCheckoutSite(array $items): ?Site
+    {
+        $siteIds = array_values(array_unique(array_filter(array_map(
+            static fn(array $item): int => (int)($item['site_id'] ?? 0),
+            $items,
+        ))));
+
+        if (count($siteIds) !== 1) {
+            return null;
+        }
+
+        return Site::where('id', $siteIds[0])
+            ->where('is_active', 1)
+            ->first();
+    }
+
+    private function resolveRequestedCheckoutSite(Request $request): ?Site
+    {
+        if (str_starts_with($request->getPath(), '/press-stack')) {
+            return null;
+        }
+
+        $routeSlug = $request->route('site')
+            ?? $request->route('siteName')
+            ?? SiteContext::slug();
+
+        if (!$routeSlug) {
+            return null;
+        }
+
+        return Site::where('slug', (string)$routeSlug)
+            ->where('is_active', 1)
+            ->first();
+    }
+
     public function add(Request $request)
     {
         $productId = $request->input('product_id');
@@ -567,8 +609,8 @@ class CartController extends Controller
         $result = $this->cartService->addItem($productId, $quantity, $options);
 
         return $this->resourceResponse(array_merge($result, [
-            'count' => $this->cartService->getCount(),
-            'total' => $this->cartService->getTotal(),
+            'count' => $this->cartService->getCount(SiteContext::getId()),
+            'total' => $this->cartService->getTotal(SiteContext::getId()),
         ]));
     }
 
@@ -580,27 +622,29 @@ class CartController extends Controller
             return $this->resourceResponse(['success' => false, 'message' => 'Quantity required'], 400);
         }
 
+        $siteId = SiteContext::getId();
         $result = $this->cartService->updateQuantity($id, $quantity);
 
         return $this->resourceResponse(array_merge($result, [
-            'count' => $this->cartService->getCount(),
-            'total' => $this->cartService->getTotal(),
+            'count' => $this->cartService->getCount($siteId),
+            'total' => $this->cartService->getTotal($siteId),
         ]));
     }
 
     public function remove(int $id)
     {
+        $siteId = SiteContext::getId();
         $result = $this->cartService->removeItem($id);
 
         return $this->resourceResponse(array_merge($result, [
-            'count' => $this->cartService->getCount(),
-            'total' => $this->cartService->getTotal(),
+            'count' => $this->cartService->getCount($siteId),
+            'total' => $this->cartService->getTotal($siteId),
         ]));
     }
 
     public function clear()
     {
-        $this->cartService->clear();
+        $this->cartService->clear(SiteContext::getId());
 
         return $this->resourceResponse([
             'success' => true,
@@ -655,12 +699,29 @@ class CartController extends Controller
             ], 400);
         }
 
+        $site = null;
+        $routeSite = $request->route('site');
+        if ($routeSite) {
+            $site = Site::where('slug', (string)$routeSite)
+                ->where('is_active', 1)
+                ->first();
+            $plan = $this->subscriptionPlanRepository->find((int)$planId);
+
+            if (!$site || !$plan || (int)$plan->site_id !== (int)$site->id) {
+                return $this->resourceResponse([
+                    'success' => false,
+                    'message' => 'Subscription plan is not available for this site',
+                ], 400);
+            }
+        }
+
         $result = $this->cartService->addSubscriptionToCart($planId, $deliveryType, $data);
+        $siteId = $site?->id ?? SiteContext::getId();
 
         return $this->resourceResponse(array_merge($result, [
-            'count' => $this->cartService->getCount(),
-            'total' => $this->cartService->getTotal(),
-            'items' => $this->cartService->getItems(),
+            'count' => $this->cartService->getCount($siteId),
+            'total' => $this->cartService->getTotal($siteId),
+            'items' => $this->cartService->getItems($siteId),
         ]));
     }
 

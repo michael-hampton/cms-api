@@ -131,8 +131,9 @@ class OneTimeSubscriptionService
                 $endDate = $this->dateCalculator->calculateEndDate($startDate, $billingPeriod);
             }
 
-            $basePrice = Money::fromCents($pricing->totalCents, $plan->currency);
-            $discount = Money::fromCents($pricing->discountCents, $plan->currency);
+            $currency = strtoupper((string)($pricing->currency ?: $plan->currency));
+            $basePrice = Money::fromCents($pricing->totalCents, $currency);
+            $discount = Money::fromCents($pricing->discountCents, $currency);
 
             $this->pricingCalculator->validateDiscount($basePrice, $discount);
             $finalPrice = $this->pricingCalculator->calculateFinalPrice($basePrice, $discount);
@@ -152,7 +153,7 @@ class OneTimeSubscriptionService
                 'original_price' => $pricing->originalAmount ?: $plan->price,
                 'discount_amount' => $discount->toDecimal(),
                 'voucher_id' => $voucherId,
-                'currency' => $plan->currency,
+                'currency' => $currency,
                 'auto_renew' => false,
                 'delivery_type' => $deliveryType,
                 'gifted_by_member_id' => $giftedByMemberId,

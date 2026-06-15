@@ -56,6 +56,7 @@ class StripeSubscriptionGateway implements StripeSubscriptionGatewayInterface
         ?int                        $trialDays,
     ): StripeSubscriptionResultDto {
         try {
+
             $coupon = $dto->voucherId !== null
                 ? $this->couponGateway->getOrCreateForVoucher($dto->voucherId, $dto->currency ?? 'gbp')
                 : null;

@@ -161,7 +161,7 @@ class SubscriptionBillingService
                 planId:           $subscription->plan_id,
                 memberId:         $subscription->member_id,
                 siteId:           $subscription->site_id,
-                currency:         $subscription->currency,
+                currency:         $this->resolveCurrency($subscription, $pricingTier),
                 voucherId:        $subscription->voucher_id,
             )
         );
@@ -184,7 +184,7 @@ class SubscriptionBillingService
                 memberId:         $subscription->member_id,
                 siteId:           $subscription->site_id,
                 trialDays:        $trialDays,
-                currency:         $subscription->currency,
+                currency:         $this->resolveCurrency($subscription, $pricingTier),
                 voucherId:        $subscription->voucher_id,
             )
         );
@@ -210,7 +210,7 @@ class SubscriptionBillingService
                 memberId:          $subscription->member_id,
                 siteId:            $subscription->site_id,
                 trialDays:         $trialDays,
-                currency:          $subscription->currency,
+                currency:          $this->resolveCurrency($subscription, $pricingTier),
                 voucherId:         $subscription->voucher_id,
             )
         );
@@ -227,6 +227,11 @@ class SubscriptionBillingService
         }
 
         return $pricingTier->stripe_price_id;
+    }
+
+    private function resolveCurrency(Subscription $subscription, SubscriptionPlanPricing $pricingTier): string
+    {
+        return strtolower((string)($pricingTier->currency ?: $subscription->currency ?: 'gbp'));
     }
 
     private function requireStripeIntroPriceId(SubscriptionPlanPricing $pricingTier): string

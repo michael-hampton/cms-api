@@ -135,7 +135,7 @@ class SubscriptionPricingResolver
                 variant: $variant,
                 basePrice: $basePrice,
                 salePrice: $salePrice,
-                currency: $plan->currency,
+                currency: $pricingTier->currency ?: $plan->currency,
                 discountAmount: $discountAmount,
                 voucherId: $voucherId,
             );
