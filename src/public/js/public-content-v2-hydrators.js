@@ -28,8 +28,14 @@
             this.scripts = new Set([...document.querySelectorAll('script[src]')].map(script => script.src));
         }
 
+        normalize(url) {
+            if (!url) return url;
+            return String(url).replace(/^\/public\//, '/');
+        }
+
         load(component) {
-            for (const url of component.assets?.styles ?? []) {
+            for (const source of component.assets?.styles ?? []) {
+                const url = this.normalize(source);
                 const absolute = new URL(url, window.location.origin).href;
                 if (this.styles.has(absolute)) continue;
                 this.styles.add(absolute);
@@ -39,7 +45,8 @@
                 document.head.append(link);
             }
 
-            for (const url of component.assets?.scripts ?? []) {
+            for (const source of component.assets?.scripts ?? []) {
+                const url = this.normalize(source);
                 const absolute = new URL(url, window.location.origin).href;
                 if (this.scripts.has(absolute)) continue;
                 this.scripts.add(absolute);
