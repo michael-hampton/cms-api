@@ -216,8 +216,6 @@
 
                 this.hydrator.hydrate(element, component);
 
-                // guest-contributors is hydrated by the class-based registry. Its
-                // legacy inline script uses global IDs and breaks when API-mounted.
                 if (component.type !== 'guest-contributors') {
                     await this.assetLoader.execute(prepared.scripts);
                 }
@@ -259,6 +257,7 @@
             this.api = api;
             this.store = store;
             this.view = view;
+            this.siteSlug = root.dataset.site;
             this.onClick = this.onClick.bind(this);
         }
 
@@ -292,15 +291,57 @@
             }
 
             const url = new URL(link.href, window.location.origin);
+            if (url.origin !== window.location.origin) {
+                return;
+            }
+
             const canonicalPath = url.pathname
                 .replace(/\/category\//, '/categories/')
                 .replace(/\/tag\//, '/tags/')
                 .replace(/\/author\//, '/authors/');
 
-            if (canonicalPath !== url.pathname) {
+            const previewPath = this.toPreviewPath(canonicalPath);
+            const targetPath = previewPath ?? canonicalPath;
+
+            if (targetPath !== url.pathname) {
                 event.preventDefault();
-                window.location.assign(`${canonicalPath}${url.search}${url.hash}`);
+                window.location.assign(`${targetPath}${url.search}${url.hash}`);
             }
+        }
+
+        toPreviewPath(pathname) {
+            if (!this.siteSlug) return null;
+
+            const segments = pathname.split('/').filter(Boolean);
+            if (segments[0] !== this.siteSlug) return null;
+
+            if (segments.length === 1) {
+                return `/${this.siteSlug}/content-v2`;
+            }
+
+            const first = segments[1];
+            const reserved = new Set([
+                'content-v2',
+                'authors',
+                'categories',
+                'tags',
+                'member',
+                'open-collab',
+                'shop',
+                'cart',
+                'checkout',
+                'search',
+                'api',
+                'assets',
+                'images',
+                'subscription-confirmation',
+            ]);
+
+            if (reserved.has(first) || segments.length !== 2) {
+                return null;
+            }
+
+            return `/${this.siteSlug}/content-v2/${encodeURIComponent(first)}`;
         }
     }
 
