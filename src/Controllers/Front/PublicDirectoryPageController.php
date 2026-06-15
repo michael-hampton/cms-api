@@ -6,6 +6,7 @@ use App\Controllers\Controller;
 use App\Framework\Http\Response;
 use App\Framework\Support\SiteContext;
 use App\Repositories\PublicContent\PublicNavigationRepository;
+use App\Services\Cms\MenuRenderer;
 use App\Services\FooterRenderer;
 
 final class PublicDirectoryPageController extends Controller
@@ -13,6 +14,7 @@ final class PublicDirectoryPageController extends Controller
     public function __construct(
         private readonly PublicNavigationRepository $navigation,
         private readonly FooterRenderer $footerRenderer,
+        private readonly MenuRenderer $menuRenderer,
     ) {
         parent::__construct();
     }
@@ -64,6 +66,7 @@ final class PublicDirectoryPageController extends Controller
             'type' => $type,
             'slug' => $slug,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header'),
+            'menuRenderer' => $this->menuRenderer,
             'footerHtml' => $footerMenu
                 ? $this->footerRenderer->renderFooter($footerMenu)
                 : '',
