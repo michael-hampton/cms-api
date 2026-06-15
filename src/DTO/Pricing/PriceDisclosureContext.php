@@ -10,19 +10,32 @@ final readonly class PriceDisclosureContext
         public string $locale,
         public string $currency,
         public int $quantity,
-        public int $unitAmountMinor,
-        public string $billingPeriod,
-        public int $billingInterval = 1,
-        public ?int $trialDays = null,
-        public ?DateTimeImmutable $renewalDate = null,
-        public bool $isRecurring = true,
-        public array $copyOverrides = [],
-        public array $formatterSettings = [],
+        public int $itemAmountMinor,
+        public ?int $initialChargeAmountMinor,
+        public ?int $renewalAmountMinor,
+        public bool $isRecurring,
+        public ?int $trialDays,
+        public ?int $introCycles,
+        public ?string $initialChargePeriodLabel,
+        public ?string $introPeriodLabel,
+        public ?string $renewalPeriodLabel,
+        public ?DateTimeImmutable $renewalDate,
+        public ?string $pricingLabel = null,
+        public array $badges = [],
+        public array $experienceLanguageLines = [],
+        public array $storeLanguageLines = [],
     ) {
     }
 
-    public function lineAmountMinor(): int
+    public function hasTrial(): bool
     {
-        return $this->unitAmountMinor * max(1, $this->quantity);
+        return $this->trialDays !== null && $this->trialDays > 0;
+    }
+
+    public function hasValidInitialCharge(): bool
+    {
+        return $this->initialChargeAmountMinor !== null
+            && $this->initialChargeAmountMinor > 0
+            && $this->initialChargePeriodLabel !== null;
     }
 }
