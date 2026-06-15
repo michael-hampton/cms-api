@@ -78,7 +78,7 @@ class OnboardingPageController extends Controller
 
         return $this->view('open-collab.onboarding.index', [
             'vm' => $viewModel,
-            'terms' => $terms,
+            'terms' => $this->legalDocumentFactory->forTerms($terms),
             'termsDisplay' => $this->legalDocumentFactory->forTerms($terms),
             'contract' => $contract,
             'contractDisplay' => $this->legalDocumentFactory->forContract($contract),

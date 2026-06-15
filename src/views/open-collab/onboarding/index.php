@@ -1183,6 +1183,56 @@ if ($profile && !empty($profile->expertise)) {
         }
     }
 
+    class TermsStep extends OnboardingStepBase {
+        async _submit() {
+            this._clearError();
+
+            const agreed = document.querySelector(
+                '#onboarding-form input[name="agreed"]'
+            )?.checked;
+
+            const termsVersionId = Number(
+                document.querySelector(
+                    '#onboarding-form input[name="terms_version_id"]'
+                )?.value || 0
+            );
+
+            if (!agreed) {
+                this._showError(
+                    'You must agree to the Terms and Conditions before continuing.'
+                );
+                return;
+            }
+
+            if (!termsVersionId) {
+                this._showError(
+                    'The Terms and Conditions version could not be identified.'
+                );
+                return;
+            }
+
+            const button = this._setButtonLoading('Accepting…');
+
+            try {
+                const response = await this._post('terms', {
+                    terms_version_id: termsVersionId,
+                    agreed: true,
+                });
+
+                await this._handleResponse(
+                    response,
+                    button,
+                    'Accept & continue'
+                );
+            } catch (error) {
+                this._showError(
+                    'The Terms and Conditions could not be accepted. Please try again.'
+                );
+                this._resetButton(button, 'Accept & continue');
+            }
+        }
+    }
+
     class PaymentStep extends OnboardingStepBase {
         #stripe = null;
         #cardElement = null;
@@ -1583,6 +1633,8 @@ if ($profile && !empty($profile->expertise)) {
                     return new GuidelinesStep(site, token);
                 case 'age_verification':
                     return new AgeVerificationStep(site, token);
+                case 'terms':
+                    return new TermsStep(site, token);
                 default:
                     return null;
             }

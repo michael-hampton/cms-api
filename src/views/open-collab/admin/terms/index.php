@@ -3,9 +3,11 @@
 $canCreateTerms = $canCreateTerms ?? false;
 $canEditTerms = $canEditTerms ?? false;
 $canPublishTerms = $canPublishTerms ?? false;
+$canDeleteTerms = $canDeleteTerms ?? false;
 $pageTitle = 'Terms & Conditions';
 $activeNav = 'terms';
 $breadcrumbs = [['label' => 'Terms & Conditions']];
+
 ?>
 @endsection
 
@@ -16,7 +18,8 @@ $breadcrumbs = [['label' => 'Terms & Conditions']];
      data-site="<?= htmlspecialchars($siteSlug ?? $site ?? '') ?>"
      data-can-create="<?= $canCreateTerms ? '1' : '0' ?>"
      data-can-edit="<?= $canEditTerms ? '1' : '0' ?>"
-     data-can-publish="<?= $canPublishTerms ? '1' : '0' ?>">
+     data-can-publish="<?= $canPublishTerms ? '1' : '0' ?>"
+     data-can-delete="<?= $canDeleteTerms ? '1' : '0' ?>">
 
     <div id="terms-toast"
          style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:9px 20px;border-radius:20px;font-size:.8rem;font-weight:500;opacity:0;transition:opacity .3s;z-index:9999;pointer-events:none;white-space:nowrap;"></div>
@@ -263,6 +266,12 @@ class TermsAdminManager {
                 return;
             }
 
+            if (button.dataset.action === 'publish') {
+                this.state.selected = item;
+                this.publish();
+                return;
+            }
+
             this.select(item);
         });
     }
@@ -352,6 +361,9 @@ class TermsAdminManager {
             const canDelete =
                 status === 'draft' &&
                 this.permissions.delete;
+            const canPublish =
+                status === 'draft' &&
+                this.permissions.publish;
 
             const actions = [
                 `<button
@@ -374,6 +386,19 @@ class TermsAdminManager {
             style="color:var(--red);"
         >
             Delete
+        </button>
+    `);
+            }
+
+            if (canPublish) {
+                actions.push(`
+        <button
+            type="button"
+            class="oc-btn oc-btn--sm oc-btn--amber"
+            data-action="publish"
+            data-terms-id="${Number(item.id)}"
+        >
+            Publish
         </button>
     `);
             }

@@ -55,21 +55,21 @@ class SitePermissionResolver
     public function bundleForUser(int $userId): array
     {
         $key = $this->invalidator->keyForUser($userId);
-//
-//        try {
-//            $bundle = $this->cache->get($key);
-//
-//            if (is_array($bundle)) {
-//                return $bundle;
-//            }
-//        } catch (\Throwable $exception) {
-//            Logger::warning('Permission cache read failure', [
-//                'operation' => 'get',
-//                'user_id' => $userId,
-//                'cache_key' => $key,
-//                'error' => $exception->getMessage(),
-//            ]);
-//        }
+
+        try {
+            $bundle = $this->cache->get($key);
+
+            if (is_array($bundle)) {
+                return $bundle;
+            }
+        } catch (\Throwable $exception) {
+            Logger::warning('Permission cache read failure', [
+                'operation' => 'get',
+                'user_id' => $userId,
+                'cache_key' => $key,
+                'error' => $exception->getMessage(),
+            ]);
+        }
 
         $bundle = $this->bundleBuilder->build($userId);
 
