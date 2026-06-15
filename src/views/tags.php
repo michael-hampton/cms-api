@@ -1,3 +1,7 @@
+<?php
+$tagBase = $directoryBase ?? ('/' . \App\Framework\Support\SiteContext::slug());
+?>
+
 <?php if ($page->tags): ?>
     <div class="page-tags">
         <div class="tags-header">
@@ -9,7 +13,7 @@
         </div>
         <div class="tags-list">
             <?php foreach ($page->tags as $tag): ?>
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/tags/<?= urlencode($tag->slug) ?>"
+                <a href="<?= htmlspecialchars($tagBase . '/tags/' . rawurlencode($tag->slug), ENT_QUOTES, 'UTF-8') ?>"
                    class="tag-badge <?= $tag->is_featured ? 'featured-tag' : '' ?>">
                     <?php if ($tag->is_featured): ?>
                         <svg class="featured-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
@@ -93,7 +97,6 @@
         color: #6c757d;
     }
 
-    /* Featured Tags */
     .featured-tag {
         background: #fff9e6;
         border: 2px solid #ffe59d;
