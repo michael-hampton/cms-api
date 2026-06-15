@@ -28,7 +28,25 @@ class EscalationResource
             'resolved_at' => $this->escalation->resolved_at?->format('Y-m-d\TH:i:sP'),
             'resolution' => $this->escalation->resolution,
             'resolution_notes' => $this->escalation->resolution_notes,
+            'available_actions' => $this->availableActions(),
         ];
+    }
+
+    private function availableActions(): array
+    {
+        $status = $this->enumValue($this->escalation->status);
+
+        $actions = [];
+
+        if ($status === 'open') {
+            $actions[] = 'acknowledge';
+        }
+
+        if (in_array($status, ['open', 'acknowledged', 'in_progress'], true)) {
+            $actions[] = 'resolve';
+        }
+
+        return $actions;
     }
 
     private function enumValue(mixed $value): mixed

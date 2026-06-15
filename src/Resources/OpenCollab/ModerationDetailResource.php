@@ -35,9 +35,9 @@ class ModerationDetailResource extends JsonResource
         $governance = $governanceGate->check($this->getAttribute('page_id'));
         $authorizationService = app(OpencollabAuthorizationService::class);
 
-        $canViewHighRisk = $authorizationService->canViewHighRisk($this->getAttribute('site_id'), $this->getAttribute('page_id'));
-        $canEscalate = $authorizationService->canEscalate($this->getAttribute('site_id'), $this->getAttribute('page_id'));
-        $canResolveRisk = $authorizationService->canResolveRisk($this->getAttribute('site_id'), $this->getAttribute('page_id'));
+        $canViewHighRisk = $authorizationService->canViewHighRisk(Auth::id(), $this->getAttribute('site_id'));
+        $canEscalate = $authorizationService->canEscalate(Auth::id(), $this->getAttribute('site_id'));
+        $canResolveRisk = $authorizationService->canResolveRisk(Auth::id(), $this->getAttribute('site_id'));
 
         return [
             'id' => $this->getAttribute('id'),
@@ -100,8 +100,6 @@ class ModerationDetailResource extends JsonResource
             if ($this->viewerCan('review')) $actions[] = 'add_risk';
             if ($canEscalate) $actions[] = 'escalate';
         }
-
-        $canResolveRisk = true; //todo
 
         if ($canResolveRisk) $actions[] = 'resolve_risk';
 

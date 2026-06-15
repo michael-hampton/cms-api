@@ -97,7 +97,7 @@ $breadcrumbs = [['label' => 'Escalations']];
      role="dialog"
      aria-modal="true"
      aria-labelledby="esc-resolve-modal-title">
-    <div class="oc-modal" role="document" style="max-width:520px;">
+    <div class="oc-modal" role="document" style="max-width:520px;padding:28px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;">
             <div>
                 <h3 id="esc-resolve-modal-title"

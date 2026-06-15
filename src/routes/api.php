@@ -500,6 +500,7 @@ $router->group(['prefix' => 'api', 'middleware' => AuthenticateWithToken::class]
         $router->post('/open-collab/admin/moderation/{queueEntryId}/escalate', [ModerationEscalationController::class, 'store']);
         $router->get('/open-collab/images', [ImageLibraryController::class, 'index']);
         $router->post('/open-collab/images', [ImageLibraryController::class, 'store']);
+        $router->get('/open-collab/images/{imageId}', [ImageLibraryController::class, 'show']);
 
         $router->get(
             '/open-collab/admin/contributors',
