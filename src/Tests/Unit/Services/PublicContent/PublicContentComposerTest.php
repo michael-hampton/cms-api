@@ -40,6 +40,10 @@ final class PublicContentComposerTest extends TestCase
     {
         $regions = $this->compose('landing-page', withCategories: true);
 
+        self::assertSame(
+            ['page-title'],
+            array_map(static fn($component) => $component->type, $regions['header']),
+        );
         self::assertContains(
             'activity-feed-widget',
             array_map(static fn($component) => $component->type, $regions['after-content']),
@@ -48,7 +52,6 @@ final class PublicContentComposerTest extends TestCase
             'guest-contributors',
             array_map(static fn($component) => $component->type, $regions['below-content']),
         );
-        self::assertArrayNotHasKey('header', $regions);
     }
 
     private function compose(string $pageType, bool $withCategories = false): array
