@@ -42,7 +42,11 @@ final readonly class PriceDisclosureFormatter
 
         return [
             'main_line' => $this->render($context, $mainKey, $tokens),
-            'renewal_line' => $this->render($context, $context->renewalDate === null ? 'renewal_without_date' : 'subscription_without_trial', $tokens),
+            'renewal_line' => $this->render(
+                $context,
+                $context->renewalDate === null ? 'renewal_without_date' : 'renewal_with_date',
+                $tokens,
+            ),
             'label' => $context->pricingLabel,
             'badges' => $context->badges,
         ];
@@ -84,7 +88,12 @@ final readonly class PriceDisclosureFormatter
         }
 
         if (class_exists(\IntlDateFormatter::class)) {
-            $formatter = new \IntlDateFormatter($locale, \IntlDateFormatter::MEDIUM, \IntlDateFormatter::NONE, 'UTC');
+            $formatter = new \IntlDateFormatter(
+                $locale,
+                \IntlDateFormatter::MEDIUM,
+                \IntlDateFormatter::NONE,
+                'UTC',
+            );
             $formatted = $formatter->format($date);
             if ($formatted !== false) {
                 return $formatted;
@@ -105,6 +114,10 @@ final readonly class PriceDisclosureFormatter
 
     private function currencyFractionDigits(string $currency): int
     {
-        return in_array(strtoupper($currency), ['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'], true) ? 0 : 2;
+        return in_array(
+            strtoupper($currency),
+            ['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'],
+            true,
+        ) ? 0 : 2;
     }
 }
