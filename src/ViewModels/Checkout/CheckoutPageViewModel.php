@@ -46,9 +46,10 @@ final readonly class CheckoutPageViewModel
         string $site,
         CartLineDisclosureService $disclosures,
         array $plansById,
+        array $pricingById = [],
         string $locale = 'en_GB',
-        array $copyOverrides = [],
-        array $formatterSettings = [],
+        array $experienceLanguageLines = [],
+        array $storeLanguageLines = [],
     ): self {
         $subscriptionItems = [];
         $productItems = [];
@@ -61,20 +62,33 @@ final readonly class CheckoutPageViewModel
 
             if ($planId > 0) {
                 $plan = $plansById[$planId] ?? null;
+                $pricingId = (int)($item['options']['pricing_tier_id'] ?? 0);
+                $pricing = $pricingById[$pricingId] ?? null;
+
                 $planFacts = [
                     'billing_period' => $plan?->billing_period ?? 'monthly',
                     'trial_days' => $plan?->trial_days,
                     'is_one_time' => $plan?->isOneTime() ?? false,
-                    'renewal_date' => $item['options']['renewal_date'] ?? null,
+                ];
+
+                $pricingFacts = $pricing === null ? [] : [
+                    'price' => $pricing->getEffectivePrice((string)($item['options']['delivery_type'] ?? 'digital')),
+                    'renewal_price' => $pricing->getEffectivePrice((string)($item['options']['delivery_type'] ?? 'digital')),
+                    'trial_days' => $pricing->trial_days,
+                    'intro_price' => $pricing->intro_price,
+                    'intro_cycles' => $pricing->intro_cycles,
+                    'label' => $pricing->label,
+                    'period_description' => $pricing->period_description ?: ($plan?->billing_period ?? 'monthly'),
                 ];
 
                 $item = $disclosures->enrich(
-                    $item,
-                    $planFacts,
-                    $locale,
-                    $currency,
-                    $copyOverrides,
-                    $formatterSettings,
+                    item: $item,
+                    planFacts: $planFacts,
+                    locale: $locale,
+                    currency: $currency,
+                    experienceLanguageLines: $experienceLanguageLines,
+                    storeLanguageLines: $storeLanguageLines,
+                    pricingFacts: $pricingFacts,
                 );
 
                 $deliveryType = strtolower((string)($item['options']['delivery_type'] ?? 'print'));
@@ -95,16 +109,12 @@ final readonly class CheckoutPageViewModel
             default => 'print_only',
         };
 
-        $effectiveRequiresShipping = $basketType === 'digital_only'
-            ? false
-            : $requiresShipping;
-
+        $effectiveRequiresShipping = $basketType === 'digital_only' ? false : $requiresShipping;
         $subtotal = array_reduce(
             $resolvedItems,
             static fn(float $total, array $item): float => $total + (float)($item['subtotal'] ?? 0),
             0.0,
         );
-
         $voucherDiscount = (float)($appliedVoucher['discount'] ?? 0);
         $finalTotal = max(0, $subtotal + $shipping + $tax - $voucherDiscount);
 
