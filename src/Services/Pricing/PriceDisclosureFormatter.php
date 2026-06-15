@@ -31,6 +31,9 @@ final readonly class PriceDisclosureFormatter
             ':initial_charge_period_label' => $context->initialChargePeriodLabel ?? '',
             ':intro_period_label' => $context->introPeriodLabel ?? '',
             ':renewal_period_label' => $context->renewalPeriodLabel ?? '',
+            ':raw_period_label' => $context->rawPeriodLabel ?? '',
+            ':numeric_period_label' => $context->numericPeriodLabel ?? '',
+            ':worded_period_label' => $context->wordedPeriodLabel ?? '',
             ':renewal_date' => $this->formatDate($context->renewalDate, $context->locale),
         ];
 
