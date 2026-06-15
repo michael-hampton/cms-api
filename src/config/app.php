@@ -15,9 +15,9 @@ return [
         \App\Framework\ServiceProvider\ControllerServiceProvider::class,
         \App\Framework\ServiceProvider\ScheduleServiceProvider::class,
         \App\Framework\ServiceProvider\EventServiceProvider::class,
+        \App\Providers\PublicContentWidgetServiceProvider::class,
 
-        // Add custom providers here. A widget provider can resolve
-        // PublicContentWidgetRegistry and register additional definitions.
+        // Add custom providers here.
         // \App\Providers\CustomServiceProvider::class,
     ],
 
@@ -40,7 +40,6 @@ return [
         \App\Framework\View\ViewRenderer::class,
         \App\Framework\Validation\Validator::class,
         \App\Parsers\BlockRegistry::class,
-        \App\Services\PublicContent\Widgets\PublicContentWidgetRegistry::class,
     ],
 
     'bindings' => [
