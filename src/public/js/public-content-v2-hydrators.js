@@ -24,6 +24,42 @@
         }
     }
 
+    class ComponentAssetManifestLoader {
+        constructor() {
+            this.styles = new Set(
+                [...document.querySelectorAll('link[rel="stylesheet"]')]
+                    .map(link => link.href),
+            );
+            this.scripts = new Set(
+                [...document.querySelectorAll('script[src]')]
+                    .map(script => script.src),
+            );
+        }
+
+        load(component) {
+            for (const url of component.assets?.styles ?? []) {
+                const absolute = new URL(url, window.location.origin).href;
+                if (this.styles.has(absolute)) continue;
+                this.styles.add(absolute);
+
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = url;
+                document.head.append(link);
+            }
+
+            for (const url of component.assets?.scripts ?? []) {
+                const absolute = new URL(url, window.location.origin).href;
+                if (this.scripts.has(absolute)) continue;
+                this.scripts.add(absolute);
+
+                const script = document.createElement('script');
+                script.src = url;
+                document.body.append(script);
+            }
+        }
+    }
+
     class CommentsComponent {
         constructor(element, component, api) {
             this.element = element;
@@ -119,6 +155,7 @@
     class ComponentHydratorRegistry {
         constructor(api) {
             this.api = api;
+            this.assets = new ComponentAssetManifestLoader();
             this.factories = new Map([
                 ['comments', (element, component) => new CommentsComponent(element, component, this.api)],
                 ['newsletter-signup-widget', element => new NewsletterComponent(element)],
@@ -126,6 +163,8 @@
         }
 
         hydrate(element, component) {
+            this.assets.load(component);
+
             const factory = this.factories.get(component.type);
             if (!factory) return;
             factory(element, component).start();
