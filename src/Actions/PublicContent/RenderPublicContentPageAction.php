@@ -8,7 +8,7 @@ use App\Models\Page;
 use App\Repositories\PublicContent\PublicNavigationRepository;
 use App\Services\Cms\MenuRenderer;
 
-final class RenderPublicContentPageAction
+class RenderPublicContentPageAction
 {
     public function __construct(
         private readonly PublicNavigationRepository $navigation,
