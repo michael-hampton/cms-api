@@ -4,10 +4,19 @@ namespace App\Services\Pricing;
 
 use App\DTO\Pricing\PriceDisclosureContext;
 use DateTimeInterface;
-use NumberFormatter;
 
 final readonly class PriceDisclosureFormatter
 {
+    private const CURRENCY_SYMBOLS = [
+        'GBP' => '£',
+        'USD' => '$',
+        'EUR' => '€',
+        'PHP' => '₱',
+        'AUD' => 'A$',
+        'CAD' => 'C$',
+        'JPY' => '¥',
+    ];
+
     public function __construct(private PriceDisclosureTemplateResolver $templates)
     {
     }
@@ -72,13 +81,26 @@ final readonly class PriceDisclosureFormatter
 
     private function formatMoney(int $amountMinor, PriceDisclosureContext $context): string
     {
-        $formatter = new NumberFormatter($context->locale, NumberFormatter::CURRENCY);
-        $divisor = 10 ** $this->currencyFractionDigits($context->currency);
-        $formatted = $formatter->formatCurrency($amountMinor / $divisor, strtoupper($context->currency));
+        $currency = strtoupper($context->currency);
+        $fractionDigits = $this->currencyFractionDigits($currency);
+        $divisor = 10 ** $fractionDigits;
+        $amount = $amountMinor / $divisor;
 
-        return $formatted !== false
-            ? $formatted
-            : strtoupper($context->currency) . ' ' . number_format($amountMinor / $divisor, 2, '.', ',');
+        if (class_exists(\NumberFormatter::class)) {
+            $formatter = new \NumberFormatter($context->locale, \NumberFormatter::CURRENCY);
+            $formatted = $formatter->formatCurrency($amount, $currency);
+
+            if ($formatted !== false) {
+                return $formatted;
+            }
+        }
+
+        $formattedAmount = number_format($amount, $fractionDigits, '.', ',');
+        $symbol = self::CURRENCY_SYMBOLS[$currency] ?? null;
+
+        return $symbol !== null
+            ? $symbol . $formattedAmount
+            : $currency . ' ' . $formattedAmount;
     }
 
     private function formatDate(?DateTimeInterface $date, string $locale): string
@@ -95,6 +117,7 @@ final readonly class PriceDisclosureFormatter
                 'UTC',
             );
             $formatted = $formatter->format($date);
+
             if ($formatted !== false) {
                 return $formatted;
             }
