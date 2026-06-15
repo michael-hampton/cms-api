@@ -8,6 +8,9 @@ $cssFile = asset(SiteContext::css(), 'css');
 $site = SiteContext::get();
 $siteName = $site ? $site->name : 'Site';
 $siteSlug = $site ? $site->slug : 'default';
+$navigationTitle = isset($hasTitle) && $hasTitle === false
+    ? ''
+    : ($title ?? ($page->title ?? $siteName));
 
 ?>
 
@@ -23,7 +26,6 @@ $siteSlug = $site ? $site->slug : 'default';
         site = '<?= \App\Framework\Support\SiteContext::slug() ?>';
         SITE = '<?= \App\Framework\Support\SiteContext::slug() ?>';
 
-        // Newsletter signup functionality
         document.addEventListener('DOMContentLoaded', function() {
             const form = document.getElementById('newsletter-form');
             if (!form) return;
@@ -31,8 +33,6 @@ $siteSlug = $site ? $site->slug : 'default';
             const emailInput = document.getElementById('newsletter-email');
             const submitBtn = document.getElementById('newsletter-submit');
             const messageDiv = document.getElementById('newsletter-message');
-
-            // Get site name from URL or data attribute
             const siteName = document.querySelector('[data-site-name]')?.dataset.siteName
                 || window.location.hostname.split('.')[0];
 
@@ -42,7 +42,6 @@ $siteSlug = $site ? $site->slug : 'default';
                 const email = emailInput.value.trim();
                 if (!email) return;
 
-                // Disable form
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Subscribing...';
                 messageDiv.className = 'newsletter-message';
@@ -51,10 +50,8 @@ $siteSlug = $site ? $site->slug : 'default';
                 try {
                     const response = await fetch(`/api/${siteName}/newsletter/web/signup`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ email: email })
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({email: email})
                     });
 
                     const data = await response.json();
@@ -76,7 +73,6 @@ $siteSlug = $site ? $site->slug : 'default';
                 }
             });
 
-            // Handle unsubscribe if token in URL
             const urlParams = new URLSearchParams(window.location.search);
             const unsubToken = urlParams.get('unsubscribe');
 
@@ -88,10 +84,8 @@ $siteSlug = $site ? $site->slug : 'default';
                 try {
                     const response = await fetch(`/api/${siteName}/newsletter/unsubscribe`, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ token: token })
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({token: token})
                     });
 
                     const data = await response.json();
@@ -109,16 +103,11 @@ $siteSlug = $site ? $site->slug : 'default';
     </script>
 
     <link rel="stylesheet" href="<?= $cssFile ?>">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-<!-- ===================================
-     HEADER
-     =================================== -->
 <header class="site-header" data-site="<?= $siteSlug ?>">
     <div class="header-container">
-        <!-- Logo Section -->
         <a href="/" class="site-logo">
             <div class="logo-wrapper">
                 <span class="logo-icon">
@@ -145,15 +134,13 @@ $siteSlug = $site ? $site->slug : 'default';
             </div>
         </a>
 
-        <!-- Navigation -->
         <?php echo $menuRenderer->render($menu, [
-                'layout' => 'mega',
-                'css_classes' => 'main-navigation',
-                'logo' => false,
-                'title' => isset($hasTitle) && $hasTitle === false ? '' : $title ?? $page->title
+            'layout' => 'mega',
+            'css_classes' => 'main-navigation',
+            'logo' => false,
+            'title' => $navigationTitle,
         ]); ?>
 
-        <!-- Header Actions -->
         <div class="header-actions">
             <button class="header-search-toggle" onclick="toggleSearch()" aria-label="Search">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -186,7 +173,6 @@ $siteSlug = $site ? $site->slug : 'default';
         </div>
     </div>
 
-    <!-- Enhanced Search Overlay -->
     @include('components/search-overlay')
 </header>
 
