@@ -42,7 +42,7 @@ final class GetPublicDirectoryAction
         $entity = match ($type) {
             'author' => $this->authors->findActiveBySlug($siteId, $slug),
             'category' => $this->categories->findActiveBySlug($siteId, $slug),
-            'tag' => $this->tags->findBySlug($siteId, $slug),
+            'tag' => $this->tags->findForSiteBySlug($siteId, $slug),
             default => throw new InvalidArgumentException('Unsupported directory type.'),
         };
 
