@@ -13,32 +13,34 @@ class SiteDetectionMiddleware
         $host = $request->getHost();
         $path = $request->getPath();
 
-        // Resolve the current site
+        // SiteContext uses static state. Always reset it at the request boundary so
+        // long-running workers cannot leak one site's context into the next request.
+        SiteContext::clear();
+
         try {
             $site = SiteContext::resolve($host, $path);
         } catch (\RuntimeException $e) {
-            // No active site found
             http_response_code(503);
-            echo "Service Unavailable: No active site configured";
+            echo 'Service Unavailable: No active site configured';
             exit;
         }
 
-        // Store site in request for easy access
         $request->setSite($site);
         $request->setSiteId($site->id);
 
-        // If localhost and path starts with site slug, strip it
         if (SiteContext::isLocalhost($host)) {
-            $segments = array_filter(explode('/', $path));
-            if (!empty($segments) && reset($segments) === $site->slug) {
-                // Remove site slug from path
+            $segments = array_values(array_filter(explode('/', $path)));
+
+            // Web URLs are /{site}/..., whereas versioned API URLs are
+            // /api/v1/{site}/.... Only strip the leading site segment for the
+            // web URL shape; API route matching still requires its full prefix.
+            if (($segments[0] ?? null) === $site->slug) {
                 array_shift($segments);
                 $newPath = '/' . implode('/', $segments);
                 $request->setPath($newPath ?: '/');
             }
         }
 
-        // Define site constants for easy access
         if (!defined('CURRENT_SITE_ID')) {
             define('CURRENT_SITE_ID', $site->id);
             define('CURRENT_SITE_NAME', $site->name);
