@@ -12,6 +12,7 @@ return [
     'files' => [
         'routes/web.php',
         'routes/api.php',
+        'routes/public-content-api.php',
         // 'routes/admin.php',
         // 'routes/console.php',
     ],
