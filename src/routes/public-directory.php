@@ -10,8 +10,11 @@ $router->get('/{site}/authors', [PublicDirectoryPageController::class, 'authors'
 $router->get('/{site}/authors/{slug}', [PublicDirectoryPageController::class, 'author']);
 $router->get('/{site}/categories', [PublicDirectoryPageController::class, 'categories']);
 $router->get('/{site}/categories/{slug}', [PublicDirectoryPageController::class, 'category']);
+$router->get('/{site}/category/{slug}', [PublicDirectoryPageController::class, 'category']);
 $router->get('/{site}/tags', [PublicDirectoryPageController::class, 'tags']);
 $router->get('/{site}/tags/{slug}', [PublicDirectoryPageController::class, 'tag']);
+$router->get('/{site}/tag/{slug}', [PublicDirectoryPageController::class, 'tag']);
+$router->get('/{site}/author/{slug}', [PublicDirectoryPageController::class, 'author']);
 
 $router->get('/api/v1/{site}/directory/author', [PublicDirectoryController::class, 'authors']);
 $router->get('/api/v1/{site}/directory/author/{slug}', [PublicDirectoryController::class, 'author']);
