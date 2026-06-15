@@ -3,6 +3,7 @@
 namespace App\Framework\Http;
 
 use App\Framework\Container;
+use App\Middleware\PublicContent\PublicContentRolloutMiddleware;
 use App\Models\Page;
 use App\Services\Url\UrlResolutionResult;
 use ReflectionMethod;
@@ -12,35 +13,46 @@ class ControllerDispatcher
 {
     private Container $container;
 
+    /** @var list<class-string> */
+    private array $middleware = [
+        PublicContentRolloutMiddleware::class,
+    ];
+
     public function __construct()
     {
         $this->container = Container::getInstance();
     }
 
-
     public function dispatch(string $controllerAction, Page $page, UrlResolutionResult $result, Request $request)
     {
         [$controllerClass, $method] = $this->parseControllerAction($controllerAction);
 
-        // Resolve controller from container
+        $request->setAttribute('page', $page);
+        $request->setAttribute('url_resolution', $result);
+        $request->setAttribute('controller_action', $controllerAction);
+
         $controller = $this->container->make($controllerClass);
 
-        // Check if method exists
         if (!method_exists($controller, $method)) {
             throw new \BadMethodCallException("Method [{$method}] does not exist on controller [{$controllerClass}]");
         }
 
-//        if ((new CheckPageMemberAccess())->handle($request, $page)) {
-//            $message = $page->non_member_message ?? 'This content requires a member login.';
-//            return new Response(accessDenied($message), 403);
-//        }
+        $next = function (Request $request) use ($controller, $method, $page, $result) {
+            if ($page->custom_handler) {
+                return $this->call($controller, $method);
+            }
 
-        if ($page->custom_handler) {
-            return $this->call($controller, $method);
+            return $controller->{$method}($page, $result);
+        };
+
+        foreach (array_reverse($this->middleware) as $middlewareClass) {
+            $next = function (Request $request) use ($middlewareClass, $next) {
+                $middleware = $this->container->resolve($middlewareClass);
+                return $middleware->handle($request, $next);
+            };
         }
 
-        // Call controller method with page and result
-        return $controller->{$method}($page, $result);
+        return $next($request);
     }
 
     private function parseControllerAction(string $controllerAction): array
@@ -49,7 +61,6 @@ class ControllerDispatcher
             return explode('@', $controllerAction, 2);
         }
 
-        // If no method specified, default to 'show'
         return [$controllerAction, 'show'];
     }
 
@@ -60,17 +71,14 @@ class ControllerDispatcher
         $dependencies = array_map(function (ReflectionParameter $param) use ($provided, $reflector) {
             $type = $param->getType();
 
-            // If class type → resolve from container
             if ($type && !$type->isBuiltin()) {
                 return $this->container->make($type->getName());
             }
 
-            // If value was provided manually → use it
             if (array_key_exists($param->getName(), $provided)) {
                 return $provided[$param->getName()];
             }
 
-            // If default value exists → use it
             if ($param->isDefaultValueAvailable()) {
                 return $param->getDefaultValue();
             }
@@ -80,5 +88,4 @@ class ControllerDispatcher
 
         return $reflector->invokeArgs($controller, $dependencies);
     }
-
 }
