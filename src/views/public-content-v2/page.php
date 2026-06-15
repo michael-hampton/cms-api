@@ -3,6 +3,8 @@ $title = 'Content preview';
 $description = 'Public content V2 preview';
 ?>
 
+@include('header', ['menu' => $menu])
+
 <main class="public-content-v2-shell">
     <div
         id="public-content-v2-app"
@@ -22,5 +24,6 @@ $description = 'Public content V2 preview';
 
 @css('public-content-v2.css')
 @css('public-content-v2-interactions.css')
+@js('base.js')
 @js('public-content-v2.js')
 @js('public-content-v2-supplementary.js')
