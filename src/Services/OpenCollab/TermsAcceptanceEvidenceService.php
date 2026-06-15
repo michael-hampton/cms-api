@@ -3,20 +3,19 @@
 namespace App\Services\OpenCollab;
 
 use App\DTO\OpenCollab\TermsAcceptanceEvidence;
-use App\Models\UserTermsAcceptance;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepositoryInterface;
 use RuntimeException;
 
 class TermsAcceptanceEvidenceService
 {
-    public function __construct(private readonly mixed $findAcceptance = null)
-    {
+    public function __construct(
+        private readonly UserTermsAcceptanceRepositoryInterface $repository,
+    ) {
     }
 
     public function get(int $acceptanceId): TermsAcceptanceEvidence
     {
-        $acceptance = is_callable($this->findAcceptance)
-            ? ($this->findAcceptance)($acceptanceId)
-            : UserTermsAcceptance::find($acceptanceId);
+        $acceptance = $this->repository->findWithTermsVersion($acceptanceId);
 
         if (!$acceptance) {
             throw new RuntimeException('Terms acceptance evidence not found.');
