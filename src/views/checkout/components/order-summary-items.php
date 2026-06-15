@@ -78,6 +78,11 @@ $groupIndex = 0;
             } else {
                 $productImg = $item['product_image'] ?? null;
             }
+
+            $pricingLabel = trim((string)($lineSummary['label'] ?? ''));
+            $showPricingLabel = $isSubscription
+                && $pricingLabel !== ''
+                && strcasecmp($pricingLabel, trim($productName)) !== 0;
             ?>
 
             <div class="cs-item" data-item-id="<?= $item['id'] ?>">
@@ -130,8 +135,8 @@ $groupIndex = 0;
 
                     <div class="cs-item-meta">Qty: <?= (int)($item['quantity'] ?? 1) ?></div>
 
-                    <?php if ($isSubscription && !empty($lineSummary['label'])): ?>
-                        <div class="cs-item-meta"><?= htmlspecialchars($lineSummary['label']) ?></div>
+                    <?php if ($showPricingLabel): ?>
+                        <div class="cs-item-meta"><?= htmlspecialchars($pricingLabel) ?></div>
                     <?php endif; ?>
 
                     <?php foreach (($lineSummary['badges'] ?? []) as $badge): ?>
