@@ -2,6 +2,7 @@
 
 namespace App\Repositories\PublicContent;
 
+use App\Framework\Support\Collection;
 use App\Models\Page;
 use App\Models\Site;
 use App\Repositories\Repository;
@@ -40,11 +41,8 @@ final class PublicContentPageRepository extends Repository
         return $page instanceof Page ? $page : null;
     }
 
-    public function findPublishedBySlug(
-        int $siteId,
-        string $slug,
-        array $relations = [],
-    ): ?Page {
+    public function findPublishedBySlug(int $siteId, string $slug, array $relations = []): ?Page
+    {
         $query = $relations === [] ? Page::query() : Page::with($relations);
 
         $page = $query
@@ -78,11 +76,7 @@ final class PublicContentPageRepository extends Repository
 
     public function findCompletePublishedBySlug(int $siteId, string $slug): ?Page
     {
-        return $this->findPublishedBySlug(
-            $siteId,
-            $slug,
-            self::COMPLETE_RELATIONS,
-        );
+        return $this->findPublishedBySlug($siteId, $slug, self::COMPLETE_RELATIONS);
     }
 
     public function findCompletePublishedBySlugForTerritory(
@@ -98,32 +92,40 @@ final class PublicContentPageRepository extends Repository
         );
     }
 
+    public function getRelatedForTerritory(
+        int $siteId,
+        int $territoryId,
+        int $excludePageId,
+        int $limit = 6,
+    ): Collection {
+        return Page::where('site_id', $siteId)
+            ->where('status', 'published')
+            ->where('id', '!=', $excludePageId)
+            ->whereHas('territories', function ($territories) use ($territoryId): void {
+                $territories->where('territories.id', $territoryId);
+            })
+            ->with(['customFields'])
+            ->orderBy('published_at', 'desc')
+            ->limit($limit)
+            ->get();
+    }
+
     public function findHomepage(Site $site): ?Page
     {
         $pageId = $site->getSetting('homepage_page_id');
         if ($pageId) {
             $page = $this->findPublishedById((int)$pageId, (int)$site->id);
-            if ($page) {
-                return $page;
-            }
+            if ($page) return $page;
         }
 
-        $configuredSlug = $site->getSetting(
-            'homepage_slug',
-            $site->getSetting('homepage_page_slug'),
-        );
-
+        $configuredSlug = $site->getSetting('homepage_slug', $site->getSetting('homepage_page_slug'));
         if ($configuredSlug) {
             $page = $this->findPublishedBySlug((int)$site->id, (string)$configuredSlug);
-            if ($page) {
-                return $page;
-            }
+            if ($page) return $page;
         }
 
         $home = $this->findPublishedBySlug((int)$site->id, 'home');
-        if ($home) {
-            return $home;
-        }
+        if ($home) return $home;
 
         $page = Page::where('site_id', (int)$site->id)
             ->where('status', 'published')
