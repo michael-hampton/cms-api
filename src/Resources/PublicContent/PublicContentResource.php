@@ -21,6 +21,9 @@ final readonly class PublicContentResource
             'summary' => $this->document->summary,
             'seo' => $this->document->seo,
             'taxonomy' => $this->document->taxonomy,
+            'authors' => $this->document->authors,
+            'landing_sections' => $this->document->landingSections,
+            'links' => $this->document->links,
             'content' => [
                 'schema_version' => $this->document->schemaVersion,
                 'regions' => array_map(
