@@ -8,8 +8,10 @@ use App\Framework\View\ViewRenderer;
 
 final class PublicContentComposer
 {
-    public function __construct(private readonly ViewRenderer $views)
-    {
+    public function __construct(
+        private readonly ViewRenderer $views,
+        private readonly RegionalPublicContentComponentFactory $regionalComponents,
+    ) {
     }
 
     /** @return array<string, list<PublicContentComponent>> */
@@ -28,6 +30,11 @@ final class PublicContentComposer
             }
 
             $regions[$component->region][] = $component;
+        }
+
+        $regional = $this->regionalComponents->make($context);
+        if ($regional && trim($regional->html) !== '') {
+            $regions[$regional->region][] = $regional;
         }
 
         foreach ($regions as &$components) {
