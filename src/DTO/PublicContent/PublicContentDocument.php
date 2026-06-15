@@ -14,6 +14,7 @@ final readonly class PublicContentDocument
         public array $seo,
         public array $taxonomy,
         public array $regions,
+        public array $components = [],
         public array $authors = [],
         public array $landingSections = [],
         public array $links = [],
