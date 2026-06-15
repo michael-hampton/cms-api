@@ -3,11 +3,11 @@
 namespace App\Services\PublicContent\Widgets;
 
 use App\DTO\PublicContent\PublicContentContext;
-use App\Repositories\PublicContent\PageWidgetRepository;
+use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 
 final class PageWidgetLayoutResolver
 {
-    public function __construct(private readonly PageWidgetRepository $repository)
+    public function __construct(private readonly PageWidgetRepositoryInterface $repository)
     {
     }
 
@@ -42,6 +42,18 @@ final class PageWidgetLayoutResolver
                 $resolved[] = $placement;
             }
         }
+
+        usort($resolved, static function (WidgetPlacement $left, WidgetPlacement $right): int {
+            if ($left->region !== $right->region) {
+                return strcmp($left->region, $right->region);
+            }
+
+            if ($left->priority !== $right->priority) {
+                return $left->priority <=> $right->priority;
+            }
+
+            return strcmp($left->widgetKey, $right->widgetKey);
+        });
 
         return $resolved;
     }
