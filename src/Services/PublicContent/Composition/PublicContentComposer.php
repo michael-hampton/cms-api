@@ -39,11 +39,6 @@ final class PublicContentComposer
             $regions[$component->region][] = $component;
         }
 
-        $regional = $this->regionalComponents->make($context);
-        if ($regional && trim($regional->html) !== '') {
-            $regions[$regional->region][] = $regional;
-        }
-
         foreach ($regions as &$components) {
             usort(
                 $components,
@@ -60,6 +55,8 @@ final class PublicContentComposer
         foreach ($this->definitions() as $definition) {
             $this->registry->register($definition);
         }
+
+        $this->registry->register($this->regionalComponents);
     }
 
     /** @return list<PublicContentComponentDefinition> */
