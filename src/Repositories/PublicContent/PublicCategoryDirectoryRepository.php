@@ -4,7 +4,7 @@ namespace App\Repositories\PublicContent;
 
 use App\Framework\Support\Collection;
 use App\Models\Category;
-use App\Models\Page;
+use App\Models\PageCategory;
 use App\Repositories\Repository;
 
 final class PublicCategoryDirectoryRepository extends Repository
@@ -40,12 +40,16 @@ final class PublicCategoryDirectoryRepository extends Repository
 
     public function getPublishedPages(int $siteId, int $categoryId): Collection
     {
-        return Page::with(['metadata', 'categories', 'tags', 'authors'])
-            ->where('site_id', $siteId)
-            ->where('status', 'published')
-            ->whereHas('categories', static fn($query) => $query->where('categories.id', $categoryId))
-            ->orderByDesc('published_at')
-            ->get();
+        return PageCategory::with(['page.metadata', 'page.categories', 'page.tags', 'page.authors'])
+            ->where('category_id', $categoryId)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(static fn($item) => $item->page)
+            ->filter(static fn($page): bool =>
+                $page !== null
+                && (int)$page->site_id === $siteId
+                && (string)$page->status === 'published'
+            );
     }
 
     protected function getModelClass(): string
