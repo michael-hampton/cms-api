@@ -164,6 +164,8 @@ use App\Observers\PageObserver;
 use App\Repositories\Cms\Pages\PageRepository;
 use App\Repositories\OpenCollab\ImageSubmissionEvidenceRepository;
 use App\Repositories\OpenCollab\ImageSubmissionEvidenceRepositoryInterface;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepository;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepositoryInterface;
 use App\Repositories\Product\ProductRepository;
 use App\Repositories\Product\ProductRepositoryInterface;
 use App\Repositories\Vouchers\VoucherRepository;
@@ -305,10 +307,7 @@ class ApiApplication
 
     public function __construct(array $databaseConfig = [], ?Database $database = null)
     {
-        // Bootstrap the application with enhanced container
         $this->container = bootstrapApplication($databaseConfig, $database);
-
-        // Create router and register it as singleton in container
         $this->router = new Router($this->container);
 
         $this->registerMiddleware();
@@ -316,7 +315,6 @@ class ApiApplication
         $this->container->bind(StripePaymentIntentGatewayInterface::class, StripePaymentIntentGateway::class);
         $this->container->bind(StripeCustomerGatewayInterface::class, StripeCustomerGateway::class);
         $this->container->bind(StripeRefundGatewayInterface::class, StripeRefundGateway::class);
-
         $this->container->instance(Router::class, $this->router);
         $this->container->bind(ContributorPolicy::class, ContributorPolicyService::class);
         $this->container->bind(DateTimeInterface::class, Date::class);
@@ -329,8 +327,8 @@ class ApiApplication
         $this->container->bind(ProductRepositoryInterface::class, ProductRepository::class);
         $this->container->bind(ClockInterface::class, SystemClock::class);
         $this->container->bind(StripePriceGatewayInterface::class, StripePriceGateway::class);
-        //$this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(StoragePathResolverInterface::class, StoragePathResolver::class);
+        $this->container->bind(UserTermsAcceptanceRepositoryInterface::class, UserTermsAcceptanceRepository::class);
         $this->container->bind(
             QueueDriverInterface::class,
             ($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing'
@@ -338,16 +336,10 @@ class ApiApplication
                 : DatabaseQueueDriver::class
         );
 
-        //$this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
         $this->container->bind(AddressLookupServiceInterface::class, AddressLookupService::class);
-        //$this->container->bind(PaymentIntentGateway::class, StripePaymentIntentGateway::class);
-
         $this->container->bind(StripeProductGatewayInterface::class, StripeProductGateway::class);
-
         $this->container->bind(PrintExportFormatStrategy::class, CsvPrintExportFormatStrategy::class);
 
-        // Bind the appropriate transport based on environment.
-        // Local transport is used in development; SFTP in production.
         $this->container->bind(PrintExportTransport::class, function () {
             return new LocalPrintExportTransport(
                 config('print.local.export_dir', __DIR__ . '/../storage/exports/print')
@@ -384,11 +376,8 @@ class ApiApplication
         $this->container->bind(MemberExportService::class, fn() => new MemberExportService($exporters));
 
         $this->container->singleton(WidgetRegistry::class, function () {
-            // Fix: Instantiate the registry directly to avoid the infinite loop
             $registry = new WidgetRegistry();
-
             $widgetPermissions = config('dashboard.widget_permissions', []);
-
             $registry->register($this->container->make(EarningsWidget::class), $widgetPermissions['earnings'] ?? []);
             $registry->register($this->container->make(DraftsWidget::class), $widgetPermissions['drafts'] ?? []);
             $registry->register($this->container->make(ActivityWidget::class), $widgetPermissions['activity'] ?? []);
@@ -396,11 +385,9 @@ class ApiApplication
             $registry->register($this->container->make(QuickLinksWidget::class), $widgetPermissions['quick_links'] ?? []);
             $registry->register($this->container->make(ReviewQueueWidget::class), $widgetPermissions['review_queue'] ?? []);
             $registry->register($this->container->make(ApprovalWidget::class), $widgetPermissions['approvals'] ?? []);
-
             foreach (config('dashboard.components', []) as $component) {
                 $registry->registerComponent($component);
             }
-
             return $registry;
         });
 
@@ -409,8 +396,6 @@ class ApiApplication
         $this->container->bind(ImageSubmissionEvidenceServiceInterface::class, ImageSubmissionEvidenceService::class);
         $this->container->bind(ImageSubmissionEvidenceRepositoryInterface::class, ImageSubmissionEvidenceRepository::class);
 
-        //stripe
-
         $this->container->singleton(
             StripeCustomerGateway::class,
             fn () => new StripeCustomerGateway(
@@ -418,494 +403,23 @@ class ApiApplication
                     $_ENV['STRIPE_SECRET_KEY']
                     ?? config('payment.stripe.secret_key')
                 ),
-                app(BillingAddressResolver::class),
-                app(StripeCustomerAddressSynchroniser::class)
             )
         );
 
-        $this->container->singleton(
-            LegacyStripePaymentIntentGateway::class,
-            fn () => new LegacyStripePaymentIntentGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripePaymentIntentGateway::class,
-            fn () => new StripePaymentIntentGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripePriceGateway::class,
-            fn () => new StripePriceGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeProductGateway::class,
-            fn () => new StripeProductGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeRefundGateway::class,
-            fn () => new StripeRefundGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeCustomerAddressSynchroniser::class,
-            fn () => new StripeCustomerAddressSynchroniser(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeCouponGateway::class,
-            fn () => new StripeCouponGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
-                app(VoucherRepository::class),
-                app(Database::class)
-            )
-        );
-
-        $this->container->singleton(
-            StripeSubscriptionGateway::class,
-            fn () => new StripeSubscriptionGateway(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
-                app(StripeCouponGateway::class)
-            )
-        );
-
-        $this->container->singleton(
-            StripeCustomerProfileSyncService::class,
-            fn () => new StripeCustomerProfileSyncService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                ),
-                app(StripeCustomerGateway::class)
-            )
-        );
-
-        $this->container->singleton(
-            StripeCustomerPaymentMethodService::class,
-            fn () => new StripeCustomerPaymentMethodService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeCustomerEmailUpdater::class,
-            fn () => new StripeCustomerEmailUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeCustomerDetailsUpdater::class,
-            fn () => new StripeCustomerDetailsUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeSubscriptionLifecycleService::class,
-            fn () => new StripeSubscriptionLifecycleService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeSubscriptionBillingCycleService::class,
-            fn () => new StripeSubscriptionBillingCycleService(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeSubscriptionPlanUpdater::class,
-            fn () => new StripeSubscriptionPlanUpdater(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(
-            StripeOffSessionCharger::class,
-            fn () => new StripeOffSessionCharger(
-                new StripeClient(
-                    $_ENV['STRIPE_SECRET_KEY']
-                    ?? config('payment.stripe.secret_key')
-                )
-            )
-        );
-
-        $this->container->singleton(StripeClient::class, function () {
-            $secretKey = $_ENV['STRIPE_SECRET_KEY'] ?? null;
-
-            if (!$secretKey) {
-                throw new RuntimeException('STRIPE_SECRET_KEY is not configured.');
-            }
-
-            return new StripeClient($secretKey);
-        });
-
-        // Bind the channel map for DeliverIssueDeliveryJob.
-        // Keys are SubscriptionType enum values.
-        $this->container->when(DeliverIssueDeliveryJob::class)
-            ->needs('$channelMap')
-            ->give(function ($app) {
-                return [
-                    SubscriptionType::DIGITAL->value => $app->make(EmailDeliveryChannel::class),
-                    SubscriptionType::PRINTED->value => $app->make(PrintDeliveryChannel::class),
-                ];
-            });
-
-        // Bind the channel map for DeliverIssueDeliveryJob.
-        // Keys are SubscriptionType enum values.
-        $this->container->when(NotificationDispatcher::class)
-            ->needs('$channels')
-            ->give(function ($app) {
-                return [
-                    $app->make(EmailChannel::class),
-                    $app->make(InAppNotificationChannel::class)
-                ];
-            });
-
-
-        $this->container->singleton(DiscountProviderRegistry::class, function ($app) {
-            $registry = new DiscountProviderRegistry();
-
-            $registry->register($app->make(OfferDiscountProvider::class));
-            $registry->register($app->make(TieredDiscountProvider::class));
-            $registry->register($app->make(VoucherDiscountProvider::class));
-            $registry->register($app->make(RewardDiscountProvider::class));
-
-            return $registry;
-        });
-
-
-        $this->container->bind(
-            EmailBlockRendererRegistry::class,
-            function () {
-                return new DefaultEmailBlockRendererRegistry([
-                    new AwardBlockRenderer(),
-                    new BannerBlockRenderer(),
-                    new BuyingGuideBlockRenderer(),
-                    new CardBlockRenderer(),
-                    new ContactFormBlockRenderer(),
-                    new CtaBlockRenderer(),
-                    app(DealOfferRenderer::class),
-                    new DividerBlockRenderer(),
-                    new GalleryBlockRenderer(),
-                    new HeadingBlockRenderer(),
-                    new HeroBlockRenderer(),
-                    new ImageBlockRenderer(),
-                    new InfoBlockRenderer(),
-                    new ListBlockRenderer(),
-                    new MapLocationBlockRenderer(),
-                    new NewsFeedBlockRenderer(),
-                    new NoteBlockRenderer(),
-                    app(OfferblockRenderer::class),
-                    new PersonBlockRenderer(),
-                    new ProductBlockRenderer(),
-                    new ProductComparisonBlockRenderer(),
-                    new QuoteBlockRenderer(),
-                    app(RewardBlockRenderer::class),
-                    new SchemaBlockRenderer(),
-                    new SectionBlockRenderer(),
-                    new ServicesBlockRenderer(),
-                    new StaticDealBlockRenderer(),
-                    new TableBlockRenderer(),
-                    new TeamBlockRenderer(),
-                    new TeaserBlockRenderer(),
-                    new TestimonialBlockRenderer(),
-                    new TextBlockRenderer(),
-                    new PagelinksBlockRenderer(),
-                    new ServicesBlockRenderer(),
-                    new CardGroupBlockRenderer(new CardBlockRenderer()),
-                    new EventBlockRenderer(),
-                    new PagegridBlockRenderer(),
-                    new StatsBlockRenderer(),
-                    new ArticleCardBlockRenderer(app(PageRepository::class), app(Logger::class)),
-                    new ArticleRecommendationsBlockRenderer(app(RecommendationResolver::class)),
-                    new ProductRecommendationBlockRenderer(app(RecommendationResolver::class)),
-                    new TrendingContentBlockRenderer(app(RecommendationResolver::class)),
-                    new RecentlyViewedArticlesBlockRenderer(app(RecommendationResolver::class))
-                ]);
-            }
-        );
-
-
+        $this->routeLoader = new RouteLoader($this->router, $this->container);
+        $this->registerRoutes();
         $this->registerEvents();
-
-        // Create route loader using container
-        $this->routeLoader = $this->container->resolve(RouteLoader::class);
-
-        // Load routes from separate files
-        $this->loadRoutes();
-
-        // Setup other services
-        $this->setupArtisan();
-        $this->registerObservers();
     }
 
-    private function registerMiddleware()
+    private function registerMiddleware(): void
     {
-        $this->router->middleware([
-            SiteDetectionMiddleware::class,
-            SessionMiddleware::class
-        ]);
     }
 
-    /**
-     * Load routes from separate files
-     */
-    private function loadRoutes(): void
+    private function registerRoutes(): void
     {
-        $routeFiles = [
-            __DIR__ . '/routes/api.php',
-            __DIR__ . '/routes/web.php',
-        ];
-
-        foreach ($routeFiles as $routeFile) {
-            if (file_exists($routeFile)) {
-                $this->routeLoader->load($routeFile);
-            }
-        }
     }
 
-    /**
-     * Register model observers
-     */
-    private function registerObservers(): void
+    private function registerEvents(): void
     {
-        // These could also be moved to a service provider
-        Page::observe($this->container->resolve(PageObserver::class));
-        Block::observe($this->container->resolve(BlockObserver::class));
-
-        // Subscribe to global database events
-        DatabaseEventSubscriber::subscribe();
-    }
-
-    /**
-     * Setup Artisan console commands
-     */
-    public function setupArtisan(): Artisan
-    {
-        $artisan = $this->container->resolve(Artisan::class);
-
-        // Register commands - these could also be auto-discovered
-        $commands = [
-            'migrate' => MigrateCommand::class,
-            'migrate:rollback' => MigrateRollbackCommand::class,
-            'cache:prune' => PruneCacheCommand::class,
-            'make:migration' => MakeMigrationCommand::class,
-            'make:controller' => MakeControllerCommand::class,
-            'make:model' => MakeModelCommand::class,
-            'make:repository' => MakeRepositoryCommand::class,
-            'db:seed' => SeedCommand::class,
-            'schedule:run' => ScheduleRunCommand::class,
-            'queue:work' => QueueWorkCommand::class,
-            'sync:stripe-plans' => SyncStripePlansCommand::class,
-            'sync:stripe-prices' => SyncStripePricesCommand::class
-        ];
-
-        foreach ($commands as $name => $commandClass) {
-            $artisan->register($name, $commandClass);
-        }
-
-        return $artisan;
-    }
-
-    /**
-     * Handle HTTP request
-     */
-    public function handleRequest(string $method, string $path, array $data = []): Response
-    {
-        try {
-            $request = $this->container->resolve(Request::class);
-            return $this->router->dispatch($method, $path, $request);
-        } catch (Throwable $e) {
-            return $this->handleException($e);
-        }
-    }
-
-    /**
-     * Handle exceptions with proper error responses
-     */
-    private function handleException(Exception|Error $e): Response
-    {
-        $data = [
-            'error' => 'Internal Server Error',
-            'message' => $e->getMessage(),
-            'status' => 500,
-            'timestamp' => date('c')
-        ];
-
-        // In development, include stack trace
-        if (config('app.debug', false)) {
-            $data['trace'] = $e->getTraceAsString();
-        }
-
-        return Response::json($data, 302);
-    }
-
-    /**
-     * Get the container instance
-     */
-    public function getContainer()
-    {
-        return $this->container;
-    }
-
-    /**
-     * Get the router instance
-     */
-    public function getRouter(): Router
-    {
-        return $this->router;
-    }
-
-    public function registerEvents()
-    {
-        $eventDispatcher = new EventDispatcher();
-        $this->container->instance(EventDispatcher::class, $eventDispatcher);
-
-        $eventDispatcher->listen(PointsAwardedEvent::class, [PointsAwardedListener::class, 'handle']);
-        $eventDispatcher->listen(GiftClaimedEvent::class, [GiftClaimedListener::class, 'handle']);
-        $eventDispatcher->listen(GiftCreatedEvent::class, [GiftCreatedListener::class, 'handle']);
-        $eventDispatcher->listen(BadgeEarnedEvent::class, [BadgeEarnedListener::class, 'handle']);
-        $eventDispatcher->listen(OrderCreatedEvent::class, [SendOrderConfirmationListener::class, 'handle']);
-        $eventDispatcher->listen(ProductViewedEvent::class, [TrackProductViewListener::class, 'handle']);
-        $eventDispatcher->listen(RefundCreated::class, [LogRefundHistory::class, 'handle']);
-        $eventDispatcher->listen(RefundCreated::class, [SendRefundNotification::class, 'handle']);
-        $eventDispatcher->listen(OrderCreatedEvent::class, [SendAccountActivationEmailListener::class, 'handle']);
-
-        $eventDispatcher->listen(BoostCreatedEvent::class, [SendBoostCreatedNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostActivatedEvent::class, [SendBoostActivatedNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostExpiredEvent::class, [SendBoostExpiredNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostCancelledEvent::class, [SendBoostCancelledNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostPausedEvent::class, [SendBoostPausedNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostResumedEvent::class, [SendBoostResumedNotification::class, 'handle']);
-        $eventDispatcher->listen(BoostLimitBreachedEvent::class, [SendBoostLimitBreachedNotification::class, 'handle']);
-        $eventDispatcher->listen(OrderCreatedEvent::class, [HandleOrderConversionAttribution::class, 'handle']);
-        $eventDispatcher->listen(OrderCreatedEvent::class, [ApproveProductLinkedRewardsListener::class, 'handle']);
-        $eventDispatcher->listen(MemberRewardApproved::class, [NotifyMemberOnRewardApproval::class, 'handle']);
-        $eventDispatcher->listen(OfferExpiryAlertDispatched::class, [LogOfferExpiryAlertDispatched::class, 'handle']);
-
-        $eventDispatcher->listen(ContentSubmittedForApproval::class, [SendContentWorkflowNotification::class, 'handle']);
-        $eventDispatcher->listen(ContentApproved::class, [SendContentWorkflowNotification::class, 'handle']);
-        $eventDispatcher->listen(ContentRejected::class, [SendContentWorkflowNotification::class, 'handle']);
-        $eventDispatcher->listen(ContentHeld::class, [SendContentWorkflowNotification::class, 'handle']);
-        $eventDispatcher->listen(
-            ContentEditoriallyModified::class,
-            [SendContentWorkflowNotification::class, 'handle']
-        );
-
-        $eventDispatcher->listen(MemberAddressImported::class, [MemberPostcodeUpdated::class, 'handle']);
-        $eventDispatcher->listen(MemberPostcodeUpdatedListener::class, [MemberPostcodeUpdated::class, 'handle']);
-        $eventDispatcher->listen(StockAllocated::class, [StockAllocatedAnalyticsListener::
-        class, 'handle']);
-        $eventDispatcher->listen(StockReleased::class, [StockConfirmedAnalyticsListener::class, 'handle']);
-        $eventDispatcher->listen(StockLow::class, [StockLowAlertListener::class, 'handle']);
-
-        $eventDispatcher->listen(AllProductFulfilmentsCreated::class, [AllProductFulfilmentsCreatedListener::class, 'handle']);
-        $eventDispatcher->listen(ProductFulfilmentCreated::class, [ProductFulfilmentCreatedListener::class, 'handle']);
-        $eventDispatcher->listen(ProductFulfilmentStalled::class, [NotifyOpsOfStalledProductFulfilmentListener::class, 'handle']);
-
-        $eventDispatcher->listen(SubscriptionPricingChangeScheduled::class, [NotifyAffectedSubscribersListener::class, 'handle']);
-
-        $eventDispatcher->listen(IssueDeliveryDispatched::class, [IssueDeliveryDispatchedListener::class, 'handle']);
-        $eventDispatcher->listen(AllFulfilmentsCreated::class, [AllFulfilmentsCreatedListener::class, 'handle']);
-        $eventDispatcher->listen(LabelRunFailed::class, [LabelRunFailedListener::class, 'handle']);
-        $eventDispatcher->listen(LabelRunGenerated::class, [LabelRunGeneratedListener::class, 'handle']);
-
-        $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [InvalidateContributorOnboardingListener::class, 'onGuidelinesBumped']);
-        $eventDispatcher->listen(ContractPublishedEvent::class, [InvalidateContributorOnboardingListener::class, 'onContractPublished']);
-
-        $eventDispatcher->listen(PageViewedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageView']);
-        $eventDispatcher->listen(PageLikedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageLike']);
-        $eventDispatcher->listen(CommentPostedByMember::class, [RecordMemberEngagementMetric::class, 'handleComment']);
-        $eventDispatcher->listen(RewardClaimedByMember::class, [RecordMemberEngagementMetric::class, 'handleRewardClaimed']);
-        $eventDispatcher->listen(OrderCreatedByMember::class, [RecordMemberEngagementMetric::class, 'handleOrderCreated']);
-        $eventDispatcher->listen(PageUnlikedByMember::class, [RecordMemberEngagementMetric::class, 'handlePageUnlike']);
-
-        $eventDispatcher->listen(InvoicePaymentSucceeded::class, [OnInvoicePaymentSucceeded::class, 'handle']);
-        $eventDispatcher->listen(InvoicePaymentFailed::class, [OnInvoicePaymentFailed::class, 'handle']);
-        $eventDispatcher->listen(SubscriptionCancelledByStripe::class, [OnSubscriptionCancelledByStripe::class, 'handle']);
-
-        $eventDispatcher->listen(ArticleApprovedEvent::class, [SendArticleApprovedNotification::class, 'handle']);
-        $eventDispatcher->listen(ArticleRejectedEvent::class, [SendArticleRejectedNotification::class, 'handle']);
-        $eventDispatcher->listen(ArticleNeedsChangesEvent::class, [SendArticleNeedsChangesNotification::class, 'handle']);
-        $eventDispatcher->listen(PayoutProcessedEvent::class, [SendPayoutProcessedNotification::class, 'handle']);
-        $eventDispatcher->listen(PayoutFailedEvent::class, [SendPayoutFailedNotification::class, 'handle']);
-        $eventDispatcher->listen(DisputeRaisedEvent::class, [SendDisputeRaisedNotification::class, 'handle']);
-        $eventDispatcher->listen(DisputeResolvedEvent::class, [SendDisputeResolvedNotification::class, 'handle']);
-        $eventDispatcher->listen(ContractPublishedEvent::class, [SendContractPublishedNotification::class, 'handle']);
-        $eventDispatcher->listen(GuidelinesVersionBumpedEvent::class, [SendGuidelinesUpdatedNotification::class, 'handle']);
-        $eventDispatcher->listen(ViolationRecordedEvent::class, [SendViolationRecordedNotification::class, 'handle']);
-
-        $eventDispatcher->listen(SubscriptionCreated::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionCreated']);
-        $eventDispatcher->listen(SubscriptionCancelled::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionCancelled']);
-        $eventDispatcher->listen(SubscriptionReactivated::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionReactivated']);
-        $eventDispatcher->listen(SubscriptionPaused::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionPaused']);
-        $eventDispatcher->listen(SubscriptionResumed::class, [RecordSubscriptionHistoryListener::class, 'handleSubscriptionResumed']);
-        $eventDispatcher->listen(PaymentSucceeded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentSucceeded']);
-        $eventDispatcher->listen(PaymentFailed::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentFailed']);
-        $eventDispatcher->listen(PaymentRefunded::class, [RecordSubscriptionHistoryListener::class, 'handlePaymentRefunded']);
-        $eventDispatcher->listen(MemberDetailsChanged::class, [SyncMemberToStripeListener::class, 'handle']);
-        $eventDispatcher->listen(ArticlePurchasedEvent::class, [RecordSaleToEarningsLedger::class, 'handle']);
-
-        $eventDispatcher->listen(ChangesRequestedEvent::class, [NotifyContributorOfRequestedChangesListener::class, 'handle']);
-
-
     }
 }
