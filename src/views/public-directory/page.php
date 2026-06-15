@@ -13,6 +13,8 @@ $description = 'Public ' . $type . ' directory';
             data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
             data-type="<?= htmlspecialchars($type, ENT_QUOTES, 'UTF-8') ?>"
             data-slug="<?= htmlspecialchars($slug ?? '', ENT_QUOTES, 'UTF-8') ?>"
+            data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-preview="<?= !empty($preview) ? 'true' : 'false' ?>"
         >
             <div class="public-directory-status" role="status" aria-live="polite">
                 <div class="public-directory-spinner" aria-hidden="true"></div>
