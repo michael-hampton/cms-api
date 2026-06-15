@@ -6,7 +6,6 @@ use App\Actions\PublicContent\GetPublicDirectoryAction;
 use App\Controllers\Controller;
 use App\Framework\Http\JsonResponse;
 use App\Framework\Support\SiteContext;
-use InvalidArgumentException;
 
 final class PublicDirectoryController extends Controller
 {
@@ -15,24 +14,46 @@ final class PublicDirectoryController extends Controller
         parent::__construct();
     }
 
-    public function index(string $type): JsonResponse
+    public function authors(): JsonResponse
     {
-        try {
-            return $this->resourceResponse([
-                'data' => $this->directories->index($type, SiteContext::getId()),
-            ]);
-        } catch (InvalidArgumentException $exception) {
-            return $this->errorResponse($exception->getMessage(), 404);
-        }
+        return $this->index('author');
     }
 
-    public function show(string $type, string $slug): JsonResponse
+    public function author(string $slug): JsonResponse
     {
-        try {
-            $document = $this->directories->show($type, $slug, SiteContext::getId());
-        } catch (InvalidArgumentException $exception) {
-            return $this->errorResponse($exception->getMessage(), 404);
-        }
+        return $this->show('author', $slug);
+    }
+
+    public function categories(): JsonResponse
+    {
+        return $this->index('category');
+    }
+
+    public function category(string $slug): JsonResponse
+    {
+        return $this->show('category', $slug);
+    }
+
+    public function tags(): JsonResponse
+    {
+        return $this->index('tag');
+    }
+
+    public function tag(string $slug): JsonResponse
+    {
+        return $this->show('tag', $slug);
+    }
+
+    private function index(string $type): JsonResponse
+    {
+        return $this->resourceResponse([
+            'data' => $this->directories->index($type, SiteContext::getId()),
+        ]);
+    }
+
+    private function show(string $type, string $slug): JsonResponse
+    {
+        $document = $this->directories->show($type, $slug, SiteContext::getId());
 
         if (!$document) {
             return $this->errorResponse('Directory entity not found.', 404);
