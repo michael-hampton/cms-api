@@ -2,6 +2,8 @@
 $preview = (bool)($preview ?? false);
 $title = $preview ? 'Content preview' : ($pageTitle ?? '');
 $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '');
+$regionSlug = isset($territory) && $territory ? (string)$territory->slug : '';
+$resolvedLocale = (string)($locale ?? '');
 ?>
 
 @include('header', ['menu' => $menu])
@@ -14,6 +16,8 @@ $description = $preview ? 'Public content V2 preview' : ($pageDescription ?? '')
             data-api-url="<?= htmlspecialchars($apiUrl, ENT_QUOTES, 'UTF-8') ?>"
             data-site="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
             data-slug="<?= htmlspecialchars($contentSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-region="<?= htmlspecialchars($regionSlug, ENT_QUOTES, 'UTF-8') ?>"
+            data-locale="<?= htmlspecialchars($resolvedLocale, ENT_QUOTES, 'UTF-8') ?>"
             data-preview="<?= $preview ? 'true' : 'false' ?>"
         >
             <div class="public-content-v2-status" role="status" aria-live="polite">
