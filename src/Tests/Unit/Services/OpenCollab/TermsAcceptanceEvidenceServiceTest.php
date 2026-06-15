@@ -4,17 +4,32 @@ namespace App\Tests\Unit\Services\OpenCollab;
 
 use App\Models\TermsVersion;
 use App\Models\UserTermsAcceptance;
+use App\Repositories\OpenCollab\UserTermsAcceptanceRepositoryInterface;
 use App\Services\OpenCollab\TermsAcceptanceEvidenceService;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use RuntimeException;
 
 class TermsAcceptanceEvidenceServiceTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
     public function test_missing_acceptance_throws(): void
     {
+        $repository = Mockery::mock(UserTermsAcceptanceRepositoryInterface::class);
+        $repository->shouldReceive('findWithTermsVersion')
+            ->once()
+            ->with(999999)
+            ->andReturnNull();
+
         $this->expectException(RuntimeException::class);
-        (new TermsAcceptanceEvidenceService(fn() => null))->get(999999);
+
+        (new TermsAcceptanceEvidenceService($repository))->get(999999);
     }
 
     public function test_hash_verification_logic_is_reproducible(): void
