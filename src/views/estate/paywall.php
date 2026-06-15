@@ -1,6 +1,7 @@
 <?php
 $title = 'Subscribe to Read - ' . (string)$page->title;
 $description = $page->meta_description ?? '';
+$isContributorCreated = !empty($page->contributor_id);
 ?>
 
 @include('header', [
@@ -29,6 +30,12 @@ $description = $page->meta_description ?? '';
     'reason' => $reason,
     'member' => $member,
 ])
+
+<?php if (!$isContributorCreated && !empty($subscriptionModalData)): ?>
+    @include('components/subscription-modal', [
+        'subscriptionModalData' => $subscriptionModalData,
+    ])
+<?php endif; ?>
 
 @css('paywall-overlay.css')
 @js('paywall-overlay.js')
