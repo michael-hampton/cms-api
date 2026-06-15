@@ -9,7 +9,7 @@ use App\Repositories\Repository;
 
 final class PublicTagDirectoryRepository extends Repository
 {
-    public function findBySlug(int $siteId, string $slug): ?Tag
+    public function findForSiteBySlug(int $siteId, string $slug): ?Tag
     {
         $tag = Tag::where('site_id', $siteId)
             ->where('slug', $slug)
