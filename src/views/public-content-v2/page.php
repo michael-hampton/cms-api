@@ -25,9 +25,6 @@ $description = 'Public content V2 preview';
 <?php endif; ?>
 
 @include('consent-banner', ['site' => $site])
-@include('components/newsletter-account-creation-modal')
-@include('components/newsletter-modal')
-@include('components/comment-modal')
 
 @css('public-content-v2.css')
 @js('base.js')
