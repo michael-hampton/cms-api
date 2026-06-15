@@ -43,7 +43,7 @@
         if (component.type !== 'page-actions') return;
 
         const button = element.querySelector('#like-button');
-        if (!button || button.dataset.hydrated === 'true') return;
+        if (!button || button.dataset.hydrated === 'true' || button.dataset.apiHydrated === 'true') return;
 
         button.dataset.hydrated = 'true';
         button.addEventListener('click', async () => {
@@ -67,7 +67,7 @@
                 });
                 const payload = await response.json();
                 if (!response.ok || !payload.data) {
-                    throw new Error(payload.message || 'Failed to update like');
+                    throw new Error(payload.message || payload.error || 'Failed to update like');
                 }
 
                 const viewer = payload.data;
