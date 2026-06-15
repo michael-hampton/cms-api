@@ -58,7 +58,7 @@ final class PublicContentCompositionData
             'claimedGift' => $member
                 ? $this->gifting->checkAndClaimGiftForPage($member, $page)
                 : null,
-            'subscriptionModalData' => $this->subscriptionModal->getModalData($member, $siteId),
+            'subscriptionModalData' => $this->subscriptionModalData($member, $siteId),
             'comments' => $this->comments->getApprovedForPage((int)$page->id, $siteId),
             'isLiked' => $member
                 ? $this->likes->isLikedBy((int)$page->id, (int)$member->id, $siteId)
@@ -70,5 +70,10 @@ final class PublicContentCompositionData
             'territory' => $territory,
             'directoryBase' => $directoryBase,
         ];
+    }
+
+    public function subscriptionModalData(?Member $member, int $siteId): array
+    {
+        return $this->subscriptionModal->getModalData($member, $siteId);
     }
 }
