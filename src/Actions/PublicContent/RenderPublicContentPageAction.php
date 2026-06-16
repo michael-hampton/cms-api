@@ -25,8 +25,10 @@ class RenderPublicContentPageAction
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int)$territory->id : null;
-        $isRegionalHomepage = $territory
-            && (string) $page->page_type === 'landing-page';
+        $isRegionalHomepage = $territory && (
+            (string) $page->page_type === 'landing-page'
+            || (string) $page->slug === (string) $territory->slug
+        );
 
         if ($isRegionalHomepage) {
             $apiUrl = sprintf(
