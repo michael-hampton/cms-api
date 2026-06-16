@@ -18,6 +18,19 @@ final class PublicTerritoryRepository extends Repository
         return $territory instanceof Territory ? $territory : null;
     }
 
+    public function findActiveForPage(int $siteId, int $pageId): ?Territory
+    {
+        $territory = Territory::where('site_id', $siteId)
+            ->where('is_active', true)
+            ->whereHas('pages', function ($pages) use ($pageId): void {
+                $pages->where('pages.id', $pageId);
+            })
+            ->orderBy('sort_order', 'asc')
+            ->first();
+
+        return $territory instanceof Territory ? $territory : null;
+    }
+
     public function findActiveBySlug(int $siteId, string $slug): ?Territory
     {
         $territory = Territory::where('site_id', $siteId)
