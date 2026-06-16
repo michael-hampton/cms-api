@@ -49,4 +49,5 @@ $resolvedLocale = (string)($locale ?? '');
 @js('public-content-v2-author-links.js')
 @js('public-content-v2-deals-carousel.js')
 @js('public-content-v2-deals-cart.js')
+@js('newsletter-scroll-trigger.js')
 @js('public-content-v2.js')
