@@ -9,8 +9,11 @@ use App\Models\Page;
 use App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface;
 use App\Services\PublicContent\Composition\PublicContentComposer;
 use App\Services\PublicContent\Composition\RegionalPublicContentComponentFactory;
+use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
+use App\Services\PublicContent\Widgets\BuiltInPublicContentWidgetCatalog;
 use App\Services\PublicContent\Widgets\PageWidgetLayoutResolver;
 use App\Services\PublicContent\Widgets\PaywallOverlayWidget;
+use App\Services\PublicContent\Widgets\PublicContentWidgetEligibility;
 use App\Services\PublicContent\Widgets\PublicContentWidgetRegistry;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -113,6 +116,7 @@ final class PublicContentComposerTest extends TestCase
         $page->title = 'Premium article';
         $page->slug = 'premium-article';
         $page->is_paid = false;
+        $page->is_public_contribution = false;
 
         $views = Mockery::mock(ViewRenderer::class);
         $views->shouldReceive('partial')
@@ -124,12 +128,16 @@ final class PublicContentComposerTest extends TestCase
             ->with(42)
             ->andReturn(new Collection());
 
+        $paywallMode = new PublicContentPaywallModeResolver();
         $registry = new PublicContentWidgetRegistry([
-            new PaywallOverlayWidget($views),
+            new PaywallOverlayWidget($views, $paywallMode),
         ]);
 
         return (new PublicContentComposer(
-            $views,
+            new BuiltInPublicContentWidgetCatalog(
+                $views,
+                new PublicContentWidgetEligibility(),
+            ),
             new RegionalPublicContentComponentFactory($views),
             $registry,
             new PageWidgetLayoutResolver($pageWidgets),
