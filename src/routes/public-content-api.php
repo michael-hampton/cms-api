@@ -6,7 +6,6 @@ use App\Framework\Http\Router;
 
 /** @var Router $router */
 $router->get('/api/v1/{site}/content/{slug}', [PublicContentController::class, 'show']);
-$router->get('/api/v1/{site}/regions/{regionSlug}/content', [PublicContentController::class, 'showRegionalHomepage']);
 $router->get('/api/v1/{site}/regions/{regionSlug}/content/{slug}', [PublicContentController::class, 'showRegional']);
 $router->get('/api/v1/{site}/content/{pageId}/viewer-state', [PublicContentViewerController::class, 'show']);
 $router->put('/api/v1/{site}/content/{pageId}/like', [PublicContentViewerController::class, 'like']);
