@@ -62,7 +62,7 @@ final class RegionalPublicContentComponentFactory implements PublicContentWidget
                 ]),
             ),
             styles: [],
-            scripts: ['public-content-v2-region-context.js'],
+            scripts: [asset('public-content-v2-region-context.js', 'js')],
             endpoints: [],
             stateful: true,
         );
