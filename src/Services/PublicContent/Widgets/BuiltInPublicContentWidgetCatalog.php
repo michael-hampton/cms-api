@@ -76,7 +76,7 @@ final class BuiltInPublicContentWidgetCatalog
                 40,
                 stateful: true,
                 supports: fn(PublicContentContext $context): bool =>
-                    $this->eligibility->isNotLanding($context),
+                    $this->eligibility->isEditorial($context),
                 endpoints: static fn(PublicContentContext $context): array => [
                     'viewer' => $context->viewData['links']['viewer_state'] ?? null,
                     'like' => $context->viewData['links']['like'] ?? null,
