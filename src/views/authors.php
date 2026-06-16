@@ -1,9 +1,26 @@
 <?php
-$authors = $page->authors ?? null;
+$authors = collect([]);
 
-if (!$authors || !method_exists($authors, 'count') || $authors->count() === 0) {
-    $legacyAuthor = $page->author ?? null;
-    $authors = $legacyAuthor ? collect([$legacyAuthor]) : collect([]);
+if (!empty($page->authors) && method_exists($page->authors, 'count')) {
+    foreach ($page->authors as $author) {
+        if ($author) {
+            $authors->push($author);
+        }
+    }
+}
+
+if ($authors->count() === 0 && !empty($page->pageAuthors) && method_exists($page->pageAuthors, 'count')) {
+    foreach ($page->pageAuthors as $pageAuthor) {
+        if (!empty($pageAuthor->author)) {
+            $author = $pageAuthor->author;
+            $author->page_author_role = $pageAuthor->role ?? 'primary';
+            $authors->push($author);
+        }
+    }
+}
+
+if ($authors->count() === 0 && !empty($page->author)) {
+    $authors->push($page->author);
 }
 ?>
 
@@ -45,8 +62,10 @@ if (!$authors || !method_exists($authors, 'count') || $authors->count() === 0) {
                         <div class="author-card-header">
                             <h4 class="author-name"><?= htmlspecialchars($author->name) ?></h4>
                             <?php
-                            $pivotRole = $author->pivot->role ?? 'primary';
-                            if ($pivotRole === 'contributor'):
+                            $authorRole = $author->page_author_role
+                                ?? $author->pivot->role
+                                ?? 'primary';
+                            if ($authorRole === 'contributor'):
                                 ?>
                                 <span class="author-role-badge">Contributor</span>
                             <?php endif; ?>
