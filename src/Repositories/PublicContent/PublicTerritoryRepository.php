@@ -22,7 +22,6 @@ final class PublicTerritoryRepository extends Repository
     public function findActiveForPage(int $siteId, int $pageId): ?Territory
     {
         $assignment = PageTerritory::where('page_id', $pageId)
-            ->where('site_id', $siteId)
             ->orderBy('territory_id', 'asc')
             ->first();
 
