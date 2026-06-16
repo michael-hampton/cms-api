@@ -1,4 +1,4 @@
-.public-directory-app { min-height: 24rem; }
+.public-directory-app { min-height:24rem; }
 .public-directory-status,.public-directory-error,.directory-empty { align-items:center; display:flex; flex-direction:column; justify-content:center; min-height:18rem; text-align:center; }
 .public-directory-spinner { animation:directory-spin .8s linear infinite; border:4px solid #e5e7eb; border-radius:50%; border-top-color:#111827; height:2.5rem; width:2.5rem; }
 .directory-page { padding-bottom:4rem; }
@@ -37,4 +37,8 @@
 .directory-profile-grid article p { margin:.5rem 0 0; }
 .directory-links a { color:#4338ca; font-weight:600; text-decoration:none; }
 .public-directory-error button { background:#111827; border:0; border-radius:.5rem; color:#fff; cursor:pointer; padding:.75rem 1rem; }
+.public-directory-pagination { align-items:center; display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-top:2rem; }
+.public-directory-pagination button { background:#fff; border:1px solid #d1d5db; border-radius:.5rem; color:#111827; cursor:pointer; min-width:2.5rem; padding:.65rem .85rem; }
+.public-directory-pagination button:hover:not(:disabled),.public-directory-pagination button.active { background:#111827; border-color:#111827; color:#fff; }
+.public-directory-pagination button:disabled { cursor:not-allowed; opacity:.45; }
 @keyframes directory-spin { to { transform:rotate(360deg); } }
