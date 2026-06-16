@@ -60,6 +60,13 @@ final class GetPublicContentAction
             throw new RuntimeException('Public content site scope mismatch.');
         }
 
+        if (!$territory && !empty($page->territory_id)) {
+            $territory = $this->territories->findActiveById(
+                $siteId,
+                (int) $page->territory_id,
+            );
+        }
+
         $siteSlug = SiteContext::slug();
         $base = '/api/v1/' . rawurlencode($siteSlug) . '/content/' . $page->id;
         $links = [
@@ -68,7 +75,7 @@ final class GetPublicContentAction
             'like' => $base . '/like',
             'view' => $base . '/views',
             'canonical' => $territory
-                ? sprintf('/%s/%s/%s', rawurlencode($siteSlug), rawurlencode((string) $territory->slug), rawurlencode((string) $page->slug))
+                ? $this->regionalCanonicalUrl($siteSlug, $territory, $page)
                 : sprintf('/%s/%s', rawurlencode($siteSlug), rawurlencode((string) $page->slug)),
         ];
 
@@ -200,6 +207,24 @@ final class GetPublicContentAction
                 6,
             ),
         ];
+    }
+
+    private function regionalCanonicalUrl(string $siteSlug, Territory $territory, Page $page): string
+    {
+        if ((string) $page->slug === (string) $territory->slug) {
+            return sprintf(
+                '/%s/%s',
+                rawurlencode($siteSlug),
+                rawurlencode((string) $territory->slug),
+            );
+        }
+
+        return sprintf(
+            '/%s/%s/%s',
+            rawurlencode($siteSlug),
+            rawurlencode((string) $territory->slug),
+            rawurlencode((string) $page->slug),
+        );
     }
 
     private function taxonomy(Page $page): array
