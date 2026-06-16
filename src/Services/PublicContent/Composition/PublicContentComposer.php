@@ -68,10 +68,26 @@ final class PublicContentComposer
     /** @return list<PublicContentComponentDefinition> */
     private function definitions(): array
     {
+        $pageType = static fn(PublicContentContext $context): string =>
+            (string)$context->page->page_type;
         $notLanding = static fn(PublicContentContext $context): bool =>
-            (string)$context->page->page_type !== 'landing-page';
+            $pageType($context) !== 'landing-page';
         $landing = static fn(PublicContentContext $context): bool =>
-            (string)$context->page->page_type === 'landing-page';
+            $pageType($context) === 'landing-page';
+        $editorial = static fn(PublicContentContext $context): bool =>
+            in_array($pageType($context), ['article', 'content'], true);
+        $hasAuthors = static function (PublicContentContext $context) use ($notLanding): bool {
+            if (!$notLanding($context)) {
+                return false;
+            }
+
+            $authors = $context->page->authors ?? null;
+            if ($authors && method_exists($authors, 'count') && $authors->count() > 0) {
+                return true;
+            }
+
+            return !empty($context->page->author_id) || !empty($context->page->author);
+        };
         $hasCategories = static fn(PublicContentContext $context): bool =>
             $landing($context) && !empty($context->viewData['categories']);
         $hasProducts = static fn(PublicContentContext $context): bool =>
@@ -91,8 +107,8 @@ final class PublicContentComposer
                 supports: $hasClaimedGift,
                 data: static fn(PublicContentContext $context): array => ['claimedGift' => $context->viewData['claimedGift'] ?? null]),
             $this->definition('page-title', 'page-title', 'components/page-title', 'header', 10),
-            $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: $notLanding),
-            $this->definition('tags', 'tags', 'tags', 'header', 30, supports: $notLanding),
+            $this->definition('category-pills', 'category-pills', 'components/category-pills', 'header', 20, supports: $editorial),
+            $this->definition('tags', 'tags', 'tags', 'header', 30, supports: $editorial),
             $this->definition('page-actions', 'page-actions', 'components/page-actions', 'header', 40,
                 stateful: true,
                 supports: $notLanding,
@@ -120,10 +136,12 @@ final class PublicContentComposer
                 ]),
             $this->definition('products', 'product-section', 'components/product-section', 'after-content', 130,
                 styles: ['products.css'], scripts: ['product-interactions.js'], supports: $hasProducts),
-            $this->definition('newsletter', 'newsletter-signup-widget', 'components/newsletter-signup-widget', 'after-content', 140, stateful: true),
+            $this->definition('newsletter', 'newsletter-signup-widget', 'components/newsletter-signup-widget', 'after-content', 140,
+                stateful: true,
+                supports: $landing),
             $this->definition('comments', 'comments', 'components/comments', 'after-content', 150,
                 stateful: true,
-                supports: $notLanding,
+                supports: $editorial,
                 endpoints: static fn(PublicContentContext $context): array => [
                     'list' => $context->viewData['links']['comments'] ?? null,
                     'create' => $context->viewData['links']['comments'] ?? null,
@@ -142,7 +160,7 @@ final class PublicContentComposer
             $this->definition('deals', 'deals-carousel', 'components/deals-carousel', 'below-content', 210,
                 styles: ['deals-carousel.css'], scripts: ['deals-carousel.js'], supports: $hasDeals),
             $this->definition('guest-contributors', 'guest-contributors', 'components/guest-contributors', 'below-content', 220, supports: $landing),
-            $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: $notLanding),
+            $this->definition('authors', 'authors', 'authors', 'below-content', 230, supports: $hasAuthors),
             $this->definition('subscription-modal', 'subscription-modal', 'components/subscription-modal', 'modals', 300,
                 supports: $hasSubscriptionModal,
                 data: static fn(PublicContentContext $context): array => [
