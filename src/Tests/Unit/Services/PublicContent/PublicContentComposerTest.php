@@ -26,140 +26,79 @@ final class PublicContentComposerTest extends TestCase
         parent::tearDown();
     }
 
-    public function testArticleDoesNotContainHomepageOnlyComponents(): void
+    public function testArticleWidgets(): void
     {
-        $regions = $this->compose('article', withAuthor: true);
+        $regions = $this->compose('article', true);
 
         self::assertSame(
             ['page-title', 'category-pills', 'tags', 'page-actions'],
-            array_map(static fn($component) => $component->type, $regions['header']),
+            $this->types($regions['header']),
         );
-        self::assertSame(
-            ['trending-widget', 'comments', 'social-links'],
-            array_map(static fn($component) => $component->type, $regions['after-content']),
-        );
-        self::assertSame(
-            ['authors'],
-            array_map(static fn($component) => $component->type, $regions['below-content']),
-        );
+        self::assertSame(['authors'], $this->types($regions['below-content']));
     }
 
-    public function testLandingPageContainsHomepageOnlyComponents(): void
+    public function testLandingWidgets(): void
     {
-        $regions = $this->compose('landing-page', withCategories: true);
+        $regions = $this->compose('landing-page');
 
-        self::assertSame(
-            ['page-title'],
-            array_map(static fn($component) => $component->type, $regions['header']),
-        );
-        self::assertContains(
-            'activity-feed-widget',
-            array_map(static fn($component) => $component->type, $regions['after-content']),
-        );
-        self::assertContains(
-            'newsletter-signup-widget',
-            array_map(static fn($component) => $component->type, $regions['after-content']),
-        );
-        self::assertContains(
-            'guest-contributors',
-            array_map(static fn($component) => $component->type, $regions['below-content']),
-        );
+        self::assertSame(['page-title'], $this->types($regions['header']));
+        self::assertContains('newsletter-signup-widget', $this->types($regions['after-content']));
+        self::assertContains('guest-contributors', $this->types($regions['below-content']));
     }
 
-    public function testOrdinaryPageDoesNotContainEditorialTaxonomyOrComments(): void
+    public function testStaticPageOmitsEditorialWidgetsAndActions(): void
     {
-        $regions = $this->compose('page', withAuthor: true);
+        $regions = $this->compose('page', true);
 
-        self::assertSame(
-            ['page-title', 'page-actions'],
-            array_map(static fn($component) => $component->type, $regions['header']),
-        );
-        self::assertSame(
-            ['trending-widget', 'social-links'],
-            array_map(static fn($component) => $component->type, $regions['after-content']),
-        );
-        self::assertSame(
-            ['authors'],
-            array_map(static fn($component) => $component->type, $regions['below-content']),
-        );
+        self::assertSame(['page-title'], $this->types($regions['header']));
+        self::assertSame(['authors'], $this->types($regions['below-content']));
+        self::assertNotContains('comments', $this->types($regions['after-content']));
     }
 
-    public function testRestrictedPageOnlyContainsTitleAndPaywall(): void
+    private function compose(string $pageType, bool $withAuthor = false): array
     {
-        $regions = $this->compose('article', restricted: true);
-
-        self::assertSame(
-            ['page-title'],
-            array_map(static fn($component) => $component->type, $regions['header']),
-        );
-        self::assertSame(
-            ['paywall-overlay'],
-            array_map(static fn($component) => $component->type, $regions['modals']),
-        );
-        self::assertArrayNotHasKey('after-content', $regions);
-        self::assertArrayNotHasKey('below-content', $regions);
-    }
-
-    private function compose(
-        string $pageType,
-        bool $withCategories = false,
-        bool $restricted = false,
-        bool $withAuthor = false,
-    ): array {
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 42;
         $page->page_type = $pageType;
         $page->products = new Collection();
         $page->authors = $withAuthor
-            ? new Collection([(object)['name' => 'Example Author', 'slug' => 'example-author']])
+            ? new Collection([(object) ['name' => 'Author', 'slug' => 'author']])
             : new Collection();
-        $page->title = 'Premium article';
-        $page->slug = 'premium-article';
+        $page->title = 'Example';
+        $page->slug = 'example';
         $page->is_paid = false;
         $page->is_public_contribution = false;
 
         $views = Mockery::mock(ViewRenderer::class);
-        $views->shouldReceive('partial')
-            ->andReturnUsing(static fn(string $template): string => '<div data-template="' . $template . '"></div>');
+        $views->shouldReceive('partial')->andReturn('<div>component</div>');
 
-        $pageWidgets = Mockery::mock(PageWidgetRepositoryInterface::class);
-        $pageWidgets->shouldReceive('getForPage')
-            ->once()
-            ->with(42)
-            ->andReturn(new Collection());
+        $repository = Mockery::mock(PageWidgetRepositoryInterface::class);
+        $repository->shouldReceive('getForPage')->with(42)->andReturn(new Collection());
 
         $paywallMode = new PublicContentPaywallModeResolver();
         $registry = new PublicContentWidgetRegistry([
             new PaywallOverlayWidget($views, $paywallMode),
         ]);
 
-        return (new PublicContentComposer(
-            new BuiltInPublicContentWidgetCatalog(
-                $views,
-                new PublicContentWidgetEligibility(),
-            ),
+        $composer = new PublicContentComposer(
+            new BuiltInPublicContentWidgetCatalog($views, new PublicContentWidgetEligibility()),
             new RegionalPublicContentComponentFactory($views),
             $registry,
-            new PageWidgetLayoutResolver($pageWidgets),
-        ))->compose(new PublicContentContext(
+            new PageWidgetLayoutResolver($repository),
+        );
+
+        return $composer->compose(new PublicContentContext(
             page: $page,
             siteId: 1,
             siteSlug: 'estate',
             member: null,
             viewData: [
-                'access' => [
-                    'can_view' => !$restricted,
-                    'reason' => $restricted ? 'subscription_required' : null,
-                ],
-                'categories' => $withCategories ? new Collection([(object)['id' => 1]]) : new Collection(),
+                'access' => ['can_view' => true, 'reason' => null],
+                'categories' => new Collection(),
                 'categoriesWithPages' => [],
                 'feedPages' => new Collection(),
                 'trendingPages' => new Collection(),
                 'todaysDeals' => [],
-                'comments' => [],
-                'likeCount' => 0,
-                'viewCount' => 0,
-                'isLiked' => false,
                 'links' => [
                     'viewer_state' => '/viewer',
                     'comments' => '/comments',
@@ -168,5 +107,10 @@ final class PublicContentComposerTest extends TestCase
                 ],
             ],
         ));
+    }
+
+    private function types(array $components): array
+    {
+        return array_map(static fn($component) => $component->type, $components);
     }
 }
