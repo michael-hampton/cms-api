@@ -7,6 +7,8 @@
  *   $siteSlug  – current site slug
  */
 
+use App\Framework\Support\Collection;
+
 if (empty($feedPages) || $feedPages->isEmpty()) return;
 
 $feedTitle = $feedTitle ?? 'Activity Feed';
@@ -24,19 +26,29 @@ $feedTitle = $feedTitle ?? 'Activity Feed';
         <div class="activity-feed-items">
             <?php foreach ($feedPages as $page):
                 $url = '/' . htmlspecialchars($siteSlug) . '/' . htmlspecialchars($page->slug);
-                $image = $page->metadata->featured_image ?? null;
+                $image = $page->metadata?->featured_image ?? null;
+                $categories = $page->categories instanceof Collection
+                    ? $page->categories
+                    : new Collection();
+                $authors = $page->authors instanceof Collection
+                    ? $page->authors
+                    : new Collection();
+                $comments = $page->comments instanceof Collection
+                    ? $page->comments
+                    : new Collection();
+                $primaryCategory = $categories->first();
                 ?>
                 <div class="feed-card">
                     <?php if ($image): ?>
                         <div class="feed-card-thumb">
-                            <img src="<?= $image ?>" alt="<?= htmlspecialchars($page->title) ?>">
+                            <img src="<?= htmlspecialchars($image) ?>" alt="<?= htmlspecialchars($page->title) ?>">
                         </div>
                     <?php endif; ?>
 
                     <div class="feed-card-content">
                         <div class="feed-card-meta">
-                            <?php if ($page->categories->first()): ?>
-                                <span class="feed-category"><?= htmlspecialchars($page->categories->first()->name) ?></span>
+                            <?php if ($primaryCategory): ?>
+                                <span class="feed-category"><?= htmlspecialchars($primaryCategory->name) ?></span>
                             <?php endif; ?>
                             <span class="feed-time"><?= diffForHumans($page->created_at) ?></span>
                         </div>
@@ -47,12 +59,12 @@ $feedTitle = $feedTitle ?? 'Activity Feed';
 
                         <div class="feed-card-footer">
                             <div class="feed-authors">
-                                <?php foreach ($page->authors->take(2) as $author): ?>
+                                <?php foreach ($authors->take(2) as $author): ?>
                                     <span class="feed-author-tag">@<?= htmlspecialchars($author->name) ?></span>
                                 <?php endforeach; ?>
                             </div>
-                            <?php if ($page->comments->count() > 0): ?>
-                                <span class="feed-comments">💬 <?= $page->comments->count() ?></span>
+                            <?php if ($comments->count() > 0): ?>
+                                <span class="feed-comments">💬 <?= $comments->count() ?></span>
                             <?php endif; ?>
                         </div>
                     </div>
