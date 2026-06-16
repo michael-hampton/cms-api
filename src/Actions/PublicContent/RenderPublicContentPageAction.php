@@ -24,39 +24,27 @@ class RenderPublicContentPageAction
     ): Response {
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
-        $territoryId = $territory ? (int)$territory->id : null;
-        $isRegionalHomepage = $territory && (
-            (string) $page->page_type === 'landing-page'
-            || (string) $page->slug === (string) $territory->slug
-        );
+        $territoryId = $territory ? (int) $territory->id : null;
 
-        if ($isRegionalHomepage) {
-            $apiUrl = sprintf(
-                '/api/v1/%s/regions/%s/content',
-                rawurlencode($siteSlug),
-                rawurlencode((string)$territory->slug),
-            );
-        } elseif ($territory) {
-            $apiUrl = sprintf(
+        $apiUrl = $territory
+            ? sprintf(
                 '/api/v1/%s/regions/%s/content/%s',
                 rawurlencode($siteSlug),
-                rawurlencode((string)$territory->slug),
-                rawurlencode((string)$page->slug),
-            );
-        } else {
-            $apiUrl = sprintf(
+                rawurlencode((string) $territory->slug),
+                rawurlencode((string) $page->slug),
+            )
+            : sprintf(
                 '/api/v1/%s/content/%s',
                 rawurlencode($siteSlug),
-                rawurlencode((string)$page->slug),
+                rawurlencode((string) $page->slug),
             );
-        }
 
         return Response::view('public-content-v2/page', [
             'preview' => $preview,
             'site' => SiteContext::get(),
             'siteSlug' => $siteSlug,
-            'contentSlug' => (string)$page->slug,
-            'pageTitle' => (string)$page->title,
+            'contentSlug' => (string) $page->slug,
+            'pageTitle' => (string) $page->title,
             'pageDescription' => $page->meta_description ?? '',
             'territory' => $territory,
             'menu' => $this->navigation->findActiveMenu($siteId, 'header', $territoryId),
