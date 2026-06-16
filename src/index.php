@@ -4,41 +4,38 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use App\ApiApplication;
-use App\Framework\Http\JsonResponse;
 use App\Framework\Http\Response;
 
-// -----------------------------
-// Initialize application
-// -----------------------------
 $app = new ApiApplication();
 
-// Allow Angular dev server
-header("Access-Control-Allow-Origin: http://localhost:4200");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Site-Id"); // Add X-Site-Id
-header("Access-Control-Allow-Credentials: true"); // Add this for cookies/auth
+header('Access-Control-Allow-Origin: http://localhost:4200');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Site-Id');
+header('Access-Control-Allow-Credentials: true');
 
-// If it's a preflight (OPTIONS) request, return immediately
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
-// -----------------------------
-// Automatically detect request
-// -----------------------------
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$path   = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?: '/';
+$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$data = json_decode(file_get_contents('php://input'), true) ?: [];
+$data = array_merge($_GET, $data);
 
-$data   = json_decode(file_get_contents('php://input'), true) ?: [];
-$queryParams = $_GET;
-$data = array_merge($queryParams, $data); // include query parameters
-
-// -----------------------------
-// Dispatch request and handle errors
-// -----------------------------
 try {
     $response = $app->handleRequest($method, $path, $data);
+
+    $accept = strtolower((string) ($_SERVER['HTTP_ACCEPT'] ?? ''));
+    $requestedWith = strtolower((string) ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? ''));
+    $expectsJson = str_starts_with($path, '/api/')
+        || str_contains($accept, 'application/json')
+        || $requestedWith === 'xmlhttprequest';
+
+    if ($response->getStatusCode() === 404 && !$expectsJson) {
+        $response = Response::view('errors/404')->setStatusCode(404);
+    }
+
     $response->send();
     exit;
 } catch (Throwable $e) {
@@ -48,6 +45,6 @@ try {
         'error' => 'Internal Server Error',
         'message' => $e->getMessage(),
         'status' => 500,
-        'timestamp' => date('c')
+        'timestamp' => date('c'),
     ], JSON_PRETTY_PRINT);
 }
