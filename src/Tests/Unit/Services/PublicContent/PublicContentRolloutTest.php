@@ -4,6 +4,7 @@ namespace App\Tests\Unit\Services\PublicContent;
 
 use App\Models\Page;
 use App\Services\PublicContent\PublicContentRollout;
+use Mockery;
 use PHPUnit\Framework\TestCase;
 
 final class PublicContentRolloutTest extends TestCase
@@ -17,7 +18,7 @@ final class PublicContentRolloutTest extends TestCase
 
     public function testProductionRolloutIsDisabledByDefault(): void
     {
-        $page = new Page();
+        $page = Mockery::mock(Page::class)->makePartial();
         $page->site_id = 1;
         $page->page_type = 'article';
 

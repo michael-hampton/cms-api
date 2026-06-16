@@ -50,6 +50,8 @@ class ContentController extends Controller
 
     public function show(Page $page)
     {
+        dd('here');
+
         $member = MemberAuth::getMember();
         $memberId = $member ? $member->id : null;
 

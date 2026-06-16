@@ -12,11 +12,14 @@ class SearchEngine
     {
         $this->configuration->configure();
 
+        // Apply search query
         if ($criteria->getSearchQuery()) {
             $queryBuilder = $this->applySearchQuery($queryBuilder, $criteria->getSearchQuery());
         }
 
+        // Apply filters
         foreach ($criteria->getFilters() as $key => $value) {
+
             if ($value === null || $value === '') {
                 continue;
             }
@@ -28,9 +31,11 @@ class SearchEngine
             }
         }
 
+        // Apply sorting
         $sortBy = $criteria->getSortBy() ?? $this->configuration->getDefaultSort();
 
         if ($sortBy) {
+
             $sort = $this->configuration->getSorts()[$sortBy] ?? null;
             if ($sort) {
                 $sortDirection = $criteria->getSortOrder() ?: $this->configuration->getDefaultSortDirection();
@@ -38,15 +43,15 @@ class SearchEngine
             }
         }
 
-        // QueryBuilder::toSql() allocates parameter names while compiling.
-        // Count on a clone so its compilation state cannot leak into the data query.
-        $countQuery = clone $queryBuilder;
-        $total = $countQuery->count();
+        // Get total count before pagination
+        $total = $queryBuilder->count();
 
+        // Apply pagination
         $queryBuilder = $queryBuilder
             ->limit($criteria->getPerPage())
             ->offset($criteria->getOffset());
 
+        // Execute query
         $results = $queryBuilder->get();
 
         return new PaginatedResult(
@@ -65,35 +70,10 @@ class SearchEngine
             return $queryBuilder;
         }
 
-        $clauses = [];
-        $bindings = [];
-        $token = bin2hex(random_bytes(4));
-
-        foreach (array_values($searchableColumns) as $index => $column) {
-            $parameter = "search_{$token}_{$index}";
-            $safeColumn = $this->quoteSearchColumn($column);
-            $clauses[] = "{$safeColumn} LIKE :{$parameter}";
-            $bindings[$parameter] = "%{$searchQuery}%";
-        }
-
-        return $queryBuilder->whereRaw(
-            '(' . implode(' OR ', $clauses) . ')',
-            $bindings,
-        );
-    }
-
-    private function quoteSearchColumn(string $column): string
-    {
-        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/', $column)) {
-            throw new \InvalidArgumentException('Invalid searchable column: ' . $column);
-        }
-
-        if (!str_contains($column, '.')) {
-            return '`' . $column . '`';
-        }
-
-        [$table, $field] = explode('.', $column, 2);
-
-        return sprintf('`%s`.`%s`', $table, $field);
+        return $queryBuilder->where(function($q) use ($searchQuery, $searchableColumns) {
+            foreach ($searchableColumns as $column) {
+                $q->orWhere($column, 'LIKE', "%{$searchQuery}%");
+            }
+        });
     }
 }
