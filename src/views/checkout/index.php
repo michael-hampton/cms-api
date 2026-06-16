@@ -1,106 +1,12 @@
 @section('logic')
 <?php
+
 /**
- * Checkout page
- *
- * Expected view data:
- *   array[]      $items            — flat cart items
- *   float        $subtotal
- *   float        $shipping
- *   float        $tax
- *   float        $tax_rate         — decimal
- *   string       $currency         — display symbol/code
- *   int          $count            — cart item count (badge)
- *   object|null  $member           — logged-in member or null
- *   bool         $requiresShipping — show shipping address fields
- *   array[]      $hasPreOrders     — pre-order warning entries
- *   string       $checkoutMode     — 'steps' | 'single-page'
- *
- * Session:
- *   $_SESSION['applied_voucher_code'] — ['code','discount','voucher_id'] or null
+ * @var \App\ViewModels\Checkout\CheckoutPageViewModel $vm
+ * @var \App\Models\Member|null $member
+ * @var array $savedCards
  */
 
-use App\Framework\Authorization\MemberAuth;
-use App\Framework\Support\SiteContext;
-
-$checkoutMode = $checkoutMode ?? 'steps';
-$appliedVoucher = $_SESSION['applied_voucher_code'] ?? null;
-$displayCurrency = strtoupper($currency ?? 'GBP');
-
-$finalTotal = (float)($subtotal ?? 0)
-        + (float)($tax ?? 0)
-        + (float)($shipping ?? 0)
-        - (float)($appliedVoucher['discount'] ?? 0);
-
-$cartSubscriptionItems = array_filter($items ?? [], fn($i) => !empty($i['subscription_plan_id']));
-$cartProductItems = array_filter($items ?? [], fn($i) => empty($i['subscription_plan_id']));
-$isMixedCart = !empty($cartSubscriptionItems) && !empty($cartProductItems);
-$isSubscription = !empty($cartSubscriptionItems);
-$isOneTimeCart = $isOneTimeCart ?? false;
-$isMixedSubscriptionCart = $isMixedSubscriptionCart ?? false;
-
-// ── Basket type derivation ────────────────────────────────────────────────
-// Inspect every cart item (subscription + product) to determine whether the
-// basket contains print, digital, or a combination of both.
-// Subscription items carry delivery_type in their options array.
-// Non-subscription product items are assumed to be physical (print).
-$hasPrint = false;
-$hasDigital = false;
-
-foreach ($items ?? [] as $item) {
-    if (!empty($item['subscription_plan_id'])) {
-        $deliveryType = strtolower($item['options']['delivery_type'] ?? 'print');
-        if ($deliveryType === 'digital') {
-            $hasDigital = true;
-        } else {
-            // 'print', 'print_digital', or any physical type
-            $hasPrint = true;
-            if (str_contains($deliveryType, 'digital')) {
-                $hasDigital = true;
-            }
-        }
-    } else {
-        // Plain product — physical by nature
-        $hasPrint = true;
-    }
-}
-
-if ($hasPrint && $hasDigital) {
-    $basketType = 'print_and_digital';
-} elseif ($hasDigital) {
-    $basketType = 'digital_only';
-} else {
-    $basketType = 'print_only';
-}
-
-$forceAddress = $member?->addresses->count() === 0 ?: true;
-
-// For digital-only baskets the shipping address is never needed.
-// Override the controller-supplied $requiresShipping so every downstream
-// component (address-lookup, validation) picks up the correct value.
-if ($basketType === 'digital_only' && ($member?->addresses->count() > 0 ?? true)) {
-    $requiresShipping = false;
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-
-$subscriptionCartSnapshot = array_values(array_map(function ($item) {
-    $options = $item['options'] ?? [];
-    $planId = (int)($item['subscription_plan_id'] ?? 0);
-    $plan = $planId > 0 ? \App\Models\SubscriptionPlan::find($planId) : null;
-
-    return [
-            'subscription_plan_id' => $planId,
-            'delivery_type' => $options['delivery_type'] ?? 'print',
-            'pricing_tier_id' => $options['pricing_tier_id'] ?? null,
-            'start_date' => $options['start_date'] ?? null,
-            'is_one_time' => $plan?->isOneTime() ?? false,
-            'promotion' => $item['promotion'] ?? null,
-    ];
-}, $cartSubscriptionItems));
-
-$site = SiteContext::slug();
-$apiBase = '/api/' . $site;
 ?>
 @endsection
 
@@ -352,7 +258,7 @@ $apiBase = '/api/' . $site;
 @section('content')
 
 <!-- ── Progress stepper (steps mode only) ───────────────────────── -->
-<?php if ($checkoutMode === 'steps'): ?>
+<?php if ($vm->checkoutMode === 'steps'): ?>
     <div class="checkout-progress">
         <div class="progress-steps">
             <div class="progress-line" id="progress-line" style="width: 33%;"></div>
@@ -364,7 +270,7 @@ $apiBase = '/api/' . $site;
             <div class="step active" id="step-2-indicator">
                 <div class="step-circle">2</div>
                 <div class="step-label">
-                    <?= $basketType === 'digital_only' ? 'Details' : 'Shipping' ?>
+                    <?= $vm->basketType === 'digital_only' ? 'Details' : 'Shipping' ?>
                 </div>
             </div>
             <div class="step" id="step-3-indicator">
@@ -389,7 +295,7 @@ $apiBase = '/api/' . $site;
 <?php endif; ?>
 
 <!-- ── Mixed-cart warning ───────────────────────────────────────── -->
-<?php if ($isMixedCart): ?>
+<?php if ($vm->isMixedCart): ?>
     <div class="alert alert-error" style="margin-bottom: 1.5rem;">
         <strong>Your cart contains both subscription and physical items.</strong>
         These cannot be purchased together. Please
@@ -399,7 +305,7 @@ $apiBase = '/api/' . $site;
 <?php endif; ?>
 
 <!-- ── Guest login prompt ───────────────────────────────────────── -->
-<?php if (!MemberAuth::check()): ?>
+<?php if ($member === null): ?>
     <div class="login-prompt">
         Already have an account?
         <a href="/member/login?redirect=/checkout">Login</a> to use saved addresses.
@@ -413,23 +319,23 @@ $apiBase = '/api/' . $site;
         <form id="checkout-form">
 
             <!-- ════ STEP 2: Contact + Shipping / Details ════ -->
-            <?php if ($checkoutMode === 'steps'): ?>
+            <?php if ($vm->checkoutMode === 'steps'): ?>
             <div id="step-2-section">
                 <?php endif; ?>
 
                 @include('checkout/components/form/billing-form', [
                 'member' => $member ?? null,
-                'requiresShipping' => $requiresShipping ?? true,
-                'basketType' => $basketType,
+                'requiresShipping' => $vm->requiresShipping,
+                'basketType' => $vm->basketType,
                 ])
 
                 <!-- Gift options — shown for all basket types -->
                 @include('checkout/components/form/gift-fields', [
-                'basketType' => $basketType,
+                'basketType' => $vm->basketType,
                 'isGift' => false,
                 ])
 
-                <?php if ($checkoutMode === 'steps'): ?>
+                <?php if ($vm->checkoutMode === 'steps'): ?>
                     @include('checkout/components/form/button', [
                     'id'      => 'continue-to-payment-btn',
                     'type'    => 'button',
@@ -448,12 +354,12 @@ $apiBase = '/api/' . $site;
                     ])
                 <?php endif; ?>
 
-                <?php if ($checkoutMode === 'steps'): ?>
+                <?php if ($vm->checkoutMode === 'steps'): ?>
             </div>
         <?php endif; ?>
 
             <!-- ════ STEP 3: Payment ════ -->
-            <?php if ($checkoutMode === 'steps'): ?>
+            <?php if ($vm->checkoutMode === 'steps'): ?>
             <div id="step-3-section" style="display: none;">
                 <?php endif; ?>
 
@@ -479,16 +385,16 @@ $apiBase = '/api/' . $site;
                 ])
                 @include('checkout/components/form/form-section', ['close' => true])
 
-                <?php if ($checkoutMode === 'steps'): ?>
+                <?php if ($vm->checkoutMode === 'steps'): ?>
                     @include('checkout/components/form/button', [
-                    'label'   => '← Back to ' . ($basketType === 'digital_only' ? 'Details' : 'Shipping'),
+                    'label' => '← Back to ' . ($vm->basketType === 'digital_only' ? 'Details' : 'Shipping'),
                     'variant' => 'secondary',
                     'onclick' => 'window.checkoutManager.goToStep(2)',
                     'style'   => 'margin-top: 1rem;',
                     ])
                 <?php endif; ?>
 
-                <?php if ($checkoutMode === 'steps'): ?>
+                <?php if ($vm->checkoutMode === 'steps'): ?>
             </div>
         <?php endif; ?>
 
@@ -497,18 +403,18 @@ $apiBase = '/api/' . $site;
 
     <!-- ── Right: order summary sidebar ──────────────────────── -->
     @include('checkout/components/order-summary-sidebar', [
-    'items' => $items ?? [],
-    'subtotal' => $subtotal ?? 0,
-    'shipping' => $shipping ?? 0,
-    'tax' => $tax ?? 0,
-    'finalTotal' => $finalTotal,
-    'taxRate' => $tax_rate ?? 0,
-    'currency' => $displayCurrency,
-    'displayCurrency' => $displayCurrency,
-    'apiBase' => $apiBase,
-    'appliedVoucher' => $appliedVoucher,
-    'hasPreOrders' => $hasPreOrders ?? [],
-    'isSubscription' => $isSubscription,
+    'items' => $vm->items,
+    'subtotal' => $vm->subtotal,
+    'shipping' => $vm->shipping,
+    'tax' => $vm->tax,
+    'finalTotal' => $vm->finalTotal,
+    'taxRate' => $vm->taxRate,
+    'currency' => $vm->currency,
+    'displayCurrency' => $vm->currency,
+    'apiBase' => $vm->apiBase,
+    'appliedVoucher' => $vm->appliedVoucher,
+    'hasPreOrders' => $vm->hasPreOrders,
+    'isSubscription' => $vm->isSubscriptionCart,
     'submitBtnId' => 'place-order-btn',
     'submitBtnLabel' => 'Place Order',
     'backUrl' => '/cart',
@@ -522,27 +428,10 @@ $apiBase = '/api/' . $site;
 @include('checkout/components/loading-overlay', ['message' => 'Processing your order...', 'id' => 'loading-overlay'])
 
 <script>
-    const CHECKOUT_BOOTSTRAP = <?= json_encode([
-            'apiBase' => $apiBase ?? '',
-            'planCurrency' => $currency ?? '$',
-            'taxRate' => (float)($tax_rate ?? 0),
-            'initialSubtotal' => (float)($subtotal ?? 0),
-            'initialShipping' => (float)($shipping ?? 0),
-            'subscriptionCartSnapshot' => $subscriptionCartSnapshot,
-            'cartItems' => array_values(array_map(function ($item) {
-                return [
-                        'id'                   => $item['id'] ?? null,
-                        'product_name'         => $item['product_name'] ?? $item['plan_name'] ?? 'Subscription',
-                        'plan_name'            => $item['plan_name'] ?? null,
-                        'subscription_plan_id' => $item['subscription_plan_id'] ?? null,
-                        'price'                => (float)($item['price'] ?? 0),
-                        'subtotal'             => (float)($item['subtotal'] ?? 0),
-                        'quantity'             => (int)($item['quantity'] ?? 1),
-                        'options'              => $item['options'] ?? [],
-                        'promotion'            => $item['promotion'] ?? null,
-                ];
-            }, $items ?? [])),
-    ]) ?>;
+    const CHECKOUT_BOOTSTRAP = <?= json_encode(
+            $vm->checkoutBootstrap(),
+            JSON_THROW_ON_ERROR
+    ) ?>;
 
     const API_BASE = CHECKOUT_BOOTSTRAP.apiBase;
     const PLAN_CURRENCY = CHECKOUT_BOOTSTRAP.planCurrency;
@@ -569,25 +458,29 @@ $apiBase = '/api/' . $site;
 <script src="https://js.stripe.com/v3/"></script>
 
 <script>
-    const CHECKOUT_CONFIG = <?= json_encode([
-            'site' => $site,
-            'stripeKey' => $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key'),
-            'checkoutMode' => $checkoutMode,
-            'requiresShipping' => $requiresShipping ?? true,
-            'basketType' => $basketType,
-            'isMixedCart' => $isMixedCart,
-            'isMixedSubscriptionCart' => $isMixedSubscriptionCart,
-            'isSubscriptionCart' => $isSubscription,
-            'isOneTimeCart' => $isOneTimeCart,
-            'forceAddress' => $forceAddress,
-    ]) ?>;
+    const CHECKOUT_CONFIG = <?= json_encode(
+            $vm->checkoutConfig(
+                    $_ENV['STRIPE_PUBLIC_KEY']
+                    ?? config('payment.stripe.public_key')
+            ),
+            JSON_THROW_ON_ERROR
+    ) ?>;
 
     let isLoggedIn = false;
     let currentMember = null;
     let selectedAddressId = null;
-    window.appliedVoucher = <?= json_encode($appliedVoucher) ?>;
-    const requiresShipping = <?= json_encode($requiresShipping ?? true) ?>;
-    const SITE = <?= json_encode($site) ?>;
+    window.appliedVoucher = <?= json_encode(
+            $vm->appliedVoucher,
+            JSON_THROW_ON_ERROR
+    ) ?>;
+    const requiresShipping = <?= json_encode(
+            $vm->requiresShipping,
+            JSON_THROW_ON_ERROR
+    ) ?>;
+    const SITE = <?= json_encode(
+            $vm->site,
+            JSON_THROW_ON_ERROR
+    ) ?>;
 
     // ── StripeService ────────────────────────────────────────────────────
     class StripeService {
