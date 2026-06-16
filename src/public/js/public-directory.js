@@ -50,15 +50,26 @@
                 root.innerHTML = '<div class="public-directory-status"><div class="public-directory-spinner"></div><p>Loading…</p></div>';
                 return;
             }
+
             if (state.status === 'error') {
                 root.innerHTML = `<div class="public-directory-error"><h1>Page unavailable</h1><p>${EscapeHtml.value(state.error?.message)}</p><button type="button" data-action="retry">Try again</button></div>`;
                 return;
             }
+
             if (state.status === 'loaded') {
                 root.innerHTML = state.document.entity
                     ? this.detail(state.document)
                     : this.index(state.document);
             }
+        }
+
+        search(query, placeholder, total, noun) {
+            return `<div class="directory-search" role="search">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+                <input type="search" data-directory-search value="${EscapeHtml.value(query)}" placeholder="${EscapeHtml.value(placeholder)}" autocomplete="off" aria-label="${EscapeHtml.value(placeholder)}">
+                ${query ? '<button type="button" data-action="clear-search">Clear</button>' : ''}
+            </div>
+            <div class="directory-search-summary" aria-live="polite">${query ? `${total} result${total === 1 ? '' : 's'} for “${EscapeHtml.value(query)}”` : `${total} ${EscapeHtml.value(noun)}`}</div>`;
         }
 
         index(document) {
@@ -70,12 +81,7 @@
 
             return `<section class="directory-page">
                 <header class="directory-hero"><p class="directory-eyebrow">Explore</p><h1>${EscapeHtml.value(document.title)}</h1><p>Browse all published ${EscapeHtml.value(label)}.</p></header>
-                <div class="directory-search" role="search">
-                    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-                    <input type="search" data-directory-search value="${EscapeHtml.value(query)}" placeholder="Search ${EscapeHtml.value(label)}…" autocomplete="off" aria-label="Search ${EscapeHtml.value(label)}">
-                    ${query ? '<button type="button" data-action="clear-search">Clear</button>' : ''}
-                </div>
-                <div class="directory-search-summary" aria-live="polite">${query ? `${total} result${total === 1 ? '' : 's'} for “${EscapeHtml.value(query)}”` : `${total} ${EscapeHtml.value(label)}`}</div>
+                ${this.search(query, `Search ${label}…`, total, label)}
                 <div class="directory-grid">${entities.map(entity => this.entityCard(entity)).join('')}</div>
                 ${entities.length ? '' : `<div class="directory-empty"><h2>No matches found</h2><p>Try a different search term.</p>${query ? '<button type="button" data-action="clear-search">Clear search</button>' : ''}</div>`}
                 ${this.pagination(document.pagination)}
@@ -86,6 +92,9 @@
             const entity = document.entity;
             const meta = entity.meta ?? {};
             const pages = document.pages ?? [];
+            const query = document.search?.query ?? '';
+            const total = Number(document.pagination?.total ?? pages.length);
+
             return `<section class="directory-page">
                 <header class="directory-hero directory-hero--detail">
                     ${entity.image ? `<img class="directory-avatar" src="${EscapeHtml.value(entity.image)}" alt="${EscapeHtml.value(entity.name)}">` : entity.icon ? `<div class="directory-icon">${entity.icon}</div>` : ''}
@@ -97,9 +106,10 @@
                 ${this.authorDetails(entity.type, meta)}
                 ${this.related(document.related ?? [])}
                 <section class="directory-results">
-                    <div class="directory-section-heading"><h2>Latest articles</h2><span>${Number(document.stats?.page_count ?? 0)} results</span></div>
+                    <div class="directory-section-heading"><h2>Latest articles</h2><span>${total} results</span></div>
+                    ${this.search(query, 'Search articles…', total, 'articles')}
                     <div class="directory-page-grid">${pages.map(page => this.pageCard(page)).join('')}</div>
-                    ${pages.length ? '' : '<div class="directory-empty"><h2>No articles yet</h2><p>There is no published content for this page yet.</p></div>'}
+                    ${pages.length ? '' : `<div class="directory-empty"><h2>No matches found</h2><p>Try a different search term.</p>${query ? '<button type="button" data-action="clear-search">Clear search</button>' : ''}</div>`}
                     ${this.pagination(document.pagination)}
                 </section>
             </section>`;
@@ -107,7 +117,6 @@
 
         pagination(pagination) {
             if (!pagination || pagination.last_page <= 1) return '';
-
             const current = Number(pagination.current_page);
             const last = Number(pagination.last_page);
             const start = Math.max(1, current - 2);
@@ -176,7 +185,6 @@
 
         onInput(event) {
             if (!event.target.matches('[data-directory-search]')) return;
-
             this.searchQuery = event.target.value.trim();
             this.currentPage = 1;
             this.updateUrl();
@@ -184,11 +192,7 @@
         }
 
         onClick(event) {
-            if (event.target.closest('[data-action="retry"]')) {
-                this.load();
-                return;
-            }
-
+            if (event.target.closest('[data-action="retry"]')) return void this.load();
             if (event.target.closest('[data-action="clear-search"]')) {
                 this.searchQuery = '';
                 this.currentPage = 1;
@@ -198,39 +202,23 @@
             }
 
             const pageButton = event.target.closest('[data-page]');
-            if (pageButton) {
-                this.goToPage(Number(pageButton.dataset.page));
-                return;
-            }
-
-            if (event.target.closest('[data-action="previous-page"]')) {
-                this.goToPage(this.currentPage - 1);
-                return;
-            }
-
-            if (event.target.closest('[data-action="next-page"]')) {
-                this.goToPage(this.currentPage + 1);
-                return;
-            }
-
+            if (pageButton) return void this.goToPage(Number(pageButton.dataset.page));
+            if (event.target.closest('[data-action="previous-page"]')) return void this.goToPage(this.currentPage - 1);
+            if (event.target.closest('[data-action="next-page"]')) return void this.goToPage(this.currentPage + 1);
             if (!this.preview) return;
 
             const link = event.target.closest('a[href]');
             if (!link || link.target === '_blank' || event.metaKey || event.ctrlKey || event.shiftKey) return;
-
             const url = new URL(link.href, window.location.origin);
             if (url.origin !== window.location.origin) return;
-
             const target = this.toPreviewPath(url.pathname);
             if (!target || target === url.pathname) return;
-
             event.preventDefault();
             window.location.assign(`${target}${url.search}${url.hash}`);
         }
 
         goToPage(page) {
             if (!this.document) return;
-
             const total = this.filteredItems().length;
             const last = Math.max(1, Math.ceil(total / this.perPage));
             this.currentPage = Math.max(1, Math.min(last, page));
@@ -241,13 +229,10 @@
 
         updateUrl() {
             const params = new URLSearchParams(window.location.search);
-
             if (this.currentPage > 1) params.set('page', String(this.currentPage));
             else params.delete('page');
-
-            if (this.searchQuery && !this.document?.entity) params.set('q', this.searchQuery);
+            if (this.searchQuery) params.set('q', this.searchQuery);
             else params.delete('q');
-
             const query = params.toString();
             window.history.replaceState({}, '', `${window.location.pathname}${query ? '?' + query : ''}${window.location.hash}`);
         }
@@ -259,13 +244,23 @@
 
         filteredItems() {
             const items = this.items();
-            if (this.document?.entity || !this.searchQuery) return items;
-
+            if (!this.searchQuery) return items;
             const query = this.searchQuery.toLocaleLowerCase();
 
-            return items.filter(item => [item.name, item.slug, item.description]
-                .filter(Boolean)
-                .some(value => String(value).toLocaleLowerCase().includes(query)));
+            return items.filter(item => {
+                const values = this.document.entity
+                    ? [
+                        item.title,
+                        item.slug,
+                        item.summary,
+                        ...(item.categories ?? []).map(category => category.name),
+                        ...(item.tags ?? []).map(tag => tag.name),
+                        ...(item.authors ?? []).map(author => author.name),
+                    ]
+                    : [item.name, item.slug, item.description];
+
+                return values.filter(Boolean).some(value => String(value).toLocaleLowerCase().includes(query));
+            });
         }
 
         publish(restoreSearchFocus = false) {
@@ -277,7 +272,7 @@
             const sliced = items.slice(offset, offset + this.perPage);
             const document = {
                 ...this.document,
-                search: {query: this.document.entity ? '' : this.searchQuery},
+                search: {query: this.searchQuery},
                 pagination: {
                     current_page: this.currentPage,
                     per_page: this.perPage,
@@ -288,10 +283,9 @@
 
             if (document.entity) document.pages = sliced;
             else document.entities = sliced;
-
             this.store.setState({status: 'loaded', document, error: null});
 
-            if (restoreSearchFocus && !this.document.entity) {
+            if (restoreSearchFocus) {
                 window.requestAnimationFrame(() => {
                     const input = this.root.querySelector('[data-directory-search]');
                     if (!input) return;
