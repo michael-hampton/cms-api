@@ -30,7 +30,7 @@ class RegionContentController extends Controller
         parent::__construct();
     }
 
-    public function show(string $regionSlug, string $pageSlug): Response
+    public function show(string $regionSlug, ?string $pageSlug = null): Response
     {
         $siteId = SiteContext::getId();
         $territory = $this->territories->findActiveBySlug($siteId, $regionSlug);
@@ -39,14 +39,24 @@ class RegionContentController extends Controller
             return $this->notFound('Region not found.');
         }
 
-        $page = $this->publicPages->findCompletePublishedBySlugForTerritory(
-            $siteId,
-            $pageSlug,
-            (int)$territory->id,
-        );
+        $page = $pageSlug === null || $pageSlug === ''
+            ? $this->publicPages->findCompleteHomepageForTerritory(
+                $siteId,
+                (int) $territory->id,
+                (string) $territory->slug,
+            )
+            : $this->publicPages->findCompletePublishedBySlugForTerritory(
+                $siteId,
+                $pageSlug,
+                (int) $territory->id,
+            );
 
         if (!$page) {
-            return $this->notFound('Regional content not found.');
+            return $this->notFound(
+                $pageSlug === null || $pageSlug === ''
+                    ? 'Regional homepage not found.'
+                    : 'Regional content not found.',
+            );
         }
 
         if ($this->rollout->enabledFor($page)) {
