@@ -4,9 +4,8 @@
     const rewriteAuthorLinks = root => {
         const app = document.getElementById('public-content-v2-app');
         const site = app?.dataset.site;
-        const preview = app?.dataset.preview === 'true';
 
-        if (!site || !preview) return;
+        if (!site) return;
 
         root.querySelectorAll(`a.author-profile-link[href^="/${site}/authors/"]`).forEach(link => {
             const url = new URL(link.href, window.location.origin);
