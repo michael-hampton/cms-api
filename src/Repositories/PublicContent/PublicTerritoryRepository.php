@@ -8,6 +8,16 @@ use App\Repositories\Repository;
 
 final class PublicTerritoryRepository extends Repository
 {
+    public function findActiveById(int $siteId, int $territoryId): ?Territory
+    {
+        $territory = Territory::where('site_id', $siteId)
+            ->where('id', $territoryId)
+            ->where('is_active', true)
+            ->first();
+
+        return $territory instanceof Territory ? $territory : null;
+    }
+
     public function findActiveBySlug(int $siteId, string $slug): ?Territory
     {
         $territory = Territory::where('site_id', $siteId)
