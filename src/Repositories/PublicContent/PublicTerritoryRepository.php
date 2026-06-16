@@ -3,6 +3,7 @@
 namespace App\Repositories\PublicContent;
 
 use App\Framework\Support\Collection;
+use App\Models\PageTerritory;
 use App\Models\Territory;
 use App\Repositories\Repository;
 
@@ -20,15 +21,16 @@ final class PublicTerritoryRepository extends Repository
 
     public function findActiveForPage(int $siteId, int $pageId): ?Territory
     {
-        $territory = Territory::where('site_id', $siteId)
-            ->where('is_active', true)
-            ->whereHas('pages', function ($pages) use ($pageId): void {
-                $pages->where('pages.id', $pageId);
-            })
-            ->orderBy('sort_order', 'asc')
+        $assignment = PageTerritory::where('page_id', $pageId)
+            ->where('site_id', $siteId)
+            ->orderBy('territory_id', 'asc')
             ->first();
 
-        return $territory instanceof Territory ? $territory : null;
+        if (!$assignment) {
+            return null;
+        }
+
+        return $this->findActiveById($siteId, (int) $assignment->territory_id);
     }
 
     public function findActiveBySlug(int $siteId, string $slug): ?Territory
