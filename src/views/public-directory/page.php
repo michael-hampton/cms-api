@@ -1,6 +1,7 @@
 <?php
 $title = ucfirst($type);
 $description = 'Public ' . $type . ' directory';
+$directoryScript = asset('public-directory.js', 'js');
 ?>
 
 @include('header', ['menu' => $menu])
@@ -32,4 +33,4 @@ $description = 'Public ' . $type . ' directory';
 
 @css('public-directory.css')
 @js('base.js')
-@js('public-directory.js')
+<script src="<?= htmlspecialchars($directoryScript, ENT_QUOTES, 'UTF-8') ?>&feature=directory-search-v2"></script>
