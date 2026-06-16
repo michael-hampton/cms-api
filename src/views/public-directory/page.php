@@ -2,6 +2,9 @@
 $title = ucfirst($type);
 $description = 'Public ' . $type . ' directory';
 $directoryScript = asset('public-directory.js', 'js');
+$directoryScript .= str_contains($directoryScript, '?')
+    ? '&feature=directory-search-v2'
+    : '?feature=directory-search-v2';
 ?>
 
 @include('header', ['menu' => $menu])
@@ -33,4 +36,4 @@ $directoryScript = asset('public-directory.js', 'js');
 
 @css('public-directory.css')
 @js('base.js')
-<script src="<?= htmlspecialchars($directoryScript, ENT_QUOTES, 'UTF-8') ?>&feature=directory-search-v2"></script>
+<script src="<?= htmlspecialchars($directoryScript, ENT_QUOTES, 'UTF-8') ?>"></script>
