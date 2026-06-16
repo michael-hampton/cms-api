@@ -2,15 +2,16 @@
     'use strict';
 
     const rewriteAuthorLinks = root => {
-        const path = window.location.pathname;
-        const match = path.match(/^\/([^/]+)\/content-v2(?:\/|$)/);
-        if (!match) return;
+        const app = document.getElementById('public-content-v2-app');
+        const site = app?.dataset.site;
 
-        const site = match[1];
+        if (!site) return;
 
         root.querySelectorAll(`a.author-profile-link[href^="/${site}/authors/"]`).forEach(link => {
             const url = new URL(link.href, window.location.origin);
-            link.href = `/${site}/content-v2${url.pathname.slice(site.length + 1)}${url.search}${url.hash}`;
+            const authorPath = url.pathname.slice(`/${site}`.length);
+
+            link.href = `/${site}/content-v2${authorPath}${url.search}${url.hash}`;
         });
     };
 
