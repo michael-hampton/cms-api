@@ -1,12 +1,8 @@
 <?php
-$metadataVisibility = $page->metadata->visibility ?? null;
-$isContributorCreated = !empty($page->contributor_id);
-$isPurchasablePremium = $isContributorCreated
-    && (bool)$page->is_paid
-    && (int)$page->price > 0
-    && !empty($page->premium_approved_at)
-    && empty($page->monetisation_disabled_at)
-    && $metadataVisibility === 'premium';
+use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
+
+$paywallMode = $paywallMode ?? app(PublicContentPaywallModeResolver::class)->resolve($page);
+$isArticlePurchase = $paywallMode === PublicContentPaywallModeResolver::MODE_ARTICLE_PURCHASE;
 $siteSlug = \App\Framework\Support\SiteContext::slug();
 $canonical = '/' . $siteSlug . '/' . ltrim((string)$page->slug, '/');
 $memberEmail = $member?->email ?? '';
@@ -16,11 +12,11 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
 <div
     class="paywall-overlay"
     data-paywall-overlay
+    data-paywall-mode="<?= htmlspecialchars($paywallMode, ENT_QUOTES, 'UTF-8') ?>"
     data-page-id="<?= (int)$page->id ?>"
     data-site-slug="<?= htmlspecialchars($siteSlug, ENT_QUOTES, 'UTF-8') ?>"
     data-purchase-endpoint="/api/<?= rawurlencode($siteSlug) ?>/open-collab/pages/<?= (int)$page->id ?>/purchase"
     data-stripe-key="<?= htmlspecialchars((string)$stripeKey, ENT_QUOTES, 'UTF-8') ?>"
-    data-contributor-created="<?= $isContributorCreated ? 'true' : 'false' ?>"
     role="dialog"
     aria-modal="true"
     aria-labelledby="paywall-title"
@@ -40,7 +36,7 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
         <h2><?= htmlspecialchars((string)$page->title, ENT_QUOTES, 'UTF-8') ?></h2>
 
         <div id="paywall-message" class="paywall-message">
-            <?php if ($isPurchasablePremium): ?>
+            <?php if ($isArticlePurchase): ?>
                 <p>Purchase instant, permanent access to this article. No subscription required.</p>
             <?php elseif ($reason === 'published_after_subscription'): ?>
                 <p>You had access during your previous subscription. <strong>Resubscribe to continue reading.</strong></p>
@@ -53,18 +49,20 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
             <?php endif; ?>
         </div>
 
-        <div class="paywall-benefits">
-            <h3>Membership benefits</h3>
-            <ul>
-                <li>Unlimited premium content</li>
-                <li>Access to articles from your subscription period</li>
-                <li>Support quality journalism</li>
-                <li>Ad-free reading experience</li>
-            </ul>
-        </div>
+        <?php if (!$isArticlePurchase): ?>
+            <div class="paywall-benefits">
+                <h3>Membership benefits</h3>
+                <ul>
+                    <li>Unlimited premium content</li>
+                    <li>Access to articles from your subscription period</li>
+                    <li>Support quality journalism</li>
+                    <li>Ad-free reading experience</li>
+                </ul>
+            </div>
+        <?php endif; ?>
 
         <div class="paywall-actions">
-            <?php if ($isPurchasablePremium): ?>
+            <?php if ($isArticlePurchase): ?>
                 <button class="btn btn-primary btn-lg" type="button" data-paywall-open-purchase>
                     Buy Article — <?= $priceFormatted ?>
                 </button>
@@ -82,7 +80,7 @@ $stripeKey = $_ENV['STRIPE_PUBLIC_KEY'] ?? config('payment.stripe.public_key');
         </div>
     </section>
 
-    <?php if ($isPurchasablePremium): ?>
+    <?php if ($isArticlePurchase): ?>
         <section class="paywall-purchase" data-paywall-purchase hidden role="dialog" aria-modal="true" aria-labelledby="paywall-purchase-title">
             <div class="paywall-purchase__dialog" tabindex="-1">
                 <header class="paywall-purchase__header">
