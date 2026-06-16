@@ -30,7 +30,7 @@ class RegionContentController extends Controller
         parent::__construct();
     }
 
-    public function show(string $regionSlug, ?string $pageSlug = null): Response
+    public function show(string $regionSlug, string $pageSlug): Response
     {
         $siteId = SiteContext::getId();
         $territory = $this->territories->findActiveBySlug($siteId, $regionSlug);
@@ -39,51 +39,41 @@ class RegionContentController extends Controller
             return $this->notFound('Region not found.');
         }
 
-        $page = $pageSlug === null || $pageSlug === ''
-            ? $this->publicPages->findCompleteHomepageForTerritory(
-                $siteId,
-                (int) $territory->id,
-                (string) $territory->slug,
-            )
-            : $this->publicPages->findCompletePublishedBySlugForTerritory(
-                $siteId,
-                $pageSlug,
-                (int) $territory->id,
-            );
+        $page = $this->publicPages->findCompletePublishedBySlugForTerritory(
+            $siteId,
+            $pageSlug,
+            (int) $territory->id,
+        );
 
         if (!$page) {
-            return $this->notFound(
-                $pageSlug === null || $pageSlug === ''
-                    ? 'Regional homepage not found.'
-                    : 'Regional content not found.',
-            );
+            return $this->notFound('Regional content not found.');
         }
 
         if ($this->rollout->enabledFor($page)) {
             return $this->renderPublicContent->execute($page, false, $territory);
         }
 
-        $pageGrid = $this->pageGridRepository->getActiveGridForTerritory((int)$territory->id);
+        $pageGrid = $this->pageGridRepository->getActiveGridForTerritory((int) $territory->id);
         $pageGridHtml = $pageGrid
             ? (new PageGridRenderer())->render($pageGrid, $territory)
             : null;
 
         $data = [
-            'menu' => $this->navigation->findActiveMenu($siteId, 'header', (int)$territory->id),
+            'menu' => $this->navigation->findActiveMenu($siteId, 'header', (int) $territory->id),
             'pageGridHtml' => $pageGridHtml,
-            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', (int)$territory->id),
+            'footerMenu' => $this->navigation->findActiveMenu($siteId, 'footer', (int) $territory->id),
             'page' => $page,
             'territory' => $territory,
             'allTerritories' => $this->territories->getActiveForSite($siteId),
             'regionArticles' => $this->publicPages->getRelatedForTerritory(
                 $siteId,
-                (int)$territory->id,
-                (int)$page->id,
+                (int) $territory->id,
+                (int) $page->id,
                 6,
             ),
             'blockParserService' => $this->blockParserService,
             'site' => SiteContext::get(),
-            'comments' => $this->commentRepository->getCommentsForPage((int)$page->id, true),
+            'comments' => $this->commentRepository->getCommentsForPage((int) $page->id, true),
         ];
 
         $theme = SiteContext::getTheme();
