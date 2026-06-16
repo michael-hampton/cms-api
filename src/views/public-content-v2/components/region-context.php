@@ -6,14 +6,14 @@
             <select
                 id="region-select"
                 class="region-selector__select"
-                onchange="window.location.href='/' + <?= json_encode((string)$siteSlug) ?> + '/' + this.value"
+                data-region-select
             >
                 <?php foreach ($allTerritories as $item): ?>
                     <option
-                        value="<?= htmlspecialchars((string)$item->slug, ENT_QUOTES, 'UTF-8') ?>"
-                        <?= (int)$item->id === (int)$territory->id ? 'selected' : '' ?>
+                        value="/<?= rawurlencode((string) $siteSlug) ?>/<?= rawurlencode((string) $item->slug) ?>"
+                        <?= (int) $item->id === (int) $territory->id ? 'selected' : '' ?>
                     >
-                        <?= htmlspecialchars((string)$item->name, ENT_QUOTES, 'UTF-8') ?>
+                        <?= htmlspecialchars((string) $item->name, ENT_QUOTES, 'UTF-8') ?>
                     </option>
                 <?php endforeach; ?>
             </select>
@@ -28,17 +28,17 @@
 
     <?php if (!empty($regionArticles) && count($regionArticles) > 0): ?>
         <section class="region-related-content">
-            <h2>More from <?= htmlspecialchars((string)$territory->name, ENT_QUOTES, 'UTF-8') ?></h2>
+            <h2>More from <?= htmlspecialchars((string) $territory->name, ENT_QUOTES, 'UTF-8') ?></h2>
             <div class="region-related-content__grid">
                 <?php foreach ($regionArticles as $article): ?>
                     <article class="region-related-content__card">
                         <h3>
-                            <a href="/<?= htmlspecialchars((string)$siteSlug, ENT_QUOTES, 'UTF-8') ?>/<?= htmlspecialchars((string)$territory->slug, ENT_QUOTES, 'UTF-8') ?>/<?= htmlspecialchars((string)$article->slug, ENT_QUOTES, 'UTF-8') ?>">
-                                <?= htmlspecialchars((string)$article->title, ENT_QUOTES, 'UTF-8') ?>
+                            <a href="/<?= htmlspecialchars((string) $siteSlug, ENT_QUOTES, 'UTF-8') ?>/<?= htmlspecialchars((string) $territory->slug, ENT_QUOTES, 'UTF-8') ?>/<?= htmlspecialchars((string) $article->slug, ENT_QUOTES, 'UTF-8') ?>">
+                                <?= htmlspecialchars((string) $article->title, ENT_QUOTES, 'UTF-8') ?>
                             </a>
                         </h3>
                         <?php if (!empty($article->meta_description)): ?>
-                            <p><?= htmlspecialchars((string)$article->meta_description, ENT_QUOTES, 'UTF-8') ?></p>
+                            <p><?= htmlspecialchars((string) $article->meta_description, ENT_QUOTES, 'UTF-8') ?></p>
                         <?php endif; ?>
                     </article>
                 <?php endforeach; ?>
