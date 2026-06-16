@@ -25,19 +25,29 @@ class RenderPublicContentPageAction
         $siteId = SiteContext::getId();
         $siteSlug = SiteContext::slug();
         $territoryId = $territory ? (int)$territory->id : null;
+        $isRegionalHomepage = $territory
+            && (string) $page->page_type === 'landing-page';
 
-        $apiUrl = $territory
-            ? sprintf(
+        if ($isRegionalHomepage) {
+            $apiUrl = sprintf(
+                '/api/v1/%s/regions/%s/content',
+                rawurlencode($siteSlug),
+                rawurlencode((string)$territory->slug),
+            );
+        } elseif ($territory) {
+            $apiUrl = sprintf(
                 '/api/v1/%s/regions/%s/content/%s',
                 rawurlencode($siteSlug),
                 rawurlencode((string)$territory->slug),
                 rawurlencode((string)$page->slug),
-            )
-            : sprintf(
+            );
+        } else {
+            $apiUrl = sprintf(
                 '/api/v1/%s/content/%s',
                 rawurlencode($siteSlug),
                 rawurlencode((string)$page->slug),
             );
+        }
 
         return Response::view('public-content-v2/page', [
             'preview' => $preview,
