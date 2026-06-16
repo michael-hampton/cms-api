@@ -9,10 +9,10 @@ class ControllerResolver implements ControllerResolverInterface
     public function __construct(
         private array $controllerMappings = []
     ) {
-        // Default controller mappings
         $this->controllerMappings = array_merge([
-            // Page type => Controller@method
+            'page' => 'App\Controllers\Front\ContentController@show',
             'content' => 'App\Controllers\Front\ContentController@show',
+            'article' => 'App\Controllers\Front\ContentController@show',
             'landing-page' => 'App\Controllers\Front\ContentController@show',
             'buying-guide' => 'App\Controllers\Front\ContentController@show',
             'gallery' => 'App\Controllers\Front\ContentController@show',
@@ -27,17 +27,14 @@ class ControllerResolver implements ControllerResolverInterface
 
     public function resolve(Page $page): ?string
     {
-        // 1. Check for explicit controller in page data
         if ($page->controller) {
             return $page->controller;
         }
 
-        // 2. Check for page type mapping
         if (isset($this->controllerMappings[$page->page_type])) {
             return $this->controllerMappings[$page->page_type];
         }
 
-        // 3. Check for custom handler class
         if ($page->custom_handler) {
             return $page->custom_handler;
         }
