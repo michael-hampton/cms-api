@@ -32,6 +32,15 @@ final class PublicContentWidgetEligibility
             return true;
         }
 
+        $pageAuthors = $context->page->pageAuthors ?? null;
+        if ($pageAuthors && method_exists($pageAuthors, 'count')) {
+            foreach ($pageAuthors as $pageAuthor) {
+                if (!empty($pageAuthor->author)) {
+                    return true;
+                }
+            }
+        }
+
         return !empty($context->page->author_id)
             || !empty($context->page->author);
     }
