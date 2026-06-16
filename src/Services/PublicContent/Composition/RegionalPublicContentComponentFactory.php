@@ -23,8 +23,8 @@ final class RegionalPublicContentComponentFactory implements PublicContentWidget
     {
         return new WidgetPlacement(
             widgetKey: $this->key(),
-            region: 'after-content',
-            priority: 90,
+            region: 'notices',
+            priority: 1,
         );
     }
 
@@ -62,9 +62,9 @@ final class RegionalPublicContentComponentFactory implements PublicContentWidget
                 ]),
             ),
             styles: [],
-            scripts: [],
+            scripts: ['public-content-v2-region-context.js'],
             endpoints: [],
-            stateful: false,
+            stateful: true,
         );
     }
 }
