@@ -92,6 +92,42 @@ final class PublicContentPageRepository extends Repository
         );
     }
 
+    public function findCompleteHomepageForTerritory(
+        int $siteId,
+        int $territoryId,
+        string $territorySlug,
+    ): ?Page {
+        $query = Page::with(self::COMPLETE_RELATIONS)
+            ->where('site_id', $siteId)
+            ->where('status', 'published')
+            ->whereHas('territories', function ($territories) use ($territoryId): void {
+                $territories->where('territories.id', $territoryId);
+            });
+
+        $page = (clone $query)
+            ->where('page_type', 'landing-page')
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        if ($page instanceof Page) {
+            return $page;
+        }
+
+        $page = (clone $query)
+            ->where('slug', $territorySlug)
+            ->first();
+
+        if ($page instanceof Page) {
+            return $page;
+        }
+
+        $page = (clone $query)
+            ->where('slug', 'home')
+            ->first();
+
+        return $page instanceof Page ? $page : null;
+    }
+
     public function getRelatedForTerritory(
         int $siteId,
         int $territoryId,
