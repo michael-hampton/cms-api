@@ -124,7 +124,9 @@ final readonly class CheckoutPageViewModel
             default => 'print_only',
         };
 
-        $effectiveRequiresShipping = $basketType === 'digital_only' ? false : $requiresShipping;
+        $forceAddress = !$memberHasAddresses;
+        $effectiveRequiresShipping = $forceAddress
+            || ($basketType !== 'digital_only' && $requiresShipping);
         $subtotal = array_reduce(
             $resolvedItems,
             static fn(float $total, array $item): float => $total + (float)($item['subtotal'] ?? 0),
@@ -159,7 +161,7 @@ final readonly class CheckoutPageViewModel
             currency: strtoupper($currency),
             checkoutMode: $checkoutMode,
             requiresShipping: $effectiveRequiresShipping,
-            forceAddress: !$memberHasAddresses,
+            forceAddress: $forceAddress,
             isMixedCart: $subscriptionItems !== [] && $productItems !== [],
             isSubscriptionCart: $subscriptionItems !== [],
             isOneTimeCart: $isOneTimeCart,
