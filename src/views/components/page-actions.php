@@ -1,41 +1,121 @@
-<style>
-    .page-actions { display:flex; align-items:center; gap:1rem; margin:1.5rem 0; padding:1rem 0; border-top:1px solid #e5e7eb; border-bottom:1px solid #e5e7eb; }
-    .like-button { display:inline-flex; align-items:center; gap:.5rem; padding:.75rem 1.5rem; background:#fff; border:2px solid #e5e7eb; border-radius:.5rem; cursor:pointer; font-size:1rem; font-weight:500; transition:all .2s ease; color:#6b7280; }
-    .like-button:hover { border-color:#ef4444; color:#ef4444; background:#fef2f2; }
-    .like-button.liked { background:#ef4444; border-color:#ef4444; color:white; }
-    .like-button.liked:hover { background:#dc2626; border-color:#dc2626; }
-    .like-button:disabled { opacity:.5; cursor:not-allowed; }
-    .like-icon { font-size:1.25rem; transition:transform .2s ease; }
-    .like-button:active .like-icon { transform:scale(1.2); }
-    .like-count { font-weight:600; }
-    .login-prompt { display:inline-flex; align-items:center; gap:.5rem; padding:.75rem 1.5rem; background:#f3f4f6; border-radius:.5rem; color:#6b7280; font-size:.875rem; }
-    .login-prompt a { color:#667eea; font-weight:600; text-decoration:none; }
-    .login-prompt a:hover { text-decoration:underline; }
-    .view-count { display:flex; align-items:center; gap:.5rem; color:#6b7280; font-size:.875rem; }
-</style>
-
-<div class="page-actions">
+<div class="page-actions" aria-label="Article engagement">
     <?php if (isset($member) && $member): ?>
-        <button class="like-button <?= $isLiked ? 'liked' : '' ?>" id="like-button" data-page-id="<?= $page->id ?>">
-            <span class="like-icon"><?= $isLiked ? '❤️' : '🤍' ?></span>
+        <button
+            type="button"
+            class="like-button <?= $isLiked ? 'liked' : '' ?>"
+            id="like-button"
+            data-page-id="<?= (int) $page->id ?>"
+            aria-pressed="<?= $isLiked ? 'true' : 'false' ?>"
+        >
+            <svg class="like-icon" width="20" height="20" viewBox="0 0 24 24" fill="<?= $isLiked ? 'currentColor' : 'none' ?>" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
             <span class="like-text"><?= $isLiked ? 'Liked' : 'Like' ?></span>
-            <span class="like-count" id="like-count">(<?= $likeCount ?>)</span>
+            <span class="page-action-count" id="like-count"><?= (int) $likeCount ?></span>
         </button>
     <?php else: ?>
-        <div class="login-prompt">
-            <span>❤️</span>
-            <a href="/<?= htmlspecialchars($siteSlug ?? '') ?>/member/login?redirect=<?= urlencode($_SERVER['REQUEST_URI']) ?>">Login to like this page</a>
-            <span class="like-count">(<?= $likeCount ?> <?= $likeCount === 1 ? 'like' : 'likes' ?>)</span>
-        </div>
+        <a
+            class="page-action-login"
+            href="/<?= htmlspecialchars($siteSlug ?? '', ENT_QUOTES, 'UTF-8') ?>/member/login?redirect=<?= rawurlencode($_SERVER['REQUEST_URI'] ?? '/') ?>"
+        >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            <span>Sign in to like</span>
+            <span class="page-action-count"><?= (int) $likeCount ?></span>
+        </a>
     <?php endif; ?>
 
     <?php if (isset($viewCount)): ?>
-        <div class="view-count">
-            <span>👁️</span>
-            <span><?= $viewCount ?> <?= $viewCount === 1 ? 'view' : 'views' ?></span>
+        <div class="page-action-stat" aria-label="<?= (int) $viewCount ?> views">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span><?= number_format((int) $viewCount) ?></span>
+            <span class="page-action-label"><?= (int) $viewCount === 1 ? 'view' : 'views' ?></span>
         </div>
     <?php endif; ?>
 </div>
+
+<style>
+    .page-actions {
+        display:flex;
+        align-items:center;
+        flex-wrap:wrap;
+        gap:.75rem;
+        margin:0 0 2rem;
+        padding:.9rem;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        background:#fff;
+        box-shadow:0 8px 24px rgba(15,23,42,.05);
+    }
+    .like-button,
+    .page-action-login,
+    .page-action-stat {
+        display:inline-flex;
+        align-items:center;
+        gap:.55rem;
+        min-height:42px;
+        padding:.65rem .9rem;
+        border-radius:999px;
+        font-size:.9rem;
+        font-weight:700;
+        line-height:1;
+    }
+    .like-button {
+        border:1px solid #fecdd3;
+        background:#fff1f2;
+        color:#be123c;
+        cursor:pointer;
+        transition:transform .2s ease,box-shadow .2s ease,background .2s ease,color .2s ease;
+    }
+    .like-button:hover {
+        transform:translateY(-1px);
+        box-shadow:0 6px 16px rgba(190,18,60,.14);
+    }
+    .like-button.liked {
+        border-color:#e11d48;
+        background:#e11d48;
+        color:#fff;
+    }
+    .like-button:disabled { opacity:.55; cursor:wait; transform:none; }
+    .like-icon { flex:0 0 auto; }
+    .page-action-login {
+        border:1px solid #dbeafe;
+        background:#eff6ff;
+        color:#1d4ed8;
+        text-decoration:none;
+        transition:transform .2s ease,box-shadow .2s ease;
+    }
+    .page-action-login:hover {
+        transform:translateY(-1px);
+        box-shadow:0 6px 16px rgba(37,99,235,.12);
+    }
+    .page-action-stat {
+        color:#475569;
+        background:#f8fafc;
+        border:1px solid #e2e8f0;
+    }
+    .page-action-count {
+        display:inline-grid;
+        place-items:center;
+        min-width:24px;
+        height:24px;
+        padding:0 .4rem;
+        border-radius:999px;
+        background:rgba(255,255,255,.72);
+        color:inherit;
+        font-size:.78rem;
+    }
+    .like-button.liked .page-action-count { background:rgba(255,255,255,.18); }
+    .page-action-label { color:#94a3b8; font-weight:600; }
+    @media (max-width:560px) {
+        .page-actions { align-items:stretch; }
+        .like-button,.page-action-login,.page-action-stat { justify-content:center; flex:1 1 auto; }
+    }
+</style>
 
 <script>
 (() => {
@@ -59,7 +139,7 @@
                     method: liked ? 'DELETE' : 'PUT',
                     credentials: 'same-origin',
                     headers: {
-                        'Accept': 'application/json',
+                        Accept: 'application/json',
                         'Content-Type': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     },
@@ -71,12 +151,18 @@
                 }
 
                 const viewer = payload.data;
+                const icon = button.querySelector('.like-icon');
                 button.classList.toggle('liked', viewer.liked);
-                button.querySelector('.like-icon').textContent = viewer.liked ? '❤️' : '🤍';
+                button.setAttribute('aria-pressed', String(viewer.liked));
+                if (icon) icon.setAttribute('fill', viewer.liked ? 'currentColor' : 'none');
                 button.querySelector('.like-text').textContent = viewer.liked ? 'Liked' : 'Like';
-                button.querySelector('#like-count').textContent = `(${viewer.like_count})`;
+                button.querySelector('#like-count').textContent = String(viewer.like_count);
             } catch (error) {
-                alert(error.message || 'An error occurred. Please try again.');
+                if (typeof window.showToast === 'function') {
+                    window.showToast(error.message || 'Unable to update like.', 'error');
+                } else {
+                    console.error(error);
+                }
             } finally {
                 button.disabled = false;
             }
