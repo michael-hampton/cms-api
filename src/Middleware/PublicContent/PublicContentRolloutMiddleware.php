@@ -39,12 +39,10 @@ final class PublicContentRolloutMiddleware implements MiddlewareInterface
             return $next($request);
         }
 
-        $territory = !empty($page->territory_id)
-            ? $this->territories->findActiveById(
-                SiteContext::getId(),
-                (int) $page->territory_id,
-            )
-            : null;
+        $territory = $this->territories->findActiveForPage(
+            SiteContext::getId(),
+            (int) $page->id,
+        );
 
         return $this->render->execute($page, false, $territory);
     }
