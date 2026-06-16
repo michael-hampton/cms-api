@@ -34,6 +34,11 @@
         }
 
         openSubscription() {
+            if (window.subscriptionModalManager?.show) {
+                window.subscriptionModalManager.show(null, null, true);
+                return;
+            }
+
             if (typeof window.showSubscriptionModal === 'function') {
                 window.showSubscriptionModal(null, null, true);
                 return;
@@ -44,7 +49,7 @@
                 return;
             }
 
-            throw new Error('Subscription modal is not available on this page.');
+            console.error('[Paywall] Subscription modal component is not mounted.');
         }
 
         async openPurchase() {
