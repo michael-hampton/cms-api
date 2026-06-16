@@ -25,14 +25,14 @@ final class PublicContentComposerTest extends TestCase
 
     public function testArticleDoesNotContainHomepageOnlyComponents(): void
     {
-        $regions = $this->compose('article');
+        $regions = $this->compose('article', withAuthor: true);
 
         self::assertSame(
             ['page-title', 'category-pills', 'tags', 'page-actions'],
             array_map(static fn($component) => $component->type, $regions['header']),
         );
         self::assertSame(
-            ['trending-widget', 'newsletter-signup-widget', 'comments', 'social-links'],
+            ['trending-widget', 'comments', 'social-links'],
             array_map(static fn($component) => $component->type, $regions['after-content']),
         );
         self::assertSame(
@@ -54,7 +54,29 @@ final class PublicContentComposerTest extends TestCase
             array_map(static fn($component) => $component->type, $regions['after-content']),
         );
         self::assertContains(
+            'newsletter-signup-widget',
+            array_map(static fn($component) => $component->type, $regions['after-content']),
+        );
+        self::assertContains(
             'guest-contributors',
+            array_map(static fn($component) => $component->type, $regions['below-content']),
+        );
+    }
+
+    public function testOrdinaryPageDoesNotContainEditorialTaxonomyOrComments(): void
+    {
+        $regions = $this->compose('page', withAuthor: true);
+
+        self::assertSame(
+            ['page-title', 'page-actions'],
+            array_map(static fn($component) => $component->type, $regions['header']),
+        );
+        self::assertSame(
+            ['trending-widget', 'social-links'],
+            array_map(static fn($component) => $component->type, $regions['after-content']),
+        );
+        self::assertSame(
+            ['authors'],
             array_map(static fn($component) => $component->type, $regions['below-content']),
         );
     }
@@ -79,11 +101,15 @@ final class PublicContentComposerTest extends TestCase
         string $pageType,
         bool $withCategories = false,
         bool $restricted = false,
+        bool $withAuthor = false,
     ): array {
         $page = Mockery::mock(Page::class)->makePartial();
         $page->id = 42;
         $page->page_type = $pageType;
         $page->products = new Collection();
+        $page->authors = $withAuthor
+            ? new Collection([(object)['name' => 'Example Author', 'slug' => 'example-author']])
+            : new Collection();
         $page->title = 'Premium article';
         $page->slug = 'premium-article';
         $page->is_paid = false;
