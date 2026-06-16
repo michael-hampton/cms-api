@@ -62,16 +62,19 @@
         }
 
         index(document) {
+            const entities = document.entities ?? [];
             return `<section class="directory-page">
                 <header class="directory-hero"><p class="directory-eyebrow">Explore</p><h1>${EscapeHtml.value(document.title)}</h1><p>Browse all published ${EscapeHtml.value(document.type)} profiles.</p></header>
-                <div class="directory-grid">${(document.entities ?? []).map(entity => this.entityCard(entity)).join('')}</div>
-                ${(document.entities ?? []).length ? '' : '<div class="directory-empty"><h2>Nothing here yet</h2><p>Check back soon.</p></div>'}
+                <div class="directory-grid">${entities.map(entity => this.entityCard(entity)).join('')}</div>
+                ${entities.length ? '' : '<div class="directory-empty"><h2>Nothing here yet</h2><p>Check back soon.</p></div>'}
+                ${this.pagination(document.pagination)}
             </section>`;
         }
 
         detail(document) {
             const entity = document.entity;
             const meta = entity.meta ?? {};
+            const pages = document.pages ?? [];
             return `<section class="directory-page">
                 <header class="directory-hero directory-hero--detail">
                     ${entity.image ? `<img class="directory-avatar" src="${EscapeHtml.value(entity.image)}" alt="${EscapeHtml.value(entity.name)}">` : entity.icon ? `<div class="directory-icon">${entity.icon}</div>` : ''}
@@ -82,8 +85,33 @@
                 </header>
                 ${this.authorDetails(entity.type, meta)}
                 ${this.related(document.related ?? [])}
-                <section class="directory-results"><div class="directory-section-heading"><h2>Latest articles</h2><span>${Number(document.stats?.page_count ?? 0)} results</span></div><div class="directory-page-grid">${(document.pages ?? []).map(page => this.pageCard(page)).join('')}</div>${(document.pages ?? []).length ? '' : '<div class="directory-empty"><h2>No articles yet</h2><p>There is no published content for this page yet.</p></div>'}</section>
+                <section class="directory-results">
+                    <div class="directory-section-heading"><h2>Latest articles</h2><span>${Number(document.stats?.page_count ?? 0)} results</span></div>
+                    <div class="directory-page-grid">${pages.map(page => this.pageCard(page)).join('')}</div>
+                    ${pages.length ? '' : '<div class="directory-empty"><h2>No articles yet</h2><p>There is no published content for this page yet.</p></div>'}
+                    ${this.pagination(document.pagination)}
+                </section>
             </section>`;
+        }
+
+        pagination(pagination) {
+            if (!pagination || pagination.last_page <= 1) return '';
+
+            const current = Number(pagination.current_page);
+            const last = Number(pagination.last_page);
+            const start = Math.max(1, current - 2);
+            const end = Math.min(last, current + 2);
+            const buttons = [];
+
+            for (let page = start; page <= end; page++) {
+                buttons.push(`<button type="button" data-action="page" data-page="${page}" class="${page === current ? 'active' : ''}" aria-current="${page === current ? 'page' : 'false'}">${page}</button>`);
+            }
+
+            return `<nav class="public-directory-pagination" aria-label="Directory pagination">
+                <button type="button" data-action="previous-page" ${current <= 1 ? 'disabled' : ''}>Previous</button>
+                ${buttons.join('')}
+                <button type="button" data-action="next-page" ${current >= last ? 'disabled' : ''}>Next</button>
+            </nav>`;
         }
 
         entityCard(entity) {
@@ -121,6 +149,9 @@
             this.view = view;
             this.siteSlug = root.dataset.site;
             this.preview = root.dataset.preview === 'true';
+            this.perPage = Math.max(1, Number(root.dataset.perPage || 12));
+            this.currentPage = Math.max(1, Number(new URLSearchParams(window.location.search).get('page') || 1));
+            this.document = null;
         }
 
         start() {
@@ -132,6 +163,22 @@
         onClick(event) {
             if (event.target.closest('[data-action="retry"]')) {
                 this.load();
+                return;
+            }
+
+            const pageButton = event.target.closest('[data-page]');
+            if (pageButton) {
+                this.goToPage(Number(pageButton.dataset.page));
+                return;
+            }
+
+            if (event.target.closest('[data-action="previous-page"]')) {
+                this.goToPage(this.currentPage - 1);
+                return;
+            }
+
+            if (event.target.closest('[data-action="next-page"]')) {
+                this.goToPage(this.currentPage + 1);
                 return;
             }
 
@@ -150,28 +197,70 @@
             window.location.assign(`${target}${url.search}${url.hash}`);
         }
 
+        goToPage(page) {
+            if (!this.document) return;
+
+            const total = this.items().length;
+            const last = Math.max(1, Math.ceil(total / this.perPage));
+            this.currentPage = Math.max(1, Math.min(last, page));
+
+            const params = new URLSearchParams(window.location.search);
+            if (this.currentPage > 1) params.set('page', String(this.currentPage));
+            else params.delete('page');
+            const query = params.toString();
+            window.history.pushState({}, '', `${window.location.pathname}${query ? '?' + query : ''}${window.location.hash}`);
+
+            this.publish();
+            this.root.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+
+        items() {
+            if (!this.document) return [];
+            return this.document.entity ? (this.document.pages ?? []) : (this.document.entities ?? []);
+        }
+
+        publish() {
+            const items = this.items();
+            const total = items.length;
+            const lastPage = Math.max(1, Math.ceil(total / this.perPage));
+            this.currentPage = Math.min(this.currentPage, lastPage);
+            const offset = (this.currentPage - 1) * this.perPage;
+            const sliced = items.slice(offset, offset + this.perPage);
+            const document = {
+                ...this.document,
+                pagination: {
+                    current_page: this.currentPage,
+                    per_page: this.perPage,
+                    total,
+                    last_page: lastPage,
+                },
+            };
+
+            if (document.entity) document.pages = sliced;
+            else document.entities = sliced;
+
+            this.store.setState({status: 'loaded', document, error: null});
+        }
+
         toPreviewPath(pathname) {
             const segments = pathname.split('/').filter(Boolean);
             if (segments[0] !== this.siteSlug) return null;
-
             if (segments.length === 1) return `/${this.siteSlug}/content-v2`;
             if (segments[1] === 'content-v2') return pathname;
-
             if (['authors', 'categories', 'tags'].includes(segments[1])) {
                 return `/${this.siteSlug}/content-v2/${segments.slice(1).join('/')}`;
             }
-
             if (segments.length === 2) {
                 return `/${this.siteSlug}/content-v2/${encodeURIComponent(segments[1])}`;
             }
-
             return null;
         }
 
         async load() {
             this.store.setState({status: 'loading', error: null});
             try {
-                this.store.setState({status: 'loaded', document: await this.api.load()});
+                this.document = await this.api.load();
+                this.publish();
             } catch (error) {
                 this.store.setState({status: 'error', error});
             }
