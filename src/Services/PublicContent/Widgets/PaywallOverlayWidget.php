@@ -5,11 +5,14 @@ namespace App\Services\PublicContent\Widgets;
 use App\DTO\PublicContent\PublicContentComponent;
 use App\DTO\PublicContent\PublicContentContext;
 use App\Framework\View\ViewRenderer;
+use App\Services\PublicContent\Paywall\PublicContentPaywallModeResolver;
 
 final class PaywallOverlayWidget implements PublicContentWidgetDefinition
 {
-    public function __construct(private readonly ViewRenderer $views)
-    {
+    public function __construct(
+        private readonly ViewRenderer $views,
+        private readonly PublicContentPaywallModeResolver $paywallMode,
+    ) {
     }
 
     public function key(): string
@@ -40,6 +43,8 @@ final class PaywallOverlayWidget implements PublicContentWidgetDefinition
             priority: $placement->priority,
             html: $this->views->partial('components/paywall-overlay', $context->with([
                 'reason' => $context->viewData['access']['reason'] ?? 'subscription_required',
+                'paywallMode' => $context->viewData['paywallMode']
+                    ?? $this->paywallMode->resolve($context->page),
                 'widgetConfiguration' => $placement->configuration,
             ])),
             styles: [asset('paywall-overlay.css', 'css')],
