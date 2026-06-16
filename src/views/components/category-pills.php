@@ -1,3 +1,7 @@
+<?php
+$categoryBase = $directoryBase ?? ('/' . \App\Framework\Support\SiteContext::slug());
+?>
+
 <?php if ($page->categories): ?>
     <div class="page-categories">
         <div class="categories-header">
@@ -8,7 +12,7 @@
         </div>
         <div class="categories-list">
             <?php foreach ($page->categories as $category): ?>
-                <a href="/<?= \App\Framework\Support\SiteContext::slug() ?>/category/<?= urlencode($category->slug) ?>"
+                <a href="<?= htmlspecialchars($categoryBase . '/categories/' . rawurlencode($category->slug), ENT_QUOTES, 'UTF-8') ?>"
                    class="category-badge">
                     <?php if ($category->icon): ?>
                         <span class="category-badge-icon"><?= $category->icon ?></span>

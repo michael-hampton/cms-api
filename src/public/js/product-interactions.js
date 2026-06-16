@@ -1,115 +1,86 @@
 // Shared product interaction functionality
-(function() {
+(() => {
     'use strict';
 
-    function attachProductListeners() {
-        // Add to cart
-        document.querySelectorAll('.btn-add-to-cart').forEach(btn => {
-            if (!btn.hasListener) {
-                btn.addEventListener('click', handleAddToCart);
-                btn.hasListener = true;
-            }
-        });
+    if (window.productInteractionsInitialised) return;
+    window.productInteractionsInitialised = true;
 
-        console.log('test', document.querySelectorAll('.btn-wishlist'))
+    document.addEventListener('click', async event => {
+        const wishlistButton = event.target.closest('.btn-wishlist, [data-action="toggle-wishlist"]');
+        if (!wishlistButton) return;
 
-        // Wishlist toggle
-        document.querySelectorAll('.btn-wishlist').forEach(btn => {
-            console.log('a')
-            if (!btn.hasListener) {
-                console.log('b')
-                btn.addEventListener('click', handleToggleWishlist);
-                btn.hasListener = true;
-            }
-        });
-    }
+        event.preventDefault();
+        event.stopPropagation();
 
-    async function handleAddToCart(e) {
-        const btn = e.currentTarget;
-        const productId = btn.dataset.productId;
-        const originalText = btn.textContent;
+        const productId = Number(wishlistButton.dataset.productId);
+        if (!Number.isInteger(productId) || productId <= 0 || wishlistButton.disabled) return;
 
-        btn.disabled = true;
-        btn.textContent = 'Adding...';
-
-        try {
-            const site = window.SITE || 'default';
-            const response = await fetch(`/api/${site}/cart/add`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ product_id: productId, quantity: 1 })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                showToast(data.message, 'success');
-                updateCartCount(data.count);
-            } else {
-                showToast(data.message, 'error');
-            }
-        } catch (error) {
-            console.error('Error adding to cart:', error);
-            showToast('Failed to add item to cart', 'error');
-        } finally {
-            btn.disabled = false;
-            btn.textContent = originalText;
+        const site = window.SITE || document.querySelector('[data-site]')?.dataset.site;
+        if (!site) {
+            showToast('Unable to determine the current site.', 'error');
+            return;
         }
-    }
 
-    async function handleToggleWishlist(e) {
-        const btn = e.currentTarget;
-        console.log('btn', btn)
-        const productId = btn.dataset.productId;
-        const isInWishlist = btn.classList.contains('active');
-
-        alert(productId + ' ' + isInWishlist)
-
-        btn.disabled = true;
+        const active = wishlistButton.classList.contains('active');
+        wishlistButton.disabled = true;
 
         try {
-            const site = window.SITE || 'default';
-            const url = isInWishlist
-                ? `/api/${site}/wishlist/remove/${productId}`
-                : `/api/${site}/wishlist/add`;
+            const response = await fetch(
+                active
+                    ? `/api/${encodeURIComponent(site)}/wishlist/remove/${productId}`
+                    : `/api/${encodeURIComponent(site)}/wishlist/add`,
+                {
+                    method: active ? 'DELETE' : 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: active ? null : JSON.stringify({product_id: productId}),
+                },
+            );
 
-            const response = await fetch(url, {
-                method: isInWishlist ? 'DELETE' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: isInWishlist ? null : JSON.stringify({ product_id: productId })
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                btn.classList.toggle('active');
-                showToast(data.message, 'success');
-                updateWishlistCount(data.count);
-            } else {
-                showToast(data.message, 'error');
+            const payload = await response.json();
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.message ?? payload.error ?? 'Unable to update wishlist.');
             }
+
+            const nextActive = !active;
+            wishlistButton.classList.toggle('active', nextActive);
+            wishlistButton.setAttribute('aria-pressed', String(nextActive));
+            wishlistButton.setAttribute(
+                'aria-label',
+                nextActive ? 'Remove from wishlist' : 'Add to wishlist',
+            );
+            wishlistButton.querySelector('svg')?.setAttribute(
+                'fill',
+                nextActive ? 'currentColor' : 'none',
+            );
+
+            updateCount('wishlist-count', payload.count ?? payload.data?.count);
+            showToast(
+                payload.message ?? (nextActive ? 'Added to wishlist' : 'Removed from wishlist'),
+                'success',
+            );
+            document.dispatchEvent(new CustomEvent('wishlist:updated', {detail: payload}));
         } catch (error) {
             console.error('Error toggling wishlist:', error);
-            showToast('An error occurred', 'error');
+            showToast(error.message ?? 'Unable to update wishlist.', 'error');
         } finally {
-            btn.disabled = false;
+            wishlistButton.disabled = false;
         }
-    }
+    });
 
-    function updateCartCount(count) {
-        const el = document.getElementById('cart-count');
-        if (el) {
-            el.textContent = count;
-            el.style.display = count > 0 ? 'block' : 'none';
-        }
-    }
+    function updateCount(id, value) {
+        const count = Number(value ?? NaN);
+        if (!Number.isFinite(count)) return;
 
-    function updateWishlistCount(count) {
-        const el = document.getElementById('wishlist-count');
-        if (el) {
-            el.textContent = count;
-            el.style.display = count > 0 ? 'block' : 'none';
-        }
+        const element = document.getElementById(id);
+        if (!element) return;
+
+        element.textContent = String(count);
+        element.style.display = count > 0 ? 'block' : 'none';
     }
 
     function showToast(message, type = 'info') {
@@ -123,20 +94,6 @@
 
         toast.textContent = message;
         toast.className = `toast ${type} show`;
-
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 3000);
+        window.setTimeout(() => toast.classList.remove('show'), 3000);
     }
-
-    // Initialize on page load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', attachProductListeners);
-    } else {
-        alert(document.readyState)
-        attachProductListeners();
-    }
-
-    // Export for dynamic content
-    window.attachProductListeners = attachProductListeners;
 })();

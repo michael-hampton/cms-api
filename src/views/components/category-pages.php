@@ -59,11 +59,9 @@
         gap: 1.5rem;
     }
 
-
     .page-card:hover .page-card-image img {
         transform: scale(1.05);
     }
-
 
     .page-card-title a {
         color: #111827;
@@ -126,22 +124,24 @@
 
 use App\Framework\Support\Collection;
 
+$categoryBase = $directoryBase ?? ('/' . $site);
 ?>
 
 <div class="category-pages-section">
     <?php if (!empty($categories) && count($categories) > 0): ?>
         <?php foreach ($categories as $category): ?>
+            <?php $categoryUrl = $categoryBase . '/categories/' . rawurlencode($category['category']->slug); ?>
             <div class="category-block">
                 <div class="category-header">
                     <h2 class="category-title">
-                        <a href="/<?= $site ?>/category/<?= $category['category']->slug ?>">
+                        <a href="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>">
                             <?= htmlspecialchars($category['category']->name) ?>
                         </a>
                     </h2>
                     <?php if (!empty($category['category']->description)): ?>
                         <p class="category-description"><?= htmlspecialchars($category['category']->description) ?></p>
                     <?php endif; ?>
-                    <a href="/<?= $site ?>/category/<?= $category['category']->slug ?>" class="view-all-link">
+                    <a href="<?= htmlspecialchars($categoryUrl, ENT_QUOTES, 'UTF-8') ?>" class="view-all-link">
                         View All →
                     </a>
                 </div>

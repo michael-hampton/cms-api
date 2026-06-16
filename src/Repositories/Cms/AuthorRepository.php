@@ -70,7 +70,7 @@ class AuthorRepository extends Repository
         $query = Page::where('author_id', $authorId)
             ->orderBy('created_at', 'desc');
 
-        if(!empty($limit)) {
+        if (!empty($limit)) {
             $query->limit($limit);
         }
 
@@ -84,30 +84,24 @@ class AuthorRepository extends Repository
 
     public function getBySiteId(int $siteId): array
     {
-        $categories = Author::where('site_id', $siteId)
-            ->withCount('pages', function ($query) use ($siteId) {
-                $query->where('status', 'published')->where('site_id', $siteId);
-            })
+        $authors = Author::where('site_id', $siteId)
+            ->withCount('pages')
             ->orderBy('name', 'asc')
             ->get();
 
-
-        return $categories->filter(function ($category) {
-            return $category->pages_count > 0;
-        })->toArray();
-
+        return $authors
+            ->filter(static fn(Author $author): bool => (int)$author->pages_count > 0)
+            ->toArray();
     }
 
     public function findOrCreateFromUser(object $user, int $siteId): Model
     {
-        // Try to find existing author by email
         $author = $this->findByEmail($user->email);
 
         if ($author) {
             return $author;
         }
 
-        // Create new author from user data
         return Author::create([
             'name' => $user->name ?? $user->email,
             'email' => $user->email,

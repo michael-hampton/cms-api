@@ -1,13 +1,19 @@
-<div class="deal-card" data-title="<?= strtolower(htmlspecialchars($deal['title'])) ?>">
+<div class="deal-card"
+     data-title="<?= strtolower(htmlspecialchars($deal['title'])) ?>"
+     data-product-id="<?= (int)$deal['product_id'] ?>">
 
     <div class="deal-header-actions">
         <div class="deal-badge">
             <span><?= $deal['discount_percentage'] ?>% OFF</span>
         </div>
 
-        <button class="deal-wishlist-btn"
-                onclick="event.stopPropagation(); toggleWishlist(<?= $deal['product_id'] ?>, this)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button type="button"
+                class="deal-wishlist-btn<?= !empty($deal['in_wishlist']) ? ' active' : '' ?>"
+                data-action="toggle-wishlist"
+                data-product-id="<?= (int)$deal['product_id'] ?>"
+                aria-pressed="<?= !empty($deal['in_wishlist']) ? 'true' : 'false' ?>"
+                aria-label="<?= !empty($deal['in_wishlist']) ? 'Remove from wishlist' : 'Add to wishlist' ?>">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="<?= !empty($deal['in_wishlist']) ? 'currentColor' : 'none' ?>" stroke="currentColor" stroke-width="2">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
             </svg>
         </button>
@@ -35,15 +41,19 @@
         </div>
 
         <div class="deal-actions">
-            <button class="deal-add-cart" onclick="event.stopPropagation(); addToCart(<?= $deal['product_id'] ?>)">
+            <button type="button"
+                    class="deal-add-cart"
+                    data-action="add-to-cart"
+                    data-product-id="<?= (int)$deal['product_id'] ?>">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="9" cy="21" r="1"></circle>
                     <circle cx="20" cy="21" r="1"></circle>
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
-                Add to Cart
+                <span>Add to Cart</span>
             </button>
-            <button class="deal-cta"
+            <button type="button"
+                    class="deal-cta"
                     onclick="window.location.href='/<?= \App\Framework\Support\SiteContext::slug() ?>/shop/details/<?= $deal['slug'] ?>'">
                 View Deal
             </button>

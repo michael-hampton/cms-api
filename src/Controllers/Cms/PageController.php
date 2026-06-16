@@ -341,6 +341,7 @@ class PageController extends Controller
 
             // Get all categories for filters
             $allCategories = $this->categoryRepository->getBySiteId($siteId);
+
             $allAuthors = $this->authorRepository->getBySiteId($siteId);
             $allTags = $this->tagRepository->getBySiteId($siteId);
 

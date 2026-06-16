@@ -15,8 +15,9 @@ return [
         \App\Framework\ServiceProvider\ControllerServiceProvider::class,
         \App\Framework\ServiceProvider\ScheduleServiceProvider::class,
         \App\Framework\ServiceProvider\EventServiceProvider::class,
+        \App\Providers\PublicContentWidgetServiceProvider::class,
 
-        // Add custom providers here
+        // Add custom providers here.
         // \App\Providers\CustomServiceProvider::class,
     ],
 
@@ -42,7 +43,7 @@ return [
     ],
 
     'bindings' => [
-        // Explicit interface-to-implementation bindings
-        // \App\Contracts\RepositoryInterface::class => \App\Repositories\DatabaseRepository::class,
+        \App\Repositories\PublicContent\Contracts\PageWidgetRepositoryInterface::class
+            => \App\Repositories\PublicContent\PageWidgetRepository::class,
     ],
 ];

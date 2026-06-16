@@ -719,14 +719,22 @@ class ApiApplication
     {
         $routeFiles = [
             __DIR__ . '/routes/api.php',
+
+            // Register specific routes before the legacy web routes,
+            // particularly before broad dynamic content routes.
+            __DIR__ . '/routes/public-content-api.php',
+            __DIR__ . '/routes/public-content-preview.php',
+            __DIR__ . '/routes/public-directory.php',
+
             __DIR__ . '/routes/web.php',
         ];
 
-        foreach ($routeFiles as $routeFile) {
-            if (file_exists($routeFile)) {
-                $this->routeLoader->load($routeFile);
-            }
-        }
+        $this->routeLoader->loadMultiple(
+            array_values(array_filter(
+                $routeFiles,
+                static fn(string $routeFile): bool => file_exists($routeFile),
+            )),
+        );
     }
 
     /**

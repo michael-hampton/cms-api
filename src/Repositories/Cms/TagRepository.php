@@ -38,7 +38,6 @@ class TagRepository extends Repository
     public function findBySlug(string $slug): ?Tag
     {
         $query = Tag::bySlug($slug);
-
         return $this->applySiteFilter($query)->first();
     }
 
@@ -108,14 +107,12 @@ class TagRepository extends Repository
     public function mergeTags(int $fromTagId, int $toTagId): bool
     {
         return $this->database->transaction(function () use ($fromTagId, $toTagId) {
-            // Update all references to point to the target tag
             $this->database->update(
                 'page_tags',
                 ['tag_id' => $toTagId],
                 ['tag_id' => $fromTagId]
             );
 
-            // Update usage count
             $fromTag = $this->find($fromTagId);
             $toTag = $this->find($toTagId);
 
@@ -134,14 +131,12 @@ class TagRepository extends Repository
     {
         $maxCount = 0;
 
-        // Find maximum usage count
         foreach ($tags as $tag) {
             if ($tag->usage_count > $maxCount) {
                 $maxCount = $tag->usage_count;
             }
         }
 
-        // Calculate relative size for tag cloud
         foreach ($tags as $tag) {
             $tag->relative_size = $maxCount > 0 ? ($tag->usage_count / $maxCount) * 100 : 0;
         }
@@ -159,7 +154,7 @@ class TagRepository extends Repository
         $query = PageTag::where('tag_id', $tagId)
             ->orderBy('created_at', 'desc');
 
-        if(!empty($limit)) {
+        if (!empty($limit)) {
             $query->limit($limit);
         }
 
@@ -168,17 +163,13 @@ class TagRepository extends Repository
 
     public function getBySiteId(int $siteId): array
     {
-        $categories = Tag::where('site_id', $siteId)
-            ->withCount('pages', function ($query) use ($siteId) {
-                $query->where('status', 'published')->where('site_id', $siteId);
-            })
+        $tags = Tag::where('site_id', $siteId)
+            ->withCount('pages')
             ->orderBy('name', 'asc')
             ->get();
 
-
-        return $categories->filter(function ($category) {
-            return $category->pages_count > 0;
-        })->toArray();
-
+        return $tags
+            ->filter(static fn(Tag $tag): bool => (int)$tag->pages_count > 0)
+            ->toArray();
     }
 }
